@@ -5292,12 +5292,13 @@ function paintTentWalls(){
 function drawTentRoof(){ if(!AREAS[areaId] || !AREAS[areaId].tent) return;
   const V=tentOct(), w=ROOM.w, h=ROOM.h, WH=80, c0=P(w/2,h/2), apex={x:c0.x,y:c0.y-WH-150}, top=v=>{ const q=P(v[0],v[1]); return {x:q.x,y:q.y-WH}; };
   g.save(); g.globalAlpha=0.22;
-  const panels=V.map((v,k)=>[top(v),top(V[(k+1)%V.length]),k]).sort((a,b)=>(b[0].y+b[1].y)-(a[0].y+a[1].y));   // far panels first
-  panels.reverse().forEach(([a,b,k])=>{ const lit=0.5+0.5*Math.cos(k*(tentRound()?0.3:0.7)+0.6);
+  const back=k=>{ const a=V[k], b=V[(k+1)%V.length]; return (b[1]-a[1])-(b[0]-a[0])<=0.01; };            // the panels over the back walls only: the front stays open
+  const panels=V.map((v,k)=>[top(v),top(V[(k+1)%V.length]),k]).filter(p=>back(p[2]));
+  panels.forEach(([a,b,k])=>{ const lit=0.5+0.5*Math.cos(k*(tentRound()?0.3:0.7)+0.6);
     g.fillStyle=tone('#ece6d6',-0.12+lit*0.12); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(apex.x,apex.y); g.closePath(); g.fill(); });
   g.globalAlpha=0.4; g.strokeStyle='#cdb46e'; g.lineWidth=1.2;
-  V.forEach((v,k)=>{ if(tentRound() && k%4) return; const a=top(v); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(apex.x,apex.y); g.stroke(); });    // the ribs
-  g.beginPath(); V.forEach((v,k)=>{ const a=top(v); k?g.lineTo(a.x,a.y):g.moveTo(a.x,a.y); }); g.closePath(); g.stroke();                          // the eave
+  panels.forEach(([a,b,k],n)=>{ [a].concat(n===panels.length-1?[b]:[]).forEach(q=>{ g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(apex.x,apex.y); g.stroke(); }); });   // the ribs
+  g.beginPath(); panels.forEach(([a,b],n)=>{ if(!n) g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); }); g.stroke();                                        // the eave along the back
   g.globalAlpha=0.7; g.fillStyle='#cdb46e'; g.beginPath(); g.ellipse(apex.x,apex.y+4,7,2.6,0,0,Math.PI*2); g.fill();                            // the finial
   g.restore(); }
 // A canvas A-frame tent on a 2x2 footprint; anchor = its far-front corner
@@ -5649,7 +5650,7 @@ function paintTable(x,y){
 // ════════════════ the elven country: water, white stone, silk and silver ════════════════
 function paintPool(o){                                   // flat water baked into the ground: soft shore, reeds or lilies
   const [fw,fh]=o.fp, ci=o.i+fw/2, cj=o.j+fh/2, moon=o.kind==='moon', N=36;
-  const ring=(k,sc)=>{ const pts=[]; for(let n=0;n<N;n++){ const a=n/N*Math.PI*2, w=1+(fbm(Math.cos(a)*2+ci,Math.sin(a)*2+cj,17+k)-0.5)*0.35;
+  const ring=(k,sc)=>{ const pts=[]; for(let n=0;n<N;n++){ const a=n/N*Math.PI*2, w=1+(fbm(Math.cos(a)*2+ci,Math.sin(a)*2+cj,17+k)-0.5)*(o.round?0.04:0.35);   // a built bath is a clean circle
       pts.push(P(ci+Math.cos(a)*(fw/2+0.15)*w*sc, cj+Math.sin(a)*(fh/2+0.15)*w*sc)); } return pts; };
   const poly=(pts)=>{ g.beginPath(); pts.forEach((q,n)=>n?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.closePath(); };
   poly(ring(0,1.12)); g.fillStyle=moon?'rgba(120,130,90,0.55)':'rgba(70,56,34,0.6)'; g.fill();       // wet shore
@@ -9804,14 +9805,14 @@ Object.assign(AREAS,{
     ()=>[ { id:'bertha', name:'Bertha of the Wheatsheaf', i:6, j:4, dir:1, opts:{gender:'f',skin:1,hair:4,hairColor:8,face:0,equip:{head:null,torso:'smock',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}} },
       { id:'gunnar', name:'Gunnar the Ploughman', i:3, j:1, dir:1, opts:{gender:'m',skin:2,hair:1,hairColor:3,beard:4,face:1,equip:{head:null,torso:'shirt',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}} },
       ...(nightAmt()>0.4 ? [{ id:'tobbpub', name:'Old Tobb', i:4, j:3, dir:0, sit:true, opts:{gender:'m',skin:2,hair:2,hairColor:12,beard:4,face:1,equip:{head:'hood',torso:'smock',armor:null,hands:'gloves',legs:'hose_grey',feet:'boots',weapon:null,offhand:null}} }] : []) ]),
-  moonbath: CROOM('The Moon-Bath of Sylvhaven',5,5,'sylvhaven','fromBath', ()=>[{type:'pool', i:1, j:1, fp:[3,2], kind:'moon'}, {type:'lantern', i:0, j:1}, {type:'lantern', i:4, j:1}],
+  moonbath: CROOM('The Moon-Bath of Sylvhaven',5,5,'sylvhaven','fromBath', ()=>[{type:'pool', i:1, j:1, fp:[3,3], kind:'moon', round:true}, {type:'lantern', i:0, j:1}, {type:'lantern', i:4, j:1}],
     ()=>{ const d=Math.floor(dayClock/DAY_LEN), E={race:'elf',beard:0}, N={head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:null,offhand:null};
       const st=(id,nm,i,j,dir,o,k)=>({ id, name:nm, i, j, dir, ...((d+k)%10===0?{silk:'#dfe8f4'}:{}), opts:{...E,...o,equip:{...N}} });
-      return [ { id:'nimue', name:'Nimuë, Keeper of the Bath', i:3, j:3, dir:1, opts:ELFO({gender:'f',skin:0,hair:0,hairColor:11,face:2,equip:{head:'elf_circlet',torso:'elf_robe',armor:null,hands:null,legs:null,feet:'elf_boots',weapon:null,offhand:null}}) },
-        BATHER('mb1','An Elf, Bathing',1,1,1,{...E,gender:'f',skin:0,hair:3,hairColor:12,face:2}), BATHER('mb2','An Elf, Bathing',3,2,0,{...E,gender:'m',skin:0,hair:4,hairColor:10,face:0}),
+      return [ { id:'nimue', name:'Nimuë, Keeper of the Bath', i:4, j:3, dir:1, opts:ELFO({gender:'f',skin:0,hair:0,hairColor:11,face:2,equip:{head:'elf_circlet',torso:'elf_robe',armor:null,hands:null,legs:null,feet:'elf_boots',weapon:null,offhand:null}}) },
+        BATHER('mb1','An Elf, Bathing',1,1,1,{...E,gender:'f',skin:0,hair:3,hairColor:12,face:2}), BATHER('mb2','An Elf, Bathing',2,3,0,{...E,gender:'m',skin:0,hair:4,hairColor:10,face:0}),
         {...st('mb3','An Elf',3,0,1,{gender:'f',skin:0,hair:0,hairColor:11,face:2},1), sit:'knees'} ]; }),
 });
-AREAS.moonbath.tent=true; AREAS.moonbath.round=true; AREAS.moonbath.entries.fromCity={i:1,j:4};
+AREAS.moonbath.tent=true; AREAS.moonbath.entries.fromCity={i:1,j:4};
 function berthaTalk(){ const day=Math.floor(dayClock/DAY_LEN);
   const news=[]; if(CHOICE.bard==='praise') news.push("“Pip sings about you in here every night. Every. Night.”"); if(CHOICE.sisters==='done') news.push("“Ada came in yesterday and laughed at something. First time since Edric.”");
   if(BARON_DOWN()) news.push("“No more Baron's men drinking on credit! I've had to learn what coin looks like again.”"); if(CHOICE.hobb==='done') news.push("“Hobb's mule bit the smith. Everybody's very happy about it.”");
@@ -12027,8 +12028,8 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
     tip.innerHTML=ITEMS[id].slot==='misc'?misc(id):html(id,cmp,false); tip.style.display='block';
     const w=tip.offsetWidth, h=tip.offsetHeight; let lx=Math.min(innerWidth-w-6,x+14); const ty=Math.max(6,Math.min(innerHeight-h-6,y-h-8));
     if(cmp){ tip2.innerHTML=html(cmp,null,true); tip2.style.display='block'; const w2=tip2.offsetWidth, h2=tip2.offsetHeight;
-      // what you wear always sits on the left, what you are looking at on the right; the pair stays on screen
-      const l2=Math.max(6,Math.min(innerWidth-(w2+6+w)-6,x+14)); lx=l2+w2+6;
+      // the pair stays on screen
+      lx=Math.max(6,Math.min(innerWidth-(w+6+w2)-6,x+14)); const l2=lx+w+6;   // what you are looking at on the left, what you wear on the right
       tip2.style.left=l2+'px'; tip2.style.top=Math.max(6,Math.min(innerHeight-h2-6,ty))+'px'; } else tip2.style.display='none';
     tip.style.left=lx+'px'; tip.style.top=ty+'px'; };
   const SEL='#inv-overlay .slot, .shop-slot';

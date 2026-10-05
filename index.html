@@ -6066,21 +6066,70 @@ function paintGateArch(x,y){                               // the gatehouse betw
   g.strokeStyle='#3a3a3a'; g.lineWidth=2; for(let t=0.12;t<0.9;t+=0.09){ g.beginPath(); g.moveTo(q(t,ht-62).x,q(t,ht-62).y); g.lineTo(q(t,ht-78).x,q(t,ht-78).y); g.stroke(); }   // raised portcullis teeth
   g.fillStyle='#7a1a1a'; const bm=q(0.5,ht-8); g.fillRect(bm.x-14,bm.y-4,28,40); g.fillStyle='#e8c060'; g.font='bold 16px Georgia,serif'; g.textAlign='center'; g.fillText('B',bm.x,bm.y+22); g.textAlign='left';
 }
-function paintOuterWall(x,y,len){                  // the town's outer wall: dressed stone, a walkway on top, battlements, moss at the foot
-  const dx=TW/2, dy=TH/2, H=96, B2={x:dx*0.55,y:-dy*0.55}, f=(t,h)=>({x:x+dx*len*t, y:y+dy*len*t-h});
+function paintOuterWall(x,y,len,seed=0){            // Hollowmere's outer wall: old, thin, patched; moss and ivy, cracks, gaps in the battlements
+  const dx=TW/2, dy=TH/2, H=62, BK={x:dx*0.3,y:-dy*0.3}, R=(k,n)=>rnd01(k*7+seed*31,n,150+seed);
+  const sag=t=>Math.sin(t*len*1.3+seed)*3+Math.sin(t*len*0.37+seed*2)*4;                     // the top is not straight any more
+  const f=(t,h)=>({x:x+dx*len*t, y:y+dy*len*t-h});
   const poly=(pts,fill)=>{ g.beginPath(); pts.forEach((p2,n)=>n?g.lineTo(p2.x,p2.y):g.moveTo(p2.x,p2.y)); g.closePath(); g.fillStyle=fill; g.fill(); };
-  const back=p2=>({x:p2.x+B2.x,y:p2.y+B2.y});
-  g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.moveTo(f(0,0).x,f(0,0).y); g.lineTo(f(1,0).x,f(1,0).y); g.lineTo(f(1,0).x-30,f(1,0).y+14); g.lineTo(f(0,0).x-30,f(0,0).y+14); g.closePath(); g.fill();   // its shadow on the grass
-  poly([f(0,H),f(1,H),back(f(1,H)),back(f(0,H))],'#7a7468');                                  // the walkway
-  const gr=g.createLinearGradient(0,f(0,H).y,0,f(0,0).y); gr.addColorStop(0,'#9a9284'); gr.addColorStop(1,'#6e675a');
-  poly([f(0,0),f(1,0),f(1,H),f(0,H)],gr);                                                    // the face
-  g.strokeStyle='rgba(40,36,30,0.35)'; g.lineWidth=0.8;
-  for(let h=12,row=0;h<H;h+=12,row++){ const a=f(0,h), b=f(1,h); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke();    // courses of stone
-    for(let t=(row%2?0.5:0)/(len*2);t<1;t+=1/(len*2)){ const c0=f(t,h-12), c1=f(t,h); g.beginPath(); g.moveTo(c0.x,c0.y); g.lineTo(c1.x,c1.y); g.stroke(); } }
-  for(let t=0;t<1-0.001;t+=1/(len*3)){ const w=1/(len*3)*0.55, a=f(t,H), b=f(t+w,H);            // battlements
-    poly([a,b,{x:b.x,y:b.y-13},{x:a.x,y:a.y-13}],'#a29a8c'); poly([{x:b.x,y:b.y-13},back({x:b.x,y:b.y-13}),back({x:a.x,y:a.y-13}),{x:a.x,y:a.y-13}],'#8a8476'); }
-  g.fillStyle='rgba(84,104,52,0.55)'; for(let t=0.03;t<1;t+=0.07){ const m=f(t,3); g.beginPath(); g.ellipse(m.x,m.y,7,3.4,0.46,0,Math.PI*2); g.fill(); }   // moss along the foot
-  g.strokeStyle='rgba(30,26,20,0.5)'; g.lineWidth=1; [0.25,0.65].forEach(t=>{ const a=f(t,H*0.62); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(a.x+1,a.y+10); g.stroke(); });   // arrow slits
+  const back=p2=>({x:p2.x+BK.x,y:p2.y+BK.y}), N=Math.ceil(len*4), top=t=>H+sag(t);
+  g.fillStyle='rgba(0,0,0,0.22)'; g.beginPath(); g.moveTo(f(0,0).x,f(0,0).y); g.lineTo(f(1,0).x,f(1,0).y); g.lineTo(f(1,0).x-22,f(1,0).y+10); g.lineTo(f(0,0).x-22,f(0,0).y+10); g.closePath(); g.fill();
+  const gap=len>8 ? [0.3+R(1,1)*0.15, 0.06] : null;                                         // one stretch fallen in and stopped up with stakes
+  const inGap=t=>gap && t>gap[0] && t<gap[0]+gap[1];
+  for(let k=0;k<N;k++){ const t0=k/N, t1=(k+1)/N; if(inGap((t0+t1)/2)) continue;
+    poly([f(t0,top(t0)),f(t1,top(t1)),back(f(t1,top(t1))),back(f(t0,top(t0)))],'#6e6a5c');      // the thin walk on top
+    const gr=g.createLinearGradient(0,f(t0,top(t0)).y,0,f(t0,0).y); gr.addColorStop(0,'#8a8474'); gr.addColorStop(1,'#5e594c');
+    poly([f(t0,0),f(t1,0),f(t1,top(t1)),f(t0,top(t0))],gr); }
+  for(let h=0,row=0;h<H+6;h+=9,row++) for(let k=0;k<N*2;k++){ const t0=(k+(row%2)*0.5)/(N*2), t1=t0+1/(N*2)*(0.75+R(k,row)*0.5); if(t1>1||inGap(t0)) continue;   // stones of every size and colour
+    if(h+9>Math.min(top(t0),top(t1))) continue; const c=R(k+3,row+5);
+    poly([f(t0,h+0.6),f(t1,h+0.6),f(t1,h+8.4),f(t0,h+8.4)], c<0.3?'rgba(60,56,46,0.28)':c>0.8?'rgba(170,160,140,0.18)':'rgba(110,104,90,0.12)');
+    g.strokeStyle='rgba(36,32,26,0.35)'; g.lineWidth=0.6; g.beginPath(); g.moveTo(f(t0,h).x,f(t0,h).y); g.lineTo(f(t0,h+9).x,f(t0,h+9).y); g.stroke(); }
+  for(let k=0;k<N;k++){ const t=(k+0.2)/N, w=0.45/N; if(inGap(t) || R(k,40)<0.35) continue;                                // battlements, many of them gone
+    const hh=4+R(k,41)*8, a=f(t,top(t)), b=f(t+w,top(t+w)); poly([a,b,{x:b.x,y:b.y-hh*(R(k,42)<0.25?0.5:1)},{x:a.x,y:a.y-hh}],'#7e7868'); }
+  g.strokeStyle='rgba(28,24,18,0.6)'; g.lineWidth=1;                                                                              // cracks
+  for(let c=0;c<Math.ceil(len/2.5);c++){ const t=R(c,60)*0.9+0.05; if(inGap(t)) continue; let p2=f(t,top(t)-2); g.beginPath(); g.moveTo(p2.x,p2.y);
+    for(let s2=0;s2<5;s2++){ p2={x:p2.x+(R(c,61+s2)-0.5)*6,y:p2.y+5+R(c,66+s2)*5}; g.lineTo(p2.x,p2.y); } g.stroke(); }
+  for(let k=0;k<N*1.5;k++){ const t=R(k,70); if(inGap(t)) continue; const m=f(t,top(t)-1);                                       // moss along the top, ivy hanging down
+    g.fillStyle='rgba(78,104,46,0.75)'; g.beginPath(); g.ellipse(m.x,m.y,5+R(k,71)*6,2.4,0.46,0,Math.PI*2); g.fill();
+    if(R(k,72)<0.35){ g.strokeStyle='rgba(60,90,40,0.85)'; g.lineWidth=1.4; g.beginPath(); g.moveTo(m.x,m.y); let yy=m.y; for(let s2=0;s2<6;s2++){ yy+=4+R(k,73+s2)*4; g.lineTo(m.x+Math.sin(s2*1.7+k)*2,yy); } g.stroke(); } }
+  g.fillStyle='rgba(84,104,52,0.6)'; for(let t=0.02;t<1;t+=0.05){ if(inGap(t)) continue; const m=f(t,2); g.beginPath(); g.ellipse(m.x,m.y,8,3.6,0.46,0,Math.PI*2); g.fill(); }   // weeds at the foot
+  if(gap){ for(let t=gap[0];t<gap[0]+gap[1];t+=gap[1]/7){ const a=f(t,0), hh=48+R(Math.round(t*100),80)*12;                       // the stakes in the gap, and the rubble below
+      g.fillStyle='#5a4228'; g.fillRect(a.x-2.4,a.y-hh,4.8,hh); g.fillStyle='#3e2c18'; g.beginPath(); g.moveTo(a.x-2.4,a.y-hh); g.lineTo(a.x,a.y-hh-5); g.lineTo(a.x+2.4,a.y-hh); g.fill(); }
+    const r0=f(gap[0]+gap[1]/2,0); g.fillStyle='#7a7466'; for(let q=0;q<7;q++){ g.beginPath(); g.ellipse(r0.x+(R(q,90)-0.5)*40,r0.y+4+R(q,91)*6,4+R(q,92)*4,2.6,0,0,Math.PI*2); g.fill(); } }
+}
+function paintLowGate(x,y,shut){                    // a narrow town gate: two squat stone posts, a weathered timber lintel under a little shingle roof
+  const dx=TW/2, dy=TH/2, W=0.62, L=(u,h)=>({x:x+dx*u, y:y+dy*u-h});
+  const poly=(pts,fill)=>{ g.beginPath(); pts.forEach((p2,n)=>n?g.lineTo(p2.x,p2.y):g.moveTo(p2.x,p2.y)); g.closePath(); g.fillStyle=fill; g.fill(); };
+  poly([L(-W,0),L(W,0),L(W,58),L(-W,58)],'rgba(14,10,6,0.85)');                              // the passage
+  if(shut){ [[-W,0],[0,W]].forEach(([a,b],k)=>{ poly([L(a,0),L(b,0),L(b,56),L(a,56)],k?'#5a3e22':'#4e3520');
+      g.strokeStyle='rgba(20,12,4,0.55)'; g.lineWidth=0.8; for(let u=a+(b-a)/4;u<b-0.01;u+=(b-a)/4){ g.beginPath(); g.moveTo(L(u,0).x,L(u,0).y); g.lineTo(L(u,56).x,L(u,56).y); g.stroke(); }
+      g.strokeStyle='#2a2622'; g.lineWidth=2.4; [12,40].forEach(h=>{ g.beginPath(); g.moveTo(L(a+0.02,h).x,L(a+0.02,h).y); g.lineTo(L(b-0.02,h).x,L(b-0.02,h).y); g.stroke(); });
+      g.strokeStyle='rgba(30,20,10,0.6)'; g.lineWidth=1.6; g.beginPath(); g.moveTo(L(a+0.02,12).x,L(a+0.02,12).y); g.lineTo(L(b-0.02,40).x,L(b-0.02,40).y); g.stroke(); });   // a Z-brace
+    g.fillStyle='#3a3428'; const bar=L(0,26); g.fillRect(bar.x-14,bar.y-2,28,4); }              // the bar across
+  else { poly([L(-W,0),L(-W+0.12,0),L(-W+0.12,56),L(-W,56)],'#4e3520'); poly([L(W-0.12,0),L(W,0),L(W,56),L(W-0.12,56)],'#5a3e22'); }   // swung back
+  [[-W-0.28,-W],[W,W+0.28]].forEach(([a,b])=>{ const gr=g.createLinearGradient(L(a,0).x,0,L(b,0).x,0); gr.addColorStop(0,'#8a8474'); gr.addColorStop(1,'#5e594c');   // the posts
+    poly([L(a,0),L(b,0),L(b,74),L(a,74)],gr); g.strokeStyle='rgba(36,32,26,0.4)'; g.lineWidth=0.6; for(let h=10;h<74;h+=10){ g.beginPath(); g.moveTo(L(a,h).x,L(a,h).y); g.lineTo(L(b,h).x,L(b,h).y); g.stroke(); }
+    g.fillStyle='rgba(78,104,46,0.7)'; const m=L((a+b)/2,73); g.beginPath(); g.ellipse(m.x,m.y,7,2.6,0.46,0,Math.PI*2); g.fill(); });
+  poly([L(-W-0.34,58),L(W+0.34,58),L(W+0.34,66),L(-W-0.34,66)],'#5a4228');                  // the lintel beam
+  poly([L(-W-0.42,66),L(W+0.42,66),{x:L(W+0.42,66).x+10,y:L(W+0.42,66).y-14},{x:L(-W-0.42,66).x+10,y:L(-W-0.42,66).y-14}],'#4a3a2a');   // a little roof of old shingles
+  g.strokeStyle='rgba(20,14,8,0.5)'; g.lineWidth=0.7; for(let u=-W-0.4;u<W+0.4;u+=0.14){ const a=L(u,66); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(a.x+10,a.y-14); g.stroke(); }
+  const bn=L(0,64); g.fillStyle=BARON_DOWN()?'#3a4a6a':'#6a2a22'; g.beginPath(); g.moveTo(bn.x-7,bn.y); g.lineTo(bn.x+7,bn.y); g.lineTo(bn.x+7,bn.y+20); g.lineTo(bn.x+2,bn.y+16); g.lineTo(bn.x-3,bn.y+22); g.lineTo(bn.x-7,bn.y+17); g.closePath(); g.fill();   // a faded, ragged pennant
+}
+function paintWatchtower(x,y){                      // a makeshift lookout: four rough posts, cross-braced, a plank platform and a lean-to roof
+  const T=(u,v,h)=>({x:x+(u-v)*TW/2*0.42, y:y+(u+v)*TH/2*0.42-h});
+  const line2=(a,b,w,c)=>{ g.strokeStyle=c; g.lineWidth=w; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); };
+  const legs=[[-1,-1],[1,-1],[1,1],[-1,1]], H=150;
+  g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x,y+4,40,14,0,0,Math.PI*2); g.fill();
+  [[0,1],[1,2],[2,3],[3,0]].forEach(([a,b],k)=>{ const A=legs[a], B=legs[b]; line2(T(A[0],A[1],10),T(B[0],B[1],H*0.55),1.8,'#4e3a22'); line2(T(B[0],B[1],10),T(A[0],A[1],H*0.55),1.8,'#4e3a22'); });   // cross-bracing
+  legs.forEach(([u,v],k)=>line2(T(u,v,0),T(u*0.85,v*0.85,H+(k===1?6:0)),4.2,k===2||k===3?'#5e4428':'#4a3420'));           // the posts, not quite straight
+  const pl=legs.map(([u,v])=>T(u*1.15,v*1.15,H)); g.fillStyle='#6a5034'; g.beginPath(); pl.forEach((p2,n)=>n?g.lineTo(p2.x,p2.y):g.moveTo(p2.x,p2.y)); g.closePath(); g.fill();   // the platform
+  [[2,3],[3,0]].forEach(([a,b])=>{ const A=pl[a], B=pl[b]; for(let t=0;t<=1.001;t+=0.25){ const q={x:A.x+(B.x-A.x)*t,y:A.y+(B.y-A.y)*t}; line2(q,{x:q.x,y:q.y-16},1.6,'#5a4228'); }
+    line2({x:A.x,y:A.y-15},{x:B.x,y:B.y-15},2,'#6a5034'); line2({x:A.x,y:A.y-7},{x:B.x,y:B.y-7},1.4,'#5a4228'); });      // the railing
+  const rf=legs.map(([u,v],k)=>T(u*1.3,v*1.3,H+(k<2?44:32))); [0,1].forEach(k=>line2(T(legs[k][0]*0.9,legs[k][1]*0.9,H),rf[k],2.4,'#4a3420'));   // the roof on two tall poles
+  g.fillStyle='#3e3226'; g.beginPath(); rf.forEach((p2,n)=>n?g.lineTo(p2.x,p2.y):g.moveTo(p2.x,p2.y)); g.closePath(); g.fill();
+  g.strokeStyle='rgba(20,14,8,0.5)'; g.lineWidth=0.7; for(let t=0.1;t<1;t+=0.12){ const a={x:rf[0].x+(rf[3].x-rf[0].x)*t,y:rf[0].y+(rf[3].y-rf[0].y)*t}, b={x:rf[1].x+(rf[2].x-rf[1].x)*t,y:rf[1].y+(rf[2].y-rf[1].y)*t}; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); }
+  const lad=[T(1.2,1.6,0),T(1,1.1,H)]; [-3,3].forEach(o2=>line2({x:lad[0].x+o2,y:lad[0].y},{x:lad[1].x+o2,y:lad[1].y},1.4,'#5a4228'));   // a ladder up the front
+  for(let t=0.08;t<1;t+=0.09){ const q={x:lad[0].x+(lad[1].x-lad[0].x)*t,y:lad[0].y+(lad[1].y-lad[0].y)*t}; line2({x:q.x-3,y:q.y},{x:q.x+3,y:q.y},1.2,'#6a5034'); }
+  const fp=T(-1.1,-1.1,H+50); line2(fp,{x:fp.x,y:fp.y-26},1.2,'#3a2a1a'); g.fillStyle=BARON_DOWN()?'#3a4a6a':'#6a2a22'; g.beginPath(); g.moveTo(fp.x,fp.y-26); g.lineTo(fp.x+14,fp.y-22); g.lineTo(fp.x+9,fp.y-19); g.lineTo(fp.x+13,fp.y-15); g.lineTo(fp.x,fp.y-17); g.closePath(); g.fill();   // a frayed flag
 }
 function paintGateDoors(x,y,shut){                 // under the gatehouse arch: oak doors bound in iron
   const dx=TW/2, dy=TH/2, ht=150, span=[{x:x-dx*1.5,y:y-dy*1.5},{x:x+dx*1.5,y:y+dy*1.5}];
@@ -6469,7 +6518,12 @@ function drawObject(o){
     const pp=P(player.x,player.y), behind=Math.abs(player.x-(o.i+0.5))<2.5 && player.y<o.j+0.6 && player.y>o.j-2.5; o.fade=lerpN(o.fade??1, behind?0.34:1, 0.2);
     const ga=g.globalAlpha; g.globalAlpha=ga*o.fade; drawCached('gatearch',x,y,320,300,160,250,paintGateArch,1); g.globalAlpha=ga;
   } else if(o.type==='outerwall'){                 // a stretch of the town's outer wall, running along i
-    const a=P(o.i,o.j+0.5); drawCached('owall'+o.len,a.x,a.y,o.len*TW/2+80,o.len*TH/2+200,40,170,(X,Y)=>paintOuterWall(X,Y,o.len),1);
+    const a=P(o.i,o.j+0.5); drawCached('owall'+o.len+'_'+(o.seed||0),a.x,a.y,o.len*TW/2+80,o.len*TH/2+170,40,140,(X,Y)=>paintOuterWall(X,Y,o.len,o.seed||0),1);
+  } else if(o.type==='lowgate'){                   // a narrow gate in the wall: two stone posts, a timber lintel, and the doors
+    const shut=!(o.open&&o.open()), a=P(o.i+0.5,o.j+0.5); drawCached('lowgate'+(shut?1:0),a.x,a.y,180,200,90,160,(X,Y)=>paintLowGate(X,Y,shut),1);
+  } else if(o.type==='watchtower'){
+    const a=P(o.i+0.5,o.j+0.5), behind=Math.abs(P(player.x,player.y).x-a.x)<60 && player.x+player.y<o.i+o.j+2; o.fade=lerpN(o.fade??1, behind?0.4:1, 0.2);
+    const ga=g.globalAlpha; g.globalAlpha=ga*o.fade; drawCached('watchtower'+(BARON_DOWN()?1:0),a.x,a.y,140,300,70,270,(X,Y)=>paintWatchtower(X,Y),1); g.globalAlpha=ga;
   } else if(o.type==='gatedoors'){                // the gate's two oak leaves: shut across the passage, or swung back against the walls
     const shut=!(o.open&&o.open()), behind=Math.abs(player.x-(o.i+0.5))<2.5 && player.y<o.j+0.6 && player.y>o.j-2.5; o.fade=lerpN(o.fade??1, behind?0.34:1, 0.2);
     const ga=g.globalAlpha; g.globalAlpha=ga*o.fade; drawCached('gatedoors'+(shut?1:0),x,y,320,300,160,250,(X,Y)=>paintGateDoors(X,Y,shut),1); g.globalAlpha=ga;
@@ -9474,9 +9528,9 @@ Object.assign(AREAS,{
       {type:'gallows', i:6, j:7}, {type:'cart', i:1, j:24}, {type:'barrel', i:0, j:23}, {type:'lamp', i:2, j:21}, {type:'lamp', i:6, j:4},
       {type:'critter', kind:'flowers', i:7, j:14, noblock:true},
       // the road ends at Hollowmere's outer wall: a gatehouse between two towers, the wall running off into the trees on both sides
-      {type:'tower', i:1, j:-1.5, fp:[2,2], noblock:true, flag:BARON_DOWN()?'#2a4a8a':'#7a1a1a'}, {type:'tower', i:6, j:-1.5, fp:[2,2], noblock:true, flag:BARON_DOWN()?'#2a4a8a':'#7a1a1a'},
-      {type:'gatedoors', i:4, j:-1, noblock:true, open:()=>wildDone() && cityOpen()}, {type:'gatearch', i:4, j:-1, noblock:true},
-      {type:'outerwall', i:-7, j:-1, fp:[9,1], len:9, noblock:true}, {type:'outerwall', i:7, j:-1, fp:[7,1], len:7, noblock:true} ],
+      {type:'watchtower', i:2, j:-2, noblock:true},                                       // a makeshift wooden lookout behind the wall
+      {type:'lowgate', i:4, j:-1, noblock:true, open:()=>wildDone() && cityOpen()},
+      {type:'outerwall', i:-7, j:-1, fp:[11,1], len:10.85, seed:1, noblock:true}, {type:'outerwall', i:5.15, j:-1, fp:[9,1], len:9, seed:2, noblock:true} ],
     npcs:()=>[ ...[[3,1],[6,1]].map(([i,j],k)=>({ id:'krgateguard'+k, name:BARON_DOWN()?'Crown Soldier':"Baron's Gate Guard", i, j, dir:1, opts:GUARD({skin:[1,3][k],hair:[2,0][k],beard:[3,1][k]}) })),
       ...(BARON_DOWN() ? [] : [{ id:'tollman', name:"Toll-keeper Brisk", i:2, j:20, dir:1, opts:GUARD({skin:2,hair:3,beard:4,equip:{head:'kettle',torso:'tunic_red',armor:'gambeson',hands:'gloves',legs:'hose_grey',feet:'boots',weapon:null,offhand:null}}) }]),
       ...(encounter('pilgrim',0.6) ? [{ id:'pilgrim', name:'A Pilgrim', i:5, j:15, dir:6, wander:[[4,5],[4,26],[3,15]], named:true, speed:0.7, opts:{gender:'m',skin:1,hair:2,hairColor:12,beard:5,face:0,equip:{head:'hood',torso:'smock',armor:null,hands:null,legs:'hose_grey',feet:null,weapon:null,offhand:null}} }] : []) ],

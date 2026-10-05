@@ -10644,31 +10644,32 @@ refreshDuelLabels();
 const FOOLED={};                                         // "area:name" -> true (believed you) / false (saw through you)
 const disguised=()=>!!(player.opts && unWoven(player.opts.equip.head)==='bandana' && !player.opts.hideHelm);
 const isThug=m=>!!(m && m.opts && m.opts.equip && m.opts.equip.head==='bandana' && m.type!=='dummy');
-const calmThug=m=> isThug(m) && m.hostile && !m.dead && disguised() && FOOLED[areaId+':'+m.name]!==false;
+const calmThug=m=> !!m && m.hostile && !m.dead && disguised() && FOOLED[areaId+':'+m.name]!==false && (isThug(m) || mobs.some(o=>o.faction===m.faction && isThug(o)));   // in the purple, the Baron's crews never start a fight with you: not even their mates without a bandana. Only your own blow ends it
+const REFUSED={};                                        // "area:name" -> they've already said no to handing their papers over
 // story items a hired thug is carrying, and how a disguised wanderer might get them off him
 const THUG_CARRY={
   'Bandit Thug':{ item:'letter', cond:()=>!loreNoteGiven && !hasItem('letter'), after:()=>{ loreNoteGiven=true; logMsg('The thug handed over a sealed letter.','#e8c060'); },
     tell:"The thug keeps patting a sealed letter tucked into his belt, like a man afraid he'll lose it.",
-    ask:"“The steward wants that letter back. He sent me for it.”", talk:0.4, askOk:"“Thank the saints. I can't read it anyway.” He slaps the letter into your hand.", askNo:"“The steward gave it to ME.” His eyes narrow. “Who are you really?”",
-    price:15, buy:0.7, buyOk:"“Fifteen? For a letter?” He bites the coin, shrugs, and hands it over.", buyNo:"“Why would anyone pay for this?” He looks at the letter, then at you. “Unless you're not one of us.”" },
+    ask:"“The steward wants that letter back. He sent me for it.”", talk:0.4, askOk:"“Thank the saints. I can't read it anyway.” He slaps the letter into your hand.", askNo:"“The steward gave it to ME.” He tucks the letter deeper into his belt. “He can ask me himself.”",
+    price:15, buy:0.7, buyOk:"“Fifteen? For a letter?” He bites the coin, shrugs, and hands it over.", buyNo:"“Why would anyone pay for this?” He looks at the letter, then at you, and keeps his hand on it. “No. It stays with me.”" },
   'Mara Blackthorn':{ item:'seal', cond:()=>!hasItem('seal') && !CHOICE.maraSeal, after:()=>{ CHOICE.maraSeal=true; logMsg("You have the Baron's sealed orders.",'#e8c060'); },
     tell:"Mara turns a folded order over in her fingers. You catch a glimpse of red wax: the Baron's seal.",
-    ask:"“Orrin wants the Baron's orders burned. No proof, no trouble.”", talk:0.3, askOk:"“Finally someone with sense.” She tosses the orders to you. “Burn them yourself.”", askNo:"“Orrin doesn't send messengers. He sends money.” She stands. “And you're not money.”",
-    price:40, buy:0.55, buyOk:"“Forty for a scrap of paper?” She counts it twice. “Done. Don't tell me what you want it for.”", buyNo:"“Nobody pays forty for paper unless it can hang someone.” Her axe comes up." } };
+    ask:"“Orrin wants the Baron's orders burned. No proof, no trouble.”", talk:0.3, askOk:"“Finally someone with sense.” She tosses the orders to you. “Burn them yourself.”", askNo:"“Orrin doesn't send messengers. He sends money.” She slips the orders into her boot. “Back to your post.”",
+    price:40, buy:0.55, buyOk:"“Forty for a scrap of paper?” She counts it twice. “Done. Don't tell me what you want it for.”", buyNo:"“Nobody pays forty for paper unless it can hang someone.” She slips the orders into her boot. “No sale.”" } };
 function thugTalk(m){
   const k=areaId+':'+m.name, F=m.opts.gender==='f';
   const attack={label:'Attack '+(F?'her':'him')+'.', fn:()=>{ mobs.filter(o=>o.faction===m.faction).forEach(o=>FOOLED[areaId+':'+o.name]=false); closeDialog(); startCombat(); }};
   const QC=THUG_CARRY[m.name];
-  if(FOOLED[k]===true && QC && QC.cond()){ const blow=(line)=>{ mobs.filter(o=>o.faction===m.faction).forEach(o=>FOOLED[areaId+':'+o.name]=false); say(m.name,line,[{label:'Fight.',fn:()=>{ closeDialog(); startCombat(); }}]); };
+  if(FOOLED[k]===true && QC && QC.cond()){ const blow=(line)=>{ REFUSED[k]=true; say(m.name,line,[bye]); };
     const got=(line)=>{ if(!giveQuestItem(QC.item)){ say(m.name,"“Your pack's full. Come back when you can carry it.”",[bye]); return false; } QC.after&&QC.after(); say(m.name,line,[bye]); if(ITEMS[QC.item].read) setTimeout(()=>openNote(QC.item),900); return true; };
+    if(REFUSED[k]){ say(m.name,[QC.tell,"“I said no. Leave it.”"],[attack,bye]); return; }
     say(m.name,[QC.tell],[
       {label:QC.ask, fn:()=>{ if(Math.random()<QC.talk) got(QC.askOk); else blow(QC.askNo); }},
       {label:`“I'll buy it off you. ${formatCoin(QC.price)}.”`, off:player.purse<QC.price, note:'-'+formatCoin(QC.price), fn:()=>{ if(Math.random()<QC.buy){ player.purse-=QC.price; updateHud(); got(QC.buyOk); } else blow(QC.buyNo); }},
       attack, bye]); return; }
   if(FOOLED[k]===true){ say(m.name,[["“Keep your mask up and your mouth shut. The Baron doesn't pay us to chat.”","“Quiet day. Suits me.”","“Anyone comes asking, you never saw us. Got it?”"][hsh(m.i,m.j)%3]],[attack,bye]); return; }
   const lines={ bandits: "“Oi. Who are you? The steward sent two of us to this farm, and you're not the other one.”", camp:"“Hold it. I've never seen you at the fire before. Who took you on?”", highway:"“You're wearing the purple, but I don't know you. Speak, before I decide for you.”" };
-  const outcome=(chance,ok,no)=>()=>{ if(Math.random()<chance){ FOOLED[k]=true; say(m.name,ok,QC&&QC.cond()?[{label:'Keep talking.',fn:()=>thugTalk(m)},bye]:[bye]); }
-    else { mobs.filter(o=>o.faction===m.faction).forEach(o=>FOOLED[areaId+':'+o.name]=false); say(m.name,no,[{label:'Fight.',fn:()=>{ closeDialog(); startCombat(); }}]); } };
+  const outcome=(chance,ok)=>()=>{ FOOLED[k]=true; say(m.name,ok,QC&&QC.cond()?[{label:'Keep talking.',fn:()=>thugTalk(m)},bye]:[bye]); };   // the purple is enough: whatever you say, they take you for one of their own
   say(m.name,[(F?'She':'He')+" squints at you over the purple cloth.",lines[m.faction]||"“I've never seen you before. Who sent you?”"],[
     {label:'“The steward hired me in Hollowmere. Same coin as yours.”', fn:outcome(0.6,"“The steward, eh? Figures. He hires anyone with two hands.” "+(F?'She':'He')+" waves you on.","“The steward pays in copper, not in fools. Nice try.”")},
     {label:'“Mara sent me to check you lot are still awake.”', fn:outcome(m.faction==='camp'?0.3:0.55,"“Tell her we are. Tell her we want more ale, too.”","“Mara?” A slow grin. “Mara doesn't send anyone. Mara comes herself.”")},

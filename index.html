@@ -3355,6 +3355,7 @@ function drawHead(c, x, B, opts, view=0){
 
 // Headgear is drawn in head space (same LN lean as the face).
 function drawHeadgear(c,x,B,kind,P,view,LN){
+  if(kind==='obsidian_helm') kind='kettle';           // re-coloured kettle hats keep the kettle's shape
   const Y=BODY, V=VIEW[view], HW=P.headHW, pr=V.prof, front=V.turn>-0.25;
   const TOP=Y.SKULL_TOP, LINE=Y.HAIRLINE;
   if(kind==='straw_hat'){                            // a wide, flat-coned straw hat with a ribbon
@@ -4821,7 +4822,7 @@ function drawRoadDecor(){
   const theme=AREAS[areaId].theme;
 
   const {w,h}=ROOM, spots=[];
-  const dens = theme==='city' ? 0 : theme==='farm' ? 0.18 : theme==='village' ? 0.7 : theme==='wood' ? 3.2 : theme==='bog' ? 1.8 : 2.4;
+  const dens = theme==='city'||theme==='ash' ? 0 : theme==='farm' ? 0.18 : theme==='village' ? 0.7 : theme==='wood' ? 3.2 : theme==='bog' ? 1.8 : 2.4;
   for(let k=0;k<w*h*dens;k++){
     const gx=0.3+rnd01(k,1,70)*(w-0.6), gy=0.3+rnd01(k,2,71)*(h-0.6);
     const G=groundAt(gx,gy); if(G.path>0.2 || G.notch) continue;
@@ -6977,7 +6978,7 @@ function buildWorldCache(){
     if(AREAS[areaId].theme==='interior') paintInteriorWalls(); else paintBackdrop();
     // (no earth cut under the map)
     paintGroundTexture();
-    if(AREAS[areaId].theme==='city') paintCityDetail(); else if(AREAS[areaId].theme!=='interior') paintGroundDetail();
+    if(AREAS[areaId].theme==='city') paintCityDetail(); else if(AREAS[areaId].theme!=='interior' && AREAS[areaId].theme!=='ash') paintGroundDetail();
     paintPools();
     paintFence();
     if(AREAS[areaId].theme!=='interior') drawRoadDecor();
@@ -7027,6 +7028,16 @@ function paintGroundTexture(){
       const dirt=smooth(0.6,0.85,fbm(gx*0.5,gy*0.5,41))*0.35; sc=mixC(sc,[92,74,52],dirt);
       const ao=1-0.35*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.04-0.1*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.06), o=(py*TWp+px)*4;
       D[o]=sc[0]*k; D[o+1]=sc[1]*k; D[o+2]=sc[2]*k; D[o+3]=255; continue; }
+    if(theme==='ash'){                                       // volcanic: black basalt and red scoria, glowing cracks, a path of trodden grey ash
+      const n=fbm(gx*0.5,gy*0.5,71), n2=fbm(gx*2.4,gy*2.4,72), n3=fbm(gx*7,gy*7,73), cr=Math.abs(fbm(gx*1.1,gy*1.1,74)-0.5);
+      let pc=mixC([42,37,35],[72,62,56],n2); pc=mixC(pc,[96,56,40],smooth(0.6,0.8,n)*0.5);
+      if(n3>0.72) pc=mixC(pc,[110,100,92],0.35);
+      const off=1-Math.min(1,G.path*1.8);
+      const hot=smooth(0.45,0.7,fbm(gx*0.3,gy*0.3,76));                                  // the cracks only glow in some stretches of the floor
+      if(cr<0.022 && off>0 && hot>0) pc=mixC(pc,cr<0.008?[255,128,44]:[120,50,26],(cr<0.008?0.9:0.4)*off*hot);
+      if(G.path>0){ let tr=mixC([118,110,102],[92,86,80],fbm(gx*2.2,gy*2.2,75)); pc=mixC(pc,tr,smooth(0.25,0.75,G.path)*0.85); }
+      const ao=1-0.42*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.02-0.08*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.08), o=(py*TWp+px)*4;
+      D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
     if(theme==='bog'){                                       // the fen: olive mud, black standing water, moss, a trodden track
       const n=fbm(gx*0.42,gy*0.42,61), n2=fbm(gx*1.6,gy*1.6,62), n3=fbm(gx*6,gy*6,63);
       let pc=mixC([52,56,32],[82,80,46],n2); pc=mixC(pc,[70,56,36],smooth(0.5,0.75,fbm(gx*0.8,gy*0.8,64))*0.6);
@@ -7158,8 +7169,8 @@ function paintBackdrop(){
   };
   // three depth layers along both back edges, deterministic per position
   const layer=(depth)=>{
-    const BOG=AREAS[areaId].theme==='bog';
-    const cols=BOG?[['#141812','#1c2018'],['#1a1e16','#262a1e'],['#20261a','#2e3424']][depth]:[['#0f1a0d','#162414'],['#15240f','#1f3318'],['#1b2e14','#2a4520']][depth];
+    const BOG=AREAS[areaId].theme==='bog', ASH=AREAS[areaId].theme==='ash';
+    const cols=ASH?[['#120c0a','#1e1410'],['#1a1210','#2a1a14'],['#22160f','#36201a']][depth]:BOG?[['#141812','#1c2018'],['#1a1e16','#262a1e'],['#20261a','#2e3424']][depth]:[['#0f1a0d','#162414'],['#15240f','#1f3318'],['#1b2e14','#2a4520']][depth];
     const step=depth===0?0.42:depth===1?0.6:0.85;
     const edge=(axis,len)=>{ for(let u=-0.4;u<len+0.4;u+=step){
       const jit=rnd01(Math.round(u*10),depth,30);
@@ -7167,26 +7178,32 @@ function paintBackdrop(){
       const p = axis==='r' ? P(u+jit*0.3,0) : P(0,u+jit*0.3);
       const base=p.y-(2-depth)*16;
       const ht=H*(depth===0?1.1:depth===1?0.9:0.62)*(0.8+jit*0.45);
-      if((BOG && (depth>0 || jit<0.4)) || (AREAS[areaId].boggy && depth>0 && jit<0.35 && (axis==='r'?u>w*0.35:u<h*0.5))) deadSil(p.x+(jit-0.5)*10, base, ht*(depth===0?0.9:0.8), cols[0], cols[1], Math.round(u*10)+depth*31);
+      if(ASH || (BOG && (depth>0 || jit<0.4)) || (AREAS[areaId].boggy && depth>0 && jit<0.35 && (axis==='r'?u>w*0.35:u<h*0.5))) deadSil(p.x+(jit-0.5)*10, base, ht*(depth===0?0.9:0.8), cols[0], cols[1], Math.round(u*10)+depth*31);
       else if(depth<2 || jit<0.55) conifer(p.x+(jit-0.5)*10, base, ht, 30+jit*18, cols[0], cols[1]);
       else leafy(p.x, base, ht, 14+jit*6, cols[0], cols[1]);
     }};
     edge('r',w); edge('l',h);
   };
   DOOR_GAPS=backDoorGaps();
+  if(AREAS[areaId].theme==='ash'){ const q=P(w*0.55,0), bx=q.x, by=q.y-H*0.55;           // a smoking cone far behind, lava glowing at its lip
+    g.fillStyle='#160e0c'; g.beginPath(); g.moveTo(bx-260,by+120); g.lineTo(bx-46,by-150); g.lineTo(bx+40,by-150); g.lineTo(bx+280,by+120); g.closePath(); g.fill();
+    const lg=g.createLinearGradient(0,by-150,0,by-60); lg.addColorStop(0,'rgba(255,120,40,0.8)'); lg.addColorStop(1,'rgba(255,120,40,0)');
+    g.fillStyle=lg; [[-30,-150,-56,-60],[10,-150,26,-80],[28,-150,70,-90]].forEach(([a,b,c2,d])=>{ g.beginPath(); g.moveTo(bx+a,by+b); g.lineTo(bx+a+8,by+b); g.lineTo(bx+c2+4,by+d); g.lineTo(bx+c2,by+d); g.closePath(); g.fill(); });
+    g.fillStyle='rgba(60,50,48,0.5)'; for(let k=0;k<6;k++){ g.beginPath(); g.arc(bx-10+k*14+Math.sin(k)*10,by-170-k*22,18+k*7,0,Math.PI*2); g.fill(); } }
   layer(0); layer(1); layer(2); paintDoorVistas();
   // shadowed undergrowth right along the fence line, then a low band of mist
   const brush=(axis,len)=>{ for(let u=0;u<len;u+=0.35){
     if(gapAt(axis,u,3)) continue;
     const p = axis==='r' ? P(u,0) : P(0,u), r=6+rnd01(Math.round(u*9),1,31)*6;
-    g.fillStyle=['#14220f','#1a2c13','#203618'][Math.floor(rnd01(Math.round(u*9),2,32)*3)];
+    g.fillStyle=(AREAS[areaId].theme==='ash'?['#1a1412','#221a16','#2a201a']:['#14220f','#1a2c13','#203618'])[Math.floor(rnd01(Math.round(u*9),2,32)*3)];
     g.beginPath(); g.ellipse(p.x,p.y-4,r*1.3,r*0.8,0,0,Math.PI*2); g.fill();
   }};
   brush('r',w); brush('l',h);
   const mist=(a,b)=>{
     const gr=g.createLinearGradient(0,a.y-70,0,a.y);
     const mk=AREAS[areaId].theme==='bog'?2.6:1;
-    gr.addColorStop(0,'rgba(170,190,160,0)'); gr.addColorStop(0.7,'rgba(170,190,160,'+(0.10*mk)+')'); gr.addColorStop(1,'rgba(170,190,160,'+(0.02*mk)+')');
+    const mc=AREAS[areaId].theme==='ash'?'200,90,50':'170,190,160';
+    gr.addColorStop(0,'rgba('+mc+',0)'); gr.addColorStop(0.7,'rgba('+mc+','+(0.10*mk)+')'); gr.addColorStop(1,'rgba('+mc+','+(0.02*mk)+')');
     g.fillStyle=gr; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(b.x,b.y-70); g.lineTo(a.x,a.y-70); g.closePath(); g.fill();
   };
   mist(o,rEnd); mist(lEnd,o);
@@ -10175,7 +10192,7 @@ function mapLayout(){
       pos[t.to]=cand; queue.push(t.to); } }
   return MAP_LAYOUT=pos;
 }
-const MM_COL={ bog:'#4e5434', farm:'#8a9a4a', road:'#4e6a34', crossroads:'#5a7a3a', village:'#9aa058', wood:'#3a5a2c', fen:'#44583e', elf:'#7a9a5a' };
+const MM_COL={ ash:'#5a3a30', bog:'#4e5434', farm:'#8a9a4a', road:'#4e6a34', crossroads:'#5a7a3a', village:'#9aa058', wood:'#3a5a2c', fen:'#44583e', elf:'#7a9a5a' };
 function renderMap(cv,V){                             // V: {zoom, px, py, labels} — zoom/pan on top of fitting the whole explored world
   const c=cv.getContext('2d'), L=mapLayout();
   c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,cv.width,cv.height);
@@ -11857,6 +11874,8 @@ const AGI_DODGE=0.05;                                     // each point of agili
 // every stat a piece of gear carries, in words
 function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
   if(id==='fen_boots') L.push(['Walking speed','+15%']);
+  if(WEAPONS[id] && WEAPONS[id].ember) L.push(['Grows with','Attack + Spell Power <small>(+4% each point); every cut burns</small>']);
+  if(WEAPONS[id] && WEAPONS[id].burn) L.push(['Special',Math.round(WEAPONS[id].burn*100)+'% to set the foe burning']);
   if(WEAPONS[id]){ L.push(['Damage',WEAPONS[id].dmg]); L.push(['Swing time',WEAPONS[id].wind.toFixed(2)+'s <small>('+(WEAPONS[id].wind<=0.17?'fast':WEAPONS[id].wind<=0.22?'steady':'slow')+')</small>']); } if(WEAPONS[id]&&WEAPONS[id].magic) L.push(['Spell power','×'+WEAPONS[id].magic]);
   const hp=GEAR_HP[id]||0; if(hp) L.push(['Health','+'+hp]);
   if(st.agi) L.push(['Agility','+'+st.agi+' <small>('+Math.round(st.agi*AGI_DODGE*100)+'% dodge)</small>']);
@@ -12716,7 +12735,7 @@ const APM=()=>1+gearSum('ap')*0.04;
 var HIT_SRC=null;                       // who caused the wound being dealt right now: 'melee', 'spell' or null (bones, burns)
 { const oldPH=playerHit; playerHit=function(...a){ HIT_SRC='melee'; try{ return oldPH.apply(this,a); } finally{ HIT_SRC=null; } }; }
 { const oldW=wound; wound=function(f,n,...r){ if(f!==player && HIT_SRC==='melee' && n>0) n=Math.round(n*APM()); return oldW(f,n,...r); }; }
-const playerHitDmg=()=> isMagicWeapon() ? SPELLS.right.dmg*SPM() : weaponOf(player).dmg*APM();
+let playerHitDmg=()=> isMagicWeapon() ? SPELLS.right.dmg*SPM() : weaponOf(player).dmg*APM();
 const AREA_TIER={ farm:1, road:1, lane:1, millroad:2, wolfwood:2, camp:2, southtrail:2, mistmere:2, clearing:2,
   fellings:3, ruin:3, lowstreets:3, warren:3, kingsroad:3, elfroad:3, cave1:3, cave2:4, cave3:4, cave4:4,
   fen:4, fenlow:4, fenpath:4, barrow:5 };
@@ -12725,6 +12744,161 @@ const tierDmg=f=> 1+0.12*(((f&&f.tier)||1)-1);
 { const oldRM=resetMobs; resetMobs=function(){ oldRM(); const t=tierOf(areaId);
     mobs.forEach(m=>{ if(m.type==='dummy') return; m.tier=t; const hp=Math.round(m.maxHp*(1+0.2*(t-1))); m.maxHp=hp; if(!m.dead) m.hp=hp; }); }; }
 { const oldHP=hurtPlayer; hurtPlayer=function(n,...r){ const f=combat.foe; if(n>0 && f && f.tier) n=Math.round(n*tierDmg(f)); return oldHP(n,...r); }; }
+
+// ════════════════════════════════════════════════════════════
+//  CINDER PASS and THE SUNKEN FORGE: west of the goblin warren, a volcanic valley
+//  built for hybrids. The Flamesworn there fight with fire and steel at once; their
+//  captain carries the Fire Blade, and the spirit of an old forge can wake it into the
+//  Emberbrand, a sword that grows with BOTH Attack Power and Spell Power.
+// ════════════════════════════════════════════════════════════
+Object.assign(ITEMS,{
+  fire_blade:  { name:'Fire Blade',          slot:'weapon' },
+  emberbrand:  { name:'Emberbrand',          slot:'weapon' },
+  ember_core:  { name:'Ember Core',          slot:'misc' },
+  ash_mantle:  { name:'Cinderweave Mantle',  slot:'armor', base:'robe',     col:'#4a1e16' },
+  cinder_gloves:{ name:'Cinderhide Gloves',  slot:'hands', base:'gloves',   col:'#2e2220' },
+  obsidian_helm:{ name:'Obsidian Half-Helm', slot:'head',  base:'kettle',   col:'#2a2528' },
+  scorched_greaves:{ name:'Scorched Greaves', slot:'legs', base:'trousers', col:'#3e2a22' },
+  emberstep_boots:{ name:'Emberstep Boots',  slot:'feet',  base:'boots',    col:'#5a2a1c' } });
+Object.assign(WEAPONS,{ fire_blade:{ wind:0.18, dmg:12, len:22, burn:0.35 }, emberbrand:{ wind:0.18, dmg:14, len:23, ember:true } });
+// hybrid gear: a little of both damage stats, so a sword can grow with spell power too
+Object.assign(ITEM_STATS,{ ash_mantle:{hp:6,ap:2,magic:2}, cinder_gloves:{ap:1,magic:1}, obsidian_helm:{hp:3,ap:1,magic:2},
+  scorched_greaves:{hp:2,ap:2,magic:1}, emberstep_boots:{hp:2,agi:2,ap:1,magic:1} });
+Object.entries(ITEM_STATS).forEach(([id,st])=>{ if(st.hp) GEAR_HP[id]=st.hp; });
+Object.assign(PRICES,{ fire_blade:90, emberbrand:260, ember_core:25, ash_mantle:120, cinder_gloves:55, obsidian_helm:90, scorched_greaves:80, emberstep_boots:75 });
+QUEST_ITEMS.add('ember_core');
+// Emberbrand: weapon damage × Attack Power, plus a tongue of fire × Spell Power, and every cut burns
+{ const oldW=wound; wound=function(f,n,...r){ const W=WEAPONS[player.opts&&player.opts.equip.weapon]||{};
+    if(f!==player && HIT_SRC==='melee' && n>0 && W.ember) n=n*emberMult()/APM();   // the Attack Power wrapper inside multiplies by APM again, so this comes out at dmg × emberMult
+    const r0=oldW(f,n,...r);
+    if(f!==player && HIT_SRC==='melee' && !f.dead && f.hp>0){
+      if(W.ember) addStatus(f,'burn',3.6,1+Math.round(gearSum('magic')/5));
+      else if(W.burn && Math.random()<W.burn) addStatus(f,'burn',3,2); }
+    return r0; }; }
+// one rule: +4% per point of Attack Power AND per point of Spell Power, so every point you wear counts
+const emberMult=()=>1+(gearSum('ap')+gearSum('magic'))*0.04;
+const emberHit=()=>WEAPONS.emberbrand.dmg*emberMult();
+{ const oldPHD=playerHitDmg; playerHitDmg=()=> (player.opts && player.opts.equip.weapon==='emberbrand') ? emberHit() : oldPHD(); }
+// foes with fire set you alight
+const FIRE_FOE=f=> f && ((f.opts&&f.opts.equip&&['fire_blade','emberbrand'].includes(f.opts.equip.weapon)) || /^Ash Hound|^The Slag Warden/.test(f.name||''));
+{ const oldImp=impact; impact=function(f){ const hp0=player.hp; oldImp(f); if(player.hp<hp0 && player.hp>0 && FIRE_FOE(f) && Math.random()<(/Slag/.test(f.name)?1:0.35)) addStatus(player,'burn',3,2); }; }
+
+// ── the look: a blade with a glowing edge, embers on the Emberbrand ──
+{ const oldDW=drawWeapon; drawWeapon=function(c,hx,hy,ang,id,s=1){ if(id!=='fire_blade' && id!=='emberbrand') return oldDW(c,hx,hy,ang,id,s);
+    oldDW(c,hx,hy,ang,id==='emberbrand'?'longsword':'sword',s);
+    const L=id==='emberbrand'?27:21; c.save(); c.translate(hx,hy); c.rotate(ang); c.scale(s,s); c.globalCompositeOperation='lighter';
+    const gr=c.createLinearGradient(5,0,L,0); gr.addColorStop(0,'rgba(255,90,20,0.2)'); gr.addColorStop(1,'rgba(255,190,80,0.85)');
+    c.strokeStyle=gr; c.lineCap='round'; c.lineWidth=id==='emberbrand'?2.2:1.4; c.beginPath(); c.moveTo(6,0); c.lineTo(L,0); c.stroke();
+    if(id==='emberbrand'){ const t=(typeof gt!=='undefined'?gt:0); for(let k=0;k<4;k++){ const u=((t*0.8+k*0.25)%1); c.fillStyle=`rgba(255,${150+k*20},60,${0.8*(1-u)})`; c.beginPath(); c.arc(8+u*(L-6),-2-u*6+Math.sin(t*5+k)*1.5,0.9,0,Math.PI*2); c.fill(); }
+      c.strokeStyle='rgba(255,140,40,0.35)'; c.lineWidth=5; c.beginPath(); c.moveTo(8,0); c.lineTo(L,0); c.stroke(); }
+    c.restore(); }; }
+{ const oldPIA=paintItemArt; paintItemArt=function(g2,id,size){
+    if(id==='fire_blade' || id==='emberbrand'){ g2.save(); g2.scale(size/40,size/40); drawWeapon(g2,7,33,-Math.PI/4,id,1.3); g2.restore(); return; }
+    if(id==='ember_core'){ g2.save(); g2.scale(size/40,size/40);
+      const gl=g2.createRadialGradient(20,21,0,20,21,15); gl.addColorStop(0,'rgba(255,170,60,0.7)'); gl.addColorStop(1,'rgba(255,90,20,0)'); g2.fillStyle=gl; g2.fillRect(4,5,32,32);
+      g2.fillStyle='#2a1a16'; g2.beginPath(); g2.moveTo(20,7); g2.lineTo(30,15); g2.lineTo(28,30); g2.lineTo(17,35); g2.lineTo(10,25); g2.lineTo(12,12); g2.closePath(); g2.fill();   // a lump of cooled black rock
+      g2.strokeStyle='#ffb050'; g2.lineWidth=1.4; g2.lineJoin='round'; g2.beginPath(); g2.moveTo(15,13); g2.lineTo(19,20); g2.lineTo(16,27); g2.moveTo(19,20); g2.lineTo(26,18); g2.moveTo(19,20); g2.lineTo(23,29); g2.stroke();   // fire in its cracks
+      const core=g2.createRadialGradient(19,20,0,19,20,5); core.addColorStop(0,'#fff2c0'); core.addColorStop(1,'rgba(255,140,40,0)'); g2.fillStyle=core; g2.beginPath(); g2.arc(19,20,5,0,Math.PI*2); g2.fill();
+      g2.restore(); return; }
+    return oldPIA(g2,id,size); }; }
+OWN_ART.delete('fire_blade');
+
+// ── lava: blocks the way, moves, glows; drawn over the ground, under everything standing ──
+LIGHT_TYPES.lava=[0,-4,140,'255,110,40'];
+function drawLava(o){ const [fw,fh]=o.fp, t=(typeof gt!=='undefined'?gt:0);
+  const pt=(u,v)=>{ const k=rnd01(Math.round(u*7),Math.round(v*7),770)*0.18; return P(o.i+u+(u<0.5?k:u>fw-0.5?-k:0),o.j+v+(v<0.5?k:v>fh-0.5?-k:0)); };
+  const ring=[]; for(let k=0;k<=fw*4;k++) ring.push([k/4,0.12]); for(let k=0;k<=fh*4;k++) ring.push([fw-0.12,k/4]); for(let k=fw*4;k>=0;k--) ring.push([k/4,fh-0.12]); for(let k=fh*4;k>=0;k--) ring.push([0.12,k/4]);
+  const path=()=>{ g.beginPath(); ring.forEach(([u,v],k)=>{ const q=pt(u,v); k?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y); }); g.closePath(); };
+  const c0=P(o.i+fw/2,o.j+fh/2), R=(fw+fh)*TW/4;
+  path(); g.fillStyle='#2a1612'; g.lineWidth=6; g.strokeStyle='#1a0e0c'; g.stroke();                 // a crust of black rock at the rim
+  const gr=g.createRadialGradient(c0.x,c0.y,0,c0.x,c0.y,R); gr.addColorStop(0,'#ffd27a'); gr.addColorStop(0.35,'#ff8a2a'); gr.addColorStop(0.8,'#c8401a'); gr.addColorStop(1,'#7a2010');
+  path(); g.fillStyle=gr; g.fill();
+  g.save(); path(); g.clip();                                                                // slabs of cooling crust drifting across
+  for(let k=0;k<fw*fh*2;k++){ const u=(rnd01(k,o.i,771)*fw+t*0.06*(k%2?1:-1)+fw)%fw, v=(rnd01(k,o.j,772)*fh+t*0.04)%fh, q=P(o.i+u,o.j+v), r=10+rnd01(k,3,773)*14;
+    g.fillStyle='rgba(50,24,18,0.55)'; g.beginPath(); g.ellipse(q.x,q.y,r,r*0.45,0,0,Math.PI*2); g.fill(); }
+  g.restore();
+  g.save(); g.globalCompositeOperation='lighter'; glow(c0.x,c0.y,R*1.1,R*0.55,'255,120,40',0.35+Math.sin(t*1.7+o.i)*0.06);
+  for(let k=0;k<3;k++){ const ph=(t*0.6+k*0.33+o.j*0.1)%1, q=P(o.i+0.5+rnd01(k,o.i,774)*(fw-1),o.j+0.5+rnd01(k,o.j,775)*(fh-1));   // a bubble swells and pops
+    g.fillStyle=`rgba(255,220,140,${0.6*(1-ph)})`; g.beginPath(); g.ellipse(q.x,q.y,2+ph*6,1+ph*3,0,0,Math.PI*2); g.fill(); }
+  g.restore(); }
+{ const oldDWC=drawWorldCache; drawWorldCache=function(){ oldDWC(); if(AREAS[areaId].theme==='ash') OBJECTS.forEach(o=>{ if(o.type==='lava') drawLava(o); }); }; }
+// embers rising everywhere in the valley, and a red cast over it all
+{ const oldLFX=drawLightFX; drawLightFX=function(){ oldLFX(); if(AREAS[areaId].theme!=='ash') return;
+    const W=gc.width, H=gc.height; g.save(); g.setTransform(1,0,0,1,0,0); g.globalCompositeOperation='multiply'; g.fillStyle='rgb(255,226,212)'; g.fillRect(0,0,W,H);
+    g.globalCompositeOperation='lighter'; for(let k=0;k<40;k++){ const ph=(gt*(0.05+rnd01(k,1,776)*0.06)+rnd01(k,2,777))%1, x=rnd01(k,3,778)*W+Math.sin(gt*0.7+k)*20, y=H*(1.05-ph*1.2);
+      g.fillStyle=`rgba(255,${120+Math.round(rnd01(k,4,779)*80)},40,${0.7*Math.sin(ph*Math.PI)})`; g.fillRect(x,y,2,2); } g.restore(); }; }
+// ash hounds glow from inside
+{ const oldDA=drawActor; drawActor=function(e){ if(!e.dead && /^Ash Hound/.test(e.name||'')){ const s=P(e.x+(e.ox||0),e.y+(e.oy||0)); g.save(); g.globalCompositeOperation='lighter'; glow(s.x,s.y-26,40,26,'255,110,30',0.4+Math.sin(gt*4+e.id)*0.08); g.restore(); } return oldDA(e); }; }
+
+// ── the places ──
+const FLAMESWORN=(o)=>({gender:'m',race:'human',skin:4,hair:2,hairColor:0,beard:0,face:3,marks:{warPaint:2},equip:{head:'obsidian_helm',torso:'shirt',armor:'ash_mantle',hands:'cinder_gloves',legs:'scorched_greaves',feet:'emberstep_boots',weapon:'fire_blade',offhand:null},...o});
+AREAS.emberpass={ fence:{r:false,l:false}, w:16, h:9, theme:'ash', label:'Cinder Pass', mini:{x:0,y:0}, tier:4,
+  notches:()=>[], dummy:null,
+  objects:()=>[ {type:'teleporter', i:15, j:4, to:'warren', entry:'fromPass'}, {type:'teleporter', i:0, j:4, to:'emberforge', entry:'fromPass'},
+    {type:'lava', i:4, j:6, fp:[3,2]}, {type:'lava', i:9, j:0, fp:[3,2]}, {type:'lava', i:12, j:6, fp:[2,2]}, {type:'lava', i:2, j:0, fp:[2,2]},
+    ...rockRow(8,7,10,[]), {type:'boulder', i:14, j:1, v:1}, {type:'boulder', i:7, j:1, v:2}, {type:'bones', i:8, j:6, noblock:true}, {type:'bones', i:3, j:3, noblock:true},
+    {type:'rune', i:13, j:2, text:"Scratched into black glass with a knife point: <i>“The Flamesworn burn the weak and keep the strong. Their captain's blade was quenched in the old forge, west. The forge still remembers.”</i>"},
+    ...(collectedPickups.has('emberpass:7,7') ? [] : [{type:'pickup', i:7, j:7, item:'ember_core'}]),
+    ...(collectedPickups.has('emberpass:12,2') ? [] : [{type:'pickup', i:12, j:2, item:'ember_core'}]) ],
+  mobs:()=>[
+    { name:'Ash Hound', type:'wolf', i:11, j:5, faction:'ashhound', coat:'#2a201c' },
+    { name:'Ash Hound Alpha', type:'wolf', i:10, j:3, faction:'ashhound', coat:'#3a2a24' },
+    { name:'Flamesworn Zealot', type:'mage', i:5, j:3, faction:'flamesworn', opts:FLAMESWORN({skin:2,hair:5,beard:4,hairColor:7,equip:{head:null,torso:'shirt',armor:'ash_mantle',hands:'cinder_gloves',legs:'scorched_greaves',feet:'emberstep_boots',weapon:'staff_cinder',offhand:null}}) },
+    { name:'Flamesworn Captain', type:'bandit', i:3, j:5, faction:'flamesworn', opts:FLAMESWORN({}) } ],
+  npcs:()=>[],
+  entries:{ fromWarren:{i:14,j:4}, fromForge:{i:1,j:4} } };
+AREAS.emberforge={ fence:{r:false,l:false}, w:13, h:11, theme:'ash', label:'The Sunken Forge', mini:{x:0,y:0}, tier:5,
+  notches:()=>[], dummy:null,
+  objects:()=>[ {type:'teleporter', i:12, j:5, to:'emberpass', entry:'fromForge'},
+    {type:'forge', i:5, j:1}, {type:'anvil', i:7, j:2},
+    {type:'lava', i:0, j:0, fp:[3,3]}, {type:'lava', i:9, j:8, fp:[3,2]}, {type:'lava', i:1, j:8, fp:[2,2]}, {type:'lava', i:10, j:0, fp:[2,2]},
+    ...rockRow(10,4,8,[]), {type:'boulder', i:3, j:5, v:0}, {type:'bones', i:7, j:7, noblock:true},
+    ...(collectedPickups.has('emberforge:2,4') ? [] : [{type:'pickup', i:2, j:4, item:'ember_core'}]) ],
+  mobs:()=>[ { name:'The Slag Warden', type:'brute', i:6, j:6, faction:'slagwarden', opts:{gender:'m',race:'human',skin:6,hair:2,hairColor:0,beard:5,face:5,marks:{eyePatch:1,warPaint:1},
+      equip:{head:'helm_full',torso:'shirt',armor:'blackmail',hands:'gauntlets',legs:'scorched_greaves',feet:'plate_boots',weapon:'morningstar',offhand:'shield_iron'}} } ],
+  npcs:()=> defeatedMobs.has('emberforge:The Slag Warden') ? [{ id:'ilka', name:'Ilka, Spirit of the Forge', i:6, j:3, dir:0,
+      opts:{gender:'f',race:'human',skin:5,hair:4,hairColor:11,beard:0,face:3,eyeColor:10,marks:{scarCheek:1,armTat:3},equip:{head:null,torso:'shirt',armor:null,hands:'cinder_gloves',legs:'scorched_greaves',feet:'emberstep_boots',weapon:null,offhand:null}} }] : [],
+  entries:{ fromPass:{i:11,j:5} } };
+AREA_PATHS.emberpass=[ [[16,4.5],[12,4.6],[8,4.2],[4,4.6],[-0.5,4.5]] ];
+AREA_PATHS.emberforge=[ [[13,5.5],[9,5.6],[7,4],[6,3.4]] ];
+wrap('warren','objects',l=>[...l,{type:'teleporter', i:0, j:5, to:'emberpass', entry:'fromWarren'}]);
+AREAS.warren.entries.fromPass={i:1,j:5};
+AREA_PATHS.warren.push([[-0.5,5.5],[3,5.6],[6,5]]);
+AREA_TIER.emberpass=4; AREA_TIER.emberforge=5;
+if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
+
+// ── the story: the captain's blade, three ember cores, and the forge spirit who wakes the steel ──
+{ const oldV=victory; victory=function(faction){ const r=oldV(faction);
+    if(faction==='flamesworn' && !CHOICE.fireBlade){ CHOICE.fireBlade=true; giveQuestItem('fire_blade',true); logMsg("The captain's sword lies in the ash, its edge still glowing: the Fire Blade.",'#ffb060'); }
+    if(faction==='flamesworn' && Math.random()<0.5){ const pool=['ash_mantle','cinder_gloves','obsidian_helm','scorched_greaves','emberstep_boots']; giveQuestItem(pool[Math.floor(Math.random()*pool.length)]); }
+    if(faction==='ashhound' && Math.random()<0.6) giveQuestItem('ember_core');
+    if(faction==='slagwarden'){ CHOICE.warden=true; logMsg('The Warden crumbles into slag. Behind him, the forge flares up, and a woman made of heat and smoke steps out of it.','#ffb060');
+      setTimeout(()=>{ if(areaId==='emberforge' && !NPCS.some(n=>n.id==='ilka')){ const nn=AREAS.emberforge.npcs(); NPCS.push(...nn); nn.forEach(n=>blocked.add(n.i+','+n.j)); } },1800); }
+    return r; }; }
+const coreCount=()=>player.inv.filter(x=>x==='ember_core').length;
+function ilkaTalk(){
+  const hasBlade=hasItem('fire_blade')||(player.opts.equip.weapon==='fire_blade');
+  if(CHOICE.emberbrand){ say('Ilka, Spirit of the Forge',["Ilka watches the Emberbrand at your side the way a mother watches a child cross a river.","“It drinks from both wells, that one: the strength of your arm and the fire you carry. Feed both and it will never fail you.”"],
+      [{label:'Look at her wares.', fn:()=>shopFrom('Ilka, Spirit of the Forge',['ash_mantle','cinder_gloves','obsidian_helm','scorched_greaves','emberstep_boots'],1,"“Cinderweave and black glass. Made for those who fight with both hands.”",ilkaTalk)}, bye]); return; }
+  const lines=["The woman is made of heat. Where she stands the air ripples, and her hair moves like smoke over a chimney.",
+    "“I was this forge's smith, before the mountain woke. The Warden kept me asleep. Now I can work again.”"];
+  if(!hasBlade){ say('Ilka, Spirit of the Forge',[...lines,"“The Flamesworn captain stole a blade from me. Bring it back, and three ember cores from the pass, and I will wake what sleeps in it.”"],
+      [{label:'Look at her wares.', fn:()=>shopFrom('Ilka, Spirit of the Forge',['ash_mantle','cinder_gloves','obsidian_helm','scorched_greaves','emberstep_boots'],1,"“Cinderweave and black glass.”",ilkaTalk)}, bye]); CHOICE.ilka=CHOICE.ilka||'asked'; return; }
+  const n=coreCount();
+  if(n<3){ say('Ilka, Spirit of the Forge',[...lines,`“My blade. Good. Now the cores: I need three, you carry ${n}. They form where the lava cools. The hounds in the pass swallow them, too.”`],[bye]); CHOICE.ilka=CHOICE.ilka||'asked'; return; }
+  say('Ilka, Spirit of the Forge',["Ilka takes the Fire Blade and the three cores and lays them in the heart of the forge. The cores melt into the steel like butter.",
+    "She hammers once, twice, and the whole valley seems to ring. When she lifts it out, the blade is dark as old glass, and fire runs along its edge.",
+    "“The Emberbrand. Your arm swings it. Your spells feed its flame. And whatever it cuts will burn.”"],
+    [{label:'Take the Emberbrand.', fn:()=>{ let need=3; for(let k=0;k<player.inv.length && need;k++) if(player.inv[k]==='ember_core'){ player.inv[k]=null; need--; }
+        if(player.opts.equip.weapon==='fire_blade') player.opts.equip.weapon='emberbrand'; else { const k=player.inv.indexOf('fire_blade'); if(k>=0) player.inv[k]='emberbrand'; }
+        CHOICE.emberbrand=true; CHOICE.ilka='done'; updateHud(); try{ refreshInventory(); }catch(e){} banner('The Emberbrand','#ffb060',1800); logMsg('You receive the Emberbrand: it grows with Attack Power and Spell Power, and every cut burns.','#ffb060'); closeDialog(); }}]); }
+TALKERS.ilka=ilkaTalk;
+{ const oldN=npcHasNews; npcHasNews=function(n){ const r=oldN(n); if(r) return r; if(n.id==='ilka' && !CHOICE.emberbrand) return (hasItem('fire_blade')||player.opts.equip.weapon==='fire_blade') && coreCount()>=3 ? '?' : '!'; return null; }; }
+JOURNAL.push(['The Sunken Forge', ()=> !(visitedAreas.emberpass) ? null : CHOICE.emberbrand ? ['done',"Ilka, the spirit of the Sunken Forge, woke the Fire Blade into the Emberbrand."]
+  : ['active', !CHOICE.fireBlade ? "West of the goblin warren lies Cinder Pass. The Flamesworn there follow a captain with a burning sword. A carving says it was quenched in an old forge further west."
+    : !CHOICE.warden ? "You took the Fire Blade from the Flamesworn captain. Somewhere west, in the Sunken Forge, something guards the old smithy."
+    : "Ilka, the forge spirit, will wake the Fire Blade if you bring it and three ember cores ("+coreCount()+"/3). They form where lava cools; the ash hounds swallow them."]]);
+Object.assign(CHOICE,{ fireBlade:CHOICE.fireBlade??null, warden:CHOICE.warden??null, ilka:CHOICE.ilka??null, emberbrand:CHOICE.emberbrand??null });
 </script>
 </body>
 </html>

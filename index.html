@@ -4262,6 +4262,7 @@ const ROOM={ w:13, h:8 };
 const cam={ x:0, y:0 };
 const NPCS=[];
 const WALL_TORCHES=[{side:'r',u:3},{side:'r',u:9},{side:'l',u:2},{side:'l',u:6}];
+const torchHere=tc=>!((AREAS[areaId]||{}).noTorch||[]).includes(tc.side+tc.u);   // a room can do without one (the farm's, too close to the house)
 
 // ── separate rooms, connected by teleporter tiles ──
 let OBJECTS=[], NOTCHES=[], MOB_SPAWNS=[], DUMMY_SPAWN=null, areaId='farm';
@@ -4283,7 +4284,9 @@ const destroyedBreakables_=null;  // "areaId:i,j" — a broken crate/barrel stay
 const defeatedMobs=new Set();         // "areaId:name" — a dead bandit stays dead
 const AREAS = {
   farm:{
-    fence:{r:true,l:true}, w:13, h:8, theme:'farm', label:'The Farm', mini:{x:0,y:0},
+    fence:{r:true,l:true}, w:13, h:8, theme:'farm', label:'The Farm', mini:{x:0,y:0}, noTorch:['r3'], noTree:['9,0'],
+    bushes:[[3.7,7.45,'shrub',1.0],[4.6,7.6,'flower',0.9],[5.3,7.35,'fern',1.0],[6.8,7.6,'shrub',1.2],[7.6,7.4,'flower',1.0],[8.3,7.6,'shrub',0.9],[9.4,7.45,'fern',0.9],   // along the lower fence, round the two trees
+      [0.45,4.0,'shrub',1.0],[0.4,4.7,'flower',0.8],[3.5,0.4,'fern',0.9],[4.2,0.35,'shrub',0.8],[8.6,0.4,'flower',0.9]],                   // by the house, and along the top fence
     notches:()=>[ {i0:10,j0:5}, {i0:0,j0:5, kind:'plough'}, {i0:10,j0:0} ],   // three chamfered, wheat-grown corners
     dummy:null,
     objects:()=>[
@@ -4291,8 +4294,7 @@ const AREAS = {
       {type:'house', i:0, j:0, fp:[3,3], roof:'#c0a050', door:'r', inside:'farmhouse'},
       // the pitchfork leans against the wall beside the door, tines down (older saves took it from 7,4)
       ...(collectedPickups.has('farm:3,2') || collectedPickups.has('farm:7,4') ? [] : [{type:'pickup', i:3, j:2, item:'pitchfork', lean:true}]),
-      {type:'barrel', i:0, j:3, breakable:true},          // against the house
-      {type:'barrel', i:1, j:3, breakable:true},
+      {type:'barrel', i:1, j:3, breakable:true},          // against the house, right of the firewood
       {type:'crate',  i:2, j:3, breakable:true},
       {type:'crate',  i:5, j:0, breakable:true},          // along the east fence
       {type:'crate',  i:6, j:0, breakable:true},
@@ -4588,7 +4590,7 @@ function drawWalls(){
   poly([up(o,H),up(lEnd,H),up(P(-t,h),H),up(P(-t,0),H)],cap);
   poly([up(o,H),up(P(0,-t),H),up(P(-t,-t),H),up(P(-t,0),H)],cap);
 
-  WALL_TORCHES.forEach(drawWallTorch);
+  WALL_TORCHES.filter(torchHere).forEach(drawWallTorch);
 }
 
 function drawWallTorch(tc){
@@ -4673,18 +4675,20 @@ function drawForestNotch(n){
         g.beginPath(); g.moveTo(q.x,q.y-1); g.lineTo(q.x-1.5,q.y-5); g.moveTo(q.x,q.y-1); g.lineTo(q.x+1.5,q.y-5); g.stroke(); } }
     return;
   }
-  // rows of wheat stalks: a thin stem topped with a bristled ear, swaying slightly
-  for(let j=j0;j<j1;j+=0.24) for(let i=i0;i<i1;i+=0.24){
+  // a full field: golden straw underfoot, then close rows of stalks, each a thin stem topped with a bristled ear, swaying slightly
+  { const c0=P(i0,j0), c1=P(i1,j0), c2=P(i1,j1), c3=P(i0,j1); g.fillStyle='rgba(176,138,44,0.75)'; g.beginPath(); g.moveTo(c0.x,c0.y); g.lineTo(c1.x,c1.y); g.lineTo(c2.x,c2.y); g.lineTo(c3.x,c3.y); g.closePath(); g.fill(); }
+  const ST=0.17;
+  for(let j=j0;j<j1;j+=ST) for(let i=i0+((Math.round((j-j0)/ST)%2)?ST/2:0);i<i1;i+=ST){
     const jitter=(hsh(Math.round(i*10),Math.round(j*10))%10)/10;
-    const bi=i+0.15+jitter*0.2, bj=j+0.15+((hsh(Math.round(bi*13),Math.round(j*7))%10)/10)*0.2;
-    if(bi>=i1-0.05 || bj>=j1-0.05) continue;
-    const p=P(bi,bj), sway=Math.sin(gt*1.1+bi*3+bj*2)*1.1, h=9+jitter*3;
+    const bi=i+0.06+jitter*0.1, bj=j+0.06+((hsh(Math.round(bi*13),Math.round(j*7))%10)/10)*0.1;
+    if(bi>=i1-0.04 || bj>=j1-0.04) continue;
+    const p=P(bi,bj), sway=Math.sin(gt*1.1+bi*3+bj*2)*1.1, h=10+jitter*5;
     g.strokeStyle='#8a6a1c'; g.lineWidth=1;
     g.beginPath(); g.moveTo(p.x,p.y-1); g.lineTo(p.x+sway,p.y-h); g.stroke();
-    g.fillStyle=jitter>0.5?'#f0d878':'#e8ca5a';
-    g.beginPath(); g.ellipse(p.x+sway,p.y-h-2,2.6,4.2,sway*0.15,0,Math.PI*2); g.fill();
-    g.fillStyle='#c9a13a';
-    for(let k=-1;k<=1;k+=2){ g.beginPath(); g.moveTo(p.x+sway,p.y-h-2); g.lineTo(p.x+sway+k*3.2,p.y-h-5); g.stroke(); }
+    g.fillStyle=jitter>0.66?'#f4dc80':jitter>0.33?'#ecd068':'#e2c252';
+    g.beginPath(); g.ellipse(p.x+sway,p.y-h-2,2.6,4.4,sway*0.15,0,Math.PI*2); g.fill();
+    g.strokeStyle='#c9a13a';
+    g.beginPath(); for(let k=-1;k<=1;k+=2){ g.moveTo(p.x+sway,p.y-h-2); g.lineTo(p.x+sway+k*3.2,p.y-h-5); } g.stroke();
   }
 }
 // The fence bordering a wheat-field notch: one item per post, each carrying the
@@ -4781,7 +4785,8 @@ function genTrees(id){
     if(rnd01(i*7+id.length,j*13,90)<want && !keep.some(t=>Math.abs(t.i-i)<=1 && Math.abs(t.j-j)<=1 && rnd01(i,j,122)<0.3)){
       const r=rnd01(i,j,91), sp = A.boggy && r<0.55 ? 'bogoak' : A.theme==='village'||A.theme==='farm' ? (r<0.6?'oak':'birch') : A.theme==='elf' ? (r<0.72?'silver':'birch') : A.theme==='fen' ? (r<0.55?'birch':'oak') : A.theme==='bog' ? (r<0.65?'bogoak':'birch') : r<0.42?'pine':r<0.78?'oak':'birch';
       const z=rnd01(i,j,93), size = z<0.25 ? 0.55+z : z<0.8 ? 0.85+(z-0.25)*0.6 : 1.3+(z-0.8)*2.2;   // saplings, grown trees, the odd giant
-      keep.push({type:'tree', i, j, sp, v:Math.floor(rnd01(i,j,92)*3), s:size, ox:(rnd01(i,j,120)-0.5)*0.7, oy:(rnd01(i,j,121)-0.5)*0.7});
+      if((A.noTree||[]).includes(i+','+j)) continue;
+    keep.push({type:'tree', i, j, sp, v:Math.floor(rnd01(i,j,92)*3), s:size, ox:(rnd01(i,j,120)-0.5)*0.7, oy:(rnd01(i,j,121)-0.5)*0.7});
     }
   }
   areaId=saveArea;
@@ -4911,6 +4916,8 @@ function drawRoadDecor(){
     if(r<0.22) paintFern(p.x,p.y,0.8+q*0.5); else if(r<0.40) paintShrub(p.x,p.y,0.7+q*0.6); else if(r<0.50) paintFlowerBush(p.x,p.y,0.7+q*0.4);
     else if(r<0.70) paintGrassClump(p.x,p.y,0.7+q*0.5); else if(r<0.78) paintRock(p.x,p.y,0.5+q*0.6); else if(r<0.84) paintMushrooms(p.x,p.y,0.8+q*0.4);
     else if(r<0.87 && theme!=='village' && theme!=='farm') paintLog(p.x,p.y,0.8+q*0.3); });
+  (AREAS[areaId].bushes||[]).slice().sort((a,b)=>(a[0]+a[1])-(b[0]+b[1])).forEach(([gx,gy,k,sz])=>{ const p=P(gx,gy);   // bushes set by hand
+    const S2=sz*1.55; if(k==='flower') paintFlowerBush(p.x,p.y,S2); else if(k==='fern') paintFern(p.x,p.y,S2); else paintShrub(p.x,p.y,S2); });
 
 }
 // Big trees on the near verge. Solid normally; they fade to see-through only
@@ -7396,7 +7403,7 @@ function drawNight(){
 function drawLightFX(){
   drawNight();
   g.save(); g.globalCompositeOperation='lighter';
-  WALL_TORCHES.forEach(tc=>{
+  WALL_TORCHES.filter(torchHere).forEach(tc=>{
     if((tc.side==='r'?ROOM.w:ROOM.h) < tc.u || !(AREAS[areaId].fence||{r:true,l:true})[tc.side]) return;
     const base = tc.side==='r' ? up(P(tc.u,0),30) : up(P(0,tc.u),30);
     const fl=0.85+Math.sin(gt*7+tc.u*3)*0.08+Math.sin(gt*13+tc.u)*0.05;
@@ -7445,7 +7452,7 @@ function draw(){
 
   drawWorldCache();
   const FCt=AREAS[areaId].fence||{r:true,l:true};
-  WALL_TORCHES.forEach(tc=>{ if((tc.side==='r'?ROOM.w:ROOM.h)>=tc.u && FCt[tc.side]) drawWallTorch(tc); });
+  WALL_TORCHES.filter(torchHere).forEach(tc=>{ if((tc.side==='r'?ROOM.w:ROOM.h)>=tc.u && FCt[tc.side]) drawWallTorch(tc); });
   NOTCHES.forEach(drawForestNotch);
 
   if(combat.active) drawCombatUnder();
@@ -11620,7 +11627,7 @@ function foeSpell(f){ const w=f && f.opts && f.opts.equip && f.opts.equip.weapon
     c.lineCap='butt'; c.restore(); }; }
 // necromancers' staves: no tidy claw-and-stone, but skulls, horns, bones and a cold eye-light
 { const oldDW=drawWeapon; drawWeapon=function(c,hx,hy,ang,id,s=1){ if(!NECRO_STAVES.includes(id)) return oldDW(c,hx,hy,ang,id,s);
-    const P_={ staff_hex:{wood:'#3a3424',glow:'#8ae07a'}, staff_bone:{wood:'#cfc4a4',glow:'#b8f0d0'}, staff_bog:{wood:'#2a2618',glow:'#c8d860'}, staff_barrow:{wood:'#1c1a1e',glow:'#a8c8ff'} }[id];
+    const P_={ staff_hex:{wood:'#1e1b18',glow:'#8ae07a'}, staff_bone:{wood:'#cfc4a4',glow:'#b8f0d0'}, staff_bog:{wood:'#2a2618',glow:'#c8d860'}, staff_barrow:{wood:'#1c1a1e',glow:'#a8c8ff'} }[id];
     const BONE='#ddd2b4', BD='#8a7e62';
     c.save(); c.translate(hx,hy); c.rotate(ang); c.scale(s,s); if(STAFF_REST) c.translate(14,0);
     const r0=STAFF_REST?-46:-8, rl=STAFF_REST?70:32;
@@ -11628,6 +11635,7 @@ function foeSpell(f){ const w=f && f.opts && f.opts.equip && f.opts.equip.weapon
     else { c.fillStyle=P_.wood; c.beginPath(); c.moveTo(r0,-1.2); for(let xx=r0; xx<=r0+rl; xx+=4) c.lineTo(xx,-1.3+Math.sin(xx*0.7)*0.5); c.lineTo(r0+rl,1.3); for(let xx=r0+rl; xx>=r0; xx-=4) c.lineTo(xx,1.3+Math.sin(xx*0.9)*0.4); c.closePath(); c.fill();   // a gnarled, knotted shaft
       c.fillStyle=tone(P_.wood,0.22); c.fillRect(r0,-1.2,rl,0.7); }
     c.strokeStyle='#4a3e2a'; c.lineWidth=0.9; for(let k=0;k<3;k++){ c.beginPath(); c.moveTo(r0+rl-6+k*1.6,-1.7); c.lineTo(r0+rl-7+k*1.6,1.7); c.stroke(); }   // a leather binding under the head
+    if(id==='staff_hex'){ c.fillStyle=tone(P_.wood,-0.1); c.beginPath(); c.ellipse(r0+rl+0.6,0,2.2,1.9,0,0,Math.PI*2); c.fill(); c.restore(); return; }   // the hedge-witch's: just black wood, a worn knob at the top, nothing more
     const hx0=r0+rl+5;                                                                // the head
     if(id==='staff_hex'){ c.strokeStyle='#2a2418'; c.lineWidth=1.3; c.beginPath(); c.moveTo(hx0-4,-2); c.quadraticCurveTo(hx0+2,-10,hx0+9,-8); c.moveTo(hx0-4,2); c.quadraticCurveTo(hx0+2,10,hx0+9,8); c.stroke(); }   // two black horns curving forward
     if(id==='staff_bog'){ c.strokeStyle='#3a3020'; c.lineWidth=0.9; [[-7,-3],[-5,5],[9,-6],[8,6]].forEach(([dx,dy])=>{ c.beginPath(); c.moveTo(hx0-2,0); c.quadraticCurveTo(hx0+dx*0.5,dy*1.4,hx0+dx,dy); c.stroke(); });   // tangled roots round a bird's skull

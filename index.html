@@ -526,8 +526,8 @@ const charOpts = { gender:'m', race:'human', skin:1, hair:0, hairColor:2, beard:
 // six faces per gender; the first is the original. Same proportions, different features.
 const FACES = {
   f:[ { name:'Classic',  eye:'#4a7ac0', lip:['#a04c5a','#c4707d'], arch:1.0, brow:1.0 },
-      { name:'Freckled', eye:'#4f8a5a', lip:['#b25e6a','#d48a90'], arch:0.8, brow:0.75, freckles:true },
-      { name:'Noble',    eye:'#7a5230', lip:['#8a2e42','#b04a5c'], arch:1.35, brow:1.0, mole:true },
+      { name:'Dreamy',   eye:'#6a7a7a', lip:['#b0566a','#d88c98'], arch:0.9, brow:0.8, eh:1.05, lipK:1.2, lids:true },          // heavy, half-lowered lids
+      { name:'Regal',    eye:'#7a5230', lip:['#6e2a3e','#94445a'], arch:1.45, brow:1.05, slant:0.45, eh:0.84, lipK:0.85, cheek:true },   // high cheekbones, a lifted gaze
       { name:'Fierce',   eye:'#5f857a', lip:['#7a3440','#96505a'], arch:0.7, brow:1.3, slant:1.7, eh:0.68, lipK:0.6, cheek:true },
       { name:'Sweet',    eye:'#6aa0d8', lip:['#c05a6c','#e0909c'], arch:0.6, brow:0.7, slant:-0.7, eh:1.26, lipK:1.3, dimples:true },
       { name:'Weathered',eye:'#7a6a3a', lip:['#94545a','#aa7076'], arch:0.85, brow:0.9, eh:0.9, lipK:0.8, lines:true, bags:true } ],
@@ -3160,10 +3160,16 @@ function drawHead(c, x, B, opts, view=0){
         c.fillStyle=gi; c.beginPath(); c.arc(icx,icy,ir,0,Math.PI*2); c.fill();
         fs('#140c06'); c.beginPath(); c.arc(icx,icy,ir*0.46,0,Math.PI*2); c.fill();
         fs('rgba(40,22,10,0.18)'); c.fillRect(x+ex,B+ET,w,0.6);                 // lid shadow
+        if(FC.lids){ fs(tone(skin,-0.06)); c.fillRect(x+ex-1,B+ET-2,w+2,eh*0.5+2); fs(tone(skin,-0.2,0.6)); c.fillRect(x+ex-1,B+ET+eh*0.5-0.6,w+2,0.6); }   // a heavy upper lid, lowered half over the eye
       c.restore();
       fs('rgba(255,255,255,0.95)'); c.beginPath(); c.arc(icx-ir*0.35,icy-ir*0.4,0.45,0,Math.PI*2); c.fill();
       if(!F){ c.strokeStyle='rgba(42,24,8,0.7)'; c.lineWidth=0.45; c.lineCap='round';      // a fine lid line, kept inside the eye so it never reads as a second brow
         c.beginPath(); c.moveTo(x+ex+0.2,B+ET+0.4); c.quadraticCurveTo(x+ex+w/2,B+ET-0.3,x+ex+w-0.2,B+ET+0.4); c.stroke(); }
+      else if(FC.lids){                         // the lash line follows the lowered lid
+        c.strokeStyle='#2a1808'; c.lineWidth=1.0; c.lineCap='round';
+        c.beginPath(); c.moveTo(x+ex-0.4,B+ET+eh*0.55); c.quadraticCurveTo(x+ex+w/2,B+ET+eh*0.32,x+ex+w+0.4,B+ET+eh*0.55); c.stroke();
+        c.strokeStyle=tone(skin,-0.3,0.6); c.lineWidth=0.5; c.beginPath(); c.moveTo(x+ex,B+ET-0.4); c.quadraticCurveTo(x+ex+w/2,B+ET-1.6,x+ex+w,B+ET-0.4); c.stroke();   // the crease above
+      }
       else {                                   // an arched upper lid instead of a flat bar
         c.strokeStyle='#2a1808'; c.lineWidth=0.9; c.lineCap='round';
         c.beginPath(); c.moveTo(x+ex-0.4,B+ET+eh*0.5); c.quadraticCurveTo(x+ex+w/2,B+ET-1.7,x+ex+w+0.4,B+ET+eh*0.5); c.stroke();
@@ -7651,13 +7657,15 @@ function snapshot(){
     cam:  { x:cam.x, y:cam.y },
     world:{ area:areaId, purse:player.purse, letter:loreNoteGiven, quests:{...QUEST}, choices:{...CHOICE}, visited:Object.keys(visitedAreas),
             pickups:[...collectedPickups], broken:[...destroyedBreakables], brokenK:{...OPENED_KIND}, defeated:[...defeatedMobs] },
-    ts:   Date.now(), v:2,
+    ts:   Date.now(), v:3,
   };
 }
 
 function loadGame(id){ const list=readSaves(); if(!list) return; const sv=list.find(e=>e.id===id); if(sv) applySave(sv); }
 function deleteSaveByName(n){ const list=readSaves(); if(!list) return; writeSaves(list.filter(e=>nameKey(e.name)!==nameKey(n))); renderSaves(); }
 function applySave(sv){
+  // saves from before v3: the women's Freckled and Noble faces became Dreamy and Regal; their freckles and mole are face details now
+  if(sv && sv.opts && (sv.v||0)<3 && sv.opts.gender==='f'){ const M=sv.opts.marks=sv.opts.marks||{}; if((sv.opts.face|0)===1) M.freckles=true; if((sv.opts.face|0)===2) M.mole=true; }
   player.name=sv.name||'Wanderer';
   player.opts={...sv.opts};
   // saves from before the inventory existed get the starting kit

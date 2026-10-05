@@ -11026,8 +11026,8 @@ function drawActor(e){
   if(!isP && e.dead) return;
   const ty=B-(e.type==='wolf'?66:114);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
-  const deadly=!isP && e.type!=='dummy' && e.hostile!==false && player.maxHp>0 && ((e.maxHp||0)*(((weaponOf(e)||{}).dmg)||5)) >= 2*player.maxHp*Math.max(8,((weaponOf(player)||{}).dmg)||5);   // far stronger than you: a skull
-  const label=(deadly?'☠ ':'')+e.name, tw=g.measureText(label).width;
+  const deadly=!isP && e.type!=='dummy' && e.hostile!==false && player.maxHp>0 && ((e.maxHp||0)*(((weaponOf(e)||{}).dmg)||5)*tierDmg(e)) >= 2*player.maxHp*Math.max(8,playerHitDmg());   // far stronger than you: a skull
+  const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  '+'◆'.repeat(e.tier) : ''), tw=g.measureText(label).width;
   g.fillStyle=deadly?'rgba(60,8,6,0.85)':'rgba(12,8,3,0.78)'; g.beginPath(); g.roundRect(s.x-tw/2-7,ty,tw+14,16,4); g.fill();
   if(deadly){ g.strokeStyle='rgba(220,70,50,0.8)'; g.lineWidth=1; g.stroke(); }
   g.fillStyle=isP?'#e8c878':(e.hostile===false?'#a8c4e0':deadly?'#ff9a80':'#f08a70'); g.textAlign='center'; g.textBaseline='middle'; g.fillText(label,s.x,ty+8);
@@ -11148,7 +11148,7 @@ const HEX_SPELLS = { up:  { name:'Drain', col:'#8ae07a', rgb:'140,230,120', cost
 const NECRO_STAVES=['staff_hex','staff_bone','staff_bog','staff_barrow'];
 const spellsFor=()=> NECRO_STAVES.includes(player.opts&&player.opts.equip.weapon) ? HEX_SPELLS : SPELLS;
 let SKEL=null;                                   // the risen skeleton: fights beside you for a while, then falls apart
-const SPM=()=>((WEAPONS[player.opts&&player.opts.equip.weapon]||{}).magic||1)+(typeof gearSum==='function'?gearSum('magic'):0)*0.06;   // staff × gear: each point of spell power on your gear adds 6%   // spell power, as a multiplier
+const SPM=()=>((WEAPONS[player.opts&&player.opts.equip.weapon]||{}).magic||1)*(1+(typeof gearSum==='function'?gearSum('magic'):0)*0.04);   // staff × gear: each point of spell power on your gear adds 6%   // spell power, as a multiplier
 function raiseSkeleton(f){ const m=SPM(); SKEL={t:Math.round(9*m*10)/10, max:Math.round(9*m*10)/10, dmg:Math.max(2,Math.round(3*m)), cd:0.9, hits:0, anim:0, rise:0, crumble:0}; floatText(tileOf(player),'The dead rise!','#e8e4d0'); logMsg('Bones claw their way out of the earth and turn on your foe.','#e8e4d0'); }
 // withered foes hit for half
 { const oldHP=hurtPlayer; hurtPlayer=function(n,label,...r){ if(n>0 && combat.foe && hasStatus(combat.foe,'weak')) n=Math.max(1,Math.ceil(n*0.5)); return oldHP(n,label,...r); }; }
@@ -11227,7 +11227,8 @@ let bolts=[];
     if(player.mana<S.cost){ floatText(tileOf(player),'Out of mana','#a8a0c8'); return oldHit(); }      // a plain whack with the staff
     player.mana-=S.cost; lunge(player,f); duel.caught=false;
     bolts.push({from:{x:player.x,y:player.y}, to:f, t:0, S});
-    let dmg=Math.round(S.dmg*W.magic), lbl=S.name+'!', col=S.col, fx=true;
+    let dmg=Math.round(S.dmg*SPM()), lbl=S.name+'!', col=S.col, fx=true; HIT_SRC='spell';
+    if(f.state==='windup' && !(playerGuard===f.swingDir && (f.wind-f.t)<=PARRY.punish)){ dmg=Math.round(dmg*0.5); lbl='Hurried'; col='#d8b0a0'; }   // cast into his swing: half
     const DEF=foeDef(f)||{}, guarding=!DEF.unguarded && !['recover','stagger','windup','down'].includes(f.state) && playerGuard===f.guardDir;
     if(guarding){                                  // aim at the side he covers and he can still answer it: a ward, a shield, or a quick step aside
       const sh=((f.opts&&f.opts.equip&&f.opts.equip.offhand)||'').includes('shield');
@@ -11852,14 +11853,15 @@ const AGI_DODGE=0.05;                                     // each point of agili
     if(n>0 && agi>0 && !combat.practice && Math.random()<agi*AGI_DODGE){ floatText(tileOf(player),'Dodge!','#a8e0ff',true); player.flash=0.15; return; }
     return oldH(n,label); }; }
 // magic damage from gear adds to every spell
-{ const W0=WEAPONS; const oldW=wound; wound=function(f,dmg,label,col,...r){ if(typeof label==='string' && /!$/.test(label) && isMagicWeapon && isMagicWeapon() && f!==player) dmg+=gearSum('magic'); return oldW(f,dmg,label,col,...r); }; }
+// (spell power used to be added flat to every hit; it is now a multiplier, see BALANCE at the end)
 // every stat a piece of gear carries, in words
 function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
   if(id==='fen_boots') L.push(['Walking speed','+15%']);
   if(WEAPONS[id]){ L.push(['Damage',WEAPONS[id].dmg]); L.push(['Swing time',WEAPONS[id].wind.toFixed(2)+'s <small>('+(WEAPONS[id].wind<=0.17?'fast':WEAPONS[id].wind<=0.22?'steady':'slow')+')</small>']); } if(WEAPONS[id]&&WEAPONS[id].magic) L.push(['Spell power','×'+WEAPONS[id].magic]);
   const hp=GEAR_HP[id]||0; if(hp) L.push(['Health','+'+hp]);
   if(st.agi) L.push(['Agility','+'+st.agi+' <small>('+Math.round(st.agi*AGI_DODGE*100)+'% dodge)</small>']);
-  if(st.magic) L.push(['Spell power','+'+st.magic]);
+  if(st.ap) L.push(['Attack power','+'+st.ap+' <small>(+'+st.ap*4+'% weapon damage)</small>']);
+  if(st.magic) L.push(['Spell power','+'+st.magic+' <small>(+'+st.magic*4+'% spell damage)</small>']);
   const s2=itemStat(id); if(s2 && /shield|swing/.test(s2.short)) L.push(['Special',s2.short.replace(/^\+\d+ HP, /,'')]);
   return L; }
 { const mk=id=>{ const d=document.createElement('div'); d.id=id; d.className='itip'; document.body.appendChild(d); return d; };
@@ -11868,9 +11870,9 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
   document.head.appendChild(css);
   const num=v=>parseFloat(String(v).replace(/[^\d.\-]/g,''))||0;
   const html=(id,vs,eq)=>{ const L=itemStatLines(id), M=vs?Object.fromEntries(itemStatLines(vs)):null;
-    const keys=new Set(L.map(r=>r[0])); if(M) Object.keys(M).forEach(k=>{ if(!keys.has(k) && /Health|Agility|Magic|Damage/.test(k)) L.push([k,'0']); });
+    const keys=new Set(L.map(r=>r[0])); if(M) Object.keys(M).forEach(k=>{ if(!keys.has(k) && /Health|Agility|Magic|Damage|Attack|Spell power/.test(k)) L.push([k,'0']); });
     return (eq?'<span class="eqh">equipped</span>':'')+`<b>${ITEMS[id].name}</b><i>${SLOT_NAMES[ITEMS[id].slot]||''}</i>`+(L.length?L.map(([k,v])=>{ let d='';
-      if(M){ const df=num(v)-num(M[k]||0); if(Math.abs(df)>0.001 && !/Special|power/.test(k)){ const inv=/Swing/.test(k), dd=inv?df.toFixed(2):df; d=` <em class="${(inv?df<0:df>0)?'up':'dn'}">(${df>0?'+':''}${dd}${inv?'s':''})</em>`; } }
+      if(M){ const df=num(v)-num(M[k]||0); if(Math.abs(df)>0.001 && !/Special|×/.test(k+v)){ const inv=/Swing/.test(k), dd=inv?df.toFixed(2):df; d=` <em class="${(inv?df<0:df>0)?'up':'dn'}">(${df>0?'+':''}${dd}${inv?'s':''})</em>`; } }
       return `<div class="r">${k}<span>${v}${d}</span></div>`; }).join(''):ITEMS[id].slot==='food'?'':'<small>No bonuses. Looks good, though.</small>')+extraTip(id); };
   const FOOD_TIP={ apple:'A crisp apple. A small bite between fights.', bread:'A dense brown loaf. Fills the belly.', potion:'Red, bitter, and it works fast. The best thing to have in a bad fight.', raw_meat:'Edible, barely. Cook it at an inn or a hunter\'s fire and it heals far more.', cooked_meat:'Spit-roasted and salted. A proper meal.' };
   const extraTip=id=>{ const it=ITEMS[id];
@@ -11878,7 +11880,7 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
     if(typeof NECRO_STAVES!=='undefined' && NECRO_STAVES.includes(id)){ const n=NECRO();
       if(n===0) return `<div class="fl" style="color:#b8a8e8">You don't know how to use this staff properly. In your hands it is just a heavy stick. Maybe look for someone who hangs around graveyards...?</div>`;
       if(n<3) return `<div class="fl" style="color:#b8a8e8">You know ${n===1?'one word':'two words'} of this staff (${['Drain: lean up','Wither: lean right'].slice(0,n).join(', ')}). Vesna can teach you the rest.</div>`;
-      const m=WEAPONS[id].magic+(typeof gearSum==='function'?gearSum('magic'):0)*0.06, g0=typeof gearSum==='function'?gearSum('magic'):0, d=k=>Math.round(HEX_SPELLS[k].dmg*WEAPONS[id].magic)+g0;
+      const m=WEAPONS[id].magic*(1+(typeof gearSum==='function'?gearSum('magic'):0)*0.04), d=k=>Math.round(HEX_SPELLS[k].dmg*m);
       return `<div class="fl" style="color:#b8a8e8">Drain (up): ${d('up')} damage, heals ${Math.round(3*m)}<br>Wither (right): ${d('right')} damage, foe hits for half<br>Raise Dead (left): a skeleton for ${Math.round(9*m)}s, ${Math.max(2,Math.round(3*m))} per blow</div>`; }
     return ''; };
   const FLAVOR={ necro_robe:'Vesna\'s old robe: black wool worn thin and grey, the hem gone to long rags, fen mud soaked into it, a sprig of dried bog-myrtle in the cord at the throat.', necro_bustier:'A black bodice, frayed at every edge and laced with a leather cord. It smells of peat smoke.', necro_leggings:'Black knitted stockings, laddered and worn through at the knee, muddy to the shin. A fen-witch does not care.', grave_mote:'A little cold light that sits in your palm like a moth. It came up out of an old grave.', heartshard:'A cracked crystal the size of a fist, from the heart of the goblin cave. Green light turns inside it. Someone who knows staves could use it.', raw_meat:'A bloody cut. Better roasted: an inn, or a hunter\'s fire, will cook it.', cooked_meat:'Spit-roasted, salted, still warm. Keeps you going.', wolf_fang:'A long yellow fang. Traders buy them for charms.', morwen_lantern:'A little iron lantern with a green flame that never goes out. Old Morwen wants it back.', bog_coins:'Coins so old the faces on them have no names. Still silver, though.', silver_torc:'A twisted silver neck-ring, black with bog water. A trader would pay well.', amber_brooch:'A lump of amber in a bronze setting, with a fly caught inside it forever.', wight_ring:'Black gold, cold as the barrow. The Barrow-King wore it for a thousand years.', pelt:'A grey wolf hide, still smelling of the wood. Someone will pay for it.',
@@ -11921,7 +11923,7 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
   const oc=closeDialog; closeDialog=function(){ hide(); return oc.apply(this,arguments); };
 }
 { const oldP=refreshStatPanel; refreshStatPanel=function(){ oldP(); const panel=document.getElementById('stat-panel'); if(!panel||!player.opts) return; const a=gearSum('agi'), m=gearSum('magic'), W=weaponOf(player);
-    panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Swing Time</b><span>${W.wind.toFixed(2)}s</span></div><div class="stat-row"><b>Agility</b><span>${a}${a?` (${Math.round(a*AGI_DODGE*100)}% dodge)`:''}</span></div><div class="stat-row"><b>Spell Power</b><span>${m?'+'+m:0}</span></div>`); }; }
+    panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Swing Time</b><span>${W.wind.toFixed(2)}s</span></div><div class="stat-row"><b>Agility</b><span>${a}${a?` (${Math.round(a*AGI_DODGE*100)}% dodge)`:''}</span></div><div class="stat-row"><b>Attack Power</b><span>${gearSum('ap')} (×${APM().toFixed(2)} weapon)</span></div><div class="stat-row"><b>Spell Power</b><span>${m}${isMagicWeapon()?' (×'+SPM().toFixed(2)+' spells)':''}</span></div>`); }; }
 
 // food and draughts: the grocer, the innkeeper and the priestess sell them
 { const oldG=TALKERS.grocer; TALKERS.grocer=()=>{ if(!CHOICE.nim){ oldG(); return; }
@@ -12697,6 +12699,32 @@ setInterval(()=>{ try{ if(!running || CS.on) return; const h=HOUR();
 
 // torso garments (shirts, tunics, bodices, robes worn as the torso layer) are cosmetic only: no stats at all
 for(const id in ITEMS){ const it=ITEMS[id]; if(it && it.slot==='torso'){ delete ITEM_STATS[id]; if(GEAR_HP[id]) GEAR_HP[id]=0; } }
+
+// ════════════════════════════════════════════════════════════
+//  BALANCE: two damage stats that work the same way, and one danger level per place
+//   · Attack Power (gear): each point +4% weapon damage.   Spell Power (gear): each point +4% spell damage,
+//     on top of the staff's own multiplier. Nothing is added flat any more.
+//   · Spells cast into a foe's wind-up do half damage, so a mage reads the fight like a swordsman does.
+//   · Every place has a danger level, 1 to 5, shown as ◆ after a foe's name. Each level adds
+//     20% to a foe's health and 12% to the damage of its blows. That is the whole rule.
+// ════════════════════════════════════════════════════════════
+const AP_STATS={ gloves:1, gauntlets:3, jerkin:1, gambeson:1, studded:2, mail:1, blackmail:3, brightmail:3, elf_scale:3, elf_cloak:1,
+  kettle:1, coif:1, helm_full:2, bandana:1, riding_boots:1, plate_boots:2, breeches:1, hose_grey:1, shield_red:1 };
+Object.entries(AP_STATS).forEach(([id,v])=>{ ITEM_STATS[id]={...(ITEM_STATS[id]||{}), ap:v}; });
+ITEM_STATS.elf_cloak={...ITEM_STATS.elf_cloak, magic:1};
+const APM=()=>1+gearSum('ap')*0.04;
+var HIT_SRC=null;                       // who caused the wound being dealt right now: 'melee', 'spell' or null (bones, burns)
+{ const oldPH=playerHit; playerHit=function(...a){ HIT_SRC='melee'; try{ return oldPH.apply(this,a); } finally{ HIT_SRC=null; } }; }
+{ const oldW=wound; wound=function(f,n,...r){ if(f!==player && HIT_SRC==='melee' && n>0) n=Math.round(n*APM()); return oldW(f,n,...r); }; }
+const playerHitDmg=()=> isMagicWeapon() ? SPELLS.right.dmg*SPM() : weaponOf(player).dmg*APM();
+const AREA_TIER={ farm:1, road:1, lane:1, millroad:2, wolfwood:2, camp:2, southtrail:2, mistmere:2, clearing:2,
+  fellings:3, ruin:3, lowstreets:3, warren:3, kingsroad:3, elfroad:3, cave1:3, cave2:4, cave3:4, cave4:4,
+  fen:4, fenlow:4, fenpath:4, barrow:5 };
+const tierOf=area=>AREA_TIER[area]||(AREAS[area]&&AREAS[area].tier)||2;
+const tierDmg=f=> 1+0.12*(((f&&f.tier)||1)-1);
+{ const oldRM=resetMobs; resetMobs=function(){ oldRM(); const t=tierOf(areaId);
+    mobs.forEach(m=>{ if(m.type==='dummy') return; m.tier=t; const hp=Math.round(m.maxHp*(1+0.2*(t-1))); m.maxHp=hp; if(!m.dead) m.hp=hp; }); }; }
+{ const oldHP=hurtPlayer; hurtPlayer=function(n,...r){ const f=combat.foe; if(n>0 && f && f.tier) n=Math.round(n*tierDmg(f)); return oldHP(n,...r); }; }
 </script>
 </body>
 </html>

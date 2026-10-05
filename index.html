@@ -2347,7 +2347,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   // the camera; turning away (NE) it's the screen-right side.
   const nearS = V.turn > -0.25 ? -1 : 1;
   const farDepth = V.prof*0.85;
-  if(V.prof>0.3){ drawArm(-nearS,farDepth); if(E.offhand==='shield' && offHandAt && offHandAt.behind) drawShieldOnArm(c,offHandAt.x,offHandAt.y,V.prof); }
+  if(V.prof>0.3){ drawArm(-nearS,farDepth); if(E.offhand==='shield' && offHandAt && offHandAt.behind && V.prof>0.6) drawShieldOnArm(c,offHandAt.x,offHandAt.y,V.prof,V.turn<-0.2); }   // only a true profile hides the shield behind you
   drawLeg(-nearS,V.prof*0.8);
   drawLeg( nearS,0);
 
@@ -2665,7 +2665,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
     const hc = E.hands==='gloves' ? GEAR.glove : skin;
     c.fillStyle=tone(hc,-0.04); c.beginPath(); c.arc(handAt.x,handAt.y,2.8,0,Math.PI*2); c.fill();
   }
-  if(E.offhand==='shield' && offHandAt && !offHandAt.behind) drawShieldOnArm(c,offHandAt.x,offHandAt.y,V.prof);
+  if(E.offhand==='shield' && offHandAt && (!offHandAt.behind || V.prof<=0.6)) drawShieldOnArm(c,offHandAt.x,offHandAt.y,V.prof,V.turn<-0.2);
 }
 // ── Hook for your own body details ──────────────────────────────────────
 // Called once per figure, per frame, on bare skin and before clothing is drawn.
@@ -3013,19 +3013,26 @@ function drawCustomBodyDetails(c,b){
 }
 
 // A round shield strapped to the forearm, angled slightly outward.
-function drawShieldOnArm(c,x,y,prof){
-  if(SHIELD_KIND==='shield_red' || SHIELD_KIND==='shield_iron'){
-    const kite=SHIELD_KIND==='shield_iron', col=SHIELD_COL||'#8a2a24';
-    c.save(); c.translate(x,y-1); c.rotate(-0.12+prof*0.1); c.scale(1-prof*0.35,1);
-    const shape=()=>{ c.beginPath(); if(kite){ c.moveTo(-6.4,-8); c.quadraticCurveTo(0,-11.5,6.4,-8); c.quadraticCurveTo(6.6,2,0,13); c.quadraticCurveTo(-6.6,2,-6.4,-8); }
-      else { c.moveTo(-7,-7.4); c.lineTo(7,-7.4); c.lineTo(7,0); c.quadraticCurveTo(6,6.8,0,10); c.quadraticCurveTo(-6,6.8,-7,0); } c.closePath(); };
+function drawShieldOnArm(c,x,y,prof,back){        // back: seen from behind, you see its wooden back, the straps and the grip
+  const KITE=SHIELD_KIND==='shield_iron', HEATER=SHIELD_KIND==='shield_red', col=SHIELD_COL||(HEATER?'#8a2a24':KITE?'#6a7480':'#8a5a28');
+  c.save(); c.translate(x,y-1); c.rotate((KITE||HEATER?0.12:0.18)-prof*0.22); c.scale(1-prof*0.35,1);   // the bottom tucks in toward the body a little
+  const shape=()=>{ c.beginPath(); if(KITE){ c.moveTo(-6.4,-8); c.quadraticCurveTo(0,-11.5,6.4,-8); c.quadraticCurveTo(6.6,2,0,13); c.quadraticCurveTo(-6.6,2,-6.4,-8); }
+    else if(HEATER){ c.moveTo(-7,-7.4); c.lineTo(7,-7.4); c.lineTo(7,0); c.quadraticCurveTo(6,6.8,0,10); c.quadraticCurveTo(-6,6.8,-7,0); }
+    else c.arc(0,0,7.4,0,Math.PI*2); c.closePath(); };
+  if(back){                                        // the inside: planks, a padded strap for the forearm and a grip for the hand
+    shape(); c.fillStyle=KITE||HEATER?tone(col,-0.5):'#4a2e14'; c.fill();
+    c.save(); c.scale(0.86,0.88); shape(); c.clip(); const gw=c.createLinearGradient(-7,0,7,0); gw.addColorStop(0,'#7a5634'); gw.addColorStop(1,'#4e3420'); c.fillStyle=gw; c.fillRect(-9,-12,18,26);
+    c.strokeStyle='rgba(30,18,8,0.55)'; c.lineWidth=0.6; for(let px=-6;px<=6;px+=3){ c.beginPath(); c.moveTo(px,-12); c.lineTo(px,14); c.stroke(); } c.restore();
+    c.fillStyle='#3a2410'; c.fillRect(-6,-3.2,12,2.4); c.fillRect(-4.5,2.2,9,2.2);                 // the strap and the grip
+    c.fillStyle='#8a7a5a'; [[-5.4,-2],[5.4,-2],[-3.8,3.3],[3.8,3.3]].forEach(([a,b2])=>{ c.beginPath(); c.arc(a,b2,0.6,0,Math.PI*2); c.fill(); });
+    c.restore(); return; }
+  if(KITE||HEATER){
     shape(); c.fillStyle=tone(col,-0.45); c.fill();
     c.save(); c.scale(0.86,0.88); shape(); const gs=c.createLinearGradient(-7,0,7,0); gs.addColorStop(0,tone(col,0.2)); gs.addColorStop(1,tone(col,-0.25)); c.fillStyle=gs; c.fill(); c.restore();
-    if(kite){ c.fillStyle='#8a929c'; c.fillRect(-0.9,-9.5,1.8,20); c.fillRect(-5.8,-3,11.6,1.6); c.fillStyle='#d8dce0'; [[-5,-6.5],[5,-6.5],[0,10],[-4.6,3],[4.6,3]].forEach(([a,b2])=>{ c.beginPath(); c.arc(a,b2,0.7,0,Math.PI*2); c.fill(); }); }
+    if(KITE){ c.fillStyle='#8a929c'; c.fillRect(-0.9,-9.5,1.8,20); c.fillRect(-5.8,-3,11.6,1.6); c.fillStyle='#d8dce0'; [[-5,-6.5],[5,-6.5],[0,10],[-4.6,3],[4.6,3]].forEach(([a,b2])=>{ c.beginPath(); c.arc(a,b2,0.7,0,Math.PI*2); c.fill(); }); }
     else { c.fillStyle='#e0c050'; c.beginPath(); c.moveTo(-6,2); c.lineTo(0,-3.6); c.lineTo(6,2); c.lineTo(6,4.6); c.lineTo(0,-1); c.lineTo(-6,4.6); c.closePath(); c.fill(); }
     c.fillStyle='rgba(255,255,255,0.14)'; c.beginPath(); c.ellipse(-3,-4,2.4,1.4,-0.4,0,Math.PI*2); c.fill();
     c.restore(); return; }
-  c.save(); c.translate(x,y-1); c.rotate(-0.25+prof*0.15); c.scale(1-prof*0.35,1);
   c.fillStyle=SHIELD_COL?tone(SHIELD_COL,-0.3):'#6a4018'; c.beginPath(); c.arc(0,0,7.4,0,Math.PI*2); c.fill();
   c.fillStyle=SHIELD_COL||'#8a5a28'; c.beginPath(); c.arc(0,0,6.2,0,Math.PI*2); c.fill();
   c.strokeStyle='#4a2e14'; c.lineWidth=1; c.beginPath(); c.arc(0,0,6.2,0,Math.PI*2); c.stroke();

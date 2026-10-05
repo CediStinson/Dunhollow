@@ -4184,13 +4184,14 @@ const AREAS = {
     objects:()=>[
       {type:'well',   i:6, j:3},
       {type:'house', i:0, j:0, fp:[3,3], roof:'#c0a050', door:'r', inside:'farmhouse'},
-      ...(collectedPickups.has('farm:7,4') ? [] : [{type:'pickup', i:7, j:4, item:'pitchfork'}]),
-      {type:'barrel', i:2, j:4, breakable:true},
-      {type:'barrel', i:2, j:3, breakable:true},
-      {type:'crate',  i:4, j:6, breakable:true},
-      {type:'crate',  i:5, j:6, breakable:true},
-      {type:'crate',  i:6, j:6, breakable:true},
-      {type:'barrel', i:9, j:4, breakable:true},
+      // the pitchfork leans against the wall beside the door, tines down (older saves took it from 7,4)
+      ...(collectedPickups.has('farm:3,2') || collectedPickups.has('farm:7,4') ? [] : [{type:'pickup', i:3, j:2, item:'pitchfork', lean:true}]),
+      {type:'barrel', i:0, j:3, breakable:true},          // against the house
+      {type:'barrel', i:1, j:3, breakable:true},
+      {type:'crate',  i:2, j:3, breakable:true},
+      {type:'crate',  i:5, j:0, breakable:true},          // along the east fence
+      {type:'crate',  i:6, j:0, breakable:true},
+      {type:'barrel', i:7, j:0, breakable:true},
       {type:'teleporter', i:12, j:3, to:'road', entry:'fromFarm'},   // tucked at the east edge, past the bandits
     ].filter(o=>!o.breakable || !destroyedBreakables.has('farm:'+o.i+','+o.j)),
     mobs:()=>[
@@ -4289,7 +4290,7 @@ Object.assign(AREAS,{
       {type:'crate', i:0, j:1, breakable:true},
       ...(collectedPickups.has('farmhouse:1,3') ? [] : [{type:'pickup', i:1, j:3, item:'straw_hat'}]),
     ].filter(o=>!o.breakable || !destroyedBreakables.has('farmhouse:'+o.i+','+o.j)),
-    entries:{ fromFarm:{i:3,j:2} } },
+    entries:{ fromFarm:{i:3,j:2}, bed:{i:1,j:1} } },
   elderhouse:{ ...INSIDE_BASE, w:6, h:5, theme:'interior', label:"Hamond's House", mini:{x:0,y:0},
     objects:()=>[
       {type:'teleporter', i:2, j:4, to:'village', entry:'fromHouse'},
@@ -5157,6 +5158,16 @@ function paintStall(x,y){
 }
 // ── interiors ──────────────────────────────────────────────────────────────
 // Plank floor, two log walls at the back (with a small window), and furniture.
+// the sky seen through a window: day blue over green, warm at dusk, pink at dawn, near black at night
+function windowSky(){
+  const n=nightAmt(), t=(dayClock%DAY_LEN)/DAY_LEN;                // 0 noon · 0.25 dusk · 0.5 midnight · 0.75 dawn
+  const mix=(a,b,k)=>{ const A=_rgb(a), Bc=_rgb(b); return '#'+A.map((v,i)=>Math.round(v+(Bc[i]-v)*k).toString(16).padStart(2,'0')).join(''); };
+  const dusk=Math.max(0,1-Math.abs(t-0.25)/0.09), dawn=Math.max(0,1-Math.abs(t-0.75)/0.09);
+  let top=mix('#a8c8e0','#0c1324',n), bot=mix('#6a9a5a','#121a12',n);
+  if(dusk) { top=mix(top,'#d89060',dusk*0.7); bot=mix(bot,'#5a3a28',dusk*0.5); }
+  if(dawn) { top=mix(top,'#e4a8b4',dawn*0.7); bot=mix(bot,'#6a5a5a',dawn*0.4); }
+  return { top, bot, stars:Math.max(0,(n-0.6)/0.4), key:Math.round(n*10)+'/'+Math.round(dusk*4)+'/'+Math.round(dawn*4) };
+}
 function paintInteriorWalls(){
   if(AREAS[areaId] && AREAS[areaId].elfhall) return paintElfHallWalls();
   const {w,h}=ROOM, H=118, o=P(0,0), rEnd=P(w,0), lEnd=P(0,h);
@@ -5170,8 +5181,10 @@ function paintInteriorWalls(){
     const len=side==='r'?w:h, t0=0.42, t1=0.58, L=(t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
     const p0=L(t0), p1=L(t1), lo=52, hi=84;
     g.fillStyle='#24160a'; g.beginPath(); g.moveTo(p0.x,p0.y-lo+2); g.lineTo(p1.x,p1.y-lo+2); g.lineTo(p1.x,p1.y-hi-2); g.lineTo(p0.x,p0.y-hi-2); g.closePath(); g.fill();
-    const sky=g.createLinearGradient(0,p0.y-hi,0,p0.y-lo); sky.addColorStop(0,'#a8c8e0'); sky.addColorStop(1,'#6a9a5a');
+    const WS=windowSky(), sky=g.createLinearGradient(0,p0.y-hi,0,p0.y-lo); sky.addColorStop(0,WS.top); sky.addColorStop(1,WS.bot);
     g.fillStyle=sky; g.beginPath(); g.moveTo(p0.x,p0.y-lo); g.lineTo(p1.x,p1.y-lo); g.lineTo(p1.x,p1.y-hi); g.lineTo(p0.x,p0.y-hi); g.closePath(); g.fill();
+    if(WS.stars>0){ g.fillStyle=`rgba(230,235,255,${0.8*WS.stars})`;                       // a few stars in the pane at night
+      for(let k=0;k<5;k++){ const t=t0+(t1-t0)*(0.12+0.76*rnd01(k,len,901)), pp=L(t); g.fillRect(pp.x,pp.y-hi+3+rnd01(k,len,902)*(hi-lo-12),1.2,1.2); } }
     g.strokeStyle='#3a2412'; g.lineWidth=1.6; const pm=L((t0+t1)/2); g.beginPath(); g.moveTo(pm.x,pm.y-lo); g.lineTo(pm.x,pm.y-hi); g.moveTo(p0.x,p0.y-(lo+hi)/2); g.lineTo(p1.x,p1.y-(lo+hi)/2); g.stroke();
   };
   wall(o,rEnd,'#6a4a2a','#3e2a16','r'); wall(lEnd,o,'#54391f','#2e1f10','l');
@@ -6019,8 +6032,9 @@ function drawObject(o){
     g.restore();
   } else if(o.type==='pickup'){
     g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x,y+2,10,4,0,0,Math.PI*2); g.fill();
-    const bob=Math.sin(gt*1.6)*1.5;
-    if(ITEMS[o.item].slot==='weapon') drawWeapon(g, x, y-2+bob, -Math.PI*0.62, o.item, 1.6);
+    const bob=o.lean ? 0 : Math.sin(gt*1.6)*1.5;
+    if(o.lean) drawWeapon(g, x-6, y-60, Math.PI/2-0.16, o.item, 1.6);      // leaning on the wall, tines on the ground
+    else if(ITEMS[o.item].slot==='weapon') drawWeapon(g, x, y-2+bob, -Math.PI*0.62, o.item, 1.6);
     else {                                                   // anything else shows its own inventory icon, lying where it was found
       const PK=window.PICKUP_ICONS||(window.PICKUP_ICONS={}); let ic=PK[o.item];
       if(!ic){ ic=document.createElement('canvas'); ic.width=ic.height=64; paintItemArt(ic.getContext('2d'),o.item,64); PK[o.item]=ic; }
@@ -6861,10 +6875,10 @@ function buildWorldCache(){
     paintFence();
     if(AREAS[areaId].theme!=='interior') drawRoadDecor();
   } finally { g=saveG; cam.x=sx; cam.y=sy; }
-  worldCache={ctx, cv:ctx.canvas, ox, oy, area:areaId};
+  worldCache={ctx, cv:ctx.canvas, ox, oy, area:areaId, sky:AREAS[areaId].theme==='interior' ? windowSky().key : null};
 }
 function drawWorldCache(){
-  if(!worldCache || worldCache.area!==areaId) buildWorldCache();
+  if(!worldCache || worldCache.area!==areaId || (worldCache.sky && worldCache.sky!==windowSky().key)) buildWorldCache();   // windows change with the hour
   g.drawImage(worldCache.cv, gc.width/2+cam.x-worldCache.ox, ORIGIN_Y+cam.y-worldCache.oy);
 }
 
@@ -7361,10 +7375,20 @@ function startGame(){
   destroyedBreakables.clear(); Object.keys(OPENED_KIND).forEach(k=>delete OPENED_KIND[k]);
   defeatedMobs.clear();
   QUEST.letter=0; QUEST.wolves=0; QUEST.camp=0; Object.keys(CHOICE).forEach(k=>CHOICE[k]=null);
-  switchArea('farm','start');
+  dayClock=DAY_LEN*0.5;                                   // the middle of the night
+  if(worldCache) worldCache.area=null;
+  switchArea('farmhouse','bed');
   endCombatSilently();
   enterGame();
   centerCam();
+  setTimeout(wakeUp,900);
+}
+function wakeUp(){
+  if(areaId!=='farmhouse') return;
+  say('Midnight',["You wake with a start. The hearth has burned down to embers and the window is black.",
+    "Outside, something heavy crashes against the fence. A laugh, low and ugly, and a second voice hushing it. Then the crunch of splintering wood.",
+    "Someone is in the yard. Your pitchfork leans against the wall outside, by the door."],
+    [{label:'Get up and look.', fn:closeDialog}]);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -8125,7 +8149,7 @@ const TALK_TURN={n:null,dir:0};
 setInterval(()=>{ const t=TALK_TURN.n; if(!t) return; const open=typeof dlgOverlay!=='undefined' && dlgOverlay.classList.contains('open');
   if(!open && !(typeof CS!=='undefined' && CS.on)){ if(!t.moving && !(t.path&&t.path.length)) t.dir=TALK_TURN.dir; TALK_TURN.n=null; } },250);   // when the talk ends, they turn back to what they were doing
 // ── choices: what the Wanderer decided, and what Dunhollow will remember ──
-const CHOICE = { gob:null, toll:null, baron:null, nim:null, thieves:null, morra:null, hal:null, rest:null, letter:null, camp:null, pups:null, ada:null, adaHow:null, edric:null, untrack:null, morwen:null, barrow:null, fenCaches:null, fenOpen:null, gerdMet:null, fenUnlocked:null, fenSeen:null, deadAt:null, pim:null, shardMade:null, csBrann:null, csFell:null, csFen:null, csGate:null, tobbStaff:null, shadeHow:null, csCamp:null, csHaven:null, necro:null, necroQ:null, fenRumours:null, fenMidHeard:null, bathChest:null, moonJoin:null, moonTowels:null, hobb:null, pool:null, poolq:null, sisters:null, poolDay:null, shade:null, shadePaid:null, strip:null, aldoPaid:null, moon:null, moonDay:null, baronDay:null, ruler:null, unpaid:null, orrinOut:null, tallyBurnt:null, moonAtoned:null, bathDay:null, vennStreak:null, vennSus:null, vennCaught:null, gb1:null, gb2:null, gb3:null, gbDay:null, tomas:null, innDay:null, gunnarBeat:null, mbDay:null, ruvin:null, livery:null, oath:null, appr:null, puz:null, moonBless:null, wear:null, bard:null, goat:null, grave:null, hunter:null, faelan:null, fell:null, fellAsked:null, pact:null, wynn:null, wynnThanked:null, tirnel:null, gift:null, warden:null, stones:null, greyDead:null, maraSeal:null, ledger:null, adafarm:null, martaElf:null, stq:null, charterGiven:null, epiDone:null, crier:null };
+const CHOICE = { csFarm:null, gob:null, toll:null, baron:null, nim:null, thieves:null, morra:null, hal:null, rest:null, letter:null, camp:null, pups:null, ada:null, adaHow:null, edric:null, untrack:null, morwen:null, barrow:null, fenCaches:null, fenOpen:null, gerdMet:null, fenUnlocked:null, fenSeen:null, deadAt:null, pim:null, shardMade:null, csBrann:null, csFell:null, csFen:null, csGate:null, tobbStaff:null, shadeHow:null, csCamp:null, csHaven:null, necro:null, necroQ:null, fenRumours:null, fenMidHeard:null, bathChest:null, moonJoin:null, moonTowels:null, hobb:null, pool:null, poolq:null, sisters:null, poolDay:null, shade:null, shadePaid:null, strip:null, aldoPaid:null, moon:null, moonDay:null, baronDay:null, ruler:null, unpaid:null, orrinOut:null, tallyBurnt:null, moonAtoned:null, bathDay:null, vennStreak:null, vennSus:null, vennCaught:null, gb1:null, gb2:null, gb3:null, gbDay:null, tomas:null, innDay:null, gunnarBeat:null, mbDay:null, ruvin:null, livery:null, oath:null, appr:null, puz:null, moonBless:null, wear:null, bard:null, goat:null, grave:null, hunter:null, faelan:null, fell:null, fellAsked:null, pact:null, wynn:null, wynnThanked:null, tirnel:null, gift:null, warden:null, stones:null, greyDead:null, maraSeal:null, ledger:null, adafarm:null, martaElf:null, stq:null, charterGiven:null, epiDone:null, crier:null };
 function remember(k,v,msg){ CHOICE[k]=v; if(msg) logMsg(msg,'#c8a0e0'); }
 const say=(who,text,opts,purse)=>showDialog(who,text,opts,purse);
 const ELFP=()=>!!(player.opts && player.opts.race==='elf');   // is the Wanderer an elf? many people notice
@@ -12248,12 +12272,16 @@ JOURNAL.push(['Lights in the Fen', ()=> !CHOICE.pim ? null : CHOICE.pim==='done'
 const CS={on:false, steps:[], k:0, t:0, onEnd:null, queued:[], focus:null};
 let CS_PRE=[];
 function csUI(on){ let el=document.getElementById('cs-ui');
-  if(!el){ el=document.createElement('div'); el.id='cs-ui'; el.innerHTML='<div class="cs-bar t"></div><div class="cs-bar b"></div><button class="cs-skip">Skip ▸▸</button>';
-    const st=document.createElement('style'); st.textContent='#cs-ui{position:fixed;inset:0;z-index:40;display:none;pointer-events:auto;}#cs-ui .cs-bar{position:absolute;left:0;right:0;height:0;background:#000;transition:height .45s ease;}#cs-ui .cs-bar.t{top:0}#cs-ui .cs-bar.b{bottom:0}#cs-ui.open .cs-bar{height:9vh}#cs-ui .cs-skip{position:absolute;left:50%;transform:translate(-50%,50%);bottom:4.5vh;font:600 13px "Segoe UI",system-ui,sans-serif;letter-spacing:1px;color:#f0dca0;background:rgba(36,24,8,.9);border:1px solid rgba(200,150,60,.75);border-radius:6px;padding:7px 22px;cursor:pointer;opacity:.9}#cs-ui .cs-skip:hover{opacity:1}';
+  if(!el){ el=document.createElement('div'); el.id='cs-ui'; el.innerHTML='<div class="cs-bar t"></div><div class="cs-bar b"></div><div class="cs-cap"></div><button class="cs-skip">Skip ▸▸</button>';
+    const st=document.createElement('style'); st.textContent='#cs-ui{position:fixed;inset:0;z-index:40;display:none;pointer-events:auto;}#cs-ui .cs-bar{position:absolute;left:0;right:0;height:0;background:#000;transition:height .45s ease;}#cs-ui .cs-bar.t{top:0}#cs-ui .cs-bar.b{bottom:0}#cs-ui.open .cs-bar{height:9vh}#cs-ui .cs-skip{position:absolute;left:50%;transform:translate(-50%,50%);bottom:4.5vh;font:600 13px "Segoe UI",system-ui,sans-serif;letter-spacing:1px;color:#f0dca0;background:rgba(36,24,8,.9);border:1px solid rgba(200,150,60,.75);border-radius:6px;padding:7px 22px;cursor:pointer;opacity:.9}#cs-ui .cs-skip:hover{opacity:1}#cs-ui .cs-cap{position:absolute;left:50%;bottom:calc(9vh + 22px);transform:translateX(-50%);max-width:min(640px,86vw);text-align:center;font:500 15px Georgia,serif;color:#f4e6c0;background:rgba(14,9,4,.72);border:1px solid rgba(160,120,50,.45);border-radius:6px;padding:8px 16px;opacity:0;transition:opacity .25s;pointer-events:none}#cs-ui .cs-cap.on{opacity:1}#cs-ui .cs-cap b{color:#e8b860;font-weight:600;margin-right:6px}';
     document.head.appendChild(st); document.body.appendChild(el); el.querySelector('.cs-skip').addEventListener('click',e=>{ e.stopPropagation(); csSkip(); }); }
   if(on){ el.style.display='block'; requestAnimationFrame(()=>el.classList.add('open')); } else { el.classList.remove('open'); setTimeout(()=>{ if(!CS.on) el.style.display='none'; },450); } }
 function cutscene(steps,onEnd){ if(CS.on) return false; try{ closeDialog(); }catch(e){} CS.on=true; CS.steps=steps; CS.k=0; CS.t=0; CS.onEnd=onEnd||null; CS.focus=null; player.path=[]; csUI(true); return true; }
-function csEnd(){ CS.on=false; CS.focus=null; csUI(false); const f=CS.onEnd; CS.onEnd=null; if(f) try{ f(); }catch(e){} const q=CS.queued; CS.queued=[]; q.forEach(a=>showDialog(...a)); }
+function csCaption(who,text){ const el=document.querySelector('#cs-ui .cs-cap'); if(!el) return;
+  if(!text){ el.classList.remove('on'); return; } el.innerHTML=(who?'<b>'+who+'</b>':'')+text; el.classList.add('on'); }
+// a spoken line: a caption at the bottom of the screen for `d` seconds, the speaker turned to face `to`
+const csSay=(m,text,d=2.2,to=null)=>({dur:d, start:()=>{ if(to) csLook(m,to).start(); csCaption(m&&m.name,text); }, end:()=>csCaption(null), skip:()=>csCaption(null)});
+function csEnd(){ csCaption(null); CS.on=false; CS.focus=null; csUI(false); const f=CS.onEnd; CS.onEnd=null; if(f) try{ f(); }catch(e){} const q=CS.queued; CS.queued=[]; q.forEach(a=>showDialog(...a)); }
 function csSkip(){ if(!CS.on) return; for(let k=CS.k;k<CS.steps.length;k++){ const s=CS.steps[k]; if(!s._s && s.start) s.start(); s._s=1; if(s.skip) s.skip(); else if(s.end) s.end(); } CS.k=CS.steps.length; csEnd(); }
 function csTick(dt){ if(!CS.on) return; const s=CS.steps[CS.k]; if(!s){ csEnd(); return; }
   if(!s._s){ s._s=1; if(s.start) s.start(); } CS.t+=dt; if(s.tick) s.tick(dt,CS.t);
@@ -12297,6 +12325,7 @@ function bathScene(who, note, chestSpot, ti, tj){
 // ── first visits: Brann fighting off a wolf, Grane spotting you, the loggers at the oak ──
 { const oldSA3=switchArea; switchArea=function(id,e){ const r=oldSA3(id,e); try{
     if(id==='clearing' && !CHOICE.csBrann){ const br=NPCS.find(n=>n.id==='hunter'); if(br){ CHOICE.csBrann=true; setTimeout(()=>{ if(areaId==='clearing') brannScene(br); },350); } }
+    else if(id==='farm' && e==='fromHouse' && !CHOICE.csFarm && mobs.some(m=>m.faction==='bandits' && !m.dead)){ CHOICE.csFarm=true; setTimeout(()=>{ if(areaId==='farm') farmScene(); },350); }
     else if(id==='fellings' && !CHOICE.csFell && mobs.some(m=>m.name==='Overseer Grane' && !m.dead)){ CHOICE.csFell=true; setTimeout(()=>{ if(areaId==='fellings') fellScene(); },350); }
     else if(id==='citygate' && !CHOICE.csGate){ CHOICE.csGate=true; setTimeout(()=>{ if(areaId==='citygate') gateScene(); },350); }
     else if(id==='camp' && !CHOICE.csCamp && mobs.some(m=>m.name==='Mara Blackthorn' && !m.dead)){ CHOICE.csCamp=true; setTimeout(()=>{ if(areaId==='camp') campScene(); },350); }
@@ -12313,6 +12342,13 @@ function brannScene(br){
     csWalk(wolf,BT[0],BT[1],3.4), csDo(()=>{ wolf.path=[]; wolf.i=BT[0]; wolf.j=BT[1]; wolf.x=BT[0]+0.5; wolf.y=BT[1]+0.5; wolf.moving=false; }), csLook(br,wolf), csLook(wolf,br), hit,
     csDo(()=>{ (CHOICE.deadAt=CHOICE.deadAt||{})[areaId+':cs']=dayClock; wolf.flash=0.35; wolf.dead=true; wolf.state='down'; wolf.fallT=0; floatText(tileOf(wolf),'-30','#ffd070',true); }), csWait(1.0),
     csLook(br,player), csBark(br,"Third one this week. They're getting bold.",2.2), csFocus(player,0.6) ], ()=>{ wolf.dead=true; wolf.fallT=999; br.chop=false; }); }
+function farmScene(){ const th=mobs.find(m=>m.name==='Bandit Thug'), wi=mobs.find(m=>m.name==='Bandit Hedge-Witch'); if(!th||!wi) return;
+  cutscene([ csFocus(th,1.2), csLook(th,wi), csLook(wi,th),
+    csSay(th,"Quiet as a grave. Told you, they sleep like the dead out here.",2.8),
+    csSay(wi,"Grain's in the barrels. Anything worth more is in the house.",2.8),
+    csSay(th,"And if somebody wakes up?",2.0),
+    csSay(wi,"Then there's one more grave on the hill. Start with the barrels.",3.0),
+    csLook([th,wi],player), csFocus(player,0.8) ]); }
 function fellScene(){ const gr=mobs.find(m=>m.name==='Overseer Grane'); if(!gr) return;
   cutscene([ csFocus(gr,1.1), csDo(()=>floatText(tileOf(gr),"Oi! Baron's timber. Who sent you?",'#f0dca0',true)), csWait(1.7), csFocus(player,0.7) ]); }
 function gateScene(){ const cr=NPCS.find(n=>n.id==='crier'), dr=NPCS.find(n=>n.id==='drunk'); if(!cr) return;

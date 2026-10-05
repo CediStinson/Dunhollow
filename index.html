@@ -4284,8 +4284,8 @@ const torchHere=tc=>!((AREAS[areaId]||{}).noTorch||[]).includes(tc.side+tc.u);  
 // ── separate rooms, connected by teleporter tiles ──
 let OBJECTS=[], NOTCHES=[], MOB_SPAWNS=[], DUMMY_SPAWN=null, areaId='farm';
 const visitedAreas={};
-const inNotch = (i,j) => NOTCHES.some(n=>i>=n.i0 && i<n.i0+3 && j>=n.j0 && j<n.j0+3);
-const notchAt = (i,j) => NOTCHES.find(n=>i>=n.i0 && i<n.i0+3 && j>=n.j0 && j<n.j0+3);
+const inNotch = (i,j) => NOTCHES.some(n=>i>=n.i0 && i<n.i0+(n.w||3) && j>=n.j0 && j<n.j0+(n.h||3));
+const notchAt = (i,j) => NOTCHES.find(n=>i>=n.i0 && i<n.i0+(n.w||3) && j>=n.j0 && j<n.j0+(n.h||3));
 // the one opening in each field's fence: the middle of its inner side, facing the yard
 function gateOf(n){ const j=n.j0+1; return n.i0===0 ? [[2,j],[3,j]] : [[n.i0,j],[n.i0-1,j]]; }
 function fenceBetween(a,b,c2,d){                    // true if a fence stands between tile (a,b) and (c2,d)
@@ -4682,13 +4682,13 @@ function drawFloor(){
 
 // the forest floor filling the carved-out corner, with undergrowth and a rock for closure
 function drawForestNotch(n){
-  const {i0,j0}=n, i1=i0+3, j1=j0+3;
+  const {i0,j0}=n, i1=i0+(n.w||3), j1=j0+(n.h||3);
   if(n.kind==='plough'){                           // a ploughed field: furrows with young sprouts
-    for(let r=0;r<12;r++){ const jj=j0+0.12+r*0.24;
+    for(let r=0;r<Math.floor((j1-j0)/0.24);r++){ const jj=j0+0.12+r*0.24;
       const a=P(i0+0.05,jj), b=P(i1-0.05,jj);
       g.strokeStyle='rgba(40,26,12,0.55)'; g.lineWidth=2.2; g.beginPath(); g.moveTo(a.x,a.y+1); g.lineTo(b.x,b.y+1); g.stroke();
       g.strokeStyle='rgba(170,130,84,0.5)'; g.lineWidth=1.2; g.beginPath(); g.moveTo(a.x,a.y-1); g.lineTo(b.x,b.y-1); g.stroke();
-      if(r%2===0) for(let k=0;k<14;k++){ const q=P(i0+0.15+k*0.2,jj); g.strokeStyle='#6a9a34'; g.lineWidth=1;
+      if(r%2===0) for(let k=0;k<Math.floor((i1-i0-0.1)/0.2);k++){ const q=P(i0+0.15+k*0.2,jj); g.strokeStyle='#6a9a34'; g.lineWidth=1;
         g.beginPath(); g.moveTo(q.x,q.y-1); g.lineTo(q.x-1.5,q.y-5); g.moveTo(q.x,q.y-1); g.lineTo(q.x+1.5,q.y-5); g.stroke(); } }
     return;
   }
@@ -4712,7 +4712,7 @@ function drawForestNotch(n){
 // rail segment ahead of it, so it can be depth-sorted against characters instead
 // of always drawing behind or in front of everyone.
 function wheatFenceItems(n){
-  const {i0,j0}=n, i1=i0+3, j1=j0+3;
+  const {i0,j0}=n, i1=i0+(n.w||3), j1=j0+(n.h||3);
   const vi = i0===0 ? i1 : i0, hj = j0===0 ? j1 : j0;
   const out=[];
   const post=(px,py,railTo)=>()=>{
@@ -4721,6 +4721,7 @@ function wheatFenceItems(n){
   };
   for(let j=j0;j<=j1;j++) out.push({d:vi+j+1, fn:post(vi,j, (j<j1 && j!==j0+1)?[vi,j+1]:null)});   // gap: the gate
   for(let i=i0;i<=i1;i++) out.push({d:i+hj+1, fn:post(i,hj, i<i1?[i+1,hj]:null)});
+  if(j0>0 && j1<ROOM.h) for(let i=i0;i<=i1;i++) out.push({d:i+j1+1, fn:post(i,j1, i<i1?[i+1,j1]:null)});   // a field in the middle of a verge is fenced at both ends
   return out;
 }
 
@@ -9451,19 +9452,15 @@ Object.assign(TALKERS,{ apprentice:apprenticeTalk, ellin:ellinTalk, cole:coleTal
 // ════════════════ the long ways between places ════════════════
 const encounter=(key,chance)=>{ const day=Math.floor(dayClock/DAY_LEN); return rnd01(day*17+key.length,key.charCodeAt(0),400)<chance; };   // same answer all day, new roll the next
 Object.assign(AREAS,{
-  lane:{ fence:{r:false,l:false}, w:7, h:24, theme:'farm', label:'Dunhollow Lane', mini:{x:0,y:0},
-    notches:()=>[], dummy:null,
+  lane:{ fence:{r:false,l:false}, w:7, h:24, theme:'road', label:'Dunhollow Lane', mini:{x:0,y:0},
+    // a forest road like the one from the farm, with Dunhollow's small fields and ploughland cut into the verges
+    notches:()=>[ {i0:5,j0:2,w:2,h:4}, {i0:0,j0:5,w:2,h:3,kind:'plough'}, {i0:0,j0:11,w:2,h:4}, {i0:5,j0:12,w:2,h:3,kind:'plough'}, {i0:5,j0:17,w:2,h:3} ], dummy:null,
     objects:()=>{ const l=[{type:'teleporter', i:3, j:0, to:'village', entry:'fromCrossroads'}, {type:'teleporter', i:0, j:21, to:'road', entry:'fromCrossroads'},
-      {type:'milestone', i:4, j:20, t:'DUN ½'}, {type:'scarecrow', i:0, j:8}, {type:'scarecrow', i:6, j:15}, {type:'cart', i:5, j:4}, {type:'shrine', i:1, j:13}, {type:'bench', i:5, j:11},
-      {type:'critter', kind:'flowers', i:1, j:5, noblock:true}, {type:'critter', kind:'flowers', i:6, j:19, noblock:true}];
+      {type:'milestone', i:4, j:20, t:'DUN ½'}, {type:'scarecrow', i:6, j:3}, {type:'scarecrow', i:0, j:13}, {type:'shrine', i:1, j:9},
+      {type:'stump', i:1, j:10}, {type:'logpile', i:0, j:16}];
       if(!destroyedBreakables.has('lane:0,18')) l.push({type:'crate', i:0, j:18, breakable:true});
-      // a country lane: hedgerows, a few old trees, hay, a grazing goat and wildflowers along the verge
-      const T=(i,j,sp,sz)=>({type:'tree', i, j, sp, v:(i+j)%3, s:sz, ox:((i*7+j)%5-2)*0.08, oy:((i*3+j)%5-2)*0.08});
-      l.push(T(0,2,'oak',1.1), T(6,7,'birch',0.95), T(0,11,'oak',1.25), T(6,13,'oak',1.35), T(0,16,'birch',0.9), T(6,21,'oak',1.05), T(0,22,'birch',0.8));
-      [[6,2],[6,3],[0,6],[6,9],[6,10],[0,19],[0,20]].forEach(([i,j])=>l.push({type:'hedge', i, j}));
-      l.push({type:'stump', i:1, j:10}, {type:'logpile', i:5, j:17}, {type:'haystack', i:1, j:15}, {type:'haystack', i:5, j:7}, {type:'critter', kind:'goat', i:5, j:14});
-      [[2,7],[4,14],[1,3],[5,20],[2,17],[1,8],[5,12]].forEach(([i,j])=>l.push({type:'critter', kind:'flowers', i, j, noblock:true}));
-      [[5,1],[1,18],[4,5],[2,21]].forEach(([i,j])=>l.push({type:'rocks', i, j, noblock:true}));
+      [[1,3],[2,17],[4,7],[2,20]].forEach(([i,j])=>l.push({type:'critter', kind:'flowers', i, j, noblock:true}));
+      [[4,1],[1,19]].forEach(([i,j])=>l.push({type:'rocks', i, j, noblock:true}));
       return l; },
     npcs:()=>[],
     mobs:()=> nightAmt()>0.5 && QUEST.wolves<2 ? [{ name:'Hungry Wolf', type:'wolf', i:4, j:9, faction:'lanewolf', coat:'#7a7064', daily:true }] : [],
@@ -10476,9 +10473,9 @@ function renderMap(cv,V){                             // V: {zoom, px, py, label
   ids.sort((x,y)=>(AREAS[x].under?1:0)-(AREAS[y].under?1:0));   // tunnels last: a dashed shadow crossing over the road above
   ids.forEach(id=>{ const A=AREAS[id], o=L[id], cur=id===areaId, notch=A.notches();
     c.globalAlpha=A.under&&!cur?0.6:1; if(A.under) c.setLineDash([4,3]);
-    const inN=(i,j)=>notch.some(n=>i>=n.i0&&i<n.i0+3&&j>=n.j0&&j<n.j0+3);
+    const inN=(i,j)=>notch.some(n=>i>=n.i0&&i<n.i0+(n.w||3)&&j>=n.j0&&j<n.j0+(n.h||3));
     c.fillStyle=cur?tone(MM_COL[A.theme]||'#5a7a3a',0.25):(MM_COL[A.theme]||'#5a7a3a');
-    const nk=(i,j)=>notch.find(n=>i>=n.i0&&i<n.i0+3&&j>=n.j0&&j<n.j0+3);
+    const nk=(i,j)=>notch.find(n=>i>=n.i0&&i<n.i0+(n.w||3)&&j>=n.j0&&j<n.j0+(n.h||3));
     const base=A.under?(cur?'#6a5a4a':'#2a2018'):c.fillStyle;
     for(let j=0;j<A.h;j++) for(let i=0;i<A.w;i++){ const nn=nk(i,j); c.fillStyle = nn ? (nn.kind==='plough'?'#6a4a2a':'#d8b848') : base;
       const a=P2(o.u+i,o.v+j), b=P2(o.u+i+1,o.v+j), d=P2(o.u+i+1,o.v+j+1), e=P2(o.u+i,o.v+j+1);

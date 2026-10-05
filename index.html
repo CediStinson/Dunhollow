@@ -9075,7 +9075,7 @@ function todaysStock(who,pool,n){
 }
 // selling: any trader buys what is in your pack (not story items), at forty percent of its price
 function sellTo(who,back,o){                     // o (optional): only these items, at this buyer's own price, with his own words
-  const goods=player.inv.map((id,k)=>({id,k})).filter(({id})=>id && PRICES[id] && !(typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(id)) && (ITEMS[id].slot!=='misc' || SELL_MISC.has(id)) && (!o || !o.only || o.only.has(id)));
+  const goods=player.inv.map((id,k)=>({id,k})).filter(({id})=>id && PRICES[id] && !(typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(id)) && (ITEMS[id].slot!=='misc' || SELL_MISC.has(id) || (o && o.only && o.only.has(id))) && (!o || !o.only || o.only.has(id)));
   say(who,[goods.length?(o&&o.greet||"“Let us see what you have.” (Only what is in your pack, not what you wear.)"):(o&&o.none||"“Nothing in your pack I'd buy.”")],[{label:'Back.',fn:back},bye],true);
   if(!goods.length) return;
   const box=document.getElementById('dlg-opts'), grid=document.createElement('div'); grid.className='shop-grid';
@@ -10860,7 +10860,8 @@ function victory(faction){
     const give=id=>{ const f=free(); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } else logMsg('Inventory is full.','#e0b070'); };
     const coin=(a,b)=>{ const c=a+Math.floor(R()*(b-a+1)); player.purse+=c; updateHud(); logMsg('Loot: '+formatCoin(c),'#e8c060'); };
     if(m.type==='wolf'){ if(R()<0.5) give('raw_meat'); if(m.maxHp>=60 && R()<0.3) give('raw_meat'); if(R()<0.3) give('wolf_fang'); return; }           // meat and teeth, not trousers
-    if(m.type==='skeleton'){ if(R()<0.35) coin(1,5); return; }                       // old bones carry nothing but the odd green coin
+    if(m.type==='skeleton'){ if(R()<0.35) coin(1,5); if(R()<0.5) give('old_bone'); if(R()<0.15) give('old_skull'); if(R()<0.15) give(m.opts.equip.weapon);   // bones, a skull, the blade it held
+      if(R()<0.08) give('rusted_blade'); if(R()<0.04) give('grave_ring'); return; }                                                                 // and now and then something it was buried with
     if(m.type==='lurker'){ if(R()<0.4) coin(2,5); if(R()<0.2){ const pool=LOOT_TIERS[0]; give(pool[Math.floor(R()*pool.length)]); logMsg('…something it swallowed, a while ago.','#a8a080'); } return; }
     if(m.opts && m.opts.ghost){ if(R()<0.5) coin(4,12); return; }                // the dead carry nothing but old coin
     if(m.type==='goblin'){ if(R()<0.35) coin(1,3); if(R()<0.15) give(['apple','apple','bread','raw_meat'][Math.floor(R()*4)]); if(R()<0.2) give(['dagger','hood','shirt','club'][Math.floor(R()*4)]); return; }
@@ -12312,7 +12313,7 @@ function drawLurker(x,B,e,pose){
 // ── items ──
 Object.assign(ITEMS,{
   fen_boots:{ name:'Fenwalker Boots', slot:'feet', base:'boots', col:'#3a4428' },
-  morwen_lantern:{ name:"Morwen's Lantern", slot:'misc' },
+  morwen_lantern:{ name:"Vesna's Lantern", slot:'misc' },
   bog_coins:{ name:'A Purse of Drowned Coins', slot:'misc' },
   silver_torc:{ name:'A Silver Torc', slot:'misc' },
   amber_brooch:{ name:'An Amber Brooch', slot:'misc' },
@@ -12484,7 +12485,7 @@ Object.assign(AREAS,{
       if(defeatedMobs.has('fen:Hesk the Fen Hag') && !collectedPickups.has('fen:4,20') && CHOICE.morwen!=='done') l.push({type:'pickup', i:4, j:20, item:'morwen_lantern'});
       l.filter(o=>o.type==='pickup').forEach(o=>l.push({type:'bogmound', i:o.i, j:o.j, noblock:true}));
       return l; },
-    npcs:()=>[{ id:'morwen', name:'Old Morwen', i:18, j:6, dir:1, opts:{gender:'f',skin:1,hair:3,hairColor:13,beard:0,face:1,equip:{head:'hood',torso:'tunic_green',armor:'robe',hands:null,legs:'trousers',feet:'boots',weapon:'staff_oak',offhand:null}} }],
+    npcs:()=>[],                                     // Old Morwen's stilt-hut is Vesna's now
     mobs:()=>{ const l=[ { name:'Bog Lurker', type:'lurker', i:12, j:6, faction:'bog', opts:LURK({}) },
         { name:'Mire Lurker', type:'lurker', i:7, j:16, faction:'bog2', opts:LURK({}) },
         { name:'Hesk the Fen Hag', type:'mage', i:4, j:19, faction:'hag', opts:{gender:'f',skin:4,hair:5,hairColor:13,beard:0,face:1,equip:{head:'hood',torso:'tunic_green',armor:'robe_black',hands:null,legs:'hose_grey',feet:null,weapon:'staff_bog',offhand:null}} } ];
@@ -12523,7 +12524,7 @@ AREA_PATHS.fenlow=[ [[4.5,-0.5],[5,3],[7.5,5.6],[11.5,5],[12.5,2.2]], [[7.5,5.6]
 // the reeds hide a stone door: part them and the barrow opens
 PUZ_TYPES.add('reedbank');
 { const oldPA=puzAct; puzAct=function(o){ if(o.type!=='reedbank') return oldPA(o);
-    say('A Bank of Reeds',[CHOICE.morwen==='done'?"Where the wisps gathered, the reeds grow thicker than anywhere else. Morwen said: <i>under the reeds</i>.":"The reeds here grow oddly thick and straight, as if planted. Behind them, something hard and grey.","You push your arms in and pull them apart. Cold air breathes out at you, and the smell of very old water."],[
+    say('A Bank of Reeds',[CHOICE.morwen==='done'?"Where the wisps gathered, the reeds grow thicker than anywhere else. Vesna said: <i>under the reeds</i>.":"The reeds here grow oddly thick and straight, as if planted. Behind them, something hard and grey.","You push your arms in and pull them apart. Cold air breathes out at you, and the smell of very old water."],[
       {label:'Tear the reeds aside.', fn:()=>{ CHOICE.barrow='open'; closeDialog(); logMsg('Behind the reeds: a stone doorway, half sunk in the mud. A barrow.','#e8c060'); banner('A hidden barrow','#c8d8a8',1600); switchArea('fenlow','fromBarrow'); }},
       {label:'Leave it alone.', fn:closeDialog}]); }; }
 // what you dig up in the fen
@@ -12547,36 +12548,26 @@ function gerdTalk(){
 const LOGGER_LINES={ logger2:["“Not now, the grain's turning.” <i>Chock.</i>","“Gerd says another week. Gerd always says another week.”"], logger3:["“Stand back, unless you want an axe in the shin.”","“My arms are going to fall off before this tree does.”"], logger4:["“Wood to the cart, cart to the pile, pile to the… I've forgotten what the pile's for.”","“Mind out, this is heavy!”"] };
 ['logger2','logger3','logger4'].forEach(id=>TALKERS[id]=()=>{ const n=NPCS.find(x=>x.id===id); const L=LOGGER_LINES[id]; say(n?n.name:'Logger',[L[Math.floor(Math.random()*L.length)], FEN_OPEN()?"":"“The causeway's shut till we're done. Ask Gerd.”"].filter(Boolean),[bye]); });
 TALKERS.gerd=gerdTalk;
-// Old Morwen, who lives on stilts in the fen
-function morwenTalk(){ const hag=defeatedMobs.has('fen:Hesk the Fen Hag');
-  if(CHOICE.morwen==='done'){ say('Old Morwen',[CHOICE.barrow==='done'?"“You went under the reeds and came back. Bertil's boots on your feet, I see. He'd have liked you. He liked anyone who could hit hard.”":"“Under the reeds in the Sunken Hollow, where the lights gather. Mind the old king. He doesn't like visitors.”"],[{label:'“Show me what you sell.”', fn:()=>shopFrom('Old Morwen',['potion','potion','bread','apple','potion'],0.9,"“Bog-myrtle and honey. Better than the city stuff.”",morwenTalk)},bye]); return; }
-  if(hasItem('morwen_lantern')){ say('Old Morwen',["Morwen snatches the lantern and holds it up to her face. The little flame inside turns green, then gold.","“Hesk. My own sister. She thought the light would let her talk to the drowned.” She shakes her head. “It does. That's the trouble.”","“Here. And listen. In the Sunken Hollow, south of here, the wisps gather over a bank of reeds at night. Under those reeds is the barrow of the old kings. Gold, and worse than gold.”"],[
-      {label:'Take her gift.', fn:()=>{ player.inv[player.inv.indexOf('morwen_lantern')]=null; giveQuestItem('potion',true); giveQuestItem('potion',true); player.purse+=25; updateHud(); remember('morwen','done',"You brought Morwen her lantern. She told you of a barrow under the reeds of the Sunken Hollow.");
-        say('Old Morwen',"“Two of my draughts and a little coin. The rest you'll have to dig for.” <i>You receive 25 copper and two healing draughts.</i>",[bye]); }}]); return; }
-  if(CHOICE.morwen==='asked'){ say('Old Morwen',hag?"“Hesk is gone? Then where's my lantern? She'll have dropped it where she fell. Go and look, dearie.”":"“Hesk lives on the island to the south-west, past the old ruin. You'll hear her before you see her. She sings.”",[bye]); return; }
-  say('Old Morwen',["An old woman leans on the rail of her stilt-hut and watches you come with eyes like wet stones.","“Well. The oak's gone, then. And the first thing through is a stranger with a sword.” She cackles. “Good. I've a job for a sword.”","“My sister Hesk took my lantern. It's not a lamp, it's a key: it shows the way to the drowned. She's gone bad with it, out on the island past the ruin. Bring it back to me.”"],[
-    {label:'“I will bring your lantern back.”', fn:()=>{ remember('morwen','asked',"Old Morwen wants her lantern back from her sister Hesk, the Fen Hag, on the island south-west in the Drowning Fen."); say('Old Morwen',"“She'll curse you. Curse her back.”",[bye]); }},
-    {label:'“What is this place?”', fn:()=>say('Old Morwen',["“The hollow, before the water. Kings lived here. Little kings, of a little land, but they had gold. When the river moved, they stayed. They're still here, most of them.”","“Mind the mud that stands up. It's hungry, not clever. Hit it where it isn't looking.”"],[{label:'Back.',fn:morwenTalk},bye])}, bye]); }
-TALKERS.morwen=morwenTalk;
+// (Old Morwen used to live on stilts in the fen. Vesna has her hut now, and her errands: see vesnaFen below)
+TALKERS.morwen=()=>TALKERS.vesna();
 // word gets round: once along the way, and a few times once the causeway is clear, someone mentions it in passing
-const FEN_RUMOURS=["“Heard the loggers finally cleared that oak on the fen road. Not that anyone sane goes into the fen.”","“Gerd's lot were in the Wheatsheaf last night, drinking to a dead tree. The causeway north of the stones is open, they say.”","“Old Morwen'll have visitors now, with the fen road clear. Poor woman. Or poor visitors.”"];
+const FEN_RUMOURS=["“Heard the loggers finally cleared that oak on the fen road. Not that anyone sane goes into the fen.”","“Gerd's lot were in the Wheatsheaf last night, drinking to a dead tree. The causeway north of the stones is open, they say.”","“That grave-speaker woman lives out in the fen, they say. She'll have visitors now, with the road clear. Poor visitors.”"];
 let rumourCd=0;
 { const oldSA2=switchArea; switchArea=function(id,e){ const r=oldSA2(id,e); try{ rumourCd--; if(id==='fenpath' || AREAS[id].inside && !AREAS[id].under || rumourCd>0) return r;
     const open=FEN_OPEN(), mid=!open && fenLeft()<=2 && visitedAreas.fenpath && !CHOICE.fenMidHeard;
     const want = mid ? "“They say Gerd's crew are halfway through that great oak on the fen road. Took them long enough.”" : (open && !CHOICE.fenOpen && (CHOICE.fenRumours||0)<FEN_RUMOURS.length) ? FEN_RUMOURS[CHOICE.fenRumours||0] : null;
     if(!want) return r;
-    setTimeout(()=>{ if(areaId!==id) return; const who=NPCS.filter(n=>n.name && !n.shop && !n.sit && n.id!=='shade').sort((a,b)=>Math.hypot(a.i-player.i,a.j-player.j)-Math.hypot(b.i-player.i,b.j-player.j))[0]; if(!who) return;
+    setTimeout(()=>{ if(areaId!==id) return; const who=NPCS.filter(n=>n.name && !n.shop && !n.sit && n.id!=='shade' && n.id!=='vesna').sort((a,b)=>Math.hypot(a.i-player.i,a.j-player.j)-Math.hypot(b.i-player.i,b.j-player.j))[0]; if(!who) return;
       who.bark={text:want.replace(/[“”]/g,''),t:0}; logMsg(who.name+': '+want,'#d8c8a0'); if(mid) CHOICE.fenMidHeard=true; else CHOICE.fenRumours=(CHOICE.fenRumours||0)+1; rumourCd=3; },1800); }catch(err){} return r; }; }
 { const oldN=npcHasNews; npcHasNews=function(n){ const r=oldN(n); if(r) return r;
     if(n.id==='gerd' && !CHOICE.gerdMet){ return '!'; }
-    if(n.id==='morwen'){ if(!CHOICE.morwen) return '!'; if(CHOICE.morwen==='asked' && hasItem('morwen_lantern')) return '?'; }
     return null; }; }
 { const oldG=gerdTalk; TALKERS.gerd=()=>{ CHOICE.gerdMet=true; oldG(); }; }
 // ── journal ──
 JOURNAL.push(
   ['The Fallen Oak', ()=> !visitedAreas.fenpath ? null : FEN_OPEN() ? ['done',"The loggers cleared the fallen oak. The Fen Causeway is open."] : ['active',"A giant oak blocks the Fen Causeway north of the boundary stones. Foreman Gerd's loggers are clearing it. Word will get round when they're through."]],
-  ["Morwen's Lantern", ()=> !CHOICE.morwen ? null : CHOICE.morwen==='done' ? ['done',"You brought Old Morwen her lantern from Hesk the Fen Hag."] : ['active', hasItem('morwen_lantern')?"You have Morwen's lantern. Bring it to her stilt-hut in the Drowning Fen.":defeatedMobs.has('fen:Hesk the Fen Hag')?"Hesk is dead. Her lantern must lie where she fell, on the island in the south-west of the fen.":"Take Old Morwen's lantern back from her sister Hesk, the Fen Hag, on the island south-west in the Drowning Fen."]],
-  ['The Drowned Barrow', ()=> !(CHOICE.barrow||CHOICE.morwen==='done') ? null : CHOICE.barrow==='done' ? ['done',"You woke the Barrow-King of the hollow and laid him down again. His boots and ring are yours."] : CHOICE.barrow==='open' ? ['active',"You found a barrow under the reeds of the Sunken Hollow. Go in."] : ['active',"Morwen says a barrow lies under a bank of reeds in the Sunken Hollow, where the wisps gather at night."]],
+  ["Vesna's Lantern", ()=> !CHOICE.morwen ? null : CHOICE.morwen==='done' ? ['done',"You brought Vesna her lantern back from Hesk the Fen Hag."] : ['active', hasItem('morwen_lantern')?"You have Vesna's lantern. Bring it to her stilt-hut in the Drowning Fen.":defeatedMobs.has('fen:Hesk the Fen Hag')?"Hesk is dead. The lantern must lie where she fell, on the island in the south-west of the fen.":"Take Vesna's lantern back from Hesk, the Fen Hag, her old teacher, on the island south-west in the Drowning Fen."]],
+  ['The Drowned Barrow', ()=> !(CHOICE.barrow||CHOICE.morwen==='done') ? null : CHOICE.barrow==='done' ? ['done',"You woke the Barrow-King of the hollow and laid him down again. His boots and ring are yours."] : CHOICE.barrow==='open' ? ['active',"You found a barrow under the reeds of the Sunken Hollow. Go in."] : ['active',"Vesna says a barrow lies under a bank of reeds in the Sunken Hollow, where the wisps gather at night."]],
   ['Fen Treasures', ()=> !CHOICE.fenCaches ? null : CHOICE.fenCaches>=3 ? ['done',"You dug up all three caches hidden in the fen."] : ['active',"There are things buried in the fen, under little mounds with a marker stick. Found "+CHOICE.fenCaches+" of 3."]]);
 
 // Young Pim hauls wood to the cart
@@ -12867,8 +12858,8 @@ const NECRO=()=> typeof CHOICE.necro==='number' ? CHOICE.necro : 0;
 function HEX_KNOWN(dir){ const n=NECRO(); return dir==='up' ? n>=1 : dir==='right' ? n>=2 : dir==='left' ? n>=3 : false; }
 const VESNA=(i,j,dir)=>({ id:'vesna', name:'Vesna the Grave-Speaker', i, j, dir, opts:{gender:'f',skin:0,hair:5,hairColor:0,beard:0,face:2,equip:{head:null,torso:'necro_bustier',armor:'necro_robe',hands:null,legs:'hose_grey',feet:'boots',weapon:'staff_hex',offhand:null}} });
 const vesnaInFen=()=> NECRO()>=1 && FEN_OPEN();
-wrap('graveyard','npcs',l=> CHOICE.necro && !vesnaInFen() ? [...l, VESNA(5,3,1)] : l);
-wrap('fen','npcs',l=> vesnaInFen() ? [...l, VESNA(6,19,1)] : l);
+wrap('graveyard','npcs',l=> CHOICE.necro && !FEN_OPEN() ? [...l, VESNA(5,3,1)] : l);    // once the fen road is open she goes home to her stilt-hut, and you find her there
+wrap('fen','npcs',l=> FEN_OPEN() ? [...l, VESNA(18,6,1)] : l);
 // the grave-motes: little lights over the old graves, only at night, only once she has asked
 const GRAVE_MOTES=[[1,2],[6,4],[4,8]];
 // the motes rise and fade with the night while you stand there, not only when you walk in
@@ -12910,7 +12901,7 @@ function vesnaTalk(){ const n=NECRO(), st=NECRO_STAVES.some(w=>player.opts.equip
     if(vesnaWait(0)){ say('Vesna the Grave-Speaker',["She looks at the motes in your hand, and then, for a long moment, at you.",VESNA_NOTYET[0],"“Keep them. They will not go out.”"],[bye]); return; }
     say('Vesna the Grave-Speaker',["She cups the motes in her hands. They go out one by one, like breath on glass.","“Feel that? That is what <b>Drain</b> is: you take a little of what keeps them going, and you keep it.” She taps your staff. “Lean <b>up</b> when you strike, and the staff will drink.”"],[
       {label:'Learn Drain.', fn:()=>{ for(let q=0;q<3;q++) player.inv[player.inv.indexOf('grave_mote')]=null; CHOICE.necro=1; CHOICE.necroQ=null; updateHud(); logMsg('You learned Drain: lean up with a necromancer\'s staff.','#b8a8e8');
-        say('Vesna the Grave-Speaker', FEN_OPEN() ? "“Next, the fen. Find me in the Drowning Fen, past the stilt-hut. The dead there are older and less polite.”" : "“The next words are not taught in a churchyard. They are taught where the old kings drowned, in the fen. And the fen road is still shut. Have patience. When the way opens, look for me there.”",[bye]); }}]); return; }
+        say('Vesna the Grave-Speaker', FEN_OPEN() ? "“Next, the fen. I live there, in the stilt-hut in the Drowning Fen. Come and find me. The dead there are older and less polite.”" : "“The next words are not taught in a churchyard. They are taught where the old kings drowned, in the fen. And the fen road is still shut. Have patience. When the way opens, look for me there.”",[bye]); }}]); return; }
   if(n===1){ if(!FEN_OPEN()){ say('Vesna the Grave-Speaker',"“Patience. The fen road is still shut, and I will not teach the second word over Tobb's turnips.”",[bye]); return; }
     if(!CHOICE.necroQ && vesnaWait(1)){ say('Vesna the Grave-Speaker',["Vesna stands among the reeds, watching the water.",VESNA_NOTYET[1]],[bye]); return; }
     if(!CHOICE.necroQ){ say('Vesna the Grave-Speaker',["Vesna stands among the reeds as if she has always been there.","“The mud that walks, out here. The lurkers. They are not alive, not dead: the fen remembering what it swallowed. Put down all three of them, the Bog Lurker, the Mire Lurker and old Mudmaw in the Hollow, and you will understand the second word.”"],[
@@ -13326,15 +13317,17 @@ const PURPLE_SNUBS=["“Leave, or I'll beat the shit out of you.”","“Your ki
 // ── the risen dead of the fen: the same old bones a necromancer calls up, only nobody called these ──
 FOES.skeleton={ label:'Skeleton', base:44, stagger:1.1, pattern:[
   {wait:1.2, wind:0.95, after:0.55, dir:'left'}, {wait:0.5, wind:0.70, after:0.45, dir:'right'}, {wait:1.5, wind:1.15, after:0.70, dir:'up'} ]};
-const RISEN=()=>({gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:'sword',offhand:null}});
+const RISEN_ARMS=['dagger','club','hatchet','sword','axe','mace','spear','morningstar'];
+const RISEN=name=>{ const day=Math.floor(dayClock/DAY_LEN), h=[...(name||'')].reduce((a,ch)=>a*31+ch.charCodeAt(0)|0,7);        // whatever they were buried with: a different one each day
+  return {gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:RISEN_ARMS[hsh(day+3,h)%RISEN_ARMS.length],offhand:null}}; };
 function drawRisen(x,B,e,pose){
-  if(e.dead){ const t=e.fallT||0; drawSkelFig(x,B,{asm:Math.max(0.25,1-t*1.4), emerge:1, dir:e.dir||0, weapon:'rusty'}); return; }      // it comes apart and lies there in a heap
+  if(e.dead){ const t=e.fallT||0; drawSkelFig(x,B,{asm:Math.max(0.25,1-t*1.4), emerge:1, dir:e.dir||0, weapon:e.opts.equip.weapon}); return; }      // it comes apart and lies there in a heap
   const k=pose&&pose.kind==='raise'?-0.45*Math.min(1,pose.t):pose&&pose.kind==='strike'?Math.max(0,1-Math.min(1,pose.t)*0.6):0;
-  drawSkelFig(x,B,{asm:1, stand:true, dir:e.dir||0, moving:!!e.moving, walk:gt*9+(e.id||0), k, weapon:'rusty'}); }
-wrap('fen','mobs',l=>{ const r=[...l,{ name:'Risen Bones', type:'skeleton', i:8, j:13, faction:'risen', daily:true, opts:RISEN() }];
-  if(nightAmt()>0.5) r.push({ name:'Rattling Bones', type:'skeleton', i:13, j:13, faction:'risen', daily:true, opts:RISEN() },{ name:'Restless Bones', type:'skeleton', i:20, j:18, faction:'risen', daily:true, opts:RISEN() });   // more of them walk at night
+  drawSkelFig(x,B,{asm:1, stand:true, dir:e.dir||0, moving:!!e.moving, walk:gt*9+(e.id||0), k, weapon:e.opts.equip.weapon}); }
+wrap('fen','mobs',l=>{ const r=[...l,{ name:'Risen Bones', type:'skeleton', i:8, j:13, faction:'risen', daily:true, opts:RISEN('Risen Bones') }];
+  if(nightAmt()>0.5) r.push({ name:'Rattling Bones', type:'skeleton', i:13, j:13, faction:'risen', daily:true, opts:RISEN('Rattling Bones') },{ name:'Restless Bones', type:'skeleton', i:20, j:18, faction:'risen', daily:true, opts:RISEN('Restless Bones') });   // more of them walk at night
   return r; });
-wrap('fenlow','mobs',l=>[...l,{ name:'Drowned Bones', type:'skeleton', i:9, j:12, faction:'risen', daily:true, opts:RISEN() }]);
+wrap('fenlow','mobs',l=>[...l,{ name:'Drowned Bones', type:'skeleton', i:9, j:12, faction:'risen', daily:true, opts:RISEN('Drowned Bones') }]);
 // ── arms for the dead: once Vesna allows it, the skeleton you raise can carry a weapon of your choosing (for looks: it hits as hard either way) ──
 const skelArmsOn=()=>!!(CHOICE.skelArms && player.opts && NECRO_STAVES.includes(player.opts.equip.weapon));
 SLOT_NAMES.skel='Skeleton';
@@ -13383,6 +13376,58 @@ const bonesDown=()=>FEN_BONES.filter(k=>(CHOICE.bonesDown||[]).includes(k)).leng
 JOURNAL.push(["Arms for the Dead", ()=> NECRO()<3 ? null : CHOICE.skelArms ? ['done',"Vesna showed you how to put a weapon back in a dead hand. Hold a necromancer's staff and give your skeleton a weapon in the small slot under your own."]
   : CHOICE.necroQ==='bones' ? ['active', bonesDown()>=4 ? "Four of the fen's risen dead lie still. Go back to Vesna." : "Lay four of the fen's risen dead to rest for Vesna: Risen Bones, Rattling Bones and Restless Bones in the Drowning Fen (the last two walk only at night), and Drowned Bones in the Sunken Hollow. ("+bonesDown()+"/4)"]
   : ['active',"Your skeletons fight with their fists. Vesna, in the fen, may know how to change that."]]);
+// ── Vesna at home: the stilt-hut in the Drowning Fen. Besides her lessons she has an errand of her own,
+//    buys what the fen's dead leave behind, and sells her bog-myrtle draughts ──
+Object.assign(ITEMS,{ old_bone:{ name:'An Old Bone', slot:'misc' }, old_skull:{ name:'An Old Skull', slot:'misc' },
+  rusted_blade:{ name:'A Rusted Grave-Blade', slot:'misc' }, grave_ring:{ name:'A Grave-Ring', slot:'misc' } });
+Object.assign(PRICES,{ old_bone:6, old_skull:16, rusted_blade:30, grave_ring:90 });
+const VESNA_BUYS={ only:new Set(['old_bone','old_skull','rusted_blade','grave_ring','grave_mote']), price:id=>Math.max(1,Math.round(PRICES[id]*0.5)),
+  greet:"She turns each piece over as if it might still be listening. “Bones, skulls, what they were buried with. Nobody else will touch these. I pay fairly.”",
+  none:"“Nothing from the dead on you. The fen's risen bones leave plenty behind, if you lay them down.”" };
+PRICES.grave_mote=PRICES.grave_mote||8;
+{ const oldPIA=paintItemArt; const ART={
+    old_bone(c){ c.lineCap='round'; c.strokeStyle='#4a4030'; c.lineWidth=6.5; c.beginPath(); c.moveTo(10,29); c.lineTo(30,11); c.stroke(); c.strokeStyle='#d8ccaa'; c.lineWidth=4.5; c.stroke();
+      c.fillStyle='#d8ccaa'; c.strokeStyle='#4a4030'; c.lineWidth=1.2; [[8,27],[12,31],[28,9],[32,13]].forEach(([x,y])=>{ c.beginPath(); c.arc(x,y,3.6,0,Math.PI*2); c.fill(); c.stroke(); });
+      c.strokeStyle='#d8ccaa'; c.lineWidth=4; c.beginPath(); c.moveTo(10,29); c.lineTo(30,11); c.stroke(); c.fillStyle='rgba(90,70,40,0.45)'; c.beginPath(); c.ellipse(21,20,3,1.4,-0.8,0,Math.PI*2); c.fill(); },
+    old_skull(c){ c.fillStyle='#d8ccaa'; c.strokeStyle='#4a4030'; c.lineWidth=1.4; c.beginPath(); c.ellipse(20,17,11,10.5,0,0,Math.PI*2); c.fill(); c.stroke();
+      c.beginPath(); c.moveTo(13,23); c.lineTo(14,31); c.lineTo(26,31); c.lineTo(27,23); c.closePath(); c.fill(); c.stroke();
+      c.fillStyle='#2a2016'; c.beginPath(); c.ellipse(15.5,19,3.2,3.6,0,0,Math.PI*2); c.fill(); c.beginPath(); c.ellipse(24.5,19,3.2,3.6,0,0,Math.PI*2); c.fill();
+      c.beginPath(); c.moveTo(20,22); c.lineTo(18.6,25.4); c.lineTo(21.4,25.4); c.closePath(); c.fill();
+      c.strokeStyle='#4a4030'; c.lineWidth=0.8; for(let x=15.5;x<=24.6;x+=1.8){ c.beginPath(); c.moveTo(x,27.5); c.lineTo(x,31); c.stroke(); }
+      c.fillStyle='rgba(90,110,50,0.55)'; c.beginPath(); c.ellipse(14,10.5,3.4,1.6,-0.3,0,Math.PI*2); c.fill(); },
+    rusted_blade(c){ c.save(); c.translate(20,20); c.rotate(-Math.PI/4); c.fillStyle='#7a5a40'; c.beginPath(); c.moveTo(-3,-15); c.lineTo(0,-19); c.lineTo(3,-15); c.lineTo(2.6,8); c.lineTo(-2.6,8); c.closePath(); c.fill();
+      c.fillStyle='rgba(150,80,40,0.7)'; [[-1,-10,1.6],[1,-3,2],[-1.2,3,1.4]].forEach(([x,y,r])=>{ c.beginPath(); c.arc(x,y,r,0,Math.PI*2); c.fill(); });
+      c.fillStyle='#4a3a2a'; c.fillRect(-7,8,14,2.6); c.fillStyle='#3a2a1a'; c.fillRect(-1.6,10.6,3.2,7); c.restore(); },
+    grave_ring(c){ c.strokeStyle='#5a4a2a'; c.lineWidth=5.2; c.beginPath(); c.ellipse(20,24,9,7.5,0,0,Math.PI*2); c.stroke(); c.strokeStyle='#c8a050'; c.lineWidth=3.4; c.stroke();
+      c.fillStyle='#3a5a3a'; c.strokeStyle='#2a2016'; c.lineWidth=1; c.beginPath(); c.ellipse(20,15.5,4.4,3.6,0,0,Math.PI*2); c.fill(); c.stroke();
+      c.fillStyle='rgba(180,255,180,0.6)'; c.beginPath(); c.arc(18.8,14.6,1.2,0,Math.PI*2); c.fill(); } };
+  paintItemArt=function(g2,id,size){ if(ART[id]){ g2.save(); g2.scale(size/40,size/40); try{ ART[id](g2); } finally{ g2.restore(); } return; } return oldPIA(g2,id,size); }; }
+const VESNA_N='Vesna the Grave-Speaker';
+function vesnaFen(){
+  const hag=defeatedMobs.has('fen:Hesk the Fen Hag'), back=()=>vesnaFen(), necroTalk=VESNA_NECRO;
+  if(hasItem('morwen_lantern') && CHOICE.morwen!=='done'){                       // her lantern, back from Hesk
+    say(VESNA_N,["Vesna takes the lantern in both hands and holds it up to her face. The little flame inside turns green, then gold.","“Hesk taught me everything I know. Then she tried to use this to talk the drowned kings into getting up again. It works. That's the trouble.”","“Listen. In the Sunken Hollow, south of here, the wisps gather over a bank of reeds at night. Under those reeds is the barrow of the old kings. Gold, and worse than gold.”"],[
+      {label:'Take her gift.', fn:()=>{ player.inv[player.inv.indexOf('morwen_lantern')]=null; giveQuestItem('potion',true); giveQuestItem('potion',true); player.purse+=25; updateHud(); remember('morwen','done',"You brought Vesna her lantern. She told you of a barrow under the reeds of the Sunken Hollow.");
+        say(VESNA_N,"“Two of my draughts and a little coin. The rest you'll have to dig for.” <i>You receive 25 copper and two healing draughts.</i>",[{label:'Back.',fn:back},bye]); }}]); return; }
+  const opts=[];
+  if(!CHOICE.morwen) opts.push({label:'“You look like someone with a job for a sword.”', fn:()=>say(VESNA_N,["“Hesk. Out on the island past the old ruin, south-west. She was a grave-speaker once, like me. My teacher, if you can believe it.”","“She took my lantern. It is not a lamp, it is a key: it shows the way to the drowned. She has gone bad with it. Bring it back to me.”"],[
+      {label:'“I will bring your lantern back.”', fn:()=>{ remember('morwen','asked',"Vesna wants her lantern back from Hesk, the Fen Hag, her old teacher, on the island south-west in the Drowning Fen."); say(VESNA_N,"“She'll curse you. Curse her back.”",[{label:'Back.',fn:back},bye]); }},{label:'Back.',fn:back}])});
+  if(CHOICE.morwen==='asked') opts.push({label:'Ask about Hesk.', fn:()=>say(VESNA_N,hag?"“Hesk is gone? Then where is my lantern? She will have dropped it where she fell. Go and look.”":"“Hesk lives on the island to the south-west, past the old ruin. You will hear her before you see her. She sings.”",[{label:'Back.',fn:back},bye])});
+  if(CHOICE.necro){ const nw=npcHasNews({id:'vesna',_lesson:true}); opts.push({label:'Talk about the dead.'+(nw?' ('+nw+')':''), fn:necroTalk}); }
+  opts.push({label:'Sell her bones and grave-finds.', fn:()=>sellTo(VESNA_N,back,VESNA_BUYS)});
+  if(CHOICE.morwen==='done') opts.push({label:'“Show me your draughts.”', fn:()=>shopFrom(VESNA_N,['potion','potion','bread','apple','potion'],0.9,"“Bog-myrtle and honey. Better than the city stuff.”",back)});
+  opts.push({label:'“What is this place?”', fn:()=>say(VESNA_N,["“The hollow, before the water. Kings lived here. Little kings, of a little land, but they had gold. When the river moved, they stayed. They are still here, most of them.”","“Mind the mud that stands up. It is hungry, not clever. Hit it where it isn't looking. And the bones that walk at night: lay them down, and bring me what they leave.”"],[{label:'Back.',fn:back},bye])});
+  opts.push(bye);
+  const first=!CHOICE.vesnaHut; CHOICE.vesnaHut=true;
+  const line= first ? ["A pale woman in a black robe sits on the rail of the stilt-hut, a staff across her knees, and watches you come with eyes like wet stones.", CHOICE.necro?"“So you found the fen road. Welcome to my house. Mind the third step, it is mostly rot.”":"“Well. The oak is gone, then. And the first thing through is a stranger with a sword.” A thin smile. “Good. I may have a job for a sword.”"]
+    : CHOICE.morwen==='done' ? [CHOICE.barrow==='done'?"“You went under the reeds and came back. Bertil's boots on your feet, I see. He would have liked you. He liked anyone who could hit hard.”":"“Under the reeds in the Sunken Hollow, where the lights gather. Mind the old king. He does not like visitors.”"]
+    : ["Vesna looks up from the water. “Yes?”"];
+  say(VESNA_N,line,opts); }
+const VESNA_NECRO=TALKERS.vesna;                                                   // her lessons, as they were
+TALKERS.vesna=function(){ if(areaId==='fen') return vesnaFen(); return VESNA_NECRO(); };
+{ const oN=npcHasNews; npcHasNews=function(n){ if(n && n.id==='vesna' && !n._lesson && areaId==='fen'){
+      if(!CHOICE.morwen) return '!'; if(CHOICE.morwen==='asked' && hasItem('morwen_lantern')) return '?'; }
+    return oN(n); }; }
 </script>
 </body>
 </html>

@@ -5210,6 +5210,7 @@ function windowSky(){
   return { top, bot, stars:Math.max(0,(n-0.6)/0.4), key:Math.round(n*10)+'/'+Math.round(dusk*4)+'/'+Math.round(dawn*4) };
 }
 function paintInteriorWalls(){
+  if(AREAS[areaId] && AREAS[areaId].tent) return paintTentWalls();
   if(AREAS[areaId] && AREAS[areaId].elfhall) return paintElfHallWalls();
   const {w,h}=ROOM, H=118, o=P(0,0), rEnd=P(w,0), lEnd=P(0,h);
   const wall=(a,b,c1,c2,side)=>{
@@ -5257,6 +5258,32 @@ function paintElfHallWalls(){
   };
   wall(o,rEnd,w,'#e4e6e8','#b8bec6'); wall(lEnd,o,h,'#d2d6da','#a6acb4');
   g.fillStyle='#eef0f2'; g.fillRect(o.x-5,o.y-H,10,H);
+}
+// ── inside an elven pavilion: an octagon of canvas, the roof rising to a peak over the middle ──
+const tentCut=()=>Math.round(Math.min(ROOM.w,ROOM.h)/4);
+const inTent=(gx,gy)=>{ const c=tentCut(), w=ROOM.w, h=ROOM.h; return gx+gy>=c && (w-gx)+gy>=c && gx+(h-gy)>=c && (w-gx)+(h-gy)>=c; };
+function tentOct(){ const w=ROOM.w, h=ROOM.h, c=tentCut(); return [[0,h-c],[0,c],[c,0],[w-c,0],[w,c],[w,h-c],[w-c,h],[c,h]]; }
+function paintTentWalls(){
+  const V=tentOct(), w=ROOM.w, h=ROOM.h, WH=96, apex=up(P(w/2,h/2),300), lerp=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
+  function up(q,hh){ return {x:q.x,y:q.y-hh}; }
+  // only the walls whose inside faces us: the back half of the octagon (the near half is cut away so you can see in)
+  const edges=[]; for(let k=0;k<V.length;k++){ const a=V[k], b=V[(k+1)%V.length], nx=b[1]-a[1], ny=-(b[0]-a[0]); if(nx+ny<=0.01) edges.push([a,b]); }
+  edges.forEach(([a,b],k)=>{ const A=P(a[0],a[1]), Bq=P(b[0],b[1]), At=up(A,WH), Bt=up(Bq,WH);
+    const lit=0.5+0.5*Math.cos(k*0.7+0.6);
+    // roof panel: from the top of the wall to the peak, the inside of the cone
+    const rg=g.createLinearGradient(0,apex.y,0,Math.max(At.y,Bt.y)); rg.addColorStop(0,'#8a8270'); rg.addColorStop(1,tone('#d8d0bc',-0.15+lit*0.1));
+    g.fillStyle=rg; g.beginPath(); g.moveTo(At.x,At.y); g.lineTo(Bt.x,Bt.y); g.lineTo(apex.x,apex.y); g.closePath(); g.fill();
+    g.strokeStyle='rgba(120,100,70,0.35)'; g.lineWidth=1; for(let t=0.25;t<1;t+=0.25){ const q=lerp(At,Bt,t); g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(apex.x,apex.y); g.stroke(); }   // seams in the canvas
+    // the wall: canvas hanging straight, gently scalloped at the top
+    const wg=g.createLinearGradient(0,Math.min(At.y,Bt.y),0,Math.max(A.y,Bq.y)); wg.addColorStop(0,tone('#ece6d6',-0.08+lit*0.08)); wg.addColorStop(1,tone('#d8d0bc',-0.18+lit*0.08));
+    g.fillStyle=wg; g.beginPath(); g.moveTo(A.x,A.y); g.lineTo(Bq.x,Bq.y); g.lineTo(Bt.x,Bt.y); g.lineTo(At.x,At.y); g.closePath(); g.fill();
+    g.strokeStyle='rgba(150,130,90,0.3)'; g.lineWidth=1; for(let t=1/6;t<0.99;t+=1/6){ const q=lerp(A,Bq,t); g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(q.x,q.y-WH); g.stroke(); }   // the folds
+    g.strokeStyle='#cdb46e'; g.lineWidth=2; g.beginPath(); g.moveTo(At.x,At.y+10); g.lineTo(Bt.x,Bt.y+10); g.stroke();                    // a gold band
+    g.fillStyle=tone('#ece6d6',-0.04); for(let t=0;t<1;t+=1/6){ const q0=lerp(At,Bt,t), q1=lerp(At,Bt,t+1/6), qm=lerp(At,Bt,t+1/12);   // scallops
+      g.beginPath(); g.moveTo(q0.x,q0.y); g.quadraticCurveTo(qm.x,qm.y+12,q1.x,q1.y); g.closePath(); g.fill(); }
+    g.strokeStyle='#bfa868'; g.lineWidth=3; g.beginPath(); g.moveTo(A.x,A.y); g.lineTo(A.x,A.y-WH); g.stroke(); });                    // a pole at each corner
+  // the crown ring at the peak
+  g.fillStyle='#cdb46e'; g.beginPath(); g.ellipse(apex.x,apex.y+6,14,5,0,0,Math.PI*2); g.fill(); g.fillStyle='#e8f0ff'; g.beginPath(); g.ellipse(apex.x,apex.y+4,8,3,0,0,Math.PI*2); g.fill();
 }
 // A canvas A-frame tent on a 2x2 footprint; anchor = its far-front corner
 function paintTent(x,y,burnt){
@@ -5439,8 +5466,14 @@ function drawFireplace(o){
   const courses=(a,b,h0,h1,stag)=>{ g.strokeStyle='rgba(40,34,26,0.45)'; g.lineWidth=0.8;   // stone courses and staggered joints on one face
     for(let h=h0+10; h<h1; h+=10){ const p=up(a,h), q=up(b,h); g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(q.x,q.y); g.stroke(); }
     if(stag) for(let h=h0; h<h1-2; h+=10) for(let t=((h-h0)/10)%2?0.12:0.3; t<0.98; t+=stag){ const q=up({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t},h); g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(q.x,q.y-Math.min(10,h1-h)); g.stroke(); } };
-  // ── the chimney breast: from the firebox to the ceiling, a little narrower than the firebox
-  const cj0=o.j+0.05, cj1=o.j+0.95, cd=0.34, E2=P(0,cj1), F1=P(cd,cj0), F2=P(cd,cj1);
+  // ── the firebox: near end, front, then the top slab
+  poly([D,Bq,up(Bq,H),up(D,H)],STd,EDGE);
+  poly([C,D,up(D,H),up(C,H)],ST,EDGE);
+  courses(C,D,0,H,0.3); courses(D,Bq,0,H,0.5);
+  poly([up(A,H),up(Bq,H),up(D,H),up(C,H)],STl,EDGE);
+  g.strokeStyle='rgba(255,250,235,0.35)'; g.lineWidth=1; g.beginPath(); const l0=up(C,H), l1=up(D,H); g.moveTo(l0.x,l0.y); g.lineTo(l1.x,l1.y); g.stroke();   // the lit front edge of the slab
+  // ── the chimney breast: sits on the slab, nearly flush with the front, and rises to the ceiling
+  const cj0=o.j+0.08, cj1=o.j+0.92, cd=d-0.06, E2=P(0,cj1), F1=P(cd,cj0), F2=P(cd,cj1);
   poly([up(F2,H),up(E2,H),up(E2,WALLTOP),up(F2,WALLTOP)],STdd,EDGE);          // near end, in shadow
   poly([up(F1,H),up(F2,H),up(F2,WALLTOP),up(F1,WALLTOP)],STd,EDGE);           // front
   courses(F1,F2,H,WALLTOP,0.34); courses(F2,E2,H,WALLTOP,0);
@@ -5448,12 +5481,8 @@ function drawFireplace(o){
   g.fillStyle=gs; g.beginPath(); [up(F1,H),up(F2,H),up(F2,WALLTOP),up(F1,WALLTOP)].forEach((q,k)=>k?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.closePath(); g.fill();
   g.strokeStyle='#2a1a0c'; g.lineWidth=4; g.beginPath(); const tb0=up(P(0,cj0-0.25),WALLTOP), tb1=up(F1,WALLTOP), tb2=up(F2,WALLTOP), tb3=up(E2,WALLTOP);   // the ceiling beam runs across its top
   g.moveTo(tb1.x,tb1.y); g.lineTo(tb2.x,tb2.y); g.lineTo(tb3.x,tb3.y); g.stroke();
-  // ── the firebox: near end, front, then the top slab
-  poly([D,Bq,up(Bq,H),up(D,H)],STd,EDGE);
-  poly([C,D,up(D,H),up(C,H)],ST,EDGE);
-  courses(C,D,0,H,0.3); courses(D,Bq,0,H,0.5);
-  poly([up(A,H),up(Bq,H),up(D,H),up(C,H)],STl,EDGE);
-  g.strokeStyle='rgba(255,250,235,0.35)'; g.lineWidth=1; g.beginPath(); const l0=up(C,H), l1=up(D,H); g.moveTo(l0.x,l0.y); g.lineTo(l1.x,l1.y); g.stroke();   // the lit front edge of the slab
+  const ledge=[up(P(cd+0.03,cj0-0.03),H+3),up(P(cd+0.03,cj1+0.03),H+3),up(P(0,cj1+0.03),H+3)];                      // a small stone ledge where it meets the slab
+  g.strokeStyle='#5e564a'; g.lineWidth=3; g.beginPath(); ledge.forEach((q,n)=>n?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.stroke();
   // the arched opening, black with soot, the fire inside
   const m=(t,h)=>up({x:C.x+(D.x-C.x)*t,y:C.y+(D.y-C.y)*t},h);
   g.beginPath(); const o0=m(0.22,0), o1=m(0.78,0); g.moveTo(o0.x,o0.y); const t0=m(0.22,26), t1=m(0.78,26), tm=m(0.5,36);
@@ -7026,6 +7055,12 @@ function paintGroundTexture(){
       let pc=mixC([66,62,56],[46,43,39],n*0.7+n2*0.3); if(crack) pc=mixC(pc,[70,130,90],0.35);
       const o=(py*TWp+px)*4, k=1-0.3*(1-smooth(0,1.3,Math.min(gx,gy)));
       D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
+    if(theme==='interior' && AREAS[areaId] && AREAS[areaId].tent){            // woven mats in the octagon, a round rug in the middle, nothing outside
+      const o=(py*TWp+px)*4; if(!inTent(gx,gy)){ D[o+3]=0; continue; }
+      const cx=w/2, cy=h/2, r=Math.hypot(gx-cx,gy-cy), weave=((Math.floor(gx*4)+Math.floor(gy*4))&1);
+      let pc=mixC([196,176,132],[176,154,110],weave*0.6+fbm(gx*2,gy*2,51)*0.4);
+      if(r<Math.min(w,h)*0.3){ const ring=Math.floor(r*3)%3; pc=ring===0?[70,92,130]:ring===1?[214,222,236]:[150,172,206]; if(r>Math.min(w,h)*0.27) pc=[205,180,110]; }
+      const k=1-0.25*clamp01(1-(Math.min(gx+gy,(w-gx)+gy)-tentCut())/1.2); D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
     if(theme==='interior' && AREAS[areaId] && AREAS[areaId].elfhall){      // pale marble in large squares, veined, faintly silver
       const tx=Math.floor(gx), ty=Math.floor(gy), fx=gx-tx, fy=gy-ty, vein=fbm(gx*2.2+ty,gy*2.2+tx,31), edge=Math.min(fx,fy,1-fx,1-fy)<0.03;
       let pc=mixC([232,232,226],[204,208,212],vein); if(((tx+ty)&1)) pc=mixC(pc,[214,220,226],0.5); if(edge) pc=mixC(pc,[150,156,162],0.6);
@@ -9753,14 +9788,14 @@ Object.assign(AREAS,{
     ()=>[ { id:'bertha', name:'Bertha of the Wheatsheaf', i:6, j:4, dir:1, opts:{gender:'f',skin:1,hair:4,hairColor:8,face:0,equip:{head:null,torso:'smock',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}} },
       { id:'gunnar', name:'Gunnar the Ploughman', i:3, j:1, dir:1, opts:{gender:'m',skin:2,hair:1,hairColor:3,beard:4,face:1,equip:{head:null,torso:'shirt',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}} },
       ...(nightAmt()>0.4 ? [{ id:'tobbpub', name:'Old Tobb', i:4, j:3, dir:0, sit:true, opts:{gender:'m',skin:2,hair:2,hairColor:12,beard:4,face:1,equip:{head:'hood',torso:'smock',armor:null,hands:'gloves',legs:'hose_grey',feet:'boots',weapon:null,offhand:null}} }] : []) ]),
-  moonbath: CROOM('The Moon-Bath of Sylvhaven',8,6,'sylvhaven','fromBath', ()=>[{type:'pool', i:2, j:0, fp:[4,3], kind:'moon'}, {type:'lantern', i:0, j:0}, {type:'lantern', i:7, j:0}, {type:'bench', i:7, j:2}, {type:'bench', i:0, j:3}],
+  moonbath: CROOM('The Moon-Bath of Sylvhaven',8,8,'sylvhaven','fromBath', ()=>[{type:'pool', i:2, j:2, fp:[4,3], kind:'moon'}, {type:'lantern', i:1, j:2}, {type:'lantern', i:6, j:2}, {type:'bench', i:6, j:5}, {type:'bench', i:1, j:5}],
     ()=>{ const d=Math.floor(dayClock/DAY_LEN), E={race:'elf',beard:0}, N={head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:null,offhand:null};
       const st=(id,nm,i,j,dir,o,k)=>({ id, name:nm, i, j, dir, ...((d+k)%10===0?{silk:'#dfe8f4'}:{}), opts:{...E,...o,equip:{...N}} });
-      return [ { id:'nimue', name:'Nimuë, Keeper of the Bath', i:6, j:4, dir:1, opts:ELFO({gender:'f',skin:0,hair:0,hairColor:11,face:2,equip:{head:'elf_circlet',torso:'elf_robe',armor:null,hands:null,legs:null,feet:'elf_boots',weapon:null,offhand:null}}) },
-        BATHER('mb1','An Elf, Bathing',2,1,1,{...E,gender:'f',skin:0,hair:3,hairColor:12,face:2}), BATHER('mb2','An Elf, Bathing',5,1,0,{...E,gender:'m',skin:0,hair:4,hairColor:10,face:0}),
-        {...st('mb3','An Elf',1,2,1,{gender:'f',skin:0,hair:0,hairColor:11,face:2},1), sit:'knees'}, st('mb4','An Elf',3,4,1,{gender:'f',skin:0,hair:1,hairColor:10,face:1},4) ]; }),
+      return [ { id:'nimue', name:'Nimuë, Keeper of the Bath', i:5, j:6, dir:1, opts:ELFO({gender:'f',skin:0,hair:0,hairColor:11,face:2,equip:{head:'elf_circlet',torso:'elf_robe',armor:null,hands:null,legs:null,feet:'elf_boots',weapon:null,offhand:null}}) },
+        BATHER('mb1','An Elf, Bathing',2,3,1,{...E,gender:'f',skin:0,hair:3,hairColor:12,face:2}), BATHER('mb2','An Elf, Bathing',5,3,0,{...E,gender:'m',skin:0,hair:4,hairColor:10,face:0}),
+        {...st('mb3','An Elf',1,4,1,{gender:'f',skin:0,hair:0,hairColor:11,face:2},1), sit:'knees'}, st('mb4','An Elf',3,6,1,{gender:'f',skin:0,hair:1,hairColor:10,face:1},4) ]; }),
 });
-AREAS.moonbath.elfhall=true;
+AREAS.moonbath.tent=true;
 function berthaTalk(){ const day=Math.floor(dayClock/DAY_LEN);
   const news=[]; if(CHOICE.bard==='praise') news.push("“Pip sings about you in here every night. Every. Night.”"); if(CHOICE.sisters==='done') news.push("“Ada came in yesterday and laughed at something. First time since Edric.”");
   if(BARON_DOWN()) news.push("“No more Baron's men drinking on credit! I've had to learn what coin looks like again.”"); if(CHOICE.hobb==='done') news.push("“Hobb's mule bit the smith. Everybody's very happy about it.”");
@@ -13003,8 +13038,9 @@ const RESPAWN_AFTER=DAY_LEN;               // one full day
 // a few more things to hunt
 wrap('road','mobs',l=> nightAmt()<0.3 ? [...l,{ name:'Road Thief', type:'bandit', i:9, j:3, faction:'roadthief', opts:BANDIT({skin:1,hair:1,hairColor:2,beard:1,equip:{head:'hood',torso:'shirt',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:'club',offhand:null}}) }] : l);
 // Maelis weaves in her own tent now: the empty pavilion in Sylvhaven, with a loom that works by moonlight
-AREAS.weavetent={ ...CROOM("Maelis's Weaving Tent",6,5,'sylvhaven','fromTent', ()=>[{type:'loom', i:1, j:0, fp:[2,1]}, {type:'clothtable', i:4, j:0}, {type:'lantern', i:0, j:2}, {type:'lantern', i:5, j:2}, {type:'bench', i:4, j:3}],
-  ()=> havenBurnt() ? [] : [{ id:'maelis', name:'Maelis the Weaver', i:2, j:2, dir:0, opts:ELFO({gender:'f',skin:1,hair:3,hairColor:1,face:1,equip:{head:null,torso:'elf_tunic',armor:null,hands:null,legs:'elf_leggings',feet:'elf_boots',weapon:null,offhand:null}}) }]), elfhall:true };
+AREAS.weavetent={ ...CROOM("Maelis's Weaving Tent",8,8,'sylvhaven','fromTent', ()=>[{type:'loom', i:3, j:1, fp:[2,1]}, {type:'clothtable', i:6, j:3}, {type:'lantern', i:1, j:3}, {type:'lantern', i:6, j:5}, {type:'bench', i:1, j:5}],
+  ()=> havenBurnt() ? [] : [{ id:'maelis', name:'Maelis the Weaver', i:4, j:3, dir:0, opts:ELFO({gender:'f',skin:1,hair:3,hairColor:1,face:1,equip:{head:null,torso:'elf_tunic',armor:null,hands:null,legs:'elf_leggings',feet:'elf_boots',weapon:null,offhand:null}}) }]), tent:true };
+{ const oldSA=switchArea; switchArea=function(id,...a){ const r=oldSA(id,...a); if(AREAS[id] && AREAS[id].tent){ for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++) if(!inTent(i+0.5,j+0.5)) blocked.add(i+','+j); } return r; }; }
 wrap('sylvhaven','npcs',l=>l.filter(n=>n.id!=='maelis'));
 wrap('sylvhaven','objects',l=>l.map(o=>o.type==='pavilion'&&o.i===1&&o.j===1&&!o.burnt ? {...o, door:'r', dt:1, inside:'weavetent', back:'fromCity'} : o));
 AREAS.sylvhaven.entries.fromTent={i:3,j:2};

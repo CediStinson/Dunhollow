@@ -6065,6 +6065,36 @@ function paintGateArch(x,y){                               // the gatehouse betw
   g.strokeStyle='#3a3a3a'; g.lineWidth=2; for(let t=0.12;t<0.9;t+=0.09){ g.beginPath(); g.moveTo(q(t,ht-62).x,q(t,ht-62).y); g.lineTo(q(t,ht-78).x,q(t,ht-78).y); g.stroke(); }   // raised portcullis teeth
   g.fillStyle='#7a1a1a'; const bm=q(0.5,ht-8); g.fillRect(bm.x-14,bm.y-4,28,40); g.fillStyle='#e8c060'; g.font='bold 16px Georgia,serif'; g.textAlign='center'; g.fillText('B',bm.x,bm.y+22); g.textAlign='left';
 }
+function paintOuterWall(x,y,len){                  // the town's outer wall: dressed stone, a walkway on top, battlements, moss at the foot
+  const dx=TW/2, dy=TH/2, H=96, B2={x:dx*0.55,y:-dy*0.55}, f=(t,h)=>({x:x+dx*len*t, y:y+dy*len*t-h});
+  const poly=(pts,fill)=>{ g.beginPath(); pts.forEach((p2,n)=>n?g.lineTo(p2.x,p2.y):g.moveTo(p2.x,p2.y)); g.closePath(); g.fillStyle=fill; g.fill(); };
+  const back=p2=>({x:p2.x+B2.x,y:p2.y+B2.y});
+  g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.moveTo(f(0,0).x,f(0,0).y); g.lineTo(f(1,0).x,f(1,0).y); g.lineTo(f(1,0).x-30,f(1,0).y+14); g.lineTo(f(0,0).x-30,f(0,0).y+14); g.closePath(); g.fill();   // its shadow on the grass
+  poly([f(0,H),f(1,H),back(f(1,H)),back(f(0,H))],'#7a7468');                                  // the walkway
+  const gr=g.createLinearGradient(0,f(0,H).y,0,f(0,0).y); gr.addColorStop(0,'#9a9284'); gr.addColorStop(1,'#6e675a');
+  poly([f(0,0),f(1,0),f(1,H),f(0,H)],gr);                                                    // the face
+  g.strokeStyle='rgba(40,36,30,0.35)'; g.lineWidth=0.8;
+  for(let h=12,row=0;h<H;h+=12,row++){ const a=f(0,h), b=f(1,h); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke();    // courses of stone
+    for(let t=(row%2?0.5:0)/(len*2);t<1;t+=1/(len*2)){ const c0=f(t,h-12), c1=f(t,h); g.beginPath(); g.moveTo(c0.x,c0.y); g.lineTo(c1.x,c1.y); g.stroke(); } }
+  for(let t=0;t<1-0.001;t+=1/(len*3)){ const w=1/(len*3)*0.55, a=f(t,H), b=f(t+w,H);            // battlements
+    poly([a,b,{x:b.x,y:b.y-13},{x:a.x,y:a.y-13}],'#a29a8c'); poly([{x:b.x,y:b.y-13},back({x:b.x,y:b.y-13}),back({x:a.x,y:a.y-13}),{x:a.x,y:a.y-13}],'#8a8476'); }
+  g.fillStyle='rgba(84,104,52,0.55)'; for(let t=0.03;t<1;t+=0.07){ const m=f(t,3); g.beginPath(); g.ellipse(m.x,m.y,7,3.4,0.46,0,Math.PI*2); g.fill(); }   // moss along the foot
+  g.strokeStyle='rgba(30,26,20,0.5)'; g.lineWidth=1; [0.25,0.65].forEach(t=>{ const a=f(t,H*0.62); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(a.x+1,a.y+10); g.stroke(); });   // arrow slits
+}
+function paintGateDoors(x,y,shut){                 // under the gatehouse arch: oak doors bound in iron
+  const dx=TW/2, dy=TH/2, ht=150, span=[{x:x-dx*1.5,y:y-dy*1.5},{x:x+dx*1.5,y:y+dy*1.5}];
+  const q=(t,hh)=>({x:span[0].x+(span[1].x-span[0].x)*t, y:span[0].y+(span[1].y-span[0].y)*t-hh});
+  const poly=(pts,fill)=>{ g.beginPath(); pts.forEach((p2,n)=>n?g.lineTo(p2.x,p2.y):g.moveTo(p2.x,p2.y)); g.closePath(); g.fillStyle=fill; g.fill(); };
+  const t0=0.08, t1=0.92, top=t=>ht-62+Math.sin((t-t0)/(t1-t0)*Math.PI)*16;     // the doors fill the arch up to its curve
+  const leaf=(a,b)=>{ const pts=[q(a,0),q(b,0)]; for(let t=b;t>=a-0.001;t-=(b-a)/8) pts.push(q(t,top(t))); return pts; };
+  poly(leaf(t0,t1),'rgba(16,12,8,0.75)');                                          // the dark of the passage
+  if(!shut){ [[t0,t0+0.07],[t1-0.07,t1]].forEach(([a,b])=>poly(leaf(a,b),'#4a3018')); return; }   // open: the leaves folded back to either side
+  [[t0,0.5],[0.5,t1]].forEach(([a,b],k)=>{ poly(leaf(a,b),k?'#55381c':'#4a3018');
+    g.strokeStyle='rgba(20,12,4,0.6)'; g.lineWidth=1; for(let t=a+(b-a)/5;t<b-0.01;t+=(b-a)/5){ const p0=q(t,0), p1=q(t,top(t)); g.beginPath(); g.moveTo(p0.x,p0.y); g.lineTo(p1.x,p1.y); g.stroke(); }   // the planks
+    [18,52,82].forEach(hh=>{ const p0=q(a+0.01,hh), p1=q(b-0.01,hh); g.strokeStyle='#2a2a2c'; g.lineWidth=4; g.beginPath(); g.moveTo(p0.x,p0.y); g.lineTo(p1.x,p1.y); g.stroke();   // iron bands, studded
+      g.fillStyle='#6a6a6e'; for(let t=a+0.03;t<b-0.02;t+=0.06){ const st=q(t,hh); g.beginPath(); g.arc(st.x,st.y,1.2,0,Math.PI*2); g.fill(); } }); });
+  const r1=q(0.47,44), r2=q(0.53,44); g.strokeStyle='#8a8a8e'; g.lineWidth=1.6; [r1,r2].forEach(r=>{ g.beginPath(); g.arc(r.x,r.y+4,3.6,0,Math.PI*2); g.stroke(); });   // two iron ring-pulls
+}
 function paintKeep(X,Y,fw,fh){                             // the Baron's keep: a massive stone block with towers at the corners
   const o={fw,fh,h:260,rh:1,v:2,stone:true,nochim:true,ridge:'i'}, T=TW/2, H2=TH/2, pt=(gi,gj,hh=0)=>({x:X+(gi-gj)*T, y:Y+(gi+gj)*H2-hh});
   paintBuilding(X,Y,{...o,rh:2,door:'l',dt:Math.floor(fw/2)});
@@ -6437,6 +6467,11 @@ function drawObject(o){
   } else if(o.type==='gatearch'){
     const pp=P(player.x,player.y), behind=Math.abs(player.x-(o.i+0.5))<2.5 && player.y<o.j+0.6 && player.y>o.j-2.5; o.fade=lerpN(o.fade??1, behind?0.34:1, 0.2);
     const ga=g.globalAlpha; g.globalAlpha=ga*o.fade; drawCached('gatearch',x,y,320,300,160,250,paintGateArch,1); g.globalAlpha=ga;
+  } else if(o.type==='outerwall'){                 // a stretch of the town's outer wall, running along i
+    const a=P(o.i,o.j+0.5); drawCached('owall'+o.len,a.x,a.y,o.len*TW/2+80,o.len*TH/2+200,40,170,(X,Y)=>paintOuterWall(X,Y,o.len),1);
+  } else if(o.type==='gatedoors'){                // the gate's two oak leaves: shut across the passage, or swung back against the walls
+    const shut=!(o.open&&o.open()), behind=Math.abs(player.x-(o.i+0.5))<2.5 && player.y<o.j+0.6 && player.y>o.j-2.5; o.fade=lerpN(o.fade??1, behind?0.34:1, 0.2);
+    const ga=g.globalAlpha; g.globalAlpha=ga*o.fade; drawCached('gatedoors'+(shut?1:0),x,y,320,300,160,250,(X,Y)=>paintGateDoors(X,Y,shut),1); g.globalAlpha=ga;
   } else if(o.type==='fountain'){
     const a=P(o.i+1,o.j+1); drawCached('fountain',a.x,a.y,240,200,120,160,paintFountain);
     for(let k=0;k<10;k++){ const t=((gt*0.9+k/10)%1), ang=k/10*Math.PI*2; g.fillStyle=`rgba(200,230,245,${0.6*(1-t)})`;
@@ -9433,15 +9468,20 @@ Object.assign(AREAS,{
     npcs:()=>[],
     mobs:()=> nightAmt()>0.5 && QUEST.wolves<2 ? [{ name:'Hungry Wolf', type:'wolf', i:4, j:9, faction:'lanewolf', coat:'#7a7064', daily:true }] : [],
     entries:{ fromRoad:{i:1,j:21}, fromCross:{i:1,j:21}, fromVillage:{i:3,j:1} } },
-  kingsroad:{ fence:{r:false,l:false}, w:8, h:49, theme:'road', label:"The King's Road", mini:{x:0,y:0},
+  kingsroad:{ fence:{r:false,l:false}, w:8, h:49, theme:'road', label:"The King's Road", mini:{x:0,y:0}, noTree:['0,0','1,0','2,0','3,0','5,0','6,0','7,0','0,1','1,1','2,1','6,1','7,1','0,2','7,2'],
     notches:()=>[], dummy:null,
     objects:()=>[ {type:'teleporter', i:4, j:48, to:'road', entry:'fromCity'}, {type:'milestone', i:6, j:44, t:'HOL 3'}, {type:'rocks', i:1, j:38, noblock:true}, {type:'rocks', i:6, j:33, noblock:true},
       {type:'teleporter', i:4, j:0, to:'citygate', entry:'fromRoad', locked:()=>!wildDone(), onLocked:()=>setTimeout(gateDenied,200)},
       {type:'milestone', i:6, j:27, t:'HOL 2'}, {type:'milestone', i:1, j:12, t:'HOL 1'},
       B(0,19,2,2,2,{stone:true,h:90,rh:40,door:'r',dt:0,sign:'⚖'}), {type:'banner', i:2, j:18},
       {type:'gallows', i:6, j:7}, {type:'cart', i:1, j:24}, {type:'barrel', i:0, j:23}, {type:'lamp', i:2, j:21}, {type:'lamp', i:6, j:4},
-      {type:'critter', kind:'flowers', i:7, j:14, noblock:true} ],
-    npcs:()=>[ ...(BARON_DOWN() ? [] : [{ id:'tollman', name:"Toll-keeper Brisk", i:2, j:20, dir:1, opts:GUARD({skin:2,hair:3,beard:4,equip:{head:'kettle',torso:'tunic_red',armor:'gambeson',hands:'gloves',legs:'hose_grey',feet:'boots',weapon:null,offhand:null}}) }]),
+      {type:'critter', kind:'flowers', i:7, j:14, noblock:true},
+      // the road ends at Hollowmere's outer wall: a gatehouse between two towers, the wall running off into the trees on both sides
+      {type:'tower', i:1, j:-1.5, fp:[2,2], noblock:true, flag:BARON_DOWN()?'#2a4a8a':'#7a1a1a'}, {type:'tower', i:6, j:-1.5, fp:[2,2], noblock:true, flag:BARON_DOWN()?'#2a4a8a':'#7a1a1a'},
+      {type:'gatedoors', i:4, j:-1, noblock:true, open:()=>wildDone() && cityOpen()}, {type:'gatearch', i:4, j:-1, noblock:true},
+      {type:'outerwall', i:-7, j:-1, fp:[9,1], len:9, noblock:true}, {type:'outerwall', i:7, j:-1, fp:[7,1], len:7, noblock:true} ],
+    npcs:()=>[ ...[[3,1],[6,1]].map(([i,j],k)=>({ id:'krgateguard'+k, name:BARON_DOWN()?'Crown Soldier':"Baron's Gate Guard", i, j, dir:1, opts:GUARD({skin:[1,3][k],hair:[2,0][k],beard:[3,1][k]}) })),
+      ...(BARON_DOWN() ? [] : [{ id:'tollman', name:"Toll-keeper Brisk", i:2, j:20, dir:1, opts:GUARD({skin:2,hair:3,beard:4,equip:{head:'kettle',torso:'tunic_red',armor:'gambeson',hands:'gloves',legs:'hose_grey',feet:'boots',weapon:null,offhand:null}}) }]),
       ...(encounter('pilgrim',0.6) ? [{ id:'pilgrim', name:'A Pilgrim', i:5, j:15, dir:6, wander:[[4,5],[4,26],[3,15]], named:true, speed:0.7, opts:{gender:'m',skin:1,hair:2,hairColor:12,beard:5,face:0,equip:{head:'hood',torso:'smock',armor:null,hands:null,legs:'hose_grey',feet:null,weapon:null,offhand:null}} }] : []) ],
     mobs:()=> nightAmt()>0.5 && !(BARON_DOWN() && CHOICE.unpaid!=='fought' && CHOICE.ruler!=='voss') ? [ { name:'Highwayman', daily:true, type:'bandit', i:5, j:10, faction:'highway', opts:BANDIT({skin:3,hair:0,hairColor:1,beard:4,equip:{head:'bandana',torso:'tunic_linen',armor:'studded',hands:'gloves',legs:'hose_grey',feet:'riding_boots',weapon:'sword',offhand:null}}) } ] : [],
     entries:{ fromRoad:{i:4,j:47}, fromCity:{i:4,j:1} } },
@@ -13473,6 +13513,11 @@ TALKERS.vesna=function(){ if(areaId==='fen') return vesnaFen(); return VESNA_NEC
 { const oN=npcHasNews; npcHasNews=function(n){ if(n && n.id==='vesna' && !n._lesson && areaId==='fen'){
       if(!CHOICE.morwen) return '!'; if(CHOICE.morwen==='asked' && hasItem('morwen_lantern')) return '?'; }
     return oN(n); }; }
+// the two guards at the gate on the King's Road
+['krgateguard0','krgateguard1'].forEach(id=>{ TALKERS[id]=()=>{ const N=BARON_DOWN()?'Crown Soldier':"Baron's Gate Guard";
+    if(!wildDone()){ gateDenied(); return; }
+    if(!cityOpen()){ say(N,["The guard plants his spear across the gate.","“Nobody in from the valley without papers. A letter from your elder, a lord, anybody. No letter, no Hollowmere.”"],[bye]); return; }
+    say(N,[BARON_DOWN()?"“The Crown keeps the gate now. Go on in, and mind your manners in the city.”":"“Papers are in order. Go on through, and don't make trouble.”"],[bye]); }; });
 </script>
 </body>
 </html>

@@ -10065,7 +10065,9 @@ function traderTalk(){
 }
 function shopBuy(){
   const disc = CHOICE.pups==='marta' || CHOICE.goat==='sold' ? 0.85 : 1;
-  const stock=todaysStock('marta',SHOP_STOCK,5);
+  // bread and apples every day; six other things off the cart, a different six each day (now and then a potion or something fine)
+  const MARTA_POOL=['potion','tunic_blue','tunic_green','tunic_red','tunic_linen','smock','breeches','hose_grey','hood','hood_red','straw_hat','bandana','gambeson','jerkin','studded','gloves','boots','riding_boots','kettle','coif','mail','shield','shield_red','shield_iron','dagger','hatchet','club','spear','sword','axe','mace','robe'];
+  const stock=['apple','bread'].filter(id=>!SOLD_TODAY.has('marta'+Math.floor(dayClock/DAY_LEN)+id)).concat(todaysStock('marta',MARTA_POOL.filter(id=>ITEMS[id]),6)); stock.key='marta';
   if(CHOICE.pact==='trade' && !havenBurnt() && !SOLD_TODAY.has('marta'+Math.floor(dayClock/DAY_LEN)+'elf_boots')) stock.push('elf_boots');   // only once the elves trade with the valley
   shopFrom('Marta the Trader',stock,disc,"“Take your time. The rest comes on tomorrow's cart.”",traderTalk);
 }
@@ -12795,9 +12797,10 @@ const ROUTINES={
     { h:[18,22.5], area:'wheatsheaf', at:[4,3], dir:0, sit:true },
     { h:[22.5,23], area:'village', walk:[[3,2],[4,0]] } ] },                                                // home to his hut by the graves; asleep till dawn
   marta:{ name:'Marta the Trader', ids:{village:'trader', wheatsheaf:'trader'}, opts:{gender:'f',skin:2,hair:0,hairColor:3,beard:0,equip:{head:null,torso:'tunic_green',armor:null,hands:null,legs:'breeches',feet:'boots',weapon:null,offhand:null}}, slots:[
-    { h:[7,18.5],  area:'village', at:[3,6], dir:0 },
+    { h:[7,18.5],  area:'village', at:[3,6], dir:0, from:[6,8] },                                           // in from her cottage down the lane with the morning cart
     { h:[18.5,19], area:'village', walk:[[3,6],[3,2]] },
-    { h:[19,21.5], area:'wheatsheaf', at:[2,2], dir:1, sit:true } ] },                                   // counting the day's coin over a cider
+    { h:[19,21.5], area:'wheatsheaf', at:[2,2], dir:1, sit:true },
+    { h:[21.5,22], area:'village', walk:[[3,2],[6,8]] } ] },                                         // home again, down the lane                                   // counting the day's coin over a cider
   pip:{ name:'Pip the Bard', ids:{village:'bard', wheatsheaf:'bard'}, opts:{gender:'m',skin:0,hair:1,hairColor:7,beard:2,face:2,equip:{head:'hood_red',torso:'tunic_red',armor:null,hands:null,legs:'hose_grey',feet:'boots',weapon:null,offhand:null}}, slots:[
     { h:[10,17],   area:'village', at:[10,7], dir:1, wander:[[10,7],[7,6],[11,5],[8,8]] },             // busking round the well
     { h:[17,17.5], area:'village', walk:[[10,7],[3,2]] },
@@ -12832,7 +12835,7 @@ setInterval(()=>{ try{ if(!running || CS.on) return; const h=HOUR();
       const dest=(s&&s.area)||nextArea(R,n.slot)||null, ex=dest?exitToward(dest):exitToward('?');
       n.sit=false; n.chop=false; n.wander=null; n.path=[]; n.opts={...R.opts}; delete n.opts._ck; if(n.x==null){ n.x=n.i+0.5; n.y=n.j+0.5; }
       if(ex){ n.goto=ex; n.vanish=true; } else NPCS.splice(NPCS.indexOf(n),1); continue; }
-    if(!n && here){ const from=prevArea(R,s), en=s.walk?s.walk[0]:(from?exitToward(from):null)||s.at;   // walking in from wherever he was
+    if(!n && here){ const from=prevArea(R,s), en=s.walk?s.walk[0]:(from?exitToward(from):null)||s.from||s.at;   // s.from: where they come in from, starting the day   // walking in from wherever he was
       const m=rtNPC(k,s,true); m.i=en[0]; m.j=en[1]; m.x=en[0]+0.5; m.y=en[1]+0.5; m.path=[];
       if(!s.walk){ m.goto=s.at; m.arrive=s; m.sit=false; m.chop=false; m.wander=null; }
       NPCS.push(m); } }
@@ -13048,7 +13051,8 @@ const TRAINING={
             lines:r=>["Mother Hild sets down her broom and takes both your hands.", "“A blessing is a gift, child. The candles, the oil, the hours on my knees: those are not. For the chapel roof, you understand.”"] } };
 const TRAIN_MAX=6, trainCost=r=>40*Math.pow(2,r);
 // Maelis threads moonlight into one piece of what you wear: +1 Spell Power on that piece, once per piece, priced by the piece
-const WEAVE_SLOTS=['head','torso','armor','hands','legs','feet','offhand'], weaveCost=id=>60+Math.round((PRICES[id]||20)/2);
+const WEAVE_SLOTS=['torso','armor','hands','legs','feet'], WEAVE_TWIN_SLOTS=['head','torso','armor','hands','legs','feet','offhand'],   // only clothes and armour take the thread (twins stay registered so pieces woven earlier still load)
+      weaveCost=id=>60+Math.round((PRICES[id]||20)/2);
 const isWoven=id=>!!(id && id.startsWith && id.startsWith('w_'));
 function weaveTalk(){ const E=player.opts.equip, back=()=>TALKERS.maelis();
   const pieces=WEAVE_SLOTS.map(sl=>E[sl]).filter(id=>id && ITEMS[id]);
@@ -13133,7 +13137,7 @@ AREAS.sylvhaven.entries.fromTent={i:3,j:2};
 wrap('wolfwood','mobs',l=> nightAmt()>0.5 && (QUEST.wolves||0)>=2 ? [...l,{ name:'Timber Wolf', type:'wolf', i:3, j:3, faction:'timber', coat:'#5a524a' },{ name:'Timber Wolf Bitch', type:'wolf', i:4, j:5, faction:'timber', coat:'#6e665a' }] : l);
 
 // ════════ woven pieces: a one-of-a-kind twin of each wearable item, made only by Maelis ════════
-for(const id of Object.keys(ITEMS)){ const it=ITEMS[id]; if(id.startsWith('w_') || !WEAVE_SLOTS.includes(it.slot)) continue;
+for(const id of Object.keys(ITEMS)){ const it=ITEMS[id]; if(id.startsWith('w_') || !WEAVE_TWIN_SLOTS.includes(it.slot)) continue;
   ITEMS['w_'+id]={...it, name:it.name+' (woven)', woven:true};
   ITEM_STATS['w_'+id]={...(ITEM_STATS[id]||{}), magic:((ITEM_STATS[id]||{}).magic||0)+1};
   if(GEAR_HP[id]) GEAR_HP['w_'+id]=GEAR_HP[id];

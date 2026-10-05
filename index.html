@@ -2522,7 +2522,10 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   else if(E.armor==='elf_scale') drawElfScale();
   else if(E.armor==='robe') drawOpenRobe();
   if(E.offhand==='moon_amulet' && front){ const ax=LN+(pr>0.8?CH*0.45:po), ay=Y.SHOULDER+(F?6.4:7);   // the moonsilver focus on a cord of light
-    c.strokeStyle='rgba(220,232,245,0.85)'; c.lineWidth=0.5; c.beginPath(); c.moveTo(x+ax-(pr>0.8?1.5:3.6),B+Y.SHOULDER-0.4); c.quadraticCurveTo(x+ax,B+ay+1,x+ax+(pr>0.8?1.5:3.6),B+Y.SHOULDER-0.4); c.stroke();
+    // the cord's lowest point (the middle of a quadratic) sits exactly on the bail at the top of the orb
+    const bailY=ay+1.2-1.5-0.6, ctrlY=2*bailY-(Y.SHOULDER-0.4);
+    c.strokeStyle='rgba(220,232,245,0.85)'; c.lineWidth=0.5; c.beginPath(); c.moveTo(x+ax-(pr>0.8?1.5:3.6),B+Y.SHOULDER-0.4); c.quadraticCurveTo(x+ax,B+ctrlY,x+ax+(pr>0.8?1.5:3.6),B+Y.SHOULDER-0.4); c.stroke();
+    c.strokeStyle=ELFC.silver; c.lineWidth=0.35; c.beginPath(); c.arc(x+ax,B+bailY,0.55,0,Math.PI*2); c.stroke();   // the little silver loop
     const gg=c.createRadialGradient(x+ax,B+ay+1.2,0,x+ax,B+ay+1.2,4); gg.addColorStop(0,'rgba(220,235,255,0.55)'); gg.addColorStop(1,'rgba(220,235,255,0)'); c.fillStyle=gg; c.fillRect(x+ax-4,B+ay-3,8,8);
     c.fillStyle='#d4dce8'; c.beginPath(); c.arc(x+ax,B+ay+1.2,1.5,0,Math.PI*2); c.fill(); c.strokeStyle=ELFC.silver; c.lineWidth=0.4; c.stroke(); c.fillStyle='#a8b4c4'; c.beginPath(); c.arc(x+ax+0.5,B+ay+0.8,0.6,0,Math.PI*2); c.fill(); }
 
@@ -4047,7 +4050,7 @@ function drawBeardPreview(ctx,style,w,h){
 // One-sided marks are on the character's own left or right and stay there as they turn.
 const MARKS=[ ['scarBrow','Brow Scar'], ['scarCheek','Cheek Scar'],
   ['armTat','Arm Bands',0,1], ['armTat','Left Sleeve',0,2], ['armTat','Right Shoulder Sun',0,3],
-  ['chestTat','Heart Sigil',0,1], ['chestTat','Serpent',0,2], ['chestTat','Back Wings',0,3],
+  ['chestTat','Back Wings',0,3],
   ['neckTat','Neck Runes'],
   ['faceTat','Eye Line',0,1], ['faceTat','Chin Lines',0,2], ['faceTat','Cheek Runes',0,3],
   ['elfFace','Leaf Marks',1,1], ['elfFace','Moon Brow',1,2], ['elfFace','Tear Vines',1,3], ['elfBody','Body Vines',1,1], ['elfBody','Starlines',1,2],
@@ -4055,7 +4058,7 @@ const MARKS=[ ['scarBrow','Brow Scar'], ['scarCheek','Cheek Scar'],
   ['freckles','Freckles',0,undefined,'face'], ['mole','Mole',0,undefined,'face'],
   ['noseRing','Nose Ring',0,1,'face'], ['noseRing','Septum Ring',0,2,'face'], ['browRing','Brow Piercing',0,undefined,'face'],
   ['warPaint','Woad Band',0,1,'face'], ['warPaint','Red Stripes',0,2,'face'], ['eyePatch','Eye Patch',0,undefined,'face'] ];
-const markVal=(M,k)=>{ const v=M&&M[k]; if(v===true) return k==='earrings'?'hoop':1; return v||null; };    // older saves stored plain on/off
+const markVal=(M,k)=>{ const v=M&&M[k]; if(v===true) return k==='earrings'?'hoop':1; if(k==='chestTat' && v!==3) return null; return v||null; };   // heart sigil and serpent were removed    // older saves stored plain on/off
 function buildMarkChips(){ const row=document.getElementById('mark-styles'), row2=document.getElementById('face-details'); if(!row || row.childElementCount) return;
   MARKS.forEach(([k,label,elf,val,grp],i)=>{ const b=document.createElement('button'); b.type='button'; b.className='chip'; b.textContent=label; b.dataset.mark=k; b.dataset.i=i; if(elf) b.dataset.elf='1';
     b.addEventListener('click',()=>{ const M=charOpts.marks=charOpts.marks||{};
@@ -5460,20 +5463,7 @@ function drawNeckTat(c,x,B,P,pr,LN,front){ const Y=BODY, nw=P.neckW/2; c.save();
 // chest and back tattoos. `sdL` is the screen side (-1/+1) of the character's own left.
 function drawChestTat(c,x,B,LN,CH,WA,front,pr,po,F,kind){ const Y=BODY, ink='rgba(28,34,52,0.62)', sdL=(front?1:-1)*(CUR_FLIP?-1:1);
   c.save(); c.strokeStyle=ink; c.fillStyle=ink; c.lineCap='round'; c.lineJoin='round';
-  if(kind===1 && front && pr<=0.8){                                             // heart sigil over the left breast: two linked rings in a diamond
-    const cx=LN+sdL*CH*(F?0.62:0.48)*(1-pr*0.3)+po*0.4, cy=Y.SHOULDER+(F?4:6);
-    { c.lineWidth=0.5;
-      c.beginPath(); c.moveTo(x+cx,B+cy-3); c.lineTo(x+cx+2.6,B+cy); c.lineTo(x+cx,B+cy+3); c.lineTo(x+cx-2.6,B+cy); c.closePath(); c.stroke();
-      [-0.8,0.8].forEach(d=>{ c.beginPath(); c.arc(x+cx+d,B+cy,1.1,0,Math.PI*2); c.stroke(); });
-      c.beginPath(); c.arc(x+cx,B+cy-4,0.4,0,Math.PI*2); c.fill(); } }
-  else if(kind===2 && front){                                                   // a serpent from the right shoulder across to the left hip
-    const s0=LN-sdL*(CH-2)+po*0.4, s1=LN+sdL*(WA-0.5)+po*0.4, y0=Y.SHOULDER+1.5, y1=Y.WAIST+3;
-    const pt=t=>{ const u=1-t; return [u*u*u*s0+3*u*u*t*(s0+sdL*6)+3*u*t*t*(s1-sdL*7)+t*t*t*s1 + Math.sin(t*12)*0.9, u*u*u*y0+3*u*u*t*(y0+7)+3*u*t*t*(y1-9)+t*t*t*y1]; };
-    c.lineWidth=1.1; c.beginPath(); for(let k=0;k<=24;k++){ const [a,b]=pt(k/24); k?c.lineTo(x+a,B+b):c.moveTo(x+a,B+b); } c.stroke();
-    c.strokeStyle='rgba(200,190,170,0.35)'; c.lineWidth=0.35; for(let k=2;k<23;k+=2){ const [a,b]=pt(k/24); c.beginPath(); c.moveTo(x+a-0.4,B+b-0.3); c.lineTo(x+a+0.4,B+b+0.3); c.stroke(); }   // scales
-    const [hx,hy]=pt(0); c.fillStyle=ink; c.beginPath(); c.ellipse(x+hx,B+hy,1.6,1.1,-sdL*0.5,0,Math.PI*2); c.fill();
-    c.strokeStyle='rgba(150,30,30,0.7)'; c.lineWidth=0.3; c.beginPath(); c.moveTo(x+hx-sdL*1.4,B+hy-0.6); c.lineTo(x+hx-sdL*2.6,B+hy-1.2); c.stroke(); }
-  else if(kind===3 && !front){                                                  // wings over both shoulder blades
+  if(kind===3 && !front){                                                  // wings over both shoulder blades
     [-1,1].forEach(sd=>{ if(pr>0.8 && sd<0) return; const bx=LN+sd*1.0, by=Y.SHOULDER+4, tip=[bx+sd*(CH-1),by-3.2];
       c.lineWidth=0.6; c.beginPath(); c.moveTo(x+bx,B+by); c.quadraticCurveTo(x+bx+sd*(CH*0.5),B+by-3.6,x+tip[0],B+tip[1]); c.stroke();   // leading edge, rising to the shoulder
       // three ranks of feathers hanging from it, longest by the spine, sweeping outward
@@ -5488,12 +5478,19 @@ function drawFaceExtras(c,x,B,opts,P,pr,LN,skin){ const Y=BODY, M=opts.marks, F=
   const cy=Y.EYE_TOP+Y.EYE_H/2, ink='rgba(28,34,52,0.66)';
   const noEyes=fn=>{ c.save(); c.beginPath(); c.rect(x-200,B-200,400,400); [-1,1].forEach(sd=>{ if(pr>0.8 && sd<0) return; const e=eyeAt(sd); c.ellipse(x+e.cx,B+cy,e.w/2+0.5,Y.EYE_H/2+0.6,0,0,Math.PI*2); }); c.clip('evenodd'); fn(); c.restore(); };
   c.save(); c.lineCap='round'; c.lineJoin='round';
+  c.beginPath(); c.ellipse(x+LN+(pr>0.8?HW*0.15:0),B+(Y.SKULL_TOP+Y.CHIN)/2+1.5,HW-1.0,(Y.CHIN-Y.SKULL_TOP)/2-0.5,0,0,Math.PI*2); c.clip();   // nothing spills past the face
   const WP=markVal(M,'warPaint');
-  if(WP===1) noEyes(()=>{ c.fillStyle='rgba(44,72,150,0.55)';                   // woad: a blue band right across the eyes
-    c.beginPath(); c.moveTo(x+LN-HW-1,B+cy-2.6); for(let k=0;k<=8;k++){ const t=k/8; c.lineTo(x+LN-HW-1+t*(HW*2+2),B+cy-2.6+(k%2?-0.5:0.3)); }
-    for(let k=8;k>=0;k--){ const t=k/8; c.lineTo(x+LN-HW-1+t*(HW*2+2),B+cy+2.8+(k%2?0.6:-0.2)); } c.closePath(); c.fill(); });
-  if(WP===2){ const sd=sdOf(true); if(sd!=null){ const e=eyeAt(sd); c.strokeStyle='rgba(150,34,28,0.7)'; c.lineWidth=1.0;   // two red stripes down the left cheek
-    [-0.8,0.9].forEach(d=>{ c.beginPath(); c.moveTo(x+e.cx+d,B+cy+2.6); c.lineTo(x+e.cx+d-sd*0.6,B+Y.MOUTH); c.stroke(); }); } }
+  if(WP===1) noEyes(()=>{                                                        // woad: a band across the eyes, rubbed on by hand, ragged at the edges
+    const x0=LN-HW-1, x1=LN+HW+1, ed=(k,a)=>rnd01(k,a,733)-0.5;
+    c.fillStyle='rgba(44,72,150,0.58)'; c.beginPath(); c.moveTo(x+x0,B+cy-2.4);
+    for(let k=0;k<=10;k++){ const t=k/10; c.lineTo(x+x0+t*(x1-x0),B+cy-2.4+ed(k,1)*1.0); }
+    for(let k=10;k>=0;k--){ const t=k/10; c.lineTo(x+x0+t*(x1-x0),B+cy+2.6+ed(k,2)*1.3); } c.closePath(); c.fill();
+    c.fillStyle='rgba(30,50,120,0.4)'; for(let k=0;k<6;k++){ const px=x0+(x1-x0)*(0.08+0.84*rnd01(k,3,734)), py=cy+2.4, len=1.2+rnd01(k,5,736)*2;   // a few runs where the paint dripped
+      c.beginPath(); c.moveTo(x+px-0.35,B+py); c.lineTo(x+px-0.25,B+py+len); c.arc(x+px,B+py+len,0.3,Math.PI,0,true); c.lineTo(x+px+0.35,B+py); c.closePath(); c.fill(); } });
+  if(WP===2){ const sd=sdOf(true); if(sd!=null){ const e=eyeAt(sd), k0=e.w/ew;   // two red stripes down the left cheek, drawn by two fingers
+    [-0.9,0.8].forEach(d=>{ const x0=e.cx+d*k0, y0=cy+2.4, y1=Y.MOUTH-0.4, gs=c.createLinearGradient(0,B+y0,0,B+y1);
+      gs.addColorStop(0,'rgba(160,36,28,0.8)'); gs.addColorStop(1,'rgba(160,36,28,0.25)'); c.strokeStyle=gs; c.lineWidth=0.95*Math.max(0.7,k0);
+      c.beginPath(); c.moveTo(x+x0,B+y0); c.quadraticCurveTo(x+x0+(pr>0.3?0.3:-sd*0.2),B+(y0+y1)/2,x+x0+(pr>0.3?0.6:-sd*0.5),B+y1); c.stroke(); }); } }
   const FT=markVal(M,'faceTat');
   if(FT===1){ const sd=sdOf(true); if(sd!=null){ const e=eyeAt(sd); noEyes(()=>{ c.strokeStyle=ink; c.lineWidth=0.5;   // a line straight down through the left eye
     c.beginPath(); c.moveTo(x+e.cx,B+Y.BROW-3.6); c.lineTo(x+e.cx,B+cy+4.6); c.stroke();
@@ -5517,11 +5514,18 @@ function drawFaceExtras(c,x,B,opts,P,pr,LN,skin){ const Y=BODY, M=opts.marks, F=
     else { const sd=sdOf(true); if(sd!=null){ const rx=nx+sd*(F?0.8:1.7)*(1-pr*0.5); c.beginPath(); c.arc(x+rx,B+ny+0.2,0.85,-0.6,Math.PI+0.2); c.stroke(); } } }   // a hoop in the left nostril
   else if(NR && pr>0.8 && (NR===2 || CUR_FLIP)){ c.strokeStyle=metal; c.lineWidth=0.4; c.beginPath(); c.arc(x+LN+HW-0.2,B+Y.NOSE+(F?0.9:1.9),0.8,-0.4,Math.PI); c.stroke(); }
   if(M.eyePatch){ const sd=sdOf(true);                                           // a leather patch over the left eye, its cord round the head
-    c.strokeStyle='#241810'; c.lineWidth=0.6; c.beginPath();
-    if(sd!=null){ const e=eyeAt(sd); c.moveTo(x+LN-HW,B+Y.HAIRLINE+3.5+(sd>0?2.5:0)); c.lineTo(x+LN+HW,B+Y.HAIRLINE+3.5+(sd>0?0:2.5)); c.stroke();
-      c.fillStyle='#2e2016'; c.beginPath(); c.ellipse(x+e.cx,B+cy+0.3,e.w/2+1.1,Y.EYE_H/2+1.6,0,0,Math.PI*2); c.fill();
-      c.strokeStyle='#4a3626'; c.lineWidth=0.4; c.beginPath(); c.ellipse(x+e.cx,B+cy+0.3,e.w/2+0.6,Y.EYE_H/2+1.1,0,0,Math.PI*2); c.stroke(); }
-    else { c.moveTo(x+LN-HW,B+Y.HAIRLINE+4.5); c.lineTo(x+LN+HW,B+Y.HAIRLINE+5.5); c.stroke(); } }   // only the cord shows on this side
+    c.strokeStyle='#241810'; c.lineWidth=0.6;
+    if(sd!=null){ const e=eyeAt(sd), rx=e.w/2+1.1, ry=Y.EYE_H/2+1.6, py=cy+0.3, cl=[e.cx-rx*0.8,py-ry*0.6], cr=[e.cx+rx*0.8,py-ry*0.6];
+      // each end runs to the side of the head just above the ear; the inner one crosses the brow, the outer one stays short and steep
+      const endL=[LN-HW, Y.EAR_TOP-1.2], endR=[pr>0.8 ? LN-HW*0.2 : LN+HW, Y.EAR_TOP-1.2];
+      [[cl,endL],[cr,endR]].forEach(([a,b2])=>{ c.beginPath(); c.moveTo(x+a[0],B+a[1]); c.quadraticCurveTo(x+(a[0]+b2[0])/2,B+Math.min(a[1],b2[1])-1.6,x+b2[0],B+b2[1]); c.stroke(); });
+      c.fillStyle='#2e2016'; c.beginPath(); c.ellipse(x+e.cx,B+py,rx,ry,0,0,Math.PI*2); c.fill();
+      c.strokeStyle='#4a3626'; c.lineWidth=0.4; c.beginPath(); c.ellipse(x+e.cx,B+py,rx-0.5,ry-0.5,0,0,Math.PI*2); c.stroke();
+      [cl,cr].forEach(([a,b])=>{ c.fillStyle='#1a120a'; c.beginPath(); c.arc(x+a,B+b,0.45,0,Math.PI*2); c.fill(); }); }      // the cord's knots on the patch
+    else { c.beginPath();                                        // the patch is round the far side: only the cord, from the brow back to above the ear
+      if(pr>0.8){ c.moveTo(x+LN+HW-0.6,B+Y.BROW-0.8); c.quadraticCurveTo(x+LN+HW*0.3,B+Y.BROW-2.6,x+LN-HW*0.2,B+Y.EAR_TOP-1.2); }
+      else { c.moveTo(x+LN-HW,B+Y.EAR_TOP-1.2); c.quadraticCurveTo(x+LN,B+Y.HAIRLINE+4.6,x+LN+HW,B+Y.EAR_TOP-1.2); }
+      c.stroke(); } }
   c.restore(); }
 function drawFaceMarks(c,x,B,opts,P,pr,LN,skin){ const Y=BODY, M=opts.marks, HW=P.headHW, off=LN+(pr>0.8?HW*0.45:faceOff(pr)), near=s=>!(pr>0.3 && s<0);
   // everything stays on the face: clipped to the head's own oval, narrowing toward the jaw
@@ -6132,8 +6136,8 @@ function drawObject(o){
     if(o.lean) drawWeapon(g, x-6, y-60, Math.PI/2-0.16, o.item, 1.6);      // leaning on the wall, tines on the ground
     else if(ITEMS[o.item].slot==='weapon') drawWeapon(g, x, y-2+bob, -Math.PI*0.62, o.item, 1.6);
     else {                                                   // anything else shows its own inventory icon, lying where it was found
-      const PK=window.PICKUP_ICONS||(window.PICKUP_ICONS={}); let ic=PK[o.item];
-      if(!ic){ ic=document.createElement('canvas'); ic.width=ic.height=64; paintItemArt(ic.getContext('2d'),o.item,64); PK[o.item]=ic; }
+      const PK=window.PICKUP_ICONS||(window.PICKUP_ICONS={}), pk=o.item+(player.opts&&player.opts.gender==='f'?'':'|m'); let ic=PK[pk];
+      if(!ic){ ic=document.createElement('canvas'); ic.width=ic.height=64; paintItemArt(ic.getContext('2d'),o.item,64); PK[pk]=ic; }
       g.drawImage(ic,x-17,y-30+bob,34,34); }
     g.fillStyle='rgba(255,220,120,0.16)';
     g.beginPath(); g.arc(x,y-24,26,0,Math.PI*2); g.fill();
@@ -7846,7 +7850,8 @@ function paintItemArt(g2,id,size){
     case 'potion': { P2([[17,6],[23,6],[23,13],[31,22],[31,33],[9,33],[9,22],[17,13]],'rgba(200,220,230,0.5)','#5a6a72'); P2([[9.6,22],[30.4,22],[30.4,32.4],[9.6,32.4]],'#c83a4a','#7a1a24'); R(16,3,8,4,'#7a5a30'); E(14,25,2,3,'rgba(255,255,255,0.5)'); break; }
     case 'moonthread': { E(20,22,9,11,'#c8b080'); E(20,22,7,9,'#e8eef8'); g2.strokeStyle='rgba(160,180,210,0.7)'; g2.lineWidth=0.7; for(let k=0;k<6;k++){ g2.beginPath(); g2.moveTo(13,14+k*3); g2.lineTo(27,15+k*3); g2.stroke(); } R(11,10,18,2.4,'#8a6a3a'); R(11,32,18,2.4,'#8a6a3a'); break; }
     case 'silver_setting': { g2.strokeStyle='#dfe6ee'; g2.lineWidth=1.4; g2.beginPath(); g2.ellipse(20,22,8,9,0,0,Math.PI*2); g2.stroke(); g2.lineWidth=0.8; [-0.6,0,0.6].forEach(a=>{ g2.beginPath(); g2.ellipse(20,22,8*Math.cos(a),9,0,0,Math.PI*2); g2.stroke(); }); g2.beginPath(); g2.arc(20,11,2,0,Math.PI*2); g2.stroke(); break; }
-    case 'moon_amulet': { g2.strokeStyle='rgba(220,232,245,0.9)'; g2.lineWidth=1.2; g2.beginPath(); g2.moveTo(8,4); g2.quadraticCurveTo(20,20,32,4); g2.stroke(); E(20,25,10,10,'rgba(220,235,255,0.25)'); E(20,25,7,7,'#d4dce8'); E(20,25,5,5,'#b8c4d4'); E(22,23,2,2,'#a8b4c4');
+    case 'moon_amulet': { g2.strokeStyle='rgba(220,232,245,0.9)'; g2.lineWidth=1.2; g2.beginPath(); g2.moveTo(8,4); g2.quadraticCurveTo(20,26,32,4); g2.stroke();   // bottoms out at y=15, on the bail
+      g2.strokeStyle='#dfe6ee'; g2.lineWidth=1.1; g2.beginPath(); g2.ellipse(20,16,1.6,1.8,0,0,Math.PI*2); g2.stroke(); E(20,25,10,10,'rgba(220,235,255,0.25)'); E(20,25,7,7,'#d4dce8'); E(20,25,5,5,'#b8c4d4'); E(22,23,2,2,'#a8b4c4');
       g2.strokeStyle='#dfe6ee'; g2.lineWidth=1; g2.beginPath(); g2.ellipse(20,25,7.6,7.6,0,0,Math.PI*2); g2.stroke(); g2.beginPath(); g2.moveTo(12.4,25); g2.lineTo(27.6,25); g2.moveTo(20,17.4); g2.lineTo(20,32.6); g2.stroke(); break; }
     case 'elf_bustier': { const w=ELFC.leg, sat=tone(w,0.32);
       g2.strokeStyle=tone(sat,-0.2); g2.lineWidth=1; g2.beginPath(); g2.moveTo(11,3); g2.lineTo(12.5,12); g2.moveTo(29,3); g2.lineTo(27.5,12); g2.stroke();   // straps
@@ -12051,7 +12056,29 @@ QUEST_ITEMS.add('morwen_lantern');
       g2.strokeStyle='rgba(200,230,255,0.7)'; g2.lineWidth=1; g2.beginPath(); g2.moveTo(20,26); g2.quadraticCurveTo(15,31,18,36); g2.moveTo(21,26); g2.quadraticCurveTo(26,30,23,35); g2.stroke();
       E(20,19,3,3.6,'#ffffff'); },
   };
-  paintItemArt=function(g2,id,size){ const f=EXTRA[id]; if(!f) return oldPIA(g2,id,size);
+  // a man wears the bustiers as a waistcoat and the leggings as trousers, so his icons show that
+  const VEST={ elf_bustier:['#c8bc9c','#e8dcb8','#b89a50'], necro_bustier:['#26231e','#3e3a32','#7a6a4a'] };
+  const TROUSER={ elf_leggings:'#b3a283', necro_leggings:'#2a2a26', elf_leggings_worn:'#5c564a' };
+  const male=()=>typeof player!=='undefined' && player.opts && player.opts.gender!=='f' && running;
+  EXTRA.vest=(g2,E,id)=>{ const [base,lit,trim]=VEST[id];
+    const body=()=>{ g2.beginPath(); g2.moveTo(11,7); g2.lineTo(16,6); g2.lineTo(20,17); g2.lineTo(24,6); g2.lineTo(29,7); g2.lineTo(31,14); g2.lineTo(30,33);
+      g2.quadraticCurveTo(25,36,21,34); g2.lineTo(19,34); g2.quadraticCurveTo(15,36,10,33); g2.lineTo(9,14); g2.closePath(); };
+    body(); g2.fillStyle=base; g2.fill();
+    g2.save(); body(); g2.clip(); g2.fillStyle=lit; g2.fillRect(9,6,6,30);                       // light down the left front
+      g2.strokeStyle='rgba(0,0,0,0.25)'; g2.lineWidth=0.8; g2.beginPath(); g2.moveTo(20,17); g2.lineTo(20,35); g2.stroke(); g2.restore();
+    g2.strokeStyle=trim; g2.lineWidth=1.3; g2.beginPath(); g2.moveTo(16,6); g2.lineTo(20,17); g2.lineTo(24,6); g2.stroke();   // edged neckline
+    if(id==='necro_bustier'){ g2.strokeStyle='#8a7a5a'; g2.lineWidth=0.8; for(let k=0;k<5;k++){ const y=19+k*3; g2.beginPath(); g2.moveTo(18.2,y); g2.lineTo(21.8,y+2); g2.moveTo(21.8,y); g2.lineTo(18.2,y+2); g2.stroke(); }   // lacing
+      g2.fillStyle='#26231e'; for(let k=0;k<4;k++){ g2.beginPath(); g2.moveTo(11+k*5,33.5); g2.lineTo(13+k*5,38); g2.lineTo(15+k*5,34); g2.fill(); } }   // ragged hem
+    else { [21,25,29].forEach(y=>{ E(21.6,y,0.9,0.9,'#e8e0c8'); }); g2.strokeStyle=trim; g2.lineWidth=0.7; g2.beginPath(); g2.moveTo(10,32.5); g2.quadraticCurveTo(15,35,19,33.5); g2.moveTo(21,33.5); g2.quadraticCurveTo(25,35,30,32.5); g2.stroke(); } };
+  paintItemArt=function(g2,id,size){
+    if(male() && VEST[id]){ g2.save(); g2.scale(size/40,size/40); try{ EXTRA.vest(g2,(x,y,rx,ry,c)=>{ g2.beginPath(); g2.ellipse(x,y,rx,ry,0,0,Math.PI*2); g2.fillStyle=c; g2.fill(); },id); } finally{ g2.restore(); } return; }
+    if(male() && TROUSER[id]){                                                  // the plain trousers, re-dyed
+      const cv=document.createElement('canvas'); cv.width=cv.height=Math.ceil(size); const t=cv.getContext('2d'); oldPIA(t,'trousers',size);
+      t.globalCompositeOperation='color'; t.fillStyle=TROUSER[id]; t.fillRect(0,0,cv.width,cv.height);
+      t.globalCompositeOperation='multiply'; t.globalAlpha=0.25; t.fillRect(0,0,cv.width,cv.height); t.globalAlpha=1;
+      const mk=document.createElement('canvas'); mk.width=mk.height=cv.width; oldPIA(mk.getContext('2d'),'trousers',size);
+      t.globalCompositeOperation='destination-in'; t.drawImage(mk,0,0); g2.drawImage(cv,0,0); return; }
+    const f=EXTRA[id]; if(!f) return oldPIA(g2,id,size);
     g2.save(); g2.scale(size/40,size/40);
     try{ f(g2,(x,y,rx,ry,c)=>{ g2.beginPath(); g2.ellipse(x,y,rx,ry,0,0,Math.PI*2); g2.fillStyle=c; g2.fill(); }); } finally{ g2.restore(); } };
 }

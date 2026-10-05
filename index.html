@@ -5261,19 +5261,20 @@ function paintElfHallWalls(){
 }
 // ── inside an elven pavilion: an octagon of canvas, the roof rising to a peak over the middle ──
 const tentCut=()=>Math.max(1.5,Math.min(ROOM.w,ROOM.h)*0.3);   // how much each corner is cut off, in tiles
-const inTent=(gx,gy)=>{ const c=tentCut(), w=ROOM.w, h=ROOM.h; return gx+gy>=c && (w-gx)+gy>=c && gx+(h-gy)>=c && (w-gx)+(h-gy)>=c; };
-function tentOct(){ const w=ROOM.w, h=ROOM.h, c=tentCut(); return [[0,h-c],[0,c],[c,0],[w-c,0],[w,c],[w,h-c],[w-c,h],[c,h]]; }
+const tentRound=()=>!!(AREAS[areaId]&&AREAS[areaId].round);
+const inTent=(gx,gy)=>{ const w=ROOM.w, h=ROOM.h; if(tentRound()) return Math.hypot(gx-w/2,gy-h/2)<=Math.min(w,h)/2+0.05;
+  const c=tentCut(); return gx+gy>=c && (w-gx)+gy>=c && gx+(h-gy)>=c && (w-gx)+(h-gy)>=c; };
+function tentOct(){ const w=ROOM.w, h=ROOM.h, c=tentCut();
+  if(tentRound()){ const R=Math.min(w,h)/2, N=20; return Array.from({length:N},(_,k)=>{ const a=Math.PI+k*2*Math.PI/N; return [w/2+Math.cos(a)*R, h/2+Math.sin(a)*R]; }); }   // a circle, as a fine polygon, in the same winding as the octagon
+  return [[0,h-c],[0,c],[c,0],[w-c,0],[w,c],[w,h-c],[w-c,h],[c,h]]; }
 function paintTentWalls(){
   const V=tentOct(), w=ROOM.w, h=ROOM.h, WH=80, apex=up(P(w/2,h/2),190), lerp=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
   function up(q,hh){ return {x:q.x,y:q.y-hh}; }
   // only the walls whose inside faces us: the back half of the octagon (the near half is cut away so you can see in)
   const edges=[]; for(let k=0;k<V.length;k++){ const a=V[k], b=V[(k+1)%V.length], nx=b[1]-a[1], ny=-(b[0]-a[0]); if(nx+ny<=0.01) edges.push([a,b]); }
+  edges.sort((e1,e2)=>(e1[0][0]+e1[0][1]+e1[1][0]+e1[1][1])-(e2[0][0]+e2[0][1]+e2[1][0]+e2[1][1]));
   edges.forEach(([a,b],k)=>{ const A=P(a[0],a[1]), Bq=P(b[0],b[1]), At=up(A,WH), Bt=up(Bq,WH);
     const lit=0.5+0.5*Math.cos(k*0.7+0.6);
-    // roof panel: from the top of the wall to the peak, the inside of the cone
-    const rg=g.createLinearGradient(0,apex.y,0,Math.max(At.y,Bt.y)); rg.addColorStop(0,'#8a8270'); rg.addColorStop(1,tone('#d8d0bc',-0.15+lit*0.1));
-    g.fillStyle=rg; g.beginPath(); g.moveTo(At.x,At.y); g.lineTo(Bt.x,Bt.y); g.lineTo(apex.x,apex.y); g.closePath(); g.fill();
-    g.strokeStyle='rgba(120,100,70,0.35)'; g.lineWidth=1; for(let t=0.25;t<1;t+=0.25){ const q=lerp(At,Bt,t); g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(apex.x,apex.y); g.stroke(); }   // seams in the canvas
     // the wall: canvas hanging straight, gently scalloped at the top
     const wg=g.createLinearGradient(0,Math.min(At.y,Bt.y),0,Math.max(A.y,Bq.y)); wg.addColorStop(0,tone('#ece6d6',-0.08+lit*0.08)); wg.addColorStop(1,tone('#d8d0bc',-0.18+lit*0.08));
     g.fillStyle=wg; g.beginPath(); g.moveTo(A.x,A.y); g.lineTo(Bq.x,Bq.y); g.lineTo(Bt.x,Bt.y); g.lineTo(At.x,At.y); g.closePath(); g.fill();
@@ -5281,10 +5282,24 @@ function paintTentWalls(){
     g.strokeStyle='#cdb46e'; g.lineWidth=2; g.beginPath(); g.moveTo(At.x,At.y+10); g.lineTo(Bt.x,Bt.y+10); g.stroke();                    // a gold band
     g.fillStyle=tone('#ece6d6',-0.04); for(let t=0;t<1;t+=1/6){ const q0=lerp(At,Bt,t), q1=lerp(At,Bt,t+1/6), qm=lerp(At,Bt,t+1/12);   // scallops
       g.beginPath(); g.moveTo(q0.x,q0.y); g.quadraticCurveTo(qm.x,qm.y+12,q1.x,q1.y); g.closePath(); g.fill(); }
-    g.strokeStyle='#bfa868'; g.lineWidth=3; g.beginPath(); g.moveTo(A.x,A.y); g.lineTo(A.x,A.y-WH); g.stroke(); });                    // a pole at each corner
-  // the crown ring at the peak
-  g.fillStyle='#cdb46e'; g.beginPath(); g.ellipse(apex.x,apex.y+6,14,5,0,0,Math.PI*2); g.fill(); g.fillStyle='#e8f0ff'; g.beginPath(); g.ellipse(apex.x,apex.y+4,8,3,0,0,Math.PI*2); g.fill();
+    // where the roof begins: a short lip of canvas leaning in over the room, the rest is left open like every interior
+    const lipA={x:At.x+(apex.x-At.x)*0.12,y:At.y-26}, lipB={x:Bt.x+(apex.x-Bt.x)*0.12,y:Bt.y-26};
+    g.fillStyle=tone('#d8d0bc',-0.12+lit*0.06); g.beginPath(); g.moveTo(At.x,At.y); g.lineTo(Bt.x,Bt.y); g.lineTo(lipB.x,lipB.y); g.lineTo(lipA.x,lipA.y); g.closePath(); g.fill();
+    g.strokeStyle='rgba(120,100,70,0.35)'; g.lineWidth=1; g.beginPath(); g.moveTo(lipA.x,lipA.y); g.lineTo(lipB.x,lipB.y); g.stroke();
+    if(!tentRound() || k%4===0){ g.strokeStyle='#bfa868'; g.lineWidth=3; g.beginPath(); g.moveTo(A.x,A.y); g.lineTo(lipA.x,lipA.y); g.stroke(); } });   // a pole at each corner (every few panels on the round one)
 }
+// the pavilion's roof, drawn over everything as a pale see-through cone so the room stays readable
+function drawTentRoof(){ if(!AREAS[areaId] || !AREAS[areaId].tent) return;
+  const V=tentOct(), w=ROOM.w, h=ROOM.h, WH=80, c0=P(w/2,h/2), apex={x:c0.x,y:c0.y-WH-150}, top=v=>{ const q=P(v[0],v[1]); return {x:q.x,y:q.y-WH}; };
+  g.save(); g.globalAlpha=0.22;
+  const panels=V.map((v,k)=>[top(v),top(V[(k+1)%V.length]),k]).sort((a,b)=>(b[0].y+b[1].y)-(a[0].y+a[1].y));   // far panels first
+  panels.reverse().forEach(([a,b,k])=>{ const lit=0.5+0.5*Math.cos(k*(tentRound()?0.3:0.7)+0.6);
+    g.fillStyle=tone('#ece6d6',-0.12+lit*0.12); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(apex.x,apex.y); g.closePath(); g.fill(); });
+  g.globalAlpha=0.4; g.strokeStyle='#cdb46e'; g.lineWidth=1.2;
+  V.forEach((v,k)=>{ if(tentRound() && k%4) return; const a=top(v); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(apex.x,apex.y); g.stroke(); });    // the ribs
+  g.beginPath(); V.forEach((v,k)=>{ const a=top(v); k?g.lineTo(a.x,a.y):g.moveTo(a.x,a.y); }); g.closePath(); g.stroke();                          // the eave
+  g.globalAlpha=0.7; g.fillStyle='#cdb46e'; g.beginPath(); g.ellipse(apex.x,apex.y+4,7,2.6,0,0,Math.PI*2); g.fill();                            // the finial
+  g.restore(); }
 // A canvas A-frame tent on a 2x2 footprint; anchor = its far-front corner
 function paintTent(x,y,burnt){
   if(burnt){ paintTent(x,y,false); g.save(); g.globalCompositeOperation='source-atop'; g.fillStyle='rgba(24,14,8,0.72)'; g.fillRect(x-200,y-200,400,300);
@@ -7060,7 +7075,7 @@ function paintGroundTexture(){
       const cx=w/2, cy=h/2, r=Math.hypot(gx-cx,gy-cy), weave=((Math.floor(gx*4)+Math.floor(gy*4))&1);
       let pc=mixC([196,176,132],[176,154,110],weave*0.6+fbm(gx*2,gy*2,51)*0.4);
       if(r<Math.min(w,h)*0.3){ const ring=Math.floor(r*3)%3; pc=ring===0?[70,92,130]:ring===1?[214,222,236]:[150,172,206]; if(r>Math.min(w,h)*0.27) pc=[205,180,110]; }
-      const k=1-0.25*clamp01(1-(Math.min(gx+gy,(w-gx)+gy)-tentCut())/1.2); D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
+      const edgeD=tentRound()? Math.min(w,h)/2-r : Math.min(gx+gy-tentCut(),(w-gx)+gy-tentCut(),gx,gy,w-gx,h-gy), k=1-0.25*clamp01(1-edgeD/1.0); D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
     if(theme==='interior' && AREAS[areaId] && AREAS[areaId].elfhall){      // pale marble in large squares, veined, faintly silver
       const tx=Math.floor(gx), ty=Math.floor(gy), fx=gx-tx, fy=gy-ty, vein=fbm(gx*2.2+ty,gy*2.2+tx,31), edge=Math.min(fx,fy,1-fx,1-fy)<0.03;
       let pc=mixC([232,232,226],[204,208,212],vein); if(((tx+ty)&1)) pc=mixC(pc,[214,220,226],0.5); if(edge) pc=mixC(pc,[150,156,162],0.6);
@@ -7388,6 +7403,7 @@ function draw(){
       if(front && it.d<hd) it.d=hd+0.01+d0*1e-4; else if(!front && it.d>hd) it.d=hd-0.02+d0*1e-4; }); });
   items.sort((a,b)=>a.d-b.d).forEach(it=>it.fn());
   drawForegroundTrees();
+  drawTentRoof();
   drawLightFX();
   if(typeof drawCsSpeech==='function') drawCsSpeech();
   g.setTransform(1,0,0,1,0,0);
@@ -9793,9 +9809,9 @@ Object.assign(AREAS,{
       const st=(id,nm,i,j,dir,o,k)=>({ id, name:nm, i, j, dir, ...((d+k)%10===0?{silk:'#dfe8f4'}:{}), opts:{...E,...o,equip:{...N}} });
       return [ { id:'nimue', name:'Nimuë, Keeper of the Bath', i:3, j:3, dir:1, opts:ELFO({gender:'f',skin:0,hair:0,hairColor:11,face:2,equip:{head:'elf_circlet',torso:'elf_robe',armor:null,hands:null,legs:null,feet:'elf_boots',weapon:null,offhand:null}}) },
         BATHER('mb1','An Elf, Bathing',1,1,1,{...E,gender:'f',skin:0,hair:3,hairColor:12,face:2}), BATHER('mb2','An Elf, Bathing',3,2,0,{...E,gender:'m',skin:0,hair:4,hairColor:10,face:0}),
-        {...st('mb3','An Elf',0,3,1,{gender:'f',skin:0,hair:0,hairColor:11,face:2},1), sit:'knees'} ]; }),
+        {...st('mb3','An Elf',3,0,1,{gender:'f',skin:0,hair:0,hairColor:11,face:2},1), sit:'knees'} ]; }),
 });
-AREAS.moonbath.tent=true;
+AREAS.moonbath.tent=true; AREAS.moonbath.round=true; AREAS.moonbath.entries.fromCity={i:1,j:4};
 function berthaTalk(){ const day=Math.floor(dayClock/DAY_LEN);
   const news=[]; if(CHOICE.bard==='praise') news.push("“Pip sings about you in here every night. Every. Night.”"); if(CHOICE.sisters==='done') news.push("“Ada came in yesterday and laughed at something. First time since Edric.”");
   if(BARON_DOWN()) news.push("“No more Baron's men drinking on credit! I've had to learn what coin looks like again.”"); if(CHOICE.hobb==='done') news.push("“Hobb's mule bit the smith. Everybody's very happy about it.”");
@@ -13040,6 +13056,7 @@ wrap('road','mobs',l=> nightAmt()<0.3 ? [...l,{ name:'Road Thief', type:'bandit'
 // Maelis weaves in her own tent now: the empty pavilion in Sylvhaven, with a loom that works by moonlight
 AREAS.weavetent={ ...CROOM("Maelis's Weaving Tent",5,5,'sylvhaven','fromTent', ()=>[{type:'loom', i:1, j:0, fp:[2,1]}, {type:'clothtable', i:4, j:2}, {type:'lantern', i:0, j:2}],
   ()=> havenBurnt() ? [] : [{ id:'maelis', name:'Maelis the Weaver', i:3, j:1, dir:0, opts:ELFO({gender:'f',skin:1,hair:3,hairColor:1,face:1,equip:{head:null,torso:'elf_tunic',armor:null,hands:null,legs:'elf_leggings',feet:'elf_boots',weapon:null,offhand:null}}) }]), tent:true };
+AREAS.weavetent.entries.fromCity={i:1,j:4};
 { const oldSA=switchArea; switchArea=function(id,...a){ const r=oldSA(id,...a); if(AREAS[id] && AREAS[id].tent){ for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++) if(!inTent(i+0.5,j+0.5)) blocked.add(i+','+j); } return r; }; }
 wrap('sylvhaven','npcs',l=>l.filter(n=>n.id!=='maelis'));
 wrap('sylvhaven','objects',l=>l.map(o=>o.type==='pavilion'&&o.i===1&&o.j===1&&!o.burnt ? {...o, door:'r', dt:1, inside:'weavetent', back:'fromCity'} : o));

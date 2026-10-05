@@ -392,7 +392,8 @@ html,body{touch-action:none;overscroll-behavior:none;-webkit-tap-highlight-color
         </div>
       </div>
       <div class="opt-section" id="beard-section"><div class="opt-label">Beard</div><div class="chip-row" id="beard-styles"></div></div>
-      <div class="opt-section"><div class="opt-label">Markings &amp; Accessories</div><div class="chip-row" id="mark-styles"></div></div>
+      <div class="opt-section"><div class="opt-label">Scars &amp; Tattoos</div><div class="chip-row" id="mark-styles"></div></div>
+      <div class="opt-section"><div class="opt-label">Face Details</div><div class="chip-row" id="face-details"></div></div>
       <div class="opt-section"><div class="opt-label">Eye Color</div><div class="swatch-row" id="eye-colors"></div></div>
       <div class="opt-section"><div class="opt-label">Hair Color</div><div class="swatch-row" id="hair-colors"></div></div>
       <input id="char-name-input" type="text" placeholder="Your hero's name" maxlength="18">
@@ -832,7 +833,7 @@ const POSE = {
   strikeEnd: { up:[55,430],   left:[25,15],    right:[-35,-45] },
   stagger:   [100,115],
 };
-let CUR_POSE=null;                         // set by drawChar for the duration of one sprite
+let CUR_POSE=null, CUR_FLIP=false;   // CUR_FLIP: the sprite is drawn mirrored (facing west), so screen left/right swap body sides                         // set by drawChar for the duration of one sprite
 const easeOut = t => 1-(1-t)*(1-t);
 function poseAngles(p){
   const L=(a,b,t)=>a+(b-a)*t;
@@ -882,9 +883,8 @@ function drawCharInner(c,x,B,opts,swing=0,dir=0,pose=null){
     try{ drawCharInner(c,x,B,{...opts,race:'elf_'},swing,dir,pose); } finally{ c.restore(); } return; }
   const flip=dirMirrored(dir), view=dirView(dir);
   if(flip){ c.save(); c.translate(x,0); c.scale(-1,1); c.translate(-x,0); }
-  CUR_POSE=pose;
-  drawCharBody(c,x,B,opts,swing,view);
-  CUR_POSE=null;
+  CUR_POSE=pose; CUR_FLIP=flip;
+  try{ drawCharBody(c,x,B,opts,swing,view); } finally{ CUR_POSE=null; CUR_FLIP=false; }
   if(flip) c.restore();
 }
 
@@ -1277,7 +1277,17 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
         c.save(); c.translate(x+ac,B+Ys(0.5)); c.scale(1,0.45); c.translate(-(x+ac),-(B+Ys(0.5)));
         c.beginPath(); c.arc(x+ac+a2*0.2,B+Ys(0.5),a2*0.9,0,Math.PI*2); c.fill(); c.restore(); }
       fur(ac-x0+x0,Ys(0.76),a2*0.75,L*0.17,22,31+s*5,1.25,0.5,1.0);
-      if(opts.marks && opts.marks.armTat){ const ink='rgba(28,34,52,0.55)', y1=Ys(0.18), y2=Ys(0.26);   // a band of knotwork round the upper arm
+      const AT=opts.marks && markVal(opts.marks,'armTat'), charLeft=s*(V.turn>-0.25?1:-1)*(CUR_FLIP?-1:1)>0;
+      if(AT===2 && charLeft){ const ink='rgba(28,34,52,0.62)';                        // left sleeve: a vine of leaves from shoulder to wrist, a band at each end
+        c.strokeStyle=ink; c.lineWidth=0.55; c.lineCap='round';
+        c.beginPath(); for(let k=0;k<=12;k++){ const t=k/12, px=ac+Math.sin(t*9)*a2*0.45, py=Ys(0.06+t*0.8); k?c.lineTo(x+px,B+py):c.moveTo(x+px,B+py); } c.stroke();
+        c.fillStyle=ink; for(let k=1;k<12;k+=2){ const t=k/12, px=ac+Math.sin(t*9)*a2*0.45, py=Ys(0.06+t*0.8), sd=k%4===1?1:-1;
+          c.save(); c.translate(x+px,B+py); c.rotate(sd*0.8); c.beginPath(); c.ellipse(sd*1.1,0,1.2,0.5,0,0,Math.PI*2); c.fill(); c.restore(); }
+        [Ys(0.05),Ys(0.88)].forEach(yy=>{ c.lineWidth=0.7; c.beginPath(); c.moveTo(x+ac-a2-1,B+yy); c.quadraticCurveTo(x+ac,B+yy+0.8,x+ac+a2+1,B+yy); c.stroke(); }); }
+      if(AT===3 && !charLeft){ const ink='rgba(28,34,52,0.62)', cx=ac, cy=Ys(0.2), r0=Math.min(1.6,a2*0.5);   // right shoulder: a small sun
+        c.strokeStyle=ink; c.fillStyle=ink; c.lineWidth=0.45; c.beginPath(); c.arc(x+cx,B+cy,r0,0,Math.PI*2); c.stroke(); c.beginPath(); c.arc(x+cx,B+cy,0.5,0,Math.PI*2); c.fill();
+        for(let k=0;k<8;k++){ const a=k*Math.PI/4, r1=r0+0.5, r2=r0+(k%2?1.1:1.8); c.beginPath(); c.moveTo(x+cx+Math.cos(a)*r1,B+cy+Math.sin(a)*r1); c.lineTo(x+cx+Math.cos(a)*r2,B+cy+Math.sin(a)*r2); c.stroke(); } }
+      if(AT===1){ const ink='rgba(28,34,52,0.55)', y1=Ys(0.18), y2=Ys(0.26);   // a band of knotwork round the upper arm
         c.strokeStyle=ink; c.lineWidth=0.55; [y1,y2].forEach(yy=>{ c.beginPath(); c.moveTo(x+ac-a2-1,B+yy+0.3); c.quadraticCurveTo(x+ac,B+yy+0.9,x+ac+a2+1,B+yy+0.3); c.stroke(); });
         c.lineWidth=0.35; for(let k=-1;k<=1;k++){ const px=ac+k*a2*0.6, my=(y1+y2)/2+0.6; c.beginPath(); c.moveTo(x+px-0.9,B+y1+0.9); c.lineTo(x+px,B+my); c.lineTo(x+px+0.9,B+y1+0.9); c.stroke(); c.beginPath(); c.arc(x+px,B+my+0.9,0.35,0,Math.PI*2); c.fillStyle=ink; c.fill(); } }
       c.restore(); }
@@ -2473,8 +2483,9 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   }
   // ── your own body details go in drawCustomBodyDetails() (defined right after drawCharBody).
   //    It runs on bare skin, before any clothing, so clothes always cover it.
-  if(opts.marks && (opts.marks.elfBody && String(opts.race||'').startsWith('elf') || opts.marks.neckTat)){ c.save(); path(torsoPts(0.2,Y.WAIST+4,HI+0.4)); c.clip();   // on the bare skin, under any clothes, never past the body's edge
+  if(opts.marks && (opts.marks.elfBody && String(opts.race||'').startsWith('elf') || opts.marks.neckTat || opts.marks.chestTat)){ c.save(); path(torsoPts(0.2,Y.WAIST+4,HI+0.4)); c.clip();   // on the bare skin, under any clothes, never past the body's edge
     if(opts.marks.elfBody && String(opts.race||'').startsWith('elf')) drawElfBodyMarks(c,x,B,LN,CH,WA,HI,front,pr,po,F,markVal(opts.marks,'elfBody'));
+    if(opts.marks.chestTat) drawChestTat(c,x,B,LN,CH,WA,front,pr,po,F,markVal(opts.marks,'chestTat'));
     c.restore(); }
   if(typeof drawCustomBodyDetails==='function'){
     const bustY=Y.SHOULDER+10, bRx=5.6, bRy=5.0;
@@ -3225,7 +3236,7 @@ function drawHead(c, x, B, opts, view=0){
       fs(tone(skin,-0.2,0.5)); c.beginPath(); c.ellipse(x+mc,B+my+2.6*k+0.5,mw*0.24,0.45,0,0,Math.PI*2); c.fill();   // under the lower lip
     }
     // per-face marks
-    if(FC.freckles){ fs(tone(skin,-0.30,0.55));
+    if(FC.freckles || (opts.marks&&opts.marks.freckles)){ fs(tone(skin,-0.30,0.55));
       [[-3.6,-0.6],[-2.6,0.4],[-4.4,0.5],[-1.8,-0.9],[2.2,-0.8],[3.2,0.3],[4.2,-0.4],[2.8,1.2],[-3.2,1.3],[0.4,-1.6],[-0.6,-1.3]].forEach(([dx,dy])=>{
         if(pr>0.8 && dx<0) return; c.beginPath(); c.arc(x+off+dx*(1-pr*0.3),B+Y.NOSE+dy,0.33,0,Math.PI*2); c.fill(); }); }
     if(FC.lines && pr<0.8){ c.strokeStyle=tone(skin,-0.3,0.7); c.lineWidth=0.4; c.lineCap='round';          // crow's feet and laugh lines
@@ -3242,10 +3253,17 @@ function drawHead(c, x, B, opts, view=0){
     const STUBBLE = !F && !GOB && (FC.stubble || (!String(opts.race||'').startsWith('elf') && (opts.beard ?? (opts.hair===1 ? 5 : 0))===1));
     if(STUBBLE){ fs(tone(hair,-0.1,0.28)); for(let k=0;k<70;k++){ const u=rnd01(k,7,610)*2-1, v=rnd01(k,8,611); const px=off+u*(HW-2.5)*(1-v*0.35), py=Y.MOUTH-2.5+v*5.8;
         if(Math.abs(px-off)<2.8 && py<Y.MOUTH+1.8 && py>Y.MOUTH-0.8) continue; if(pr>0.8 && px<off) continue; c.fillRect(x+px,B+py,0.45,0.45); } }
-    if(FC.mole){ fs('#3a2014'); c.beginPath(); c.arc(x+mx+mw+0.9,B+Y.MOUTH-2.2,0.42,0,Math.PI*2); c.fill(); }
-    if((FC.scar || (opts.marks&&opts.marks.scarBrow)) && pr<0.8){ c.strokeStyle=tone(skin,-0.35,0.9); c.lineWidth=0.7; c.lineCap='round';
-      const sx0=off+2.2; c.beginPath(); c.moveTo(x+sx0,B+Y.BROW-3.5); c.lineTo(x+sx0+2.6,B+Y.EYE_TOP+4.2); c.stroke();
-      c.strokeStyle=tone(skin,0.2,0.6); c.lineWidth=0.35; c.beginPath(); c.moveTo(x+sx0+0.4,B+Y.BROW-3.5); c.lineTo(x+sx0+3,B+Y.EYE_TOP+4.2); c.stroke(); }
+    if(FC.mole || (opts.marks&&opts.marks.mole)){ fs('#3a2014'); c.beginPath(); c.arc(x+mx+mw+0.9,B+Y.MOUTH-2.2,0.42,0,Math.PI*2); c.fill(); }
+    if((FC.scar || (opts.marks&&opts.marks.scarBrow)) && pr<0.8){
+      // over the outer part of one eye: it splits the brow, stops at the lid and carries on below the eye
+      const q3=pr>0.3, ex0=q3 ? off-1.5-ew : off+es*(1-pr*0.35), sw=ew, cx=ex0+sw*(q3?0.35:0.62);
+      const y0=Y.BROW-3.4, y1=ET+eh+3.4, xa=cx-1.1, xb=cx+1.3, at=yy=>xa+(xb-xa)*(yy-y0)/(y1-y0);
+      c.save(); c.beginPath(); c.rect(x-200,B-200,400,400); c.ellipse(x+ex0+sw/2,B+ET+eh/2,sw/2+0.6,eh/2+0.7,0,0,Math.PI*2); c.clip('evenodd');
+        c.lineCap='round';
+        c.strokeStyle=tone(skin,0.04); c.lineWidth=1.0; c.beginPath(); c.moveTo(x+at(Y.BROW-2.4),B+Y.BROW-2.4); c.lineTo(x+at(Y.BROW+0.3),B+Y.BROW+0.3); c.stroke();   // the hair never grew back
+        c.strokeStyle=tone(skin,-0.35,0.9); c.lineWidth=0.7; c.beginPath(); c.moveTo(x+xa,B+y0); c.lineTo(x+xb,B+y1); c.stroke();
+        c.strokeStyle=tone(skin,0.2,0.6); c.lineWidth=0.35; c.beginPath(); c.moveTo(x+xa+0.4,B+y0); c.lineTo(x+xb+0.4,B+y1); c.stroke();
+      c.restore(); }
     c.save(); face(); c.clip();
     const blush=bx=>{ if(F){ const gb=c.createRadialGradient(x+bx,B+Y.NOSE,0,x+bx,B+Y.NOSE,3.4);
         gb.addColorStop(0,'rgba(222,120,128,0.24)'); gb.addColorStop(1,'rgba(222,120,128,0)'); c.fillStyle=gb; c.fillRect(x+bx-4,B+Y.NOSE-4,8,8); }
@@ -3255,7 +3273,9 @@ function drawHead(c, x, B, opts, view=0){
     c.restore();
   }
 
-  if(V.turn>-0.25 && opts.marks && !GOB) drawFaceMarks(c,x,B,opts,P,pr,LN,skin);
+  if(V.turn>-0.25 && opts.marks && !GOB){ drawFaceMarks(c,x,B,opts,P,pr,LN,skin); drawFaceExtras(c,x,B,opts,P,pr,LN,skin); }
+  else if(opts.marks && opts.marks.eyePatch && !GOB && !hooded){ c.strokeStyle='#241810'; c.lineWidth=0.6;   // from behind: just the cord of the eye patch
+    c.beginPath(); c.moveTo(x+LN-HW,B+Y.HAIRLINE+4.5); c.quadraticCurveTo(x+LN,B+Y.HAIRLINE+6.5,x+LN+HW,B+Y.HAIRLINE+4.5); c.stroke(); }
   if(opts.marks && opts.marks.neckTat && !GOB) drawNeckTat(c,x,B,P,pr,LN,V.turn>-0.25);
   if(hooded) drawHeadgear(c,x,B,(opts.vari&&opts.vari.head)||'hood',P,view,LN);
   if(!F && V.turn>-0.25 && !String(opts.race||'').startsWith('elf') && !GOB){
@@ -4023,18 +4043,28 @@ function drawBeardPreview(ctx,style,w,h){
 }
 
 // [key, label, elves only, value]: chips with a value pick one style for that key (click again to remove)
-const MARKS=[ ['earrings','Hoops',0,'hoop'], ['earrings','Studs',0,'stud'], ['earrings','Drops',0,'drop'], ['earrings','Ear Cuffs',0,'cuff'],
-  ['scarBrow','Brow Scar'], ['scarCheek','Cheek Scar'], ['armTat','Arm Tattoos'], ['neckTat','Neck Tattoo'],
-  ['elfFace','Leaf Marks',1,1], ['elfFace','Moon Brow',1,2], ['elfFace','Tear Vines',1,3], ['elfBody','Body Vines',1,1], ['elfBody','Starlines',1,2] ];
+// [key, label, elves only, value, group]: group 'face' goes under Face Details, the rest under Scars & Tattoos.
+// One-sided marks are on the character's own left or right and stay there as they turn.
+const MARKS=[ ['scarBrow','Brow Scar'], ['scarCheek','Cheek Scar'],
+  ['armTat','Arm Bands',0,1], ['armTat','Left Sleeve',0,2], ['armTat','Right Shoulder Sun',0,3],
+  ['chestTat','Heart Sigil',0,1], ['chestTat','Serpent',0,2], ['chestTat','Back Wings',0,3],
+  ['neckTat','Neck Runes'],
+  ['faceTat','Eye Line',0,1], ['faceTat','Chin Lines',0,2], ['faceTat','Cheek Runes',0,3],
+  ['elfFace','Leaf Marks',1,1], ['elfFace','Moon Brow',1,2], ['elfFace','Tear Vines',1,3], ['elfBody','Body Vines',1,1], ['elfBody','Starlines',1,2],
+  ['earrings','Hoops',0,'hoop','face'], ['earrings','Studs',0,'stud','face'], ['earrings','Drops',0,'drop','face'], ['earrings','Ear Cuffs',0,'cuff','face'],
+  ['freckles','Freckles',0,undefined,'face'], ['mole','Mole',0,undefined,'face'],
+  ['noseRing','Nose Ring',0,1,'face'], ['noseRing','Septum Ring',0,2,'face'], ['browRing','Brow Piercing',0,undefined,'face'],
+  ['warPaint','Woad Band',0,1,'face'], ['warPaint','Red Stripes',0,2,'face'], ['eyePatch','Eye Patch',0,undefined,'face'] ];
 const markVal=(M,k)=>{ const v=M&&M[k]; if(v===true) return k==='earrings'?'hoop':1; return v||null; };    // older saves stored plain on/off
-function buildMarkChips(){ const row=document.getElementById('mark-styles'); if(!row || row.childElementCount) return;
-  MARKS.forEach(([k,label,elf,val],i)=>{ const b=document.createElement('button'); b.type='button'; b.className='chip'; b.textContent=label; b.dataset.mark=k; b.dataset.i=i; if(elf) b.dataset.elf='1';
+function buildMarkChips(){ const row=document.getElementById('mark-styles'), row2=document.getElementById('face-details'); if(!row || row.childElementCount) return;
+  MARKS.forEach(([k,label,elf,val,grp],i)=>{ const b=document.createElement('button'); b.type='button'; b.className='chip'; b.textContent=label; b.dataset.mark=k; b.dataset.i=i; if(elf) b.dataset.elf='1';
     b.addEventListener('click',()=>{ const M=charOpts.marks=charOpts.marks||{};
       if(val===undefined) M[k]=!M[k]; else M[k]= markVal(M,k)===val ? null : val;
-      if(k==='elfBody'||k==='armTat'||k==='neckTat') creatorClothed=!M[k];
-      refreshCreator(); }); row.appendChild(b); }); }
+      if(k==='elfBody'||k==='armTat'||k==='neckTat'||k==='chestTat') creatorClothed=!M[k];
+      if(k==='chestTat' && M[k]===3) creatorDir=4; else if(k==='chestTat' && creatorDir===4) creatorDir=0;   // wings are on the back: turn round to show them
+      refreshCreator(); }); (grp==='face' && row2 ? row2 : row).appendChild(b); }); }
 function refreshMarkChips(){ buildMarkChips(); const elf=charOpts.race==='elf'; const M=charOpts.marks=charOpts.marks||{};
-  document.querySelectorAll('#mark-styles .chip').forEach(b=>{ const [k,,isElf,val]=MARKS[+b.dataset.i], off=isElf && !elf; if(off) M[k]=null;
+  document.querySelectorAll('.chip[data-mark]').forEach(b=>{ const [k,,isElf,val]=MARKS[+b.dataset.i], off=isElf && !elf; if(off) M[k]=null;
     b.classList.toggle('active', val===undefined ? !!M[k] : markVal(M,k)===val); b.disabled=!!off; b.style.opacity=off?0.35:1; b.title=off?'Only for elves':''; }); }
 function refreshCreator(){
   refreshMarkChips();
@@ -4197,7 +4227,7 @@ const AREAS = {
     mobs:()=>[
       { name:'Bandit Thug', type:'brute', i:11, j:3, faction:'bandits',
         opts:{gender:'m',skin:3,hair:2,hairColor:1,beard:5,equip:{head:'bandana',torso:'tunic_red',armor:'studded',hands:'gloves',legs:'trousers',feet:'boots',weapon:'mace'}} },
-      { name:'Bandit Hedge-Witch', type:'mage', i:12, j:4, faction:'bandits',
+      { name:'Bandit Hedge-Witch', type:'mage', i:10, j:4, faction:'bandits',
         opts:{gender:'f',skin:4,hair:5,hairColor:0,equip:{head:'bandana',torso:'tunic_green',armor:'robe',hands:null,legs:'hose_grey',feet:'boots',weapon:'staff_hex',offhand:null}} },
     ],
     entries:{ start:{i:6,j:1}, fromRoad:{i:11,j:4}, fromHouse:{i:3,j:1} },
@@ -5427,6 +5457,72 @@ function drawNeckTat(c,x,B,P,pr,LN,front){ const Y=BODY, nw=P.neckW/2; c.save();
   for(let k=0;k<3;k++){ const yy=y0+k*1.6, xx=sx+(k%2?0.4:-0.4); c.beginPath(); c.moveTo(x+xx-0.8,B+yy); c.lineTo(x+xx,B+yy-0.9); c.lineTo(x+xx+0.8,B+yy); if(k===1){ c.moveTo(x+xx,B+yy-0.9); c.lineTo(x+xx,B+yy+0.7); } c.stroke(); }
   c.beginPath(); c.moveTo(x+sx-1.4,B+y0-1.6); c.lineTo(x+sx+1.4,B+y0-1.4); c.moveTo(x+sx-1.4,B+y0+4.4); c.lineTo(x+sx+1.4,B+y0+4.2); c.stroke();
   c.restore(); }
+// chest and back tattoos. `sdL` is the screen side (-1/+1) of the character's own left.
+function drawChestTat(c,x,B,LN,CH,WA,front,pr,po,F,kind){ const Y=BODY, ink='rgba(28,34,52,0.62)', sdL=(front?1:-1)*(CUR_FLIP?-1:1);
+  c.save(); c.strokeStyle=ink; c.fillStyle=ink; c.lineCap='round'; c.lineJoin='round';
+  if(kind===1 && front && pr<=0.8){                                             // heart sigil over the left breast: two linked rings in a diamond
+    const cx=LN+sdL*CH*(F?0.62:0.48)*(1-pr*0.3)+po*0.4, cy=Y.SHOULDER+(F?4:6);
+    { c.lineWidth=0.5;
+      c.beginPath(); c.moveTo(x+cx,B+cy-3); c.lineTo(x+cx+2.6,B+cy); c.lineTo(x+cx,B+cy+3); c.lineTo(x+cx-2.6,B+cy); c.closePath(); c.stroke();
+      [-0.8,0.8].forEach(d=>{ c.beginPath(); c.arc(x+cx+d,B+cy,1.1,0,Math.PI*2); c.stroke(); });
+      c.beginPath(); c.arc(x+cx,B+cy-4,0.4,0,Math.PI*2); c.fill(); } }
+  else if(kind===2 && front){                                                   // a serpent from the right shoulder across to the left hip
+    const s0=LN-sdL*(CH-2)+po*0.4, s1=LN+sdL*(WA-0.5)+po*0.4, y0=Y.SHOULDER+1.5, y1=Y.WAIST+3;
+    const pt=t=>{ const u=1-t; return [u*u*u*s0+3*u*u*t*(s0+sdL*6)+3*u*t*t*(s1-sdL*7)+t*t*t*s1 + Math.sin(t*12)*0.9, u*u*u*y0+3*u*u*t*(y0+7)+3*u*t*t*(y1-9)+t*t*t*y1]; };
+    c.lineWidth=1.1; c.beginPath(); for(let k=0;k<=24;k++){ const [a,b]=pt(k/24); k?c.lineTo(x+a,B+b):c.moveTo(x+a,B+b); } c.stroke();
+    c.strokeStyle='rgba(200,190,170,0.35)'; c.lineWidth=0.35; for(let k=2;k<23;k+=2){ const [a,b]=pt(k/24); c.beginPath(); c.moveTo(x+a-0.4,B+b-0.3); c.lineTo(x+a+0.4,B+b+0.3); c.stroke(); }   // scales
+    const [hx,hy]=pt(0); c.fillStyle=ink; c.beginPath(); c.ellipse(x+hx,B+hy,1.6,1.1,-sdL*0.5,0,Math.PI*2); c.fill();
+    c.strokeStyle='rgba(150,30,30,0.7)'; c.lineWidth=0.3; c.beginPath(); c.moveTo(x+hx-sdL*1.4,B+hy-0.6); c.lineTo(x+hx-sdL*2.6,B+hy-1.2); c.stroke(); }
+  else if(kind===3 && !front){                                                  // wings over both shoulder blades
+    [-1,1].forEach(sd=>{ if(pr>0.8 && sd<0) return; const bx=LN+sd*1.0, by=Y.SHOULDER+4, tip=[bx+sd*(CH-1),by-3.2];
+      c.lineWidth=0.6; c.beginPath(); c.moveTo(x+bx,B+by); c.quadraticCurveTo(x+bx+sd*(CH*0.5),B+by-3.6,x+tip[0],B+tip[1]); c.stroke();   // leading edge, rising to the shoulder
+      // three ranks of feathers hanging from it, longest by the spine, sweeping outward
+      for(let k=0;k<5;k++){ const t=k/4, ex=bx+sd*(CH-1)*t*0.92, ey=by-3.2*t-0.4*Math.sin(t*Math.PI), len=8.5-t*5.5;
+        c.lineWidth=0.5; c.beginPath(); c.moveTo(x+ex,B+ey); c.quadraticCurveTo(x+ex+sd*(0.8+t),B+ey+len*0.6,x+ex+sd*(1.6+t*1.4),B+ey+len); c.stroke(); }
+      c.lineWidth=0.45; c.beginPath(); c.moveTo(x+bx,B+by+8.5); c.quadraticCurveTo(x+bx+sd*(CH*0.5),B+by+6,x+tip[0]+sd*2.4,B+tip[1]+2.3); c.stroke(); }); }   // the trailing edge
+  c.restore(); }
+// face tattoos, paint and piercings, drawn after the eyes. Placed by the character's own left/right.
+function drawFaceExtras(c,x,B,opts,P,pr,LN,skin){ const Y=BODY, M=opts.marks, F=opts.gender==='f', HW=P.headHW, fo=LN+faceOff(pr), es=F?2.8:3.2, ew=4.6;
+  const sdOf=charLeft=>{ if(pr>0.8) return charLeft===CUR_FLIP ? 1 : null; return (charLeft?1:-1)*(CUR_FLIP?-1:1); };   // screen side of that eye, or null if hidden
+  const eyeAt=sd=> pr>0.8 ? {cx:fo+es*0.65+ew/2, w:ew} : pr>0.3 ? (sd<0 ? {cx:fo-1.5-ew/2, w:ew} : {cx:fo+1.6+ew*0.29, w:ew*0.58}) : {cx:fo+sd*(es+ew/2), w:ew};
+  const cy=Y.EYE_TOP+Y.EYE_H/2, ink='rgba(28,34,52,0.66)';
+  const noEyes=fn=>{ c.save(); c.beginPath(); c.rect(x-200,B-200,400,400); [-1,1].forEach(sd=>{ if(pr>0.8 && sd<0) return; const e=eyeAt(sd); c.ellipse(x+e.cx,B+cy,e.w/2+0.5,Y.EYE_H/2+0.6,0,0,Math.PI*2); }); c.clip('evenodd'); fn(); c.restore(); };
+  c.save(); c.lineCap='round'; c.lineJoin='round';
+  const WP=markVal(M,'warPaint');
+  if(WP===1) noEyes(()=>{ c.fillStyle='rgba(44,72,150,0.55)';                   // woad: a blue band right across the eyes
+    c.beginPath(); c.moveTo(x+LN-HW-1,B+cy-2.6); for(let k=0;k<=8;k++){ const t=k/8; c.lineTo(x+LN-HW-1+t*(HW*2+2),B+cy-2.6+(k%2?-0.5:0.3)); }
+    for(let k=8;k>=0;k--){ const t=k/8; c.lineTo(x+LN-HW-1+t*(HW*2+2),B+cy+2.8+(k%2?0.6:-0.2)); } c.closePath(); c.fill(); });
+  if(WP===2){ const sd=sdOf(true); if(sd!=null){ const e=eyeAt(sd); c.strokeStyle='rgba(150,34,28,0.7)'; c.lineWidth=1.0;   // two red stripes down the left cheek
+    [-0.8,0.9].forEach(d=>{ c.beginPath(); c.moveTo(x+e.cx+d,B+cy+2.6); c.lineTo(x+e.cx+d-sd*0.6,B+Y.MOUTH); c.stroke(); }); } }
+  const FT=markVal(M,'faceTat');
+  if(FT===1){ const sd=sdOf(true); if(sd!=null){ const e=eyeAt(sd); noEyes(()=>{ c.strokeStyle=ink; c.lineWidth=0.5;   // a line straight down through the left eye
+    c.beginPath(); c.moveTo(x+e.cx,B+Y.BROW-3.6); c.lineTo(x+e.cx,B+cy+4.6); c.stroke();
+    c.beginPath(); c.moveTo(x+e.cx-0.9,B+Y.BROW-3.6); c.lineTo(x+e.cx+0.9,B+Y.BROW-3.6); c.stroke();
+    c.fillStyle=ink; c.beginPath(); c.arc(x+e.cx,B+cy+5.8,0.45,0,Math.PI*2); c.fill(); }); } }
+  if(FT===2){ c.strokeStyle=ink; c.lineWidth=0.5; const sx=pr>0.8 ? [HW*0.75] : [-1.7,0,1.7].map(d=>d*(1-pr*0.4));   // three lines down the chin
+    sx.forEach(d=>{ const xx=pr>0.8 ? LN+d : fo+d; c.beginPath(); c.moveTo(x+xx,B+Y.MOUTH+2.6); c.lineTo(x+xx,B+Y.CHIN-0.6); c.stroke(); }); }
+  if(FT===3){ const sd=sdOf(false); if(sd!=null){ const e=eyeAt(sd), k0=e.w/ew; c.strokeStyle=ink; c.lineWidth=0.45;   // three runes on the right cheek
+    [-1.6,0,1.6].forEach((d,k)=>{ const rx=e.cx+d*k0, ry=Y.NOSE+0.6; c.beginPath(); c.moveTo(x+rx,B+ry-1.2); c.lineTo(x+rx,B+ry+1.2);
+      if(k===0){ c.moveTo(x+rx,B+ry-1.2); c.lineTo(x+rx+0.8*k0,B+ry-0.4); c.moveTo(x+rx,B+ry-0.3); c.lineTo(x+rx+0.8*k0,B+ry+0.4); }
+      else if(k===1){ c.moveTo(x+rx-0.8*k0,B+ry-1.2); c.lineTo(x+rx+0.8*k0,B+ry+0.2); }
+      else { c.moveTo(x+rx,B+ry-0.2); c.lineTo(x+rx-0.8*k0,B+ry+1.0); c.moveTo(x+rx,B+ry-0.2); c.lineTo(x+rx+0.8*k0,B+ry+1.0); } c.stroke(); }); } }
+  const metal='#d8d4c8', metalD='#7a7468';
+  if(M.browRing){ const sd=sdOf(false); if(sd!=null){ const e=eyeAt(sd), bx=e.cx+(pr>0.3?0.3:sd)*e.w*0.32, by=Y.BROW-1.3;   // two beads through the outer end of the right brow
+    c.strokeStyle=metalD; c.lineWidth=0.35; c.beginPath(); c.moveTo(x+bx,B+by-1.1); c.lineTo(x+bx+0.2,B+by+1.1); c.stroke();
+    [[0,-1.2],[0.2,1.2]].forEach(([dx,dy])=>{ c.fillStyle=metal; c.beginPath(); c.arc(x+bx+dx,B+by+dy,0.5,0,Math.PI*2); c.fill(); }); } }
+  const NR=markVal(M,'noseRing');
+  if(NR && pr<=0.8){ const ny=Y.NOSE+(F?1.5:3.0), nx=fo+(pr>0.3?0.6:0);
+    c.strokeStyle=metal; c.lineWidth=0.4;
+    if(NR===2){ c.beginPath(); c.arc(x+nx,B+ny+0.6,0.9,0.1,Math.PI-0.1); c.stroke(); }                                   // septum ring
+    else { const sd=sdOf(true); if(sd!=null){ const rx=nx+sd*(F?0.8:1.7)*(1-pr*0.5); c.beginPath(); c.arc(x+rx,B+ny+0.2,0.85,-0.6,Math.PI+0.2); c.stroke(); } } }   // a hoop in the left nostril
+  else if(NR && pr>0.8 && (NR===2 || CUR_FLIP)){ c.strokeStyle=metal; c.lineWidth=0.4; c.beginPath(); c.arc(x+LN+HW-0.2,B+Y.NOSE+(F?0.9:1.9),0.8,-0.4,Math.PI); c.stroke(); }
+  if(M.eyePatch){ const sd=sdOf(true);                                           // a leather patch over the left eye, its cord round the head
+    c.strokeStyle='#241810'; c.lineWidth=0.6; c.beginPath();
+    if(sd!=null){ const e=eyeAt(sd); c.moveTo(x+LN-HW,B+Y.HAIRLINE+3.5+(sd>0?2.5:0)); c.lineTo(x+LN+HW,B+Y.HAIRLINE+3.5+(sd>0?0:2.5)); c.stroke();
+      c.fillStyle='#2e2016'; c.beginPath(); c.ellipse(x+e.cx,B+cy+0.3,e.w/2+1.1,Y.EYE_H/2+1.6,0,0,Math.PI*2); c.fill();
+      c.strokeStyle='#4a3626'; c.lineWidth=0.4; c.beginPath(); c.ellipse(x+e.cx,B+cy+0.3,e.w/2+0.6,Y.EYE_H/2+1.1,0,0,Math.PI*2); c.stroke(); }
+    else { c.moveTo(x+LN-HW,B+Y.HAIRLINE+4.5); c.lineTo(x+LN+HW,B+Y.HAIRLINE+5.5); c.stroke(); } }   // only the cord shows on this side
+  c.restore(); }
 function drawFaceMarks(c,x,B,opts,P,pr,LN,skin){ const Y=BODY, M=opts.marks, HW=P.headHW, off=LN+(pr>0.8?HW*0.45:faceOff(pr)), near=s=>!(pr>0.3 && s<0);
   // everything stays on the face: clipped to the head's own oval, narrowing toward the jaw
   c.save(); c.beginPath(); c.ellipse(x+LN+(pr>0.8?HW*0.15:0),B+(Y.SKULL_TOP+Y.CHIN)/2+1.5,HW-1.2,(Y.CHIN-Y.SKULL_TOP)/2-0.6,0,0,Math.PI*2); c.clip();
@@ -6551,6 +6647,16 @@ function drawSitting(c,x,B,opts,dir,mode){
   sitGenitals();
   frontLegs.forEach(g=>drawLeg(g,tuck)); frontArms.sort((a,b)=>a.d-b.d).forEach(q=>drawArm(q,false));
 }
+// a parchment speech bubble whose tail points down at (x, bottom); long lines wrap instead of being squeezed
+function speechBubble(x,bottom,text,a=1){ if(a<=0) return;
+  g.save(); g.globalAlpha=a; g.font='italic 500 12px "Segoe UI", system-ui, sans-serif';
+  const lines=[]; let cur=''; String(text).split(' ').forEach(w=>{ const t=cur?cur+' '+w:w; if(cur && g.measureText(t).width>200){ lines.push(cur); cur=w; } else cur=t; }); if(cur) lines.push(cur);
+  const lh=15, w=Math.max(...lines.map(l=>g.measureText(l).width))+18, h=lines.length*lh+9, top=bottom-h, bx=x;
+  g.fillStyle='rgba(250,244,228,0.95)'; g.strokeStyle='rgba(90,64,30,0.55)'; g.lineWidth=1;
+  g.beginPath(); g.roundRect(bx-w/2,top,w,h,8); g.fill(); g.stroke();
+  g.beginPath(); g.moveTo(x-5,bottom-0.5); g.lineTo(x,bottom+7); g.lineTo(x+4,bottom-0.5); g.fill();
+  g.fillStyle='#3a2a18'; g.textAlign='center'; g.textBaseline='middle'; lines.forEach((l,k)=>g.fillText(l,bx,top+4.5+lh*(k+0.5)));
+  g.restore(); }
 function drawNPC(n){
   const P0=P(n.x??n.i+0.5,n.y??n.j+0.5), x=P0.x, y=P0.y-(n.moving?Math.abs(Math.sin(gt*9+n.i))*2:0), sw=n.moving?Math.sin(gt*9+n.i)*5:0;
   if(n.bathe){ const sink=56+Math.sin(gt*1.4+n.i)*0.8;          // shoulder-deep: everything below the waterline is hidden
@@ -6571,10 +6677,7 @@ function drawNPC(n){
     g.strokeStyle=tone(n.silk,-0.3,0.6); g.lineWidth=0.5; for(let k=0;k<3;k++){ g.beginPath(); g.moveTo(x+6-k*4,wy+2.5); g.quadraticCurveTo(x+5-k*4,wy+8,x+6.5-k*4.5,hy); g.stroke(); }
     g.fillStyle=tone(n.silk,-0.12); g.beginPath(); g.ellipse(x+8,wy+2,1.8,1.3,0,0,Math.PI*2); g.fill(); g.beginPath(); g.moveTo(x+8,wy+2.5); g.quadraticCurveTo(x+10,wy+8,x+9,hy+4); g.lineTo(x+7.5,hy+3); g.quadraticCurveTo(x+8.5,wy+8,x+7.5,wy+3); g.fill();
     g.restore(); }
-  if(n.bark){ const a=Math.min(1,n.bark.t*4,(4-n.bark.t)*2); g.save(); g.globalAlpha=a; g.font='italic 500 11px "Segoe UI", system-ui, sans-serif';
-    const tw=Math.min(220,g.measureText(n.bark.text).width)+16, by=y-128-n.bark.t*2;
-    g.fillStyle='rgba(250,244,228,0.95)'; g.beginPath(); g.roundRect(x-tw/2,by-10,tw,20,8); g.fill(); g.beginPath(); g.moveTo(x-5,by+9); g.lineTo(x,by+16); g.lineTo(x+4,by+9); g.fill();
-    g.fillStyle='#3a2a18'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(n.bark.text,x,by,210); g.restore(); }
+  if(n.bark) speechBubble(x,y-118-n.bark.t*2,n.bark.text,Math.min(1,n.bark.t*4,(4-n.bark.t)*2));
   if(n.wander && !n.named) return;                          // passers-by go unlabelled
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const tw=g.measureText(n.name).width, ty=y-(n.sit?92:114);
@@ -7211,6 +7314,7 @@ function draw(){
   items.sort((a,b)=>a.d-b.d).forEach(it=>it.fn());
   drawForegroundTrees();
   drawLightFX();
+  if(typeof drawCsSpeech==='function') drawCsSpeech();
   g.setTransform(1,0,0,1,0,0);
   if(!LOW_FX) drawPostFX(W,H);
   applyDuelZoom();
@@ -11901,6 +12005,57 @@ Object.assign(ITEMS,{
 Object.assign(PRICES,{ raw_meat:2, cooked_meat:6, wolf_fang:4, fen_boots:110, bog_coins:30, silver_torc:70, amber_brooch:45, wight_ring:120 });
 ITEM_STATS.fen_boots={hp:3,agi:3,magic:1}; GEAR_HP.fen_boots=3;
 QUEST_ITEMS.add('morwen_lantern');
+// icons for the fen, barrow and cave finds (they came after the inventory art and had none)
+{ const oldPIA=paintItemArt;
+  const EXTRA={
+    morwen_lantern(g2,E){                                                     // a small iron lantern, the flame inside burning green-gold
+      g2.strokeStyle='#3a3430'; g2.lineWidth=1.6; g2.beginPath(); g2.arc(20,7,3.2,Math.PI,0); g2.stroke();
+      g2.fillStyle='#2e2a26'; g2.beginPath(); g2.moveTo(13,13); g2.lineTo(27,13); g2.lineTo(24,9); g2.lineTo(16,9); g2.closePath(); g2.fill();
+      const gl=g2.createRadialGradient(20,22,0,20,22,9); gl.addColorStop(0,'rgba(230,240,140,0.95)'); gl.addColorStop(0.5,'rgba(150,200,90,0.6)'); gl.addColorStop(1,'rgba(60,90,50,0.35)');
+      g2.fillStyle=gl; g2.fillRect(14,13,12,17);
+      g2.fillStyle='#f4f0b0'; g2.beginPath(); g2.moveTo(20,16.5); g2.quadraticCurveTo(23.5,22,20,26); g2.quadraticCurveTo(16.5,22,20,16.5); g2.fill();
+      g2.strokeStyle='#3a3430'; g2.lineWidth=1.4; g2.strokeRect(14,13,12,17); g2.beginPath(); g2.moveTo(20,13); g2.lineTo(20,30); g2.stroke();
+      g2.fillStyle='#2e2a26'; g2.fillRect(12.5,30,15,3.5); g2.fillStyle='#5a524a'; g2.fillRect(12.5,30,15,1); },
+    bog_coins(g2,E){                                                          // a rotten leather purse, tarnished coins spilling out
+      g2.fillStyle='#4a3a26'; g2.beginPath(); g2.moveTo(9,18); g2.quadraticCurveTo(7,33,18,34); g2.quadraticCurveTo(28,33,26,18); g2.quadraticCurveTo(17,14,9,18); g2.fill();
+      g2.fillStyle='#5e4a30'; g2.beginPath(); g2.ellipse(17.5,18,8.5,3,0,0,Math.PI*2); g2.fill(); g2.strokeStyle='#2a2016'; g2.lineWidth=1.2; g2.beginPath(); g2.moveTo(10,19); g2.quadraticCurveTo(17.5,22,25,19); g2.stroke();
+      g2.fillStyle='rgba(60,80,40,0.45)'; g2.beginPath(); g2.ellipse(13,29,4,2.5,0.3,0,Math.PI*2); g2.fill();
+      [[28,30],[33,33],[25,35],[31,26]].forEach(([a,b],k)=>{ E(a,b,4,2.4,k%2?'#8a8a5a':'#a89a5a'); E(a-0.8,b-0.6,2.2,1,'rgba(240,230,170,0.5)'); g2.strokeStyle='#4a4a2a'; g2.lineWidth=0.6; g2.beginPath(); g2.ellipse(a,b,4,2.4,0,0,Math.PI*2); g2.stroke(); }); },
+    silver_torc(g2,E){                                                        // an open neck ring of twisted silver with heavy knobbed ends
+      g2.lineCap='round'; g2.strokeStyle='#8a929c'; g2.lineWidth=5; g2.beginPath(); g2.arc(20,21,12,Math.PI*0.62,Math.PI*0.38+Math.PI*2); g2.stroke();
+      g2.strokeStyle='#dfe6ee'; g2.lineWidth=2.4; g2.beginPath(); g2.arc(20,21,12,Math.PI*0.62,Math.PI*0.38+Math.PI*2); g2.stroke();
+      g2.strokeStyle='#6a727c'; g2.lineWidth=1; for(let k=0;k<14;k++){ const a=Math.PI*0.7+k*0.115*Math.PI*1.1; g2.beginPath(); g2.moveTo(20+Math.cos(a)*9.6,21+Math.sin(a)*9.6); g2.lineTo(20+Math.cos(a+0.1)*14.4,21+Math.sin(a+0.1)*14.4); g2.stroke(); }
+      [Math.PI*0.62,Math.PI*0.38].forEach(a=>{ const px=20+Math.cos(a)*12, py=21+Math.sin(a)*12; E(px,py,3.6,3.6,'#b8c0ca'); E(px-1,py-1,1.4,1.4,'#f4f8fc'); }); },
+    amber_brooch(g2,E){                                                       // a bronze ring brooch set with a drop of amber, its pin across the back
+      g2.strokeStyle='#5a4a2a'; g2.lineWidth=1.6; g2.beginPath(); g2.moveTo(6,30); g2.lineTo(34,10); g2.stroke(); E(34,10,1.4,1.4,'#8a7040');
+      E(20,20,12,12,'#8a6a30'); E(20,20,10.5,10.5,'#c89a48'); E(20,20,8,8,'#7a5a28');
+      for(let k=0;k<8;k++){ const a=k*Math.PI/4; E(20+Math.cos(a)*9.3,20+Math.sin(a)*9.3,0.9,0.9,'#e8c070'); }
+      const am=g2.createRadialGradient(18,17,0.5,20,20,7); am.addColorStop(0,'#ffe0a0'); am.addColorStop(0.5,'#e89a30'); am.addColorStop(1,'#8a4a10');
+      g2.fillStyle=am; g2.beginPath(); g2.ellipse(20,20,6,6.5,0,0,Math.PI*2); g2.fill(); E(17.6,17.2,1.6,1.1,'rgba(255,250,230,0.8)'); },
+    wight_ring(g2,E){                                                         // a black iron ring, a cold pale stone that still glows
+      const gw=g2.createRadialGradient(20,13,0,20,13,11); gw.addColorStop(0,'rgba(170,220,255,0.55)'); gw.addColorStop(1,'rgba(170,220,255,0)'); g2.fillStyle=gw; g2.fillRect(6,2,28,24);
+      g2.strokeStyle='#1e1c22'; g2.lineWidth=5; g2.beginPath(); g2.ellipse(20,25,10,8,0,0,Math.PI*2); g2.stroke();
+      g2.strokeStyle='#4a4652'; g2.lineWidth=1.6; g2.beginPath(); g2.ellipse(20,25,10,8,0,Math.PI*1.05,Math.PI*1.7); g2.stroke();
+      g2.fillStyle='#2a262e'; g2.beginPath(); g2.moveTo(13,17); g2.lineTo(27,17); g2.lineTo(24,12); g2.lineTo(16,12); g2.closePath(); g2.fill();
+      E(20,12.5,4.4,4.4,'#bfe4ff'); E(20,12.5,2.6,2.6,'#eef8ff'); E(18.8,11.2,1,0.8,'#ffffff'); },
+    heartshard(g2,E){                                                         // the cave's heart: a green crystal split by a black crack, light moving inside
+      const gl=g2.createRadialGradient(20,21,0,20,21,14); gl.addColorStop(0,'rgba(140,255,170,0.5)'); gl.addColorStop(1,'rgba(140,255,170,0)'); g2.fillStyle=gl; g2.fillRect(4,4,32,34);
+      g2.fillStyle='#3e9a5e'; g2.beginPath(); g2.moveTo(20,4); g2.lineTo(31,15); g2.lineTo(28,30); g2.lineTo(20,37); g2.lineTo(12,30); g2.lineTo(9,15); g2.closePath(); g2.fill();
+      g2.fillStyle='#7ad89a'; g2.beginPath(); g2.moveTo(20,4); g2.lineTo(31,15); g2.lineTo(20,20); g2.lineTo(9,15); g2.closePath(); g2.fill();
+      g2.fillStyle='#d8ffe4'; g2.beginPath(); g2.moveTo(20,8); g2.lineTo(24,15); g2.lineTo(20,17); g2.lineTo(16,14); g2.closePath(); g2.fill();
+      g2.strokeStyle='#14281c'; g2.lineWidth=1.3; g2.lineJoin='round'; g2.beginPath(); g2.moveTo(22,5.5); g2.lineTo(19,13); g2.lineTo(23,19); g2.lineTo(18,26); g2.lineTo(21,35); g2.stroke();
+      g2.lineWidth=0.7; g2.beginPath(); g2.moveTo(23,19); g2.lineTo(27,22); g2.moveTo(18,26); g2.lineTo(14,27); g2.stroke(); },
+    grave_mote(g2,E){                                                         // a wisp of pale grave-light, cupped in nothing
+      const gl=g2.createRadialGradient(20,20,0,20,20,15); gl.addColorStop(0,'rgba(230,245,255,1)'); gl.addColorStop(0.25,'rgba(170,215,255,0.85)'); gl.addColorStop(0.6,'rgba(110,160,230,0.3)'); gl.addColorStop(1,'rgba(110,160,230,0)');
+      g2.fillStyle=gl; g2.beginPath(); g2.arc(20,20,15,0,Math.PI*2); g2.fill();
+      g2.strokeStyle='rgba(200,230,255,0.7)'; g2.lineWidth=1; g2.beginPath(); g2.moveTo(20,26); g2.quadraticCurveTo(15,31,18,36); g2.moveTo(21,26); g2.quadraticCurveTo(26,30,23,35); g2.stroke();
+      E(20,19,3,3.6,'#ffffff'); },
+  };
+  paintItemArt=function(g2,id,size){ const f=EXTRA[id]; if(!f) return oldPIA(g2,id,size);
+    g2.save(); g2.scale(size/40,size/40);
+    try{ f(g2,(x,y,rx,ry,c)=>{ g2.beginPath(); g2.ellipse(x,y,rx,ry,0,0,Math.PI*2); g2.fillStyle=c; g2.fill(); }); } finally{ g2.restore(); } };
+}
+
 
 // ── the fallen oak across the causeway ──
 function drawFellTree(o){ const a=P(o.i+0.2,o.j+0.55), b=P(o.i+o.fp[0]-0.1,o.j+0.45), R=13;
@@ -12269,22 +12424,22 @@ wrap('fenpath','npcs',l=> FEN_OPEN() && CHOICE.pim==='done' ? [...l,{ id:'logger
 JOURNAL.push(['Lights in the Fen', ()=> !CHOICE.pim ? null : CHOICE.pim==='done' ? ['done',"You brought Young Pim back from the fen. Gerd gave you his felling axe."] : CHOICE.pim==='found' ? ['active',"Pim is safe. Tell Foreman Gerd on the Fen Causeway."] : ['active',"Young Pim ran into the Drowning Fen after the lights. Gerd thinks he went south, to the Sunken Hollow."]]);
 
 // ════════ CUTSCENES: short scripted moments with letterbox bars and a skip button ════════
-const CS={on:false, steps:[], k:0, t:0, onEnd:null, queued:[], focus:null};
+const CS={on:false, steps:[], k:0, t:0, onEnd:null, queued:[], focus:null, say:null};
 let CS_PRE=[];
 function csUI(on){ let el=document.getElementById('cs-ui');
-  if(!el){ el=document.createElement('div'); el.id='cs-ui'; el.innerHTML='<div class="cs-bar t"></div><div class="cs-bar b"></div><div class="cs-cap"></div><button class="cs-skip">Skip ▸▸</button>';
-    const st=document.createElement('style'); st.textContent='#cs-ui{position:fixed;inset:0;z-index:40;display:none;pointer-events:auto;}#cs-ui .cs-bar{position:absolute;left:0;right:0;height:0;background:#000;transition:height .45s ease;}#cs-ui .cs-bar.t{top:0}#cs-ui .cs-bar.b{bottom:0}#cs-ui.open .cs-bar{height:9vh}#cs-ui .cs-skip{position:absolute;left:50%;transform:translate(-50%,50%);bottom:4.5vh;font:600 13px "Segoe UI",system-ui,sans-serif;letter-spacing:1px;color:#f0dca0;background:rgba(36,24,8,.9);border:1px solid rgba(200,150,60,.75);border-radius:6px;padding:7px 22px;cursor:pointer;opacity:.9}#cs-ui .cs-skip:hover{opacity:1}#cs-ui .cs-cap{position:absolute;left:50%;bottom:calc(9vh + 22px);transform:translateX(-50%);max-width:min(640px,86vw);text-align:center;font:500 15px Georgia,serif;color:#f4e6c0;background:rgba(14,9,4,.72);border:1px solid rgba(160,120,50,.45);border-radius:6px;padding:8px 16px;opacity:0;transition:opacity .25s;pointer-events:none}#cs-ui .cs-cap.on{opacity:1}#cs-ui .cs-cap b{color:#e8b860;font-weight:600;margin-right:6px}';
+  if(!el){ el=document.createElement('div'); el.id='cs-ui'; el.innerHTML='<div class="cs-bar t"></div><div class="cs-bar b"></div><button class="cs-skip">Skip ▸▸</button>';
+    const st=document.createElement('style'); st.textContent='#cs-ui{position:fixed;inset:0;z-index:40;display:none;pointer-events:auto;}#cs-ui .cs-bar{position:absolute;left:0;right:0;height:0;background:#000;transition:height .45s ease;}#cs-ui .cs-bar.t{top:0}#cs-ui .cs-bar.b{bottom:0}#cs-ui.open .cs-bar{height:9vh}#cs-ui .cs-skip{position:absolute;left:50%;transform:translate(-50%,50%);bottom:4.5vh;font:600 13px "Segoe UI",system-ui,sans-serif;letter-spacing:1px;color:#f0dca0;background:rgba(36,24,8,.9);border:1px solid rgba(200,150,60,.75);border-radius:6px;padding:7px 22px;cursor:pointer;opacity:.9}#cs-ui .cs-skip:hover{opacity:1}';
     document.head.appendChild(st); document.body.appendChild(el); el.querySelector('.cs-skip').addEventListener('click',e=>{ e.stopPropagation(); csSkip(); }); }
   if(on){ el.style.display='block'; requestAnimationFrame(()=>el.classList.add('open')); } else { el.classList.remove('open'); setTimeout(()=>{ if(!CS.on) el.style.display='none'; },450); } }
 function cutscene(steps,onEnd){ if(CS.on) return false; try{ closeDialog(); }catch(e){} CS.on=true; CS.steps=steps; CS.k=0; CS.t=0; CS.onEnd=onEnd||null; CS.focus=null; player.path=[]; csUI(true); return true; }
-function csCaption(who,text){ const el=document.querySelector('#cs-ui .cs-cap'); if(!el) return;
-  if(!text){ el.classList.remove('on'); return; } el.innerHTML=(who?'<b>'+who+'</b>':'')+text; el.classList.add('on'); }
-// a spoken line: a caption at the bottom of the screen for `d` seconds, the speaker turned to face `to`
-const csSay=(m,text,d=2.2,to=null)=>({dur:d, start:()=>{ if(to) csLook(m,to).start(); csCaption(m&&m.name,text); }, end:()=>csCaption(null), skip:()=>csCaption(null)});
-function csEnd(){ csCaption(null); CS.on=false; CS.focus=null; csUI(false); const f=CS.onEnd; CS.onEnd=null; if(f) try{ f(); }catch(e){} const q=CS.queued; CS.queued=[]; q.forEach(a=>showDialog(...a)); }
+// a spoken line: a speech bubble over the speaker for `d` seconds, the speaker turned to face `to`
+const csSay=(m,text,d=2.2,to=null)=>({dur:d, start:()=>{ if(to) csLook(m,to).start(); CS.say=m?{ent:m,text,t:0}:null; }, end:()=>{ CS.say=null; }, skip:()=>{ CS.say=null; }});
+function drawCsSpeech(){ const S=CS.say; if(!CS.on || !S) return;
+  const e=S.ent, q=P(e.x??e.i+0.5, e.y??e.j+0.5); speechBubble(q.x,q.y-124,S.text,Math.min(1,S.t*5)); }
+function csEnd(){ CS.say=null; CS.on=false; CS.focus=null; csUI(false); const f=CS.onEnd; CS.onEnd=null; if(f) try{ f(); }catch(e){} const q=CS.queued; CS.queued=[]; q.forEach(a=>showDialog(...a)); }
 function csSkip(){ if(!CS.on) return; for(let k=CS.k;k<CS.steps.length;k++){ const s=CS.steps[k]; if(!s._s && s.start) s.start(); s._s=1; if(s.skip) s.skip(); else if(s.end) s.end(); } CS.k=CS.steps.length; csEnd(); }
 function csTick(dt){ if(!CS.on) return; const s=CS.steps[CS.k]; if(!s){ csEnd(); return; }
-  if(!s._s){ s._s=1; if(s.start) s.start(); } CS.t+=dt; if(s.tick) s.tick(dt,CS.t);
+  if(!s._s){ s._s=1; if(s.start) s.start(); } CS.t+=dt; if(CS.say) CS.say.t+=dt; if(s.tick) s.tick(dt,CS.t);
   if(CS.focus){ const f=CS.focus, fx=f.x??f.i+0.5, fy=f.y??f.j+0.5, tx=-(fx-fy)*TW/2, ty=gc.height/2-ORIGIN_Y-(fx+fy)*TH/2-40, r=Math.min(1,dt*2.6); cam.x+=(tx-cam.x)*r; cam.y+=(ty-cam.y)*r; }
   if(s.until && CS.t>10){ if(s.skip) s.skip(); else if(s.end) s.end(); CS.k++; CS.t=0; return; }     // never get stuck
   if(s.until ? s.until() : CS.t>=(s.dur||0)){ if(s.end) s.end(); CS.k++; CS.t=0; } }
@@ -12350,12 +12505,12 @@ function farmScene(){ const th=mobs.find(m=>m.name==='Bandit Thug'), wi=mobs.fin
     csSay(wi,"Then there's one more grave on the hill. Start with the barrels.",3.0),
     csLook([th,wi],player), csFocus(player,0.8) ]); }
 function fellScene(){ const gr=mobs.find(m=>m.name==='Overseer Grane'); if(!gr) return;
-  cutscene([ csFocus(gr,1.1), csDo(()=>floatText(tileOf(gr),"Oi! Baron's timber. Who sent you?",'#f0dca0',true)), csWait(1.7), csFocus(player,0.7) ]); }
+  cutscene([ csFocus(gr,1.1), csSay(gr,"Oi! Baron's timber. Who sent you?",2.4,player), csFocus(player,0.7) ]); }
 function gateScene(){ const cr=NPCS.find(n=>n.id==='crier'), dr=NPCS.find(n=>n.id==='drunk'); if(!cr) return;
   cutscene([ csFocus(cr,1.0), csBark(cr,"Hear ye! Hollowmere, the city on the river! Mind your purse!",2.2), ...(dr?[csFocus(dr,0.6), csBark(dr,"Mind your... hic... purse, he says!",1.6)]:[]), csFocus(player,0.6) ]); }
 function campScene(){ const ma=mobs.find(m=>m.name==='Mara Blackthorn'), gr=mobs.find(m=>m.name==='Grenn'); if(!ma) return;
-  cutscene([ csFocus(ma,1.0), csDo(()=>floatText(tileOf(ma),"Well, well. Look what wandered in.",'#f0dca0',true)), csWait(1.6),
-    ...(gr?[csFocus(gr,0.6), csDo(()=>floatText(tileOf(gr),"Do we gut it, Mara?",'#f0dca0',true)), csWait(1.4)]:[]), csFocus(player,0.6) ]); }
+  cutscene([ csFocus(ma,1.0), csSay(ma,"Well, well. Look what wandered in.",2.4,player),
+    ...(gr?[csFocus(gr,0.6), csSay(gr,"Do we gut it, Mara?",2.0,ma)]:[]), csFocus(player,0.6) ]); }
 function havenScene(){ const ae=NPCS.find(n=>n.id==='aerwen')||NPCS.find(n=>n.id==='calandor'), mw=NPCS.find(n=>n.id==='maelis'); if(!ae) return;
   cutscene([ csFocus(ae,1.2), csLook(ae,player), csBark(ae,"A human walks under the willows. It has been a long time.",2.2),
     ...(mw?[csLook(mw,player), csBark(mw,"Mud on its boots, too.",1.4)]:[]), csFocus(player,0.7) ]); }

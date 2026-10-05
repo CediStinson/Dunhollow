@@ -3166,6 +3166,8 @@ function drawHead(c, x, B, opts, view=0){
       if(!F){ c.strokeStyle='rgba(42,24,8,0.7)'; c.lineWidth=0.45; c.lineCap='round';      // a fine lid line, kept inside the eye so it never reads as a second brow
         c.beginPath(); c.moveTo(x+ex+0.2,B+ET+0.4); c.quadraticCurveTo(x+ex+w/2,B+ET-0.3,x+ex+w-0.2,B+ET+0.4); c.stroke(); }
       else if(FC.lids){                         // the lash line follows the lowered lid
+        fs(tone(skin,-0.06)); c.beginPath(); c.moveTo(x+ex-0.8,B+ET+eh*0.55); c.quadraticCurveTo(x+ex+w/2,B+ET-2.4,x+ex+w+0.8,B+ET+eh*0.55);   // the lid itself, a little wider than the eye
+        c.quadraticCurveTo(x+ex+w/2,B+ET+eh*0.32,x+ex-0.8,B+ET+eh*0.55); c.closePath(); c.fill();                                       // so no white shows above it
         c.strokeStyle='#2a1808'; c.lineWidth=1.0; c.lineCap='round';
         c.beginPath(); c.moveTo(x+ex-0.4,B+ET+eh*0.55); c.quadraticCurveTo(x+ex+w/2,B+ET+eh*0.32,x+ex+w+0.4,B+ET+eh*0.55); c.stroke();
         c.strokeStyle=tone(skin,-0.3,0.6); c.lineWidth=0.5; c.beginPath(); c.moveTo(x+ex,B+ET-0.4); c.quadraticCurveTo(x+ex+w/2,B+ET-1.6,x+ex+w,B+ET-0.4); c.stroke();   // the crease above
@@ -7655,7 +7657,7 @@ function snapshot(){
     inv:  [...player.inv],
     pos:  { i:player.i, j:player.j, x:player.x, y:player.y, dir:player.dir },
     cam:  { x:cam.x, y:cam.y },
-    world:{ area:areaId, purse:player.purse, letter:loreNoteGiven, quests:{...QUEST}, choices:{...CHOICE}, visited:Object.keys(visitedAreas),
+    world:{ area:areaId, clock:dayClock, purse:player.purse, letter:loreNoteGiven, quests:{...QUEST}, choices:{...CHOICE}, visited:Object.keys(visitedAreas),
             pickups:[...collectedPickups], broken:[...destroyedBreakables], brokenK:{...OPENED_KIND}, defeated:[...defeatedMobs] },
     ts:   Date.now(), v:3,
   };
@@ -12534,7 +12536,14 @@ function drawWetPlayer(e,oldDA,wet,kind,clad){
   g.save(); g.setTransform(1,0,0,1,0,0); g.drawImage(WET_OUT,ox,oy); g.restore(); }
 
 // the fallen don't lie there forever: after half a day they are gone (buried, carried off, or eaten)
-const corpseGone=(id,m)=>{ const t=(CHOICE.deadAt||{})[id+':'+(m.key||m.name)]; return t==null || dayClock-t > DAY_LEN*0.5; };
+const corpseGone=(id,m)=>{ const t=(CHOICE.deadAt||{})[id+':'+(m.key||m.name)]; return t==null || t>dayClock+1 || dayClock-t > DAY_LEN*0.5; };   // a death 'in the future' is from a clock that went back: gone
+// the clock is saved with the game; older saves did not keep it, so their dead stayed dead (and unburied) until the clock caught up
+{ const oldAS=applySave; applySave=function(sv,...r){ const W=sv&&(sv.world||{});
+    const D=(W.choices&&W.choices.deadAt)||{}, latest=Math.max(0,...Object.values(D).filter(v=>typeof v==='number'));
+    const res=oldAS.call(this,sv,...r);
+    if(typeof W.clock==='number') dayClock=W.clock; else if(latest>dayClock) dayClock=latest+DAY_LEN*0.6;
+    try{ if(worldCache) worldCache.area=null; if(!combat.active) resetMobs(); }catch(e){}   // with the right clock: old corpses go, foes due back come back
+    return res; }; }
 { const oldRM2=resetMobs; resetMobs=function(...a){ const r=oldRM2.apply(this,a); mobs.forEach(m=>{ if(m.dead && corpseGone(areaId,m)) m.gone=true; }); return r; }; }
 setInterval(()=>{ try{ if(!running || combat.active) return; mobs.forEach(m=>{ if(m.dead && !m.gone && corpseGone(areaId,m)) m.gone=true; }); }catch(e){} },2000);
 

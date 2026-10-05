@@ -1424,7 +1424,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
     }
     const hc = E.hands==='gloves' ? GEAR.glove : skin;
     if(s===nearS) handAt={x:x+x0+hw/2, y:B+hy+3.2};
-    else offHandAt={x:x+x0+hw/2, y:B+hy+1.6, behind:depth>0};
+    else { offHandAt={x:x+x0+hw/2, y:B+hy+1.6, behind:depth>0}; LAST_OFF={x:x0+hw/2, y:hy+1.6}; }
     { const hx=x0-0.1, tS=s<0?1:-1, tx=tS<0?hx+hw:hx;          // thumb on the body side
       blob([[hx+0.6,hy-0.4],[hx+hw-0.6,hy-0.4],[hx+hw+0.2,hy+2.4],[hx+hw-0.4,hy+5.4],[hx+hw*0.5,hy+6.6],[hx+0.4,hy+5.4],[hx-0.2,hy+2.4]]);
       const gr=c.createLinearGradient(x+hx,0,x+hx+hw,0);
@@ -2347,7 +2347,11 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   // the camera; turning away (NE) it's the screen-right side.
   const nearS = V.turn > -0.25 ? -1 : 1;
   const farDepth = V.prof*0.85;
-  if(V.prof>0.3){ drawArm(-nearS,farDepth); if(E.offhand==='shield' && offHandAt && offHandAt.behind && V.prof>0.6) drawShieldOnArm(c,offHandAt.x,offHandAt.y,V.prof,V.turn<-0.2); }   // only a true profile hides the shield behind you
+  if(V.prof>0.3){ drawArm(-nearS,farDepth); if(E.offhand==='shield' && offHandAt && offHandAt.behind && V.prof>0.6 && V.turn>=-0.2) drawShieldOnArm(c,offHandAt.x,offHandAt.y,V.prof,false); }   // only a true profile hides the shield behind you
+  if(E.offhand==='shield' && V.turn<-0.2 && !SHIELD_DRY){                 // walking away, the shield is carried in front of you: behind your body, its back to us
+    const k=view+'|'+opts.gender+'|'+(opts.race||'')+'|'+Math.round(swing*2)+'|'+(CUR_POSE?CUR_POSE.kind+(CUR_POSE.dir||''):'');
+    let r=SHIELD_POS.get(k); if(!r){ SHIELD_DRY=true; LAST_OFF=null; try{ drawCharBody(DRY_CTX,0,0,opts,swing,view); } catch(e){} finally{ SHIELD_DRY=false; } r=LAST_OFF; if(r) SHIELD_POS.set(k,r); }
+    if(r) drawShieldOnArm(c,x+r.x,B+r.y,V.prof,true); }
   drawLeg(-nearS,V.prof*0.8);
   drawLeg( nearS,0);
 
@@ -2665,7 +2669,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
     const hc = E.hands==='gloves' ? GEAR.glove : skin;
     c.fillStyle=tone(hc,-0.04); c.beginPath(); c.arc(handAt.x,handAt.y,2.8,0,Math.PI*2); c.fill();
   }
-  if(E.offhand==='shield' && offHandAt && (!offHandAt.behind || V.prof<=0.6)) drawShieldOnArm(c,offHandAt.x,offHandAt.y,V.prof,V.turn<-0.2);
+  if(E.offhand==='shield' && offHandAt && (!offHandAt.behind || V.prof<=0.6) && V.turn>=-0.2) drawShieldOnArm(c,offHandAt.x,offHandAt.y,V.prof,false);
 }
 // ── Hook for your own body details ──────────────────────────────────────
 // Called once per figure, per frame, on bare skin and before clothing is drawn.
@@ -3013,9 +3017,10 @@ function drawCustomBodyDetails(c,b){
 }
 
 // A round shield strapped to the forearm, angled slightly outward.
+let LAST_OFF=null, SHIELD_DRY=false; const SHIELD_POS=new Map(), DRY_CTX=document.createElement('canvas').getContext('2d');   // where the off hand ends up, found once per pose
 function drawShieldOnArm(c,x,y,prof,back){        // back: seen from behind, you see its wooden back, the straps and the grip
   const KITE=SHIELD_KIND==='shield_iron', HEATER=SHIELD_KIND==='shield_red', col=SHIELD_COL||(HEATER?'#8a2a24':KITE?'#6a7480':'#8a5a28');
-  c.save(); c.translate(x,y-1); c.rotate((KITE||HEATER?0.12:0.18)-prof*0.22); c.scale(1-prof*0.35,1);   // the bottom tucks in toward the body a little
+  c.save(); c.translate(x,y-1); c.rotate((KITE||HEATER?0.12:0.18)-prof*0.22); c.scale((1-prof*0.35)*1.3,1.3);   // a proper shield, not a buckler   // the bottom tucks in toward the body a little
   const shape=()=>{ c.beginPath(); if(KITE){ c.moveTo(-6.4,-8); c.quadraticCurveTo(0,-11.5,6.4,-8); c.quadraticCurveTo(6.6,2,0,13); c.quadraticCurveTo(-6.6,2,-6.4,-8); }
     else if(HEATER){ c.moveTo(-7,-7.4); c.lineTo(7,-7.4); c.lineTo(7,0); c.quadraticCurveTo(6,6.8,0,10); c.quadraticCurveTo(-6,6.8,-7,0); }
     else c.arc(0,0,7.4,0,Math.PI*2); c.closePath(); };

@@ -12944,8 +12944,8 @@ Object.assign(CHOICE,{ fireBlade:CHOICE.fireBlade??null, warden:CHOICE.warden??n
 const TRAINING={
   smith:  { key:'temper', who:'Oswin the Armourer', label:'Have Oswin temper your gear', stat:'+1 Attack Power',
             lines:r=>["Oswin turns your gear over in his black hands, tutting at every nick.", r?`“Back again? I can always find another edge. Costs more each time, mind. Good steel is patient work.”`:"“I can take the burrs out of all this. Rebalance the blade, tighten the rivets. You'll hit harder for it.”"] },
-  orvell: { key:'attune', who:'Magister Orvell', label:'Ask Orvell to attune you', stat:'+1 Spell Power',
-            lines:r=>["Orvell peers at you over his spectacles as if you were an interesting stain.", "“Magic runs through you like water through a bad pipe. I can clear some of the rust. It is tedious, and I charge for tedium.”"] },
+  maelis: { key:'attune', who:'Maelis the Weaver', label:'Ask Maelis to weave magic into you', stat:'+1 Spell Power',
+            lines:r=>["Maelis leaves the loom running by itself. Threads of pale light keep crossing and recrossing without her.", r?"“The weave holds. Shall I add another thread? Each one is finer than the last, and finer thread is dearer.”":"“Your magic is a loose weave, guest. Gaps everywhere; it leaks. Sit still and I will thread moonlight through it.”"] },
   priest: { key:'bless', who:'Mother Hild', label:'Ask Mother Hild for a blessing', stat:'+5 Health',
             lines:r=>["Mother Hild sets down her broom and takes both your hands.", "“A blessing is a gift, child. The candles, the oil, the hours on my knees: those are not. For the chapel roof, you understand.”"] } };
 const TRAIN_MAX=6, trainCost=r=>40*Math.pow(2,r);
@@ -12962,7 +12962,7 @@ function crateTalk(){ const u=CHOICE.stashUp||0, cost=STASH_UPS[u];
     {label:`Pay ${formatCoin(cost)}. (+6 crate spaces)`, off:player.purse<cost, note:'-'+formatCoin(cost), fn:()=>{ player.purse-=cost; CHOICE.stashUp=u+1; updateHud(); logMsg('Your crate at the Wheatsheaf now holds '+stashCap()+' things.','#e8c060'); crateTalk(); }},
     {label:'Back.',fn:TALKERS.bertha}, bye],true); }
 // each of them gets one more line in their usual talk
-[['smith',()=>trainTalk('smith'),()=>TRAINING.smith.label],['orvell',()=>trainTalk('orvell'),()=>TRAINING.orvell.label],['priest',()=>trainTalk('priest'),()=>TRAINING.priest.label],
+[['smith',()=>trainTalk('smith'),()=>TRAINING.smith.label],['maelis',()=>trainTalk('maelis'),()=>TRAINING.maelis.label],['priest',()=>trainTalk('priest'),()=>TRAINING.priest.label],
  ['bertha',crateTalk,()=>'“Can my crate in the cellar hold more?”']].forEach(([id,fn,label])=>{ const old=TALKERS[id]; if(!old) return;
   TALKERS[id]=(...a)=>{ const r=old(...a); const box=document.getElementById('dlg-opts');
     if(dlgOverlay.classList.contains('open') && box && !box.querySelector('.dlg-opt.train')){ const b=document.createElement('button'); b.className='dlg-opt train';
@@ -12980,8 +12980,37 @@ const RESPAWN_AFTER=DAY_LEN;               // one full day
     mobs.forEach(m=>{ if(!m.dead || !RESPAWNS.has(m.name)) return; const k=areaId+':'+m.key, at=D[k];
       if(at==null || dayClock-at<RESPAWN_AFTER) return;
       defeatedMobs.delete(k); delete D[k]; Object.assign(m,{dead:false, gone:false, fade:1, hp:m.maxHp, state:'guard', hostile:!(A.mobsCalm&&A.mobsCalm()), fallT:0, t:0, k:0, flash:0, st:[]}); }); }; }
+// ── no foe stands right beside a friendly face or on a doorstep: anyone spawning within 3 tiles of an
+//    NPC (or 2 of an entrance) is moved to the nearest open spot that is clear of both
+{ const oldRM=resetMobs; resetMobs=function(){ oldRM(); const A=AREAS[areaId]; if(A.inside && !A.cave && !A.under) return;
+    const ents=Object.values(A.entries||{}), tps=OBJECTS.filter(o=>o.type==='teleporter');
+    const tooClose=(i,j)=> NPCS.some(n=>Math.max(Math.abs(n.i-i),Math.abs(n.j-j))<=3) || [...ents,...tps].some(e=>Math.max(Math.abs(e.i-i),Math.abs(e.j-j))<=2);
+    mobs.forEach(m=>{ if(m.dead || m.hostile===false || m.type==='dummy' || !tooClose(m.i,m.j)) return;
+      let best=null, bd=1e9;
+      for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++){ if(blocked.has(i+','+j) || inNotch(i,j) || tooClose(i,j) || mobs.some(o=>o!==m && !o.dead && o.i===i && o.j===j)) continue;
+        const d=Math.abs(i-m.i)+Math.abs(j-m.j); if(d<bd){ bd=d; best=[i,j]; } }
+      if(best){ m.i=best[0]; m.j=best[1]; m.x=m.i+0.5; m.y=m.j+0.5; m.spawn=[m.i,m.j]; } }); }; }
 // a few more things to hunt
 wrap('road','mobs',l=> nightAmt()<0.3 ? [...l,{ name:'Road Thief', type:'bandit', i:9, j:3, faction:'roadthief', opts:BANDIT({skin:1,hair:1,hairColor:2,beard:1,equip:{head:'hood',torso:'shirt',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:'club',offhand:null}}) }] : l);
+// Maelis weaves in her own tent now: the empty pavilion in Sylvhaven, with a loom that works by moonlight
+AREAS.weavetent={ ...CROOM("Maelis's Weaving Tent",6,5,'sylvhaven','fromTent', ()=>[{type:'loom', i:1, j:0, fp:[2,1]}, {type:'clothtable', i:4, j:0}, {type:'lantern', i:0, j:2}, {type:'lantern', i:5, j:2}, {type:'bench', i:4, j:3}],
+  ()=> havenBurnt() ? [] : [{ id:'maelis', name:'Maelis the Weaver', i:2, j:2, dir:0, opts:ELFO({gender:'f',skin:1,hair:3,hairColor:1,face:1,equip:{head:null,torso:'elf_tunic',armor:null,hands:null,legs:'elf_leggings',feet:'elf_boots',weapon:null,offhand:null}}) }]), elfhall:true };
+wrap('sylvhaven','npcs',l=>l.filter(n=>n.id!=='maelis'));
+wrap('sylvhaven','objects',l=>l.map(o=>o.type==='pavilion'&&o.i===1&&o.j===1&&!o.burnt ? {...o, door:'r', dt:1, inside:'weavetent', back:'fromCity'} : o));
+AREAS.sylvhaven.entries.fromTent={i:3,j:2};
+{ const oldDO=drawObject; drawObject=function(o){ if(o.type!=='loom') return oldDO(o);
+    const a=P(o.i+0.15,o.j+0.55), b=P(o.i+o.fp[0]-0.15,o.j+0.55), H=62, t=gt;
+    g.strokeStyle='#7a5a34'; g.lineWidth=4; g.lineCap='round';
+    [a,b].forEach(q=>{ g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(q.x,q.y-H); g.stroke(); });                       // two posts
+    g.lineWidth=3; [H,H*0.18].forEach(h=>{ g.beginPath(); g.moveTo(a.x,a.y-h); g.lineTo(b.x,b.y-h); g.stroke(); });   // beams
+    g.save(); g.globalCompositeOperation='lighter';
+    for(let k=1;k<12;k++){ const u=k/12, x1=a.x+(b.x-a.x)*u, y1=a.y+(b.y-a.y)*u, sh=0.5+0.5*Math.sin(t*2+k);           // warp threads of light
+      g.strokeStyle=`rgba(190,220,255,${0.25+0.35*sh})`; g.lineWidth=1; g.beginPath(); g.moveTo(x1,y1-H); g.lineTo(x1,y1-H*0.18); g.stroke(); }
+    const woven=0.18+0.5*((t*0.05)%1);                                                                                   // the cloth creeping up, row by row
+    g.fillStyle='rgba(220,235,255,0.35)'; g.beginPath(); g.moveTo(a.x,a.y-H*0.18); g.lineTo(b.x,b.y-H*0.18); g.lineTo(b.x,b.y-H*woven); g.lineTo(a.x,a.y-H*woven); g.closePath(); g.fill();
+    const sx=(Math.sin(t*1.6)+1)/2, sp={x:a.x+(b.x-a.x)*sx, y:a.y+(b.y-a.y)*sx-H*woven};                                    // the shuttle flying by itself
+    glow(sp.x,sp.y,16,10,'200,230,255',0.7); g.fillStyle='#f4f8ff'; g.beginPath(); g.ellipse(sp.x,sp.y,4,1.6,0,0,Math.PI*2); g.fill();
+    g.restore(); }; }
 wrap('wolfwood','mobs',l=> nightAmt()>0.5 && (QUEST.wolves||0)>=2 ? [...l,{ name:'Timber Wolf', type:'wolf', i:3, j:3, faction:'timber', coat:'#5a524a' },{ name:'Timber Wolf Bitch', type:'wolf', i:4, j:5, faction:'timber', coat:'#6e665a' }] : l);
 </script>
 </body>

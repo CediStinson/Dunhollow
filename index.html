@@ -284,6 +284,23 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0e0b06;color:#e8d5a
 .slot.skel-slot{width:42px;height:42px;margin:-4px 0 0 7px;border-style:dashed;}
 .slot.skel-slot canvas{width:36px!important;height:36px!important;}
 .slot.skel-slot .lbl{font-size:7px;letter-spacing:0.5px;}
+/* ── reading a signpost: a little post of wooden plates ── */
+#sign-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:40;background:rgba(8,5,2,0.35);}
+#sign-overlay.open{display:flex;}
+.sign-card{width:min(380px,92vw);padding:16px 18px 14px;background:linear-gradient(#21170b,#150e06);border:1px solid #5a4018;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:center;}
+.sign-title{font:13px Georgia,serif;letter-spacing:3px;text-transform:uppercase;color:#e8c878;margin-bottom:10px;}
+.sign-post{position:relative;display:flex;flex-direction:column;gap:9px;padding:4px 0 26px;}
+.sign-pole{position:absolute;left:50%;top:-6px;bottom:0;width:12px;margin-left:-6px;background:linear-gradient(90deg,#7a5a36,#3a2614);border-radius:2px;}
+.sign-plate{position:relative;z-index:1;width:78%;padding:7px 26px 8px 14px;background:linear-gradient(#a27c4c,#7e5c34);color:#2a180a;text-align:left;box-shadow:0 2px 0 #3a2614,0 4px 8px rgba(0,0,0,0.4);clip-path:polygon(0 0,calc(100% - 18px) 0,100% 50%,calc(100% - 18px) 100%,0 100%);}
+.sign-plate.left{align-self:flex-start;padding:7px 14px 8px 26px;clip-path:polygon(18px 0,100% 0,100% 100%,18px 100%,0 50%);text-align:right;}
+.sign-plate.right{align-self:flex-end;}
+.sign-plate.broken{width:62%;clip-path:polygon(0 0,100% 0,94% 30%,100% 55%,93% 78%,100% 100%,0 100%);background:linear-gradient(#8a6a40,#6a4c2a);}
+.sign-plate b{display:block;font:bold 15px Georgia,serif;letter-spacing:3px;color:#2a160a;text-shadow:0 1px 0 rgba(255,230,180,0.35);}
+.sign-plate span{display:block;font:12px Georgia,serif;line-height:1.35;color:#2e1c0c;}
+.sign-plate span i{font-style:normal;font-weight:bold;}
+.sign-plate em{display:block;margin-top:3px;font:italic 11px Georgia,serif;color:#4a2e14;}
+.sign-close{margin-top:4px;background:#2a1a06;border:1px solid #c09040;border-radius:5px;color:#f0c060;font:13px Georgia,serif;padding:8px 22px;cursor:pointer;}
+.sign-close:hover{background:#3a2508;}
 /* ── the gate: a small sign-in before the game ── */
 #login-screen{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 40%,rgba(255,170,80,0.08),transparent 55%),radial-gradient(ellipse at 50% 80%,#1a1005 0%,#080502 100%);}
 #login-screen.hidden{display:none;}
@@ -5000,14 +5017,15 @@ function bedPrompt(){
     {label:'Sleep until evening.', fn:()=>sleepUntil('evening')},
     {label:'Not now.', fn:closeDialog}]);
 }
-function readSignpost(sp){
-  if(sp.city){ banner('A Milestone','#e8c878',1400); logMsg('North — HOLLOWMERE, seat of Baron Bertram. Tolls payable at the gate.','#a8c8a0'); logMsg('Someone has scratched underneath: "and at every gate after".','#c8a070'); return; }
-  banner('A Weathered Signpost','#e8c878',1400);
-  logMsg('Carved arrows point the way:','#c8a860');
-  logMsg('East — the Mill Track to DUNHOLLOW, a village a mile on.','#a8c8a0');
-  logMsg('North — someone has scratched a crude wolf\'s head into the arrow.','#c8a070');
-  logMsg('South — someone has hacked the arrow off. Smoke rises beyond the trees.','#c8a070');
-}
+function readSignpost(sp){                      // a small signpost of your own to read, one wooden plate per direction
+  let ov=document.getElementById('sign-overlay');
+  if(!ov){ ov=document.createElement('div'); ov.id='sign-overlay'; document.body.appendChild(ov); }
+  const P=signPlanks(sp), esc=t=>String(t).replace(/</g,'&lt;');
+  ov.innerHTML=`<div class="sign-card"><div class="sign-title">${sp.city?'A Milestone':'A Weathered Signpost'}</div><div class="sign-post"><div class="sign-pole"></div>${P.map(p=>{ const right=Math.cos(p.ang)>=0;
+      return `<div class="sign-plate ${right?'right':'left'}${p.broken?' broken':''}"><b>${p.broken?'':esc(p.label|| (p.wolf?'🐺':''))}</b><span><i>${esc(p.dir)}.</i> ${esc(p.text)}</span>${p.note?`<em>${esc(p.note)}</em>`:''}</div>`; }).join('')}</div>
+    <button class="sign-close" type="button">Step back.</button></div>`;
+  ov.querySelector('.sign-close').onclick=()=>ov.classList.remove('open');
+  ov.classList.add('open'); }
 // Static objects are painted once into a cached 2x sprite and then only blitted.
 const SPRITES={};
 function drawCached(key,x,y,w,h,ax,ay,paint,k=2){
@@ -5151,22 +5169,35 @@ function openHint(o,x,y){ if(!player || combat.active || cheb([o.i,o.j],[player.
   g.save(); g.font='bold 11px Georgia,serif'; g.textAlign='center'; const t='Click to open', w=g.measureText(t).width+12, a=0.75+0.25*Math.sin(gt*3);
   g.globalAlpha=a; g.fillStyle='rgba(20,14,6,0.8)'; g.beginPath(); g.roundRect(x-w/2,y-15,w,18,5); g.fill(); g.strokeStyle='rgba(200,160,90,0.7)'; g.lineWidth=1; g.stroke();
   g.fillStyle='#f0d890'; g.fillText(t,x,y-2); g.restore(); }
-function paintSignpost(x,y){
+// what each signpost says: one wooden plate per direction (ang: which way the arrow points on screen)
+function signPlanks(sp){
+  if(sp.city) return [
+    { ang:0.3,  len:22, col:'#9a7446', label:'DUNHOLLOW',  dir:'East',  text:'The forest road runs on to Dunhollow, a village a mile on.' },
+    { ang:Math.PI+0.32, len:21, col:'#8a6a3e', label:'HOLLOWMERE', dir:'North', text:'Hollowmere, seat of Baron Bertram. Tolls payable at the gate.', note:'Someone has scratched underneath: “and at every gate after”.' } ];
+  return [
+    { ang:-0.12, len:20, col:'#9a7446', label:'DUNHOLLOW', dir:'East', text:'The Mill Track to Dunhollow, a village a mile on.' },
+    { ang:Math.PI+0.18, len:17, col:'#8a6a3e', label:'', wolf:true, dir:'North', text:"No words. Someone has scratched a crude wolf's head into the arrow." },
+    { ang:-0.35, len:6, col:'#826238', label:'', broken:true, dir:'South', text:'Someone has hacked the arrow off. Smoke rises beyond the trees.' } ];
+}
+function paintSignpost(x,y,sp){
     const sh=g.createRadialGradient(x+6,y+2,0,x+6,y+2,18); sh.addColorStop(0,'rgba(0,0,0,0.4)'); sh.addColorStop(1,'rgba(0,0,0,0)');
     g.fillStyle=sh; g.beginPath(); g.ellipse(x+6,y+2,18,7,0,0,Math.PI*2); g.fill();
     const pg=g.createLinearGradient(x-3,0,x+3,0); pg.addColorStop(0,'#7a5a36'); pg.addColorStop(1,'#3a2614');
     g.fillStyle=pg; g.fillRect(x-2.6,y-54,5.2,54);
     g.fillStyle='#4e3820'; g.beginPath(); g.moveTo(x-3,y-54); g.lineTo(x,y-58); g.lineTo(x+3,y-54); g.closePath(); g.fill();
-    const plank=(yy,ang,len,col)=>{
+    const plank=(yy,P)=>{ const {ang,len,col}=P;
       g.save(); g.translate(x,y-yy); g.rotate(ang);
       g.fillStyle='rgba(0,0,0,0.3)'; g.fillRect(1,-2.8,len,6.6);
-      g.fillStyle=col; g.beginPath(); g.moveTo(0,-3.4); g.lineTo(len,-3.4); g.lineTo(len+6,0.2); g.lineTo(len,3.8); g.lineTo(0,3.8); g.closePath(); g.fill();
+      g.fillStyle=col; g.beginPath(); g.moveTo(0,-3.4);
+      if(P.broken){ g.lineTo(len,-3.4); g.lineTo(len-1.5,-1); g.lineTo(len+1.5,0.6); g.lineTo(len-1,2.2); g.lineTo(len,3.8); }   // hacked off: a splintered stub
+      else { g.lineTo(len,-3.4); g.lineTo(len+6,0.2); g.lineTo(len,3.8); }
+      g.lineTo(0,3.8); g.closePath(); g.fill();
       g.fillStyle='rgba(255,235,190,0.22)'; g.fillRect(0,-3.4,len,1.1);
       g.strokeStyle='rgba(40,24,10,0.55)'; g.lineWidth=0.6;
-      for(let k=0;k<3;k++){ g.beginPath(); g.moveTo(4+k*5,-1); g.lineTo(7+k*5,1.4); g.stroke(); }     // carved marks
-      g.restore();
-    };
-    plank(46,-0.12,20,'#9a7446'); plank(38,Math.PI+0.18,17,'#8a6a3e'); plank(30,-0.35,15,'#826238');
+      if(P.wolf){ g.beginPath(); g.moveTo(6,2); g.lineTo(8,-2); g.lineTo(9.5,0); g.lineTo(11,-2); g.lineTo(13,2); g.lineTo(9.5,3); g.closePath(); g.stroke(); }   // a scratched wolf's head
+      else if(!P.broken) for(let k=0;k<Math.floor(len/5);k++){ g.beginPath(); g.moveTo(3+k*4.4,-1.6); g.lineTo(3+k*4.4,1.8); g.moveTo(3+k*4.4,-1.6); g.lineTo(5+k*4.4,-1.6); g.stroke(); }   // carved letters
+      g.restore(); };
+    signPlanks(sp||{}).forEach((P,k)=>plank(46-k*8,P));
     g.fillStyle='rgba(80,120,46,0.85)'; g.beginPath(); g.ellipse(x-1,y-2,6,2.4,0,0,Math.PI*2); g.fill();
 }
 function paintWell(x,y){
@@ -5886,14 +5917,24 @@ function paintStump(x,y,v){
   g.strokeStyle='rgba(120,84,40,0.6)'; g.lineWidth=0.6; for(let r=2;r<9;r+=2){ g.beginPath(); g.ellipse(x,y-12,r,r*0.44,0,0,Math.PI*2); g.stroke(); }
   g.fillStyle='#f0e0b0'; g.beginPath(); g.moveTo(x+3,y-15); g.lineTo(x+7,y-19); g.lineTo(x+6,y-14); g.closePath(); g.fill();   // a fresh splinter
 }
-function paintLogPile(x,y,silver){
-  g.fillStyle='rgba(10,6,2,0.3)'; g.beginPath(); g.ellipse(x+34,y+10,62,18,0.46,0,Math.PI*2); g.fill();
-  const log=(ox,oy)=>{ const a={x:x+ox,y:y+oy}, b={x:x+ox+TW/2*1.6,y:y+oy+TH/2*1.6};
-    g.strokeStyle=silver?'#9a988c':'#3a2614'; g.lineWidth=15; g.lineCap='round'; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke();
-    g.strokeStyle=silver?'#e4e2d6':'#6a4a2a'; g.lineWidth=11; g.beginPath(); g.moveTo(a.x,a.y-2); g.lineTo(b.x,b.y-2); g.stroke();
-    g.fillStyle='#d8b880'; g.beginPath(); g.ellipse(a.x-1,a.y-1,5.5,7.5,-0.5,0,Math.PI*2); g.fill();
-    g.strokeStyle='rgba(120,84,40,0.6)'; g.lineWidth=0.6; g.beginPath(); g.ellipse(a.x-1,a.y-1,3,4,-0.5,0,Math.PI*2); g.stroke(); };
-  log(-18,-6); log(-4,1); log(-11,-17);
+function paintLogPile(x,y,silver){                 // three round logs, two on the ground and one on top, cut ends toward you
+  const dx=TW/2, dy=TH/2, L=1.25, d={x:dx*L,y:dy*L}, dl=Math.hypot(d.x,d.y), ux=d.x/dl, uy=d.y/dl, nx=-uy, ny=ux, R=8, ang=Math.atan2(uy,ux);
+  const C=silver ? {lt:'#e8e6dc',md:'#bcbab0',dk:'#7a786e',line:'rgba(60,58,52,0.55)',face:'#efe2c0',ring:'#b89a64'} : {lt:'#8a6440',md:'#5e4026',dk:'#2e1e10',line:'rgba(30,18,8,0.55)',face:'#dcbc84',ring:'#9a7440'};
+  g.fillStyle='rgba(10,6,2,0.32)'; g.beginPath(); g.ellipse(x+12,y+14,58,20,0.42,0,Math.PI*2); g.fill();
+  const log=(ax,ay,seed)=>{ const a={x:x+ax,y:y+ay}, b={x:a.x+d.x,y:a.y+d.y};
+    const t1={x:a.x-nx*R,y:a.y-ny*R}, t2={x:b.x-nx*R,y:b.y-ny*R}, b1={x:a.x+nx*R,y:a.y+ny*R}, b2={x:b.x+nx*R,y:b.y+ny*R};
+    const gr=g.createLinearGradient((t1.x+t2.x)/2,(t1.y+t2.y)/2,(b1.x+b2.x)/2,(b1.y+b2.y)/2); gr.addColorStop(0,C.lt); gr.addColorStop(0.45,C.md); gr.addColorStop(1,C.dk);
+    g.fillStyle=gr; g.beginPath(); g.moveTo(t1.x,t1.y); g.lineTo(t2.x,t2.y); g.lineTo(b2.x,b2.y); g.lineTo(b1.x,b1.y); g.closePath(); g.fill();
+    g.fillStyle=C.md; g.beginPath(); g.ellipse(a.x,a.y,R*0.55,R,ang,0,Math.PI*2); g.fill();                                   // the far end, rounded off
+    g.strokeStyle=C.line; g.lineWidth=0.8; for(let k=-2;k<=2;k++){ const o=k*R*0.36, w=rnd01(seed,k,140)*0.5;                // bark running the length
+      g.beginPath(); g.moveTo(a.x+nx*o+ux*(4+w*8),a.y+ny*o+uy*(4+w*8)); for(let t=0.2;t<=0.95;t+=0.15){ const q=t*dl, wob=Math.sin(t*9+seed+k)*0.7; g.lineTo(a.x+ux*q+nx*(o+wob),a.y+uy*q+ny*(o+wob)); } g.stroke(); }
+    g.fillStyle=C.dk; [0.3,0.62].forEach((t,k)=>{ const q=t*dl; g.beginPath(); g.ellipse(a.x+ux*q-nx*R*0.2,a.y+uy*q-ny*R*0.2,1.6,1.1,ang,0,Math.PI*2); g.fill(); });   // a knot or two
+    g.fillStyle=C.dk; g.beginPath(); g.ellipse(b.x,b.y,R*0.6,R+0.6,ang,0,Math.PI*2); g.fill();                                  // the cut end facing you: bark rim, pale wood, rings
+    g.fillStyle=C.face; g.beginPath(); g.ellipse(b.x+ux*0.4,b.y+uy*0.4,R*0.5,R-0.8,ang,0,Math.PI*2); g.fill();
+    g.strokeStyle=C.ring; g.lineWidth=0.6; [0.66,0.36].forEach(f=>{ g.beginPath(); g.ellipse(b.x+ux*0.5,b.y+uy*0.5,R*0.5*f,(R-0.8)*f,ang,0,Math.PI*2); g.stroke(); });
+    g.fillStyle=C.ring; g.beginPath(); g.arc(b.x+ux*0.5,b.y+uy*0.5,0.9,0,Math.PI*2); g.fill();
+    g.strokeStyle='rgba(90,60,30,0.5)'; g.lineWidth=0.5; g.beginPath(); g.moveTo(b.x+ux*0.5,b.y+uy*0.5); g.lineTo(b.x+ux*0.5+nx*(R-2),b.y+uy*0.5+ny*(R-2)); g.stroke(); };   // a drying crack
+  log(-30,-12,1); log(-44,-4,2); log(-36,-21,3);
 }
 function paintSnare(x,y,open){
   g.fillStyle='rgba(10,6,2,0.3)'; g.beginPath(); g.ellipse(x+2,y+1,12,4,0,0,Math.PI*2); g.fill();
@@ -6304,7 +6345,7 @@ function drawObject(o){
     }
     g.restore();
   } else if(o.type==='signpost'){
-    drawCached('signpost',x,y,70,80,35,66,paintSignpost);
+    drawCached('signpost'+(o.city?'c':'x'),x,y,80,80,40,66,(X,Y)=>paintSignpost(X,Y,o));
   } else if(o.type==='bed'){
     drawCached('bed2',x,y,280,170,110,100,paintBed);
   } else if(o.type==='hearth' && o.i===0){ drawFireplace(o);           // indoors: a stone fireplace built into the wall, not a campfire on the floorboards
@@ -6370,7 +6411,7 @@ function drawObject(o){
   } else if(o.type==='stump'){
     drawCached('stump'+(o.v||0),x,y,40,30,20,24,(X,Y)=>paintStump(X,Y,o.v));
   } else if(o.type==='logpile'){
-    drawCached('logs'+(o.silver?1:0),x,y,170,90,40,50,(X,Y)=>paintLogPile(X,Y,o.silver));
+    drawCached('logs2'+(o.silver?1:0),x,y,170,120,80,70,(X,Y)=>paintLogPile(X,Y,o.silver));
   } else if(o.type==='snare'){
     drawCached('snare'+(o.open?1:0),x,y,50,24,20,16,(X,Y)=>paintSnare(X,Y,o.open));
   } else if(o.type==='bldg'){

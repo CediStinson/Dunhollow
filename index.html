@@ -269,6 +269,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0e0b06;color:#e8d5a
 html,body{touch-action:none;overscroll-behavior:none;-webkit-tap-highlight-color:transparent;}
 #screen-creator,.inv-panel,#dlg-overlay,.menu-panel,.ctrl-panel{touch-action:pan-y;}
 .slot{touch-action:none;}
+#stash-box{display:none;margin:10px 0 8px;padding-top:8px;border-top:1px dashed rgba(160,120,50,.35)}#inv-overlay.stashing #stash-box{display:block}
+#stash-grid{display:grid;grid-template-columns:repeat(6,46px);gap:5px;margin-top:6px}#stash-grid .slot{width:46px;height:46px;background:#20160a}
+.stash-help{font-size:11px;color:#a08a60;margin-top:5px}
+.hide-eye{position:absolute;top:2px;right:2px;width:17px;height:17px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:4px;border:1px solid rgba(160,120,50,.5);background:rgba(20,14,6,.82);color:#e8c878;cursor:pointer;z-index:2;opacity:.75}
+.hide-eye:hover{opacity:1;border-color:#c09040}.hide-eye.off{color:#a08070;opacity:1;background:rgba(60,20,14,.85)}
+.slot.veiled canvas{opacity:.45;filter:grayscale(.6)}
 #fs-btn{position:absolute;top:14px;right:14px;display:none;}
 @media (pointer:coarse){
   .p-dir{width:64px;height:64px;border-radius:14px;}
@@ -847,7 +853,8 @@ function poseAngles(p){
 const DYE_SLOT = { torso:[CLOTH,'shirt'], legs:[CLOTH,'pants'], feet:[CLOTH,'boot'], armor:null, head:null, hands:[GEAR,'glove'], offhand:null };
 let SHIELD_COL=null, SHIELD_KIND=null;
 function withLook(opts,fn){
-  if(opts.hideHelm && opts.equip && opts.equip.head) opts={...opts, equip:{...opts.equip, head:null}};   // helmet hidden by the player's toggle
+  if(opts.equip && (opts.hideHelm || opts.hide)){ const H=opts.hide||{}, e={...opts.equip}; let ch=false;     // pieces the player chose to hide: still worn (stats count), just not drawn
+    for(const k in e){ if(e[k] && (H[k] || (k==='head' && opts.hideHelm))){ e[k]=null; ch=true; } } if(ch) opts={...opts, equip:e}; }
   const e=opts.equip; if(!e) return fn(opts);
   const saved=[], look={...e}; let any=false;
   const set=(obj,k,v)=>{ saved.push([obj,k,obj[k]]); obj[k]=v; };
@@ -6106,6 +6113,9 @@ function drawObject(o){
     drawCached('crate',x,y,110,90,55,58,paintCrate); if(o.breakable) openHint(o,x,y-40);
   } else if(o.type==='chest'){
     drawCached('chest',x,y,90,70,45,48,()=>paintChest(45,48,false)); if(o.breakable) openHint(o,x,y-30);
+  } else if(o.type==='stash'){                                            // your own crate: a chest with a painted sheaf on the lid
+    drawCached('chest',x,y,90,70,45,48,()=>paintChest(45,48,false));
+    g.fillStyle='#e0c060'; g.font='600 9px Georgia,serif'; g.textAlign='center'; g.fillText('Your crate',x,y-40); g.textAlign='left';
   } else if(o.type==='crates'){
     drawCached('crates',x,y,120,130,55,98,()=>paintCrates(55,98,false)); if(o.breakable) openHint(o,x,y-66);
   } else if(o.type==='barrels'){
@@ -8056,13 +8066,19 @@ const dollCanvas=document.getElementById('doll-canvas');
 const ghost=document.getElementById('drag-ghost');
 let dollDir=0, invBuilt=false, msgTimer=null;
 
-function getAt(loc){ return loc.kind==='eq' ? player.opts.equip[loc.key] : player.inv[loc.key]; }
-function setAt(loc,id){ if(player.opts) delete player.opts._ck; if(loc.kind==='eq') player.opts.equip[loc.key]=id||null; else player.inv[loc.key]=id||null; }
+function getAt(loc){ return loc.kind==='eq' ? player.opts.equip[loc.key] : loc.kind==='stash' ? stashArr()[loc.key] : player.inv[loc.key]; }
+function setAt(loc,id){ if(player.opts) delete player.opts._ck; if(loc.kind==='eq') player.opts.equip[loc.key]=id||null; else if(loc.kind==='stash') stashArr()[loc.key]=id||null; else player.inv[loc.key]=id||null; }
+// ── the crate at the Wheatsheaf: things you want to keep but not carry. It is saved with the game.
+const STASH_SIZE=30; let STASH_OPEN=false;
+var SELL_RATE=0.25;                      // traders pay a quarter of their own price (the fence a third)
+const stashCap=()=>12+6*(CHOICE.stashUp||0);   // 12 slots to start; Bertha can make room for more
+function stashArr(){ if(!Array.isArray(CHOICE.stash)) CHOICE.stash=Array(STASH_SIZE).fill(null); while(CHOICE.stash.length<STASH_SIZE) CHOICE.stash.push(null); return CHOICE.stash; }
 function flash(t){ invMsg.textContent=t; clearTimeout(msgTimer); msgTimer=setTimeout(()=>invMsg.textContent='',2600); }
 
 // Can `id` go into `loc`? Returns an error message, or '' when it can.
 function placeError(id,loc){
-  if(!id || loc.kind==='inv') return '';
+  if(loc.kind==='stash' && loc.key>=stashCap()) return 'That part of the crate is not yours yet.';
+  if(!id || loc.kind==='inv' || loc.kind==='stash') return '';
   const it=ITEMS[id];
   if(it.slot!==loc.key) return `${it.name} goes in the ${SLOT_NAMES[it.slot]} slot.`;
   if(!itemFits(id,player.opts.gender)) return `${it.name} doesn't fit you.`;
@@ -8106,6 +8122,8 @@ function refreshFoodBar(){
     bar.appendChild(b); }); }
 function quickMove(loc){
   const id=getAt(loc); if(!id) return;
+  if(STASH_OPEN && loc.kind==='stash'){ const free=player.inv.indexOf(null); if(free<0){ flash('Your backpack is full.'); return; } moveItem(loc,{kind:'inv',key:free}); return; }   // crate → pack
+  if(STASH_OPEN && loc.kind==='inv'){ const free=stashArr().slice(0,stashCap()).indexOf(null); if(free<0){ flash('The crate is full.'); return; } moveItem(loc,{kind:'stash',key:free}); return; }       // pack → crate
   if(ITEMS[id].read){ openNote(id); return; }
   if(ITEMS[id].slot==='food'){ if(loc.kind==='inv') eatItem(loc.key); return; }
   if(loc.kind==='inv') moveItem(loc,{kind:'eq',key:ITEMS[id].slot});
@@ -8121,24 +8139,36 @@ function makeSlot(kind,key){
   el.className='slot'; el.dataset.kind=kind; el.dataset.key=key;
   const cv=document.createElement('canvas'); cv.width=96; cv.height=96; cv.style.width='48px'; cv.style.height='48px';
   el.appendChild(cv);
-  if(kind==='eq'){ const l=document.createElement('div'); l.className='lbl'; l.textContent=SLOT_NAMES[key]; el.appendChild(l); }
+  if(kind==='eq'){ const l=document.createElement('div'); l.className='lbl'; l.textContent=SLOT_NAMES[key]; el.appendChild(l);
+    if(HIDEABLE.includes(key)){ const eye=document.createElement('button'); eye.type='button'; eye.className='hide-eye'; eye.dataset.key=key;    // a tiny eye in the corner: show or hide this piece
+      eye.addEventListener('pointerdown',e=>{ e.stopPropagation(); }); eye.addEventListener('dblclick',e=>e.stopPropagation());
+      eye.addEventListener('click',e=>{ e.stopPropagation(); if(!player.opts) return; const H=player.opts.hide=player.opts.hide||{};
+        if(key==='head'){ player.opts.hideHelm=!isHidden('head'); H.head=player.opts.hideHelm; } else H[key]=!H[key];
+        delete player.opts._ck; syncHideEyes(); drawDoll(); if(typeof saveGame==='function') saveGame(); });
+      el.appendChild(eye); } }
   el.addEventListener('pointerdown',onSlotDown);
   el.addEventListener('dblclick',()=>quickMove(slotLoc(el)));
   return el;
 }
-function slotLoc(el){ return { kind:el.dataset.kind, key: el.dataset.kind==='inv' ? +el.dataset.key : el.dataset.key }; }
+const HIDEABLE=['head','torso','armor','hands','legs','feet','offhand'];
+const isHidden=k=>!!(player.opts && ((player.opts.hide||{})[k] || (k==='head' && player.opts.hideHelm)));
+const EYE_OPEN='<svg viewBox="0 0 16 16" width="11" height="11"><path d="M1 8s2.6-4.5 7-4.5S15 8 15 8s-2.6 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="2.1" fill="currentColor"/></svg>';
+const EYE_SHUT='<svg viewBox="0 0 16 16" width="11" height="11"><path d="M1 8s2.6-4.5 7-4.5S15 8 15 8s-2.6 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2 14L14 2" stroke="currentColor" stroke-width="1.8"/></svg>';
+function syncHideEyes(){ document.querySelectorAll('#inv-overlay .hide-eye').forEach(b=>{ const k=b.dataset.key, off=isHidden(k), filled=!!(player.opts&&player.opts.equip[k]);
+    b.innerHTML=off?EYE_SHUT:EYE_OPEN; b.classList.toggle('off',off); b.style.display=filled?'':'none'; b.title=off?'Hidden on your character (still worn). Click to show.':'Click to hide this piece on your character. It stays equipped.';
+    b.parentElement.classList.toggle('veiled',off && filled); }); }
+function slotLoc(el){ return { kind:el.dataset.kind, key: el.dataset.kind==='eq' ? el.dataset.key : +el.dataset.key }; }
 
 function buildInventoryUI(){
   if(invBuilt) return; invBuilt=true;
   const L=document.getElementById('eq-left'), Rt=document.getElementById('eq-right');
-  const hb=document.createElement('button'); hb.id='helm-toggle'; hb.className='helm-toggle';
-  const hbSync=()=>{ const off=!!(player.opts&&player.opts.hideHelm); hb.textContent=off?'Helm: hidden':'Helm: shown'; hb.classList.toggle('off',off); };
-  hb.addEventListener('click',e=>{ e.stopPropagation(); if(!player.opts) return; player.opts.hideHelm=!player.opts.hideHelm; delete player.opts._ck; hbSync(); drawDoll(); if(typeof saveGame==='function') saveGame(); });
-  window.syncHelmToggle=hbSync; hbSync(); L.appendChild(hb);
-  const sp=document.createElement('div'); sp.className='helm-toggle-sp'; Rt.appendChild(sp);
+  window.syncHelmToggle=()=>syncHideEyes();
   ['head','torso','armor','weapon'].forEach(k=>L.appendChild(makeSlot('eq',k)));
   ['hands','legs','feet','offhand'].forEach(k=>Rt.appendChild(makeSlot('eq',k)));
   for(let i=0;i<INV_SIZE;i++) invGrid.appendChild(makeSlot('inv',i));
+  { const box=document.createElement('div'); box.id='stash-box'; box.innerHTML='<div class="menu-label">The Wheatsheaf Crate</div><div id="stash-grid"></div><div class="stash-help">Double-click moves things between the crate and your pack.</div>';
+    const bag=document.querySelector('#inv-overlay .bag'); bag.insertBefore(box,document.getElementById('inv-trash'));
+    const sg=box.querySelector('#stash-grid'); for(let i=0;i<STASH_SIZE;i++) sg.appendChild(makeSlot('stash',i)); }
   document.getElementById('rot-l').addEventListener('click',()=>{ dollDir=(dollDir+1)%8; drawDoll(); });
   document.getElementById('rot-r').addEventListener('click',()=>{ dollDir=(dollDir+7)%8; drawDoll(); });
   document.getElementById('inv-close').addEventListener('click',closeInventory);
@@ -8183,6 +8213,7 @@ function refreshInventory(){
     const lbl=el.querySelector('.lbl'); if(lbl) lbl.style.display = id ? 'none' : '';
   });
   refreshStatPanel();
+  if(typeof syncHideEyes==='function') syncHideEyes();
   drawDoll();
 }
 function refreshStatPanel(){
@@ -8907,7 +8938,7 @@ function sellTo(who,back){
   say(who,[goods.length?"“Let us see what you have.” (Only what is in your pack, not what you wear.)":"“Nothing in your pack I'd buy.”"],[{label:'Back.',fn:back},bye],true);
   if(!goods.length) return;
   const box=document.getElementById('dlg-opts'), grid=document.createElement('div'); grid.className='shop-grid';
-  goods.forEach(({id,k})=>{ const pr=Math.max(1,Math.round(PRICES[id]*0.4)); const cell=document.createElement('div'); cell.className='shop-cell';
+  goods.forEach(({id,k})=>{ const pr=Math.max(1,Math.round(PRICES[id]*SELL_RATE)); const cell=document.createElement('div'); cell.className='shop-cell';
     const sl=document.createElement('div'); sl.className='slot filled shop-slot'; sl.dataset.item=id; const cv=document.createElement('canvas'); cv.width=cv.height=104; cv.style.width=cv.style.height='52px'; drawItemIcon(cv.getContext('2d'),id,104); sl.appendChild(cv);
     const pl=document.createElement('div'); pl.className='shop-price'; pl.textContent='+'+formatCoin(pr); cell.appendChild(sl); cell.appendChild(pl);
     cell.addEventListener('pointerdown',e=>{ cell._touch=e.pointerType==='touch'; });
@@ -8980,7 +9011,7 @@ function heraldTalk(){ say(BARON_DOWN()?'Crown Herald':"Baron's Herald", BARON_D
 function mguardTalk(){ say(BARON_DOWN()?'Crown Soldier':"Baron's Guard", BARON_DOWN() ? "“The Baron's men took off their red and put on blue. Mostly the same men. Don't tell the Magistrate.”" : "“Keep walking. The Baron doesn't like crowds that aren't cheering.”",[bye]); }
 function fenceSell(){
   const opts=[];
-  player.inv.forEach((id,k)=>{ if(!id || ITEMS[id].slot==='misc' && id!=='moonbloom' || !PRICES[id]) return; const pr=Math.max(1,Math.round(PRICES[id]*0.55));
+  player.inv.forEach((id,k)=>{ if(!id || ITEMS[id].slot==='misc' && id!=='moonbloom' || !PRICES[id]) return; const pr=Math.max(1,Math.round(PRICES[id]*SELL_RATE*1.35));
     opts.push({label:itemLabel(id), note:'+'+formatCoin(pr), fn:()=>{ player.inv[k]=null; player.purse+=pr; updateHud(); if(id==='moonbloom' && !CHOICE.wynn) remember('wynn','sold'); logMsg('Sold '+ITEMS[id].name+' for '+formatCoin(pr)+'.','#e8c060'); fenceSell(); }}); });
   say('Sella the Fence', opts.length?"“I pay better than Marta. I also ask fewer questions.”":"“Nothing to sell? Then stop blocking my light.”",[...opts,bye],true);
 }
@@ -9709,7 +9740,7 @@ AREAS.village.entries.fromTavern={i:3,j:2};
 wrap('sylvhaven','objects',l=>l.map(o=>o.type==='pavilion'&&o.i===10&&o.j===1&&!o.burnt ? {...o, door:'r', dt:1, inside:'moonbath', back:'fromCity'} : o));
 AREAS.sylvhaven.entries.fromBath={i:12,j:2};
 Object.assign(AREAS,{
-  wheatsheaf: CROOM('The Wheatsheaf',7,6,'village','fromTavern', ()=>[{type:'hearth', i:0, j:2}, {type:'table', i:2, j:1}, {type:'table', i:4, j:2}, {type:'counter', i:6, j:1, fp:[1,3]}, {type:'barrel', i:6, j:0}, {type:'barrel', i:5, j:0}, {type:'bench', i:1, j:4}],
+  wheatsheaf: CROOM('The Wheatsheaf',7,6,'village','fromTavern', ()=>[{type:'stash', i:1, j:0}, {type:'hearth', i:0, j:2}, {type:'table', i:2, j:1}, {type:'table', i:4, j:2}, {type:'counter', i:6, j:1, fp:[1,3]}, {type:'barrel', i:6, j:0}, {type:'barrel', i:5, j:0}, {type:'bench', i:1, j:4}],
     ()=>[ { id:'bertha', name:'Bertha of the Wheatsheaf', i:6, j:4, dir:1, opts:{gender:'f',skin:1,hair:4,hairColor:8,face:0,equip:{head:null,torso:'smock',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}} },
       { id:'gunnar', name:'Gunnar the Ploughman', i:3, j:1, dir:1, opts:{gender:'m',skin:2,hair:1,hairColor:3,beard:4,face:1,equip:{head:null,torso:'shirt',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}} },
       ...(nightAmt()>0.4 ? [{ id:'tobbpub', name:'Old Tobb', i:4, j:3, dir:0, sit:true, opts:{gender:'m',skin:2,hair:2,hairColor:12,beard:4,face:1,equip:{head:'hood',torso:'smock',armor:null,hands:'gloves',legs:'hose_grey',feet:'boots',weapon:null,offhand:null}} }] : []) ]),
@@ -9972,7 +10003,10 @@ function openInventory(){
   dollDir=player.dir||0;
   invOverlay.classList.add('open'); refreshInventory();
 }
-function closeInventory(){ invOverlay.classList.remove('open'); invMsg.textContent=''; }
+function closeInventory(){ invOverlay.classList.remove('open'); invMsg.textContent=''; if(STASH_OPEN){ STASH_OPEN=false; invOverlay.classList.remove('stashing'); if(typeof saveGame==='function') saveGame(); } }
+function openStash(){ STASH_OPEN=true; stashArr(); openInventory(); if(!invOverlay.classList.contains('open')){ STASH_OPEN=false; return; } invOverlay.classList.add('stashing');
+  const cap=stashCap(); document.querySelectorAll('#stash-grid .slot').forEach(el=>{ el.style.display = +el.dataset.key<cap ? '' : 'none'; });
+  const lb=document.querySelector('#stash-box .menu-label'); if(lb) lb.textContent='The Wheatsheaf Crate ('+stashArr().slice(0,cap).filter(Boolean).length+'/'+cap+')'; refreshInventory(); }
 function toggleInventory(){ invOverlay.classList.contains('open') ? closeInventory() : openInventory(); }
 
 // ── drag & drop (pointer events, so it also works on touch) ──
@@ -10165,7 +10199,7 @@ let lastRenown=-1;
 function renownDone(){ try{ return JOURNAL.filter(([t,f])=>{ if(t==='The Fallen Oak') return false; const r=f(); return r && r[0]==='done'; }).length; }catch(e){ return 0; } }
 function renownRank(){ return Math.min(RENOWN.length-1, Math.floor(renownDone()/3)); }
 function refreshPlayerHp(full){ const rk=renownRank(); if(lastRenown>=0 && rk>lastRenown && running) logMsg('Renown: you are now "'+RENOWN[rk]+'" in the valley. (+4 max HP)','#e8c060'); lastRenown=rk;
-  player.maxHp=maxHpOf(player.opts?player.opts.equip:defaultEquip(),PARRY.hpBase)+rk*4+(CHOICE.moonBless?10:0); if(full||player.hp==null) player.hp=player.maxHp; player.hp=Math.min(player.hp,player.maxHp); }
+  player.maxHp=maxHpOf(player.opts?player.opts.equip:defaultEquip(),PARRY.hpBase)+rk*4+(CHOICE.moonBless?10:0)+(CHOICE.bless||0)*5; if(full||player.hp==null) player.hp=player.maxHp; player.hp=Math.min(player.hp,player.maxHp); }
 
 // ── HUD ──
 const duelHud=document.getElementById('duel-hud'), clog=document.getElementById('combat-log'), cbanner=document.getElementById('combat-banner');
@@ -10672,14 +10706,14 @@ function victory(faction){
     const give=id=>{ const f=free(); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } else logMsg('Inventory is full.','#e0b070'); };
     const coin=(a,b)=>{ const c=a+Math.floor(R()*(b-a+1)); player.purse+=c; updateHud(); logMsg('Loot: '+formatCoin(c),'#e8c060'); };
     if(m.type==='wolf'){ if(R()<0.5) give('raw_meat'); if(m.maxHp>=60 && R()<0.3) give('raw_meat'); if(R()<0.3) give('wolf_fang'); return; }           // meat and teeth, not trousers
-    if(m.type==='lurker'){ if(R()<0.6) coin(3,9); if(R()<0.2){ const pool=LOOT_TIERS[0]; give(pool[Math.floor(R()*pool.length)]); logMsg('…something it swallowed, a while ago.','#a8a080'); } return; }
+    if(m.type==='lurker'){ if(R()<0.4) coin(2,5); if(R()<0.2){ const pool=LOOT_TIERS[0]; give(pool[Math.floor(R()*pool.length)]); logMsg('…something it swallowed, a while ago.','#a8a080'); } return; }
     if(m.opts && m.opts.ghost){ if(R()<0.5) coin(4,12); return; }                // the dead carry nothing but old coin
-    if(m.type==='goblin'){ if(R()<0.5) coin(1,5); if(R()<0.15) give(['apple','apple','bread','raw_meat'][Math.floor(R()*4)]); if(R()<0.2) give(['dagger','hood','shirt','club'][Math.floor(R()*4)]); return; }
+    if(m.type==='goblin'){ if(R()<0.35) coin(1,3); if(R()<0.15) give(['apple','apple','bread','raw_meat'][Math.floor(R()*4)]); if(R()<0.2) give(['dagger','hood','shirt','club'][Math.floor(R()*4)]); return; }
     const gearP=[0.3,0.2,0.12][tier]*(m.daily?0.4:1)*(m.faction==='guard'||m.type==='mage'?0:1);    // rarer the better it is; road toughs who come back every day carry less; guards and mages are handled on their own
     if(R()<gearP){ const pool=LOOT_TIERS[tier]; give(pool[Math.floor(R()*pool.length)]); }
     if(m.type==='mage' && R()<0.2) give(R()<0.65?'robe':'robe_blue');                 // a mage's plain robe, now and then; never the good ones
     if(R()<0.15) give(m.type==='mage'&&R()<0.4 ? 'potion' : tier>=2&&R()<0.2?'potion':R()<0.5?'bread':'apple');
-    if(R()<0.5) coin(2,6+tier*6);
+    if(R()<0.35) coin(1,3+tier*3);
   });
   if(faction==='grey'){
     if(!hasItem('seal')) giveQuestItem('seal');
@@ -10693,7 +10727,7 @@ function victory(faction){
   if(faction==='goblins' || faction==='gobwarren'){ const coin=(faction==='gobwarren'?14:4)+Math.floor(Math.random()*8); player.purse+=coin; logMsg('Goblin pockets: '+formatCoin(coin)+', a button, and a very old sausage.','#e8c060');
     if(faction==='gobwarren'){ remember('gob','fought','Snagtooth\'s warren is broken.');
       if(!['returned','kept'].includes(CHOICE.poolq) && !collectedPickups.has('warren:10,8') && !hasItem('brooch')){ collectedPickups.add('warren:10,8'); giveQuestItem('brooch',true); logMsg('Snagtooth had a silver brooch pinned inside his helmet. You take it.','#d8c890'); } } }
-  if(faction==='highway'){ const coin=12+Math.floor(Math.random()*10); player.purse+=coin; logMsg('The highwayman\'s purse: '+formatCoin(coin)+'.','#e8c060'); }
+  if(faction==='highway'){ const coin=4+Math.floor(Math.random()*6); player.purse+=coin; logMsg('The highwayman\'s purse: '+formatCoin(coin)+'.','#e8c060'); }
   if(faction==='wild2') logMsg('Greymaw\'s orphans are dead. You left them to become this.','#c8a0e0');
   if(faction==='camp'){
     const coin=15+Math.floor(Math.random()*12); player.purse+=coin; logMsg('In Mara\'s strongbox: '+formatCoin(coin)+'.','#e8c060');
@@ -11396,7 +11430,7 @@ Object.assign(TALKERS,{ orvell:orvellTalk, tessaly:tessalyTalk });
 
 // ════════ The Crystal Cave: a small dungeon of puzzles beneath the goblin warren ════════
 const PZ=()=> (CHOICE.puz=CHOICE.puz||{});
-const PUZ_TYPES=new Set(['block','water','thorns','crystal','rune','gate']);
+const PUZ_TYPES=new Set(['block','water','thorns','crystal','rune','gate','stash']);
 let pendingPuz=null;
 wrap('warren','objects',l=>[...l.filter(o=>!(o.type==='bones'&&o.i===5&&o.j===2)),{type:'teleporter', i:6, j:1, to:'cave1', entry:'fromWarren'},{type:'bones', i:8, j:3, noblock:true}]);   // the way in is the cave mouth itself
 AREAS.warren.entries.fromCave={i:6,j:2};
@@ -11451,6 +11485,7 @@ function pzRebuild(){ blocked.clear(); [...OBJECTS,...NPCS].forEach(o=>{ if(o.ty
   const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) blocked.add((o.i+a)+','+(o.j+b)); }); }
 function pzSay(t,col){ floatText(tileOf(player),t,col||'#e8d8a8'); logMsg(t,col||'#e8d8a8'); }
 function puzAct(o){
+  if(o.type==='stash'){ openStash(); return; }
   const P=PZ(), di=o.i-player.i, dj=o.j-player.j;
   if(o.type==='rune'){ say('An Inscription',o.text,[bye]); return; }
   if(o.type==='gate'){ pzSay('The gate is shut fast. Something in this room must open it.'); return; }
@@ -11864,7 +11899,7 @@ const ITEM_STATS={ moon_amulet:{agi:2,magic:3}, robe:{hp:1,magic:1}, robe_blue:{
   hood:{hp:2}, elf_circlet:{hp:1,agi:1,magic:3}, kettle:{hp:5}, bandana:{hp:1,agi:2}, coif:{hp:3}, helm_full:{hp:8},
   hose_grey:{hp:1,agi:1}, breeches:{hp:2}, elf_leggings:{agi:2,magic:2}, elf_leggings_worn:{agi:2,magic:1} };
 Object.entries(ITEM_STATS).forEach(([id,st])=>{ GEAR_HP[id]=st.hp||0; });
-const gearSum=(k)=>{ const E=(player.opts&&player.opts.equip)||{}; return SLOTS.reduce((a,sl)=>a+((ITEM_STATS[E[sl]]||{})[k]||0),0) + (k==='agi' ? (CHOICE.brannTaught?1:0)+(CHOICE.brannTrap==='done'?1:0) : 0); };   // plus what Brann taught you
+const gearSum=(k)=>{ const E=(player.opts&&player.opts.equip)||{}; return SLOTS.reduce((a,sl)=>a+((ITEM_STATS[E[sl]]||{})[k]||0),0) + (k==='agi' ? (CHOICE.brannTaught?1:0)+(CHOICE.brannTrap==='done'?1:0) : 0) + (k==='ap' ? (CHOICE.temper||0) : k==='magic' ? (CHOICE.attune||0) : 0); };   // plus what Brann taught you, and what you paid to be trained in
 const AGI_DODGE=0.05;                                     // each point of agility: 5% to dodge a blow outright
 { const oldH=hurtPlayer; hurtPlayer=function(n,label){ const agi=gearSum('agi');
     if(n>0 && agi>0 && !combat.practice && Math.random()<agi*AGI_DODGE){ floatText(tileOf(player),'Dodge!','#a8e0ff',true); player.flash=0.15; return; }
@@ -12899,6 +12934,55 @@ JOURNAL.push(['The Sunken Forge', ()=> !(visitedAreas.emberpass) ? null : CHOICE
     : !CHOICE.warden ? "You took the Fire Blade from the Flamesworn captain. Somewhere west, in the Sunken Forge, something guards the old smithy."
     : "Ilka, the forge spirit, will wake the Fire Blade if you bring it and three ember cores ("+coreCount()+"/3). They form where lava cools; the ash hounds swallow them."]]);
 Object.assign(CHOICE,{ fireBlade:CHOICE.fireBlade??null, warden:CHOICE.warden??null, ilka:CHOICE.ilka??null, emberbrand:CHOICE.emberbrand??null });
+
+// ════════════════════════════════════════════════════════════
+//  ECONOMY: less coin from repeatable sources, and lasting things to spend it on
+//   · Oswin tempers your gear (+1 Attack Power), Orvell attunes you (+1 Spell Power),
+//     Mother Hild blesses you (+5 Health). Each rank costs twice the last: 40, 80, 160 ... six ranks.
+//   · Bertha makes room in your crate: 12 slots, then +6 for 60, 150, 300 copper.
+// ════════════════════════════════════════════════════════════
+const TRAINING={
+  smith:  { key:'temper', who:'Oswin the Armourer', label:'Have Oswin temper your gear', stat:'+1 Attack Power',
+            lines:r=>["Oswin turns your gear over in his black hands, tutting at every nick.", r?`“Back again? I can always find another edge. Costs more each time, mind. Good steel is patient work.”`:"“I can take the burrs out of all this. Rebalance the blade, tighten the rivets. You'll hit harder for it.”"] },
+  orvell: { key:'attune', who:'Magister Orvell', label:'Ask Orvell to attune you', stat:'+1 Spell Power',
+            lines:r=>["Orvell peers at you over his spectacles as if you were an interesting stain.", "“Magic runs through you like water through a bad pipe. I can clear some of the rust. It is tedious, and I charge for tedium.”"] },
+  priest: { key:'bless', who:'Mother Hild', label:'Ask Mother Hild for a blessing', stat:'+5 Health',
+            lines:r=>["Mother Hild sets down her broom and takes both your hands.", "“A blessing is a gift, child. The candles, the oil, the hours on my knees: those are not. For the chapel roof, you understand.”"] } };
+const TRAIN_MAX=6, trainCost=r=>40*Math.pow(2,r);
+function trainTalk(id){ const T=TRAINING[id], r=CHOICE[T.key]||0, cost=trainCost(r), back=()=>TALKERS[id]();
+  if(r>=TRAIN_MAX){ say(T.who,[...T.lines(r),"“There's nothing more I can do for you. You are as good as my craft can make you.”"],[{label:'Back.',fn:back},bye]); return; }
+  say(T.who,[...T.lines(r),`<i>Rank ${r} of ${TRAIN_MAX}. The next rank gives ${T.stat} for ${formatCoin(cost)}.</i>`],[
+    {label:`Pay ${formatCoin(cost)}. (${T.stat})`, off:player.purse<cost, note:'-'+formatCoin(cost), fn:()=>{ player.purse-=cost; CHOICE[T.key]=r+1; refreshPlayerHp(false); updateHud();
+      logMsg(`${T.who}: rank ${r+1}. ${T.stat}.`,'#e8c060'); if(typeof saveGame==='function') saveGame(); trainTalk(id); }},
+    {label:'Back.',fn:back}, bye],true); }
+const STASH_UPS=[60,150,300];
+function crateTalk(){ const u=CHOICE.stashUp||0, cost=STASH_UPS[u];
+  if(cost==null){ say('Bertha of the Wheatsheaf',"“Your crate's the biggest one in the cellar already. Any bigger and I'd be renting you the cellar.”",[{label:'Back.',fn:TALKERS.bertha},bye]); return; }
+  say('Bertha of the Wheatsheaf',[`“Your crate holds ${stashCap()} things. For ${formatCoin(cost)} I'll knock a second one onto it. Six more spaces.”`],[
+    {label:`Pay ${formatCoin(cost)}. (+6 crate spaces)`, off:player.purse<cost, note:'-'+formatCoin(cost), fn:()=>{ player.purse-=cost; CHOICE.stashUp=u+1; updateHud(); logMsg('Your crate at the Wheatsheaf now holds '+stashCap()+' things.','#e8c060'); crateTalk(); }},
+    {label:'Back.',fn:TALKERS.bertha}, bye],true); }
+// each of them gets one more line in their usual talk
+[['smith',()=>trainTalk('smith'),()=>TRAINING.smith.label],['orvell',()=>trainTalk('orvell'),()=>TRAINING.orvell.label],['priest',()=>trainTalk('priest'),()=>TRAINING.priest.label],
+ ['bertha',crateTalk,()=>'“Can my crate in the cellar hold more?”']].forEach(([id,fn,label])=>{ const old=TALKERS[id]; if(!old) return;
+  TALKERS[id]=(...a)=>{ const r=old(...a); const box=document.getElementById('dlg-opts');
+    if(dlgOverlay.classList.contains('open') && box && !box.querySelector('.dlg-opt.train')){ const b=document.createElement('button'); b.className='dlg-opt train';
+      b.innerHTML=`<span>${label()}</span>`; b.addEventListener('click',fn); box.insertBefore(b,box.lastElementChild); }
+    return r; }; });
+{ const oldP=refreshStatPanel; refreshStatPanel=function(){ oldP(); const panel=document.getElementById('stat-panel'); if(!panel||!player.opts) return;
+    const t=[CHOICE.temper&&('Tempered '+CHOICE.temper),CHOICE.attune&&('Attuned '+CHOICE.attune),CHOICE.bless&&('Blessed '+CHOICE.bless)].filter(Boolean);
+    if(t.length) panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Training</b><span>${t.join(' · ')}</span></div>`); }; }
+
+// ════════ RESPAWNS: ordinary foes come back a day after you kill them; story foes stay dead ════════
+const RESPAWNS=new Set(['Forest Wolf','Mist Wolf','Pale Mist Wolf','Barrow Wolf','Old Barrow Wolf','Hungry Wolf','Ridge Wolf','Night Wolf','Prowling Wolf','Lean Wolf',
+  'Goblin Sneak','Goblin Stabber','Bog Lurker','Mire Lurker','Ash Hound','Ash Hound Alpha','Road Thief','Timber Wolf','Timber Wolf Bitch']);
+const RESPAWN_AFTER=DAY_LEN;               // one full day
+{ const oldRM=resetMobs; resetMobs=function(){ oldRM(); const D=CHOICE.deadAt||{}, A=AREAS[areaId]; if(A.mobsGone && A.mobsGone()) return;   // (an old corpse is marked gone; that is fine)
+    mobs.forEach(m=>{ if(!m.dead || !RESPAWNS.has(m.name)) return; const k=areaId+':'+m.key, at=D[k];
+      if(at==null || dayClock-at<RESPAWN_AFTER) return;
+      defeatedMobs.delete(k); delete D[k]; Object.assign(m,{dead:false, gone:false, fade:1, hp:m.maxHp, state:'guard', hostile:!(A.mobsCalm&&A.mobsCalm()), fallT:0, t:0, k:0, flash:0, st:[]}); }); }; }
+// a few more things to hunt
+wrap('road','mobs',l=> nightAmt()<0.3 ? [...l,{ name:'Road Thief', type:'bandit', i:9, j:3, faction:'roadthief', opts:BANDIT({skin:1,hair:1,hairColor:2,beard:1,equip:{head:'hood',torso:'shirt',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:'club',offhand:null}}) }] : l);
+wrap('wolfwood','mobs',l=> nightAmt()>0.5 && (QUEST.wolves||0)>=2 ? [...l,{ name:'Timber Wolf', type:'wolf', i:3, j:3, faction:'timber', coat:'#5a524a' },{ name:'Timber Wolf Bitch', type:'wolf', i:4, j:5, faction:'timber', coat:'#6e665a' }] : l);
 </script>
 </body>
 </html>

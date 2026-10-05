@@ -7461,6 +7461,7 @@ function draw(){
   NPCS.forEach(n=>{ const nx=n.x??n.i+0.5, ny=n.y??n.j+0.5; if(!onScr(nx,ny,80,200)) return; items.push({d:nx+ny+0.01, fn:()=>drawNPC(n), ax:nx, ay:ny}); });
   mobs.forEach(m=>{ if(!m.gone) items.push({d:m.x+m.y+0.01, fn:()=>drawActor(m), ax:m.x, ay:m.y}); });
   items.push({d:player.x+player.y+0.01, fn:()=>drawActor(player), ax:player.x, ay:player.y});
+  if(typeof skelDrawItems==='function') skelDrawItems(items);
   // big footprints (the cottage): someone is in front only once past its near edges, behind otherwise
   OBJECTS.forEach(o=>{ if(!o.fp || o.flat) return; const hd=o.i+o.j+o.fp[0]+o.fp[1]-1.2;
     items.forEach(it=>{ if(it.ax===undefined) return;
@@ -11336,75 +11337,137 @@ const HEX_SPELLS = { up:  { name:'Drain', col:'#8ae07a', rgb:'140,230,120', cost
                      right:{ name:'Wither', col:'#b07ad0', rgb:'170,110,200', cost:20, dmg:3, fx:f=>addStatus(f,'weak',5,0) } };
 const NECRO_STAVES=['staff_hex','staff_bone','staff_bog','staff_barrow'];
 const spellsFor=()=> NECRO_STAVES.includes(player.opts&&player.opts.equip.weapon) ? HEX_SPELLS : SPELLS;
-let SKEL=null;                                   // the risen skeleton: fights beside you for a while, then falls apart
+let SKEL=null, SKEL_PILES=[];                    // the risen skeleton: fights beside you, follows you a while after, then falls into a heap of bones
+const SKEL_PILE_LIFE=60;                         // seconds a fallen heap lies there before it sinks away
 const SPM=()=>((WEAPONS[player.opts&&player.opts.equip.weapon]||{}).magic||1)*(1+(typeof gearSum==='function'?gearSum('magic'):0)*0.04);   // staff × gear: each point of spell power on your gear adds 6%   // spell power, as a multiplier
-function raiseSkeleton(f){ const m=SPM(); SKEL={t:Math.round(9*m*10)/10, max:Math.round(9*m*10)/10, dmg:Math.max(2,Math.round(3*m)), cd:0.9, hits:0, anim:0, rise:0, crumble:0}; floatText(tileOf(player),'The dead rise!','#e8e4d0'); logMsg('Bones claw their way out of the earth and turn on your foe.','#e8e4d0'); }
+function raiseSkeleton(f){ const m=SPM(), T=Math.round(9*m*10)/10, fx=f?f.x-player.x:1, fy=f?f.y-player.y:0, fl=Math.hypot(fx,fy)||1;
+  SKEL={x:player.x-fy/fl*0.95+fx/fl*0.25, y:player.y+fx/fl*0.95+fy/fl*0.25, t:T, max:T, dmg:Math.max(2,Math.round(3*m)), cd:0.6, anim:0, asm:0, crumble:0, walk:0, moving:false, dir:f?dirFromDelta(f.x-player.x,f.y-player.y):0, fought:true};
+  floatText(tileOf(player),'The dead rise!','#e8e4d0'); logMsg('Bones claw their way out of the earth, knit themselves together and turn on your foe.','#e8e4d0'); }
+function crumbleSkel(){ const S=SKEL; if(!S || S.crumble) return; S.crumble=1; S.asm=Math.min(S.asm,1);
+  floatText([Math.floor(S.x),Math.floor(S.y)],'The bones fall apart','#a8a490'); }
 // withered foes hit for half
 { const oldHP=hurtPlayer; hurtPlayer=function(n,label,...r){ if(n>0 && combat.foe && hasStatus(combat.foe,'weak')) n=Math.max(1,Math.ceil(n*0.5)); return oldHP(n,label,...r); }; }
 { const oldCU=combatUpdate; combatUpdate=function(dt){ const r=oldCU(dt);
-    if(SKEL){ if(!combat.active || combat.practice){ SKEL=null; return r; }
-      SKEL.rise=Math.min(1,SKEL.rise+dt*2.5); SKEL.anim=Math.max(0,SKEL.anim-dt);
-      if(SKEL.crumble>0){ SKEL.crumble+=dt; if(SKEL.crumble>0.8) SKEL=null; return r; }
-      SKEL.t-=dt; const f=combat.foe;
-      if(SKEL.t<=0){ SKEL.crumble=0.001; floatText(tileOf(player),'The bones fall apart','#a8a490'); return r; }
-      if(f && !f.dead && combat.phase==='fight' && SKEL.rise>=1){ SKEL.cd-=dt; if(SKEL.cd<=0){ SKEL.cd=1.5; SKEL.anim=0.3; wound(f,SKEL.dmg||3,'Bones!','#e8e4d0'); } } }
+    SKEL_PILES.forEach(p=>p.age+=dt); SKEL_PILES=SKEL_PILES.filter(p=>p.age<SKEL_PILE_LIFE && p.area===areaId);
+    const S=SKEL; if(!S) return r;
+    S.anim=Math.max(0,S.anim-dt);
+    if(S.crumble){ S.asm-=dt*1.5; if(S.asm<=0.25){ SKEL_PILES.push({x:S.x,y:S.y,dir:S.dir,age:0,area:areaId}); SKEL=null; } return r; }   // falls into a heap that lies there like any body
+    S.asm=Math.min(1,S.asm+dt/1.5);                                                  // out of the ground, then bone by bone
+    if(!combat.active && combat.phase==='down'){ crumbleSkel(); return r; }          // you fell: so does it
+    if(combat.active) S.fought=true;
+    else if(S.fought){ S.fought=false; S.t=Math.max(S.t,12); S.max=Math.max(S.max,S.t); logMsg('Your skeleton rattles along behind you until the magic runs out.','#e8e4d0'); }
+    S.t-=dt*(combat.active?1:0.5);                                                   // between fights the magic drains slower
+    if(S.t<=0){ crumbleSkel(); return r; }
+    const f=combat.active?combat.foe:null; let tx=S.x, ty=S.y;
+    if(S.asm>=1){
+      if(f && !f.dead){ const fx=f.x-player.x, fy=f.y-player.y, fl=Math.hypot(fx,fy)||1; tx=player.x-fy/fl*0.95+fx/fl*0.25; ty=player.y+fx/fl*0.95+fy/fl*0.25; }   // beside you, flanking the foe
+      else { const dx=S.x-player.x, dy=S.y-player.y, d=Math.hypot(dx,dy)||1; if(d>1.3){ tx=player.x+dx/d*1.05; ty=player.y+dy/d*1.05; } } }   // a step behind you, wherever you go
+    const mx=tx-S.x, my=ty-S.y, md=Math.hypot(mx,my), sp=Math.min(md,dt*Math.max(2.2,md*3));
+    S.moving=md>0.04; if(md>0.001){ S.x+=mx/md*sp; S.y+=my/md*sp; }
+    if(S.moving) S.walk+=dt*Math.min(12,6+sp/dt*1.5);
+    if(f && !f.dead) S.dir=dirFromDelta(f.x-S.x,f.y-S.y); else if(S.moving && md>0.08) S.dir=dirFromDelta(mx,my);   // faces its foe, or the way it walks
+    if(f && !f.dead && combat.phase==='fight' && S.asm>=1 && md<0.5){ S.cd-=dt; if(S.cd<=0){ S.cd=1.5; S.anim=0.3; wound(f,S.dmg||3,'Bones!','#e8e4d0'); } }
     return r; }; }
-{ const oldOver2=drawCombatOver; drawCombatOver=function(){ oldOver2(); if(!SKEL || !combat.active) return;
-    const f=combat.foe, fx=f?f.x-player.x:1, fy=f?f.y-player.y:0, fl=Math.hypot(fx,fy)||1, base=P(player.x-fy/fl*0.95+fx/fl*0.25,player.y+fx/fl*0.95+fy/fl*0.25), tgt=f?P(f.x,f.y):base,   /* beside you, flanking the foe */ k=SKEL.anim>0?Math.sin((0.3-SKEL.anim)/0.3*Math.PI)*0.35:0;
-    const x=base.x+(tgt.x-base.x)*k, y=base.y+(tgt.y-base.y)*k, rise=SKEL.rise, cr=SKEL.crumble;
-    g.save(); g.globalAlpha=cr>0?Math.max(0,1-cr/0.8):1; g.beginPath(); g.rect(x-50,y-125,100,125+(rise<1?0:6)); g.clip();
-    const yy=y+(1-rise)*96+(cr>0?cr*24:0), B='#ad9c72', D='#3e3426';            // human height: skull at the head, hips at the waist
-    g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(x,y+2,13,4.5,0,0,Math.PI*2); g.fill();
-    g.strokeStyle=B; g.lineCap='round'; g.lineJoin='round';
-    const L=(pts,w)=>{ g.lineWidth=w; g.beginPath(); pts.forEach(([a1,b1],i)=>i?g.lineTo(x+a1,yy+b1):g.moveTo(x+a1,yy+b1)); g.stroke(); };
-    const sw=Math.sin(gt*3)*0.8, bob=Math.sin(gt*2.2)*0.6;
-    // a real skeleton at a person's size: head as big as anyone's here, shoulders, ribs, pelvis, two-boned shins and forearms
-    const bone=(x1,y1,x2,y2,w)=>{ g.strokeStyle=D; g.lineWidth=w+1.1; g.beginPath(); g.moveTo(x+x1,yy+y1); g.lineTo(x+x2,yy+y2); g.stroke(); g.strokeStyle=B; g.lineWidth=w; g.stroke();
-      g.fillStyle=B; [[x1,y1],[x2,y2]].forEach(([a1,b1])=>{ g.beginPath(); g.arc(x+a1,yy+b1,w*0.75,0,Math.PI*2); g.fill(); }); };   // knobbed ends
-    const pair=(x1,y1,x2,y2,w)=>{ const dx=x2-x1, dy=y2-y1, l=Math.hypot(dx,dy)||1, nx=-dy/l*0.9, ny=dx/l*0.9; bone(x1+nx,y1+ny,x2+nx,y2+ny,w); bone(x1-nx,y1-ny,x2-nx,y2-ny,w*0.8); };   // radius & ulna, tibia & fibula
-    // legs
-    [-1,1].forEach(k2=>{ const hx=k2*5.6, kx=k2*5.4, ax=k2*5.2;
-      bone(hx,-45,kx,-21,2.8); g.fillStyle=B; g.beginPath(); g.ellipse(x+kx,yy-20.5,2.3,1.9,0,0,Math.PI*2); g.fill();   // femur, kneecap
-      pair(kx,-19,ax,-7,1.7);
-      g.strokeStyle=B; g.lineWidth=1.4; for(let t=0;t<3;t++){ g.beginPath(); g.moveTo(x+ax-1+t*0.9,yy-6); g.lineTo(x+ax+k2*1.6+t*1.4-1,yy+0.6); g.stroke(); } });      // the little bones of the feet
-    // pelvis: two wings and the hollow
-    g.fillStyle=B; g.strokeStyle=D; g.lineWidth=0.7; [-1,1].forEach(k2=>{ g.beginPath(); g.moveTo(x+k2*1.2,yy-50); g.quadraticCurveTo(x+k2*10.5,yy-53,x+k2*9.5,yy-46.5); g.quadraticCurveTo(x+k2*7,yy-42.5,x+k2*2.2,yy-43); g.closePath(); g.fill(); g.stroke(); });
-    g.fillStyle='rgba(20,16,12,0.85)'; [-1,1].forEach(k2=>{ g.beginPath(); g.ellipse(x+k2*4.6,yy-46.6,1.6,1.3,0,0,Math.PI*2); g.fill(); });
-    // spine
-    for(let v=-50; v>-66; v-=2.1){ g.fillStyle=B; g.beginPath(); g.ellipse(x,yy+v+bob*0.3,1.6,0.95,0,0,Math.PI*2); g.fill(); g.strokeStyle=D; g.lineWidth=0.4; g.stroke(); }
-    // ribcage: sternum and seven curved ribs, wide as a chest
-    g.strokeStyle=B; g.lineCap='round';
-    for(let r2=0;r2<7;r2++){ const ry=-62+r2*2.15+bob*0.3, rw=12.2-Math.abs(r2-2.2)*0.95-(r2>4?1.2:0); g.lineWidth=1.25;
-      g.beginPath(); g.moveTo(x-0.6,yy+ry-0.6); g.quadraticCurveTo(x-rw-0.4,yy+ry-0.2,x-rw*0.78,yy+ry+3.2); g.moveTo(x+0.6,yy+ry-0.6); g.quadraticCurveTo(x+rw+0.4,yy+ry-0.2,x+rw*0.78,yy+ry+3.2); g.stroke(); }
-    bone(0,-63,0,-52.5,1.6);                                                                                   // sternum
-    bone(-12.6,-62.6,-1.8,-64.2,1.5); bone(1.8,-64.2,12.6,-62.6,1.5);                                          // collarbones
-    g.fillStyle=B; [-1,1].forEach(k2=>{ g.beginPath(); g.arc(x+k2*12.8,yy-62.4,2.4,0,Math.PI*2); g.fill(); });   // shoulder knobs
-    // the off arm hangs; the sword arm swings
-    bone(-12.8,-62,-14.6,-46+sw,2.3); pair(-14.6,-45+sw,-14.2,-33+sw,1.4); g.fillStyle=B; g.beginPath(); g.ellipse(x-14.1,yy-31+sw,2.2,2.6,0,0,Math.PI*2); g.fill();
-    const ex=15+k*5, ey=-46-k*13, hx=17+k*11, hy=-33-k*25;
-    bone(12.8,-62,ex,ey,2.3); pair(ex,ey+1,hx,hy,1.4); g.fillStyle=B; g.beginPath(); g.ellipse(x+hx,yy+hy+1,2.2,2.6,0,0,Math.PI*2); g.fill();
-    g.strokeStyle='#7a6a58'; g.lineWidth=2.4; g.beginPath(); g.moveTo(x+hx,yy+hy); g.lineTo(x+hx+9+k*7,yy+hy-21+k*5); g.stroke();   // a rusted old blade
-    g.strokeStyle='#4a3a2a'; g.lineWidth=1.8; g.beginPath(); g.moveTo(x+hx-2.6,yy+hy+1.4); g.lineTo(x+hx+2.6,yy+hy-1.4); g.stroke();
-    // neck and a skull as big as a living head
-    bone(0,-66,0,-68.5,1.8);
-    g.fillStyle=B; g.strokeStyle=D; g.lineWidth=0.8; g.beginPath(); g.ellipse(x,yy-81+bob,9.8,11,0,0,Math.PI*2); g.fill(); g.stroke();   // cranium
-    g.beginPath(); g.moveTo(x-7.6,yy-75+bob); g.quadraticCurveTo(x-7.4,yy-69+bob,x-3.4,yy-67.6+bob); g.lineTo(x+3.4,yy-67.6+bob); g.quadraticCurveTo(x+7.4,yy-69+bob,x+7.6,yy-75+bob); g.closePath(); g.fill(); g.stroke();   // cheekbones and jaw
-    g.fillStyle='#120e0a'; [-1,1].forEach(k2=>{ g.beginPath(); g.ellipse(x+k2*3.8,yy-80+bob,2.9,3.3,k2*0.15,0,Math.PI*2); g.fill(); });   // deep eye sockets
-    g.beginPath(); g.moveTo(x,yy-76.6+bob); g.lineTo(x-1.4,yy-73.2+bob); g.lineTo(x+1.4,yy-73.2+bob); g.closePath(); g.fill();          // the nose hole
-    g.fillStyle=B; g.fillRect(x-4.4,yy-71.6+bob,8.8,2.8); g.strokeStyle='#4a4234'; g.lineWidth=0.4; for(let t=-3.6;t<=3.7;t+=1.2){ g.beginPath(); g.moveTo(x+t,yy-71.6+bob); g.lineTo(x+t,yy-68.8+bob); g.stroke(); }   // teeth
-    g.strokeStyle=D; g.lineWidth=0.4; g.beginPath(); g.moveTo(x-2,yy-91+bob); g.quadraticCurveTo(x+1,yy-87+bob,x-0.5,yy-84.5+bob); g.stroke();   // an old crack
-    // centuries in the ground: grave-dirt in every joint, moss on the shoulders, a rag of a shroud, a cobweb in one eye
-    g.fillStyle='rgba(58,44,26,0.55)'; [[-5.4,-21],[5.4,-21],[0,-46],[-12.8,-62],[12.8,-62],[-5.2,-7],[5.2,-7],[0,-58],[-6,-81],[4,-86]].forEach(([a1,b1],q)=>{ g.beginPath(); g.ellipse(x+a1,yy+b1+(b1<-70?bob:0),2.6+(q%3)*0.7,1.8+(q%2),q*0.7,0,Math.PI*2); g.fill(); });
-    g.save(); g.globalCompositeOperation='source-atop'; g.restore();
-    g.strokeStyle='rgba(52,40,24,0.5)'; g.lineWidth=1.6; [[-6,-60,-5,-48],[5,-62,6,-50],[-5.5,-40,-5.2,-24],[5.6,-42,5.2,-26],[-5.2,-18,-5,-9],[5.4,-17,5,-9],[-14,-56,-14.4,-40],[3,-90,4,-78]].forEach(([a1,b1,a2,b2])=>{ g.beginPath(); g.moveTo(x+a1,yy+b1+(b1<-75?bob:0)); g.lineTo(x+a2,yy+b2+(b2<-75?bob:0)); g.stroke(); });   // streaks of old earth
-    g.fillStyle='rgba(84,98,46,0.7)'; [[-12,-63.6,3,1.4],[11.4,-64,2.2,1.2],[-4,-89+bob,3.4,1.6]].forEach(([a1,b1,rx,ry])=>{ g.beginPath(); g.ellipse(x+a1,yy+b1,rx,ry,0.3,0,Math.PI*2); g.fill(); });
-    g.fillStyle='rgba(70,62,46,0.85)'; g.beginPath(); g.moveTo(x-8,yy-49); g.lineTo(x+6,yy-50); g.lineTo(x+4,yy-38); g.lineTo(x+1.5,yy-42); g.lineTo(x-1,yy-35); g.lineTo(x-3.5,yy-41); g.lineTo(x-7,yy-37); g.closePath(); g.fill();   // the last of the shroud, round the hips
-    g.fillStyle='#120e0a'; [[-2.4],[1.2],[3.6]].forEach(([t])=>g.fillRect(x+t-0.5,yy-71.6+bob,1.1,2.8));             // missing teeth
-    g.strokeStyle='rgba(220,220,210,0.45)'; g.lineWidth=0.3; g.beginPath(); for(let q=0;q<5;q++){ const a=q*Math.PI/4; g.moveTo(x-3.8,yy-80+bob); g.lineTo(x-3.8+Math.cos(a)*3,yy-80+bob+Math.sin(a)*3.2); } g.stroke();
-    g.strokeStyle=D; g.lineWidth=0.4; g.beginPath(); g.moveTo(x+5,yy-87+bob); g.lineTo(x+6.6,yy-84+bob); g.lineTo(x+5.6,yy-82+bob); g.moveTo(x-9,yy-60); g.lineTo(x-6,yy-58.4); g.stroke();
-    g.globalCompositeOperation='lighter'; glow(x+3.8,yy-80+bob,8,8,'140,230,120',0.55); glow(x-3.8,yy-80+bob,8,8,'140,230,120',0.55);
-    g.restore();
-    if(!cr){ const w=26, r2=Math.max(0,SKEL.t/(SKEL.max||9)); g.fillStyle='rgba(10,8,4,0.8)'; g.fillRect(x-w/2,y-100,w,3); g.fillStyle='#d8d4c0'; g.fillRect(x-w/2,y-100,w*r2,3); } }; }
+// it comes along through doors and gates
+{ const oldSA=switchArea; switchArea=function(id,ek,...r){ const res=oldSA(id,ek,...r); if(SKEL){ if(SKEL.crumble) SKEL=null; else { SKEL.x=player.x+0.7; SKEL.y=player.y+0.35; } } return res; }; }
+// the skeleton as a little model of bones in 3D (x across, y up the screen, z toward you when it faces south), so it can turn to all eight facings like anyone else
+// and its pieces can lie in a real heap on the ground: each group of bones has a resting place in the heap, and flies up into place (or back down) bone by bone
+const SKEL_HEAP=[   // per group: centre, then how it lies in the heap: tipped over x, tipped over z, turned, and where (in degrees and px)
+  [-5.5,-24,0,   0, 90, 25,  -15,-2.5,6],    // 0 one leg, on its side
+  [ 5.5,-24,0,  90,  0,-35,   12,-2.5,-4],   // 1 the other, pointing away
+  [ 0,-45,0,    70,  0, 15,   -1,-5,-8],     // 2 pelvis and the rag of a shroud
+  [ 0,-57,0,     0, 90, 12,   -3,-12,-2],    // 3 spine and ribcage, on its side so the ribs arch up
+  [-14,-46,1.5,  0,-85, 40,  -18,-2,9],      // 4 the hanging arm
+  [ 16,-44,1.5,  0, 95,-50,   19,-2,5],      // 5 the sword arm and its blade
+  [ 0,-79,0,    25,  0, 70,    7,-10,11] ];  // 6 neck and skull, rolled onto one cheek
+function drawSkelFig(x0,y0,o){
+  const B='#ad9c72', D='#3e3426', PI2=Math.PI*2, d=o.dir||0, view=dirView(d), A=VIEW[view].ang*Math.PI/180, ca=Math.cos(A), sa=Math.sin(A);
+  const k=o.k||0, stand=!!o.stand, bob=stand?Math.sin(gt*2.2)*0.6:0, sw=stand?Math.sin(gt*3)*0.8:0, emerge=o.emerge??1;
+  const E=t=>t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2, prog=i=>o.pile?0:clamp01((o.asm-0.25-i*0.07)/0.33), GE=[0,1,2,3,4,5,6].map(i=>E(prog(i)));
+  const rx=(p,t,c)=>{ const y=p[1]-c[1], z=p[2]-c[2]; return [p[0], c[1]+y*Math.cos(t)-z*Math.sin(t), c[2]+y*Math.sin(t)+z*Math.cos(t)]; };
+  // one point of group i: walking, then (if not yet whole) on its way between the heap and its place, then turned to face, then onto the screen
+  const T=(i,p)=>{ const e=GE[i];
+    if(e>=1 && o.moving){ const s=i===0?-1:1, ph=o.walk+(i===0?0:Math.PI);
+      if(i<2) p=rx(p,Math.sin(ph)*0.36,[s*5.6,-45,0]); else if(i===4) p=rx(p,-Math.sin(o.walk)*0.25,[-12.8,-62,0]); }
+    if(i>=3) p=[p[0],p[1]+bob*(i===6?1:0.3),p[2]];
+    if(e<1){ const H=SKEL_HEAP[i], r=t=>t*Math.PI/180; let x=p[0]-H[0], y=p[1]-H[1], z=p[2]-H[2], c, s;
+      c=Math.cos(r(H[3])); s=Math.sin(r(H[3])); [y,z]=[y*c-z*s, y*s+z*c];      // tip over forwards
+      c=Math.cos(r(H[4])); s=Math.sin(r(H[4])); [x,y]=[x*c-y*s, x*s+y*c];      // tip over sideways
+      c=Math.cos(r(H[5])); s=Math.sin(r(H[5])); [x,z]=[x*c+z*s, -x*s+z*c];     // turn on the ground
+      const q=[x+H[6], y+H[7]+(1-emerge)*14, z+H[8]];
+      p= e<=0 ? q : [q[0]+(p[0]-q[0])*e, q[1]+(p[1]-q[1])*e-Math.sin(e*Math.PI)*10, q[2]+(p[2]-q[2])*e]; }
+    const X=p[0]*ca+p[2]*sa, Z=-p[0]*sa+p[2]*ca; return {x:x0+X, y:y0+p[1]+Z*0.32, z:Z}; };
+  const prims=[], add=(i,pts,fn)=>{ const q=pts.map(p=>T(i,p)); prims.push({z:q.reduce((a,b)=>a+b.z,0)/q.length, fn:()=>fn(q)}); };
+  const line=(a,b,w,col)=>{ g.strokeStyle=col; g.lineWidth=w; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); };
+  const bone=(i,a,b,w)=>add(i,[a,b],([p,q])=>{ line(p,q,w+1.1,D); line(p,q,w,B); g.fillStyle=B; [p,q].forEach(r=>{ g.beginPath(); g.arc(r.x,r.y,w*0.75,0,PI2); g.fill(); }); });   // knobbed ends
+  const pair=(i,a,b,w)=>{ bone(i,[a[0]+0.9,a[1],a[2]],[b[0]+0.9,b[1],b[2]],w); bone(i,[a[0]-0.9,a[1],a[2]+0.3],[b[0]-0.9,b[1],b[2]+0.3],w*0.8); };   // radius & ulna, tibia & fibula
+  const knob=(i,p,r1,r2,col)=>add(i,[p],([q])=>{ g.fillStyle=col||B; g.beginPath(); g.ellipse(q.x,q.y,r1,r2,0,0,PI2); g.fill(); });
+  const poly=(i,pts,fill,stroke)=>add(i,pts,q=>{ g.fillStyle=fill; g.beginPath(); q.forEach((r,n)=>n?g.lineTo(r.x,r.y):g.moveTo(r.x,r.y)); g.closePath(); g.fill(); if(stroke){ g.strokeStyle=stroke; g.lineWidth=0.7; g.stroke(); } });
+  const curve=(i,pts,w)=>add(i,pts,q=>{ g.strokeStyle=D; g.lineWidth=w+0.7; const run=()=>{ g.beginPath(); q.forEach((r,n)=>n?g.lineTo(r.x,r.y):g.moveTo(r.x,r.y)); g.stroke(); }; run(); g.strokeStyle=B; g.lineWidth=w; run(); });
+  // legs and feet
+  [-1,1].forEach((s,i)=>{ bone(i,[s*5.6,-45,0],[s*5.4,-21,1],2.8); knob(i,[s*5.4,-20.5,2.8],2.3,1.9);
+    pair(i,[s*5.4,-19,1],[s*5.2,-7,0],1.7);
+    for(let t=0;t<3;t++) bone(i,[s*5.2+(t-1)*1.1,-6,0.4],[s*5.5+(t-1)*1.7,-0.4,4.6],0.9);   // the little bones of the feet
+    knob(i,[s*5.4,-21,3.2],2.2,1.5,'rgba(58,44,26,0.55)'); });                                 // grave-dirt in the knee
+  // pelvis: two wings, the hollows, and the last of the shroud before and behind
+  [-1,1].forEach(s=>{ poly(2,[[s*1.2,-50,-1],[s*10,-52.5,0],[s*9.5,-46.5,1],[s*7,-43,2],[s*2.2,-43,2]],B,D); knob(2,[s*4.6,-46.6,2.6],1.6,1.3,'rgba(20,16,12,0.85)'); });
+  poly(2,[[-8,-49,4.6],[6,-50,4.6],[4,-38,5],[1.5,-42,5],[-1,-35,5],[-3.5,-41,5],[-7,-37,5]],'rgba(70,62,46,0.85)');
+  poly(2,[[-7,-50,-3.5],[7,-50,-3.5],[5,-40,-4],[0,-37,-4],[-4,-41,-4]],'rgba(62,54,40,0.85)');
+  // spine, ribs, sternum, collarbones
+  for(let v=-50; v>-66; v-=2.1) add(3,[[0,v,-3]],([q])=>{ g.fillStyle=B; g.beginPath(); g.ellipse(q.x,q.y,1.6,0.95,0,0,PI2); g.fill(); g.strokeStyle=D; g.lineWidth=0.4; g.stroke(); });
+  for(let r2=0;r2<7;r2++){ const ry=-62+r2*2.15, rw=12.2-Math.abs(r2-2.2)*0.95-(r2>4?1.2:0);
+    [-1,1].forEach(s=>curve(3,[[s*0.6,ry-0.6,-3],[s*rw*0.86,ry-0.2,-1.8],[s*rw,ry+1,0.6],[s*rw*0.86,ry+2.6,3],[s*rw*0.5,ry+3.4,4.3]],1.25)); }
+  bone(3,[0,-63,4.6],[0,-52.5,4.6],1.6);
+  [-1,1].forEach(s=>{ bone(3,[s*1.8,-64.2,3.6],[s*12.6,-62.6,0.5],1.5); knob(3,[s*12.8,-62.4,0.8],2.4,2.4); knob(3,[s*12,-63.6,1.4],2.6,1.2,'rgba(84,98,46,0.7)'); });   // shoulder knobs, moss
+  // the off arm hangs; the sword arm swings, and lunges forward when it strikes
+  bone(4,[-12.8,-62,1.5],[-14.6,-46+sw,1],2.3); pair(4,[-14.6,-45+sw,1],[-14.2,-33+sw,2],1.4); knob(4,[-14.1,-31+sw,2.4],2.2,2.6);
+  { const el=[15+k*3,-46-k*13,1.5+k*5], h=[17+k*4,-33-k*25,2.5+k*12], tip=[h[0]+5+k*2,h[1]-21+k*5,h[2]+6+k*6];
+    bone(5,[12.8,-62,1.5],el,2.3); pair(5,[el[0],el[1]+1,el[2]],h,1.4); knob(5,[h[0],h[1]+1,h[2]],2.2,2.6);
+    add(5,[h,tip],([p,q])=>line(p,q,2.4,'#7a6a58'));                                                        // a rusted old blade
+    add(5,[[h[0]-2.6,h[1]+1.4,h[2]+0.2],[h[0]+2.6,h[1]-1.4,h[2]+0.2]],([p,q])=>line(p,q,1.8,'#4a3a2a')); }
+  // neck and a skull as big as a living head; what of its face you see depends on which way it looks
+  bone(6,[0,-66,-1],[0,-68.5,-1],1.8);
+  let skullE=GE[6];
+  { const C=T(6,[0,-81,0]), F=T(6,[0,-81,10]), face=(F.z-C.z)/10, P3=p=>T(6,p);
+    prims.push({z:C.z, fn:()=>{
+      const jaw=()=>{ const pts=[]; [-1,1].forEach(s=>pts.push([s*7.6,-75,4.6],[s*7.4,-69,5],[s*3.4,-67.6,7],[s*6.4,-75,-2.5],[s*5.4,-69,0.5],[0,-67.4,7.4],[0,-72,9.4]));   // cheekbones, the jaw's corners and hinges
+        const q=pts.map(P3).sort((a,b)=>a.x-b.x||a.y-b.y), cr=(o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x), lo=[], hi=[];       // its outline from wherever you stand: the hull of those points
+        q.forEach(r=>{ while(lo.length>1&&cr(lo[lo.length-2],lo[lo.length-1],r)<=0) lo.pop(); lo.push(r); }); q.slice().reverse().forEach(r=>{ while(hi.length>1&&cr(hi[hi.length-2],hi[hi.length-1],r)<=0) hi.pop(); hi.push(r); });
+        const h=lo.slice(0,-1).concat(hi.slice(0,-1)); g.fillStyle=B; g.strokeStyle=D; g.lineWidth=0.8; g.beginPath(); h.forEach((r,n)=>n?g.lineTo(r.x,r.y):g.moveTo(r.x,r.y)); g.closePath(); g.fill(); g.stroke(); };
+      const cran=()=>{ g.fillStyle=B; g.strokeStyle=D; g.lineWidth=0.8; g.beginPath(); g.ellipse(C.x+(F.x-C.x)*0.06,C.y,9.8+1.6*Math.sqrt(Math.max(0,1-face*face)),11,0,0,PI2); g.fill(); g.stroke();
+        g.strokeStyle=D; g.lineWidth=0.4; const c1=[[-2,-91,-2],[1,-87,-1],[-0.5,-84.5,0]].map(P3); g.beginPath(); g.moveTo(c1[0].x,c1[0].y); g.quadraticCurveTo(c1[1].x,c1[1].y,c1[2].x,c1[2].y); g.stroke();   // an old crack
+        g.fillStyle='rgba(84,98,46,0.7)'; const m=P3([-4,-89,-4]); g.beginPath(); g.ellipse(m.x,m.y,3.4,1.6,0.3,0,PI2); g.fill(); };      // moss on the crown
+      if(face<0){ jaw(); cran(); return; }                                          // seen from behind: the back of the skull
+      cran(); jaw();
+      [-1,1].forEach(s=>{ const e=P3([s*3.8,-81,8.6]), ez=(e.z-C.z)/8.6; if(ez<-0.1) return; g.fillStyle='#120e0a'; g.beginPath(); g.ellipse(e.x,e.y,2.9*Math.max(0.35,Math.min(1,face+0.15)),3.3,s*0.15,0,PI2); g.fill(); });   // deep eye sockets
+      const n=[[0,-77,9.6],[-1.4,-73.6,9.4],[1.4,-73.6,9.4]].map(P3); g.fillStyle='#120e0a'; g.beginPath(); n.forEach((r,i)=>i?g.lineTo(r.x,r.y):g.moveTo(r.x,r.y)); g.closePath(); g.fill();   // the nose hole
+      const tq=[[-4.4,-72,8.4],[4.4,-72,8.4],[4.4,-69.2,8.4],[-4.4,-69.2,8.4]].map(P3); g.fillStyle=B; g.beginPath(); tq.forEach((r,i)=>i?g.lineTo(r.x,r.y):g.moveTo(r.x,r.y)); g.closePath(); g.fill();
+      g.strokeStyle='#4a4234'; g.lineWidth=0.4; for(let t=-3.6;t<=3.7;t+=1.2){ const a=P3([t,-72,8.5]), b=P3([t,-69.2,8.5]); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); }   // teeth
+      g.strokeStyle='#120e0a'; g.lineWidth=1.1; [-2.4,1.2,3.6].forEach(t=>{ const a=P3([t,-72,8.6]), b=P3([t,-69.2,8.6]); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); });   // missing teeth
+      if(!o.pile && skullE>0.6){ g.save(); g.globalCompositeOperation='lighter'; const gl=0.55*(skullE-0.6)/0.4*Math.max(0,face);
+        [-1,1].forEach(s=>{ const e=P3([s*3.8,-81,8.6]); if((e.z-C.z)/8.6>-0.1) glow(e.x,e.y,8,8,'140,230,120',gl); }); g.restore(); } } });   // the green spark in its eyes
+  }
+  // dirt and moss in the joints, which go wherever the bones go
+  [[0,-46,3.5,2],[0,-58,5,3],[-12.8,-62,2.5,3],[12.8,-62,2.5,3]].forEach(([a,b,c,i])=>knob(i,[a,b,c],2.6,1.8,'rgba(58,44,26,0.5)'));
+  // and draw: the earth it climbed out of, its shadow, then every piece from the far side to the near one
+  g.save(); g.globalAlpha=(o.alpha??1)*(emerge<1?emerge:1);
+  if(dirMirrored(d)){ g.translate(x0,0); g.scale(-1,1); g.translate(-x0,0); }
+  if(o.mound>0){ g.fillStyle=`rgba(44,32,18,${0.6*o.mound})`; g.beginPath(); g.ellipse(x0,y0,21,7,0,0,PI2); g.fill();
+    g.fillStyle=`rgba(70,54,32,${0.7*o.mound})`; [[-12,-1],[9,2],[-3,3],[14,-2],[-17,2]].forEach(([a,b],q)=>{ g.beginPath(); g.ellipse(x0+a,y0+b,2.4+q%2,1.4,0,0,PI2); g.fill(); }); }
+  const st=GE[2]; g.fillStyle=`rgba(0,0,0,${0.12+0.18*st})`; g.beginPath(); g.ellipse(x0,y0+2,13+8*(1-st),4.5+2*(1-st),0,0,PI2); g.fill();
+  g.lineCap='round'; g.lineJoin='round';
+  prims.sort((a,b)=>a.z-b.z).forEach(p=>p.fn());
+  g.restore(); }
+function drawSkel(S){ const base=P(S.x,S.y), f=combat.active?combat.foe:null, tgt=f?P(f.x,f.y):base, k=S.anim>0?Math.sin((0.3-S.anim)/0.3*Math.PI)*0.35:0;
+  const x=base.x+(tgt.x-base.x)*k, y=base.y+(tgt.y-base.y)*k, stand=!S.crumble && S.asm>=1;
+  const mound=S.crumble?0:Math.min(1,S.asm*5)*(1-clamp01((S.asm-0.8)/0.2));
+  drawSkelFig(x,y,{asm:S.asm, emerge:S.crumble?1:clamp01(S.asm/0.25), k, stand, moving:S.moving, walk:S.walk, dir:S.dir, mound});
+  if(stand){ const w=26, r2=Math.max(0,S.t/(S.max||9)); g.fillStyle='rgba(10,8,4,0.8)'; g.fillRect(x-w/2,y-100,w,3); g.fillStyle='#d8d4c0'; g.fillRect(x-w/2,y-100,w*r2,3); } }
+// into the world's draw order, so it stands behind and before things and takes the day's light and the night's dark like everyone else
+function skelDrawItems(items){
+  SKEL_PILES.forEach(p=>{ if(p.area!==areaId) return; const a=Math.min(1,(SKEL_PILE_LIFE-p.age)/4);
+    items.push({d:p.x+p.y-0.2, fn:()=>{ const q=P(p.x,p.y); drawSkelFig(q.x,q.y,{pile:true, alpha:a, dir:p.dir}); }}); });
+  if(SKEL) items.push({d:SKEL.x+SKEL.y+0.01, ax:SKEL.x, ay:SKEL.y, fn:()=>drawSkel(SKEL)}); }
 const isMagicWeapon=()=>!!(WEAPONS[player.opts&&player.opts.equip.weapon]||{}).magic;
 let bolts=[];
 { const oldHit=playerHit; playerHit=function(){ const W=WEAPONS[player.opts.equip.weapon]||{}, f=combat.foe;
@@ -13195,6 +13258,12 @@ for(const id of Object.keys(ITEMS)){ const it=ITEMS[id]; if(id.startsWith('w_') 
     const gl=g2.createRadialGradient(6,6,0,6,6,7); gl.addColorStop(0,'rgba(210,230,255,0.9)'); gl.addColorStop(1,'rgba(210,230,255,0)'); g2.fillStyle=gl; g2.fillRect(0,0,13,13);   // top left: the hide toggle sits top right
     g2.strokeStyle='rgba(230,240,255,0.95)'; g2.lineWidth=1; g2.beginPath(); g2.moveTo(6,2); g2.lineTo(6,10); g2.moveTo(2,6); g2.lineTo(10,6); g2.stroke();
     g2.restore(); }; }
+// road bandits and footpads mostly wear the Baron's purple bandana (most days, not every day; the same all day long)
+const ROAD_THUGS=new Set(['roadthief','highway']);
+Object.keys(AREAS).forEach(a=>{ if(typeof AREAS[a].mobs!=='function') return;
+  wrap(a,'mobs',l=>l.map(m=>{ if(!ROAD_THUGS.has(m.faction) || !m.opts || !m.opts.equip || m.opts.equip.head==='bandana') return m;
+    const day=Math.floor(dayClock/DAY_LEN), name=[...m.name].reduce((h,ch)=>h*31+ch.charCodeAt(0)|0,7);
+    return hsh(day+1,name)%4===0 ? m : {...m, opts:{...m.opts, equip:{...m.opts.equip, head:'bandana'}}}; })); });
 </script>
 </body>
 </html>

@@ -10644,7 +10644,8 @@ refreshDuelLabels();
 const FOOLED={};                                         // "area:name" -> true (believed you) / false (saw through you)
 const disguised=()=>!!(player.opts && unWoven(player.opts.equip.head)==='bandana' && !player.opts.hideHelm);
 const isThug=m=>!!(m && m.opts && m.opts.equip && m.opts.equip.head==='bandana' && m.type!=='dummy');
-const calmThug=m=> !!m && m.hostile && !m.dead && disguised() && FOOLED[areaId+':'+m.name]!==false && (isThug(m) || mobs.some(o=>o.faction===m.faction && isThug(o)));   // in the purple, the Baron's crews never start a fight with you: not even their mates without a bandana. Only your own blow ends it
+const calmThug=m=> !!m && m.hostile && !m.dead && disguised() && FOOLED[areaId+':'+m.name]!==false && (isThug(m) || OUTLAWS.has(m.faction) || mobs.some(o=>o.faction===m.faction && isThug(o)));   // in the purple, the Baron's crews never start a fight with you: not even their mates without a bandana. Only your own blow ends it
+const OUTLAWS=new Set(['thieves','unpaid','roadthief','highway']);   // other rough folk: they know the purple, and want no trouble with the Baron's men
 const REFUSED={};                                        // "area:name" -> they've already said no to handing their papers over
 // story items a hired thug is carrying, and how a disguised wanderer might get them off him
 const THUG_CARRY={
@@ -10658,6 +10659,9 @@ const THUG_CARRY={
     price:40, buy:0.55, buyOk:"“Forty for a scrap of paper?” She counts it twice. “Done. Don't tell me what you want it for.”", buyNo:"“Nobody pays forty for paper unless it can hang someone.” She slips the orders into her boot. “No sale.”" } };
 function thugTalk(m){
   const k=areaId+':'+m.name, F=m.opts.gender==='f';
+  if(!isThug(m) && !mobs.some(o=>o.faction===m.faction && isThug(o))){                 // not one of the Baron's crews: just men who know better than to cross them
+    say(m.name,[(F?'She':'He')+" sees the purple on your face and takes a step back.",["“The Baron's dog. We want no trouble with your lot. Walk on.”","“We've paid already this month. Tell your master that.”","“Easy. Nobody here's looking for a fight with the Baron.”","“Go bark somewhere else. We're not your business.”"][hsh(m.i,m.j)%4]],
+      [{label:'Attack '+(F?'her':'him')+'.', fn:()=>{ mobs.filter(o=>o.faction===m.faction).forEach(o=>FOOLED[areaId+':'+o.name]=false); closeDialog(); startCombat(); }},bye]); return; }
   const attack={label:'Attack '+(F?'her':'him')+'.', fn:()=>{ mobs.filter(o=>o.faction===m.faction).forEach(o=>FOOLED[areaId+':'+o.name]=false); closeDialog(); startCombat(); }};
   const QC=THUG_CARRY[m.name];
   if(FOOLED[k]===true && QC && QC.cond()){ const blow=(line)=>{ REFUSED[k]=true; say(m.name,line,[bye]); };
@@ -13265,6 +13269,14 @@ Object.keys(AREAS).forEach(a=>{ if(typeof AREAS[a].mobs!=='function') return;
   wrap(a,'mobs',l=>l.map(m=>{ if(!ROAD_THUGS.has(m.faction) || !m.opts || !m.opts.equip || m.opts.equip.head==='bandana') return m;
     const day=Math.floor(dayClock/DAY_LEN), name=[...m.name].reduce((h,ch)=>h*31+ch.charCodeAt(0)|0,7);
     return hsh(day+1,name)%4===0 ? m : {...m, opts:{...m.opts, equip:{...m.opts.equip, head:'bandana'}}}; })); });
+// in the Baron's purple, the decent folk of the land want nothing to do with you; only his guards and his own people talk to you as before
+const BARON_FOLK=new Set(['recruit','voss','bram','steward','surveyor','stranger','grane','marapits']);
+const PURPLE_SNUBS=["“Leave, or I'll beat the shit out of you.”","“Your kind has no place here.”","“We don't serve the Baron's thugs. Out.”","“Get out before I call the whole street.”","“I've nothing for you. Go back to your master.”","“Take your purple rag and go.”"];
+{ const oldTalk=talkTo; talkTo=function(n){
+    if(combat.active || !n || !disguised() || BARON_FOLK.has(n.id) || /guard/i.test(n.id||'')) return oldTalk(n);
+    if(n.wander){ n.path=[]; n.moving=false; n.wait=4; }
+    n.dir=dirTo([n.i,n.j],tileOf(player)); player.dir=dirTo(tileOf(player),[n.i,n.j]); player.path=[]; player.moving=false;
+    say(n.name,[PURPLE_SNUBS[(hsh((n.id||'').length*7+n.i,n.j)+Math.floor(dayClock/DAY_LEN))%PURPLE_SNUBS.length],"<i>They stare at the purple bandana and will not deal with you while you wear it.</i>"],[bye]); }; }
 </script>
 </body>
 </html>

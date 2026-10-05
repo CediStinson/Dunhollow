@@ -280,6 +280,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0e0b06;color:#e8d5a
   #char-name-input{max-width:none;}
   .opt-basics{flex-wrap:wrap;} .opt-basics .skin-col{flex:1 1 100%;}
 }
+/* ── the skeleton's own weapon slot, tucked under yours ── */
+.slot.skel-slot{width:42px;height:42px;margin:-4px 0 0 7px;border-style:dashed;}
+.slot.skel-slot canvas{width:36px!important;height:36px!important;}
+.slot.skel-slot .lbl{font-size:7px;letter-spacing:0.5px;}
 /* ── the gate: a small sign-in before the game ── */
 #login-screen{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 40%,rgba(255,170,80,0.08),transparent 55%),radial-gradient(ellipse at 50% 80%,#1a1005 0%,#080502 100%);}
 #login-screen.hidden{display:none;}
@@ -11354,7 +11358,7 @@ let SKEL=null, SKEL_PILES=[];                    // the risen skeleton: fights b
 const SKEL_PILE_LIFE=60;                         // seconds a fallen heap lies there before it sinks away
 const SPM=()=>((WEAPONS[player.opts&&player.opts.equip.weapon]||{}).magic||1)*(1+(typeof gearSum==='function'?gearSum('magic'):0)*0.04);   // staff × gear: each point of spell power on your gear adds 6%   // spell power, as a multiplier
 function raiseSkeleton(f){ const m=SPM(), T=Math.round(9*m*10)/10, fx=f?f.x-player.x:1, fy=f?f.y-player.y:0, fl=Math.hypot(fx,fy)||1;
-  SKEL={x:player.x-fy/fl*0.95+fx/fl*0.25, y:player.y+fx/fl*0.95+fy/fl*0.25, t:T, max:T, dmg:Math.max(2,Math.round(3*m)), cd:0.6, anim:0, asm:0, crumble:0, walk:0, moving:false, dir:f?dirFromDelta(f.x-player.x,f.y-player.y):0, fought:true};
+  SKEL={x:player.x-fy/fl*0.95+fx/fl*0.25, y:player.y+fx/fl*0.95+fy/fl*0.25, t:T, max:T, dmg:Math.max(2,Math.round(3*m)), cd:0.6, anim:0, asm:0, crumble:0, walk:0, moving:false, dir:f?dirFromDelta(f.x-player.x,f.y-player.y):0, fought:true, weapon:skelArmsOn()?CHOICE.skelWeapon||null:null};
   floatText(tileOf(player),'The dead rise!','#e8e4d0'); logMsg('Bones claw their way out of the earth, knit themselves together and turn on your foe.','#e8e4d0'); }
 function crumbleSkel(){ const S=SKEL; if(!S || S.crumble) return; S.crumble=1; S.asm=Math.min(S.asm,1);
   floatText([Math.floor(S.x),Math.floor(S.y)],'The bones fall apart','#a8a490'); }
@@ -11364,7 +11368,7 @@ function crumbleSkel(){ const S=SKEL; if(!S || S.crumble) return; S.crumble=1; S
     SKEL_PILES.forEach(p=>p.age+=dt); SKEL_PILES=SKEL_PILES.filter(p=>p.age<SKEL_PILE_LIFE && p.area===areaId);
     const S=SKEL; if(!S) return r;
     S.anim=Math.max(0,S.anim-dt);
-    if(S.crumble){ S.asm-=dt*1.5; if(S.asm<=0.25){ SKEL_PILES.push({x:S.x,y:S.y,dir:S.dir,age:0,area:areaId}); SKEL=null; } return r; }   // falls into a heap that lies there like any body
+    if(S.crumble){ S.asm-=dt*1.5; if(S.asm<=0.25){ SKEL_PILES.push({x:S.x,y:S.y,dir:S.dir,weapon:S.weapon,age:0,area:areaId}); SKEL=null; } return r; }   // falls into a heap that lies there like any body
     S.asm=Math.min(1,S.asm+dt/1.5);                                                  // out of the ground, then bone by bone
     if(!combat.active && combat.phase==='down'){ crumbleSkel(); return r; }          // you fell: so does it
     if(combat.active) S.fought=true;
@@ -11434,10 +11438,15 @@ function drawSkelFig(x0,y0,o){
   [-1,1].forEach(s=>{ bone(3,[s*1.8,-64.2,3.6],[s*12.6,-62.6,0.5],1.5); knob(3,[s*12.8,-62.4,0.8],2.4,2.4); knob(3,[s*12,-63.6,1.4],2.6,1.2,'rgba(84,98,46,0.7)'); });   // shoulder knobs, moss
   // the off arm hangs; the sword arm swings, and lunges forward when it strikes
   bone(4,[-12.8,-62,1.5],[-14.6,-46+sw,1],2.3); pair(4,[-14.6,-45+sw,1],[-14.2,-33+sw,2],1.4); knob(4,[-14.1,-31+sw,2.4],2.2,2.6);
-  { const el=[15+k*3,-46-k*13,1.5+k*5], h=[17+k*4,-33-k*25,2.5+k*12], tip=[h[0]+5+k*2,h[1]-21+k*5,h[2]+6+k*6];
-    bone(5,[12.8,-62,1.5],el,2.3); pair(5,[el[0],el[1]+1,el[2]],h,1.4); knob(5,[h[0],h[1]+1,h[2]],2.2,2.6);
-    add(5,[h,tip],([p,q])=>line(p,q,2.4,'#7a6a58'));                                                        // a rusted old blade
-    add(5,[[h[0]-2.6,h[1]+1.4,h[2]+0.2],[h[0]+2.6,h[1]-1.4,h[2]+0.2]],([p,q])=>line(p,q,1.8,'#4a3a2a')); }
+  { const W=o.weapon, fist=!W;                     // empty-handed it punches straight out; armed, it swings from on high
+    const el=fist?[15,-46-k*10,1.5+k*8]:[15+k*3,-46-k*13,1.5+k*5], h=fist?[15.5,-33-k*20,2.5+k*17]:[17+k*4,-33-k*25,2.5+k*12], tip=[h[0]+5+k*2,h[1]-21+k*5,h[2]+6+k*6];
+    bone(5,[12.8,-62,1.5],el,2.3); pair(5,[el[0],el[1]+1,el[2]],h,1.4);
+    if(fist) add(5,[[h[0],h[1]+1.2,h[2]]],([q])=>{ g.fillStyle=B; g.strokeStyle=D; g.lineWidth=0.6; g.beginPath(); g.ellipse(q.x,q.y,2.7,2.9,0,0,PI2); g.fill(); g.stroke();   // a bony fist
+      g.beginPath(); for(let n=-1;n<=1;n++){ g.moveTo(q.x-2.2,q.y+n*1.1); g.lineTo(q.x+2.2,q.y+n*1.1); } g.lineWidth=0.4; g.stroke(); });
+    else { knob(5,[h[0],h[1]+1,h[2]],2.2,2.6);
+      if(W==='rusty'){ add(5,[h,tip],([p,q])=>line(p,q,2.4,'#7a6a58'));                                    // a rusted old blade
+        add(5,[[h[0]-2.6,h[1]+1.4,h[2]+0.2],[h[0]+2.6,h[1]-1.4,h[2]+0.2]],([p,q])=>line(p,q,1.8,'#4a3a2a')); }
+      else add(5,[h,tip],([p,q])=>drawWeapon(g,p.x,p.y,Math.atan2(q.y-p.y,q.x-p.x),W,0.85)); } }   // whatever you gave it
   // neck and a skull as big as a living head; what of its face you see depends on which way it looks
   bone(6,[0,-66,-1],[0,-68.5,-1],1.8);
   let skullE=GE[6];
@@ -11502,12 +11511,13 @@ function drawSkelFig(x0,y0,o){
 function drawSkel(S){ const base=P(S.x,S.y), f=combat.active?combat.foe:null, tgt=f?P(f.x,f.y):base, k=S.anim>0?Math.sin((0.3-S.anim)/0.3*Math.PI)*0.35:0;
   const x=base.x+(tgt.x-base.x)*k, y=base.y+(tgt.y-base.y)*k, stand=!S.crumble && S.asm>=1;
   const mound=S.crumble?0:Math.min(1,S.asm*5)*(1-clamp01((S.asm-0.8)/0.2));
-  drawSkelFig(x,y,{asm:S.asm, emerge:S.crumble?1:clamp01(S.asm/0.25), k, stand, moving:S.moving, walk:S.walk, dir:S.dir, mound});
+  if(!S.crumble) S.weapon=skelArmsOn()?CHOICE.skelWeapon||null:null;                                   // change what it holds and it changes hands at once
+  drawSkelFig(x,y,{asm:S.asm, emerge:S.crumble?1:clamp01(S.asm/0.25), k, stand, moving:S.moving, walk:S.walk, dir:S.dir, mound, weapon:S.weapon});
   if(stand){ const w=26, r2=Math.max(0,S.t/(S.max||9)); g.fillStyle='rgba(10,8,4,0.8)'; g.fillRect(x-w/2,y-100,w,3); g.fillStyle='#d8d4c0'; g.fillRect(x-w/2,y-100,w*r2,3); } }
 // into the world's draw order, so it stands behind and before things and takes the day's light and the night's dark like everyone else
 function skelDrawItems(items){
   SKEL_PILES.forEach(p=>{ if(p.area!==areaId) return; const a=Math.min(1,(SKEL_PILE_LIFE-p.age)/4);
-    items.push({d:p.x+p.y-0.2, fn:()=>{ const q=P(p.x,p.y); drawSkelFig(q.x,q.y,{pile:true, alpha:a, dir:p.dir}); }}); });
+    items.push({d:p.x+p.y-0.2, fn:()=>{ const q=P(p.x,p.y); drawSkelFig(q.x,q.y,{pile:true, alpha:a, dir:p.dir, weapon:p.weapon}); }}); });
   if(SKEL) items.push({d:SKEL.x+SKEL.y+0.01, ax:SKEL.x, ay:SKEL.y, fn:()=>drawSkel(SKEL)}); }
 const isMagicWeapon=()=>!!(WEAPONS[player.opts&&player.opts.equip.weapon]||{}).magic;
 let bolts=[];
@@ -13318,13 +13328,61 @@ FOES.skeleton={ label:'Skeleton', base:44, stagger:1.1, pattern:[
   {wait:1.2, wind:0.95, after:0.55, dir:'left'}, {wait:0.5, wind:0.70, after:0.45, dir:'right'}, {wait:1.5, wind:1.15, after:0.70, dir:'up'} ]};
 const RISEN=()=>({gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:'sword',offhand:null}});
 function drawRisen(x,B,e,pose){
-  if(e.dead){ const t=e.fallT||0; drawSkelFig(x,B,{asm:Math.max(0.25,1-t*1.4), emerge:1, dir:e.dir||0}); return; }      // it comes apart and lies there in a heap
+  if(e.dead){ const t=e.fallT||0; drawSkelFig(x,B,{asm:Math.max(0.25,1-t*1.4), emerge:1, dir:e.dir||0, weapon:'rusty'}); return; }      // it comes apart and lies there in a heap
   const k=pose&&pose.kind==='raise'?-0.45*Math.min(1,pose.t):pose&&pose.kind==='strike'?Math.max(0,1-Math.min(1,pose.t)*0.6):0;
-  drawSkelFig(x,B,{asm:1, stand:true, dir:e.dir||0, moving:!!e.moving, walk:gt*9+(e.id||0), k}); }
+  drawSkelFig(x,B,{asm:1, stand:true, dir:e.dir||0, moving:!!e.moving, walk:gt*9+(e.id||0), k, weapon:'rusty'}); }
 wrap('fen','mobs',l=>{ const r=[...l,{ name:'Risen Bones', type:'skeleton', i:8, j:13, faction:'risen', daily:true, opts:RISEN() }];
   if(nightAmt()>0.5) r.push({ name:'Rattling Bones', type:'skeleton', i:13, j:13, faction:'risen', daily:true, opts:RISEN() },{ name:'Restless Bones', type:'skeleton', i:20, j:18, faction:'risen', daily:true, opts:RISEN() });   // more of them walk at night
   return r; });
 wrap('fenlow','mobs',l=>[...l,{ name:'Drowned Bones', type:'skeleton', i:9, j:12, faction:'risen', daily:true, opts:RISEN() }]);
+// ── arms for the dead: once Vesna allows it, the skeleton you raise can carry a weapon of your choosing (for looks: it hits as hard either way) ──
+const skelArmsOn=()=>!!(CHOICE.skelArms && player.opts && NECRO_STAVES.includes(player.opts.equip.weapon));
+SLOT_NAMES.skel='Skeleton';
+{ const oG=getAt, oS=setAt, oL=slotLoc, oP=placeError;
+  getAt=loc=>loc.kind==='skel' ? (CHOICE.skelWeapon||null) : oG(loc);
+  setAt=(loc,id)=>{ if(loc.kind==='skel'){ CHOICE.skelWeapon=id||null; return; } oS(loc,id); };
+  slotLoc=el=>el.dataset.kind==='skel' ? {kind:'skel',key:'weapon'} : oL(el);
+  placeError=(id,loc)=>{ if(loc.kind!=='skel') return oP(id,loc);
+    if(!skelArmsOn()) return 'Only the dead you raise can carry that.';
+    if(id && ITEMS[id].slot!=='weapon') return 'Your skeleton can only hold a weapon.';
+    return ''; }; }
+function skelWeaponHome(){ if(!CHOICE.skelWeapon || skelArmsOn()) return true;     // the staff is put away: its skeleton's weapon goes back in your pack
+  const free=player.inv.indexOf(null); if(free<0) return false;
+  player.inv[free]=CHOICE.skelWeapon; logMsg(ITEMS[CHOICE.skelWeapon].name+' goes back into your pack.','#a89878'); CHOICE.skelWeapon=null; return true; }
+{ const oM=moveItem; moveItem=function(from,to){
+    if((from.kind==='skel'&&to.kind==='eq') || (from.kind==='eq'&&to.kind==='skel')){ flash('Put it in your pack first.'); return false; }
+    const had=skelArmsOn(), ok=oM(from,to);
+    if(ok && had && !skelArmsOn() && CHOICE.skelWeapon && !skelWeaponHome()){ oM(to,from); flash("Make room in your pack first: your skeleton's weapon has to go somewhere."); return false; }
+    if(ok) refreshInventory();
+    return ok; }; }
+{ const oB=buildInventoryUI; buildInventoryUI=function(){ const fresh=!invBuilt; oB(); if(!fresh) return;
+    const w=document.querySelector('#eq-left .slot[data-key="weapon"]'), sl=makeSlot('skel','weapon'); sl.classList.add('skel-slot');
+    const l=document.createElement('div'); l.className='lbl'; l.textContent='Skeleton'; sl.appendChild(l); w.after(sl); }; }
+{ const oR=refreshInventory; refreshInventory=function(){ skelWeaponHome(); oR();
+    const sl=document.querySelector('#inv-overlay .skel-slot'); if(sl){ sl.style.display=skelArmsOn()?'':'none'; sl.title=CHOICE.skelWeapon?ITEMS[CHOICE.skelWeapon].name+' (carried by the skeleton you raise, for show)':'Your skeleton\'s weapon: drop any weapon here. It is only for show.'; } }; }
+{ const oD=onDragMove; onDragMove=function(e){ const was=invDrag&&invDrag.moved; oD(e);
+    if(invDrag && !was && invDrag.moved && ITEMS[invDrag.id].slot==='weapon' && skelArmsOn() && invDrag.loc.kind==='inv'){ const sl=document.querySelector('#inv-overlay .skel-slot'); if(sl) sl.classList.add('valid'); } }; }
+setInterval(()=>{ try{ if(CHOICE.skelWeapon && !skelArmsOn()) skelWeaponHome(); }catch(e){} },1000);   // however the staff left your hand
+// Vesna's last lesson: the bones you raise fight with their fists, until the fen's own dead teach you how to put a weapon back in a dead hand
+const FEN_BONES=['fen:Risen Bones','fen:Rattling Bones','fen:Restless Bones','fenlow:Drowned Bones'];
+const bonesDown=()=>FEN_BONES.filter(k=>(CHOICE.bonesDown||[]).includes(k)).length;
+{ const oF=foeDown; foeDown=function(f){ const r=oF(f);
+    if(f && f.type==='skeleton' && CHOICE.necroQ==='bones'){ const k=areaId+':'+f.name; CHOICE.bonesDown=CHOICE.bonesDown||[];
+      if(FEN_BONES.includes(k) && !CHOICE.bonesDown.includes(k)){ CHOICE.bonesDown.push(k); logMsg(`The bones lie down. (${bonesDown()}/4 for Vesna)`,'#b8a8e8'); } }
+    return r; }; }
+{ const oV=TALKERS.vesna; TALKERS.vesna=function(){
+    if(NECRO()<3 || CHOICE.skelArms) return oV();
+    const V='Vesna the Grave-Speaker';
+    if(CHOICE.necroQ!=='bones'){ say(V,["Vesna watches your last skeleton fall apart in the reeds and tilts her head.","“They punch. Did you notice? Bones remember how to stand, but they have forgotten how to hold anything. The dead let go of everything, first of all their weapons.”","“The fen's own dead walk at night now: old bones that nobody asked to get up. Put four of them back in the mud: the three that wander the Drowning Fen, and the one in the Hollow. Watch how they hold their blades as they fall. Then come back, and I will show you how to put a weapon back in a dead hand.”"],[
+        {label:'“I will.”', fn:()=>{ remember('necroQ','bones',"Vesna wants four of the fen's risen dead laid to rest: Risen Bones, Rattling Bones and Restless Bones in the Drowning Fen (the last two walk only at night), and Drowned Bones in the Sunken Hollow."); closeDialog(); }}, bye]); return; }
+    const n=bonesDown();
+    if(n<4){ say(V,`“${n} of four. The rest still walk. Two of them only after dark.”`,[bye]); return; }
+    say(V,["Vesna takes your hand and closes your fingers around nothing, as if around a hilt. Her hand is very cold.","“There. That is how they held them. Now, when you carry a grave-speaker's staff, you can give the dead you raise a weapon of your own choosing. It will not make them hit any harder. The dead do not care about steel. But they look the part, and that matters more than you'd think.”"],[
+      {label:'Learn to arm the dead.', fn:()=>{ CHOICE.skelArms=true; CHOICE.necroQ=null; logMsg("You can now give your skeleton a weapon: hold a necromancer's staff and use the small slot under your weapon in the inventory. It is only for show.",'#b8a8e8'); say(V,"“Pick something with a bit of style. They have been lying in the dark a long time.”",[bye]); }}]); }; }
+{ const oN=npcHasNews; npcHasNews=function(n){ if(n && n.id==='vesna' && NECRO()>=3 && !CHOICE.skelArms) return CHOICE.necroQ==='bones' ? (bonesDown()>=4?'?':null) : '!'; return oN(n); }; }
+JOURNAL.push(["Arms for the Dead", ()=> NECRO()<3 ? null : CHOICE.skelArms ? ['done',"Vesna showed you how to put a weapon back in a dead hand. Hold a necromancer's staff and give your skeleton a weapon in the small slot under your own."]
+  : CHOICE.necroQ==='bones' ? ['active', bonesDown()>=4 ? "Four of the fen's risen dead lie still. Go back to Vesna." : "Lay four of the fen's risen dead to rest for Vesna: Risen Bones, Rattling Bones and Restless Bones in the Drowning Fen (the last two walk only at night), and Drowned Bones in the Sunken Hollow. ("+bonesDown()+"/4)"]
+  : ['active',"Your skeletons fight with their fists. Vesna, in the fen, may know how to change that."]]);
 </script>
 </body>
 </html>

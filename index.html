@@ -11986,7 +11986,7 @@ const ITEM_STATS={ moon_amulet:{agi:2,magic:3}, robe:{hp:1,magic:1}, robe_blue:{
   hood:{hp:2}, elf_circlet:{hp:1,agi:1,magic:3}, kettle:{hp:5}, bandana:{hp:1,agi:2}, coif:{hp:3}, helm_full:{hp:8},
   hose_grey:{hp:1,agi:1}, breeches:{hp:2}, elf_leggings:{agi:2,magic:2}, elf_leggings_worn:{agi:2,magic:1} };
 Object.entries(ITEM_STATS).forEach(([id,st])=>{ GEAR_HP[id]=st.hp||0; });
-const gearSum=(k)=>{ const E=(player.opts&&player.opts.equip)||{}; return SLOTS.reduce((a,sl)=>a+((ITEM_STATS[E[sl]]||{})[k]||0),0) + (k==='agi' ? (CHOICE.brannTaught?1:0)+(CHOICE.brannTrap==='done'?1:0) : 0) + (k==='ap' ? (CHOICE.temper||0) : k==='magic' ? (CHOICE.attune||0) : 0); };   // plus what Brann taught you, and what you paid to be trained in
+const gearSum=(k)=>{ const E=(player.opts&&player.opts.equip)||{}; return SLOTS.reduce((a,sl)=>a+((ITEM_STATS[E[sl]]||{})[k]||0),0) + (k==='agi' ? (CHOICE.brannTaught?1:0)+(CHOICE.brannTrap==='done'?1:0) : 0) + (k==='ap' ? (CHOICE.temper||0) : k==='magic' ? (CHOICE.attune||0)+SLOTS.filter(sl=>E[sl] && (CHOICE.woven||[]).includes(E[sl])).length : 0); };   // attune: ranks from older saves; woven: Maelis's thread in a piece you wear   // plus what Brann taught you, and what you paid to be trained in
 const AGI_DODGE=0.05;                                     // each point of agility: 5% to dodge a blow outright
 { const oldH=hurtPlayer; hurtPlayer=function(n,label){ const agi=gearSum('agi');
     if(n>0 && agi>0 && !combat.practice && Math.random()<agi*AGI_DODGE){ floatText(tileOf(player),'Dodge!','#a8e0ff',true); player.flash=0.15; return; }
@@ -12003,6 +12003,7 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
   if(st.agi) L.push(['Agility','+'+st.agi+' <small>('+Math.round(st.agi*AGI_DODGE*100)+'% dodge)</small>']);
   if(st.ap) L.push(['Attack power','+'+st.ap+' <small>(+'+st.ap*4+'% weapon damage)</small>']);
   if(st.magic) L.push(['Spell power','+'+st.magic+' <small>(+'+st.magic*4+'% spell damage)</small>']);
+  if(typeof isWoven==='function' && isWoven(id)) L.push(['Woven by Maelis','+1 Spell power']);
   const s2=itemStat(id); if(s2 && /shield|swing/.test(s2.short)) L.push(['Special',s2.short.replace(/^\+\d+ HP, /,'')]);
   return L; }
 { const mk=id=>{ const d=document.createElement('div'); d.id=id; d.className='itip'; document.body.appendChild(d); return d; };
@@ -13044,6 +13045,17 @@ const TRAINING={
   priest: { key:'bless', who:'Mother Hild', label:'Ask Mother Hild for a blessing', stat:'+5 Health',
             lines:r=>["Mother Hild sets down her broom and takes both your hands.", "“A blessing is a gift, child. The candles, the oil, the hours on my knees: those are not. For the chapel roof, you understand.”"] } };
 const TRAIN_MAX=6, trainCost=r=>40*Math.pow(2,r);
+// Maelis threads moonlight into one piece of what you wear: +1 Spell Power on that piece, once per piece, priced by the piece
+const WEAVE_SLOTS=['head','torso','armor','hands','legs','feet','offhand'], weaveCost=id=>100+2*(PRICES[id]||20);
+const isWoven=id=>(CHOICE.woven||[]).includes(id);
+function weaveTalk(){ const E=player.opts.equip, back=()=>TALKERS.maelis();
+  const pieces=WEAVE_SLOTS.map(sl=>E[sl]).filter(id=>id && ITEMS[id]);
+  const opts=pieces.map(id=> isWoven(id) ? {label:`${ITEMS[id].name}: already woven`, off:true, fn:()=>{}}
+    : {label:`Weave the ${ITEMS[id].name}. (+1 Spell Power)`, off:player.purse<weaveCost(id), note:'-'+formatCoin(weaveCost(id)), fn:()=>{ const c=weaveCost(id); player.purse-=c; CHOICE.woven=[...(CHOICE.woven||[]),id]; updateHud();
+        logMsg(`Maelis weaves moonlight into your ${ITEMS[id].name}: +1 Spell Power while you wear it.`,'#c8d8ff'); if(typeof saveGame==='function') saveGame(); weaveTalk(); }});
+  say('Maelis the Weaver',["Maelis lets the loom run on by itself and looks you over, piece by piece, the way a tailor would.",
+    pieces.length ? "“Each thing you wear can hold one thread of moonlight, no more. Choose well. The thread is not cheap, and finer cloth takes a finer thread.”" : "“Come back wearing something. I cannot weave into skin.”"],
+    [...opts,{label:'Back.',fn:back},bye],true); }
 function trainTalk(id){ const T=TRAINING[id], r=CHOICE[T.key]||0, cost=trainCost(r), back=()=>TALKERS[id]();
   if(r>=TRAIN_MAX){ say(T.who,[...T.lines(r),"“There's nothing more I can do for you. You are as good as my craft can make you.”"],[{label:'Back.',fn:back},bye]); return; }
   say(T.who,[...T.lines(r),`<i>Rank ${r} of ${TRAIN_MAX}. The next rank gives ${T.stat} for ${formatCoin(cost)}.</i>`],[
@@ -13057,14 +13069,14 @@ function crateTalk(){ const u=CHOICE.stashUp||0, cost=STASH_UPS[u];
     {label:`Pay ${formatCoin(cost)}. (+6 crate spaces)`, off:player.purse<cost, note:'-'+formatCoin(cost), fn:()=>{ player.purse-=cost; CHOICE.stashUp=u+1; updateHud(); logMsg('Your crate at the Wheatsheaf now holds '+stashCap()+' things.','#e8c060'); crateTalk(); }},
     {label:'Back.',fn:TALKERS.bertha}, bye],true); }
 // each of them gets one more line in their usual talk
-[['smith',()=>trainTalk('smith'),()=>TRAINING.smith.label],['maelis',()=>trainTalk('maelis'),()=>TRAINING.maelis.label],['priest',()=>trainTalk('priest'),()=>TRAINING.priest.label],
+[['smith',()=>trainTalk('smith'),()=>TRAINING.smith.label],['maelis',()=>weaveTalk(),()=>'Ask Maelis to weave magic into your gear'],['priest',()=>trainTalk('priest'),()=>TRAINING.priest.label],
  ['bertha',crateTalk,()=>'“Can my crate in the cellar hold more?”']].forEach(([id,fn,label])=>{ const old=TALKERS[id]; if(!old) return;
   TALKERS[id]=(...a)=>{ const r=old(...a); const box=document.getElementById('dlg-opts');
     if(dlgOverlay.classList.contains('open') && box && !box.querySelector('.dlg-opt.train')){ const b=document.createElement('button'); b.className='dlg-opt train';
       b.innerHTML=`<span>${label()}</span>`; b.addEventListener('click',fn); box.insertBefore(b,box.lastElementChild); }
     return r; }; });
 { const oldP=refreshStatPanel; refreshStatPanel=function(){ oldP(); const panel=document.getElementById('stat-panel'); if(!panel||!player.opts) return;
-    const t=[CHOICE.temper&&('Tempered '+CHOICE.temper),CHOICE.attune&&('Attuned '+CHOICE.attune),CHOICE.bless&&('Blessed '+CHOICE.bless)].filter(Boolean);
+    const t=[CHOICE.temper&&('Tempered '+CHOICE.temper),CHOICE.attune&&('Attuned '+CHOICE.attune),(CHOICE.woven||[]).length&&('Woven pieces '+SLOTS.filter(sl=>player.opts.equip[sl]&&isWoven(player.opts.equip[sl])).length+'/'+CHOICE.woven.length),CHOICE.bless&&('Blessed '+CHOICE.bless)].filter(Boolean);
     if(t.length) panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Training</b><span>${t.join(' · ')}</span></div>`); }; }
 
 // ════════ RESPAWNS: ordinary foes come back a day after you kill them; story foes stay dead ════════

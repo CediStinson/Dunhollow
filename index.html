@@ -8554,6 +8554,11 @@ function diggerTalk(){
   ]);
 }
 // Brann the hunter, who knows what happened in the Wolfwood
+// he buys meat, teeth and hides, and pays a little better for them than any trader or fence in the land
+const BRANN_BUYS={ only:new Set(['raw_meat','cooked_meat','wolf_fang']),
+  price:id=>Math.max(Math.round(PRICES[id]*0.4), Math.round(PRICES[id]*SELL_RATE*1.35)+1),
+  greet:"He turns each piece over in his hands. “Meat, teeth, hides. I know what they're worth, and I pay it.”",
+  none:"“Nothing there I can use. Bring me what the wood gives you: meat, fangs, hides.”" };
 function hunterTalk(){
   // old saves: one choice used to close the others
   if(CHOICE.hunter==='taught' && !CHOICE.brannTaught) CHOICE.brannTaught=true;
@@ -8569,6 +8574,7 @@ function hunterTalk(){
     say('Brann the Hunter',["He listens, then spits into the fire. “Jaws like that in an honest wood. Good riddance.”","He counts out coins, then stops and puts them back, and gives you more. “And this: watch the ground, not the beast. The ground tells you where it's going before it knows.” <i>You receive 25 copper. (+1 agility, permanently)</i>"],[{label:'Back.',fn:back},bye]); }});
   if(hasItem('pelt')) opts.push({label:'Sell him the wolf pelt. (+30 copper)', fn:()=>{ player.inv[player.inv.indexOf('pelt')]=null; player.purse+=30; updateHud(); CHOICE.peltSold=true; remember('hunter','sold','Brann paid well for the pelt.');
     say('Brann the Hunter',"He runs his thumb against the grain. “Old Greymaw. Thirty, and a fair price.”",[{label:'Back.',fn:back},bye]); }});
+  opts.push({label:'Sell him what you have hunted.', fn:()=>sellTo('Brann the Hunter',back,BRANN_BUYS)});
   if(!CHOICE.brannTaught) opts.push({label:'Ask him to teach you to move quietly. (-10 copper)', off:player.purse<10, note:'-10c', fn:()=>{ player.purse-=10; CHOICE.brannTaught=true; updateHud(); refreshStatPanel&&refreshStatPanel();
     say('Brann the Hunter',["An afternoon of crawling through ferns. “Heel first. Then the outside of the foot. Breathe out when you step.”","You come back filthy, scratched, and lighter on your feet than you have ever been. <i>(+1 agility, permanently)</i>"],[{label:'Back.',fn:back},bye]); }});
   if(!CHOICE.brannTrap) opts.push({label:'“Anything troubling the wood besides wolves?”', fn:()=>{ CHOICE.brannTrap='asked'; remember('brannTrap','asked','Brann wants the Baron\'s trapper on the Old Elven Road stopped.');
@@ -9064,18 +9070,18 @@ function todaysStock(who,pool,n){
   const out=pool.map((id,k)=>[id,rnd01(day*13+k,h,410)]).sort((a,b)=>a[1]-b[1]).slice(0,n).map(x=>x[0]).filter(id=>!SOLD_TODAY.has(who+day+id)); out.key=who; return out;
 }
 // selling: any trader buys what is in your pack (not story items), at forty percent of its price
-function sellTo(who,back){
-  const goods=player.inv.map((id,k)=>({id,k})).filter(({id})=>id && PRICES[id] && !(typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(id)) && (ITEMS[id].slot!=='misc' || SELL_MISC.has(id)));
-  say(who,[goods.length?"“Let us see what you have.” (Only what is in your pack, not what you wear.)":"“Nothing in your pack I'd buy.”"],[{label:'Back.',fn:back},bye],true);
+function sellTo(who,back,o){                     // o (optional): only these items, at this buyer's own price, with his own words
+  const goods=player.inv.map((id,k)=>({id,k})).filter(({id})=>id && PRICES[id] && !(typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(id)) && (ITEMS[id].slot!=='misc' || SELL_MISC.has(id)) && (!o || !o.only || o.only.has(id)));
+  say(who,[goods.length?(o&&o.greet||"“Let us see what you have.” (Only what is in your pack, not what you wear.)"):(o&&o.none||"“Nothing in your pack I'd buy.”")],[{label:'Back.',fn:back},bye],true);
   if(!goods.length) return;
   const box=document.getElementById('dlg-opts'), grid=document.createElement('div'); grid.className='shop-grid';
-  goods.forEach(({id,k})=>{ const pr=Math.max(1,Math.round(PRICES[id]*SELL_RATE)); const cell=document.createElement('div'); cell.className='shop-cell';
+  goods.forEach(({id,k})=>{ const pr=o&&o.price?o.price(id):Math.max(1,Math.round(PRICES[id]*SELL_RATE)); const cell=document.createElement('div'); cell.className='shop-cell';
     const sl=document.createElement('div'); sl.className='slot filled shop-slot'; sl.dataset.item=id; const cv=document.createElement('canvas'); cv.width=cv.height=104; cv.style.width=cv.style.height='52px'; drawItemIcon(cv.getContext('2d'),id,104); sl.appendChild(cv);
     const pl=document.createElement('div'); pl.className='shop-price'; pl.textContent='+'+formatCoin(pr); cell.appendChild(sl); cell.appendChild(pl);
     cell.addEventListener('pointerdown',e=>{ cell._touch=e.pointerType==='touch'; });
     cell.addEventListener('click',()=>{ if(cell._touch && !cell.classList.contains('armed')){ grid.querySelectorAll('.armed').forEach(x=>x.classList.remove('armed')); cell.classList.add('armed'); return; }
       if(player.inv[k]!==id) return; player.inv[k]=null; player.purse+=pr; updateHud(); logMsg('Sold '+ITEMS[id].name+' for '+formatCoin(pr)+'.','#e8c060');
-      const t=document.getElementById('item-tip'), t2=document.getElementById('item-tip2'); if(t) t.style.display='none'; if(t2) t2.style.display='none'; sellTo(who,back); });
+      const t=document.getElementById('item-tip'), t2=document.getElementById('item-tip2'); if(t) t.style.display='none'; if(t2) t2.style.display='none'; sellTo(who,back,o); });
     grid.appendChild(cell); });
   const hint=document.createElement('div'); hint.className='shop-hint'; hint.textContent=matchMedia('(hover:none)').matches?'Tap to inspect, tap again to sell.':'Hover to inspect, click to sell.';
   box.prepend(hint); box.prepend(grid);
@@ -10844,12 +10850,13 @@ function victory(faction){
   combat.active=false; combat.phase='idle'; combat.foe=null;
   duelHud.classList.remove('open'); document.getElementById('hint').style.display='';
   banner('Victory!');
-  logMsg(faction==='wild'||faction==='wild2' ? 'The wolf is dealt with.' : faction==='grey' ? 'The man in grey will not trouble anyone again.' : faction==='guard' ? 'The stones are Dunhollow\'s again.' : faction==='shade' ? 'The shade comes apart like smoke.' : faction==='trapper' ? 'The trappers will set no more nets.' : faction==='unpaid' ? 'The deserters lie in the road.' : faction==='camp' ? 'The bandit camp falls silent.' : faction==='loggers' ? 'The axes fall silent.' : faction==='thieves' ? 'The alley is quiet again.' : faction==='highway' ? 'The road is safe again, for tonight.' : faction==='lanewolf'||faction==='nightwolf' ? 'The wolf is dealt with.' : faction==='goblins'||faction==='gobwarren' ? 'The goblins stop giggling.' : faction==='cavequeen' ? 'Mother Mogg falls, and the crystal hum grows softer.' : faction==='acolyte' ? 'The acolytes\' fires go out.' : faction==='mist'||faction==='ruin' ? 'The wolves are dealt with.' : 'The farm is yours again, for now.','#d8b24a');
+  logMsg(faction==='wild'||faction==='wild2' ? 'The wolf is dealt with.' : faction==='grey' ? 'The man in grey will not trouble anyone again.' : faction==='guard' ? 'The stones are Dunhollow\'s again.' : faction==='shade' ? 'The shade comes apart like smoke.' : faction==='trapper' ? 'The trappers will set no more nets.' : faction==='unpaid' ? 'The deserters lie in the road.' : faction==='camp' ? 'The bandit camp falls silent.' : faction==='loggers' ? 'The axes fall silent.' : faction==='thieves' ? 'The alley is quiet again.' : faction==='highway' ? 'The road is safe again, for tonight.' : faction==='lanewolf'||faction==='nightwolf' ? 'The wolf is dealt with.' : faction==='goblins'||faction==='gobwarren' ? 'The goblins stop giggling.' : faction==='cavequeen' ? 'Mother Mogg falls, and the crystal hum grows softer.' : faction==='acolyte' ? 'The acolytes\' fires go out.' : faction==='mist'||faction==='ruin' ? 'The wolves are dealt with.' : faction==='risen' ? 'The bones lie still again. For now.' : 'The farm is yours again, for now.','#d8b24a');
   mobs.filter(m=>m.hostile && (!faction || m.faction===faction)).forEach(m=>{       // what a foe drops depends on what it was, and how dangerous
     const tier=lootTier(m), free=()=>player.inv.indexOf(null), R=Math.random;
     const give=id=>{ const f=free(); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } else logMsg('Inventory is full.','#e0b070'); };
     const coin=(a,b)=>{ const c=a+Math.floor(R()*(b-a+1)); player.purse+=c; updateHud(); logMsg('Loot: '+formatCoin(c),'#e8c060'); };
     if(m.type==='wolf'){ if(R()<0.5) give('raw_meat'); if(m.maxHp>=60 && R()<0.3) give('raw_meat'); if(R()<0.3) give('wolf_fang'); return; }           // meat and teeth, not trousers
+    if(m.type==='skeleton'){ if(R()<0.35) coin(1,5); return; }                       // old bones carry nothing but the odd green coin
     if(m.type==='lurker'){ if(R()<0.4) coin(2,5); if(R()<0.2){ const pool=LOOT_TIERS[0]; give(pool[Math.floor(R()*pool.length)]); logMsg('…something it swallowed, a while ago.','#a8a080'); } return; }
     if(m.opts && m.opts.ghost){ if(R()<0.5) coin(4,12); return; }                // the dead carry nothing but old coin
     if(m.type==='goblin'){ if(R()<0.35) coin(1,3); if(R()<0.15) give(['apple','apple','bread','raw_meat'][Math.floor(R()*4)]); if(R()<0.2) give(['dagger','hood','shirt','club'][Math.floor(R()*4)]); return; }
@@ -11204,7 +11211,7 @@ function drawActor(e){
   const s=P(wx,wy), bob=e.moving?-Math.abs(Math.sin(gt*10))*2.5:0, B=s.y+bob;
   const open = !isP && e===combat.foe && (e.state==='recover'||e.state==='stagger') && combat.phase==='fight';
   g.save();
-  if(!isP && e.dead){                             // topple over and stay down, instead of fading away
+  if(!isP && e.dead && e.type!=='skeleton'){      // topple over and stay down, instead of fading away
     const fallP=Math.min(1,(e.fallT||0)/0.55), ease=1-(1-fallP)*(1-fallP);
     const dir2=(e.id%2===0)?1:-1;
     g.translate(s.x,B); g.rotate(dir2*ease*(Math.PI/2)*0.94); g.translate(-s.x,-B);
@@ -11216,6 +11223,7 @@ function drawActor(e){
   if(e.type==='dummy') drawDummy(s.x,B,e);
   else if(e.type==='wolf') drawLitSprite(s.x,B,()=>drawWolf(s.x,B,e,e.dir||0,poseFor(e)),1.2);
   else if(e.type==='lurker') drawLurker(s.x,B,e,poseFor(e));
+  else if(e.type==='skeleton') drawRisen(s.x,B,e,poseFor(e));
   else drawLitSprite(s.x,B,()=>drawChar(g,s.x,B,e.opts,e.moving?Math.sin(gt*10)*5:0,e.dir||0,poseFor(e)));
   g.restore();
   if(!isP && e.dead) return;
@@ -11384,7 +11392,7 @@ const SKEL_HEAP=[   // per group: centre, then how it lies in the heap: tipped o
   [ 0,-57,0,     0, 90, 12,   -3,-12,-2],    // 3 spine and ribcage, on its side so the ribs arch up
   [-14,-46,1.5,  0,-85, 40,  -18,-2,9],      // 4 the hanging arm
   [ 16,-44,1.5,  0, 95,-50,   19,-2,5],      // 5 the sword arm and its blade
-  [ 0,-79,0,    25,  0, 70,    7,-10,11] ];  // 6 neck and skull, rolled onto one cheek
+  [ 0,-79,0,    25,  0, 70,    7,-11,11] ];  // 6 neck and skull, rolled onto one cheek
 function drawSkelFig(x0,y0,o){
   const B='#ad9c72', D='#3e3426', PI2=Math.PI*2, d=o.dir||0, view=dirView(d), A=VIEW[view].ang*Math.PI/180, ca=Math.cos(A), sa=Math.sin(A);
   const k=o.k||0, stand=!!o.stand, bob=stand?Math.sin(gt*2.2)*0.6:0, sw=stand?Math.sin(gt*3)*0.8:0, emerge=o.emerge??1;
@@ -11433,24 +11441,52 @@ function drawSkelFig(x0,y0,o){
   // neck and a skull as big as a living head; what of its face you see depends on which way it looks
   bone(6,[0,-66,-1],[0,-68.5,-1],1.8);
   let skullE=GE[6];
-  { const C=T(6,[0,-81,0]), F=T(6,[0,-81,10]), face=(F.z-C.z)/10, P3=p=>T(6,p);
+  // the skull: a little smaller than a living head (no skin, no hair), the cranium and upper jaw in one smooth silhouette,
+  // and below it the lower jaw as a bone of its own, hinged under the ears: it hangs slack in the heap and drops open when it strikes
+  { const SK=0.9, P3=p=>T(6,[p[0]*SK, -79+(p[1]+79)*SK, p[2]*SK]), C=P3([0,-81,0]), F=P3([0,-81,10]), face=(F.z-C.z)/10;
+    const jo=o.pile||!stand&&GE[6]<1 ? 0.35 : Math.max(0,k)*0.75, M=p=>P3(rx(p,-jo*0.38,[0,-75.6,-3.2]));   // how far the jaw hangs open
+    const hull=pts=>{ const q=pts.slice().sort((a,b)=>a.x-b.x||a.y-b.y), cr=(o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x), lo=[], hi=[];
+      q.forEach(r=>{ while(lo.length>1&&cr(lo[lo.length-2],lo[lo.length-1],r)<=0) lo.pop(); lo.push(r); }); q.slice().reverse().forEach(r=>{ while(hi.length>1&&cr(hi[hi.length-2],hi[hi.length-1],r)<=0) hi.pop(); hi.push(r); });
+      return lo.slice(0,-1).concat(hi.slice(0,-1)); };
+    const path=(q,close=true)=>{ g.beginPath(); q.forEach((r,n)=>n?g.lineTo(r.x,r.y):g.moveTo(r.x,r.y)); if(close) g.closePath(); };
+    const ring=(cx,cy,cz,rx2,ry,n=14,tilt=0)=>Array.from({length:n},(_,kk)=>{ const a=kk/n*Math.PI*2; return P3([cx+Math.cos(a)*rx2, cy+Math.sin(a)*ry, cz-Math.sign(cx)*Math.cos(a)*tilt]); });   // turned a little toward the side of the head, as sockets are
+    const arch=t=>9.2-t*t*0.1, fa=clamp01((face+0.35)/0.45);
+    const row=(f,y1,y2,w,z0=0)=>{ const top=[], bot=[]; for(let t=-w;t<=w+0.01;t+=w/4){ top.push(f([t,y1,arch(t)+z0])); bot.push(f([t*0.95,y2,arch(t)+z0-0.2])); } return top.concat(bot.reverse()); };
+    const shell=[]; for(let la=-1;la<=1.001;la+=0.25) for(let lo=0;lo<16;lo++){ const a=lo/16*Math.PI*2, r=Math.sqrt(1-la*la*0.96);
+      shell.push([Math.cos(a)*11*r, -82.4+la*10, -1.6+Math.sin(a)*11.6*r]); }                                  // the cranium: longer front to back than side to side
+    [-1,1].forEach(s=>shell.push([s*9.4,-77.4,4],[s*7.8,-74.4,6.2],[s*5.4,-71.8,7.8],[s*4.4,-70.4,8.2],[s*9.4,-76,-3]));   // cheekbones, the upper jaw down to the teeth, the arch back to the ear
+    shell.push([0,-70.3,9.4],[0,-72.6,9.6]);
+    const sil=hull(shell.map(P3));
+    // the lower jaw: a horseshoe of bone from the chin back to the hinge, its upright branches rising behind the cheekbones
+    const mand=[]; [-1,1].forEach(s=>mand.push([s*4.6,-70.2,7.4],[s*3,-66.8,7.4],[s*5.4,-67.8,5.8],[s*7.1,-69.6,2.8],[s*7.6,-72.8,-0.6],[s*7.4,-76.4,-2.8],[s*7,-75.4,0.8])); mand.push([0,-66.3,7.9],[0,-70.2,8.8]);
+    const mq=hull(mand.map(M));
+    prims.push({z:C.z-0.05, fn:()=>{
+      g.lineJoin='round'; g.fillStyle='#a6956c'; g.strokeStyle=D; g.lineWidth=1; path(mq); g.fill(); g.stroke();
+      if(face<-0.25) return;
+      g.save(); g.globalAlpha*=fa;
+      g.fillStyle='rgba(62,52,38,0.25)'; [-1,1].forEach(s=>{ const h=M([s*2.6,-68.4,7.6]); g.beginPath(); g.ellipse(h.x,h.y,0.8,0.6,0,0,PI2); g.fill(); });   // the little holes in the chin
+      g.fillStyle='#d8ccae'; path(row(M,-70.2,-68.8,4.4,-0.4)); g.fill();                                         // the lower teeth, riding with the jaw
+      g.strokeStyle='rgba(70,60,44,0.7)'; g.lineWidth=0.4; for(let t=-3.6;t<=3.61;t+=1.2){ const a1=M([t,-70.2,arch(t)-0.3]), b1=M([t*0.95,-68.8,arch(t)-0.6]); g.beginPath(); g.moveTo(a1.x,a1.y); g.lineTo(b1.x,b1.y); g.stroke(); }
+      g.restore(); } });
     prims.push({z:C.z, fn:()=>{
-      const jaw=()=>{ const pts=[]; [-1,1].forEach(s=>pts.push([s*7.6,-75,4.6],[s*7.4,-69,5],[s*3.4,-67.6,7],[s*6.4,-75,-2.5],[s*5.4,-69,0.5],[0,-67.4,7.4],[0,-72,9.4]));   // cheekbones, the jaw's corners and hinges
-        const q=pts.map(P3).sort((a,b)=>a.x-b.x||a.y-b.y), cr=(o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x), lo=[], hi=[];       // its outline from wherever you stand: the hull of those points
-        q.forEach(r=>{ while(lo.length>1&&cr(lo[lo.length-2],lo[lo.length-1],r)<=0) lo.pop(); lo.push(r); }); q.slice().reverse().forEach(r=>{ while(hi.length>1&&cr(hi[hi.length-2],hi[hi.length-1],r)<=0) hi.pop(); hi.push(r); });
-        const h=lo.slice(0,-1).concat(hi.slice(0,-1)); g.fillStyle=B; g.strokeStyle=D; g.lineWidth=0.8; g.beginPath(); h.forEach((r,n)=>n?g.lineTo(r.x,r.y):g.moveTo(r.x,r.y)); g.closePath(); g.fill(); g.stroke(); };
-      const cran=()=>{ g.fillStyle=B; g.strokeStyle=D; g.lineWidth=0.8; g.beginPath(); g.ellipse(C.x+(F.x-C.x)*0.06,C.y,9.8+1.6*Math.sqrt(Math.max(0,1-face*face)),11,0,0,PI2); g.fill(); g.stroke();
-        g.strokeStyle=D; g.lineWidth=0.4; const c1=[[-2,-91,-2],[1,-87,-1],[-0.5,-84.5,0]].map(P3); g.beginPath(); g.moveTo(c1[0].x,c1[0].y); g.quadraticCurveTo(c1[1].x,c1[1].y,c1[2].x,c1[2].y); g.stroke();   // an old crack
-        g.fillStyle='rgba(84,98,46,0.7)'; const m=P3([-4,-89,-4]); g.beginPath(); g.ellipse(m.x,m.y,3.4,1.6,0.3,0,PI2); g.fill(); };      // moss on the crown
-      if(face<0){ jaw(); cran(); return; }                                          // seen from behind: the back of the skull
-      cran(); jaw();
-      [-1,1].forEach(s=>{ const e=P3([s*3.8,-81,8.6]), ez=(e.z-C.z)/8.6; if(ez<-0.1) return; g.fillStyle='#120e0a'; g.beginPath(); g.ellipse(e.x,e.y,2.9*Math.max(0.35,Math.min(1,face+0.15)),3.3,s*0.15,0,PI2); g.fill(); });   // deep eye sockets
-      const n=[[0,-77,9.6],[-1.4,-73.6,9.4],[1.4,-73.6,9.4]].map(P3); g.fillStyle='#120e0a'; g.beginPath(); n.forEach((r,i)=>i?g.lineTo(r.x,r.y):g.moveTo(r.x,r.y)); g.closePath(); g.fill();   // the nose hole
-      const tq=[[-4.4,-72,8.4],[4.4,-72,8.4],[4.4,-69.2,8.4],[-4.4,-69.2,8.4]].map(P3); g.fillStyle=B; g.beginPath(); tq.forEach((r,i)=>i?g.lineTo(r.x,r.y):g.moveTo(r.x,r.y)); g.closePath(); g.fill();
-      g.strokeStyle='#4a4234'; g.lineWidth=0.4; for(let t=-3.6;t<=3.7;t+=1.2){ const a=P3([t,-72,8.5]), b=P3([t,-69.2,8.5]); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); }   // teeth
-      g.strokeStyle='#120e0a'; g.lineWidth=1.1; [-2.4,1.2,3.6].forEach(t=>{ const a=P3([t,-72,8.6]), b=P3([t,-69.2,8.6]); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); });   // missing teeth
-      if(!o.pile && skullE>0.6){ g.save(); g.globalCompositeOperation='lighter'; const gl=0.55*(skullE-0.6)/0.4*Math.max(0,face);
-        [-1,1].forEach(s=>{ const e=P3([s*3.8,-81,8.6]); if((e.z-C.z)/8.6>-0.1) glow(e.x,e.y,8,8,'140,230,120',gl); }); g.restore(); } } });   // the green spark in its eyes
+      g.lineJoin='round'; g.fillStyle=B; g.strokeStyle=D; g.lineWidth=1.1; path(sil); g.fill(); g.stroke();
+      const lit=P3([-3.2,-87.6,1+Math.max(0,face)*3]); g.fillStyle='rgba(255,248,220,0.22)'; g.beginPath(); g.ellipse(lit.x,lit.y,5,3.2,-0.4,0,PI2); g.fill();   // the light on the crown
+      if(face<-0.25) return;                                                         // seen from behind: just the round of the skull
+      g.save(); g.globalAlpha*=fa;
+      [-1,1].forEach(s=>{ const t=P3([s*9.4,-79.4,0]); if((t.z-C.z)>-2){ g.fillStyle='rgba(62,52,38,0.22)'; g.beginPath(); g.ellipse(t.x,t.y,2,3,0,0,PI2); g.fill(); } });   // the hollows of the temples
+      [-1,1].forEach(s=>{ const c=P3([s*4.4,-80.2,7]), vis=(c.z-C.z)/7; if(vis<-0.3) return;            // eye sockets: rounded, a little heavier under the brow
+        const q=ring(s*4.4,-80.2,6.9,3.2,3.4,14,2.1); g.fillStyle='#1b140d'; path(q); g.fill();
+        g.strokeStyle='rgba(62,52,38,0.55)'; g.lineWidth=0.5; const br=[[s*1,-83.9,8.8],[s*4.4,-84.6,8.2],[s*7.6,-83.4,5.6]].map(P3); path(br,false); g.stroke(); });   // brow ridge
+      const ns=[[0,-77.8,9.8],[-1.9,-74.6,9.7],[-0.6,-73.6,9.9],[0,-74,10],[0.6,-73.6,9.9],[1.9,-74.6,9.7]].map(P3); g.fillStyle='#1b140d'; path(ns); g.fill();   // the nose, a little upside-down heart
+      g.fillStyle='#e6dcc0'; path(row(P3,-72.2,-70.3,5)); g.fill();                                             // the upper teeth, set in the skull
+      g.strokeStyle='rgba(70,60,44,0.75)'; g.lineWidth=0.4; path([-5,-4,-3,-2,-1,0,1,2,3,4,5].map(t=>P3([t*0.95,-70.3,arch(t)-0.1])),false); g.stroke();
+      for(let t=-4.2;t<=4.21;t+=1.2){ const a1=P3([t,-72.2,arch(t)+0.1]), b1=P3([t*0.95,-70.3,arch(t)-0.1]); g.beginPath(); g.moveTo(a1.x,a1.y); g.lineTo(b1.x,b1.y); g.stroke(); }
+      [-1,1].forEach(s=>{ const side=(P3([s*9,-77,0]).z-C.z)/9; if(side<0.2) return; g.strokeStyle=`rgba(62,52,38,${0.5*Math.min(1,side)})`; g.lineWidth=0.7;   // on the near side: the cheekbone running back to the ear
+        path([[s*7,-77.6,5.8],[s*9.4,-77.2,1.6],[s*9.6,-76.4,-2.8]].map(P3),false); g.stroke();
+        const ear=P3([s*9.2,-76.4,-4.6]); g.fillStyle=`rgba(27,20,13,${0.7*Math.min(1,side)})`; g.beginPath(); g.ellipse(ear.x,ear.y,0.9,1.2,0,0,PI2); g.fill(); });   // and the ear-hole
+      g.restore();
+      if(!o.pile && skullE>0.6 && face>0){ g.save(); g.globalCompositeOperation='lighter'; const gl=(skullE-0.6)/0.4*Math.min(1,face*1.5);   // a cold green spark deep in each socket
+        [-1,1].forEach(s=>{ const e=P3([s*4.4,-80,6.6]); if((e.z-C.z)/6.6<-0.2) return; glow(e.x,e.y,5,5,'140,230,120',0.45*gl); g.fillStyle=`rgba(200,255,180,${0.85*gl})`; g.beginPath(); g.arc(e.x,e.y,0.9,0,PI2); g.fill(); }); g.restore(); } } });
   }
   // dirt and moss in the joints, which go wherever the bones go
   [[0,-46,3.5,2],[0,-58,5,3],[-12.8,-62,2.5,3],[12.8,-62,2.5,3]].forEach(([a,b,c,i])=>knob(i,[a,b,c],2.6,1.8,'rgba(58,44,26,0.5)'));
@@ -13277,6 +13313,18 @@ const PURPLE_SNUBS=["“Leave, or I'll beat the shit out of you.”","“Your ki
     if(n.wander){ n.path=[]; n.moving=false; n.wait=4; }
     n.dir=dirTo([n.i,n.j],tileOf(player)); player.dir=dirTo(tileOf(player),[n.i,n.j]); player.path=[]; player.moving=false;
     say(n.name,[PURPLE_SNUBS[(hsh((n.id||'').length*7+n.i,n.j)+Math.floor(dayClock/DAY_LEN))%PURPLE_SNUBS.length],"<i>They stare at the purple bandana and will not deal with you while you wear it.</i>"],[bye]); }; }
+// ── the risen dead of the fen: the same old bones a necromancer calls up, only nobody called these ──
+FOES.skeleton={ label:'Skeleton', base:44, stagger:1.1, pattern:[
+  {wait:1.2, wind:0.95, after:0.55, dir:'left'}, {wait:0.5, wind:0.70, after:0.45, dir:'right'}, {wait:1.5, wind:1.15, after:0.70, dir:'up'} ]};
+const RISEN=()=>({gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:'sword',offhand:null}});
+function drawRisen(x,B,e,pose){
+  if(e.dead){ const t=e.fallT||0; drawSkelFig(x,B,{asm:Math.max(0.25,1-t*1.4), emerge:1, dir:e.dir||0}); return; }      // it comes apart and lies there in a heap
+  const k=pose&&pose.kind==='raise'?-0.45*Math.min(1,pose.t):pose&&pose.kind==='strike'?Math.max(0,1-Math.min(1,pose.t)*0.6):0;
+  drawSkelFig(x,B,{asm:1, stand:true, dir:e.dir||0, moving:!!e.moving, walk:gt*9+(e.id||0), k}); }
+wrap('fen','mobs',l=>{ const r=[...l,{ name:'Risen Bones', type:'skeleton', i:8, j:13, faction:'risen', daily:true, opts:RISEN() }];
+  if(nightAmt()>0.5) r.push({ name:'Rattling Bones', type:'skeleton', i:13, j:13, faction:'risen', daily:true, opts:RISEN() },{ name:'Restless Bones', type:'skeleton', i:20, j:18, faction:'risen', daily:true, opts:RISEN() });   // more of them walk at night
+  return r; });
+wrap('fenlow','mobs',l=>[...l,{ name:'Drowned Bones', type:'skeleton', i:9, j:12, faction:'risen', daily:true, opts:RISEN() }]);
 </script>
 </body>
 </html>

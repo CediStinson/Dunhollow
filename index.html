@@ -294,6 +294,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0e0b06;color:#e8d5a
 .sign-plate{position:relative;z-index:1;width:78%;padding:7px 26px 8px 14px;background:linear-gradient(#a27c4c,#7e5c34);color:#2a180a;text-align:left;box-shadow:0 2px 0 #3a2614,0 4px 8px rgba(0,0,0,0.4);clip-path:polygon(0 0,calc(100% - 18px) 0,100% 50%,calc(100% - 18px) 100%,0 100%);}
 .sign-plate.left{align-self:flex-start;padding:7px 14px 8px 26px;clip-path:polygon(18px 0,100% 0,100% 100%,18px 100%,0 50%);text-align:right;}
 .sign-plate.right{align-self:flex-end;}
+.sign-plate.up{align-self:center;width:70%;padding:20px 14px 8px;text-align:center;clip-path:polygon(50% 0,100% 16px,100% 100%,0 100%,0 16px);}
 .sign-plate.broken{width:62%;clip-path:polygon(0 0,100% 0,94% 30%,100% 55%,93% 78%,100% 100%,0 100%);background:linear-gradient(#8a6a40,#6a4c2a);}
 .sign-plate b{display:block;font:bold 15px Georgia,serif;letter-spacing:3px;color:#2a160a;text-shadow:0 1px 0 rgba(255,230,180,0.35);}
 .sign-plate span{display:block;font:12px Georgia,serif;line-height:1.35;color:#2e1c0c;}
@@ -5036,8 +5037,8 @@ function readSignpost(sp){                      // a small signpost of your own 
   let ov=document.getElementById('sign-overlay');
   if(!ov){ ov=document.createElement('div'); ov.id='sign-overlay'; document.body.appendChild(ov); }
   const P=signPlanks(sp), esc=t=>String(t).replace(/</g,'&lt;');
-  ov.innerHTML=`<div class="sign-card"><div class="sign-title">${sp.city?'A Milestone':'A Weathered Signpost'}</div><div class="sign-post"><div class="sign-pole"></div>${P.map(p=>{ const right=Math.cos(p.ang)>=0;
-      return `<div class="sign-plate ${right?'right':'left'}${p.broken?' broken':''}"><b>${p.broken?'':esc(p.label|| (p.wolf?'🐺':''))}</b><span><i>${esc(p.dir)}.</i> ${esc(p.text)}</span>${p.note?`<em>${esc(p.note)}</em>`:''}</div>`; }).join('')}</div>
+  ov.innerHTML=`<div class="sign-card"><div class="sign-title">${sp.city?'A Milestone':'A Weathered Signpost'}</div><div class="sign-post"><div class="sign-pole"></div>${P.map(p=>{ const cs=Math.cos(p.ang), side=Math.abs(cs)<0.35?'up':cs>0?'right':'left';
+      return `<div class="sign-plate ${side}${p.broken?' broken':''}"><b>${p.broken?'':esc(p.label|| (p.wolf?'🐺':''))}</b><span><i>${esc(p.dir)}.</i> ${esc(p.text)}</span>${p.note?`<em>${esc(p.note)}</em>`:''}</div>`; }).join('')}</div>
     <button class="sign-close" type="button">Step back.</button></div>`;
   ov.querySelector('.sign-close').onclick=()=>ov.classList.remove('open');
   ov.classList.add('open'); }
@@ -5185,14 +5186,15 @@ function openHint(o,x,y){ if(!player || combat.active || cheb([o.i,o.j],[player.
   g.globalAlpha=a; g.fillStyle='rgba(20,14,6,0.8)'; g.beginPath(); g.roundRect(x-w/2,y-15,w,18,5); g.fill(); g.strokeStyle='rgba(200,160,90,0.7)'; g.lineWidth=1; g.stroke();
   g.fillStyle='#f0d890'; g.fillText(t,x,y-2); g.restore(); }
 // what each signpost says: one wooden plate per direction (ang: which way the arrow points on screen)
-function signPlanks(sp){
+function signPlanks(sp){                            // each plank points roughly the way its road leaves the room
   if(sp.city) return [
-    { ang:0.3,  len:22, col:'#9a7446', label:'DUNHOLLOW',  dir:'East',  text:'The forest road runs on to Dunhollow, a village a mile on.' },
-    { ang:Math.PI+0.32, len:21, col:'#8a6a3e', label:'HOLLOWMERE', dir:'North', text:'Hollowmere, seat of Baron Bertram. Tolls payable at the gate.', note:'Someone has scratched underneath: “and at every gate after”.' } ];
+    { ang:-1.35, len:21, col:'#8a6a3e', label:'HOLLOWMERE', dir:'North', text:'The King\'s Road to Hollowmere, seat of Baron Bertram. Tolls payable at the gate.', note:'Someone has scratched underneath: “and at every gate after”.' },
+    { ang:0.45,  len:22, col:'#9a7446', label:'DUNHOLLOW',  dir:'East',  text:'The forest road runs on to Dunhollow, a village a mile on.' },
+    { ang:Math.PI+0.4, len:18, col:'#826238', label:((player&&player.name)||'Your')+"'s Farm", dir:'West', text:'Back along the road to your own fields, and your own front door.', home:true } ];
   return [
-    { ang:-0.12, len:20, col:'#9a7446', label:'DUNHOLLOW', dir:'East', text:'The Mill Track to Dunhollow, a village a mile on.' },
-    { ang:Math.PI+0.18, len:17, col:'#8a6a3e', label:'', wolf:true, dir:'North', text:"No words. Someone has scratched a crude wolf's head into the arrow." },
-    { ang:-0.35, len:6, col:'#826238', label:'', broken:true, dir:'South', text:'Someone has hacked the arrow off. Smoke rises beyond the trees.' } ];
+    { ang:-0.45, len:17, col:'#8a6a3e', label:'', wolf:true, dir:'North', text:"No words. Someone has scratched a crude wolf's head into the arrow." },
+    { ang:0.45,  len:20, col:'#9a7446', label:'DUNHOLLOW', dir:'East', text:'The Mill Track to Dunhollow, a village a mile on.' },
+    { ang:Math.PI-0.45, len:6, col:'#826238', label:'', broken:true, dir:'South', text:'Someone has hacked the arrow off. Smoke rises beyond the trees.' } ];
 }
 function paintSignpost(x,y,sp){
     const sh=g.createRadialGradient(x+6,y+2,0,x+6,y+2,18); sh.addColorStop(0,'rgba(0,0,0,0.4)'); sh.addColorStop(1,'rgba(0,0,0,0)');
@@ -5672,7 +5674,8 @@ function paintFlowers(x,y){
     g.strokeStyle='#4f6e2c'; g.lineWidth=0.8; g.beginPath(); g.moveTo(fx,fy); g.lineTo(fx,fy-5); g.stroke();
     g.fillStyle=['#e84a5a','#f0d060','#f2ede0','#b894d8'][k%4]; g.beginPath(); g.arc(fx,fy-6,1.6,0,Math.PI*2); g.fill(); }
 }
-function paintBed(x,y){
+function paintBed(x,y,bl){                             // bl: the blanket's colour
+  bl=bl||'#8a3a2a';
   const T=TW/2, H2=TH/2, pt=(gi,gj,h=0)=>({x:x+(gi-gj)*T, y:y+(gi+gj)*H2-h});   // relative to the first tile's centre
   const quad=(pts,f)=>{ g.fillStyle=f; g.beginPath(); g.moveTo(pts[0].x,pts[0].y); pts.slice(1).forEach(p=>g.lineTo(p.x,p.y)); g.closePath(); g.fill(); };
   const i0=-0.42, i1=1.42, j0=-0.34, j1=0.34;
@@ -5680,7 +5683,8 @@ function paintBed(x,y){
     quad([pt(a0,b1,h0),pt(a1,b1,h0),pt(a1,b1,h1),pt(a0,b1,h1)],left);       // +j face
     quad([pt(a1,b0,h0),pt(a1,b1,h0),pt(a1,b1,h1),pt(a1,b0,h1)],right);      // +i face
     quad([pt(a0,b0,h1),pt(a1,b0,h1),pt(a1,b1,h1),pt(a0,b1,h1)],top); };
-  g.fillStyle='rgba(10,6,2,0.32)'; g.beginPath(); const c=pt(0.5,0.1); g.ellipse(c.x+6,c.y+4,T*1.4,H2*0.9,0.46,0,Math.PI*2); g.fill();
+  quad([pt(i0-0.02,j0-0.02),pt(i1+0.14,j0-0.02),pt(i1+0.14,j1+0.16),pt(i0-0.02,j1+0.16)],'rgba(10,6,2,0.3)');   // its shadow, the shape of the bed, falling a little toward us
+  quad([pt(i0+0.04,j0+0.04),pt(i1+0.06,j0+0.04),pt(i1+0.06,j1+0.08),pt(i0+0.04,j1+0.08)],'rgba(10,6,2,0.22)');
   // headboard at the head end (i0, the far end): drawn first so the mattress and pillow sit in front of it
   [[j0],[j1]].forEach(([b])=>box(i0-0.07,i0+0.04,b-0.04,b+0.03,0,36,'#5a3a1c','#4a2e16','#3a2412'));
   box(i0-0.05,i0+0.02,j0,j1,12,31,'#7a5230','#6a4424','#5a3a1c');
@@ -5692,7 +5696,7 @@ function paintBed(x,y){
   // straw mattress, a little inset and rounded by shading
   box(i0+0.05,i1-0.05,j0+0.04,j1-0.04,11,16,'#d8c890','#bfae74','#a8985e');
   // wool blanket over the foot two-thirds, folded back at the top
-  box(i0+0.55,i1-0.03,j0+0.02,j1-0.02,16,18,'#8a3a2a','#6e2e22','#5a2418');
+  box(i0+0.55,i1-0.03,j0+0.02,j1-0.02,16,18,bl,tone(bl,-0.2),tone(bl,-0.35));
   quad([pt(i0+0.52,j0+0.02,18.2),pt(i0+0.66,j0+0.02,18.2),pt(i0+0.66,j1-0.02,18.2),pt(i0+0.52,j1-0.02,18.2)],'#e8dcc0');   // folded sheet edge
   g.strokeStyle='rgba(40,12,8,0.35)'; g.lineWidth=0.8;
   for(let t=0.25;t<1;t+=0.25){ const a=pt(i0+0.66+(i1-0.03-i0-0.66)*t,j0+0.02,18), b=pt(i0+0.66+(i1-0.03-i0-0.66)*t,j1-0.02,18); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); }
@@ -5700,7 +5704,7 @@ function paintBed(x,y){
   const pc=pt(i0+0.24,0,19); g.fillStyle='#f0e8d4'; g.beginPath(); g.ellipse(pc.x,pc.y,T*0.3,H2*0.28,-0.46,0,Math.PI*2); g.fill();
   g.strokeStyle='rgba(120,100,60,0.45)'; g.lineWidth=0.7; g.stroke();
   // blanket drapes over the near side a little
-  quad([pt(i0+0.55,j1-0.02,18),pt(i1-0.03,j1-0.02,18),pt(i1-0.03,j1+0.03,9),pt(i0+0.55,j1+0.03,9)],'#6e2e22');
+  quad([pt(i0+0.55,j1-0.02,18),pt(i1-0.03,j1-0.02,18),pt(i1-0.03,j1+0.03,9),pt(i0+0.55,j1+0.03,9)],tone(bl,-0.2));
   // low footboard
   box(i1,i1+0.06,j0,j1,5,22,'#7a5230','#6a4424','#5a3a1c');
   g.strokeStyle='rgba(30,16,6,0.45)'; g.lineWidth=0.7;
@@ -5748,6 +5752,10 @@ function drawFireplace(o){
   courses(F1,F2,H,WALLTOP,0.34); courses(F2,E2,H,WALLTOP,0);
   const gs=g.createLinearGradient(0,up(F1,WALLTOP).y,0,up(F1,H+30).y); gs.addColorStop(0,'rgba(20,14,10,0.45)'); gs.addColorStop(1,'rgba(20,14,10,0)');   // soot gathering under the ceiling
   g.fillStyle=gs; g.beginPath(); [up(F1,H),up(F2,H),up(F2,WALLTOP),up(F1,WALLTOP)].forEach((q,k)=>k?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.closePath(); g.fill();
+  { const th=0.09, T0=up(P(0,cj0),WALLTOP), T1=up(P(cd,cj0),WALLTOP), T2=up(F2,WALLTOP), T3=up(E2,WALLTOP);    // its top, cut off by the ceiling: four stone walls round a black flue
+    poly([T0,T1,T2,T3],'#7a7264',EDGE);
+    poly([up(P(th,cj0+th),WALLTOP),up(P(cd-th,cj0+th),WALLTOP),up(P(cd-th,cj1-th),WALLTOP),up(P(th,cj1-th),WALLTOP)],'#0c0806');
+    g.strokeStyle='rgba(170,160,140,0.5)'; g.lineWidth=0.7; g.beginPath(); g.moveTo(T1.x,T1.y); g.lineTo(T2.x,T2.y); g.lineTo(T3.x,T3.y); g.stroke(); }
   g.strokeStyle='#2a1a0c'; g.lineWidth=4; g.beginPath(); const tb0=up(P(0,cj0-0.25),WALLTOP), tb1=up(F1,WALLTOP), tb2=up(F2,WALLTOP), tb3=up(E2,WALLTOP);   // the ceiling beam runs across its top
   g.moveTo(tb1.x,tb1.y); g.lineTo(tb2.x,tb2.y); g.lineTo(tb3.x,tb3.y); g.stroke();
   const ledge=[up(P(cd+0.03,cj0-0.03),H+3),up(P(cd+0.03,cj1+0.03),H+3),up(P(0,cj1+0.03),H+3)];                      // a small stone ledge where it meets the slab
@@ -5841,11 +5849,12 @@ function drawFaceExtras(c,x,B,opts,P,pr,LN,skin){ const Y=BODY, M=opts.marks, F=
       // each end runs to the side of the head just above the ear; the inner one crosses the brow, the outer one stays short and steep
       const endL=[LN-HW, Y.EAR_TOP-1.2], endR=[pr>0.8 ? LN-HW*0.2 : LN+HW, Y.EAR_TOP-1.2];
       [[cl,endL],[cr,endR]].forEach(([a,b2])=>{ c.beginPath(); c.moveTo(x+a[0],B+a[1]); c.quadraticCurveTo(x+(a[0]+b2[0])/2,B+Math.min(a[1],b2[1])-1.6,x+b2[0],B+b2[1]); c.stroke(); });
+      if(pr>0.8){ c.beginPath(); c.moveTo(x+endR[0],B+endR[1]); c.quadraticCurveTo(x+LN-HW*0.62,B+Y.EAR_TOP-2.2,x+LN-HW+0.2,B+Y.EAR_TOP-0.4); c.stroke(); }   // in profile the cord goes on, over the ear and round the back of the head
       c.fillStyle='#2e2016'; c.beginPath(); c.ellipse(x+e.cx,B+py,rx,ry,0,0,Math.PI*2); c.fill();
       c.strokeStyle='#4a3626'; c.lineWidth=0.4; c.beginPath(); c.ellipse(x+e.cx,B+py,rx-0.5,ry-0.5,0,0,Math.PI*2); c.stroke();
       [cl,cr].forEach(([a,b])=>{ c.fillStyle='#1a120a'; c.beginPath(); c.arc(x+a,B+b,0.45,0,Math.PI*2); c.fill(); }); }      // the cord's knots on the patch
     else { c.beginPath();                                        // the patch is round the far side: only the cord, from the brow back to above the ear
-      if(pr>0.8){ c.moveTo(x+LN+HW-0.6,B+Y.BROW-0.8); c.quadraticCurveTo(x+LN+HW*0.3,B+Y.BROW-2.6,x+LN-HW*0.2,B+Y.EAR_TOP-1.2); }
+      if(pr>0.8){ c.moveTo(x+LN+HW-0.6,B+Y.BROW-0.8); c.quadraticCurveTo(x+LN+HW*0.3,B+Y.BROW-2.6,x+LN-HW*0.2,B+Y.EAR_TOP-1.2); c.quadraticCurveTo(x+LN-HW*0.62,B+Y.EAR_TOP-2.2,x+LN-HW+0.2,B+Y.EAR_TOP-0.4); }
       else { c.moveTo(x+LN-HW,B+Y.EAR_TOP-1.2); c.quadraticCurveTo(x+LN,B+Y.HAIRLINE+4.6,x+LN+HW,B+Y.EAR_TOP-1.2); }
       c.stroke(); } }
   c.restore(); }
@@ -6326,8 +6335,8 @@ function paintGateArch(x,y){                               // the gatehouse betw
   g.strokeStyle='#3a3a3a'; g.lineWidth=2; for(let t=0.12;t<0.9;t+=0.09){ g.beginPath(); g.moveTo(q(t,ht-62).x,q(t,ht-62).y); g.lineTo(q(t,ht-78).x,q(t,ht-78).y); g.stroke(); }   // raised portcullis teeth
   g.fillStyle='#7a1a1a'; const bm=q(0.5,ht-8); g.fillRect(bm.x-14,bm.y-4,28,40); g.fillStyle='#e8c060'; g.font='bold 16px Georgia,serif'; g.textAlign='center'; g.fillText('B',bm.x,bm.y+22); g.textAlign='left';
 }
-function paintOuterWall(x,y,len,seed=0){            // Hollowmere's outer wall: old, thin, patched; moss and ivy, cracks, gaps in the battlements
-  const dx=TW/2, dy=TH/2, H=62, BK={x:dx*0.3,y:-dy*0.3}, R=(k,n)=>rnd01(k*7+seed*31,n,150+seed);
+function paintOuterWall(x,y,len,seed=0,end=false){            // Hollowmere's outer wall: old, thin, patched; moss and ivy, cracks, gaps in the battlements
+  const dx=TW/2, dy=TH/2, H=92, BK={x:dx*0.3,y:-dy*0.3}, R=(k,n)=>rnd01(k*7+seed*31,n,150+seed);
   const sag=t=>Math.sin(t*len*1.3+seed)*3+Math.sin(t*len*0.37+seed*2)*4;                     // the top is not straight any more
   const f=(t,h)=>({x:x+dx*len*t, y:y+dy*len*t-h});
   const poly=(pts,fill)=>{ g.beginPath(); pts.forEach((p2,n)=>n?g.lineTo(p2.x,p2.y):g.moveTo(p2.x,p2.y)); g.closePath(); g.fillStyle=fill; g.fill(); };
@@ -6351,6 +6360,7 @@ function paintOuterWall(x,y,len,seed=0){            // Hollowmere's outer wall: 
   for(let k=0;k<N*1.5;k++){ const t=R(k,70); if(inGap(t)) continue; const m=f(t,top(t)-1);                                       // moss along the top, ivy hanging down
     g.fillStyle='rgba(78,104,46,0.75)'; g.beginPath(); g.ellipse(m.x,m.y,5+R(k,71)*6,2.4,0.46,0,Math.PI*2); g.fill();
     if(R(k,72)<0.35){ g.strokeStyle='rgba(60,90,40,0.85)'; g.lineWidth=1.4; g.beginPath(); g.moveTo(m.x,m.y); let yy=m.y; for(let s2=0;s2<6;s2++){ yy+=4+R(k,73+s2)*4; g.lineTo(m.x+Math.sin(s2*1.7+k)*2,yy); } g.stroke(); } }
+  if(end){ const e0=f(1,0), e1=back(f(1,0)), e2=back(f(1,top(1))), e3=f(1,top(1)); poly([e0,e1,e2,e3],'#6a6456'); g.strokeStyle='rgba(36,32,26,0.4)'; g.lineWidth=0.6; for(let h=9;h<top(1);h+=9){ const a=f(1,h), b=back(f(1,h)); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); } }   // the wall's squared-off end
   g.fillStyle='rgba(84,104,52,0.6)'; for(let t=0.02;t<1;t+=0.05){ if(inGap(t)) continue; const m=f(t,2); g.beginPath(); g.ellipse(m.x,m.y,8,3.6,0.46,0,Math.PI*2); g.fill(); }   // weeds at the foot
   if(gap){ for(let t=gap[0];t<gap[0]+gap[1];t+=gap[1]/7){ const a=f(t,0), hh=48+R(Math.round(t*100),80)*12;                       // the stakes in the gap, and the rubble below
       g.fillStyle='#5a4228'; g.fillRect(a.x-2.4,a.y-hh,4.8,hh); g.fillStyle='#3e2c18'; g.beginPath(); g.moveTo(a.x-2.4,a.y-hh); g.lineTo(a.x,a.y-hh-5); g.lineTo(a.x+2.4,a.y-hh); g.fill(); }
@@ -6359,25 +6369,25 @@ function paintOuterWall(x,y,len,seed=0){            // Hollowmere's outer wall: 
 function paintLowGate(x,y,shut){                    // a narrow town gate: two squat stone posts, a weathered timber lintel under a little shingle roof
   const dx=TW/2, dy=TH/2, W=0.62, L=(u,h)=>({x:x+dx*u, y:y+dy*u-h});
   const poly=(pts,fill)=>{ g.beginPath(); pts.forEach((p2,n)=>n?g.lineTo(p2.x,p2.y):g.moveTo(p2.x,p2.y)); g.closePath(); g.fillStyle=fill; g.fill(); };
-  poly([L(-W,0),L(W,0),L(W,58),L(-W,58)],'rgba(14,10,6,0.85)');                              // the passage
-  if(shut){ [[-W,0],[0,W]].forEach(([a,b],k)=>{ poly([L(a,0),L(b,0),L(b,56),L(a,56)],k?'#5a3e22':'#4e3520');
-      g.strokeStyle='rgba(20,12,4,0.55)'; g.lineWidth=0.8; for(let u=a+(b-a)/4;u<b-0.01;u+=(b-a)/4){ g.beginPath(); g.moveTo(L(u,0).x,L(u,0).y); g.lineTo(L(u,56).x,L(u,56).y); g.stroke(); }
-      g.strokeStyle='#2a2622'; g.lineWidth=2.4; [12,40].forEach(h=>{ g.beginPath(); g.moveTo(L(a+0.02,h).x,L(a+0.02,h).y); g.lineTo(L(b-0.02,h).x,L(b-0.02,h).y); g.stroke(); });
-      g.strokeStyle='rgba(30,20,10,0.6)'; g.lineWidth=1.6; g.beginPath(); g.moveTo(L(a+0.02,12).x,L(a+0.02,12).y); g.lineTo(L(b-0.02,40).x,L(b-0.02,40).y); g.stroke(); });   // a Z-brace
-    g.fillStyle='#3a3428'; const bar=L(0,26); g.fillRect(bar.x-14,bar.y-2,28,4); }              // the bar across
-  else { poly([L(-W,0),L(-W+0.12,0),L(-W+0.12,56),L(-W,56)],'#4e3520'); poly([L(W-0.12,0),L(W,0),L(W,56),L(W-0.12,56)],'#5a3e22'); }   // swung back
+  poly([L(-W,0),L(W,0),L(W,84),L(-W,84)],'rgba(14,10,6,0.85)');                              // the passage
+  if(shut){ [[-W,0],[0,W]].forEach(([a,b],k)=>{ poly([L(a,0),L(b,0),L(b,82),L(a,82)],k?'#5a3e22':'#4e3520');
+      g.strokeStyle='rgba(20,12,4,0.55)'; g.lineWidth=0.8; for(let u=a+(b-a)/4;u<b-0.01;u+=(b-a)/4){ g.beginPath(); g.moveTo(L(u,0).x,L(u,0).y); g.lineTo(L(u,82).x,L(u,82).y); g.stroke(); }
+      g.strokeStyle='#2a2622'; g.lineWidth=2.4; [14,44,70].forEach(h=>{ g.beginPath(); g.moveTo(L(a+0.02,h).x,L(a+0.02,h).y); g.lineTo(L(b-0.02,h).x,L(b-0.02,h).y); g.stroke(); });
+      g.strokeStyle='rgba(30,20,10,0.6)'; g.lineWidth=1.6; g.beginPath(); g.moveTo(L(a+0.02,12).x,L(a+0.02,12).y); g.lineTo(L(b-0.02,70).x,L(b-0.02,70).y); g.stroke(); });   // a Z-brace
+    g.fillStyle='#3a3428'; const bar=L(0,38); g.fillRect(bar.x-14,bar.y-2,28,4); }              // the bar across
+  else { poly([L(-W,0),L(-W+0.12,0),L(-W+0.12,82),L(-W,82)],'#4e3520'); poly([L(W-0.12,0),L(W,0),L(W,82),L(W-0.12,82)],'#5a3e22'); }   // swung back
   [[-W-0.28,-W],[W,W+0.28]].forEach(([a,b])=>{ const gr=g.createLinearGradient(L(a,0).x,0,L(b,0).x,0); gr.addColorStop(0,'#8a8474'); gr.addColorStop(1,'#5e594c');   // the posts
-    poly([L(a,0),L(b,0),L(b,74),L(a,74)],gr); g.strokeStyle='rgba(36,32,26,0.4)'; g.lineWidth=0.6; for(let h=10;h<74;h+=10){ g.beginPath(); g.moveTo(L(a,h).x,L(a,h).y); g.lineTo(L(b,h).x,L(b,h).y); g.stroke(); }
-    g.fillStyle='rgba(78,104,46,0.7)'; const m=L((a+b)/2,73); g.beginPath(); g.ellipse(m.x,m.y,7,2.6,0.46,0,Math.PI*2); g.fill(); });
-  poly([L(-W-0.34,58),L(W+0.34,58),L(W+0.34,66),L(-W-0.34,66)],'#5a4228');                  // the lintel beam
-  poly([L(-W-0.42,66),L(W+0.42,66),{x:L(W+0.42,66).x+10,y:L(W+0.42,66).y-14},{x:L(-W-0.42,66).x+10,y:L(-W-0.42,66).y-14}],'#4a3a2a');   // a little roof of old shingles
-  g.strokeStyle='rgba(20,14,8,0.5)'; g.lineWidth=0.7; for(let u=-W-0.4;u<W+0.4;u+=0.14){ const a=L(u,66); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(a.x+10,a.y-14); g.stroke(); }
-  const bn=L(0,64); g.fillStyle=BARON_DOWN()?'#3a4a6a':'#6a2a22'; g.beginPath(); g.moveTo(bn.x-7,bn.y); g.lineTo(bn.x+7,bn.y); g.lineTo(bn.x+7,bn.y+20); g.lineTo(bn.x+2,bn.y+16); g.lineTo(bn.x-3,bn.y+22); g.lineTo(bn.x-7,bn.y+17); g.closePath(); g.fill();   // a faded, ragged pennant
+    poly([L(a,0),L(b,0),L(b,104),L(a,104)],gr); g.strokeStyle='rgba(36,32,26,0.4)'; g.lineWidth=0.6; for(let h=10;h<104;h+=10){ g.beginPath(); g.moveTo(L(a,h).x,L(a,h).y); g.lineTo(L(b,h).x,L(b,h).y); g.stroke(); }
+    g.fillStyle='rgba(78,104,46,0.7)'; const m=L((a+b)/2,103); g.beginPath(); g.ellipse(m.x,m.y,7,2.6,0.46,0,Math.PI*2); g.fill(); });
+  poly([L(-W-0.34,84),L(W+0.34,84),L(W+0.34,94),L(-W-0.34,94)],'#5a4228');                  // the lintel beam
+  poly([L(-W-0.42,94),L(W+0.42,94),{x:L(W+0.42,94).x+10,y:L(W+0.42,94).y-14},{x:L(-W-0.42,94).x+10,y:L(-W-0.42,94).y-14}],'#4a3a2a');   // a little roof of old shingles
+  g.strokeStyle='rgba(20,14,8,0.5)'; g.lineWidth=0.7; for(let u=-W-0.4;u<W+0.4;u+=0.14){ const a=L(u,94); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(a.x+10,a.y-14); g.stroke(); }
+  const bn=L(0,92); g.fillStyle='#7a1a1a'; g.beginPath(); g.moveTo(bn.x-7,bn.y); g.lineTo(bn.x+7,bn.y); g.lineTo(bn.x+7,bn.y+20); g.lineTo(bn.x+2,bn.y+16); g.lineTo(bn.x-3,bn.y+22); g.lineTo(bn.x-7,bn.y+17); g.closePath(); g.fill();   // a faded, ragged pennant
 }
 function paintWatchtower(x,y){                      // a makeshift lookout: four rough posts, cross-braced, a plank platform and a lean-to roof
-  const T=(u,v,h)=>({x:x+(u-v)*TW/2*0.42, y:y+(u+v)*TH/2*0.42-h});
+  const T=(u,v,h)=>({x:x+(u-v)*TW/2*0.56, y:y+(u+v)*TH/2*0.56-h});
   const line2=(a,b,w,c)=>{ g.strokeStyle=c; g.lineWidth=w; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); };
-  const legs=[[-1,-1],[1,-1],[1,1],[-1,1]], H=150;
+  const legs=[[-1,-1],[1,-1],[1,1],[-1,1]], H=112;
   g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x,y+4,40,14,0,0,Math.PI*2); g.fill();
   [[0,1],[1,2],[2,3],[3,0]].forEach(([a,b],k)=>{ const A=legs[a], B=legs[b]; line2(T(A[0],A[1],10),T(B[0],B[1],H*0.55),1.8,'#4e3a22'); line2(T(B[0],B[1],10),T(A[0],A[1],H*0.55),1.8,'#4e3a22'); });   // cross-bracing
   legs.forEach(([u,v],k)=>line2(T(u,v,0),T(u*0.85,v*0.85,H+(k===1?6:0)),4.2,k===2||k===3?'#5e4428':'#4a3420'));           // the posts, not quite straight
@@ -6389,7 +6399,7 @@ function paintWatchtower(x,y){                      // a makeshift lookout: four
   g.strokeStyle='rgba(20,14,8,0.5)'; g.lineWidth=0.7; for(let t=0.1;t<1;t+=0.12){ const a={x:rf[0].x+(rf[3].x-rf[0].x)*t,y:rf[0].y+(rf[3].y-rf[0].y)*t}, b={x:rf[1].x+(rf[2].x-rf[1].x)*t,y:rf[1].y+(rf[2].y-rf[1].y)*t}; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); }
   const lad=[T(1.2,1.6,0),T(1,1.1,H)]; [-3,3].forEach(o2=>line2({x:lad[0].x+o2,y:lad[0].y},{x:lad[1].x+o2,y:lad[1].y},1.4,'#5a4228'));   // a ladder up the front
   for(let t=0.08;t<1;t+=0.09){ const q={x:lad[0].x+(lad[1].x-lad[0].x)*t,y:lad[0].y+(lad[1].y-lad[0].y)*t}; line2({x:q.x-3,y:q.y},{x:q.x+3,y:q.y},1.2,'#6a5034'); }
-  const fp=T(-1.1,-1.1,H+50); line2(fp,{x:fp.x,y:fp.y-26},1.2,'#3a2a1a'); g.fillStyle=BARON_DOWN()?'#3a4a6a':'#6a2a22'; g.beginPath(); g.moveTo(fp.x,fp.y-26); g.lineTo(fp.x+14,fp.y-22); g.lineTo(fp.x+9,fp.y-19); g.lineTo(fp.x+13,fp.y-15); g.lineTo(fp.x,fp.y-17); g.closePath(); g.fill();   // a frayed flag
+  const fp=T(-1.1,-1.1,H+50); line2(fp,{x:fp.x,y:fp.y-26},1.2,'#3a2a1a'); g.fillStyle='#7a1a1a'; g.beginPath(); g.moveTo(fp.x,fp.y-26); g.lineTo(fp.x+14,fp.y-22); g.lineTo(fp.x+9,fp.y-19); g.lineTo(fp.x+13,fp.y-15); g.lineTo(fp.x,fp.y-17); g.closePath(); g.fill();   // a frayed flag
 }
 function paintGateDoors(x,y,shut){                 // under the gatehouse arch: oak doors bound in iron
   const dx=TW/2, dy=TH/2, ht=150, span=[{x:x-dx*1.5,y:y-dy*1.5},{x:x+dx*1.5,y:y+dy*1.5}];
@@ -6990,7 +7000,7 @@ function drawObject(o){
     }
     g.restore();
   } else if(o.type==='signpost'){
-    drawCached('signpost'+(o.city?'c':'x'),x,y,80,80,40,66,(X,Y)=>paintSignpost(X,Y,o));
+    drawCached('signpost2'+(o.city?'c':'x'),x,y,90,90,45,72,(X,Y)=>paintSignpost(X,Y,o));
   } else if(o.type==='bed'){
     drawCached('bed2',x,y,280,170,110,100,paintBed);
   } else if(o.type==='hearth' && o.i===0){ drawFireplace(o);           // indoors: a stone fireplace built into the wall, not a campfire on the floorboards
@@ -7083,12 +7093,12 @@ function drawObject(o){
     const pp=P(player.x,player.y), behind=Math.abs(player.x-(o.i+0.5))<2.5 && player.y<o.j+0.6 && player.y>o.j-2.5; o.fade=lerpN(o.fade??1, behind?0.34:1, 0.2);
     const ga=g.globalAlpha; g.globalAlpha=ga*o.fade; drawCached('gatearch',x,y,320,300,160,250,paintGateArch,1); g.globalAlpha=ga;
   } else if(o.type==='outerwall'){                 // a stretch of the town's outer wall, running along i
-    const a=P(o.i,o.j+0.5); drawCached('owall'+o.len+'_'+(o.seed||0),a.x,a.y,o.len*TW/2+80,o.len*TH/2+170,40,140,(X,Y)=>paintOuterWall(X,Y,o.len,o.seed||0),1);
+    const a=P(o.i,o.j+0.5); drawCached('owall2_'+o.len+'_'+(o.seed||0)+(o.end?'e':''),a.x,a.y,o.len*TW/2+90,o.len*TH/2+200,40,170,(X,Y)=>paintOuterWall(X,Y,o.len,o.seed||0,!!o.end),1);
   } else if(o.type==='lowgate'){                   // a narrow gate in the wall: two stone posts, a timber lintel, and the doors
-    const shut=!(o.open&&o.open()), a=P(o.i+0.5,o.j+0.5); drawCached('lowgate'+(shut?1:0),a.x,a.y,180,200,90,160,(X,Y)=>paintLowGate(X,Y,shut),1);
+    const shut=!(o.open&&o.open()), a=P(o.i+0.5,o.j+0.5); drawCached('lowgate2'+(shut?1:0),a.x,a.y,180,230,90,190,(X,Y)=>paintLowGate(X,Y,shut),1);
   } else if(o.type==='watchtower'){
     const a=P(o.i+0.5,o.j+0.5), behind=Math.abs(P(player.x,player.y).x-a.x)<60 && player.x+player.y<o.i+o.j+2; o.fade=lerpN(o.fade??1, behind?0.4:1, 0.2);
-    const ga=g.globalAlpha; g.globalAlpha=ga*o.fade; drawCached('watchtower'+(BARON_DOWN()?1:0),a.x,a.y,140,300,70,270,(X,Y)=>paintWatchtower(X,Y),1); g.globalAlpha=ga;
+    const ga=g.globalAlpha; g.globalAlpha=ga*o.fade; drawCached('watchtower2',a.x,a.y,170,260,85,230,(X,Y)=>paintWatchtower(X,Y),1); g.globalAlpha=ga;
   } else if(o.type==='gatedoors'){                // the gate's two oak leaves: shut across the passage, or swung back against the walls
     const shut=!(o.open&&o.open()), behind=Math.abs(player.x-(o.i+0.5))<2.5 && player.y<o.j+0.6 && player.y>o.j-2.5; o.fade=lerpN(o.fade??1, behind?0.34:1, 0.2);
     const ga=g.globalAlpha; g.globalAlpha=ga*o.fade; drawCached('gatedoors'+(shut?1:0),x,y,320,300,160,250,(X,Y)=>paintGateDoors(X,Y,shut),1); g.globalAlpha=ga;
@@ -10132,8 +10142,8 @@ Object.assign(AREAS,{
       // the road ends at Hollowmere's outer wall: a gatehouse between two towers, the wall running off into the trees on both sides
       // the road's end is Hollowmere's outer wall, corner to corner: a narrow gate over the road, a makeshift wooden lookout built into the wall
       {type:'outerwall', i:0, j:-0.5, fp:[4,1], len:3.88, seed:1, noblock:true}, {type:'lowgate', i:4, j:-0.5, noblock:true, open:()=>wildDone() && cityOpen()},
-      {type:'outerwall', i:5.12, j:-0.5, fp:[1,1], len:0.98, seed:2, noblock:true}, {type:'watchtower', i:6, j:-0.6, noblock:true},
-      {type:'outerwall', i:6.9, j:-0.5, fp:[1,1], len:1.1, seed:3, noblock:true} ],
+      {type:'outerwall', i:5.12, j:-0.5, fp:[3,1], len:2.88, seed:2, end:true, noblock:true}, {type:'watchtower', i:6, j:-1.1, noblock:true},
+      {type:'baronbanner', i:1.6, j:-0.5, fp:[3,1], noblock:true}, {type:'baronbanner', i:5.7, j:-0.5, fp:[3,1], noblock:true} ],
     npcs:()=>[ ...[[3,1],[6,1]].map(([i,j],k)=>({ id:'krgateguard'+k, name:BARON_DOWN()?'Crown Soldier':"Baron's Gate Guard", i, j, dir:1, opts:GUARD({skin:[1,3][k],hair:[2,0][k],beard:[3,1][k]}) })),
       ...(BARON_DOWN() ? [] : [{ id:'tollman', name:"Toll-keeper Brisk", i:2, j:20, dir:1, opts:GUARD({skin:2,hair:3,beard:4,equip:{head:'kettle',torso:'tunic_red',armor:'gambeson',hands:'gloves',legs:'hose_grey',feet:'boots',weapon:null,offhand:null}}) }]),
       ...(encounter('pilgrim',0.6) ? [{ id:'pilgrim', name:'A Pilgrim', i:5, j:15, dir:6, wander:[[4,5],[4,26],[3,15]], named:true, speed:0.7, opts:{gender:'m',skin:1,hair:2,hairColor:12,beard:5,face:0,equip:{head:'hood',torso:'smock',armor:null,hands:null,legs:'hose_grey',feet:null,weapon:null,offhand:null}} }] : []) ],
@@ -14564,6 +14574,68 @@ Object.assign(ITEMS,{ shovel:{ name:'Spade', slot:'weapon' } }); Object.assign(W
     c.fillStyle='#a8aaae'; c.beginPath(); c.moveTo(33,-4); c.quadraticCurveTo(36,0,33,4); c.lineTo(34,4.2); c.quadraticCurveTo(37,0,34,-4.2); c.fill();
     c.fillStyle='rgba(70,50,30,0.6)'; c.beginPath(); c.ellipse(28,1.5,3,1.6,0,0,Math.PI*2); c.fill();               // earth on it
     c.restore(); }; }
+// ── tables and benches, built in the room's own perspective so they sit square on the floor ──
+function furnPt(x,y){ return (u,v,h=0)=>({x:x+(u-v)*TW/2, y:y+(u+v)*TH/2-h}); }
+function furnPoly(pts,fill,stroke){ g.beginPath(); pts.forEach((p,n)=>n?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); g.fillStyle=fill; g.fill(); if(stroke){ g.strokeStyle=stroke; g.lineWidth=0.8; g.stroke(); } }
+function paintTable2(x,y){                           // a plank table: four square legs, a thick top with the grain running along it, bread and a cup
+  const pt=furnPt(x,y), A=0.36, H=30, T=4, lg=0.06;
+  g.fillStyle='rgba(10,6,2,0.3)'; g.beginPath(); g.ellipse(x+4,y+4,46,18,0,0,Math.PI*2); g.fill();
+  const leg=(u,v)=>{ const a=pt(u-lg,v+lg,0), b=pt(u+lg,v+lg,0), c=pt(u+lg,v-lg,0);       // a square leg: two faces we can see
+    furnPoly([a,pt(u,v+lg*1.4,0),pt(u,v+lg*1.4,H-T),{x:a.x,y:a.y-(H-T)}],'#3e2814'); furnPoly([pt(u,v+lg*1.4,0),b,{x:b.x,y:b.y-(H-T)},pt(u,v+lg*1.4,H-T)],'#2a1a0c'); };
+  [[-A+0.07,-A+0.07],[A-0.07,-A+0.07],[-A+0.07,A-0.07],[A-0.07,A-0.07]].sort((p,q)=>(p[0]+p[1])-(q[0]+q[1])).forEach(([u,v])=>leg(u,v));
+  const L=pt(-A,A,H), F=pt(A,A,H), R=pt(A,-A,H), Bk=pt(-A,-A,H), d=p=>({x:p.x,y:p.y+T});
+  furnPoly([L,F,d(F),d(L)],'#5a3a1c'); furnPoly([F,R,d(R),d(F)],'#43291a');                     // the thickness of the top
+  furnPoly([Bk,R,F,L],'#8a6034');
+  g.strokeStyle='rgba(40,22,8,0.45)'; g.lineWidth=0.8;                                          // three planks, the seams running along the table
+  for(let k=1;k<4;k++){ const t=-A+k*(2*A/4), a=pt(-A,t,H), b=pt(A,t,H); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); }
+  g.strokeStyle='rgba(255,220,160,0.18)'; g.beginPath(); g.moveTo(L.x,L.y); g.lineTo(Bk.x,Bk.y); g.lineTo(R.x,R.y); g.stroke();   // light along the far edges
+  g.strokeStyle='rgba(60,36,14,0.35)'; g.lineWidth=0.5; [[-0.2,-0.1,0.12],[0.1,0.15,0.1]].forEach(([u,v,l])=>{ const a=pt(u,v,H), b=pt(u+l,v,H); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); });   // a knot line or two in the grain
+  const br=pt(-0.12,0.06,H); g.fillStyle='#c8a868'; g.beginPath(); g.ellipse(br.x,br.y-2,7,3.4,0,0,Math.PI*2); g.fill(); g.fillStyle='#e0c890'; g.beginPath(); g.ellipse(br.x-1,br.y-3,5,2.2,0,0,Math.PI*2); g.fill();   // a loaf
+  const cp=pt(0.14,-0.08,H); g.fillStyle='#8a5a30'; g.fillRect(cp.x-2.6,cp.y-8,5.2,8); g.fillStyle='#c89058'; g.beginPath(); g.ellipse(cp.x,cp.y-8,2.6,1.1,0,0,Math.PI*2); g.fill();   // a cup
+}
+function paintBench2(x,y,face){                      // a bench with a back, facing face=[du,dv]: the way someone sitting on it looks
+  const pt=furnPt(x,y), [fu,fv]=face, la=fu?[0,1]:[1,0], L=0.42, D=0.15, H=13, T=3, BH=18;
+  const at=(s1,s2,h)=>pt(la[0]*s1*L+fu*s2*D, la[1]*s1*L+fv*s2*D, h);
+  g.fillStyle='rgba(8,5,2,0.28)'; g.beginPath(); g.ellipse(x+3,y+3,30,11,0,0,Math.PI*2); g.fill();
+  const legs=[[-0.9,-0.8],[0.9,-0.8],[-0.9,0.8],[0.9,0.8]].map(([a,b])=>[at(a,b,0),at(a,b,H-T),la[0]*a*L+fu*b*D+la[1]*a*L+fv*b*D]).sort((p,q)=>p[2]-q[2]);
+  const back=()=>{ [-0.95,0.95].forEach(a=>{ const b0=at(a,-1,H-T), b1=at(a,-1,H+BH); g.strokeStyle='#2a1a0c'; g.lineWidth=3.6; g.beginPath(); g.moveTo(b0.x,b0.y); g.lineTo(b1.x,b1.y); g.stroke(); g.strokeStyle='#6a4626'; g.lineWidth=2.2; g.stroke(); });
+    [[H+7,H+11],[H+14,H+BH]].forEach(([h0,h1])=>furnPoly([at(-1,-1,h0),at(1,-1,h0),at(1,-1,h1),at(-1,-1,h1)],'#7a5230','rgba(30,16,6,0.6)')); };
+  const backFar=(fu+fv)>0;                            // facing toward us: the back is on the far side, behind the seat
+  if(backFar) back();
+  legs.forEach(([a,b])=>{ g.strokeStyle='#2a1a0c'; g.lineWidth=3.2; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); g.strokeStyle='#4a2f16'; g.lineWidth=1.8; g.stroke(); });
+  const C=[at(-1,-1,H),at(1,-1,H),at(1,1,H),at(-1,1,H)], dn=p=>({x:p.x,y:p.y+T});
+  for(let k=0;k<4;k++){ const a=C[k], b=C[(k+1)%4], mid=[(k===0?0:k===1?1:k===2?0:-1),(k===0?-1:k===1?0:k===2?1:0)];   // the slab's sides that face us
+    const nu=la[0]*mid[0]+fu*mid[1], nv=la[1]*mid[0]+fv*mid[1]; if(nu+nv>0) furnPoly([a,b,dn(b),dn(a)], k%2?'#4a2d14':'#6e4620'); }
+  furnPoly(C,'#9a6c3a','rgba(30,16,6,0.55)');
+  g.strokeStyle='rgba(60,36,14,0.5)'; g.lineWidth=0.8; const m0=at(-1,0,H), m1=at(1,0,H); g.beginPath(); g.moveTo(m0.x,m0.y); g.lineTo(m1.x,m1.y); g.stroke();   // two planks
+  if(!backFar) back();
+}
+{ const oDO=drawObject; drawObject=function(o){
+    if(o.type==='table'){ const q=P(o.i+0.5,o.j+0.5); drawCached('table2',q.x,q.y,130,100,65,72,paintTable2); return; }
+    if(o.type==='bench'){ const q=P(o.i+0.5,o.j+0.5), f=o.face||[1,0]; drawCached('bench2_'+f.join('_'),q.x,q.y,110,90,55,64,(X,Y)=>paintBench2(X,Y,f)); return; }
+    return oDO(o); }; }
+// benches by the tables indoors, turned to face them; and the old outdoor benches turned the way the place suggests
+const BENCH_FACE={ 'steamcellar:0,1':[1,0], 'steamcellar:7,1':[-1,0], 'wheatsheaf:1,4':[0,-1] };
+Object.keys(AREAS).forEach(a=>{ if(typeof AREAS[a].objects!=='function') return;
+  wrap(a,'objects',l=>{ const out=l.map(o=>o.type==='bench' && BENCH_FACE[a+':'+o.i+','+o.j] ? {...o, face:BENCH_FACE[a+':'+o.i+','+o.j]} : o);
+    const A=AREAS[a]; if(!A.inside) return out;
+    const busy=(i,j)=> i<0||j<0||i>=A.w||j>=A.h || out.some(o=>{ const fw=o.fp?o.fp[0]:1, fh=o.fp?o.fp[1]:1; return i>=o.i&&i<o.i+fw&&j>=o.j&&j<o.j+fh; }) || Object.values(A.entries||{}).some(e=>e.i===i&&e.j===j);
+    out.filter(o=>o.type==='table').forEach(t=>{ [[0,1,[0,-1]],[1,0,[-1,0]]].forEach(([di,dj,face])=>{ const i=t.i+di, j=t.j+dj; if(!busy(i,j)) out.push({type:'bench', i, j, face, noblock:true, byTable:true}); }); });
+    return out; }); });
+// every bed its own blanket: red, blue, green, ochre, brown or grey, the same one each time you look
+const BED_BLANKETS=['#8a3a2a','#34507a','#4a6a34','#a8803a','#6a4a30','#5e6066'];
+{ const oDO=drawObject; drawObject=function(o){ if(o.type!=='bed') return oDO(o);
+    const k=o.col!=null ? o.col : ([...areaId].reduce((h,ch)=>h*31+ch.charCodeAt(0)|0,7)+o.i*13+o.j*7)>>>0, bl=BED_BLANKETS[k%BED_BLANKETS.length], q=P(o.i+0.5,o.j+0.5);
+    drawCached('bed3_'+bl,q.x,q.y,280,170,110,100,(X,Y)=>paintBed(X,Y,bl)); }; }
+// the Baron's banner, hung on the face of a wall: red cloth, a gold B, a fringe gone ragged
+function paintBaronBanner(x,y){ const W=11, H=40, top=y-82; g.fillStyle='rgba(0,0,0,0.25)'; g.fillRect(x-W+2,top+2,W*2,H);
+  g.fillStyle='#3a2a1a'; g.fillRect(x-W-2,top-3,W*2+4,3);
+  const gr=g.createLinearGradient(x-W,0,x+W,0); gr.addColorStop(0,'#8a1e1e'); gr.addColorStop(1,'#5a1212'); g.fillStyle=gr;
+  g.beginPath(); g.moveTo(x-W,top); g.lineTo(x+W,top); g.lineTo(x+W,top+H); g.lineTo(x+W*0.4,top+H-5); g.lineTo(x,top+H+2); g.lineTo(x-W*0.5,top+H-4); g.lineTo(x-W,top+H); g.closePath(); g.fill();
+  g.strokeStyle='#c8a040'; g.lineWidth=1; g.strokeRect(x-W+2.5,top+2.5,W*2-5,H-9);
+  g.fillStyle='#e0b850'; g.font='bold 15px Georgia,serif'; g.textAlign='center'; g.fillText('B',x,top+24); g.textAlign='left';
+  g.fillStyle='rgba(0,0,0,0.18)'; g.fillRect(x+W*0.3,top,W*0.7,H-4); }
+{ const oDO=drawObject; drawObject=function(o){ if(o.type!=='baronbanner') return oDO(o); const q=P(o.i,o.j+0.5); drawCached('baronbanner',q.x,q.y,40,110,20,100,paintBaronBanner); }; }
 </script>
 </body>
 </html>

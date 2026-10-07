@@ -11645,7 +11645,7 @@ function victory(faction){
   if(faction==='goblins' || faction==='gobwarren'){ const coin=(faction==='gobwarren'?14:4)+Math.floor(Math.random()*8); player.purse+=coin; logMsg('Goblin pockets: '+formatCoin(coin)+', a button, and a very old sausage.','#e8c060');
     if(faction==='gobwarren'){ remember('gob','fought','Snagtooth\'s warren is broken.');
       if(!['returned','kept'].includes(CHOICE.poolq) && !collectedPickups.has('warren:10,8') && !hasItem('brooch')){ collectedPickups.add('warren:10,8'); giveQuestItem('brooch',true); logMsg('Snagtooth had a silver brooch pinned inside his helmet. You take it.','#d8c890'); } } }
-  if(faction==='highway'){ const coin=4+Math.floor(Math.random()*6); player.purse+=coin; logMsg('The highwayman\'s purse: '+formatCoin(coin)+'.','#e8c060'); }
+  if(faction==='highway'){ const coin=4+Math.floor(Math.random()*6); player.purse+=coin; logMsg('In their purse: '+formatCoin(coin)+'.','#e8c060'); }
   if(faction==='wild2') logMsg('Greymaw\'s orphans are dead. You left them to become this.','#c8a0e0');
   if(faction==='camp'){
     const coin=15+Math.floor(Math.random()*12); player.purse+=coin; logMsg('In Mara\'s strongbox: '+formatCoin(coin)+'.','#e8c060');
@@ -14703,8 +14703,8 @@ const doorDest=n=>{ const t=n.goto||[n.i,n.j]; const o=OBJECTS.find(o=>o.type===
 // out in the rain, everyone gets wet, not only you: soaked clothes go dark, a sheen on the skin, drips and a damp patch underfoot
 let WET_NPC=0; const WET_NPC_BUF=document.createElement('canvas').getContext('2d');
 const rainingHere=()=>{ const A=AREAS[areaId]; return !!A && !A.inside && typeof weatherToday==='function' && weatherToday()==='rain'; };
-{ const oDN=drawNPC; drawNPC=function(n){ if(!rainingHere() || n.bathe || (n.opts&&n.opts.ghost)) return oDN(n);
-    WET_NPC=1; try{ oDN(n); } finally{ WET_NPC=0; }
+{ const oDN=drawNPC; drawNPC=function(n){ if(!rainingHere() || n.bathe || n.sleepBed || (n.opts&&n.opts.ghost)) return oDN(n);
+    WET_NPC=(typeof LOW_FX!=='undefined' && LOW_FX)?0:1; try{ oDN(n); } finally{ WET_NPC=0; }   // the soaked tint is skipped in the light mode: drips only
     const q=P(n.x??n.i+0.5,n.y??n.j+0.5);
     for(let k=0;k<3;k++){ const ph=((gt*(0.9+k*0.17)+k*0.37+n.i*0.13)%1), dx=[-6,5,-1][k], y0=q.y-[58,46,68][k]; g.fillStyle=`rgba(190,220,235,${0.7*(1-ph)})`; g.beginPath(); g.ellipse(q.x+dx,y0+ph*(q.y-y0),1,1.8,0,0,Math.PI*2); g.fill(); }
     g.fillStyle='rgba(40,60,70,0.16)'; g.beginPath(); g.ellipse(q.x,q.y+1,9,2.8,0,0,Math.PI*2); g.fill(); }; }
@@ -14735,20 +14735,21 @@ setInterval(()=>{ try{ if(!running || CS.on || combat.active || areaId!=='millro
 // ── Oswin tempers one piece of armour at a time, the way Maelis weaves: +1 Attack Power on that piece, once per piece, priced by the piece
 const TEMPER_SLOTS=['head','armor','hands','legs','feet','offhand'], temperCost=id=>40+Math.round((PRICES[unWoven(id)]||20)/2);
 const isTempered=id=>!!(id && id.startsWith && id.startsWith('t_'));
+const TEMPERABLE=id=>{ const b=unWoven(id), it=ITEMS[b]||{}; return it.slot==='offhand' || /mail|plate|gauntlet|glove|boot|helm|kettle|coif|jerkin|studded|gambeson|greave|scale|shield|obsidian|cinder_gl|steel|iron|leather/.test(b+' '+(it.base||'')); };   // steel and leather: Oswin does not temper shirts or trousers
 for(const id of Object.keys(ITEMS)){ const it=ITEMS[id]; if(id.startsWith('t_') || !TEMPER_SLOTS.includes(it.slot) || (id.startsWith('w_') && !ITEMS[id.slice(2)])) continue;
   ITEMS['t_'+id]={...it, name:it.name.replace(' (woven)','')+(it.woven?' (woven, tempered)':' (tempered)'), tempered:true};
   ITEM_STATS['t_'+id]={...(ITEM_STATS[id]||{}), ap:((ITEM_STATS[id]||{}).ap||0)+1};
   if(GEAR_HP[id]) GEAR_HP['t_'+id]=GEAR_HP[id];
   if(PRICES[id]) PRICES['t_'+id]=PRICES[id]+temperCost(id); }
 function temperTalk(){ const E=player.opts.equip, back=()=>TALKERS.smith();
-  const pieces=TEMPER_SLOTS.map(sl=>E[sl]).filter(id=>id && ITEMS[id]);
+  const pieces=TEMPER_SLOTS.map(sl=>E[sl]).filter(id=>id && ITEMS[id] && TEMPERABLE(id));
   const opts=pieces.map(id=> isTempered(id) ? {label:`${ITEMS[id].name}: already tempered`, off:true, fn:()=>{}}
     : !ITEMS['t_'+id] ? {label:`${ITEMS[id].name}: nothing to temper`, off:true, fn:()=>{}}
     : {label:`Temper the ${ITEMS[id].name}. (+1 Attack Power)`, off:player.purse<temperCost(id), note:'-'+formatCoin(temperCost(id)), fn:()=>{ const c=temperCost(id), sl=TEMPER_SLOTS.find(k=>E[k]===id); if(!sl) return;
         player.purse-=c; E[sl]='t_'+id; delete player.opts._ck; refreshPlayerHp(false); updateHud();
         logMsg(`Oswin works your ${ITEMS[id].name} over at the anvil: rivets tight, edges true, the weight where it should be. +1 Attack Power.`,'#e8c060'); if(typeof saveGame==='function') saveGame(); temperTalk(); }});
   say('Oswin the Armourer',["Oswin turns your gear over in his black hands, tutting at every nick.",
-    pieces.length ? "“One piece at a time. Each one I can true up once: rivets, straps, balance. After that it's as good as steel and leather get. Better kit costs more to do properly.”" : "“Come back wearing some armour. I don't temper shirts.”",
+    pieces.length ? "“One piece at a time. Each one I can true up once: rivets, straps, balance. After that it's as good as steel and leather get. Better kit costs more to do properly.”" : "“Come back wearing some steel or leather. I don't temper shirts.”",
     ...(CHOICE.temper ? [`<i>Your earlier training with him still counts: +${CHOICE.temper} Attack Power.</i>`] : [])],
     [...opts,{label:'Back.',fn:back},bye],true); }
 { const oldPIA=paintItemArt; paintItemArt=function(g2,id,size){ if(!isTempered(id)) return oldPIA(g2,id,size);
@@ -14889,7 +14890,8 @@ wrap('elderhouse','npcs',l=>{ if(!SLEEP_HRS()) return l; const out=[...l];
   SLEEPERS.forEach(([id,name,o])=>{ if(id==='ada' && adaHome()) return; const bed=AREAS.elderhouse.objects().find(b=>b.owner===id); if(!bed) return;
     out.push({ id:'sleep_'+id, name, i:bed.i, j:bed.j, x:bed.i+1.9, y:bed.j+0.95, dir:0, sleepBed:bed, opts:{...o, eyesShut:true, equip:{head:null,torso:'shirt',armor:null,hands:null,legs:'trousers',feet:null,weapon:null,offhand:null}} }); });
   return out; });
-SLEEPERS.forEach(([id,name])=>{ TALKERS['sleep_'+id]=()=>say(name,[{elder:"Hamond is asleep on his back with his hands folded on his chest, snoring like a slow saw.",wenna:"Old Wenna sleeps with her stick beside her, one hand still on it. Now and then she mutters something about a goat.",ada:"Ada is asleep, turned toward the empty bed by the far wall."}[id]],[{label:'Let them sleep.',fn:closeDialog}]); });
+SLEEPERS.forEach(([id,name])=>{ TALKERS['sleep_'+id]=()=>{ const real={elder:'elder',wenna:'wenna',ada:'ada'}[id], news=(()=>{ try{ return npcHasNews({id:real,name}); }catch(e){ return null; } })();
+  say(name,[{elder:"Hamond is asleep on his back with his hands folded on his chest, snoring like a slow saw.",wenna:"Old Wenna sleeps with her stick beside her, one hand still on it. Now and then she mutters something about a goat.",ada:"Ada is asleep, turned toward the empty bed by the far wall."}[id]],[...(news?[{label:'Wake '+(id==='elder'?'him':'her')+' gently.', fn:()=>{ const n=NPCS.find(q=>q.id==='sleep_'+id); TALK_NPC=null; closeDialog(); const t=TALKERS[real]; if(t) t(); }}]:[]),{label:'Let them sleep.',fn:closeDialog}]); }; });
 { const oN=npcHasNews; npcHasNews=function(n){ if(n && n.sleepBed) return null; return oN(n); }; }
 function bedBlanket(o){ const k=o.col!=null ? o.col : ([...areaId].reduce((h,ch)=>h*31+ch.charCodeAt(0)|0,7)+o.i*13+o.j*7)>>>0; return BED_BLANKETS[k%BED_BLANKETS.length]; }
 { const oDN=drawNPC; drawNPC=function(n){ if(!n.sleepBed) return oDN(n);

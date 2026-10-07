@@ -457,7 +457,7 @@ html,body{touch-action:none;overscroll-behavior:none;-webkit-tap-highlight-color
       <div class="opt-section" id="beard-section"><div class="opt-label">Beard</div><div class="chip-row" id="beard-styles"></div></div>
       </div>
       <div class="opt-col">
-      <div class="opt-section"><div class="opt-label">Scars &amp; Tattoos</div><div class="chip-row" id="mark-styles"></div></div>
+      <div class="opt-section"><div class="opt-label">Tattoos &amp; Markings</div><div class="chip-row" id="mark-styles"></div></div>
       <div class="creator-actions">
       <input id="char-name-input" type="text" placeholder="Your hero's name" maxlength="18">
       <div id="char-name-err" style="color:#e89070;font-size:12px;min-height:15px;text-align:center"></div>
@@ -3225,6 +3225,8 @@ function drawHead(c, x, B, opts, view=0){
       const w = q ? (s<0 ? ew : ew*0.58) : (s<0?farW:nearW);
       const ex = q ? (s<0 ? off-1.5-ew : off+1.6) : off+(s<0? -es-farW : es*(1-pr*0.35));
       if(w<1.2) return;
+      if(opts.eyesShut){ fs(tone(skin,-0.07)); c.beginPath(); c.ellipse(x+ex+w/2,B+ET+eh*0.5,w/2+0.4,eh/2+0.4,0,0,Math.PI*2); c.fill();      // asleep: lids down, lashes in a soft curve
+        c.strokeStyle='#2a1808'; c.lineWidth=0.8; c.lineCap='round'; c.beginPath(); c.moveTo(x+ex-0.2,B+ET+eh*0.42); c.quadraticCurveTo(x+ex+w/2,B+ET+eh*1.0,x+ex+w+0.2,B+ET+eh*0.42); c.stroke(); return; }
       if(F){ fs('rgba(150,70,60,0.10)'); c.beginPath(); c.ellipse(x+ex+w/2,B+ET+0.3,w*0.62,eh*0.55,0,0,Math.PI*2); c.fill(); }
       else { fs('rgba(60,36,20,0.08)'); c.beginPath(); c.ellipse(x+ex+w/2,B+ET+eh*0.5,w*0.6,eh*0.62,0,0,Math.PI*2); c.fill(); }
       const eyeP=()=>{ c.beginPath();
@@ -3351,7 +3353,7 @@ function drawHead(c, x, B, opts, view=0){
       const gc=c.createRadialGradient(x+cx,B+cy,0,x+cx,B+cy,3); gc.addColorStop(0,tone(skin,-0.2,0.4)); gc.addColorStop(1,tone(skin,-0.2,0)); c.fillStyle=gc; c.beginPath(); c.ellipse(x+cx,B+cy,3,1.6,sd*-0.5,0,Math.PI*2); c.fill(); }); }
     if(FC.dimples && pr<0.8){ const MGd=mouthGeom(P,pr); c.strokeStyle=tone(skin,-0.28,0.7); c.lineWidth=0.45;
       [-1,1].forEach(sd=>{ const dx=LN+MGd.mx+(sd<0?-1.2:MGd.mw+1.2); c.beginPath(); c.arc(x+dx,B+Y.MOUTH-0.2,0.8,sd<0?-0.4:Math.PI-0.8,sd<0?0.8:Math.PI+0.4); c.stroke(); }); }
-    const STUBBLE = !F && !GOB && (FC.stubble || (!String(opts.race||'').startsWith('elf') && (opts.beard ?? (opts.hair===1 ? 5 : 0))===1));
+    const STUBBLE = !F && !GOB && (FC.stubble || (!String(opts.race||'').startsWith('elf') && (opts.stubble || (opts.beard ?? (opts.hair===1 ? 5 : 0))===1)));
     if(STUBBLE){ fs(tone(hair,-0.1,0.28)); for(let k=0;k<70;k++){ const u=rnd01(k,7,610)*2-1, v=rnd01(k,8,611); const px=off+u*(HW-2.5)*(1-v*0.35), py=Y.MOUTH-2.5+v*5.8;
         if(Math.abs(px-off)<2.8 && py<Y.MOUTH+1.8 && py>Y.MOUTH-0.8) continue; if(pr>0.8 && px<off) continue; c.fillRect(x+px,B+py,0.45,0.45); } }
     if(FC.mole || (opts.marks&&opts.marks.mole)){ fs('#3a2014'); c.beginPath(); c.arc(x+(pr>0.8?mx-0.8:mx+mw+0.9),B+Y.MOUTH-2.2,0.42,0,Math.PI*2); c.fill(); }
@@ -4145,9 +4147,9 @@ function drawBeardPreview(ctx,style,w,h){
 }
 
 // [key, label, elves only, value]: chips with a value pick one style for that key (click again to remove)
-// [key, label, elves only, value, group]: group 'face' goes under Face Details, the rest under Scars & Tattoos.
+// [key, label, elves only, value, group]: group 'face' goes under Face Details, the rest under Tattoos & Markings.
 // One-sided marks are on the character's own left or right and stay there as they turn.
-const MARKS=[ ['scarBrow','Brow Scar'], ['scarCheek','Cheek Scar'],
+const MARKS=[ ['scarBrow','Brow Scar',0,undefined,'face'], ['scarCheek','Cheek Scar',0,undefined,'face'],
   ['armTat','Arm Bands',0,1], ['armTat','Left Sleeve',0,2], ['armTat','Right Shoulder Sun',0,3],
   ['chestTat','Back Wings',0,3],
   ['neckTat','Neck Runes'],
@@ -4156,7 +4158,7 @@ const MARKS=[ ['scarBrow','Brow Scar'], ['scarCheek','Cheek Scar'],
   ['earrings','Hoops',0,'hoop','face'], ['earrings','Studs',0,'stud','face'], ['earrings','Drops',0,'drop','face'], ['earrings','Ear Cuffs',0,'cuff','face'],
   ['freckles','Freckles',0,undefined,'face'], ['mole','Mole',0,undefined,'face'],
   ['noseRing','Nose Ring',0,1,'face'], ['noseRing','Septum Ring',0,2,'face'], ['browRing','Brow Piercing',0,undefined,'face'],
-  ['warPaint','Woad Band',0,1,'face'], ['warPaint','Red Stripes',0,2,'face'], ['eyePatch','Eye Patch',0,undefined,'face'] ];
+  ['warPaint','Woad Band',0,1], ['warPaint','Red Stripes',0,2,'face'], ['eyePatch','Eye Patch',0,undefined,'face'] ];
 // tattoos stack: these keys hold a list of every design picked (older saves held a single number)
 const STACK_MARKS=new Set(['armTat','faceTat','elfFace','elfBody']);
 const marksOf=(M,k)=>{ const v=M&&M[k]; if(Array.isArray(v)) return v; if(v===true) return [1]; return v ? [v] : []; };
@@ -4192,7 +4194,7 @@ function refreshCreator(){
   });
   beardGrid.querySelectorAll('.chip').forEach((btn,i)=>{
     btn.textContent = BEARD_NAMES[i] || btn.textContent;
-    btn.classList.toggle('active', i===charOpts.beard);
+    btn.classList.toggle('active', i===1 ? !!(charOpts.stubble || charOpts.beard===1) : i===charOpts.beard || (i===0 && charOpts.beard===1));
   });
   drawCreator();
 }
@@ -4271,7 +4273,8 @@ function buildCreatorUI(){
   BEARD_NAMES.forEach((_,i)=>{
     const btn=document.createElement('button');
     btn.type='button'; btn.className='chip';
-    btn.addEventListener('click',()=>{ charOpts.beard=i; creatorClothed = true; refreshCreator(); });
+    btn.addEventListener('click',()=>{ if(i===1){ const on=charOpts.stubble || charOpts.beard===1; charOpts.stubble=!on; if(charOpts.beard===1) charOpts.beard=0; }   // stubble goes with any beard: it is a toggle of its own
+      else { if(charOpts.beard===1){ charOpts.beard=0; charOpts.stubble=true; } charOpts.beard=i; } creatorClothed = true; refreshCreator(); });
     beardGrid.appendChild(btn);
   });
 
@@ -4430,16 +4433,17 @@ Object.assign(AREAS,{
       ...(collectedPickups.has('farmhouse:1,3') ? [] : [{type:'pickup', i:1, j:3, item:'straw_hat'}]),
     ].filter(o=>!o.breakable || !destroyedBreakables.has('farmhouse:'+o.i+','+o.j)),
     entries:{ fromFarm:{i:3,j:2}, bed:{i:1,j:1} } },
-  elderhouse:{ ...INSIDE_BASE, w:6, h:5, theme:'interior', label:"Hamond's House", mini:{x:0,y:0},
+  elderhouse:{ ...INSIDE_BASE, w:7, h:6, theme:'interior', label:"Hamond's House", mini:{x:0,y:0},
     objects:()=>[
-      {type:'teleporter', i:2, j:4, to:'village', entry:'fromHouse'},
-      {type:'bed', i:3, j:0, fp:[2,1]},
-      {type:'hearth', i:0, j:1},
-      {type:'table', i:3, j:2},
-      {type:'crate', i:5, j:3, breakable:true},
-      {type:'barrel', i:5, j:0, breakable:true},
+      {type:'teleporter', i:3, j:5, to:'village', entry:'fromHouse'},
+      {type:'bed', i:1, j:0, fp:[2,1], owner:'elder'}, {type:'bed', i:3, j:0, fp:[2,1], owner:'wenna'}, {type:'bed', i:5, j:0, fp:[2,1], owner:'ada'},
+      {type:'bed', i:5, j:3, fp:[2,1], edric:true},                                       // Edric's; Ada keeps it made
+      {type:'hearth', i:0, j:2},
+      {type:'table', i:2, j:3},
+      {type:'crate', i:6, j:5, breakable:true},
+      {type:'barrel', i:0, j:5, breakable:true},
     ].filter(o=>!o.breakable || !destroyedBreakables.has('elderhouse:'+o.i+','+o.j)),
-    entries:{ fromVillage:{i:2,j:3} } },
+    entries:{ fromVillage:{i:3,j:4} } },
   camp:{ fence:{r:false,l:false}, w:13, h:9, theme:'road', label:'Bandit Camp', mini:{x:1,y:2},
     notches:()=>[], dummy:null,
     objects:()=>[
@@ -8358,7 +8362,7 @@ function startGame(){
     if(saveExists(nm)){ err.innerHTML='A hero named <b>'+nm.replace(/</g,'&lt;')+'</b> already has a save. Pick another name, or load or delete that save in the menu.'; document.getElementById('char-name-input').focus(); return; }
     err.textContent=''; }
   player.name=document.getElementById('char-name-input').value.trim()||'Wanderer';
-  player.opts={...charOpts, beard: (charOpts.gender==='f'||charOpts.race==='elf') ? 0 : charOpts.beard, equip: charOpts.race==='elf' ? { ...defaultEquip(), ...ELF_START } : defaultEquip(charOpts.gender)};
+  player.opts={...charOpts, beard: (charOpts.gender==='f'||charOpts.race==='elf') ? 0 : charOpts.beard, stubble: (charOpts.gender==='f'||charOpts.race==='elf') ? false : !!charOpts.stubble, equip: charOpts.race==='elf' ? { ...defaultEquip(), ...ELF_START } : defaultEquip(charOpts.gender)};
   player.inv=defaultInv(charOpts.gender);
   player.purse=0;
   Object.keys(visitedAreas).forEach(k=>delete visitedAreas[k]);
@@ -14877,6 +14881,56 @@ let wolfBiteT=2.2;
     try{ oDP(p); } finally{ p.lie=lie; p.moving=om; g.restore(); }
     g.save(); for(let k=0;k<3;k++){ const t=((gt*0.7+k/3)%1); g.strokeStyle=`rgba(225,240,250,${0.5*(1-t)})`; g.lineWidth=1.2; g.beginPath(); g.ellipse(q.x,wl,(10+t*22)*sc,(3.5+t*7)*sc,0,0,Math.PI*2); g.stroke(); }
     g.fillStyle='rgba(225,240,250,0.35)'; g.beginPath(); g.ellipse(q.x,wl,13*sc,4*sc,0,0,Math.PI*2); g.fill(); g.restore(); }; }
+// ── Hamond's house at night: Hamond, Old Wenna and Ada asleep in their beds; Edric's bed is yours if you want it ──
+const SLEEP_HRS=()=>{ const h=HOUR(); return h>=22 || h<6; };
+const SLEEPERS=[ ['elder','Elder Hamond',{gender:'m',skin:1,hair:4,hairColor:13,beard:5}], ['wenna','Old Wenna',{gender:'f',skin:0,hair:4,hairColor:13,beard:0}], ['ada','Ada',{gender:'f',skin:1,hair:3,hairColor:8,beard:0,face:1}] ];
+wrap('village','npcs',l=> SLEEP_HRS() ? l.filter(n=>n.id!=='elder' && !(n.id==='ada' && !adaHome()) && n.id!=='wenna') : l);
+wrap('elderhouse','npcs',l=>{ if(!SLEEP_HRS()) return l; const out=[...l];
+  SLEEPERS.forEach(([id,name,o])=>{ if(id==='ada' && adaHome()) return; const bed=AREAS.elderhouse.objects().find(b=>b.owner===id); if(!bed) return;
+    out.push({ id:'sleep_'+id, name, i:bed.i, j:bed.j, x:bed.i+1.9, y:bed.j+0.95, dir:0, sleepBed:bed, opts:{...o, eyesShut:true, equip:{head:null,torso:'shirt',armor:null,hands:null,legs:'trousers',feet:null,weapon:null,offhand:null}} }); });
+  return out; });
+SLEEPERS.forEach(([id,name])=>{ TALKERS['sleep_'+id]=()=>say(name,[{elder:"Hamond is asleep on his back with his hands folded on his chest, snoring like a slow saw.",wenna:"Old Wenna sleeps with her stick beside her, one hand still on it. Now and then she mutters something about a goat.",ada:"Ada is asleep, turned toward the empty bed by the far wall."}[id]],[{label:'Let them sleep.',fn:closeDialog}]); });
+{ const oN=npcHasNews; npcHasNews=function(n){ if(n && n.sleepBed) return null; return oN(n); }; }
+function bedBlanket(o){ const k=o.col!=null ? o.col : ([...areaId].reduce((h,ch)=>h*31+ch.charCodeAt(0)|0,7)+o.i*13+o.j*7)>>>0; return BED_BLANKETS[k%BED_BLANKETS.length]; }
+{ const oDN=drawNPC; drawNPC=function(n){ if(!n.sleepBed) return oDN(n);
+    const bed=n.sleepBed, c0=P(bed.i+0.62,bed.j+0.5), U=Math.hypot(TW/2,TH/2), ax={x:(TW/2)/U,y:(TH/2)/U}, ac={x:-(TW/2)/U,y:(TH/2)/U};   // ax: from head to foot along the bed; ac: across it
+    const cx=c0.x, cy=c0.y-19, br=Math.sin(gt*1.1+bed.i)*0.6;
+    g.save(); g.transform(-ac.x*0.8, -ac.y*0.8, ax.x*0.95, ax.y*0.95, cx, cy);                              // the figure's 'down' runs toward the foot of the bed
+    drawChar(g,0,46+br,n.opts,0,0,null);                                                                   // feet 46px down the bed from the middle, head on the pillow
+    g.restore();
+    const bl=bedBlanket(bed), pt=(gi,gj,h)=>{ const q=P(bed.i+0.5+gi,bed.j+0.5+gj); return {x:q.x,y:q.y-h}; };
+    const quad=(pts,f)=>{ g.fillStyle=f; g.beginPath(); pts.forEach((p,k)=>k?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); g.fill(); };
+    const i0=-0.42+0.48, i1=1.42-0.03, j0=-0.34+0.01, j1=0.34-0.01, H=27+br;                              // the blanket pulled up to the chest, over the body
+    quad([pt(i0,j0,H),pt(i1,j0,H-4),pt(i1,j1,H-4),pt(i0,j1,H)],bl);
+    quad([pt(i0,j1,H),pt(i1,j1,H-4),pt(i1,j1+0.05,10),pt(i0,j1+0.05,10)],tone(bl,-0.22));
+    quad([pt(i1,j0,H-4),pt(i1,j1,H-4),pt(i1+0.02,j1,12),pt(i1+0.02,j0,12)],tone(bl,-0.35));
+    quad([pt(i0-0.02,j0,H+0.4),pt(i0+0.12,j0,H+0.4),pt(i0+0.12,j1,H+0.4),pt(i0-0.02,j1,H+0.4)],'#e8dcc0');      // the sheet folded over its edge
+    const z=pt(-0.2,-0.2,48); g.save(); g.font='italic 600 11px Georgia,serif'; g.fillStyle=`rgba(220,226,250,${0.5+0.3*Math.sin(gt*1.4)})`; g.fillText('z',z.x+((gt*6)%8),z.y-((gt*6)%8)); g.font='italic 600 8px Georgia,serif'; g.fillText('z',z.x+8,z.y-12); g.restore(); }; }
+{ const oBP=bedPrompt; bedPrompt=function(){ let bed=null, bd=1e9; OBJECTS.filter(o=>o.type==='bed').forEach(o=>{ const d=Math.hypot(o.i+1-player.x,o.j+0.5-player.y); if(d<bd){ bd=d; bed=o; } });
+    const sl=bed && NPCS.find(n=>n.sleepBed && n.sleepBed.i===bed.i && n.sleepBed.j===bed.j);
+    if(sl){ say(sl.name,[sl.name+" is asleep in that one. The bed by the far wall is free."],[{label:'Leave them be.',fn:closeDialog}]); return; }
+    if(bed && bed.owner && areaId==='elderhouse'){ say('A Bed',["That is "+({elder:"Hamond's",wenna:"Old Wenna's",ada:"Ada's"}[bed.owner])+" bed. Better not."],[{label:'Not now.',fn:closeDialog}]); return; }
+    const r=oBP(); if(bed && bed.edric){ const t=document.getElementById('dlg-text'); if(t) t.innerHTML="<p>Edric's bed. Ada keeps it made, the blanket turned down as if he might still come home. Hamond told you to use it.</p>"+t.innerHTML.replace(/<p>The blanket is rough but warm\. /,'<p>'); }
+    return r; }; }
+// ── a little round hut in Dunhollow's west corner: wattle and daub, a cone of thatch, smoke from the top ──
+wrap('village','objects',l=>[...l,{type:'roundhut', i:0, j:8, fp:[2,2]}]);
+function paintRoundHut(x,y){ const rx=72, ry=36, H=46, R=1.16;
+  g.fillStyle='rgba(8,5,2,0.32)'; g.beginPath(); g.ellipse(x+8,y+6,rx*1.15,ry*1.15,0,0,Math.PI*2); g.fill();
+  const wg=g.createLinearGradient(x-rx,0,x+rx,0); wg.addColorStop(0,'#8a7656'); wg.addColorStop(0.45,'#b8a27c'); wg.addColorStop(1,'#6e5c40');
+  g.fillStyle=wg; g.beginPath(); g.ellipse(x,y,rx,ry,0,0,Math.PI); g.lineTo(x-rx,y-H); g.ellipse(x,y-H,rx,ry,0,Math.PI,0,true); g.closePath(); g.fill();     // the wall: a short drum
+  g.strokeStyle='rgba(70,52,30,0.35)'; g.lineWidth=1.2; for(let k=1;k<12;k++){ const a=Math.PI*k/12, px=x+Math.cos(a)*rx, py=y+Math.sin(a)*ry; g.beginPath(); g.moveTo(px,py); g.lineTo(px,py-H); g.stroke(); }   // the stakes in the wattle
+  g.strokeStyle='rgba(60,44,24,0.25)'; g.lineWidth=0.8; for(let h=10;h<H;h+=9){ g.beginPath(); g.ellipse(x,y-h,rx,ry,0,0.15,Math.PI-0.15); g.stroke(); }
+  g.fillStyle='rgba(60,46,28,0.35)'; g.beginPath(); g.ellipse(x,y,rx,ry,0,0,Math.PI); g.lineTo(x-rx,y-6); g.ellipse(x,y-6,rx,ry,0,Math.PI,0,true); g.closePath(); g.fill();   // damp at the foot
+  const da=0.45, dx=x+Math.cos(da)*rx, dy=y+Math.sin(da)*ry;                                                   // the door, toward the square
+  g.fillStyle='#3a2614'; g.beginPath(); g.moveTo(dx-12,dy+1); g.lineTo(dx-12,dy-30); g.quadraticCurveTo(dx-3,dy-38,dx+6,dy-31); g.lineTo(dx+6,dy-2); g.closePath(); g.fill();
+  g.strokeStyle='#5a4024'; g.lineWidth=1; for(let k=0;k<3;k++){ g.beginPath(); g.moveTo(dx-9+k*5,dy); g.lineTo(dx-9+k*5,dy-31); g.stroke(); }
+  const top=y-H-62, rg=g.createLinearGradient(x-rx*R,0,x+rx*R,0); rg.addColorStop(0,'#9a7a3a'); rg.addColorStop(0.4,'#d2b468'); rg.addColorStop(1,'#7a5e2a');
+  g.fillStyle=rg; g.beginPath(); g.moveTo(x,top); g.lineTo(x+rx*R,y-H+4); g.ellipse(x,y-H+4,rx*R,ry*R,0,0,Math.PI); g.closePath(); g.fill();        // the thatch cone, overhanging the wall
+  g.strokeStyle='rgba(90,66,26,0.5)'; g.lineWidth=0.9; for(let k=0;k<=16;k++){ const a=Math.PI*k/16, px=x+Math.cos(a)*rx*R, py=y-H+4+Math.sin(a)*ry*R; g.beginPath(); g.moveTo(x+(px-x)*0.12,top+(py-top)*0.12); g.lineTo(px,py); g.stroke(); }
+  g.strokeStyle='rgba(60,42,16,0.5)'; g.lineWidth=1.4; g.beginPath(); g.ellipse(x,y-H+4,rx*R,ry*R,0,0.05,Math.PI-0.05); g.stroke();           // the ragged eave
+  g.fillStyle='#4a3a20'; g.beginPath(); g.ellipse(x,top+4,5,2.5,0,0,Math.PI*2); g.fill(); }
+{ const oDO=drawObject; drawObject=function(o){ if(o.type!=='roundhut') return oDO(o); const q=P(o.i+1,o.j+1); drawCached('roundhut',q.x,q.y,190,190,95,150,paintRoundHut);
+    for(let k=0;k<4;k++){ const t=((gt*0.18+k/4)%1); g.fillStyle=`rgba(150,146,140,${0.22*(1-t)})`; g.beginPath(); g.arc(q.x+Math.sin(t*3+k)*6+t*8,q.y-46-62-t*55,3+t*9,0,Math.PI*2); g.fill(); } }; }
 </script>
 </body>
 </html>

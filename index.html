@@ -7532,7 +7532,7 @@ function drawNPC(n){
     g.fillStyle=tone(n.silk,-0.12); g.beginPath(); g.ellipse(x+8,wy+2,1.8,1.3,0,0,Math.PI*2); g.fill(); g.beginPath(); g.moveTo(x+8,wy+2.5); g.quadraticCurveTo(x+10,wy+8,x+9,hy+4); g.lineTo(x+7.5,hy+3); g.quadraticCurveTo(x+8.5,wy+8,x+7.5,wy+3); g.fill();
     g.restore(); }
   if(n.bark) speechBubble(x,y-118-n.bark.t*2,n.bark.text,Math.min(1,n.bark.t*4,(4-n.bark.t)*2));
-  if(n.wander && !n.named) return;                          // passers-by go unlabelled
+  if(n.wander && !n.named && !n.route) return;              // passers-by go unlabelled (people with a day of their own keep their names)
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const tw=g.measureText(n.name).width, ty=y-(n.sit?92:114);
   g.fillStyle='rgba(12,8,3,0.78)'; g.beginPath(); g.roundRect(x-tw/2-7,ty,tw+14,16,4); g.fill();
@@ -13734,6 +13734,8 @@ function exitToward(dest){ const t=OBJECTS.find(o=>o.type==='teleporter' && o.to
   const any=OBJECTS.find(o=>o.type==='teleporter'); return any?[any.i,any.j]:null; }
 setInterval(()=>{ try{ if(!running || CS.on) return; const h=HOUR();
   for(const k in ROUTINES){ const R=ROUTINES[k], s=slotOf(R,h), n=NPCS.find(x=>x.route===k), here=s && s.area===areaId;
+    if(n && n.early && n.slot===s) n.early=false;                                   // their hour has caught up with them
+    if(n && ((typeof RT_HOLD==='function' && RT_HOLD()===n) || (n.early && (!s || s.walk)))) continue;   // still talking to you, or came in ahead of time: the day can wait
     if(n && !n.vanish && n.slot!==s){                                         // time to go: walk out toward wherever he goes next
       if(here){ n.slot=s; n.sit=false; n.chop=false; n.wander=null; n.path=[]; n.goto=s.walk?s.walk[1]:s.at; n.arrive=s; if(s.walk) n.vanish=true; n.opts={...R.opts, equip:{...R.opts.equip,...(s.equip||{})}}; delete n.opts._ck; continue; }
       const dest=(s&&s.area)||nextArea(R,n.slot)||null, ex=dest?exitToward(dest):exitToward('?');
@@ -14636,6 +14638,64 @@ function paintBaronBanner(x,y){ const W=11, H=40, top=y-82; g.fillStyle='rgba(0,
   g.fillStyle='#e0b850'; g.font='bold 15px Georgia,serif'; g.textAlign='center'; g.fillText('B',x,top+24); g.textAlign='left';
   g.fillStyle='rgba(0,0,0,0.18)'; g.fillRect(x+W*0.3,top,W*0.7,H-4); }
 { const oDO=drawObject; drawObject=function(o){ if(o.type!=='baronbanner') return oDO(o); const q=P(o.i,o.j+0.5); drawCached('baronbanner',q.x,q.y,40,110,20,100,paintBaronBanner); }; }
+// ── whoever you are talking to stays put until you are done: no wandering off, no routine pulling them away mid-trade ──
+let TALK_NPC=null, TALK_DEPTH=0;
+const dlgIsOpen=()=>typeof dlgOverlay!=='undefined' && dlgOverlay.classList.contains('open');
+{ const oT=talkTo; talkTo=function(n){ TALK_NPC=n; TALK_DEPTH=0; return oT(n); }; }
+{ const oU=update; update=function(dt){ const n=TALK_NPC, hold=n && dlgIsOpen() && NPCS.includes(n);
+    let saved=null; if(hold){ saved={goto:n.goto, path:n.path}; n.goto=null; n.path=[]; n.moving=false; if(n.wander) n.wait=Math.max(n.wait||0,1); }
+    oU(dt);
+    if(hold){ n.goto=saved.goto; n.path=saved.path||[]; }
+    if(n && !dlgIsOpen()) TALK_NPC=null; }; }
+const RT_HOLD=()=> TALK_NPC && dlgIsOpen() ? TALK_NPC : null;
+// "Back." on every reply that would otherwise only say goodbye, inside a conversation you started
+{ const oSD=showDialog; showDialog=function(name,text,opts,...r){
+    if(TALK_NPC && dlgIsOpen() && Array.isArray(opts)){ TALK_DEPTH++;
+      const onlyBye=opts.length && opts.every(o=>o===bye || o.fn===closeDialog || /^(Farewell|Leave|Not now|Close|Bow and leave)/.test(String(o.label)));
+      const hasBack=opts.some(o=>/^Back\b/.test(String(o.label)));
+      const root=TALKERS[TALK_NPC.id], who=TALK_NPC;
+      if(onlyBye && !hasBack && root && name===who.name) opts=[{label:'Back.', fn:()=>{ TALK_NPC=who; TALK_DEPTH=0; root(); }}, ...opts]; }
+    else TALK_DEPTH=0;
+    return oSD(name,text,opts,...r); }; }
+// a cutscene clears the screen: inventory, notes, the map, a signpost you were reading (never the menu)
+{ const oC=cutscene; cutscene=function(steps,onEnd){ try{ if(invOverlay.classList.contains('open')) closeInventory(); closeNote(); if(typeof closeBigMap==='function') closeBigMap();
+      const so=document.getElementById('sign-overlay'); if(so) so.classList.remove('open'); if(typeof ctrlOverlay!=='undefined') ctrlOverlay.classList.remove('open'); }catch(e){}
+    return oC(steps,onEnd); }; }
+// people on their way somewhere: follow them through a door and they are still walking on the other side
+const TRANSIT={};
+const doorDest=n=>{ const t=n.goto||[n.i,n.j]; const o=OBJECTS.find(o=>o.type==='teleporter' && Math.abs(o.i-t[0])+Math.abs(o.j-t[1])<=1); if(o) return o.to;
+  const hs=OBJECTS.find(o=>o.inside && o.fp && (d=>d && Math.abs(d[0]-t[0])+Math.abs(d[1]-t[1])<=1)(doorTile(o))); return hs?hs.inside:null; };
+{ const oU=update; update=function(dt){ const before=NPCS.filter(n=>n.route && n.vanish); oU(dt);
+    before.forEach(n=>{ if(NPCS.includes(n)) return; const R=ROUTINES[n.route], s=n.walkSlot||slotOf(R)||n.slot, dest=s&&(s.walk?(nextArea(R,s)||doorDest(n)):s.area);
+      if(n.transit && n._gone!==undefined) R.gone=n._gone;                                   // passing through does not count as having arrived anywhere
+      if(dest && dest!==areaId) TRANSIT[n.route]={from:areaId, dest, t:gt, slot:s}; }); }; }
+{ const oSA=switchArea; switchArea=function(id,...a){ const prev=areaId, r=oSA(id,...a);
+    try{ for(const k in TRANSIT){ const T=TRANSIT[k]; delete TRANSIT[k]; if(T.from!==prev || gt-T.t>25 || NPCS.some(n=>n.route===k)) continue;
+        const R=ROUTINES[k], en=exitToward(prev);
+        if(T.dest===id){ const R2=R, ns=R2.slots[(R2.slots.indexOf(T.slot)+1)%R2.slots.length];      // you followed them home: they come in right behind you and settle
+          if(!en || !ns || ns.area!==id || ns.walk) continue; const m=rtNPC(k,ns,true); m.i=en[0]; m.j=en[1]; m.x=en[0]+0.5; m.y=en[1]+0.5; m.path=[];
+          m.goto=ns.at; m.arrive=ns; m.sit=false; m.chop=false; m.wander=null; m.early=true; NPCS.push(m); continue; }
+        const ex=exitToward(T.dest); if(!en || !ex) continue;
+        const m=rtNPC(k,T.slot,true); m.i=en[0]; m.j=en[1]; m.x=en[0]+0.5; m.y=en[1]+0.5; m.path=[]; m.sit=false; m.chop=false; m.wander=null;
+        m.goto=ex; m.vanish=true; m.transit=true; m._gone=R.gone; m.slot=T.slot; NPCS.push(m); } }catch(e){ console.error(e); }
+    return r; }; }
+// out in the rain, everyone gets wet, not only you: soaked clothes go dark, a sheen on the skin, drips and a damp patch underfoot
+let WET_NPC=0; const WET_NPC_BUF=document.createElement('canvas').getContext('2d');
+const rainingHere=()=>{ const A=AREAS[areaId]; return !!A && !A.inside && typeof weatherToday==='function' && weatherToday()==='rain'; };
+{ const oDN=drawNPC; drawNPC=function(n){ if(!rainingHere() || n.bathe || (n.opts&&n.opts.ghost)) return oDN(n);
+    WET_NPC=1; try{ oDN(n); } finally{ WET_NPC=0; }
+    const q=P(n.x??n.i+0.5,n.y??n.j+0.5);
+    for(let k=0;k<3;k++){ const ph=((gt*(0.9+k*0.17)+k*0.37+n.i*0.13)%1), dx=[-6,5,-1][k], y0=q.y-[58,46,68][k]; g.fillStyle=`rgba(190,220,235,${0.7*(1-ph)})`; g.beginPath(); g.ellipse(q.x+dx,y0+ph*(q.y-y0),1,1.8,0,0,Math.PI*2); g.fill(); }
+    g.fillStyle='rgba(40,60,70,0.16)'; g.beginPath(); g.ellipse(q.x,q.y+1,9,2.8,0,0,Math.PI*2); g.fill(); }; }
+{ const oDC=drawChar; drawChar=function(c,x,B,opts,swing=0,dir=0,pose=null){ if(!WET_NPC || c!==g) return oDC(c,x,B,opts,swing,dir,pose);
+    const T=g.getTransform(), sc=Math.hypot(T.a,T.b), d=T.transformPoint({x,y:B}), W=Math.ceil(130*sc), H=Math.ceil(190*sc), ox=Math.floor(d.x-W/2), oy=Math.floor(d.y-H*0.9);
+    const b=WET_NPC_BUF; if(b.canvas.width<W||b.canvas.height<H){ b.canvas.width=Math.max(W,b.canvas.width); b.canvas.height=Math.max(H,b.canvas.height); }
+    b.setTransform(1,0,0,1,0,0); b.globalCompositeOperation='source-over'; b.clearRect(0,0,b.canvas.width,b.canvas.height);
+    b.setTransform(T.a,T.b,T.c,T.d,T.e-ox,T.f-oy); oDC(b,x,B,opts,swing,dir,pose);
+    b.setTransform(1,0,0,1,0,0); b.globalCompositeOperation='source-atop'; b.fillStyle='rgba(18,26,44,0.24)'; b.fillRect(0,0,W,H);   // everything soaked a shade darker
+    b.fillStyle='rgba(210,228,245,0.13)'; for(let k=0;k<5;k++){ const xx=W*(0.32+k*0.09); b.fillRect(xx,H*0.25,Math.max(1,sc*0.8),H*0.6); }   // and a wet sheen running down
+    b.globalCompositeOperation='source-over';
+    g.save(); g.setTransform(1,0,0,1,0,0); g.drawImage(b.canvas,0,0,W,H,ox,oy,W,H); g.restore(); }; }
 </script>
 </body>
 </html>

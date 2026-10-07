@@ -704,7 +704,7 @@ const ITEMS = {
   leaf:        { name:"Faelan's Leaf",      slot:'misc', read:true, title:'A leaf of beaten silver',
     body:["A leaf of beaten silver on a green cord, cool to the touch. Along the vein, in a script like running water, a single word you somehow understand: <i>friend</i>.","“Show this at the Silver Gate,” Faelan said."] },
   moonbloom:   { name:'Moonbloom',          slot:'misc', read:true, title:'A flower from the moon pool',
-    body:["A pale flower that gives off its own faint light, even in your pack. It has not wilted, and Calandor said it never will.","“Lay it where Wynn sleeps. If she sleeps.”"] },
+    body:["A pale flower that gives off its own faint light, even in your pack. It has not wilted, and Calandor said it never will.","“Lay it where Maren sleeps. If she sleeps.”"] },
   // ── weapons ──
   hatchet:     { name:'Woodsman\'s Hatchet', slot:'weapon' },
   axe:         { name:'Bearded Axe',      slot:'weapon' },
@@ -4425,7 +4425,7 @@ Object.assign(AREAS,{
       {type:'bed', i:1, j:0, fp:[2,1]},
       {type:'hearth', i:0, j:3},
       {type:'table', i:2, j:2},
-      {type:'crate', i:0, j:1, breakable:true},
+      {type:'crate', i:0, j:0, breakable:true},          // the stacked crates, up in the corner by the head of the bed
       ...(collectedPickups.has('farmhouse:1,3') ? [] : [{type:'pickup', i:1, j:3, item:'straw_hat'}]),
     ].filter(o=>!o.breakable || !destroyedBreakables.has('farmhouse:'+o.i+','+o.j)),
     entries:{ fromFarm:{i:3,j:2}, bed:{i:1,j:1} } },
@@ -8816,8 +8816,8 @@ function paintItemArt(g2,id,size){
       for(let k=0;k<6;k++){ g2.save(); g2.translate(20,17); g2.rotate(k*Math.PI/3); E(0,-6,3,6,'#f4f0ff'); g2.restore(); } E(20,17,2.6,2.6,'#f0d870'); break; }
     case 'elegy': case 'journal': { R(8,8,24,26,id==='elegy'?'#d8d0c0':'#6a4626'); R(10,10,20,22,id==='elegy'?'#e8e2d4':'#e8dcb8');
       g2.fillStyle='rgba(60,50,40,0.6)'; for(let k=0;k<6;k++) R(12,13+k*3,16-(k%2)*4,1,'rgba(60,50,40,0.6)'); if(id==='journal') R(19.4,8,1.2,26,'#4a2e14'); break; }
-    case 'staff_bog': case 'staff_hex': case 'staff_bone': case 'staff_barrow': case 'staff_oak': case 'staff_star': case 'staff_cinder': case 'staff_crystal': case 'dagger': case 'sword': case 'morningstar': case 'pitchfork': case 'club': case 'hatchet': case 'axe': case 'spear': case 'mace': case 'longsword': case 'elf_blade': {
-      const T={staff_bone:[6,33,0.75],staff_barrow:[6,33,0.75],staff_bog:[6,33,0.75],staff_hex:[6,33,0.75],staff_crystal:[6,33,0.75],staff_oak:[6,33,0.75],staff_star:[6,33,0.75],staff_cinder:[6,33,0.75],morningstar:[6,26,1.05],pitchfork:[5,24,0.85],dagger:[10,30,1.45],sword:[10,30,1.05],club:[7,29,1.3],hatchet:[8,29,1.45],axe:[6,28,1.05],spear:[5,33,0.8],mace:[7,28,1.15],longsword:[11,31,0.85],elf_blade:[11,31,0.85]}[id];
+    case 'staff_bog': case 'staff_hex': case 'staff_bone': case 'staff_barrow': case 'staff_oak': case 'staff_star': case 'staff_cinder': case 'staff_crystal': case 'dagger': case 'sword': case 'morningstar': case 'pitchfork': case 'club': case 'hatchet': case 'axe': case 'spear': case 'mace': case 'longsword': case 'elf_blade': case 'shovel': {
+      const T={shovel:[6,30,0.85],staff_bone:[6,33,0.75],staff_barrow:[6,33,0.75],staff_bog:[6,33,0.75],staff_hex:[6,33,0.75],staff_crystal:[6,33,0.75],staff_oak:[6,33,0.75],staff_star:[6,33,0.75],staff_cinder:[6,33,0.75],morningstar:[6,26,1.05],pitchfork:[5,24,0.85],dagger:[10,30,1.45],sword:[10,30,1.05],club:[7,29,1.3],hatchet:[8,29,1.45],axe:[6,28,1.05],spear:[5,33,0.8],mace:[7,28,1.15],longsword:[11,31,0.85],elf_blade:[11,31,0.85]}[id];
       g2.save(); g2.translate(T[0],T[1]); g2.rotate(-Math.PI/4);
       drawWeapon(g2,0,0,0,id, T[2]);
       g2.restore(); break; }
@@ -8876,6 +8876,7 @@ function paintItemArt(g2,id,size){
   g2.restore();
 }
 const ICON={};
+const ICON_FIT={};
 function drawItemIcon(g2,id,size){
   g2.setTransform(1,0,0,1,0,0); g2.clearRect(0,0,size,size);
   if(!id) return;
@@ -8883,7 +8884,14 @@ function drawItemIcon(g2,id,size){
     ICON[size]={a:a.getContext('2d'),o:o.getContext('2d')}; }
   const {a,o}=ICON[size];
   a.setTransform(1,0,0,1,0,0); a.globalCompositeOperation='source-over'; a.clearRect(0,0,size,size);
-  a.save(); a.translate(size*0.06,size*0.04); a.scale(0.88,0.88); paintItemArt(a,id,size); a.restore();
+  { // paint the art aside, find where it really is, then centre it in the slot and let it fill the space sensibly
+    if(!ICON_FIT[size]){ const t=document.createElement('canvas'); t.width=t.height=size; ICON_FIT[size]=t.getContext('2d',{willReadFrequently:true}); }
+    const t=ICON_FIT[size]; t.setTransform(1,0,0,1,0,0); t.globalCompositeOperation='source-over'; t.clearRect(0,0,size,size); paintItemArt(t,id,size); t.setTransform(1,0,0,1,0,0);
+    const px=t.getImageData(0,0,size,size).data; let x0=size,y0=size,x1=-1,y1=-1;
+    for(let yy=0;yy<size;yy++) for(let xx=0;xx<size;xx++) if(px[(yy*size+xx)*4+3]>10){ if(xx<x0)x0=xx; if(xx>x1)x1=xx; if(yy<y0)y0=yy; if(yy>y1)y1=yy; }
+    if(x1<0){ a.save(); a.translate(size*0.06,size*0.04); a.scale(0.88,0.88); paintItemArt(a,id,size); a.restore(); }
+    else { const bw=x1-x0+1, bh=y1-y0+1, room=size*0.8, k=Math.min(room/bw, room/bh, 1.45);       // small things grow a little, big ones shrink to fit
+      a.save(); a.translate(size/2,size/2); a.scale(k,k); a.drawImage(t.canvas,-(x0+bw/2),-(y0+bh/2)); a.restore(); } }
   // key light from the upper left, cool shade to the lower right, clipped to the item
   a.globalCompositeOperation='source-atop';
   const lg=a.createLinearGradient(0,0,size,size);
@@ -9146,7 +9154,7 @@ function npcHasNews(n){
   if(n.id==='wenna' && STQ()==='wenna') return '!';
   if(n.id==='warden' && !gateOpen()) return '!';
   if(n.id==='aerwen' && ((!fellDone() && !CHOICE.fellAsked) || (fellDone() && (!CHOICE.gift || !CHOICE.pact)))) return fellDone()?'?':'!';
-  if(n.id==='calandor' && !havenBurnt() && (!CHOICE.wynn || (CHOICE.wynn==='laid' && !CHOICE.wynnThanked))) return CHOICE.wynn==='laid'?'?':'!';
+  if(n.id==='calandor' && !havenBurnt() && ((!CHOICE.maren && !hasItem('moonbloom')) || (CHOICE.maren==='laid' && !CHOICE.marenThanked))) return CHOICE.maren==='laid'?'?':'!';
   if(n.id==='tirnel' && !CHOICE.tirnel) return '!';
   if(n.id==='nim' && !CHOICE.nim) return '!';
   if(n.id==='magistrate' && !BARON_DOWN() && (hasItem('seal')||hasItem('ledger')||hasItem('journal')||hasItem('orrinletters')||hasItem('trapnote')||(hasItem('charter')&&!CHOICE.charterGiven))) return '!';
@@ -9171,7 +9179,7 @@ const TALK_TURN={n:null,dir:0};
 setInterval(()=>{ const t=TALK_TURN.n; if(!t) return; const open=typeof dlgOverlay!=='undefined' && dlgOverlay.classList.contains('open');
   if(!open && !(typeof CS!=='undefined' && CS.on)){ if(!t.moving && !(t.path&&t.path.length)) t.dir=TALK_TURN.dir; TALK_TURN.n=null; } },250);   // when the talk ends, they turn back to what they were doing
 // ── choices: what the Wanderer decided, and what Dunhollow will remember ──
-const CHOICE = { csFarm:null, gob:null, toll:null, baron:null, nim:null, thieves:null, morra:null, hal:null, rest:null, letter:null, camp:null, pups:null, ada:null, adaHow:null, edric:null, untrack:null, morwen:null, barrow:null, fenCaches:null, fenOpen:null, gerdMet:null, fenUnlocked:null, fenSeen:null, deadAt:null, pim:null, shardMade:null, csBrann:null, csFell:null, csFen:null, csGate:null, tobbStaff:null, shadeHow:null, csCamp:null, csHaven:null, necro:null, necroQ:null, fenRumours:null, fenMidHeard:null, bathChest:null, moonJoin:null, moonTowels:null, hobb:null, pool:null, poolq:null, sisters:null, poolDay:null, shade:null, shadePaid:null, strip:null, aldoPaid:null, moon:null, moonDay:null, baronDay:null, ruler:null, unpaid:null, orrinOut:null, tallyBurnt:null, moonAtoned:null, bathDay:null, vennStreak:null, vennSus:null, vennCaught:null, gb1:null, gb2:null, gb3:null, gbDay:null, tomas:null, innDay:null, gunnarBeat:null, mbDay:null, ruvin:null, livery:null, oath:null, appr:null, puz:null, moonBless:null, wear:null, bard:null, goat:null, grave:null, hunter:null, faelan:null, fell:null, fellAsked:null, pact:null, wynn:null, wynnThanked:null, tirnel:null, gift:null, warden:null, stones:null, greyDead:null, maraSeal:null, ledger:null, adafarm:null, martaElf:null, stq:null, charterGiven:null, epiDone:null, crier:null };
+const CHOICE = { csFarm:null, gob:null, toll:null, baron:null, nim:null, thieves:null, morra:null, hal:null, rest:null, letter:null, camp:null, pups:null, ada:null, adaHow:null, edric:null, untrack:null, morwen:null, barrow:null, fenCaches:null, fenOpen:null, gerdMet:null, fenUnlocked:null, fenSeen:null, deadAt:null, pim:null, shardMade:null, csBrann:null, csFell:null, csFen:null, csGate:null, tobbStaff:null, shadeHow:null, csCamp:null, csHaven:null, necro:null, necroQ:null, fenRumours:null, fenMidHeard:null, bathChest:null, moonJoin:null, moonTowels:null, hobb:null, pool:null, poolq:null, sisters:null, poolDay:null, shade:null, shadePaid:null, strip:null, aldoPaid:null, moon:null, moonDay:null, baronDay:null, ruler:null, unpaid:null, orrinOut:null, tallyBurnt:null, moonAtoned:null, bathDay:null, vennStreak:null, vennSus:null, vennCaught:null, gb1:null, gb2:null, gb3:null, gbDay:null, tomas:null, innDay:null, gunnarBeat:null, mbDay:null, ruvin:null, livery:null, oath:null, appr:null, puz:null, moonBless:null, wear:null, bard:null, goat:null, grave:null, hunter:null, faelan:null, fell:null, fellAsked:null, pact:null, maren:null, marenThanked:null, tirnel:null, gift:null, warden:null, stones:null, greyDead:null, maraSeal:null, ledger:null, adafarm:null, martaElf:null, stq:null, charterGiven:null, epiDone:null, crier:null };
 function remember(k,v,msg){ CHOICE[k]=v; if(msg) logMsg(msg,'#c8a0e0'); }
 const say=(who,text,opts,purse)=>showDialog(who,text,opts,purse);
 const ELFP=()=>!!(player.opts && player.opts.race==='elf');   // is the Wanderer an elf? many people notice
@@ -9481,7 +9489,7 @@ Object.assign(AREAS,{
       { id:'aerwen', name:'Lady Aerwen', i:7, j:6, dir:0, opts:ELFO({gender:'f',skin:0,hair:0,hairColor:11,face:2,equip:{head:'elf_circlet',torso:'elf_robe',armor:null,hands:null,legs:null,feet:'elf_boots',weapon:null,offhand:null}}) },
       { id:'maelis', name:'Maelis the Weaver', i:10, j:4, dir:0, opts:ELFO({gender:'f',skin:1,hair:3,hairColor:1,face:1,equip:{head:null,torso:'elf_tunic',armor:null,hands:null,legs:'elf_leggings',feet:'elf_boots',weapon:null,offhand:null}}) },
       { id:'tirnel', name:'Tirnel the Poet', i:5, j:9, dir:1, opts:ELFO({gender:'m',skin:0,hair:1,hairColor:9,face:2,equip:{head:null,torso:'elf_robe',armor:null,hands:null,legs:null,feet:'elf_boots',weapon:null,offhand:null}}) } ];
-      if(CHOICE.wynnThanked!=='gone') l.push({ id:'calandor', name:'Calandor', i:3, j:5, dir:1, opts:ELFO({gender:'m',skin:0,hair:4,hairColor:13,equip:{head:null,torso:'elf_robe',armor:'elf_cloak',hands:null,legs:null,feet:'elf_boots',weapon:null,offhand:null}}) });
+      if(CHOICE.marenThanked!=='gone') l.push({ id:'calandor', name:'Calandor', i:3, j:5, dir:1, opts:ELFO({gender:'m',skin:0,hair:4,hairColor:13,equip:{head:null,torso:'elf_robe',armor:'elf_cloak',hands:null,legs:null,feet:'elf_boots',weapon:null,offhand:null}}) });
       return l; },
     mobs:()=>[], entries:{ fromGate:{i:7,j:10} } },
   fellings:{ fence:{r:false,l:false}, w:13, h:9, theme:'wood', label:'The Fellings', mini:{x:0,y:0},
@@ -9599,12 +9607,12 @@ function tirnelTalk(){
 }
 function calandorTalk(){
   if(havenBurnt()){ say('Calandor',["An old elf sits alone by the dead pool. The pavilions are black. The lanterns are glass and ash.","“They came in the night, with torches and the Baron's banner. They knew the paths. Someone showed them the paths.” He does not look at you. He does not need to."],[bye]); return; }
-  if(CHOICE.wynn==='laid' && !CHOICE.wynnThanked){ CHOICE.wynnThanked='gone'; giveQuestItem('elf_circlet',true); updateHud();
+  if(CHOICE.maren==='laid' && !CHOICE.marenThanked){ CHOICE.marenThanked='gone'; giveQuestItem('elf_circlet',true); updateHud();
     say('Calandor',["“I felt it. The pool was bright for a moment, as bright as the evening she first came here, soaked to the knees, looking for her goat.”","“Thank you. I think I will go and sit with her awhile. Take this; she always said it suited humans better.” <i>You receive a Silver Circlet.</i>"],[bye]); return; }
-  if(CHOICE.wynn==='sold'){ say('Calandor',"“The moonbloom is not in your pack, and it is not in the ground. It is in a market somewhere.” He turns back to the water. "+(ELFP()?"“You have lived among the humans too long. You needed the coin more than the dead do.”":"“Humans. You always need the coin more than the dead do.”")+"",[bye]); return; }
-  if(hasItem('moonbloom')){ say('Calandor',"“The graveyard of Dunhollow, north of the well. Her name was Wynn. Please.”",[bye]); return; }
+  if(CHOICE.maren==='sold'){ say('Calandor',"“The moonbloom is not in your pack, and it is not in the ground. It is in a market somewhere.” He turns back to the water. "+(ELFP()?"“You have lived among the humans too long. You needed the coin more than the dead do.”":"“Humans. You always need the coin more than the dead do.”")+"",[bye]); return; }
+  if(hasItem('moonbloom')){ say('Calandor',"“The graveyard of Dunhollow, north of the well. Her name was Maren. Please.”",[bye]); return; }
   say('Calandor',["An old elf sits by the moon pool, very still. Lily flowers glow on the water.",
-    "“I had a friend in your village once. Wynn, a weaver. She laughed like the brook. She said she would come back in the spring.” He smiles. “That was sixty springs ago.”"+(ELFP()?" He looks at you. “You grew up among them. Perhaps you know how fast they count.”":" “You short-lived people count so fast.”")+""],[
+    "“I had a friend in your village once. Maren, a weaver. She laughed like the brook. She said she would come back in the spring.” He smiles. “That was sixty springs ago.”"+(ELFP()?" He looks at you. “You grew up among them. Perhaps you know how fast they count.”":" “You short-lived people count so fast.”")+""],[
     {label:'“I will find out what happened to her.”', fn:()=>{ giveQuestItem('moonbloom',true); updateHud();
       say('Calandor',"He lifts a pale flower out of the water and holds it out to you. “Then lay this where she sleeps. If she sleeps.” <i>You receive a Moonbloom.</i>",[bye]); }},
     {label:'“Sixty years is a long time for us. I am sorry.”', fn:()=>say('Calandor',"“I know,” he says. “I knew when I said it. It helps to hear it said by one of you.”",[bye])},
@@ -9882,15 +9890,15 @@ function mguardTalk(){ say(BARON_DOWN()?'Crown Soldier':"Baron's Guard", BARON_D
 function fenceSell(){
   const opts=[];
   player.inv.forEach((id,k)=>{ if(!id || ITEMS[id].slot==='misc' && id!=='moonbloom' || !PRICES[id]) return; const pr=Math.max(1,Math.round(PRICES[id]*SELL_RATE*1.35));
-    opts.push({label:itemLabel(id), note:'+'+formatCoin(pr), fn:()=>{ player.inv[k]=null; player.purse+=pr; updateHud(); if(id==='moonbloom' && !CHOICE.wynn) remember('wynn','sold'); logMsg('Sold '+ITEMS[id].name+' for '+formatCoin(pr)+'.','#e8c060'); fenceSell(); }}); });
+    opts.push({label:itemLabel(id), note:'+'+formatCoin(pr), fn:()=>{ player.inv[k]=null; player.purse+=pr; updateHud(); if(id==='moonbloom' && !CHOICE.maren) remember('maren','sold'); logMsg('Sold '+ITEMS[id].name+' for '+formatCoin(pr)+'.','#e8c060'); fenceSell(); }}); });
   say('Sella the Fence', opts.length?"“I pay better than Marta. I also ask fewer questions.”":"“Nothing to sell? Then stop blocking my light.”",[...opts,bye],true);
 }
 function sellaTalk(){
-  const opts=[{label:'“I have things to sell.”', fn:fenceSell}];
+  const opts=[];                                  // Sella buys nothing from strangers: she has her own suppliers
   if(!CHOICE.baron && !hasItem('ledger') && !CHOICE.ledger) opts.push({label:'“Have you got anything on the Baron?”', fn:()=>say('Sella the Fence',["She glances at the door, then pulls a folded bundle from inside her coat.","“Pages cut out of the Steward's own ledger. What the Baron paid, and to whom. A clerk owed me money. Forty copper, and you never saw me.”"],[
     {label:'Buy the pages. (-40c)', off:player.purse<40, note:'-40c', fn:()=>{ player.purse-=40; CHOICE.ledger=true; giveQuestItem('ledger',true); updateHud(); say('Sella the Fence',"“Pleasure. Don't read them in public.” <i>You receive the Steward's Ledger.</i>",[bye]); }},
     {label:'Not now.', fn:closeDialog}])});
-  if(!CHOICE.thieves) opts.push({label:'“Your friends in the east alley jumped me.”', fn:()=>say('Sella the Fence',"“Jory's crew? They jump everybody. It's a hobby.” She thinks. “Give me 15 copper and they'll leave you be. Or break their heads and I'll buy what they drop.”",[
+  if(!CHOICE.thieves) opts.push({label:'“Your friends in the east alley jumped me.”', fn:()=>say('Sella the Fence',"“Jory's crew? They jump everybody. It's a hobby.” She thinks. “Give me 15 copper and they'll leave you be. Or break their heads. Either way, keep it out of my shop.”",[
     {label:'Pay 15 copper.', off:player.purse<15, note:'-15c', fn:()=>{ player.purse-=15; updateHud(); remember('thieves','deal','You bought peace with the Lowstreets\' cutpurses.'); defeatedMobs.add('lowstreets:Cutpurse Jory'); defeatedMobs.add('lowstreets:Cutpurse Mags'); defeatedMobs.add('lowstreets:Big Rolf'); say('Sella the Fence',"“Pleasure doing business.”",[bye]); }},
     {label:'“I will break heads.”', fn:closeDialog}])});
   opts.push(bye);
@@ -10046,7 +10054,7 @@ const JOURNAL=[
   ['The Silver Gate', ()=> !visitedAreas.silvergate ? null : havenBurnt() ? ['done',"There is nobody left to guard the gate."] : gateOpen() ? ['done',"The elves of the Silver Gate let you pass."] : ['active',"Elves guard a white arch north of the Mistmere. They will not let you through."]],
   ['The Axes in the Fellings', ()=> !(CHOICE.fellAsked||visitedAreas.fellings) ? null : CHOICE.fell && CHOICE.fell!=='fight' ? ['done',{fought:"You drove the Baron's loggers out by force.",seal:"The Baron's own orders sent the loggers home.",colliers:"The loggers now cut dead wood for Mara's colliers.",paid:"You paid the loggers to leave.",betrayed:"You sold the way to Sylvhaven to the Baron's men."}[CHOICE.fell]] : ['active',"The Baron's loggers are cutting down the silver trees east of the Mistmere."]],
   ["Lady Aerwen's Gift", ()=> !visitedAreas.sylvhaven || havenBurnt() ? null : CHOICE.gift ? ['done',"Aerwen gave you the "+ITEMS[CHOICE.gift].name+"."] : fellDone() ? ['active',"Tell Lady Aerwen that the axes are silent."] : null],
-  ['A Flower for Wynn', ()=> !(has('moonbloom')||CHOICE.wynn) ? null : CHOICE.wynn==='sold' ? ['done',"You sold Calandor's moonbloom."] : CHOICE.wynnThanked ? ['done',"Calandor went to sit by Wynn's grave."] : CHOICE.wynn==='laid' ? ['active',"The moonbloom lies on Wynn's grave. Calandor will want to know."] : ['active',"Lay the moonbloom on Wynn's grave in Dunhollow. Old Tobb may know where it is."]],
+  ['A Flower for Maren', ()=> !(has('moonbloom')||CHOICE.maren) ? null : CHOICE.maren==='sold' ? ['done',"You sold Calandor's moonbloom."] : CHOICE.marenThanked ? ['done',"Calandor went to sit by Maren's grave."] : CHOICE.maren==='laid' ? ['active',"The moonbloom lies on Maren's grave. Calandor will want to know."] : ['active',"Lay the moonbloom on Maren's grave in Dunhollow. Old Tobb may know where it is."]],
   ["Snagtooth's Warren", ()=> !visitedAreas.warren ? null : CHOICE.gob && CHOICE.gob!=='fight' ? ['done',{fought:"You broke the goblin warren.",paid:"You paid the goblins to move house."}[CHOICE.gob]] : ['active',"Goblins have dug in north of the Wolfwood."]],
   ['Hollowmere', ()=> !(gateExcuse||visitedAreas.citygate) ? null : visitedAreas.citygate ? ['done',"The Baron's town, north of the forest road."] : ['active',"The gate of Hollowmere, north of the forest road, was shut."]],
   ['Nim', ()=> !CHOICE.nim ? null : CHOICE.nim ? ['done',{paid:"You paid for Nim's stolen bread.",guard:"You handed Nim to the guard.",free:"You let Nim run."}[CHOICE.nim]] : ['active',"A thief in the Market Ward is about to be caught."]],
@@ -10102,12 +10110,12 @@ const encounter=(key,chance)=>{ const day=Math.floor(dayClock/DAY_LEN); return r
 Object.assign(AREAS,{
   lane:{ fence:{r:false,l:false}, w:7, h:24, theme:'road', label:'Dunhollow Lane', mini:{x:0,y:0},
     // a forest road like the one from the farm, with Dunhollow's small fields and ploughland cut into the verges
-    notches:()=>[ {i0:5,j0:2,w:2,h:4}, {i0:0,j0:5,w:2,h:3,kind:'plough'}, {i0:0,j0:11,w:2,h:4}, {i0:5,j0:12,w:2,h:3,kind:'plough'}, {i0:5,j0:17,w:2,h:3} ], dummy:null,
+    notches:()=>[ {i0:5,j0:1,w:2,h:7}, {i0:0,j0:2,w:2,h:9,kind:'plough'}, {i0:5,j0:12,w:2,h:7} ], dummy:null,
     objects:()=>{ const l=[{type:'teleporter', i:3, j:0, to:'village', entry:'fromCrossroads'}, {type:'teleporter', i:0, j:21, to:'road', entry:'fromCrossroads'},
-      {type:'milestone', i:4, j:20, t:'DUN ½'}, {type:'scarecrow', i:6, j:3}, {type:'scarecrow', i:0, j:13}, {type:'shrine', i:1, j:9},
-      {type:'stump', i:1, j:10}, {type:'logpile', i:0, j:16}];
+      {type:'milestone', i:4, j:20, t:'DUN ½'}, {type:'scarecrow', i:6, j:4}, {type:'scarecrow', i:6, j:15}, {type:'shrine', i:1, j:13},
+      {type:'logpile', i:0, j:16}];
       if(!destroyedBreakables.has('lane:0,18')) l.push({type:'crate', i:0, j:18, breakable:true});
-      [[1,3],[2,17],[4,7],[2,20]].forEach(([i,j])=>l.push({type:'critter', kind:'flowers', i, j, noblock:true}));
+      [[2,14],[2,17],[4,7],[2,20]].forEach(([i,j])=>l.push({type:'critter', kind:'flowers', i, j, noblock:true}));
       [[4,1],[1,19]].forEach(([i,j])=>l.push({type:'rocks', i, j, noblock:true}));
       return l; },
     npcs:()=>[],
@@ -10116,7 +10124,7 @@ Object.assign(AREAS,{
   kingsroad:{ fence:{r:false,l:false}, w:8, h:49, theme:'road', label:"The King's Road", mini:{x:0,y:0}, noTree:['0,0','1,0','2,0','3,0','5,0','6,0','7,0','0,1','1,1','2,1','6,1','7,1','0,2','7,2'],
     notches:()=>[], dummy:null,
     objects:()=>[ {type:'teleporter', i:4, j:48, to:'road', entry:'fromCity'}, {type:'milestone', i:6, j:44, t:'HOL 3'}, {type:'rocks', i:1, j:38, noblock:true}, {type:'rocks', i:6, j:33, noblock:true},
-      ...(wildDone() && cityOpen() ? [{type:'teleporter', i:4, j:0, to:'citygate', entry:'fromRoad'}] : []),   // the way into Hollowmere is there only once the gate is open to you
+      ...(MAP_ALL || (wildDone() && cityOpen()) ? [{type:'teleporter', i:4, j:0, to:'citygate', entry:'fromRoad'}] : []),   // the way into Hollowmere is there only once the gate is open to you
       {type:'milestone', i:6, j:27, t:'HOL 2'}, {type:'milestone', i:1, j:12, t:'HOL 1'},
       B(0,19,2,2,2,{stone:true,h:90,rh:40,door:'r',dt:0,sign:'⚖'}), {type:'banner', i:2, j:18},
       {type:'gallows', i:6, j:7}, {type:'cart', i:1, j:24}, {type:'barrel', i:0, j:23}, {type:'lamp', i:2, j:21}, {type:'lamp', i:6, j:4},
@@ -10737,16 +10745,16 @@ function cityBarks(dt){
 AREAS.crossroads.entries.fromVillage={i:9,j:5}; AREAS.crossroads.entries.fromWood={i:5,j:1};
 
 // ── what changes back home ──
-wrap('graveyard','objects',list=>[...list,{type:'grave', i:8, j:5, v:1, name:'Wynn'}]);
-wrap('graveyard','npcs',list=> CHOICE.wynnThanked==='gone' ? [...list,{ id:'calandorG', name:'Calandor', i:8, j:6, dir:6, opts:ELFO({gender:'m',skin:0,hair:4,hairColor:13,equip:{head:null,torso:'elf_robe',armor:'elf_cloak',hands:null,legs:null,feet:'elf_boots',weapon:null,offhand:null}}) }] : list);
+wrap('graveyard','objects',list=>[...list,{type:'grave', i:8, j:5, v:1, name:'Maren'}]);
+wrap('graveyard','npcs',list=> CHOICE.marenThanked==='gone' ? [...list,{ id:'calandorG', name:'Calandor', i:8, j:6, dir:6, opts:ELFO({gender:'m',skin:0,hair:4,hairColor:13,equip:{head:null,torso:'elf_robe',armor:'elf_cloak',hands:null,legs:null,feet:'elf_boots',weapon:null,offhand:null}}) }] : list);
 wrap('village','npcs',list=> CHOICE.pact==='trade' && !havenBurnt() ? [...list,{ id:'envoy', name:'Elven Envoy', i:7, j:4, dir:0, opts:ELFO({gender:'f',skin:0,hair:0,hairColor:10,face:2,equip:{head:'elf_circlet',torso:'elf_tunic',armor:'elf_cloak',hands:null,legs:'elf_leggings',feet:'elf_boots',weapon:null,offhand:null}}) }] : list);
 { const dt=diggerTalk; TALKERS.digger=()=>{
-    if(hasItem('moonbloom') && !CHOICE.wynn){ say('Old Tobb',["You show Tobb the glowing flower and say the name Wynn.","“Wynn the weaver? Lord, that's a name. She went up to the mere every spring when I was a boy, and came back singing. Folk said she had an elf for a sweetheart.” He points to a small grey stone by the east wall. “Died the winter I turned twelve.”"],[
-      {label:'Lay the moonbloom on her grave.', fn:()=>{ player.inv[player.inv.indexOf('moonbloom')]=null; remember('wynn','laid','You laid the moonbloom on Wynn\'s grave.'); updateHud();
+    if(hasItem('moonbloom') && !CHOICE.maren){ say('Old Tobb',["You show Tobb the glowing flower and say the name Maren.","“Maren the weaver? Lord, that's a name. She went up to the mere every spring when I was a boy, and came back singing. Folk said she had an elf for a sweetheart.” He points to a small grey stone by the east wall. “Died the winter I turned twelve.”"],[
+      {label:'Lay the moonbloom on her grave.', fn:()=>{ player.inv[player.inv.indexOf('moonbloom')]=null; remember('maren','laid','You laid the moonbloom on Maren\'s grave.'); updateHud();
         say('Old Tobb',"The flower keeps glowing on the stone, even in daylight. Tobb takes off his hood. “Well. That's a thing I didn't expect to see before I died.”",[bye]); }},
       {label:'Keep it for now.', fn:closeDialog} ]); return; }
     dt(); }; }
-{ const ss=shopSell; shopSell=function(){ const had=hasItem('moonbloom'); ss(); if(had) setTimeout(()=>{ if(!hasItem('moonbloom') && !CHOICE.wynn) remember('wynn','sold','You sold Calandor\'s moonbloom to Marta.'); },0); }; }
+{ const ss=shopSell; shopSell=function(){ const had=hasItem('moonbloom'); ss(); if(had) setTimeout(()=>{ if(!hasItem('moonbloom') && !CHOICE.maren) remember('maren','sold','You sold Calandor\'s moonbloom to Marta.'); },0); }; }
 
 
 // Hamond looks back on everything, once the camp is dealt with
@@ -10797,7 +10805,7 @@ function epilogue(){
   if(CHOICE.pact==='trade' && !havenBurnt()) L.push("“And now there is an elf by our well, eating Marta's cheese with a face of great suffering. Dunhollow has never been so strange, or so safe.”");
   if(CHOICE.pact==='hidden') L.push("“You came back from the east with a look in your eyes. Whatever you found out there, keep it. Some secrets are fences.”");
   if(havenBurnt()) L.push("“The Baron's men came back from the east with carts of silver wood and strange white cloth. They were laughing. I have never heard men laugh like that.”");
-  if(CHOICE.wynn==='laid') L.push("“Tobb says a light burns on old Wynn's grave now, day and night. And an old man with long ears sits beside it. I have stopped asking questions.”");
+  if(CHOICE.maren==='laid') L.push("“Tobb says a light burns on old Maren's grave now, day and night. And an old man with long ears sits beside it. I have stopped asking questions.”");
   if(CHOICE.tirnel==='goat') L.push("“Pip claims an elf wrote to him, praising the goat song. I would dismiss it, but the letter smells of flowers and is written in silver.”");
   if(BARON_DOWN()) L.push("“A rider came from Hollowmere: Bertram is taken by the Crown, for murder under his own seal. I sat down on the well and laughed until I cried. Thirty souls, a well, and a Wanderer.”");
   if(CHOICE.baron==='sold_seal') L.push("“They say the Baron's steward paid someone well for a piece of paper. They say the Baron sleeps soundly. I do not.”");
@@ -11090,12 +11098,12 @@ function logMsg(t,col){
 let bannerT=null;
 function banner(t,col='#f0c060',ms=1400){ cbanner.textContent=t; cbanner.style.color=col; cbanner.classList.add('show'); clearTimeout(bannerT); bannerT=setTimeout(()=>cbanner.classList.remove('show'),ms); }
 // ── minimap: every visited room drawn in its real shape, placed exactly where its doors meet ──
-let MAP_LAYOUT=null;
+let MAP_LAYOUT=null, MAP_ALL=false;                    // MAP_ALL: while the map is laid out, gated ways count as open
 const MAP_LINKS=[];
 function mapLayout(){
   if(MAP_LAYOUT) return MAP_LAYOUT;
   const pos={farm:{u:0,v:0}}, queue=['farm'];
-  const tps=id=>AREAS[id].objects().filter(o=>o.type==='teleporter');
+  const tps=id=>{ MAP_ALL=true; try{ return AREAS[id].objects().filter(o=>o.type==='teleporter'); } finally{ MAP_ALL=false; } };
   const out=(A,o)=> o.i>=A.w-1?[1,0] : o.i<=0?[-1,0] : o.j<=0?[0,-1] : [0,1];
   while(queue.length){ const id=queue.shift(), A=AREAS[id];
     for(const t of tps(id)){ if(pos[t.to] || AREAS[t.to].inside) continue;
@@ -11698,7 +11706,7 @@ function combatUpdate(dt){
       combat.respawnT-=dt;
       if(combat.respawnT<=0){
         if(MOB_SPAWNS.some(s=>cheb([s.i,s.j],tileOf(player))<=3)) combat.respawnT=5;
-        else { resetMobs(); combat.respawnT=0; logMsg('You hear footsteps… they are back.','#c0483a'); setTimeout(()=>{ if(!combat.active) clog.classList.remove('open'); },4000); }
+        else { resetMobs(); combat.respawnT=0; setTimeout(()=>{ if(!combat.active) clog.classList.remove('open'); },4000); }
       }
     }
     if(player.opts && mobs.some(m=>m.hostile && !m.dead && !calmThug(m) && cheb(tileOf(m),tileOf(player))<=PARRY.aggro)) startCombat();
@@ -12387,7 +12395,7 @@ function foeSpell(f){ const w=f && f.opts && f.opts.equip && f.opts.equip.weapon
     c.restore(); }; }
 
 // ── Magister Orvell and the runaway apprentice ──
-wrap('keepward','npcs',l=>[...l,{ id:'orvell', name:'Magister Orvell', i:10, j:9, dir:1, opts:{gender:'m',skin:0,hair:4,hairColor:13,beard:5,face:0,equip:{head:'hood',torso:'elf_robe',armor:null,hands:null,legs:null,feet:'boots',weapon:'staff_oak',offhand:null}} }]);
+wrap('keepward','npcs',l=>[...l,{ id:'orvell', name:'Magister Orvell', i:10, j:9, dir:1, opts:{gender:'m',skin:0,hair:4,hairColor:13,beard:5,face:0,equip:{head:'hood',torso:'tunic_blue',armor:'robe_blue',hands:null,legs:null,feet:'boots',weapon:'staff_oak',offhand:null}} }]);
 FOES.mage={ label:'Magus', base:38, stagger:1.3, pattern:[        // long, glowing windups: easy to read, painful to miss
   {wait:1.6, wind:1.35, after:0.8, dir:'up'}, {wait:1.2, wind:1.2, after:0.7, dir:'left'}, {wait:1.5, wind:1.4, after:0.9, dir:'right'} ]};
 const ACOLYTE=(name,i,j,o)=>({ name, type:'mage', i, j, faction:'acolyte', opts:{gender:'m',skin:1,hair:2,hairColor:1,beard:1,face:0,...o,equip:{head:'hood',torso:'smock',armor:null,hands:null,legs:'hose_grey',feet:'boots',weapon:'staff_cinder',offhand:null,...(o.equip||{})}} });
@@ -13676,7 +13684,7 @@ const HOUR=()=>((dayClock%DAY_LEN)/DAY_LEN*24+12)%24;
 const TOBB_O={gender:'m',skin:2,hair:2,hairColor:12,beard:4,face:1,equip:{head:'hood',torso:'smock',armor:null,hands:'gloves',legs:'hose_grey',feet:'boots',weapon:null,offhand:null}};
 const ROUTINES={
   tobb:{ name:'Old Tobb', ids:{graveyard:'digger', village:'digger', wheatsheaf:'tobbpub'}, opts:TOBB_O, slots:[
-    { h:[6,12],    area:'graveyard', at:[3,7], dir:1, chop:true, equip:{weapon:'pitchfork'} },             // digging graves, turning the earth
+    { h:[6,12],    area:'graveyard', at:[3,7], dir:1, chop:true, equip:{weapon:'shovel'} },             // digging graves, turning the earth
     { h:[12,13],   area:'wheatsheaf', at:[4,3], dir:0, sit:true },                                            // his bread and ale at noon
     { h:[13,17.5], area:'graveyard', at:[2,4], dir:1, wander:[[2,4],[6,6],[3,7],[7,3]] },                   // tending the graves
     { h:[17.5,18], area:'village', walk:[[4,0],[3,2]] },                                                    // down to the inn
@@ -14534,6 +14542,28 @@ JOURNAL.push(['A Wolf of Your Own', ()=>{
   const d=CHOICE.pupDays||0;
   return ['active', d>=PUP_FEED_NEED ? "The pups are ready. Ask Marta about taking one of them with you."
     : "Marta's pups need meat, raw or roasted, a little each day. Bring it to her stall. Wolves remember who feeds them. ("+d+" of "+PUP_FEED_NEED+" days)"]; }]);
+// saves from before Calandor's weaver was called Maren
+{ const oAS=applySave; applySave=function(sv){ const r=oAS(sv); if('wynn' in CHOICE){ if(CHOICE.maren==null) CHOICE.maren=CHOICE.wynn; delete CHOICE.wynn; } if('wynnThanked' in CHOICE){ if(CHOICE.marenThanked==null) CHOICE.marenThanked=CHOICE.wynnThanked; delete CHOICE.wynnThanked; } return r; }; }
+// skeletons are dead already: Drain finds nothing to drink, and frost means nothing to bones
+const SPELL_IMMUNE=f=>!!f && f.type==='skeleton';
+{ const oPH=playerHit; playerHit=function(){ const f=combat.foe, W=WEAPONS[player.opts.equip.weapon]||{};
+    if(W.magic && f && SPELL_IMMUNE(f)){ const SP=spellsFor(), S=SP[playerGuard]||SP.right;
+      if((S.name==='Drain'||S.name==='Frost') && player.mana>=S.cost){ const hp0=f.hp, st0=(f.st||[]).length, m0=player.hp, sk=f.state, t0=f.t, w0=f.wind;
+        oPH(); const lost=hp0-f.hp; if(lost>0 && !f.dead){ f.hp=Math.min(f.maxHp,f.hp+Math.ceil(lost*0.7)); }       // it barely feels it
+        f.st=(f.st||[]).filter(x=>x.kind!=='chill'); if(S.name==='Drain'){ player.hp=Math.min(player.hp,m0); updateHud(); } if(S.name==='Frost'){ f.t=Math.min(f.t,t0+0.01); f.wind=w0; }
+        floatText(tileOf(f),'Resisted','#c8c0b0'); return; } }
+    return oPH(); }; }
+// Old Tobb's spade
+Object.assign(ITEMS,{ shovel:{ name:'Spade', slot:'weapon' } }); Object.assign(WEAPONS,{ shovel:{ wind:0.26, dmg:6, len:26 } }); Object.assign(PRICES,{ shovel:8 });
+{ const oDW=drawWeapon; drawWeapon=function(c,hx,hy,ang,id,s=1){ if(id!=='shovel') return oDW(c,hx,hy,ang,id,s);
+    c.save(); c.translate(hx,hy); c.rotate(ang); c.scale(s,s);
+    c.fillStyle='#6a4a28'; c.fillRect(-8,-1.3,30,2.6); c.fillStyle='#8a6438'; c.fillRect(-8,-1.3,30,0.9);          // the ash handle
+    c.strokeStyle='#5a3c20'; c.lineWidth=1.6; c.beginPath(); c.moveTo(-8,-3.2); c.lineTo(-11,-3.2); c.lineTo(-11,3.2); c.lineTo(-8,3.2); c.stroke();   // the D-grip
+    c.fillStyle='#4a4a4c'; c.fillRect(21,-2,3,4);                                                                  // the socket
+    c.fillStyle='#7a7c80'; c.beginPath(); c.moveTo(24,-4.6); c.lineTo(34,-4.2); c.quadraticCurveTo(37,0,34,4.2); c.lineTo(24,4.6); c.closePath(); c.fill();   // the blade, worn bright at the edge
+    c.fillStyle='#a8aaae'; c.beginPath(); c.moveTo(33,-4); c.quadraticCurveTo(36,0,33,4); c.lineTo(34,4.2); c.quadraticCurveTo(37,0,34,-4.2); c.fill();
+    c.fillStyle='rgba(70,50,30,0.6)'; c.beginPath(); c.ellipse(28,1.5,3,1.6,0,0,Math.PI*2); c.fill();               // earth on it
+    c.restore(); }; }
 </script>
 </body>
 </html>

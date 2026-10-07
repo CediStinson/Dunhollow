@@ -926,7 +926,7 @@ function withLook(opts,fn){
   if(opts.equip && (opts.hideHelm || opts.hide)){ const H=opts.hide||{}, e={...opts.equip}; let ch=false;     // pieces the player chose to hide: still worn (stats count), just not drawn
     for(const k in e){ if(e[k] && (H[k] || (k==='head' && opts.hideHelm))){ e[k]=null; ch=true; } } if(ch) opts={...opts, equip:e}; }
   let e=opts.equip; if(!e) return fn(opts);
-  if(Object.values(e).some(v=>v && v.startsWith && v.startsWith('w_'))){ e={...e}; for(const k in e) e[k]=unWoven(e[k]); opts={...opts, equip:e}; }
+  if(Object.values(e).some(v=>v && v.startsWith && /^[tw]_/.test(v))){ e={...e}; for(const k in e) e[k]=unWoven(e[k]); opts={...opts, equip:e}; }
   const saved=[], look={...e}; let any=false;
   const set=(obj,k,v)=>{ saved.push([obj,k,obj[k]]); obj[k]=v; };
   const vari={};
@@ -6649,8 +6649,15 @@ function paintCart(x, y) {
   line(up(shaftStart2, 5), { x: shaftStart2.x + 45, y: shaftStart2.y + 22 });
 
   // 7. VORDERES RAD (Mitte der vorderen Wand)
-  drawWheel(c0.x - 19, c0.y - 3, 1.05);
+  if(!CART_NOWHEEL) drawWheel(c0.x - 19, c0.y - 3, 1.05);
+  else {   // the wheel is gone: a bare axle end pokes out, and that corner sags onto a chock of wood
+    g.fillStyle='#4a3420'; g.beginPath(); g.moveTo(c0.x-30,c0.y+10); g.lineTo(c0.x-12,c0.y+10); g.lineTo(c0.x-10,c0.y+4); g.lineTo(c0.x-28,c0.y+4); g.closePath(); g.fill();
+    g.fillStyle='#6a4a2a'; g.beginPath(); g.moveTo(c0.x-28,c0.y+4); g.lineTo(c0.x-10,c0.y+4); g.lineTo(c0.x-14,c0.y+1); g.lineTo(c0.x-31,c0.y+1); g.closePath(); g.fill();
+    g.strokeStyle='#1e140a'; g.lineWidth=4.5; g.lineCap='round'; g.beginPath(); g.moveTo(c0.x-15,c0.y-7); g.lineTo(c0.x-23,c0.y-1); g.stroke();
+    g.strokeStyle='#7a7a7e'; g.lineWidth=2.4; g.beginPath(); g.moveTo(c0.x-15,c0.y-7); g.lineTo(c0.x-23,c0.y-1); g.stroke();
+    g.fillStyle='#9a9aa0'; g.beginPath(); g.ellipse(c0.x-23.5,c0.y-0.6,2.2,1.6,0.6,0,Math.PI*2); g.fill(); g.lineCap='butt'; }
 }
+let CART_NOWHEEL=false;
 
 function paintWashLine(x,y){
   const a={x:x-TW/2+8,y:y-TH/2-120}, b={x:x+TW/2-8,y:y+TH/2-120};
@@ -7114,7 +7121,7 @@ function drawObject(o){
     drawCached('lamp',x,y,30,110,15,104,paintStreetLamp);
     g.save(); g.globalCompositeOperation='lighter'; glow(x,y-86,34,34,'255,210,130',0.32+Math.sin(gt*7+o.i*3)*0.05); g.restore();
   } else if(o.type==='cart'){
-    drawCached('cart',x,y,160,90,60,60,paintCart);
+    CART_NOWHEEL=!!o.nowheel; drawCached(o.nowheel?'cart_nw':'cart',x,y,160,90,60,60,paintCart); CART_NOWHEEL=false;
   } else if(o.type==='washline'){
     drawCached('wash',x,y,150,170,75,160,paintWashLine);
   } else if(o.type==='haystack'){
@@ -7881,6 +7888,8 @@ function paintGroundTexture(){
       const moss=smooth(0.55,0.8,fbm(gx*0.7,gy*0.7,40))*(1-street);
       sc=mixC(sc,[66,78,44],moss*(1-bulge)*0.9);
       const dirt=smooth(0.6,0.85,fbm(gx*0.5,gy*0.5,41))*0.35; sc=mixC(sc,[92,74,52],dirt);
+      if(AREAS[areaId].grassy){ const gr=(1-smooth(0.15,0.55,street))*smooth(0.28,0.5,fbm(gx*0.6,gy*0.6,44)+0.2*(1-street)), gn=fbm(gx*2.2,gy*2.2,45), bl=(hsh(px*3,py*7)%1000)/1000;
+        let gc=mixC([58,82,34],[104,130,56],gn); if(bl>0.9) gc=mixC(gc,[140,150,80],0.4); sc=mixC(sc,gc,clamp01(gr*1.15)); }
       const ao=1-0.35*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.04-0.1*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.06), o=(py*TWp+px)*4;
       D[o]=sc[0]*k; D[o+1]=sc[1]*k; D[o+2]=sc[2]*k; D[o+3]=255; continue; }
     if(theme==='ash'){                                       // volcanic: black basalt and red scoria, glowing cracks, a path of trodden grey ash
@@ -9180,7 +9189,7 @@ function talkTo(n){
   if(combat.active) return;
   if(n.wander){ n.path=[]; n.moving=false; n.wait=6; n.x=n.i+0.5; n.y=n.j+0.5; }
   if(TALK_TURN.n && TALK_TURN.n!==n) TALK_TURN.n.dir=TALK_TURN.dir;
-  if(TALK_TURN.n!==n && n.chop && areaId==='fenpath'){ TALK_TURN.n=n; TALK_TURN.dir=n.dir; }   // the loggers at the fallen oak go back to chopping
+  if(TALK_TURN.n!==n && !n.wander && !n.goto){ TALK_TURN.n=n; TALK_TURN.dir=n.dir; }   // when you are done they turn back to their work: the loggers to the oak, Tobb to his digging
   n.dir=dirTo([n.i,n.j],tileOf(player)); player.dir=dirTo(tileOf(player),[n.i,n.j]);
   player.path=[]; player.moving=false;
   TALKERS[n.id]?.();
@@ -9200,11 +9209,11 @@ function strangerTalk(){
   if(!hasItem('letter')){ say('A Stranger in Grey',"“Travelling light? Wise. The roads have ears.”",[bye]); return; }
   if(QUEST.letter>=2){ say('A Stranger in Grey',["The man in grey looks at your pack, then at the village behind you.","“The old man has read it, then.” He shrugs. “Paper can still burn. People too. Good day.”"],[bye]); return; }
   say('A Stranger in Grey',["A thin man in a grey cloak steps out from behind the hedge. His boots are too clean for the road.",
-    "“You carry a letter sealed with a B. My master would pay handsomely to have it back, unread by village elders. Sixty copper. More than those farmers will ever give you.”"],[
-    {label:'Sell it to him. (+60 copper)', fn:()=>{ const k=player.inv.indexOf('letter'); if(k>=0) player.inv[k]=null; player.purse+=60; updateHud(); remember('letter','sold','You sold the Baron\'s letter. Nobody in Dunhollow will ever know who sent the bandits.');
+    "“You carry a letter sealed with a B. My master would pay handsomely to have it back, unread by village elders. Thirty-five copper. More than those farmers will ever give you.”"],[
+    {label:'Sell it to him. (+35 copper)', fn:()=>{ const k=player.inv.indexOf('letter'); if(k>=0) player.inv[k]=null; player.purse+=35; updateHud(); remember('letter','sold','You sold the Baron\'s letter. Nobody in Dunhollow will ever know who sent the bandits.');
       say('A Stranger in Grey',"“A sensible soul.” The coins are cold. By the time you look up, the road is empty.",[bye]); }},
     {label:'“This letter belongs to Dunhollow.”', fn:()=>{ remember('letter','kept'); say('A Stranger in Grey',"“Then may Dunhollow bury you with it.” He steps back into the trees.",[bye]); }},
-    {label:'“Seventy, and you carry my bags.”', fn:()=>say('A Stranger in Grey',"For a moment something like a smile. “I carry nothing for anyone. Sixty.”",[{label:'Sell it. (+60 copper)',fn:()=>{ const k=player.inv.indexOf('letter'); if(k>=0) player.inv[k]=null; player.purse+=60; updateHud(); remember('letter','sold','You sold the Baron\'s letter.'); closeDialog(); }},{label:'Keep it.',fn:()=>{ remember('letter','kept'); closeDialog(); }}])},
+    {label:'“Seventy, and you carry my bags.”', fn:()=>say('A Stranger in Grey',"For a moment something like a smile. “I carry nothing for anyone. Sixty.”",[{label:'Sell it. (+35 copper)',fn:()=>{ const k=player.inv.indexOf('letter'); if(k>=0) player.inv[k]=null; player.purse+=35; updateHud(); remember('letter','sold','You sold the Baron\'s letter.'); closeDialog(); }},{label:'Keep it.',fn:()=>{ remember('letter','kept'); closeDialog(); }}])},
   ]);
 }
 // Mara Blackthorn, before the fight
@@ -9212,14 +9221,14 @@ function maraTalk(){
   if(combat.active) return;
   say('Mara Blackthorn',["A woman in mail rises from beside the fire, morningstar resting on her shoulder. The others reach for their blades; she waves them down.",
     (ELFP()?"She squints. “An elf, running Hamond's errands? The Baron would pay good silver for ears like yours. Lucky for you I don't work for him on Sundays.”":"")+" “Hamond's errand-runner. Before you swing that thing: my people were colliers in these woods until the Baron burned us out. Now we rob for him, because he pays and nobody else does.”",
-    "“So. You can bleed for an old man's village. Or you can walk away forty copper richer. Or, if you have a heart in there, let us leave this valley tonight and never come back.”"],[
+    "“So. You can bleed for an old man's village. Or you can walk away twenty-five copper richer. Or, if you have a heart in there, let us leave this valley tonight and never come back.”"],[
     {label:'Fight.', fn:()=>{ remember('camp','fought'); closeDialog(); mobs.forEach(m=>{ m.hostile=true; FOOLED[areaId+':'+m.name]=false; }); startCombat(); }},
     {label:'“Go. Take your people and leave.”', fn:()=>{ remember('camp','spared','You let the camp go. Mara\'s people vanish into the trees before dawn.');
       mobs.forEach(m=>{ m.hostile=false; m.gone=true; m.dead=true; defeatedMobs.add(areaId+':'+m.name); }); QUEST.camp=2;
       say('Mara Blackthorn',"She looks at you a long moment. “Huh. There are still some of you left.” She drops a small pouch at your feet. “For the road. And watch the man in grey.” <i>You receive 10 copper.</i>",[bye]); player.purse+=10; updateHud(); }},
-    {label:'Take the forty copper and look away.', fn:()=>{ remember('camp','bribed','You took Mara\'s coin. The camp stays.'); player.purse+=40; updateHud();
+    {label:'Take the twenty-five copper and look away.', fn:()=>{ remember('camp','bribed','You took Mara\'s coin. The camp stays.'); player.purse+=25; updateHud();
       mobs.forEach(m=>m.hostile=false);
-      say('Mara Blackthorn',"“Smart.” She tosses the purse. “Tell the old man we were too many.” <i>You receive 40 copper.</i>",[bye]); }},
+      say('Mara Blackthorn',"“Smart.” She tosses the purse. “Tell the old man we were too many.” <i>You receive 25 copper.</i>",[bye]); }},
   ]);
 }
 // the wolf den, after the fight
@@ -9288,7 +9297,7 @@ function wennaTalk(){
 function diggerTalk(){
   if(CHOICE.grave && (CHOICE.ada || TRAIL_DEAD()) && !CHOICE.shade){ say('Old Tobb',["Tobb looks like he hasn't slept. “Something weeps in the yard at night. At Edric's grave. I've buried folk sixty years and never heard the dead complain.”","“The elder says it's owls. The elder doesn't sleep next to a graveyard. Come after dark, would you? See what it wants. I'll pay what I can.”"],[
     {label:'“I will come after dark.”', fn:()=>{ remember('shade','asked','Something weeps at Edric\'s grave after dark. Tobb wants to know what it is.'); say('Old Tobb',"“Bless you. Bring a light. And maybe don't bring the ring, if you've got it.” He doesn't explain.",[bye]); }}, bye]); return; }
-  if(CHOICE.shade==='rest' && !CHOICE.shadePaid){ CHOICE.shadePaid=true; player.purse+=20; updateHud(); giveQuestItem('necro_bustier',true); say('Old Tobb',["“Quiet as a church, last night. Here. Twenty coppers, and I'll dig your grave for free when it's time. Not soon, I hope.”","He hesitates, then hands you a bundle of black cloth. “Found this in the old crypt when I dug for Edric. A fen-woman's bodice, black and frayed, smelling of peat. Whoever she was, she was buried proud. Didn't feel right selling it. Feels right giving it to you.” <i>You receive 20 copper and a Fen-Witch's Bodice.</i>"],[bye]); return; }
+  if(CHOICE.shade==='rest' && !CHOICE.shadePaid){ CHOICE.shadePaid=true; player.purse+=10; updateHud(); giveQuestItem('necro_bustier',true); say('Old Tobb',["“Quiet as a church, last night. Here. Ten coppers, and I'll dig your grave for free when it's time. Not soon, I hope.”","He hesitates, then hands you a bundle of black cloth. “Found this in the old crypt when I dug for Edric. A fen-woman's bodice, black and frayed, smelling of peat. Whoever she was, she was buried proud. Didn't feel right selling it. Feels right giving it to you.” <i>You receive 10 copper and a Fen-Witch's Bodice.</i>"],[bye]); return; }
   if(CHOICE.shadePaid && NECRO()>=1 && !CHOICE.tobbStaff && !hasItem('staff_bone')){ say('Old Tobb',["Tobb glances at the staff you carry, then at the pale woman's footprints by the gate.","“So you're learning from her. Hm.” He fetches something long wrapped in sacking. “Dug it out of the old ossuary, under the chapel. Bones bound to a yew pole. I've not slept right since it came in the house. Sixty coppers and it's yours, and good riddance.”"],[
       {label:'Buy the Ossuary Staff.', off:player.purse<60, note:'-60c', fn:()=>{ player.purse-=60; updateHud(); CHOICE.tobbStaff=true; giveQuestItem('staff_bone'); say('Old Tobb',"“Don't bring it back. Ever.”",[bye]); }},
       {label:'“Not now.”', fn:closeDialog}]); return; }
@@ -9299,8 +9308,8 @@ function diggerTalk(){
     "“Hobb and I fetched him on a borrowed barrow, after you found him on Collier's Trail, poor lad. I buried him proper.” He lowers his voice. “He had a gold ring on him. I left it on. Sixty years digging, I never took a thing from the dead. My back though… my back's done. Help an old man finish the stones?”"],[
     {label:'Help him set the stones.', fn:()=>{ remember('grave','dug','You helped Tobb finish Edric\'s grave.'); player.purse+=4; updateHud();
       say('Old Tobb',"You work until your hands blister. Tobb presses four coppers into your palm. “Don't argue.” <i>You receive 4 copper.</i>",[bye]); }},
-    {label:'Wait until he leaves, then take the ring. (+25 copper)', fn:()=>{ remember('grave','robbed','You took the ring from Edric\'s grave.'); player.purse+=25; updateHud();
-      say('Old Tobb',"The ring comes off easily. It is warm from the earth. Behind you, somewhere, a spade stops scraping. <i>You receive 25 copper.</i>",[bye]); }},
+    {label:'Wait until he leaves, then take the ring. (+15 copper)', fn:()=>{ remember('grave','robbed','You took the ring from Edric\'s grave.'); player.purse+=15; updateHud();
+      say('Old Tobb',"The ring comes off easily. It is warm from the earth. Behind you, somewhere, a spade stops scraping. <i>You receive 15 copper.</i>",[bye]); }},
     {label:'Pick wildflowers and lay them on the grave.', fn:()=>{ remember('grave','flowers','You left flowers on Edric\'s grave.');
       say('Old Tobb',"Tobb takes off his hood. For a while neither of you says anything.",[bye]); }},
   ]);
@@ -9322,9 +9331,9 @@ function hunterTalk(){
                   CHOICE.pups==='left' ? "“You left pups in that den? They'll starve, or grow up hungry.”" :
                   QUEST.wolves>=2 ? "“The wood's gone quiet since Greymaw. Quiet's not the same as safe.”" : "“Wolves are thick in the wood this year. Mind yourself.”";
   const back=()=>hunterTalk(), opts=[];
-  if(CHOICE.brannTrap==='asked' && trapDead) opts.push({label:'“Your poacher won\'t set any more traps.”', fn:()=>{ CHOICE.brannTrap='done'; player.purse+=25; updateHud(); remember('brannTrap','done','You dealt with the Baron\'s trapper. Brann taught you to read a trail.');
-    say('Brann the Hunter',["He listens, then spits into the fire. “Jaws like that in an honest wood. Good riddance.”","He counts out coins, then stops and puts them back, and gives you more. “And this: watch the ground, not the beast. The ground tells you where it's going before it knows.” <i>You receive 25 copper. (+1 agility, permanently)</i>"],[{label:'Back.',fn:back},bye]); }});
-  if(hasItem('pelt')) opts.push({label:'Sell him the wolf pelt. (+30 copper)', fn:()=>{ player.inv[player.inv.indexOf('pelt')]=null; player.purse+=30; updateHud(); CHOICE.peltSold=true; remember('hunter','sold','Brann paid well for the pelt.');
+  if(CHOICE.brannTrap==='asked' && trapDead) opts.push({label:'“Your poacher won\'t set any more traps.”', fn:()=>{ CHOICE.brannTrap='done'; player.purse+=15; updateHud(); remember('brannTrap','done','You dealt with the Baron\'s trapper. Brann taught you to read a trail.');
+    say('Brann the Hunter',["He listens, then spits into the fire. “Jaws like that in an honest wood. Good riddance.”","He counts out coins, then stops and puts them back, and gives you more. “And this: watch the ground, not the beast. The ground tells you where it's going before it knows.” <i>You receive 15 copper. (+1 agility, permanently)</i>"],[{label:'Back.',fn:back},bye]); }});
+  if(hasItem('pelt')) opts.push({label:'Sell him the wolf pelt. (+20 copper)', fn:()=>{ player.inv[player.inv.indexOf('pelt')]=null; player.purse+=20; updateHud(); CHOICE.peltSold=true; remember('hunter','sold','Brann paid well for the pelt.');
     say('Brann the Hunter',"He runs his thumb against the grain. “Old Greymaw. Thirty, and a fair price.”",[{label:'Back.',fn:back},bye]); }});
   opts.push({label:'Sell him what you have hunted.', fn:()=>sellTo('Brann the Hunter',back,BRANN_BUYS)});
   if(!CHOICE.brannTaught) opts.push({label:'Ask him to teach you to move quietly. (-10 copper)', off:player.purse<10, note:'-10c', fn:()=>{ player.purse-=10; CHOICE.brannTaught=true; updateHud(); refreshStatPanel&&refreshStatPanel();
@@ -9358,7 +9367,7 @@ wrap('village','npcs',list=>{
   return l; });
 wrap('village','objects',list=>{
   const l=[...list];
-  if(CHOICE.goat==='roof') l.push({type:'critter', kind:'goatroof', i:11, j:3, noblock:true});
+  if(!CHOICE.goat || CHOICE.goat==='roof') l.push({type:'critter', kind:'goatroof', i:11, j:3, noblock:true});   // he is up there from the start; that is the whole problem
   if(CHOICE.goat==='sold' && !CHOICE.goatEaten) l.push({type:'critter', kind:'goat', i:2, j:6});
   if(CHOICE.goat==='helped') l.push({type:'critter', kind:'goat', i:13, j:2});
   return l; });
@@ -9640,8 +9649,8 @@ function graneTalk(){
     say('Overseer Grane',"“Mara Blackthorn's back in the pits? And paying?” He scratches his beard. “Dead wood burns hotter anyway. And it doesn't sing at night.” He shivers. “These ones sing at night.”",[{label:'Farewell.',fn:()=>{ closeDialog(); switchArea('fellings','fromMere'); }}]); }});
   opts.push({label:'Pay them 30 copper to leave. (-30c)', off:player.purse<30, note:'-30c', fn:()=>{ player.purse-=30; updateHud(); remember('fell','paid','You paid the loggers to go.'); mobs.forEach(m=>{ m.dead=true; m.gone=true; m.hostile=false; });
     say('Overseer Grane',"“Thirty for a day off? You're a strange one.” They leave the logs where they lie.",[{label:'Farewell.',fn:()=>{ closeDialog(); switchArea('fellings','fromMere'); }}]); }});
-  if(visitedAreas.silvergate) opts.push({label:'“I know where the elves live. For 80 copper, I will draw you a map.”', fn:()=>say('Overseer Grane',"His eyes go very small. “Elves. Real ones? With gold?” He counts out coins. “The Baron will make me a knight for this.”",[
-    {label:'Take the coin and draw the map. (+80 copper)', fn:()=>{ player.purse+=80; updateHud(); remember('fell','betrayed','You sold the way to Sylvhaven to the Baron\'s men.'); mobs.forEach(m=>{ m.dead=true; m.gone=true; m.hostile=false; }); closeDialog(); switchArea('fellings','fromMere'); }},
+  if(visitedAreas.silvergate) opts.push({label:'“I know where the elves live. For 50 copper, I will draw you a map.”', fn:()=>say('Overseer Grane',"His eyes go very small. “Elves. Real ones? With gold?” He counts out coins. “The Baron will make me a knight for this.”",[
+    {label:'Take the coin and draw the map. (+50 copper)', fn:()=>{ player.purse+=50; updateHud(); remember('fell','betrayed','You sold the way to Sylvhaven to the Baron\'s men.'); mobs.forEach(m=>{ m.dead=true; m.gone=true; m.hostile=false; }); closeDialog(); switchArea('fellings','fromMere'); }},
     {label:'Changed your mind.', fn:graneTalk} ])});
   opts.push({label:'Walk away for now.', fn:closeDialog});
   say('Overseer Grane',["Pale stumps everywhere, like broken teeth. A heavyset man with a ledger looks up from a stack of silver-barked logs. Two men with axes stop chopping.",
@@ -9673,34 +9682,31 @@ const GUARD=(o)=>BANDIT({skin:1,hair:0,hairColor:3,beard:1,equip:{head:BARON_DOW
 const B=(i,j,fw,fh,v,extra)=>({type:'bldg', i, j, fp:[fw,fh], v, ...extra});
 const streetPts=(list)=>list;
 Object.assign(AREAS,{
-  citygate:{ fence:{r:false,l:false}, w:26, h:24, theme:'city', label:'Hollowmere · Gate Ward', mini:{x:0,y:0},
+  citygate:{ fence:{r:false,l:false}, w:14, h:22, theme:'city', grassy:true, label:'Hollowmere · Gate Ward', mini:{x:0,y:0},
     notches:()=>[], dummy:null,
     objects:()=>[
-      {type:'teleporter', i:13, j:23, to:'kingsroad', entry:'fromCity'},
-      {type:'teleporter', i:13, j:0, to:'market', entry:'fromGate'},
-      {type:'tower', i:10, j:21, fp:[2,2], flag:BARON_DOWN()?'#2a4a8a':'#7a1a1a'}, {type:'tower', i:15, j:21, fp:[2,2], flag:BARON_DOWN()?'#2a4a8a':'#7a1a1a'},
-      {type:'gatearch', i:13, j:21, noblock:true},
-      B(0,22,10,2,2,{stone:true,h:70,rh:14,nochim:true,ridge:'i'}), B(17,22,9,2,2,{stone:true,h:70,rh:14,nochim:true,ridge:'i'}),
-      // south-west: two rows of houses facing the main street and a back lane
-      B(8,13,3,3,0,{ridge:'j',door:'r',dt:1}), B(8,17,3,3,1,{ridge:'j',door:'r',dt:1,sign:'✂'}), B(1,13,3,3,3,{ridge:'j',door:'r'}), B(1,17,3,3,4,{ridge:'j',door:'r'}),
-      // south-east: two rows facing the lanes along the wall
-      B(16,13,4,3,5,{door:'l'}), B(21,13,4,3,0,{door:'l',shopfront:true,awn:'#3a6a9a'}), B(16,17,4,3,2,{door:'l'}), B(21,17,4,3,3,{door:'l'}),
-      // north-west: the inn and its yard
-      B(5,4,6,4,1,{door:'l',dt:3,sign:'🍺',h:170,inside:'inn',back:'fromCity'}), B(0,0,4,3,4,{door:'l'}), B(6,0,4,3,0,{door:'l'}),
-      {type:'cart', i:2, j:6}, {type:'barrel', i:0, j:5}, {type:'barrel', i:1, j:5}, {type:'crate', i:0, j:8, breakable:true}, {type:'crate', i:1, j:8, breakable:true},
-      // north-east: the guardhouse and the watch
-      B(16,5,4,4,2,{stone:true,door:'l',h:130,sign:'⚔'}), B(21,1,4,3,5,{door:'l'}), B(16,0,3,3,3,{ridge:'j',door:'r'}), B(21,6,4,3,1,{door:'l'}),
-      {type:'lamp', i:11, j:4}, {type:'lamp', i:15, j:8}, {type:'lamp', i:11, j:16}, {type:'lamp', i:15, j:19}, {type:'lamp', i:5, j:11}, {type:'lamp', i:21, j:11},
-      {type:'notice', i:15, j:12}, {type:'washline', i:6, j:15, noblock:true}, {type:'washline', i:20, j:16, noblock:true},
-      {type:'tree', i:4, j:9, sp:'oak', v:1, s:0.9, ox:0, oy:0}, {type:'tree', i:24, j:10, sp:'oak', v:0, s:0.8, ox:0, oy:0},
+      {type:'teleporter', i:7, j:21, to:'kingsroad', entry:'fromCity'},
+      {type:'teleporter', i:7, j:0, to:'market', entry:'fromGate'},
+      {type:'tower', i:4, j:19, fp:[2,2], flag:BARON_DOWN()?'#2a4a8a':'#7a1a1a'}, {type:'tower', i:9, j:19, fp:[2,2], flag:BARON_DOWN()?'#2a4a8a':'#7a1a1a'},
+      {type:'gatearch', i:7, j:19, noblock:true},
+      B(0,20,4,2,2,{stone:true,h:70,rh:14,nochim:true,ridge:'i'}), B(11,20,3,2,2,{stone:true,h:70,rh:14,nochim:true,ridge:'i'}),
+      // the outskirts: a cobbled road up the middle, grass and gardens either side, the inn and its yard to the west
+      B(0,2,5,4,1,{door:'l',dt:3,sign:'🍺',h:170,inside:'inn',back:'fromCity'}),
+      {type:'cart', i:1, j:8}, {type:'barrel', i:0, j:7}, {type:'barrel', i:0, j:10}, {type:'crate', i:4, j:10, breakable:true},
+      // the watch-house by the road, and a few cottages with their backs to the town wall
+      B(9,2,4,4,2,{stone:true,door:'l',h:130,sign:'⚔'}), B(10,8,4,3,5,{door:'l'}), B(10,13,4,3,0,{door:'l',shopfront:true,awn:'#3a6a9a'}), B(0,13,3,3,3,{ridge:'j',door:'r'}),
+      {type:'lamp', i:6, j:4}, {type:'lamp', i:8, j:9}, {type:'lamp', i:6, j:14}, {type:'lamp', i:8, j:17},
+      {type:'notice', i:9, j:11}, {type:'washline', i:1, j:17, noblock:true},
+      {type:'tree', i:12, j:17, sp:'oak', v:1, s:0.85, ox:0, oy:0}, {type:'tree', i:3, j:12, sp:'birch', v:0, s:0.8, ox:0, oy:0}, {type:'tree', i:13, j:6, sp:'oak', v:0, s:0.75, ox:0, oy:0},
+      {type:'rocks', i:4, j:17, noblock:true}, {type:'critter', kind:'flowers', i:9, j:7, noblock:true}, {type:'critter', kind:'flowers', i:2, j:11, noblock:true}, {type:'critter', kind:'flowers', i:11, j:12, noblock:true},
     ].filter(o=>!o.breakable || !destroyedBreakables.has('citygate:'+o.i+','+o.j)),
     npcs:()=>[
-      { id:'gateguard', name:BARON_DOWN()?'Crown Soldier':"Baron's Gate Guard", i:12, j:20, dir:1, opts:GUARD({}) },
-      { id:'crier', name:'Town Crier', i:14, j:11, dir:0, opts:{gender:'m',skin:0,hair:1,hairColor:4,beard:3,face:2,equip:{head:'hood_red',torso:'tunic_red',armor:null,hands:null,legs:'hose_grey',feet:'riding_boots',weapon:null,offhand:null}} },
-      { id:'drunk', name:'Wobbly Wendel', i:9, j:9, dir:1, opts:{gender:'m',skin:2,hair:3,hairColor:6,beard:4,face:1,equip:{head:null,torso:'smock',armor:null,hands:null,legs:'breeches',feet:'boots',weapon:null,offhand:null}} },
-      ...townsfolk(1,7,[[13,3],[13,18],[4,11],[22,11],[18,20],[3,20],[9,3],[20,4],[13,10],[23,16]]) ],
+      { id:'gateguard', name:BARON_DOWN()?'Crown Soldier':"Baron's Gate Guard", i:6, j:18, dir:1, opts:GUARD({}) },
+      { id:'crier', name:'Town Crier', i:8, j:12, dir:0, opts:{gender:'m',skin:0,hair:1,hairColor:4,beard:3,face:2,equip:{head:'hood_red',torso:'tunic_red',armor:null,hands:null,legs:'hose_grey',feet:'riding_boots',weapon:null,offhand:null}} },
+      { id:'drunk', name:'Wobbly Wendel', i:4, j:8, dir:1, opts:{gender:'m',skin:2,hair:3,hairColor:6,beard:4,face:1,equip:{head:null,torso:'smock',armor:null,hands:null,legs:'breeches',feet:'boots',weapon:null,offhand:null}} },
+      ...townsfolk(1,5,[[7,3],[7,16],[5,11],[8,6],[6,8],[3,16],[11,11]]) ],
     mobs:()=>[], onEnter:()=>{ if(!CHOICE.toll) gateGuardTalk(); },
-    entries:{ fromRoad:{i:13,j:22}, fromMarket:{i:13,j:1}, fromCity:{i:8,j:9} } },
+    entries:{ fromRoad:{i:7,j:20}, fromMarket:{i:7,j:1}, fromCity:{i:3,j:7} } },
   market:{ fence:{r:false,l:false}, w:28, h:28, theme:'city', label:'Hollowmere · Market Ward', mini:{x:0,y:0},
     notches:()=>[], dummy:null,
     objects:()=>{ const l=[
@@ -9793,7 +9799,7 @@ Object.assign(AREAS,{
       { id:'pipcousin', name:'Pim the Lutenist', i:2, j:3, dir:1, opts:{gender:'m',skin:0,hair:1,hairColor:7,beard:2,face:2,equip:{head:'hood',torso:'tunic_blue',armor:null,hands:null,legs:'hose_grey',feet:'boots',weapon:null,offhand:null}} } ],
     entries:{ fromCity:{i:3,j:4} } },
 });
-AREA_PATHS.citygate=[ [[13.5,23.5],[13.5,-0.5]], [[-0.5,11.5],[26.5,11.5]], [[5.5,11.5],[5.5,8.5],[8.5,8.8]], [[20.5,11.5],[20.5,20.5],[16,20.5]], [[4.5,12],[4.5,20.5]], [[15.5,16.5],[25.5,16.5]] ];
+AREA_PATHS.citygate=[ [[7.5,21.5],[7.5,-0.5]], [[7.5,7.5],[3.5,7.2]] ];
 AREA_PATHS.market=[ [[14.5,28],[14.5,-0.5]], [[5.5,14.5],[28,14.5]], [[6,6],[21.5,6],[21.5,21.5],[6,21.5],[6,6]] ];
 AREA_PATHS.lowstreets=[ [[-0.5,13.5],[26,13.5]], [[4.5,0],[4.5,26]], [[8.5,0],[8.5,26]], [[18.5,0],[18.5,26]], [[12,3.5],[25,3.5]], [[0,20.5],[26,20.5]], [[12,7.5],[25,7.5]] ];
 AREA_PATHS.keepward=[ [[14.5,24],[14.5,5.5]], [[7.5,15.5],[20.5,15.5]], [[7,6.5],[21,6.5]], [[7.5,6.5],[7.5,20],[2.5,20]], [[20.5,6.5],[20.5,19.5]] ];
@@ -9942,8 +9948,8 @@ function kguardTalk(){ say(BARON_DOWN()?'Crown Soldier':'Keep Guard', BARON_DOWN
 function stewardTalk(){
   if(CHOICE.baron==='sold_seal'){ say('Steward Orrin',"“Our loyal friend from Dunhollow! The Baron sleeps better thanks to you. Come back if you find anything else… inconvenient.”",[bye]); return; }
   const opts=[];
-  if(hasItem('seal')) opts.push({label:"Sell him the Baron's orders. (+100 copper)", fn:()=>{ player.inv[player.inv.indexOf('seal')]=null; player.purse+=100; updateHud(); remember('baron','sold_seal','You sold the Baron\'s own orders back to his steward.');
-    say('Steward Orrin',"He tucks the paper into his boot without reading it. “Wise. Very wise. The Baron remembers his friends.” The coins are heavy and warm. <i>You receive 100 copper.</i>",[bye]); }});
+  if(hasItem('seal')) opts.push({label:"Sell him the Baron's orders. (+60 copper)", fn:()=>{ player.inv[player.inv.indexOf('seal')]=null; player.purse+=60; updateHud(); remember('baron','sold_seal','You sold the Baron\'s own orders back to his steward.');
+    say('Steward Orrin',"He tucks the paper into his boot without reading it. “Wise. Very wise. The Baron remembers his friends.” The coins are heavy and warm. <i>You receive 60 copper.</i>",[bye]); }});
   opts.push({label:'“What does the Baron want with Dunhollow?”', fn:()=>say('Steward Orrin',["“Want? Nothing. The Baron wants what every lord wants: more. More pasture, more timber, more tolls.” He smiles thinly.","“Dunhollow sits on good land and pays little tax. That is a problem the Baron is solving. Slowly. Legally, where possible.”"],[{label:'Back.',fn:stewardTalk},bye])});
   opts.push(bye);
   say('Steward Orrin',["A lean man in bright mail and a red surcoat looks you over as if pricing you.",
@@ -9957,9 +9963,9 @@ function magistrateTalk(){
   if(proof) opts.push({label:{orrinletters:"Give him the steward's letters from Salt Tomas's package.",trapnote:"Give him the trappers' tally, paid at the Keep.",seal:"Give him the Baron's orders under seal.",ledger:"Give him the pages from the Steward's ledger.",journal:"Give him Mara's journal, with the Baron's payments."}[proof], fn:()=>{ player.inv[player.inv.indexOf(proof)]=null; updateHud();
     CHOICE.baronDay=Math.floor(dayClock/DAY_LEN); remember('baron','arrested','You gave the Crown\'s Magistrate the Baron\'s own orders. Bertram of Hollowmere is arrested.');
     say('Magistrate Aldous',["He reads it once, and then again, with his lips pressed white.",{seal:"“Murder of his own subjects, in his own hand, under his own seal.”",orrinletters:"“His steward's letters. Bribes, threats, a list of names. The Keep's own hand.”",trapnote:"“The Keep paid trappers to snare the King's free elves. That alone is treason.”",ledger:"“The Steward's own ledger: every copper paid to Mara's cutthroats.”",journal:"“Mara Blackthorn's journal. Dates, coin, and whose coin it was.”"}[proof]+" He stands. “Guard! Wake the Crown's men. We go to the keep tonight.”","By morning the red banners are down. <i>The Baron of Hollowmere is arrested.</i>"],[{label:'Farewell.',fn:()=>{ closeDialog(); switchArea('keepward','fromMarket'); }}]); }});
-  if(hasItem('charter') && !CHOICE.charterGiven) opts.unshift({label:"Give him Dunhollow's Stone Charter.", fn:()=>{ CHOICE.charterGiven=true; player.inv[player.inv.indexOf('charter')]=null; player.purse+=30; updateHud();
+  if(hasItem('charter') && !CHOICE.charterGiven) opts.unshift({label:"Give him Dunhollow's Stone Charter.", fn:()=>{ CHOICE.charterGiven=true; player.inv[player.inv.indexOf('charter')]=null; player.purse+=20; updateHud();
     say('Magistrate Aldous',["He breaks nothing and hurries nothing. He reads the charter by the window, twice, then holds the lead seal up to the light.","“The old king's grant. Genuine.” He looks at you properly for the first time. “Then the Baron's surveyors are forgers, and his new pasture is theft from the Crown's own grant. That is enough to open an inquiry. It is not enough to hang him.”",
-      "“Bertram does not steal land with his own hands. He pays people. Bring me paper that shows who he paid, and for what: his orders, his steward's accounts, the bandits' books. Sella the Fence in the Lowstreets sells secrets. Start there.”","<i>You receive 30 copper from the Crown's purse.</i>"],[bye]); }});
+      "“Bertram does not steal land with his own hands. He pays people. Bring me paper that shows who he paid, and for what: his orders, his steward's accounts, the bandits' books. Sella the Fence in the Lowstreets sells secrets. Start there.”","<i>You receive 20 copper from the Crown's purse.</i>"],[bye]); }});
   if(!proof) opts.push({label:'“What do you need?”', fn:()=>say('Magistrate Aldous',[CHOICE.baron==='sold_seal'?"He looks at you for a long time. “You had proof, and you sold it. Then find me more. A man like Bertram leaves ink everywhere.”":"“Proof. Everyone whispers that the Baron burns villages and hires bandits. Nobody brings me paper with his mark on it.”",
     "“His orders, his steward's accounts, the books of the people he paid. Bring me any of that, and I will bring the Crown.”"],[bye])});
   opts.push(bye);
@@ -10173,13 +10179,15 @@ Object.assign(AREAS,{ millroad:{ fence:{r:false,l:false}, w:34, h:7, theme:'road
       {type:'pool', i:9, j:0, fp:[4,2], kind:'fen'}, {type:'milestone', i:19, j:5, t:'DUN 1'}, {type:'shrine', i:15, j:1}, {type:'stump', i:4, j:1}, {type:'logpile', i:5, j:5},
       {type:'rocks', i:12, j:5, noblock:true}, {type:'rocks', i:2, j:5, noblock:true}, {type:'critter', kind:'flowers', i:16, j:5, noblock:true}, {type:'critter', kind:'flowers', i:8, j:5, noblock:true},
       {type:'bench', i:13, j:2}, {type:'haystack', i:20, j:1}];
-      if(CHOICE.gisla==='asked' && !defeatedMobs.has('millroad:Mill-Pond Wolf')) l.push({type:'bones', i:7, j:1, noblock:true});
+      if(CHOICE.gisla!=='done' && !defeatedMobs.has('millroad:Mill-Pond Wolf')) l.push({type:'bones', i:7, j:1, noblock:true});
       return l; },
     npcs:()=> CHOICE.gisla==='done' && nightAmt()>0.5 ? [] : [{ id:'gisla', name:'Gisla the Herb-Wife', i:12, j:3, dir:1, opts:{gender:'f',skin:1,hair:3,hairColor:13,face:1,equip:{head:'hood',torso:'smock',armor:'robe',hands:null,legs:'hose_grey',feet:'boots',weapon:null,offhand:null}} }],
-    mobs:()=> CHOICE.gisla==='asked' && !defeatedMobs.has('millroad:Mill-Pond Wolf') ? [{ name:'Mill-Pond Wolf', type:'wolf', i:6, j:2, faction:'millwolf', coat:'#6a6058' }] : [],
+    mobs:()=> CHOICE.gisla!=='done' && !defeatedMobs.has('millroad:Mill-Pond Wolf') ? [{ name:'Mill-Pond Wolf', type:'wolf', i:6, j:2, faction:'millwolf', coat:'#6a6058' }] : [],
     entries:{ fromVillage:{i:32,j:3}, fromTunnel:{i:32,j:3}, fromCross:{i:1,j:3} } } });
 function gislaTalk(){
   const done=defeatedMobs.has('millroad:Mill-Pond Wolf');
+  if(!CHOICE.gisla && done){ say('Gisla the Herb-Wife',["A woman with a basket of wet green things comes splashing up out of the reeds, staring at the dead wolf and then at you.","“Well! That grey brute has kept me out of my own mint-bed all month. I never even had to ask.” She digs in the basket. “Here, it's all I have made up today. Come back for more; friend's price.” <i>You receive a Healing Draught.</i>"],[
+      {label:'Take it.', fn:()=>{ remember('gisla','done','You killed the wolf at the mill-pond before Gisla the herb-wife could even ask. She sells draughts on the Mill Track.'); giveQuestItem('potion'); closeDialog(); }}]); return; }
   if(!CHOICE.gisla){ say('Gisla the Herb-Wife',["A woman with a basket of wet green things straightens up from the reeds of the mill-pond.","“Careful where you step. Not you: the wolf. A grey one has taken to drinking here at the pond's edge, and it doesn't care for company. I need the water-mint that grows right where it sits.”"],[
       {label:'“I will drive it off.”', fn:()=>{ remember('gisla','asked','Gisla the herb-wife wants the wolf at the mill-pond on the Mill Track gone.'); MOB_SPAWNS.length=0; MOB_SPAWNS.push(...AREAS.millroad.mobs()); resetMobs(); say('Gisla the Herb-Wife',"“West end of the pond, by the old bones. Don't let it get behind you.”",[bye]); }}, bye]); return; }
   if(CHOICE.gisla==='asked' && done){ say('Gisla the Herb-Wife',["She is already up to her knees in the mint. “I heard it. Good.”","“Here. Thistle, honey, a little of this mint. Better than what the priests sell, and I'll tell them I said so.” <i>You receive 2 Healing Draughts.</i>"],[
@@ -10194,19 +10202,23 @@ function tollTalk(){ say("Toll-keeper Brisk",["A guard in a kettle hat sits in f
 function pilgrimTalk(){ say('A Pilgrim',"“I walk to the Chapel of the Dawn in Hollowmere every spring. Forty years. My knees have become a prayer of their own.”",[bye]); }
 function singerTalk(){ say('A Singing Elf',["An elf in white walks slowly along the old paving, singing in a language like water over stones. She nods to you without stopping.",gateOpen()?"“The lanterns know you now. Walk in their light.”":"The lanterns along the road stay dark as you pass."],[bye]); }
 // the carter: once you know a road, he will drive you along it for a few coppers
-const CARTER_STOPS=[ ['crossroads','fromRoad','The Crossroads'], ['village','fromCrossroads','Dunhollow'], ['citygate','fromRoad','Hollowmere'], ['clearing','fromWood',"Hunter's Clearing"] ];
+const CARTER_STOPS=[ ['crossroads','fromRoad','The Crossroads'], ['village','fromCrossroads','Dunhollow'], ['citygate','fromRoad','the Hollowmere Gate Ward'] ];
 function carterTalk(){
   if(CHOICE.hobb!=='done'){ hobbQuest(); return; }
   const here=areaId, opts=CARTER_STOPS.filter(([a])=>a!==here && visitedAreas[a]).map(([a,e,label])=>{ const locked=a==='citygate' && !wildDone();
     return {label:'Ride to '+label+(locked?' (not today)':''), note:locked?'':'-3c', off:locked||player.purse<3, fn:()=>{ player.purse-=3; updateHud(); dayClock+=40; closeDialog(); switchArea(a,e); logMsg('The cart rattles along the road. The day moves on.','#c8b890'); }}; });
-  say('Hobb the Carter',["A man with a patient ox and an impatient mule.","“Three coppers takes you anywhere I've been. Which is anywhere you've been, funnily enough.”"],[...opts,bye]);
+  const who=(NPCS.find(n=>n.id===(TALK_NPC&&TALK_NPC.id))||{}).name||'Hobb the Carter';
+  say(who, who==='Hobb the Carter' ? ["A man with a patient ox and an impatient mule.","“Three coppers takes you anywhere I've been. Which is anywhere you've been, funnily enough.”"]
+    : ["A cart with Hobb's mark burnt into the tailboard, and a driver leaning on the wheel.","“Hobb's cart. Three coppers, the crossroads, Dunhollow or the Hollowmere gate.”"],[...opts,bye]);
 }
-Object.assign(TALKERS,{ tollman:tollTalk, pilgrim:pilgrimTalk, singer:singerTalk, carter:carterTalk });
+Object.assign(TALKERS,{ tollman:tollTalk, pilgrim:pilgrimTalk, singer:singerTalk, carter:carterTalk, carter_v:()=>carterTalk(), carter_c:()=>carterTalk() });
 const CARTER=(i,j)=>({ id:'carter', name:'Hobb the Carter', i, j, dir:1, opts:{gender:'m',skin:2,hair:2,hairColor:3,beard:5,face:1,equip:{head:'straw_hat',torso:'smock',armor:null,hands:'gloves',legs:'breeches',feet:'boots',weapon:null,offhand:null}} });
-const HOBB_AT=()=>{ if(CHOICE.hobb!=='done') return 'crossroads'; const h=typeof HOUR==='function'?HOUR():12; return h>=7&&h<13?'village':h>=14&&h<20?'citygate':null; };   // one Hobb, one place: stuck at the crossroads till his wheel comes back, then carting between Dunhollow and the city
-wrap('crossroads','npcs',l=>HOBB_AT()==='crossroads'?[...l,CARTER(8,7)]:l); wrap('crossroads','objects',l=>HOBB_AT()==='crossroads'?[...l,{type:'cart', i:9, j:8}]:l);
-wrap('village','npcs',l=>HOBB_AT()==='village'?[...l,CARTER(9,8)]:l); wrap('village','objects',l=>HOBB_AT()==='village'?[...l,{type:'cart', i:10, j:9}]:l);
-wrap('citygate','npcs',l=>HOBB_AT()==='citygate'?[...l,CARTER(18,20)]:l);
+const HOBB_AT=()=>'crossroads';   // one Hobb, one place: stuck at the crossroads till his wheel comes back, then carting between Dunhollow and the city
+wrap('crossroads','npcs',l=>HOBB_AT()==='crossroads'?[...l,CARTER(8,7)]:l); wrap('crossroads','objects',l=>HOBB_AT()==='crossroads'?[...l,{type:'cart', i:9, j:8, nowheel:CHOICE.hobb!=='done'}]:l);
+// once Hobb drives again his lads keep a cart at Dunhollow and at the Hollowmere gate too: ride from any of the three
+const CART_LAD=(id,name,i,j,o)=>({ id, name, i, j, dir:1, opts:{gender:'m',skin:1,hair:1,hairColor:2,beard:0,face:0,...o,equip:{head:'hood',torso:'tunic_linen',armor:null,hands:'gloves',legs:'breeches',feet:'boots',weapon:null,offhand:null,...((o||{}).equip||{})}} });
+wrap('village','npcs',l=>CHOICE.hobb==='done'?[...l,CART_LAD('carter_v','Kit, the Carter\'s Lad',9,8,{})]:l); wrap('village','objects',l=>CHOICE.hobb==='done'?[...l,{type:'cart', i:10, j:9}]:l);
+wrap('citygate','npcs',l=>CHOICE.hobb==='done'?[...l,CART_LAD('carter_c','Bryn the Carter',9,17,{skin:3,hair:2,hairColor:1,beard:3,equip:{head:'straw_hat',torso:'smock'}})]:l);
 
 
 // ── Hobb's Wheel: the carter only drives once his cart has four wheels again ──
@@ -10277,8 +10289,8 @@ function poolTalk(who){
     ]); return; }
   if(CHOICE.poolq==='asked' && hasItem('brooch')){
     say('Maud',["You keep your eyes on the treetops and hold up the brooch. Lise wades over so fast she nearly goes under.","“Goblins,” you tell them. “A whole hoard of shiny things in their warren. They must have followed the smell of your cookfire.”"],[
-      {label:'Give Lise the brooch.', fn:()=>{ player.inv[player.inv.indexOf('brooch')]=null; remember('poolq','returned','You returned Lise\'s brooch. The women of the Willow Pool count you a friend.'); player.purse+=15; updateHud();
-        say('Lise',["She holds it against her chest and says nothing for a while.","Maud: “The pool is old, older than Dunhollow. The water takes the tiredness out of you, if the pool likes you. It likes you now. Come and rest here whenever you need it; we'll turn our backs.” The others laugh. They each press a few coppers into your hand. <i>You receive 15 copper.</i>"],[bye]); }},
+      {label:'Give Lise the brooch.', fn:()=>{ player.inv[player.inv.indexOf('brooch')]=null; remember('poolq','returned','You returned Lise\'s brooch. The women of the Willow Pool count you a friend.'); player.purse+=10; updateHud();
+        say('Lise',["She holds it against her chest and says nothing for a while.","Maud: “The pool is old, older than Dunhollow. The water takes the tiredness out of you, if the pool likes you. It likes you now. Come and rest here whenever you need it; we'll turn our backs.” The others laugh. They each press a few coppers into your hand. <i>You receive 10 copper.</i>"],[bye]); }},
       {label:'“It\'s worth a lot. I\'ll keep it.”', fn:()=>{ remember('poolq','kept','You kept Lise\'s brooch.'); say('Maud',"The water goes very still. “Then go, and don't come back.” Lise turns away before you can see her face.",[bye]); }},
     ]); return; }
   if(CHOICE.poolq==='asked' && collectedPickups.has('warren:10,8') && !hasItem('brooch')){ remember('poolq','kept','You sold Lise\'s brooch.');
@@ -10333,13 +10345,13 @@ function strippedTalk(){ const top=player.inv.find(id=>id && ITEMS[id] && ITEMS[
     {label:'Give him 5 copper for the road.', off:player.purse<5, note:'-5c', fn:()=>{ player.purse-=5; updateHud(); remember('strip','coin','You gave a robbed merchant five coppers.'); say('Aldo',"“Five coppers. I'll buy a very small blanket.” He waddles off toward the city.",[bye]); }},
     {label:'Laugh and walk on.', fn:()=>{ remember('strip','laughed','You laughed at a naked merchant on the King\'s Road.'); say('Aldo',"“Oh yes, hilarious. I'll remember that face.”",[bye]); }},
   ]); }
-wrap('citygate','npcs',l=> CHOICE.strip ? [...l,{ id:'aldo', name:'Aldo the Clothier', i:15, j:20, dir:1,
+wrap('citygate','npcs',l=> CHOICE.strip ? [...l,{ id:'aldo', name:'Aldo the Clothier', i:5, j:16, dir:1,
   opts:{gender:'m',skin:1,hair:2,hairColor:6,beard:3,face:0,equip:{head:'hood_red',torso:'tunic_blue',armor:'gambeson',hands:null,legs:'breeches',feet:'riding_boots',weapon:null,offhand:null}} }] : l);
 function aldoTalk(){
   if(CHOICE.aldoPaid){ say('Aldo the Clothier',{clothed:"“My benefactor! People ask why I'm wearing your shirt under all this. I tell them it's lucky.”",coin:"“The blanket was very small. But it was a blanket.”",laughed:"Aldo pretends not to see you."}[CHOICE.strip],[bye]); return; }
   CHOICE.aldoPaid=true;
-  if(CHOICE.strip==='clothed'){ player.purse+=30; updateHud(); giveQuestItem('tunic_red',true);
-    say('Aldo the Clothier',["Aldo, fully dressed and then some, grabs your hand. “You! The shirt! Here, thirty copper, and a proper tunic. Madder-red, my best.”","“Also, the highwaymen. They work the King's Road after dark, and the toll-keeper looks the other way. Now you know why.” <i>You receive 30 copper and a Madder-Red Tunic.</i>"],[bye]); return; }
+  if(CHOICE.strip==='clothed'){ player.purse+=20; updateHud(); giveQuestItem('tunic_red',true);
+    say('Aldo the Clothier',["Aldo, fully dressed and then some, grabs your hand. “You! The shirt! Here, twenty copper, and a proper tunic. Madder-red, my best.”","“Also, the highwaymen. They work the King's Road after dark, and the toll-keeper looks the other way. Now you know why.” <i>You receive 20 copper and a Madder-Red Tunic.</i>"],[bye]); return; }
   if(CHOICE.strip==='coin'){ player.purse+=8; updateHud(); say('Aldo the Clothier',"“Five coppers, returned with interest. Eight! I'm a man of business.” <i>You receive 8 copper.</i>",[bye]); return; }
   say('Aldo the Clothier',["Aldo sees you and turns to the guard at the gate, pointing. You hear the words “laughed at me” and “very suspicious”.","The guard shrugs. Aldo does not."],[bye]);
 }
@@ -10393,8 +10405,8 @@ function rulerTalk(){
       say('Magistrate Aldous',"“Order. It's what people ask for, until they have it.” He writes. “The roads will be safe within the week. I hope the rope stays in its drawer.”",[bye]); }},
     ...(hasItem('trapnote')||hasItem('orrinletters') ? [{label:'Show the magistrate what Orrin wrote about the elven silver.', fn:()=>{ const pi=player.inv.indexOf(hasItem('orrinletters')?'orrinletters':'trapnote'); player.inv[pi]=null; CHOICE.orrinOut=true;
       say('Magistrate Aldous',["Aldous reads it, then reads it again. “Elf-silver. And ears.” He looks across the chapel at the manacled steward, who has gone the colour of candle wax.","“Steward Orrin will be standing trial beside his master. Thank you. That leaves two.”"],[{label:'Back.', fn:rulerTalk}]); }}] : []),
-    ...(CHOICE.orrinOut ? [] : [{label:hasItem('trapnote')?'Recommend Steward Orrin, take his fifty, and burn the tally.':'Recommend Steward Orrin (and take his fifty).', fn:()=>{ if(hasItem('trapnote')){ player.inv[player.inv.indexOf('trapnote')]=null; CHOICE.tallyBurnt=true; } remember('ruler','orrin','You recommended Steward Orrin. He paid you for it. Taxes remain.'); player.purse+=50; updateHud();
-      say('Magistrate Aldous',["“The Baron's own steward.” A long look. “Competent, I grant. Crooked, I suspect. You'll forgive me if I count the silver in the chapel.”","Later a boy in grey slips you a purse. <i>You receive 50 copper.</i> Prices in Hollowmere will stay high."],[bye]); }}]),
+    ...(CHOICE.orrinOut ? [] : [{label:hasItem('trapnote')?'Recommend Steward Orrin, take his fifty, and burn the tally.':'Recommend Steward Orrin (and take his fifty).', fn:()=>{ if(hasItem('trapnote')){ player.inv[player.inv.indexOf('trapnote')]=null; CHOICE.tallyBurnt=true; } remember('ruler','orrin','You recommended Steward Orrin. He paid you for it. Taxes remain.'); player.purse+=30; updateHud();
+      say('Magistrate Aldous',["“The Baron's own steward.” A long look. “Competent, I grant. Crooked, I suspect. You'll forgive me if I count the silver in the chapel.”","Later a boy in grey slips you a purse. <i>You receive 30 copper.</i> Prices in Hollowmere will stay high."],[bye]); }}]),
     {label:'Recommend the Guild Council.', fn:()=>{ remember('ruler','guild','You recommended the Guild Council. Trade will be cheaper; the Lowstreets may pay for it.');
       say('Magistrate Aldous',"“Merchants. Well, they'll keep the lights on, if only in the Market Ward.” He writes. Prices in Hollowmere will fall; rents, perhaps, will not.",[bye]); }},
   ]);
@@ -10478,7 +10490,7 @@ function vennTalk(msg){
     updateHud(); vennTalk(r); }});
   const opts=[bet(2),bet(5),bet(10)];
   if((CHOICE.vennSus||0)>=2 && !CHOICE.vennCaught) opts.push({label:'Grab his wrist and look at his dice.', fn:()=>{ CHOICE.vennCaught=true;
-    say('Lucky Venn',["One of Venn's dice rolls a six. Then a six. Then a six. The whole den goes quiet.","Venn smiles thinly. “Well. Let's call it a refund, shall we?” He pushes twenty coppers across the table. “And let's call this… a fair game from now on.” <i>You receive 20 copper.</i>"],[bye]); player.purse+=20; updateHud(); }});
+    say('Lucky Venn',["One of Venn's dice rolls a six. Then a six. Then a six. The whole den goes quiet.","Venn smiles thinly. “Well. Let's call it a refund, shall we?” He pushes ten coppers across the table. “And let's call this… a fair game from now on.” <i>You receive 10 copper.</i>"],[bye]); player.purse+=10; updateHud(); }});
   opts.push(bye);
   say('Lucky Venn', msg || ["A smiling man in red rattles two dice in a horn cup.","“Two dice each, high roll wins, even money. Luck's a lady, friend, and tonight she's buying.”"], opts);
 }
@@ -10511,7 +10523,7 @@ Object.assign(ITEMS,{
   elfsilver:{ name:'Three Elven Bracelets', slot:'misc', read:true, title:'Silver bracelets of elven make',
     body:["Three thin bands of silver, worked with leaves so fine they seem to move. Wrapped around them, a receipt: <i>For the Company's account. Paid in full at the Keep. O.</i>"] } });
 PRICES.elfsilver=90;
-wrap('citygate','objects',l=> CHOICE.gb1==='asked' ? [...l, ...[[3,6],[3,7]].filter(([i,j])=>!collectedPickups.has('citygate:'+i+','+j)).map(([i,j])=>({type:'pickup', i, j, item:'fourage'}))] : l);
+wrap('citygate','objects',l=> CHOICE.gb1==='asked' ? [...l, ...[[2,10],[3,10]].filter(([i,j])=>!collectedPickups.has('citygate:'+i+','+j)).map(([i,j])=>({type:'pickup', i, j, item:'fourage'}))] : l);
 wrap('kingsroad','objects',l=> (!CHOICE.gb2||CHOICE.gb2==='asked') && !collectedPickups.has('kingsroad:0,11') ? [...l,{type:'pickup', i:0, j:11, item:'strongbox'}] : l);
 const GB_RANK=()=> CHOICE.gb3==='paid' ? 'Partner' : CHOICE.gb1==='done' ? 'Associate' : null;
 function crabanTalk(){
@@ -10521,20 +10533,20 @@ function crabanTalk(){
       ...(player.inv.filter(x=>x==='fourage').length>=2?[{label:'“I brought two sacks of fourage.”', fn:()=>{ CHOICE.gb1='asked'; crabanTalk(); }}]:[]),
       {label:'“Where do I find fourage?”', fn:()=>{ remember('gb1','asked','The Gold Brothers want two sacks of fourage. A Company cart broke its axle in the Gate Ward, by the inn yard.'); say('Alaric Craban',"“Our carter broke an axle in the Gate Ward this morning, by the inn yard, and ran off to find a wheelwright. Two sacks are still on the cart. Fetch them before the gate guards find them first. Mira will write you into the book.”",[bye]); }}, bye]); return; }
   if(CHOICE.gb1==='asked'){ if(fourN>=2){ say('Alaric Craban',["You drop two sacks on the counter. Craban opens one, sniffs it, and actually smiles."],[
-      {label:'Hand them over.', fn:()=>{ take('fourage'); take('fourage'); player.purse+=20; updateHud(); remember('gb1','done','You are an Associate of the Gold Brothers Trading Company.');
-        say('Alaric Craban',["“Twenty gold. Well: twenty copper, the gold is a figure of speech. Mira! Write them in. Associate of the Company.”","He taps the ledger. “And now I have real work for you.” <i>You receive 20 copper.</i>"],[{label:'“What work?”', fn:crabanTalk}]); }}]); return; }
+      {label:'Hand them over.', fn:()=>{ take('fourage'); take('fourage'); player.purse+=10; updateHud(); remember('gb1','done','You are an Associate of the Gold Brothers Trading Company.');
+        say('Alaric Craban',["“Twenty gold. Well: ten copper, the gold is a figure of speech. Mira! Write them in. Associate of the Company.”","He taps the ledger. “And now I have real work for you.” <i>You receive 10 copper.</i>"],[{label:'“What work?”', fn:crabanTalk}]); }}]); return; }
     say('Alaric Craban',`“Two sacks of fourage. You have ${fourN}. The broken cart by the inn yard in the Gate Ward.”`,[bye]); return; }
   if(!CHOICE.gb2){ say('Alaric Craban',["“One of our wagons went missing on the King's Road, south of the gallows. Driver ran home without it. The wagon's gone but the strongbox wasn't on it when it was found, so someone's hidden it, or dropped it.”","“Find the box. Don't open it. That's important. Don't open it.”"],[
       ...(hasItem('strongbox')?[{label:'“A strongbox with a golden ⚜? I found one in a ditch.”', fn:()=>{ CHOICE.gb2='asked'; crabanTalk(); }}]:[]),
       {label:'“I will find it.”', fn:()=>{ remember('gb2','asked','Find the Gold Brothers\' missing strongbox on the King\'s Road, and do not open it.'); say('Alaric Craban',"“Good. Look in the ditches on the west side, below the second milestone. Robbers hide what they can't carry.”",[bye]); }}, bye]); return; }
   if(CHOICE.gb2==='asked'){ if(!hasItem('strongbox')){ say('Alaric Craban',"“The box, Associate. West ditch, King's Road.”",[bye]); return; }
     say('Alaric Craban',["You set the strongbox on the counter. Craban's eyes go straight to the split in the lid, and the silver glinting through it.","“You looked.” Not a question. He opens it: coin, papers, and three silver bracelets wrapped in a receipt signed <i>O.</i>","“Elven work. Bought from the Keep's steward.” He is quiet for a moment. “I didn't order these. Someone in Port Fearn did, on the Company's account. They'd fetch a fortune across the sea.”"],[
-      {label:'“They were taken from elves. Give them back.”', fn:()=>{ take('strongbox'); giveQuestItem('elfsilver',true); remember('gb2','elves','You convinced Alaric Craban to return the elven silver. Take the bracelets to the Silver Gate.'); player.purse+=25; updateHud();
-        say('Alaric Craban',["He looks at the bracelets for a long time. “The Company never forgets a debt. Even one it didn't know it owed.” He pushes them to you.","“Take them to the elves at the Silver Gate. Tell them the Gold Brothers want no part of this. And tell them we'd like to trade honestly, if they'll have us.” <i>You receive 25 copper and Three Elven Bracelets.</i>"],[bye]); }},
-      {label:'“Sell them. Business is business.”', fn:()=>{ take('strongbox'); player.purse+=50; updateHud(); remember('gb2','sold','You told the Gold Brothers to sell the elven silver.');
-        say('Alaric Craban',"“Business is business.” He says it the way you'd say a prayer you don't believe. “Your share. Fifty.” <i>You receive 50 copper.</i> He closes the box and does not look at it again.",[bye]); }},
-      {label:'Keep one bracelet back when you hand it over.', fn:()=>{ take('strongbox'); giveQuestItem('elfsilver',true); remember('gb2','kept','You pocketed elven silver from the Gold Brothers\' strongbox.'); player.purse+=25; updateHud();
-        say('Alaric Craban',["Your hand is faster than his eyes. Probably. He counts the coin, not the silver. “Twenty-five for your trouble.” <i>You receive 25 copper.</i>","Across the room, Mira Quell looks up from her ledger, and then down again."],[bye]); }} ]); return; }
+      {label:'“They were taken from elves. Give them back.”', fn:()=>{ take('strongbox'); giveQuestItem('elfsilver',true); remember('gb2','elves','You convinced Alaric Craban to return the elven silver. Take the bracelets to the Silver Gate.'); player.purse+=15; updateHud();
+        say('Alaric Craban',["He looks at the bracelets for a long time. “The Company never forgets a debt. Even one it didn't know it owed.” He pushes them to you.","“Take them to the elves at the Silver Gate. Tell them the Gold Brothers want no part of this. And tell them we'd like to trade honestly, if they'll have us.” <i>You receive 15 copper and Three Elven Bracelets.</i>"],[bye]); }},
+      {label:'“Sell them. Business is business.”', fn:()=>{ take('strongbox'); player.purse+=30; updateHud(); remember('gb2','sold','You told the Gold Brothers to sell the elven silver.');
+        say('Alaric Craban',"“Business is business.” He says it the way you'd say a prayer you don't believe. “Your share. Fifty.” <i>You receive 30 copper.</i> He closes the box and does not look at it again.",[bye]); }},
+      {label:'Keep one bracelet back when you hand it over.', fn:()=>{ take('strongbox'); giveQuestItem('elfsilver',true); remember('gb2','kept','You pocketed elven silver from the Gold Brothers\' strongbox.'); player.purse+=15; updateHud();
+        say('Alaric Craban',["Your hand is faster than his eyes. Probably. He counts the coin, not the silver. “Twenty-five for your trouble.” <i>You receive 15 copper.</i>","Across the room, Mira Quell looks up from her ledger, and then down again."],[bye]); }} ]); return; }
   if(CHOICE.gb2==='elves' && hasItem('elfsilver')){ say('Alaric Craban',"“The Silver Gate, Associate. North of the Mistmere. The bracelets won't walk there on their own.”",[bye]); return; }
   if(CHOICE.gb2==='kept'){ say('Alaric Craban',["Craban doesn't look up. “Mira checked the manifest. Three bracelets. I received two.”","“The Company never forgets a debt. We'll still buy what you sell. Don't ask us for anything else.”"],[bye]); return; }
   // the share
@@ -10597,8 +10609,8 @@ function packageRead(){ // opening it: Orrin's letters fall out
   if(!hasItem('package')) return false; player.inv[player.inv.indexOf('package')]=null; giveQuestItem('orrinletters',true);
   remember('tomas','opened','You broke the seal on Salt Tomas\'s package. Inside: Steward Orrin\'s letters about elven silver.'); return true; }
 { const oldSella=TALKERS.sella; TALKERS.sella=()=>{ if(hasItem('package')){ say('Sella the Fence',["Sella's eyes go to the black wax before they go to you. “Tomas's. Unopened?” She checks the seal with a fingernail. “Unopened. How refreshing.”"],[
-      {label:'Hand it over. (+30 copper)', fn:()=>{ player.inv[player.inv.indexOf('package')]=null; player.purse+=30; updateHud(); remember('tomas','delivered','You delivered Salt Tomas\'s package to Sella. You never saw what was in it.');
-        say('Sella the Fence',"She drops it straight into the brazier behind her. Black wax, paper, gone. “Some things are worth more burned.” <i>You receive 30 copper.</i>",[bye]); }},
+      {label:'Hand it over. (+20 copper)', fn:()=>{ player.inv[player.inv.indexOf('package')]=null; player.purse+=20; updateHud(); remember('tomas','delivered','You delivered Salt Tomas\'s package to Sella. You never saw what was in it.');
+        say('Sella the Fence',"She drops it straight into the brazier behind her. Black wax, paper, gone. “Some things are worth more burned.” <i>You receive 20 copper.</i>",[bye]); }},
       {label:'“On second thought, I\'ll keep it.”', fn:()=>say('Sella the Fence',"“Then you'd better be very sure what you're holding, courier.”",[bye])}]); return; } oldSella&&oldSella(); }; }
 Object.assign(TALKERS,{ bram:bramTalk, greta:gretaTalk, tomas:tomasTalk });
 // ── Ruvin Craban, the other brother: ships, expeditions, and a green crystal ──
@@ -10612,9 +10624,9 @@ function ruvinTalk(){
       GB_RANK() ? [...(hasItem('greencrystal')?[{label:'Show him the green crystal from the cave.', fn:()=>{ CHOICE.ruvin='asked'; ruvinTalk(); }}]:[]), {label:'“A green crystal. I will find it.”', fn:()=>{ remember('ruvin','asked','Ruvin Craban wants a shard of green crystal from the goblins\' cave north of the Wolfwood.'); say('Ruvin Craban',"“Don't touch it with gold on your hands. I'm not joking. Well. I'm mostly not joking.”",[bye]); }}, bye] : [bye]); return; }
   if(CHOICE.ruvin==='asked'){ if(!hasItem('greencrystal')){ say('Ruvin Craban',"“The goblins' cave. North of the Wolfwood. Green light. You can't miss it, which is the problem.”",[bye]); return; }
     say('Ruvin Craban',["He holds the shard up to the light. It hums. The coins in his purse clink, all by themselves.","“Same as the cave in the east. So it's true.” He looks at you properly for the first time."],[
-      {label:'Give it to him. (+35 copper)', fn:()=>{ player.inv[player.inv.indexOf('greencrystal')]=null; player.purse+=35; updateHud(); remember('ruvin','done','You brought Ruvin Craban a green crystal. He says the Company owes you a voyage.');
-        say('Ruvin Craban',"“Thirty-five, and a berth on the next ship that sails for Port Fearn Arianhod. When she sails. Alaric will pretend he agreed to it.” <i>You receive 35 copper.</i>",[bye]); }},
-      {label:'“What does it do with gold?”', fn:()=>say('Ruvin Craban',["He lowers his voice. “Sailors in Port Fearn talk about a goddess. The Daughter of the Ferryman. They say gold burns on the skin of those who cheat her, and always finds its way home to those who don't.”","“I don't believe in her. I just don't wear gold near the crystal.”"],[{label:'Give him the crystal.', fn:()=>{ player.inv[player.inv.indexOf('greencrystal')]=null; player.purse+=35; updateHud(); remember('ruvin','done','You brought Ruvin Craban a green crystal.'); say('Ruvin Craban',"“Thirty-five copper. And my thanks, which is rarer.” <i>You receive 35 copper.</i>",[bye]); }}, {label:'Keep it for now.', fn:closeDialog}])} ]); return; }
+      {label:'Give it to him. (+20 copper)', fn:()=>{ player.inv[player.inv.indexOf('greencrystal')]=null; player.purse+=20; updateHud(); remember('ruvin','done','You brought Ruvin Craban a green crystal. He says the Company owes you a voyage.');
+        say('Ruvin Craban',"“Thirty-five, and a berth on the next ship that sails for Port Fearn Arianhod. When she sails. Alaric will pretend he agreed to it.” <i>You receive 20 copper.</i>",[bye]); }},
+      {label:'“What does it do with gold?”', fn:()=>say('Ruvin Craban',["He lowers his voice. “Sailors in Port Fearn talk about a goddess. The Daughter of the Ferryman. They say gold burns on the skin of those who cheat her, and always finds its way home to those who don't.”","“I don't believe in her. I just don't wear gold near the crystal.”"],[{label:'Give him the crystal.', fn:()=>{ player.inv[player.inv.indexOf('greencrystal')]=null; player.purse+=20; updateHud(); remember('ruvin','done','You brought Ruvin Craban a green crystal.'); say('Ruvin Craban',"“Twenty copper. And my thanks, which is rarer.” <i>You receive 20 copper.</i>",[bye]); }}, {label:'Keep it for now.', fn:closeDialog}])} ]); return; }
   say('Ruvin Craban',["“The crystal sits in a lead box in my cabin. It still hums. I sleep in the hold now.”", CHOICE.gb3==='paid'?"“Partner. When the ship sails for Port Fearn, there's a berth with your name on it.”":"“Alaric says hello. He doesn't, but he means it.”"],[bye]);
 }
 TALKERS.ruvin=ruvinTalk;
@@ -10829,7 +10841,7 @@ function epilogue(){
 function elderTalk(){
   const opts=[];
   if(QUEST.letter<2 && hasItem('letter') && CHOICE.letter!=='sold') opts.push({label:'Show him the sealed letter from the bandits.', fn:()=>{
-    QUEST.letter=2; player.purse+=20; updateHud();
+    QUEST.letter=2; player.purse+=10; updateHud();
     showDialog('Elder Hamond',["He turns the letter over twice before he opens it, then reads it slowly, lips moving.",
       "“B. Bertram. Baron Bertram of Hollowmere. He has wanted the land below the old boundary stones since my father's day. So now he sends cutthroats to bleed the farms and pay his way in.”",
       "“You did well to bring this to me. Take this for your trouble, it is not much. And keep that letter safe. One day someone above him may need to read it.”",
@@ -10841,22 +10853,22 @@ function elderTalk(){
       "“Clear them out and the village will pay you what it can.”"],[{label:'I will see to the wolves.',fn:closeDialog}]); } });
   else if(QUEST.wolves===1) opts.push({label:'About the wolves...', fn:()=>showDialog('Elder Hamond',"“The wood lies north of the crossroads. Take the tunnel west out of the village, then the Mill Track. Follow the arrow with the wolf's head scratched into it.”",[{label:'Back.',fn:elderTalk},bye])});
   else if(QUEST.wolves===2) opts.push({label:'The wolves of the Wolfwood are dead.', fn:()=>{
-    QUEST.wolves=3; player.purse+=25; updateHud();
+    QUEST.wolves=3; player.purse+=15; updateHud();
     showDialog('Elder Hamond',["“Greymaw too? Then the shepherds will sleep tonight.” He counts a few coins out of a worn purse and presses them into your hand.",
-      "“It is not much, but it is what the village can spare. Marta will give you a fair price for that pelt, too.”","<i>You receive 25 copper.</i>"],[bye]); } });
+      "“It is not much, but it is what the village can spare. Marta will give you a fair price for that pelt, too.”","<i>You receive 15 copper.</i>"],[bye]); } });
   if(QUEST.camp===0 && !(QUEST.letter<2 && hasItem('letter') && CHOICE.letter!=='sold')) opts.push({label:QUEST.letter>=2||loreNoteGiven?'Where did those bandits come from?':'Is there work to be had here?', fn:()=>{ QUEST.camp=1;
     showDialog('Elder Hamond',[...(QUEST.letter>=2||loreNoteGiven?[]:["“Work? Bandits have been bleeding the farms along the forest road. Yours too, by the look of you.”"]),"“South of the crossroads, where the old charcoal burners worked. Smoke rises there most nights now. A woman named Mara Blackthorn leads them, they say.”",
       "“Break that camp and Bertram loses his hands in this valley. The village will pay you for it.”"],[{label:'I will find it.',fn:closeDialog}]); } });
-  else if(QUEST.camp===2) opts.push({label:'The camp in the south is broken.', fn:()=>{ QUEST.camp=3; player.purse+=30; updateHud();
-    showDialog('Elder Hamond',[CHOICE.camp==='spared' ? "“Gone? Not dead, but gone?” He strokes his beard. “Mercy is a strange coin. But the road is ours.”" : "“Mara Blackthorn beaten? Then the road is ours again.” He counts out coins with shaking hands.","<i>You receive 30 copper.</i>"],[{label:'Back.',fn:elderTalk},bye]); } });
+  else if(QUEST.camp===2) opts.push({label:'The camp in the south is broken.', fn:()=>{ QUEST.camp=3; player.purse+=20; updateHud();
+    showDialog('Elder Hamond',[CHOICE.camp==='spared' ? "“Gone? Not dead, but gone?” He strokes his beard. “Mercy is a strange coin. But the road is ours.”" : "“Mara Blackthorn beaten? Then the road is ours again.” He counts out coins with shaking hands.","<i>You receive 20 copper.</i>"],[{label:'Back.',fn:elderTalk},bye]); } });
   else if(CHOICE.camp==='bribed' && QUEST.camp<2) opts.push({label:'“They were too many for me.”', fn:()=>{ QUEST.camp=5;
     showDialog('Elder Hamond',"He looks at your full purse for a long time. “I see.” He does not offer you his hand again.",[bye]); } });
   if(QUEST.camp>=3 && QUEST.wolves>=3 && !STQ()) opts.push({label:'Is there anything else troubling the village?', fn:()=>{ CHOICE.stq='asked'; showDialog('Elder Hamond',["“Tobb says there are men at the old boundary stones, north past the graveyard. Baron's men, with stakes and a clerk.”","“My father said those stones were raised when the old king gave this valley to the people who farm it. If they move, our sheep have nowhere to graze, and Bertram has his pasture at last.”","“I have had the path past the graveyard untied for you. I cannot ask more of you. But I am asking.”"],[{label:'I will go to the stones.',fn:closeDialog}]); }});
   else if(STQ()==='asked') opts.push({label:'About the boundary stones...', fn:()=>showDialog('Elder Hamond',"“North past the graveyard. Tobb will show you the path.”",[{label:'Back.',fn:elderTalk},bye])});
   else if(STQ()==='wenna'||STQ()==='night') opts.push({label:'About the Stone Charter...', fn:()=>showDialog('Elder Hamond',["“A charter? My grandmother swore there was one. I thought it was a story for children.”",STQ()==='wenna'?"“Ask Old Wenna. She is the only one old enough to remember the stories properly. She'll be by her goat.”":"“Dig at night, beside the stones? Well. Take a spade and do not tell Tobb.”"],[{label:'Back.',fn:elderTalk},bye])});
-  if(STQ()==='found' && hasItem('charter')) opts.push({label:'Show him the Stone Charter.', fn:()=>{ CHOICE.stq='done'; player.purse+=40; updateHud();
+  if(STQ()==='found' && hasItem('charter')) opts.push({label:'Show him the Stone Charter.', fn:()=>{ CHOICE.stq='done'; player.purse+=25; updateHud();
     showDialog('Elder Hamond',["He unrolls the lead-sealed parchment with hands that do not shake at all. For a long moment he only reads.","“<i>…to the free folk of the hollow, the land below the stones, for as long as the stones stand.</i>” He laughs, once, very loud. “For as long as the stones stand! And you kept them standing.”"+(CHOICE.stones==='lost'?" Then, quieter: “Well. Where they stood. The charter says where, and Bertram's stakes do not.”":""),
-      "“This is not for my strongbox. This is for the Crown. There is a magistrate of the King in Hollowmere, they say, asking questions. Take it to him. I have written a letter of passage: the gate guard will let you in with it.”","<i>You receive 40 copper. Hamond's letter will open the gate of Hollowmere.</i>"],[{label:'I will take it to Hollowmere.',fn:closeDialog}]); }});
+      "“This is not for my strongbox. This is for the Crown. There is a magistrate of the King in Hollowmere, they say, asking questions. Take it to him. I have written a letter of passage: the gate guard will let you in with it.”","<i>You receive 25 copper. Hamond's letter will open the gate of Hollowmere.</i>"],[{label:'I will take it to Hollowmere.',fn:closeDialog}]); }});
   if(QUEST.camp>=3) opts.push({label:CHOICE.ruler?'“It is done. Hollowmere has a new master.”':'What will they say of me in Dunhollow?', fn:()=>{ if(CHOICE.ruler) CHOICE.epiDone=true; epilogue(); }});
   opts.push({label:'Tell me about Dunhollow.', fn:()=>showDialog('Elder Hamond',["“Dunhollow is thirty souls, a well, and more sheep than sense. We sit at the top of the lane, where the forest road meets the old trade way. That was a blessing once.”",
     "“Marta keeps the stall by the barrels. If you have coin, or things worth coin, she will deal.”"],[{label:'Back.',fn:elderTalk},bye])});
@@ -10997,7 +11009,7 @@ const PARRY = { perfect:0.20, window:0.36, parryRecover:0.28, atkWind:0.18, atkW
                 chainPenalty:0.08, chainMax:0.3, chainWindow:0.8,
                 interruptStun:0.7, guardRecover:0.35,
                 shieldPerfect:0.08, shieldWindow:0.10 };   // a shield widens both timing windows
-const unWoven = id => (id && id.startsWith('w_')) ? id.slice(2) : id;   // a woven piece behaves like the piece it was made from
+const unWoven = id => (id && id.startsWith && /^[tw]_/.test(id)) ? id.replace(/^(?:[tw]_)+/,'') : id;   // a woven piece behaves like the piece it was made from
 const isShieldId = id0 => { const id=unWoven(id0); return !!id && (id==='shield' || (ITEMS[id] && ITEMS[id].base==='shield')); };
 const hasShield = e => e===player ? isShieldId(player.opts.equip.offhand) : !!(e.opts && e.opts.equip && isShieldId(e.opts.equip.offhand));
 // each shield plays differently: the round one favours perfect parries, the kite one a wide safe block
@@ -12423,8 +12435,8 @@ function orvellTalk(){
 }
 function tessalyTalk(){
   say('Tessaly',["A young woman in a scorched robe stands in the ruined shrine, her master's starwood staff in her hands. Her friends lie in the reeds.","“He sent you. Of course he did. Did he tell you he burned my notes? That he said I would never be more than his servant with a stick?”"],[
-    {label:'“Come back with me. Face him.”', fn:()=>{ remember('appr','returned','You brought Tessaly back to Magister Orvell.'); player.purse+=40; updateHud();
-      say('Tessaly',"She lets the staff drop. “Fine. But I'm telling him to his face.” Later, Orvell pays you forty copper and does not look at you. <i>You receive 40 copper.</i>",[bye]); NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='tessaly')); }},
+    {label:'“Come back with me. Face him.”', fn:()=>{ remember('appr','returned','You brought Tessaly back to Magister Orvell.'); player.purse+=25; updateHud();
+      say('Tessaly',"She lets the staff drop. “Fine. But I'm telling him to his face.” Later, Orvell pays you twenty-five copper and does not look at you. <i>You receive 25 copper.</i>",[bye]); NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='tessaly')); }},
     {label:'“Go. I will tell him I did not find you.”', fn:()=>{ remember('appr','freed','You let Tessaly go. She gave you her master\'s starwood staff.'); giveQuestItem('staff_star',true);
       say('Tessaly',"She stares at you. Then she presses the staff into your hands. “Take it. It was always his. I'll make my own.” She is gone into the mist before you can answer. <i>You receive the Starwood Staff.</i>",[bye]); NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='tessaly')); }},
     {label:'“Give me the staff. Now.”', fn:()=>{ remember('appr','taken','You took the starwood staff from Tessaly by force of words and steel.'); giveQuestItem('staff_star',true);
@@ -12712,7 +12724,7 @@ function pipBallad(){
 { const oldBard=TALKERS.bard; TALKERS.bard=()=>{ if(areaId==='wheatsheaf' && CHOICE.bard==='praise'){ say('Pip the Bard',"Pip spots you and his face lights up like a lantern. “My muse! Sit, sit. I've added verses.”",[{label:'Listen to the ballad.', fn:pipBallad},bye]); return; } oldBard&&oldBard(); }; }
 
 // ════════ Barnabas gets around ════════
-const GOAT_SPOTS=[['keepward',21,8],['market',6,1],['docks',null,null],['lowstreets',1,14],['citygate',16,5]];
+const GOAT_SPOTS=[['keepward',21,8],['market',6,1],['docks',null,null],['lowstreets',1,14],['citygate',10,3]];
 function goatToday(){ if(!CHOICE.goat) return null; const d=Math.floor(dayClock/DAY_LEN); return GOAT_SPOTS[(d*7+3)%GOAT_SPOTS.length]; }
 GOAT_SPOTS.forEach(([a,i,j])=>wrap(a,'objects',l=>{ const s=goatToday(); if(!s || s[0]!==a) return l; return [...l,{type:'goatbldg', i:i??7, j:j??2, noblock:true}]; }));
 PUZ_DRAW.goatbldg=o=>{ const b=OBJECTS.find(q=>(q.type==='bldg'&&q.i===o.i&&q.j===o.j)) , cog=OBJECTS.find(q=>q.type==='cog');
@@ -12922,6 +12934,7 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
   if(st.ap) L.push(['Attack power','+'+st.ap+' <small>(+'+st.ap*4+'% weapon damage)</small>']);
   if(st.magic) L.push(['Spell power','+'+st.magic+' <small>(+'+st.magic*4+'% spell damage)</small>']);
   if(typeof isWoven==='function' && isWoven(id)) L.push(['Woven by Maelis','one of a kind <small>(+1 spell power included)</small>']);
+  if(typeof isTempered==='function' && isTempered(id)) L.push(['Tempered by Oswin','one of a kind <small>(+1 attack power included)</small>']);
   const s2=itemStat(id); if(s2 && /shield|swing/.test(s2.short)) L.push(['Special',s2.short.replace(/^\+\d+ HP, /,'')]);
   return L; }
 { const mk=id=>{ const d=document.createElement('div'); d.id=id; d.className='itip'; document.body.appendChild(d); return d; };
@@ -13030,6 +13043,9 @@ wrap('fellings','mobs',l=>l.map((m,k)=> m.name==='Logger Wat' ? {...m, chop:true
 { const oldOv=drawCombatOver; drawCombatOver=function(){ oldOv();
     const list=[...NPCS.filter(n=>n.chop), ...mobs.filter(m=>m.chop && !m.dead && !(combat.active && combat.foe===m))];
     list.forEach(e=>{ const ph=((gt*0.9+(e.chopPh||0))%1); if(ph<0.8 || ph>0.95) return; const q=P(e.x??e.i+0.5,e.y??e.j+0.5), k=(ph-0.8)/0.15;
+      const W=e.opts&&e.opts.equip&&e.opts.equip.weapon;
+      if(W==='shovel'){ const side=(e.dir>=4?-1:1); for(let n=0;n<6;n++){ const a=-1.0-n*0.32, d=4+k*(18+n*2); g.fillStyle='rgba('+(78+n*6)+','+(58+n*4)+',36,'+(1-k*0.8)+')';   // a spadeful of earth over his shoulder
+          g.beginPath(); g.arc(q.x-side*(4+Math.cos(a)*d),q.y-14+Math.sin(a)*d+k*k*18,1.4+(n%3)*0.6,0,Math.PI*2); g.fill(); } return; }
       for(let n=0;n<4;n++){ const a=-1.2-n*0.5, d=6+k*16; g.fillStyle='rgba(222,196,140,'+(1-k)+')'; g.fillRect(q.x+14+Math.cos(a)*d,q.y-30+Math.sin(a)*d+k*k*10,2.4,1.6); } }); }; }
 
 // ── the Bog Lurker: a heap of mud and reeds that stands up and reaches for you ──
@@ -13499,8 +13515,8 @@ JOURNAL.push(['The Heart of the Cave', ()=> !(hasItem('heartshard')||CHOICE.shar
 { const oldG2=TALKERS.gerd; TALKERS.gerd=()=>{ if(!FEN_OPEN()) return oldG2();
     if(!CHOICE.pim){ say('Foreman Gerd',["Gerd is pacing by the cart, axe forgotten in his hand.","“We cleared the oak, and that idiot boy Pim went straight into the fen. Said he saw lights. Pretty lights, he said, going south.”","“Nobody follows lights in the Drowning Fen. Nobody comes back from following them, mostly. Find him? I'll pay what the crew can scrape.”"],[
         {label:'“I will find Pim.”', fn:()=>{ remember('pim','asked',"Young Pim ran into the Drowning Fen after the lights. Gerd wants him back."); say('Foreman Gerd',"“South, he said. Past the old woman's hut. Bring him back by the ear if you have to.”",[bye]); }}, bye]); return; }
-    if(CHOICE.pim==='found'){ CHOICE.pim='done'; player.purse+=25; updateHud(); giveQuestItem('axe',true);
-      say('Foreman Gerd',["Pim is sitting on the cart, wrapped in a blanket, being shouted at by Ulla.","Gerd grips your hand. “Twenty-five copper from the crew, and my old felling axe. It's taken down bigger things than that oak.” <i>You receive 25 copper and a Felling Axe.</i>"],[bye]); return; }
+    if(CHOICE.pim==='found'){ CHOICE.pim='done'; player.purse+=15; updateHud(); giveQuestItem('axe',true);
+      say('Foreman Gerd',["Pim is sitting on the cart, wrapped in a blanket, being shouted at by Ulla.","Gerd grips your hand. “Fifteen copper from the crew, and my old felling axe. It's taken down bigger things than that oak.” <i>You receive 15 copper and a Felling Axe.</i>"],[bye]); return; }
     if(CHOICE.pim==='asked'){ say('Foreman Gerd',"“No sign of him? South. The Sunken Hollow, probably. The lights go there.”",[bye]); return; }
     oldG2(); }; }
 wrap('fenlow','npcs',l=> CHOICE.pim==='asked' ? [...l,{ id:'pim_lost', name:'Young Pim', i:9, j:3, dir:1, opts:LOGGER({skin:2,hair:1,hairColor:8,beard:0,face:2,equip:{weapon:null}}) }] : l);
@@ -13959,11 +13975,12 @@ const TRAIN_MAX=6, trainCost=r=>40*Math.pow(2,r);
 // Maelis threads moonlight into one piece of what you wear: +1 Spell Power on that piece, once per piece, priced by the piece
 const WEAVE_SLOTS=['torso','armor','hands','legs','feet'], WEAVE_TWIN_SLOTS=['head','torso','armor','hands','legs','feet','offhand'],   // only clothes and armour take the thread (twins stay registered so pieces woven earlier still load)
       weaveCost=id=>60+Math.round((PRICES[id]||20)/2);
-const isWoven=id=>!!(id && id.startsWith && id.startsWith('w_'));
+const isWoven=id=>!!(id && id.startsWith && /^(?:t_)?w_/.test(id));
+const wovenOf=id=> id.startsWith('t_') ? 't_w_'+id.slice(2) : 'w_'+id;
 function weaveTalk(){ const E=player.opts.equip, back=()=>TALKERS.maelis();
   const pieces=WEAVE_SLOTS.map(sl=>E[sl]).filter(id=>id && ITEMS[id]);
   const opts=pieces.map(id=> isWoven(id) ? {label:`${ITEMS[id].name}: already woven`, off:true, fn:()=>{}}
-    : {label:`Weave the ${ITEMS[id].name}. (+1 Spell Power)`, off:player.purse<weaveCost(id), note:'-'+formatCoin(weaveCost(id)), fn:()=>{ const c=weaveCost(id); const sl=WEAVE_SLOTS.find(k=>E[k]===id); if(!sl||!ITEMS['w_'+id]) return; player.purse-=c; E[sl]='w_'+id; delete player.opts._ck; refreshPlayerHp(false); updateHud();   // this piece, and only this one, becomes woven
+    : {label:`Weave the ${ITEMS[id].name}. (+1 Spell Power)`, off:player.purse<weaveCost(id), note:'-'+formatCoin(weaveCost(id)), fn:()=>{ const c=weaveCost(id); const sl=WEAVE_SLOTS.find(k=>E[k]===id); if(!sl||!ITEMS[wovenOf(id)]) return; player.purse-=c; E[sl]=wovenOf(id); delete player.opts._ck; refreshPlayerHp(false); updateHud();   // this piece, and only this one, becomes woven
         logMsg(`Maelis weaves moonlight into your ${ITEMS[id].name}. It is one of a kind now: +1 Spell Power.`,'#c8d8ff'); if(typeof saveGame==='function') saveGame(); weaveTalk(); }});
   say('Maelis the Weaver',["Maelis lets the loom run on by itself and looks you over, piece by piece, the way a tailor would.",
     pieces.length ? "“Each thing you wear can hold one thread of moonlight, no more. Choose well. The thread is not cheap, and finer cloth takes a finer thread.”" : "“Come back wearing something. I cannot weave into skin.”"],
@@ -13981,14 +13998,14 @@ function crateTalk(){ const u=CHOICE.stashUp||0, cost=STASH_UPS[u];
     {label:`Pay ${formatCoin(cost)}. (+6 crate spaces)`, off:player.purse<cost, note:'-'+formatCoin(cost), fn:()=>{ player.purse-=cost; CHOICE.stashUp=u+1; updateHud(); logMsg('Your crate at the Wheatsheaf now holds '+stashCap()+' things.','#e8c060'); crateTalk(); }},
     {label:'Back.',fn:TALKERS.bertha}, bye],true); }
 // each of them gets one more line in their usual talk
-[['smith',()=>trainTalk('smith'),()=>TRAINING.smith.label],['maelis',()=>weaveTalk(),()=>'Ask Maelis to weave magic into your gear'],['priest',()=>trainTalk('priest'),()=>TRAINING.priest.label],
+[['smith',()=>temperTalk(),()=>'Have Oswin temper your gear'],['maelis',()=>weaveTalk(),()=>'Ask Maelis to weave magic into your gear'],['priest',()=>trainTalk('priest'),()=>TRAINING.priest.label],
  ['bertha',crateTalk,()=>'“Can my crate in the cellar hold more?”']].forEach(([id,fn,label])=>{ const old=TALKERS[id]; if(!old) return;
   TALKERS[id]=(...a)=>{ const r=old(...a); const box=document.getElementById('dlg-opts');
     if(dlgOverlay.classList.contains('open') && box && !box.querySelector('.dlg-opt.train')){ const b=document.createElement('button'); b.className='dlg-opt train';
       b.innerHTML=`<span>${label()}</span>`; b.addEventListener('click',fn); box.insertBefore(b,box.lastElementChild); }
     return r; }; });
 { const oldP=refreshStatPanel; refreshStatPanel=function(){ oldP(); const panel=document.getElementById('stat-panel'); if(!panel||!player.opts) return;
-    const t=[CHOICE.temper&&('Tempered '+CHOICE.temper),CHOICE.attune&&('Attuned '+CHOICE.attune),SLOTS.some(sl=>isWoven(player.opts.equip[sl]))&&('Woven pieces worn '+SLOTS.filter(sl=>isWoven(player.opts.equip[sl])).length),CHOICE.bless&&('Blessed '+CHOICE.bless)].filter(Boolean);
+    const t=[CHOICE.temper&&('Tempered '+CHOICE.temper),CHOICE.attune&&('Attuned '+CHOICE.attune),SLOTS.some(sl=>isWoven(player.opts.equip[sl]))&&('Woven pieces worn '+SLOTS.filter(sl=>isWoven(player.opts.equip[sl])).length),SLOTS.some(sl=>isTempered(player.opts.equip[sl]))&&('Tempered pieces worn '+SLOTS.filter(sl=>isTempered(player.opts.equip[sl])).length),CHOICE.bless&&('Blessed '+CHOICE.bless)].filter(Boolean);
     if(t.length) panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Training</b><span>${t.join(' · ')}</span></div>`); }; }
 
 // ════════ RESPAWNS: ordinary foes come back a day after you kill them; story foes stay dead ════════
@@ -14161,8 +14178,8 @@ function vesnaFen(){
   const hag=defeatedMobs.has('fen:Hesk the Fen Hag'), back=()=>vesnaFen(), necroTalk=VESNA_NECRO;
   if(hasItem('morwen_lantern') && CHOICE.morwen!=='done'){                       // her lantern, back from Hesk
     say(VESNA_N,["Vesna takes the lantern in both hands and holds it up to her face. The little flame inside turns green, then gold.","“Hesk taught me everything I know. Then she tried to use this to talk the drowned kings into getting up again. It works. That's the trouble.”","“Listen. In the Sunken Hollow, south of here, the wisps gather over a bank of reeds at night. Under those reeds is the barrow of the old kings. Gold, and worse than gold.”"],[
-      {label:'Take her gift.', fn:()=>{ player.inv[player.inv.indexOf('morwen_lantern')]=null; giveQuestItem('potion',true); giveQuestItem('potion',true); player.purse+=25; updateHud(); remember('morwen','done',"You brought Vesna her lantern. She told you of a barrow under the reeds of the Sunken Hollow.");
-        say(VESNA_N,"“Two of my draughts and a little coin. The rest you'll have to dig for.” <i>You receive 25 copper and two healing draughts.</i>",[{label:'Back.',fn:back},bye]); }}]); return; }
+      {label:'Take her gift.', fn:()=>{ player.inv[player.inv.indexOf('morwen_lantern')]=null; giveQuestItem('potion',true); giveQuestItem('potion',true); player.purse+=15; updateHud(); remember('morwen','done',"You brought Vesna her lantern. She told you of a barrow under the reeds of the Sunken Hollow.");
+        say(VESNA_N,"“Two of my draughts and a little coin. The rest you'll have to dig for.” <i>You receive 15 copper and two healing draughts.</i>",[{label:'Back.',fn:back},bye]); }}]); return; }
   const opts=[];
   if(!CHOICE.morwen) opts.push({label:'“You look like someone with a job for a sword.”', fn:()=>say(VESNA_N,["“Hesk. Out on the island past the old ruin, south-west. She was a grave-speaker once, like me. My teacher, if you can believe it.”","“She took my lantern. It is not a lamp, it is a key: it shows the way to the drowned. She has gone bad with it. Bring it back to me.”"],[
       {label:'“I will bring your lantern back.”', fn:()=>{ remember('morwen','asked',"Vesna wants her lantern back from Hesk, the Fen Hag, her old teacher, on the island south-west in the Drowning Fen."); say(VESNA_N,"“She'll curse you. Curse her back.”",[{label:'Back.',fn:back},bye]); }},{label:'Back.',fn:back}])});
@@ -14696,6 +14713,92 @@ const rainingHere=()=>{ const A=AREAS[areaId]; return !!A && !A.inside && typeof
     b.fillStyle='rgba(210,228,245,0.13)'; for(let k=0;k<5;k++){ const xx=W*(0.32+k*0.09); b.fillRect(xx,H*0.25,Math.max(1,sc*0.8),H*0.6); }   // and a wet sheen running down
     b.globalCompositeOperation='source-over';
     g.save(); g.setTransform(1,0,0,1,0,0); g.drawImage(b.canvas,0,0,W,H,ox,oy,W,H); g.restore(); }; }
+// ── the road toughs who come back are not always the same sort: now and then a hedge-witch or a hedge-mage turns up in their place
+const ROAD_TOUGHS=new Set(['Road Thief','Highwayman','Footpad','Footpad Lookout']);
+const ROAD_CASTERS=[
+  { tag:'witch', title:'Road Witch', o:{gender:'f',skin:4,hair:5,hairColor:13,beard:0,face:1,equip:{head:'hood',torso:'smock',armor:'robe_black',hands:null,legs:'hose_grey',feet:'boots',weapon:'staff_hex',offhand:null}} },
+  { tag:'witch', title:'Bone-Witch', o:{gender:'f',skin:1,hair:4,hairColor:1,beard:0,face:0,equip:{head:'bandana',torso:'tunic_green',armor:'robe_black',hands:null,legs:'trousers',feet:'boots',weapon:'staff_hex',offhand:null}} },
+  { tag:'mage', title:'Hedge-Mage', o:{gender:'m',skin:2,hair:2,hairColor:4,beard:3,face:0,equip:{head:'hood',torso:'shirt',armor:'robe_blue',hands:null,legs:'trousers',feet:'boots',weapon:'staff_oak',offhand:null}} },
+  { tag:'mage', title:'Renegade Magus', o:{gender:'m',skin:0,hair:1,hairColor:7,beard:1,face:2,equip:{head:null,torso:'tunic_linen',armor:'robe',hands:'gloves',legs:'hose_grey',feet:'boots',weapon:'staff_cinder',offhand:null}} } ];
+{ const oldRM=resetMobs; resetMobs=function(){ oldRM(); const day=Math.floor(dayClock/DAY_LEN);
+    mobs.forEach((m,k)=>{ if(m.dead || !ROAD_TOUGHS.has(m.name) || m.type!=='bandit') return;
+      const fr=x=>{ const v=Math.sin(x)*43758.5453; return v-Math.floor(v); }, r=fr(day*12.9898+k*78.233+m.spawn[0]*3.7+m.spawn[1]*1.3+m.name.length); if(r<0.64) return;     // mostly the usual cutthroat
+      const C=ROAD_CASTERS[(r<0.82?0:2)+(fr(day*4.1+k*9.7)<0.5?0:1)];
+      m.type='mage'; m.caster=C.tag; m.name=C.title; m.opts=C.o; const hp=maxHpOf(C.o.equip,FOES.mage.base); m.hp=hp; m.maxHp=hp; }); }; }
+// the mill-pond wolf is there whether or not anyone asked: kill it first and Gisla comes to thank you on her own
+setInterval(()=>{ try{ if(!running || CS.on || combat.active || areaId!=='millroad' || CHOICE.gisla || !defeatedMobs.has('millroad:Mill-Pond Wolf') || dlgIsOpen()) return;
+  const n=NPCS.find(n=>n.id==='gisla'); if(n) talkTo(n); }catch(e){} },1500);
+// ── Oswin tempers one piece of armour at a time, the way Maelis weaves: +1 Attack Power on that piece, once per piece, priced by the piece
+const TEMPER_SLOTS=['head','armor','hands','legs','feet','offhand'], temperCost=id=>40+Math.round((PRICES[unWoven(id)]||20)/2);
+const isTempered=id=>!!(id && id.startsWith && id.startsWith('t_'));
+for(const id of Object.keys(ITEMS)){ const it=ITEMS[id]; if(id.startsWith('t_') || !TEMPER_SLOTS.includes(it.slot) || (id.startsWith('w_') && !ITEMS[id.slice(2)])) continue;
+  ITEMS['t_'+id]={...it, name:it.name.replace(' (woven)','')+(it.woven?' (woven, tempered)':' (tempered)'), tempered:true};
+  ITEM_STATS['t_'+id]={...(ITEM_STATS[id]||{}), ap:((ITEM_STATS[id]||{}).ap||0)+1};
+  if(GEAR_HP[id]) GEAR_HP['t_'+id]=GEAR_HP[id];
+  if(PRICES[id]) PRICES['t_'+id]=PRICES[id]+temperCost(id); }
+function temperTalk(){ const E=player.opts.equip, back=()=>TALKERS.smith();
+  const pieces=TEMPER_SLOTS.map(sl=>E[sl]).filter(id=>id && ITEMS[id]);
+  const opts=pieces.map(id=> isTempered(id) ? {label:`${ITEMS[id].name}: already tempered`, off:true, fn:()=>{}}
+    : !ITEMS['t_'+id] ? {label:`${ITEMS[id].name}: nothing to temper`, off:true, fn:()=>{}}
+    : {label:`Temper the ${ITEMS[id].name}. (+1 Attack Power)`, off:player.purse<temperCost(id), note:'-'+formatCoin(temperCost(id)), fn:()=>{ const c=temperCost(id), sl=TEMPER_SLOTS.find(k=>E[k]===id); if(!sl) return;
+        player.purse-=c; E[sl]='t_'+id; delete player.opts._ck; refreshPlayerHp(false); updateHud();
+        logMsg(`Oswin works your ${ITEMS[id].name} over at the anvil: rivets tight, edges true, the weight where it should be. +1 Attack Power.`,'#e8c060'); if(typeof saveGame==='function') saveGame(); temperTalk(); }});
+  say('Oswin the Armourer',["Oswin turns your gear over in his black hands, tutting at every nick.",
+    pieces.length ? "“One piece at a time. Each one I can true up once: rivets, straps, balance. After that it's as good as steel and leather get. Better kit costs more to do properly.”" : "“Come back wearing some armour. I don't temper shirts.”",
+    ...(CHOICE.temper ? [`<i>Your earlier training with him still counts: +${CHOICE.temper} Attack Power.</i>`] : [])],
+    [...opts,{label:'Back.',fn:back},bye],true); }
+{ const oldPIA=paintItemArt; paintItemArt=function(g2,id,size){ if(!isTempered(id)) return oldPIA(g2,id,size);
+    oldPIA(g2,id.slice(2),size);                                                                          // the piece, with a hammer-spark in the bottom corner
+    g2.save(); g2.scale(size/40,size/40); g2.globalCompositeOperation='lighter';
+    const gl=g2.createRadialGradient(6,34,0,6,34,7); gl.addColorStop(0,'rgba(255,200,120,0.9)'); gl.addColorStop(1,'rgba(255,160,60,0)'); g2.fillStyle=gl; g2.fillRect(0,27,13,13);
+    g2.strokeStyle='rgba(255,226,170,0.95)'; g2.lineWidth=1; g2.beginPath(); g2.moveTo(3,31); g2.lineTo(9,37); g2.moveTo(9,31); g2.lineTo(3,37); g2.stroke();
+    g2.restore(); }; }
+// ── a proper bath does more than heal: for half a day afterwards you are "Refreshed" (+10 max health)
+const BATH_BUFF_LEN=()=>DAY_LEN*0.5, bathBuffOn=()=> CHOICE.bathBuff!=null && dayClock<CHOICE.bathBuff && dayClock>CHOICE.bathBuff-BATH_BUFF_LEN()-1;
+{ const oB=bathStrip; bathStrip=function(...a){ const r=oB(...a); CHOICE.bathBuff=dayClock+BATH_BUFF_LEN(); refreshPlayerHp(false); player.hp=player.maxHp; updateHud();
+    logMsg('Refreshed: clean, warm and loose-limbed. +10 max health for half a day.','#a8d8f0'); return r; }; }
+{ const oR=refreshPlayerHp; refreshPlayerHp=function(full){ const r=oR(full); if(bathBuffOn()){ player.maxHp+=10; if(full) player.hp=player.maxHp; } player.hp=Math.min(player.hp,player.maxHp); return r; }; }
+let BATH_WAS=false; setInterval(()=>{ try{ const on=bathBuffOn(); if(BATH_WAS && !on && running){ refreshPlayerHp(false); updateHud(); logMsg('The glow of the bath has worn off.','#8aa8b8'); } BATH_WAS=on; }catch(e){} },2000);
+{ const oldP=refreshStatPanel; refreshStatPanel=function(){ oldP(); const panel=document.getElementById('stat-panel'); if(!panel || !bathBuffOn()) return;
+    const h=Math.max(0,(CHOICE.bathBuff-dayClock)/DAY_LEN*24); panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Refreshed</b><span>+10 max health · ${h>=1?Math.round(h)+' h':'under an hour'} left</span></div>`); }; }
+// ── goats are goats: they amble about near home, crop the grass, lie down in the sun and stare at nothing
+function goatTick(o){ const now=gt; if(o.gx==null){ o.hx=o.i+0.5; o.hy=o.j+0.5; o.gx=o.hx; o.gy=o.hy; o.gs='idle'; o.gt=now+1+Math.random()*2; o.face=1; o.lt=now; }
+  const dt=Math.min(0.1,now-o.lt); o.lt=now; if(CS.on && o.gs==='walk'){ o.gs='idle'; }
+  if(o.gs==='walk'){ const dx=o.tx-o.gx, dy=o.ty-o.gy, d=Math.hypot(dx,dy), sp=0.55*dt; if(d<=sp){ o.gx=o.tx; o.gy=o.ty; o.gs=Math.random()<0.65?'graze':'idle'; o.gt=now+3+Math.random()*5; } else { o.gx+=dx/d*sp; o.gy+=dy/d*sp; } }
+  else if(now>o.gt){ const r=Math.random();
+    if(o.gs==='lie'){ o.gs='idle'; o.gt=now+1.5+Math.random()*2; }
+    else if(r<0.55){ for(let k=0;k<8;k++){ const a=Math.random()*Math.PI*2, rr=0.5+Math.random()*1.6, tx=o.hx+Math.cos(a)*rr, ty=o.hy+Math.sin(a)*rr, ti=Math.floor(tx), tj=Math.floor(ty);
+        if(ti<0||tj<0||ti>=ROOM.w||tj>=ROOM.h || (blocked.has(ti+','+tj) && !(ti===o.i&&tj===o.j)) || (typeof poolAt==='function' && poolAt(tx,ty))) continue;
+        o.tx=tx; o.ty=ty; o.gs='walk'; o.face=(tx-o.gx)-(ty-o.gy)>=0?1:-1; break; } if(o.gs!=='walk'){ o.gs='graze'; o.gt=now+3; } }
+    else if(r<0.8){ o.gs='graze'; o.gt=now+4+Math.random()*5; }
+    else if(r<0.93){ o.gs='lie'; o.gt=now+10+Math.random()*12; }
+    else { o.gs='idle'; o.gt=now+2+Math.random()*3; } } }
+{ const oDO=drawObject; drawObject=function(o){ if(o.type!=='critter' || o.kind!=='goat') return oDO(o);
+    goatTick(o); const q=P(o.gx,o.gy), x=q.x, y=q.y, walk=o.gs==='walk', bob=walk?Math.abs(Math.sin(gt*9))*1.2:0;
+    g.save(); g.translate(x,y); if(o.face<0) g.scale(-1,1);
+    if(o.gs==='lie'){                                                     // legs folded under, belly in the grass, chewing
+      g.fillStyle='rgba(10,6,2,0.3)'; g.beginPath(); g.ellipse(1,1,16,5,0,0,Math.PI*2); g.fill();
+      g.save(); g.translate(0,-1); g.scale(1,0.7); g.translate(0,7); drawCached('goat',0,0,50,40,25,34,paintGoat); g.restore();
+      const bg=g.createLinearGradient(0,-10,0,1); bg.addColorStop(0,'#d4cca8'); bg.addColorStop(1,'#a89e88'); g.fillStyle=bg; g.beginPath(); g.ellipse(0,-3.5,13,4.6,0,0,Math.PI*2); g.fill(); }
+    else if(o.gs==='graze'){                                              // head down in the grass, jaw going
+      const ch=Math.sin(gt*7)*0.6; g.save(); g.translate(-7,0); g.rotate(0.32+ch*0.02); g.translate(7,0); drawCached('goat',0,0,50,40,25,34,paintGoat); g.restore();
+      if(Math.sin(gt*1.3+o.hx)>0.6){ g.fillStyle='#5a7a30'; g.fillRect(17,-6+ch,3,1.2); } }
+    else drawCached('goat',0,-bob,50,40,25,34,paintGoat);
+    g.restore();
+    if(walk || Math.floor(o.gx)!==o.i || Math.floor(o.gy)!==o.j){ o.ci=Math.floor(o.gx); o.cj=Math.floor(o.gy); } }; }
+// Tobb's open grave: a hole and its heap of spoil beside it, there whether he is or not, until Edric is laid in it
+wrap('graveyard','objects',l=> EDRIC_FOUND() ? l : [...l,{type:'dughole', i:2, j:7}]);
+ROUTINES.tobb.slots[0].dir=dirFromDelta(-1,0);                                                  // facing the hole he is digging, not the road
+function paintDugHole(x,y){ const T=TW/2*0.62, H=TH/2*0.62, cx=x-6, cy=y;
+  g.fillStyle='#3a2a1a'; g.beginPath(); g.moveTo(cx-T,cy); g.lineTo(cx,cy-H); g.lineTo(cx+T,cy); g.lineTo(cx,cy+H); g.closePath(); g.fill();          // the lip, churned
+  g.fillStyle='#120c06'; g.beginPath(); g.moveTo(cx-T*0.8,cy); g.lineTo(cx,cy-H*0.8); g.lineTo(cx+T*0.8,cy); g.lineTo(cx,cy+H*0.8); g.closePath(); g.fill();   // and the dark inside
+  g.fillStyle='#2a1e12'; g.beginPath(); g.moveTo(cx-T*0.8,cy); g.lineTo(cx,cy-H*0.8); g.lineTo(cx+T*0.8,cy); g.lineTo(cx+T*0.8,cy+5); g.lineTo(cx,cy-H*0.8+9); g.lineTo(cx-T*0.8,cy+5); g.closePath(); g.fill();   // the far wall catches a little light
+  const mx=x-44, my=y-8, mg=g.createRadialGradient(mx-4,my-10,2,mx,my-4,26); mg.addColorStop(0,'#7a5a3a'); mg.addColorStop(1,'#4a3420');
+  g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(mx+2,my+2,26,9,0,0,Math.PI*2); g.fill();
+  g.fillStyle=mg; g.beginPath(); g.moveTo(mx-26,my); g.quadraticCurveTo(mx-16,my-15,mx-2,my-17); g.quadraticCurveTo(mx+16,my-14,mx+24,my); g.quadraticCurveTo(mx,my+7,mx-26,my); g.fill();   // the spoil heap
+  for(let k=0;k<14;k++){ const a=rnd01(k,3,700), b=rnd01(k,4,701); g.fillStyle=k%3?'#5a4028':'#8a6a48'; g.beginPath(); g.arc(mx-20+a*40,my-2-b*12*(1-Math.abs(a-0.5)*1.6),1+b*1.4,0,Math.PI*2); g.fill(); }
+  g.fillStyle='#6a6a6e'; g.beginPath(); g.ellipse(mx+14,my-1,3,2,0.3,0,Math.PI*2); g.fill(); }
+{ const oDO=drawObject; drawObject=function(o){ if(o.type!=='dughole') return oDO(o); const q=P(o.i+0.5,o.j+0.5); drawCached('dughole2',q.x,q.y,140,64,95,40,paintDugHole); }; }
 </script>
 </body>
 </html>

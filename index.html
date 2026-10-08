@@ -14598,6 +14598,7 @@ Object.assign(ITEMS,{ shovel:{ name:'Spade', slot:'weapon' } }); Object.assign(W
     c.fillStyle='rgba(70,50,30,0.6)'; c.beginPath(); c.ellipse(28,1.5,3,1.6,0,0,Math.PI*2); c.fill();               // earth on it
     c.restore(); }; }
 // ── tables and benches, built in the room's own perspective so they sit square on the floor ──
+const CHAIR={L:0.17,D:0.16,H:17,BH:22}, CHAIR_IN=0.3;   // a chair: narrow, a little higher than a bench, pulled in toward its table by this much of a tile
 function furnPt(x,y){ return (u,v,h=0)=>({x:x+(u-v)*TW/2, y:y+(u+v)*TH/2-h}); }
 function furnPoly(pts,fill,stroke){ g.beginPath(); pts.forEach((p,n)=>n?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); g.fillStyle=fill; g.fill(); if(stroke){ g.strokeStyle=stroke; g.lineWidth=0.8; g.stroke(); } }
 function paintTable2(x,y){                           // a plank table: four square legs, a thick top with the grain running along it, bread and a cup
@@ -14616,10 +14617,10 @@ function paintTable2(x,y){                           // a plank table: four squa
   const br=pt(-0.12,0.06,H); g.fillStyle='#c8a868'; g.beginPath(); g.ellipse(br.x,br.y-2,7,3.4,0,0,Math.PI*2); g.fill(); g.fillStyle='#e0c890'; g.beginPath(); g.ellipse(br.x-1,br.y-3,5,2.2,0,0,Math.PI*2); g.fill();   // a loaf
   const cp=pt(0.14,-0.08,H); g.fillStyle='#8a5a30'; g.fillRect(cp.x-2.6,cp.y-8,5.2,8); g.fillStyle='#c89058'; g.beginPath(); g.ellipse(cp.x,cp.y-8,2.6,1.1,0,0,Math.PI*2); g.fill();   // a cup
 }
-function paintBench2(x,y,face){                      // a bench with a back, facing face=[du,dv]: the way someone sitting on it looks
-  const pt=furnPt(x,y), [fu,fv]=face, la=fu?[0,1]:[1,0], L=0.42, D=0.15, H=13, T=3, BH=18;
+function paintBench2(x,y,face,o={}){                 // a bench with a back, facing face=[du,dv]: the way someone sitting on it looks (o: a narrower, taller chair)
+  const pt=furnPt(x,y), [fu,fv]=face, la=fu?[0,1]:[1,0], L=o.L??0.42, D=o.D??0.15, H=o.H??13, T=3, BH=o.BH??18;
   const at=(s1,s2,h)=>pt(la[0]*s1*L+fu*s2*D, la[1]*s1*L+fv*s2*D, h);
-  g.fillStyle='rgba(8,5,2,0.28)'; g.beginPath(); g.ellipse(x+3,y+3,30,11,0,0,Math.PI*2); g.fill();
+  g.fillStyle='rgba(8,5,2,0.28)'; g.beginPath(); g.ellipse(x+3,y+3,30*Math.max(0.5,L/0.42),11*Math.max(0.6,L/0.42),0,0,Math.PI*2); g.fill();
   const legs=[[-0.9,-0.8],[0.9,-0.8],[-0.9,0.8],[0.9,0.8]].map(([a,b])=>[at(a,b,0),at(a,b,H-T),la[0]*a*L+fu*b*D+la[1]*a*L+fv*b*D]).sort((p,q)=>p[2]-q[2]);
   const back=()=>{ [-0.95,0.95].forEach(a=>{ const b0=at(a,-1,H-T), b1=at(a,-1,H+BH); g.strokeStyle='#2a1a0c'; g.lineWidth=3.6; g.beginPath(); g.moveTo(b0.x,b0.y); g.lineTo(b1.x,b1.y); g.stroke(); g.strokeStyle='#6a4626'; g.lineWidth=2.2; g.stroke(); });
     [[H+7,H+11],[H+14,H+BH]].forEach(([h0,h1])=>furnPoly([at(-1,-1,h0),at(1,-1,h0),at(1,-1,h1),at(-1,-1,h1)],'#7a5230','rgba(30,16,6,0.6)')); };
@@ -14635,6 +14636,7 @@ function paintBench2(x,y,face){                      // a bench with a back, fac
 }
 { const oDO=drawObject; drawObject=function(o){
     if(o.type==='table'){ const q=P(o.i+0.5,o.j+0.5); drawCached('table2',q.x,q.y,130,100,65,72,paintTable2); return; }
+    if(o.type==='chair'){ const f=o.face||[1,0], q=P(o.i+0.5+f[0]*CHAIR_IN,o.j+0.5+f[1]*CHAIR_IN); drawCached('chair_'+f.join('_'),q.x,q.y,80,100,40,76,(X,Y)=>paintBench2(X,Y,f,CHAIR)); return; }
     if(o.type==='bench'){ const q=P(o.i+0.5,o.j+0.5), f=o.face||[1,0]; drawCached('bench2_'+f.join('_'),q.x,q.y,110,90,55,64,(X,Y)=>paintBench2(X,Y,f)); return; }
     return oDO(o); }; }
 // benches by the tables indoors, turned to face them; and the old outdoor benches turned the way the place suggests
@@ -14643,7 +14645,7 @@ Object.keys(AREAS).forEach(a=>{ if(typeof AREAS[a].objects!=='function') return;
   wrap(a,'objects',l=>{ const out=l.map(o=>o.type==='bench' && BENCH_FACE[a+':'+o.i+','+o.j] ? {...o, face:BENCH_FACE[a+':'+o.i+','+o.j]} : o);
     const A=AREAS[a]; if(!A.inside) return out;
     const busy=(i,j)=> i<0||j<0||i>=A.w||j>=A.h || out.some(o=>{ const fw=o.fp?o.fp[0]:1, fh=o.fp?o.fp[1]:1; return i>=o.i&&i<o.i+fw&&j>=o.j&&j<o.j+fh; }) || Object.values(A.entries||{}).some(e=>e.i===i&&e.j===j);
-    out.filter(o=>o.type==='table').forEach(t=>{ [[0,1,[0,-1]],[1,0,[-1,0]]].forEach(([di,dj,face])=>{ const i=t.i+di, j=t.j+dj; if(!busy(i,j)) out.push({type:'bench', i, j, face, noblock:true, byTable:true}); }); });
+    out.filter(o=>o.type==='table').forEach(t=>{ [[0,1,[0,-1]],[1,0,[-1,0]]].forEach(([di,dj,face])=>{ const i=t.i+di, j=t.j+dj; if(!busy(i,j)) out.push({type:'chair', i, j, face, byTable:true}); }); });
     return out; }); });
 // every bed its own blanket: red, blue, green, ochre, brown or grey, the same one each time you look
 const BED_BLANKETS=['#8a3a2a','#34507a','#4a6a34','#a8803a','#6a4a30','#5e6066'];
@@ -14930,6 +14932,14 @@ function paintRoundHut(x,y){ const rx=72, ry=36, H=46, R=1.16;
     for(let k=0;k<4;k++){ const t=((gt*0.18+k/4)%1); g.fillStyle=`rgba(150,146,140,${0.22*(1-t)})`; g.beginPath(); g.arc(q.x+Math.sin(t*3+k)*6+t*8,q.y-46-62-t*55,3+t*9,0,Math.PI*2); g.fill(); } }; }
 // the purple bandana is the Baron's thugs' mark: you take it off one of them, no honest (or dishonest) vendor ever sells it
 { const oSF=shopFrom; shopFrom=function(who,stock,...r){ if(Array.isArray(stock) && stock.key!=='gratis'){ const key=stock.key; stock=stock.filter(id=>unWoven(id)!=='bandana'); if(key!==undefined) stock.key=key; } return oSF(who,stock,...r); }; }
+// chairs block your way like anything else; only someone going to sit on one may step onto it
+{ const oFP=findPath; findPath=function(si,sj,ti,tj){ const ch=OBJECTS.find(o=>o.type==='chair' && o.i===ti && o.j===tj);
+    if(!ch || (si===player.i && sj===player.j)) return oFP(si,sj,ti,tj);
+    const k=ti+','+tj, was=blocked.has(k); blocked.delete(k); try{ return oFP(si,sj,ti,tj); } finally{ if(was) blocked.add(k); } }; }
+// whoever sits at a table sits on the chair, pulled in to it
+{ const oDN=drawNPC; drawNPC=function(n){ const ch=n.sit && !n.moving && OBJECTS.find(o=>o.type==='chair' && o.i===n.i && o.j===n.j);
+    if(!ch) return oDN(n); const ox=n.x, oy=n.y, bx=(n.x??n.i+0.5), by=(n.y??n.j+0.5); n.x=bx+ch.face[0]*CHAIR_IN; n.y=by+ch.face[1]*CHAIR_IN; const od=n.dir; n.dir=dirFromDelta(ch.face[0],ch.face[1]);   // and faces the table
+    try{ return oDN(n); } finally{ n.x=ox; n.y=oy; n.dir=od; if((ch.face[0]+ch.face[1])<0) drawObject(ch); } }; }   // a chair facing away from us: its back is in front of the sitter
 </script>
 </body>
 </html>

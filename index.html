@@ -7389,8 +7389,8 @@ function drawSitting(c,x,B,opts,dir,mode){
     if(!front && !bareSeat && !longTop){ const bareSeat=!(opts.equip&&opts.equip.legs), oc=bareSeat?tone(SK,-0.42):tone(LC,-0.45);   // the sprite's own outline carried round the seat
       c.beginPath(); seatPath(true); c.strokeStyle=oc; c.lineWidth=0.8; c.lineCap='round'; c.stroke(); }
     c.restore(); };
-  c.save(); c.fillStyle='rgba(0,0,0,0.24)'; c.beginPath(); c.ellipse(x+(side?5:pr*9),B+1.5,(side?21:17)+pr*6,5.5,0,0,Math.PI*2); c.fill(); c.restore();   // where they sit
-  if(!front){ c.save(); c.fillStyle='rgba(0,0,0,0.22)'; c.beginPath(); c.ellipse(x+LNs,B-0.2,(F?10.5:10)*RS[0],2.2,0,0,Math.PI*2); c.fill(); c.restore(); }   // a darker contact shadow right under the seat
+  if(!chair){ c.save(); c.fillStyle='rgba(0,0,0,0.24)'; c.beginPath(); c.ellipse(x+(side?5:pr*9),B+1.5,(side?21:17)+pr*6,5.5,0,0,Math.PI*2); c.fill(); c.restore(); }   // where they sit (a chair throws its own shadow)
+  if(!front && !chair){ c.save(); c.fillStyle='rgba(0,0,0,0.22)'; c.beginPath(); c.ellipse(x+LNs,B-0.2,(F?10.5:10)*RS[0],2.2,0,0,Math.PI*2); c.fill(); c.restore(); }   // a darker contact shadow right under the seat
 
   const SH=sd=>shoulder(sd);
   // the shaded hollow under the raised thighs, between the shins, so the knees read as coming forward
@@ -7507,7 +7507,8 @@ function drawSitting(c,x,B,opts,dir,mode){
   LG.forEach(g=>{ const q=[g.L.hip,g.L.knee,g.L.ank].map(p=>PJ([p[0],p[1],0])); c.lineWidth=8*s; c.beginPath(); c.moveTo(q[0][0],q[0][1]+0.8); q.slice(1).forEach(p=>c.lineTo(p[0],p[1]+0.8)); c.stroke(); });
   AR.forEach(q=>{ if(q.A.hand[2]<1){ const p=PJ([q.A.hand[0],q.A.hand[1],0]); c.lineWidth=5*s; c.beginPath(); c.moveTo(p[0]-1,p[1]+0.8); c.lineTo(p[0]+1,p[1]+0.8); c.stroke(); } });
   c.restore();
-  if(!front && !recl && !side){ const hw=(F?PROP.f:PROP.m).hipHW*V.sw*RS[0]*1.12+1, cx=x+LNs*RS[0], yb=B-2.2;   // from behind the seat is the lowest thing: legs only beside it
+  if(chair && !front){}                                                         // on a chair seen from behind the legs are under the seat: nothing of them shows
+  else if(!front && !recl && !side){ const hw=(F?PROP.f:PROP.m).hipHW*V.sw*RS[0]*1.12+1, cx=x+LNs*RS[0], yb=B-2.2;   // from behind the seat is the lowest thing: legs only beside it
     c.save(); c.beginPath(); c.rect(x-200,B-300,400,300+yb-B); c.rect(x-200,yb,cx-hw-(x-200),60); c.rect(cx+hw,yb,x+200-(cx+hw),60); c.clip(); backLegs.forEach(drawLeg); c.restore(); }
   else if(pr>0.8){ c.save(); c.beginPath(); c.rect(x-200,B-300,400,300); c.clip(); backLegs.forEach(drawLeg); c.restore(); }
   else backLegs.forEach(drawLeg);
@@ -7515,7 +7516,7 @@ function drawSitting(c,x,B,opts,dir,mode){
   body();
   if(!side && !lounge && !mer && !chair && front && frontLegs.length) underKnees(pr*3);
   sitGenitals();
-  frontLegs.forEach(g=>drawLeg(g,tuck)); frontArms.sort((a,b)=>a.d-b.d).forEach(q=>drawArm(q,false));
+  if(!(chair && !front)) frontLegs.forEach(g=>drawLeg(g,tuck)); frontArms.sort((a,b)=>a.d-b.d).forEach(q=>drawArm(q,false));
 }
 // a parchment speech bubble whose tail points down at (x, bottom); long lines wrap instead of being squeezed
 function speechBubble(x,bottom,text,a=1){ if(a<=0) return;
@@ -14605,8 +14606,6 @@ Object.assign(ITEMS,{ shovel:{ name:'Spade', slot:'weapon' } }); Object.assign(W
 // ── tables and benches, built in the room's own perspective so they sit square on the floor ──
 const CHAIR={L:0.17,D:0.16,H:17,BH:22}, CHAIR_OVER={...{L:0.17,D:0.16,H:17,BH:22}, part:'over'}, CHAIR_IN=0.3;
 function drawChairOver(ch){ const f=ch.face||[1,0], q=ch._x!=null?{x:ch._x,y:ch._y}:P(ch.i+0.5+f[0]*CHAIR_IN,ch.j+0.5+f[1]*CHAIR_IN);
-  g.save(); g.beginPath(); g.rect(q.x-60,q.y-CHAIR.H+1.5,120,60); g.clip();                          // the seat and what is under it cover the shins; the thighs, up at seat level, stay on top
-  drawCached('chair_'+f.join('_'),q.x,q.y,80,100,40,76,(X,Y)=>paintBench2(X,Y,f,CHAIR)); g.restore();
   drawCached('chairover_'+f.join('_'),q.x,q.y,80,100,40,76,(X,Y)=>paintBench2(X,Y,f,CHAIR_OVER)); }   // then the back and the legs   // a chair: narrow, a little higher than a bench, pulled in toward its table by this much of a tile
 function furnPt(x,y){ return (u,v,h=0)=>({x:x+(u-v)*TW/2, y:y+(u+v)*TH/2-h}); }
 function furnPoly(pts,fill,stroke){ g.beginPath(); pts.forEach((p,n)=>n?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); g.fillStyle=fill; g.fill(); if(stroke){ g.strokeStyle=stroke; g.lineWidth=0.8; g.stroke(); } }

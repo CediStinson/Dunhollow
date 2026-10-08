@@ -728,7 +728,7 @@ const ITEMS = {
           "Do this quietly. If the farmers come asking who sent you, tell them nothing.",
           "— B."] },
 };
-const SLOTS = ['head','torso','armor','hands','legs','feet','weapon','offhand'];
+const SLOTS = ['head','torso','armor','hands','legs','feet','weapon','offhand','neck'];
 // what Marta asks for her wares, in copper; she pays two fifths of it for yours
 const PRICES = { shirt:6, trousers:6, boots:14, gloves:12, hood:10, jerkin:35, kettle:30, mail:95, dagger:12, sword:45, morningstar:60, pitchfork:5, shield:28, pelt:20,
   tunic_linen:9, tunic_blue:12, tunic_green:12, tunic_red:14, smock:8, hose_grey:8, breeches:10, riding_boots:24,
@@ -736,7 +736,7 @@ const PRICES = { shirt:6, trousers:6, boots:14, gloves:12, hood:10, jerkin:35, k
   hatchet:14, axe:40, spear:34, mace:55, longsword:80, club:4,
   elf_robe:70, elf_tunic:45, elf_leggings:25, elf_boots:40, elf_cloak:60, elf_scale:160, elf_circlet:55, elf_blade:120, moonbloom:40, elf_tunic_worn:10, elf_leggings_worn:8, elf_boots_worn:12, elf_shirt:6, elf_trousers:6 };
 const SHOP_STOCK = ['apple','bread','potion','tunic_blue','tunic_green','tunic_red','breeches','hood_red','straw_hat','gambeson','studded','gloves','kettle','mail','shield','shield_red','hatchet','spear','sword','axe'];
-const SLOT_NAMES = { food:'Provisions', head:'Head', torso:'Torso', armor:'Armor', hands:'Hands', legs:'Legs', feet:'Feet', weapon:'Weapon', offhand:'Offhand' };
+const SLOT_NAMES = { food:'Provisions', head:'Head', torso:'Torso', armor:'Armor', hands:'Hands', legs:'Legs', feet:'Feet', weapon:'Weapon', offhand:'Offhand', neck:'Neck' };
 // Weapons: how fast you swing, how hard you hit, and whether the swings are heavies
 // Unarmed = fists.
 const WEAPONS = {
@@ -755,7 +755,7 @@ const WEAPONS = {
 };
 const weaponOf = e => (e.type==='wolf') ? {wind:0.35,dmg:9} : WEAPONS[(e.opts && e.opts.equip && e.opts.equip.weapon) || 'fists'] || WEAPONS.fists;
 const INV_SIZE = 30;
-function defaultEquip(){ return { head:null, torso:'shirt', armor:null, hands:null, legs:'trousers', feet:null, weapon:null, offhand:null }; }
+function defaultEquip(){ return { head:null, torso:'shirt', armor:null, hands:null, legs:'trousers', feet:null, weapon:null, offhand:null, neck:null }; }
 function defaultInv(){
   return Array(INV_SIZE).fill(null);   // the farm gives up its gear reluctantly
 }
@@ -2423,7 +2423,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   // the camera; turning away (NE) it's the screen-right side.
   const nearS = V.turn > -0.25 ? -1 : 1;
   const farDepth = V.prof*0.85;
-  if(V.prof>0.3){ drawArm(-nearS,farDepth); if(E.offhand==='shield' && offHandAt && offHandAt.behind && V.prof>0.6 && V.turn>=-0.2) drawShieldOnArm(c,offHandAt.x,offHandAt.y,V.prof,false); }   // only a true profile hides the shield behind you
+  if(V.prof>0.3){ drawArm(-nearS,farDepth); if(E.offhand==='shield' && offHandAt && offHandAt.behind && V.prof>0.6 && V.turn>=-0.2) drawShieldOnArm(c,offHandAt.x,offHandAt.y,V.prof,false); if(E.offhand==='morwen_lantern' && offHandAt && offHandAt.behind && V.prof>0.6) drawLanternInHand(c,offHandAt.x,offHandAt.y); }   // only a true profile hides the shield behind you
   if(E.offhand==='shield' && V.turn<-0.2 && !SHIELD_DRY){                 // walking away, the shield is carried in front of you: behind your body, its back to us
     const k=view+'|'+opts.gender+'|'+(opts.race||'')+'|'+Math.round(swing*2)+'|'+(CUR_POSE?CUR_POSE.kind+(CUR_POSE.dir||''):'');
     let r=SHIELD_POS.get(k); if(!r){ SHIELD_DRY=true; LAST_OFF=null; try{ drawCharBody(DRY_CTX,0,0,opts,swing,view); } catch(e){} finally{ SHIELD_DRY=false; } r=LAST_OFF; if(r) SHIELD_POS.set(k,r); }
@@ -2676,7 +2676,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   else if(E.armor==='mail'){ drawMail(vA==='brightmail' ? (F?-29:-27) : 0); if(vA==='blackmail') drawBrigandine(); if(vA==='brightmail') drawSurcoat(); }
   else if(E.armor==='elf_scale') drawElfScale();
   else if(E.armor==='robe') drawOpenRobe();
-  if(E.offhand==='moon_amulet' && front){ const ax=LN+(pr>0.8?CH*0.45:po), ay=Y.SHOULDER+(F?6.4:7);   // the moonsilver focus on a cord of light
+  if((E.neck==='moon_amulet'||E.offhand==='moon_amulet') && front){ const ax=LN+(pr>0.8?CH*0.45:po), ay=Y.SHOULDER+(F?6.4:7);   // the moonsilver focus on a cord of light
     // the cord's lowest point (the middle of a quadratic) sits exactly on the bail at the top of the orb
     const bailY=ay+1.2-1.5-0.6, ctrlY=2*bailY-(Y.SHOULDER-0.4);
     c.strokeStyle='rgba(220,232,245,0.85)'; c.lineWidth=0.5; c.beginPath(); c.moveTo(x+ax-(pr>0.8?1.5:3.6),B+Y.SHOULDER-0.4); c.quadraticCurveTo(x+ax,B+ctrlY,x+ax+(pr>0.8?1.5:3.6),B+Y.SHOULDER-0.4); c.stroke();
@@ -2746,6 +2746,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
     c.fillStyle=tone(hc,-0.04); c.beginPath(); c.arc(handAt.x,handAt.y,2.8,0,Math.PI*2); c.fill();
   }
   if(E.offhand==='shield' && offHandAt && (!offHandAt.behind || V.prof<=0.6) && V.turn>=-0.2) drawShieldOnArm(c,offHandAt.x,offHandAt.y,V.prof,false);
+  if(E.offhand==='morwen_lantern' && offHandAt && (!offHandAt.behind || V.prof<=0.6)) drawLanternInHand(c,offHandAt.x,offHandAt.y);
 }
 // ── Hook for your own body details ──────────────────────────────────────
 // Called once per figure, per frame, on bare skin and before clothing is drawn.
@@ -3094,6 +3095,19 @@ function drawCustomBodyDetails(c,b){
 
 // A round shield strapped to the forearm, angled slightly outward.
 let LAST_OFF=null, SHIELD_DRY=false; const SHIELD_POS=new Map(), DRY_CTX=document.createElement('canvas').getContext('2d');   // where the off hand ends up, found once per pose
+function drawLanternInHand(c,hx,hy){                   // Vesna's lantern hanging from the fist by its bail: iron cage, warm glass, a small flame
+  const x=hx, y=hy+2, W=3.4, H=8.2;
+  c.save();
+  c.strokeStyle='#2a2420'; c.lineWidth=0.8; c.beginPath(); c.moveTo(x-1.6,y-1.2); c.quadraticCurveTo(x,y-3.6,x+1.6,y-1.2); c.stroke();          // the bail through the fingers
+  c.fillStyle='#2a2622'; c.beginPath(); c.moveTo(x-W-0.6,y+1.4); c.lineTo(x-1.2,y-0.8); c.lineTo(x+1.2,y-0.8); c.lineTo(x+W+0.6,y+1.4); c.closePath(); c.fill();   // the hood
+  const gl=c.createLinearGradient(x-W,0,x+W,0); gl.addColorStop(0,'#e8f4a8'); gl.addColorStop(0.55,'#b8d070'); gl.addColorStop(1,'#5e7a34');
+  c.fillStyle=gl; c.fillRect(x-W,y+1.4,W*2,H);                                                                   // the glass, lit from within
+  c.fillStyle='rgba(255,250,220,0.9)'; c.beginPath(); c.ellipse(x,y+1.4+H*0.55,0.9,1.9,0,0,Math.PI*2); c.fill();   // the flame
+  c.strokeStyle='#2a2622'; c.lineWidth=0.7; c.strokeRect(x-W,y+1.4,W*2,H); c.beginPath(); c.moveTo(x,y+1.4); c.lineTo(x,y+1.4+H); c.stroke();
+  c.fillStyle='#2a2622'; c.fillRect(x-W-0.6,y+1.4+H,W*2+1.2,1.6);                                                // the base
+  c.globalCompositeOperation='lighter'; const gg=c.createRadialGradient(x,y+1.4+H*0.5,0,x,y+1.4+H*0.5,14); gg.addColorStop(0,'rgba(220,235,140,0.45)'); gg.addColorStop(1,'rgba(200,220,110,0)');
+  c.fillStyle=gg; c.beginPath(); c.arc(x,y+1.4+H*0.5,14,0,Math.PI*2); c.fill();
+  c.restore(); }
 function drawShieldOnArm(c,x,y,prof,back){        // back: seen from behind, you see its wooden back, the straps and the grip
   const KITE=SHIELD_KIND==='shield_iron', HEATER=SHIELD_KIND==='shield_red', col=SHIELD_COL||(HEATER?'#8a2a24':KITE?'#6a7480':'#8a5a28');
   c.save(); c.translate(x,y-1); c.rotate((KITE||HEATER?0.12:0.18)-prof*0.22); c.scale((1-prof*0.35)*1.3,1.3);   // a proper shield, not a buckler   // the bottom tucks in toward the body a little
@@ -8536,6 +8550,8 @@ function applySave(sv){
   // saves from before the inventory existed get the starting kit
   player.opts.equip = sv.opts.equip ? {...defaultEquip(player.opts.gender), ...sv.opts.equip} : defaultEquip(player.opts.gender);
   if(!sv.opts.equip || !('offhand' in sv.opts.equip)) player.opts.equip.offhand=null;
+  if(!('neck' in player.opts.equip)) player.opts.equip.neck=null;
+  if(player.opts.equip.offhand==='moon_amulet'){ player.opts.equip.neck=player.opts.equip.neck||'moon_amulet'; player.opts.equip.offhand=null; }   // the focus hangs at the neck now
   if(!sv.opts.equip || !('weapon' in sv.opts.equip)) player.opts.equip.weapon='sword';   // saves from before weapons existed
   rescueStrayItems();
   for(const k of SLOTS) player.opts.equip[k]=migrateId(player.opts.equip[k]);
@@ -9133,7 +9149,7 @@ function makeSlot(kind,key){
   el.addEventListener('dblclick',()=>quickMove(slotLoc(el)));
   return el;
 }
-const HIDEABLE=['head','torso','armor','hands','legs','feet','offhand'];
+const HIDEABLE=['head','torso','armor','hands','legs','feet','offhand','neck'];
 const isHidden=k=>!!(player.opts && ((player.opts.hide||{})[k] || (k==='head' && player.opts.hideHelm)));
 const EYE_OPEN='<svg viewBox="0 0 16 16" width="11" height="11"><path d="M1 8s2.6-4.5 7-4.5S15 8 15 8s-2.6 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="2.1" fill="currentColor"/></svg>';
 const EYE_SHUT='<svg viewBox="0 0 16 16" width="11" height="11"><path d="M1 8s2.6-4.5 7-4.5S15 8 15 8s-2.6 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2 14L14 2" stroke="currentColor" stroke-width="1.8"/></svg>';
@@ -9146,7 +9162,7 @@ function buildInventoryUI(){
   if(invBuilt) return; invBuilt=true;
   const L=document.getElementById('eq-left'), Rt=document.getElementById('eq-right');
   window.syncHelmToggle=()=>syncHideEyes();
-  ['head','torso','armor','weapon'].forEach(k=>L.appendChild(makeSlot('eq',k)));
+  ['head','neck','torso','armor','weapon'].forEach(k=>L.appendChild(makeSlot('eq',k)));
   ['hands','legs','feet','offhand'].forEach(k=>Rt.appendChild(makeSlot('eq',k)));
   for(let i=0;i<INV_SIZE;i++) invGrid.appendChild(makeSlot('inv',i));
   { const box=document.createElement('div'); box.id='stash-box'; box.innerHTML='<div class="menu-label">The Wheatsheaf Crate</div><div id="stash-grid"></div><div class="stash-help">Double-click moves things between the crate and your pack.</div>';
@@ -12849,7 +12865,7 @@ function moonCheck(){ const P=PZ(); if(P.moon || nightAmt()<=0.4) return; if(!mo
   logMsg('Silver light fills the drowned shrine. You feel it settle in your chest like a second heartbeat. (+10 max HP, permanently)','#dfe6ee');
   { giveQuestItem('moonsilver',true); logMsg('On the altar, where the light fell: a coin of moonsilver.','#e8c060'); } updateHud(); }
 Object.assign(ITEMS,{ moonthread:{ name:'Spool of Moonthread', slot:'misc' }, silver_setting:{ name:'A Silver Setting', slot:'misc' },
-  moon_amulet:{ name:'Moonsilver Focus', slot:'offhand' } });
+  moon_amulet:{ name:'Moonsilver Focus', slot:'neck' } });
 Object.assign(ITEMS,{ moonsilver:{ name:'Moonsilver Coin', slot:'misc', read:true, title:'A coin that is cold in the hand',
   body:["It shows a crescent on one face and a pool on the other, and it is always a little colder than the air.","The elves of Sylvhaven would know what it is. Maelis the Weaver, perhaps, who works silver into cloth."] } });
 // ── the Moonsilver Focus: Maelis sets the coin as a focus, with thread from Nimuë's pool and a setting from Oswin ──
@@ -13173,7 +13189,7 @@ function drawLurker(x,B,e,pose){
 // ── items ──
 Object.assign(ITEMS,{
   fen_boots:{ name:'Fenwalker Boots', slot:'feet', base:'boots', col:'#3a4428' },
-  morwen_lantern:{ name:"Vesna's Lantern", slot:'misc' },
+  morwen_lantern:{ name:"Vesna's Lantern", slot:'offhand' },
   bog_coins:{ name:'A Purse of Drowned Coins', slot:'misc' },
   silver_torc:{ name:'A Silver Torc', slot:'misc' },
   amber_brooch:{ name:'An Amber Brooch', slot:'misc' },
@@ -13426,7 +13442,7 @@ let rumourCd=0;
 // ── journal ──
 JOURNAL.push(
   ['The Fallen Oak', ()=> !visitedAreas.fenpath ? null : FEN_OPEN() ? ['done',"The loggers cleared the fallen oak. The Fen Causeway is open."] : ['active',"A giant oak blocks the Fen Causeway north of the boundary stones. Foreman Gerd's loggers are clearing it. Word will get round when they're through."]],
-  ["Vesna's Lantern", ()=> !CHOICE.morwen ? null : CHOICE.morwen==='done' ? ['done',"You brought Vesna her lantern back from Hesk the Fen Hag."] : ['active', hasItem('morwen_lantern')?"You have Vesna's lantern. Bring it to her stilt-hut in the Drowning Fen.":defeatedMobs.has('fen:Hesk the Fen Hag')?"Hesk is dead. The lantern must lie where she fell, on the island in the south-west of the fen.":"Take Vesna's lantern back from Hesk, the Fen Hag, her old teacher, on the island south-west in the Drowning Fen."]],
+  ["Vesna's Lantern", ()=> !CHOICE.morwen ? null : CHOICE.morwen==='done' ? ['done',"You brought Vesna her lantern back from Hesk the Fen Hag."] : ['active', hasLantern()?"You have Vesna's lantern. Bring it to her stilt-hut in the Drowning Fen.":defeatedMobs.has('fen:Hesk the Fen Hag')?"Hesk is dead. The lantern must lie where she fell, on the island in the south-west of the fen.":"Take Vesna's lantern back from Hesk, the Fen Hag, her old teacher, on the island south-west in the Drowning Fen."]],
   ['The Drowned Barrow', ()=> !(CHOICE.barrow||CHOICE.morwen==='done') ? null : CHOICE.barrow==='done' ? ['done',"You woke the Barrow-King of the hollow and laid him down again. His boots and ring are yours."] : CHOICE.barrow==='open' ? ['active',"You found a barrow under the reeds of the Sunken Hollow. Go in."] : ['active',"Vesna says a barrow lies under a bank of reeds in the Sunken Hollow, where the wisps gather at night."]],
   ['Fen Treasures', ()=> !CHOICE.fenCaches ? null : CHOICE.fenCaches>=3 ? ['done',"You dug up all three caches hidden in the fen."] : ['active',"There are things buried in the fen, under little mounds with a marker stick. Found "+CHOICE.fenCaches+" of 3."]]);
 
@@ -14268,10 +14284,10 @@ PRICES.grave_mote=PRICES.grave_mote||8;
 const VESNA_N='Vesna the Grave-Speaker';
 function vesnaFen(){
   const hag=defeatedMobs.has('fen:Hesk the Fen Hag'), back=()=>vesnaFen(), necroTalk=VESNA_NECRO;
-  if(hasItem('morwen_lantern') && CHOICE.morwen!=='done'){                       // her lantern, back from Hesk
+  if(hasLantern() && CHOICE.morwen!=='done'){                       // her lantern, back from Hesk
     say(VESNA_N,["Vesna takes the lantern in both hands and holds it up to her face. The little flame inside turns green, then gold.","“Hesk taught me everything I know. Then she tried to use this to talk the drowned kings into getting up again. It works. That's the trouble.”","“Listen. In the Sunken Hollow, south of here, the wisps gather over a bank of reeds at night. Under those reeds is the barrow of the old kings. Gold, and worse than gold.”"],[
-      {label:'Take her gift.', fn:()=>{ player.inv[player.inv.indexOf('morwen_lantern')]=null; giveQuestItem('potion',true); giveQuestItem('potion',true); player.purse+=15; updateHud(); remember('morwen','done',"You brought Vesna her lantern. She told you of a barrow under the reeds of the Sunken Hollow.");
-        say(VESNA_N,"“Two of my draughts and a little coin. The rest you'll have to dig for.” <i>You receive 15 copper and two healing draughts.</i>",[{label:'Back.',fn:back},bye]); }}]); return; }
+      {label:'Take her gift.', fn:()=>{ giveQuestItem('potion',true); giveQuestItem('potion',true); player.purse+=15; updateHud(); remember('morwen','done',"You brought Vesna her lantern. She told you of a barrow under the reeds of the Sunken Hollow.");
+        say(VESNA_N,["She breathes on the glass and the flame steadies, warm and gold. She puts the lantern back in your hands.","“Keep it. It burns green near the dead and gold near the living, and it will light your road when the sun is gone. Two of my draughts and a little coin besides. The rest you'll have to dig for.”","<i>You receive 15 copper and two healing draughts. Vesna's Lantern is yours: carry it in your off hand (+2 Spell Power, +2 Attack Power, light at night).</i>"],[{label:'Back.',fn:back},bye]); }}]); return; }
   const opts=[];
   if(!CHOICE.morwen) opts.push({label:'“You look like someone with a job for a sword.”', fn:()=>say(VESNA_N,["“Hesk. Out on the island past the old ruin, south-west. She was a grave-speaker once, like me. My teacher, if you can believe it.”","“She took my lantern. It is not a lamp, it is a key: it shows the way to the drowned. She has gone bad with it. Bring it back to me.”"],[
       {label:'“I will bring your lantern back.”', fn:()=>{ remember('morwen','asked',"Vesna wants her lantern back from Hesk, the Fen Hag, her old teacher, on the island south-west in the Drowning Fen."); say(VESNA_N,"“She'll curse you. Curse her back.”",[{label:'Back.',fn:back},bye]); }},{label:'Back.',fn:back}])});
@@ -14289,7 +14305,7 @@ function vesnaFen(){
 const VESNA_NECRO=TALKERS.vesna;                                                   // her lessons, as they were
 TALKERS.vesna=function(){ if(areaId==='fen') return vesnaFen(); return VESNA_NECRO(); };
 { const oN=npcHasNews; npcHasNews=function(n){ if(n && n.id==='vesna' && !n._lesson && areaId==='fen'){
-      if(!CHOICE.morwen) return '!'; if(CHOICE.morwen==='asked' && hasItem('morwen_lantern')) return '?'; }
+      if(!CHOICE.morwen) return '!'; if(CHOICE.morwen==='asked' && hasLantern()) return '?'; }
     return oN(n); }; }
 // the two guards at the gate on the King's Road
 ['krgateguard0','krgateguard1'].forEach(id=>{ TALKERS[id]=()=>{ const N=BARON_DOWN()?'Crown Soldier':"Baron's Gate Guard";
@@ -14864,7 +14880,7 @@ setInterval(()=>{ try{ if(!running || CS.on || combat.active || areaId!=='millro
 // ── Oswin tempers one piece of armour at a time, the way Maelis weaves: +1 Attack Power on that piece, once per piece, priced by the piece
 const TEMPER_SLOTS=['head','armor','hands','legs','feet','offhand'], temperCost=id=>40+Math.round((PRICES[unWoven(id)]||20)/2);
 const isTempered=id=>!!(id && id.startsWith && id.startsWith('t_'));
-const TEMPERABLE=id=>{ const b=unWoven(id), it=ITEMS[b]||{}; return it.slot==='offhand' || /mail|plate|gauntlet|glove|boot|helm|kettle|coif|jerkin|studded|gambeson|greave|scale|shield|obsidian|cinder_gl|steel|iron|leather/.test(b+' '+(it.base||'')); };   // steel and leather: Oswin does not temper shirts or trousers
+const TEMPERABLE=id=>{ const b=unWoven(id), it=ITEMS[b]||{}; if(b==='morwen_lantern') return false; return it.slot==='offhand' || /mail|plate|gauntlet|glove|boot|helm|kettle|coif|jerkin|studded|gambeson|greave|scale|shield|obsidian|cinder_gl|steel|iron|leather/.test(b+' '+(it.base||'')); };   // steel and leather: Oswin does not temper shirts or trousers
 for(const id of Object.keys(ITEMS)){ const it=ITEMS[id]; if(id.startsWith('t_') || !TEMPER_SLOTS.includes(it.slot) || (id.startsWith('w_') && !ITEMS[id.slice(2)])) continue;
   ITEMS['t_'+id]={...it, name:it.name.replace(' (woven)','')+(it.woven?' (woven, tempered)':' (tempered)'), tempered:true};
   ITEM_STATS['t_'+id]={...(ITEM_STATS[id]||{}), ap:((ITEM_STATS[id]||{}).ap||0)+1};
@@ -15110,6 +15126,16 @@ const ICON_TINT={"elf_circlet":[1.27,1.25,1.24],"elf_leggings":[1.73,1.87,1.9],"
     try{ g2.setTransform(1,0,0,1,0,0); const im=g2.getImageData(0,0,size,size), d=im.data;
       for(let i=0;i<d.length;i+=4){ if(!d[i+3]) continue; d[i]=Math.min(255,d[i]*T[0]); d[i+1]=Math.min(255,d[i+1]*T[1]); d[i+2]=Math.min(255,d[i+2]*T[2]); }
       g2.putImageData(im,0,0); }catch(e){} return r; }; }
+// Vesna's lantern: carried in the off hand, it lights the way at night and lends a little of the fen's strength
+const hasLantern=()=> hasItem('morwen_lantern') || !!(player.opts && player.opts.equip && unWoven(player.opts.equip.offhand||'')==='morwen_lantern');
+Object.assign(ITEM_STATS,{ morwen_lantern:{ magic:2, ap:2 } }); PRICES.morwen_lantern=PRICES.morwen_lantern||60;
+const lanternLit=()=> hasLantern() && unWoven((player.opts.equip.offhand)||'')==='morwen_lantern';
+{ const oDN=drawNight; drawNight=function(){ oDN(); if(AREAS[areaId].inside || !lanternLit()) return; const n=nightAmt(); if(n<0.05) return;
+    const pp=P(player.x,player.y), fl=0.92+Math.sin(gt*7)*0.04+Math.sin(gt*13.3)*0.03;
+    g.save(); g.globalCompositeOperation='lighter';
+    glow(pp.x,pp.y-10,210*fl,120*fl,'236,226,150',0.30*n);                                          // a warm pool round your feet, a few steps each way
+    glow(pp.x,pp.y-36,120*fl,90*fl,'226,236,160',0.22*n);
+    g.restore(); }; }
 </script>
 </body>
 </html>

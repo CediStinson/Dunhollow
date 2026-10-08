@@ -7189,6 +7189,7 @@ function sitLegCol(o){ const L=o.equip&&o.equip.legs; if(!L) return SKINS[o.skin
 function sitFootCol(o){ const F=o.equip&&o.equip.feet; if(!F) return SKINS[o.skin]||'#e8b890'; const it=ITEMS[F]; if(F.startsWith('elf_')) return (it&&it.col)||ELFC.boot; return (it&&it.col)||CLOTH.boot; }
 // how far the upper body is lowered to sit: the same in every direction (taken from the views from behind, where the seat
 // visibly rests on the floor), so a sitting figure keeps one height however it is turned
+const CHAIR_SEAT=17;   // a chair's seat, in the figure's own units above the floor
 function sitDrop(mode,dir,opts){ const V=VIEW[dirView(dir||0)], F=opts&&opts.gender==='f', r=String(opts&&opts.race||'');
   const RS1=r.startsWith('elf')?1.055:r.startsWith('goblin')?0.76:1, bare=!(opts&&opts.equip&&opts.equip.legs);
   return bare ? -0.5-(cheekGeom(F,V,true).cb+0.3)*RS1 : SIT_DROP+4.5; }
@@ -7214,6 +7215,7 @@ function cheekGeom(F,V,sit){ const P=F?PROP.f:PROP.m, HI=P.hipHW*V.sw, WA=P.wais
   return G; }
 function drawSitting(c,x,B,opts,dir,mode){
   if(dirMirrored(dir)){ c.save(); c.translate(x,0); c.scale(-1,1); c.translate(-x,0); drawSitting(c,x,B,opts,8-dir,mode); c.restore(); return; }   // west-facing = the east pose, mirrored exactly
+  const chair=mode==='chair'; if(chair) B-=CHAIR_SEAT;                // on a chair: the same seated body, lifted to the seat, the shins reaching down to the floor
   const view=dirView(dir), V=VIEW[view], front=V.turn>-0.25, pr=V.prof, F=opts.gender==='f', side0=false, mer=false, side=false,   // side-sit and recline retired: they fall back to the knees pose
       // the recline is retired: it shows as the side-sit
     recl=false,   // the side-sit is retired: it shows as the recline
@@ -7272,6 +7274,8 @@ function drawSitting(c,x,B,opts,dir,mode){
     : lounge ? [
       {hip:[5*SP,-4*pr,3-0.6*pr], knee:[8*SP+(F?0:1.5),10.5,14.5], ank:[8.5*SP+(F?0:1.5),14.5,2], toe:[0,5,0], up:true, tw:1.05+0.3*pr},           // right knee raised
       {hip:[-5.6*SP,-4*pr,2.6-0.5*pr], knee:[-13.5*SP,12,2.6], ank:[-16*SP,23,2.2], toe:[0,1.5,4.8]} ]              // left leg stretched out and a little to the side, toes up
+    : chair ? [ {hip:[4.6*SP,-4*pr,3-0.6*pr], knee:[5.4*SP,13,4.5], ank:[5.6*SP,15,-CHAIR_SEAT+2.5], toe:[0,5,0], up:true, tw:1.05+0.3*pr},          // thighs level along the seat, shins straight down
+                {hip:[-4.6*SP,-4*pr,3-0.6*pr], knee:[-5.4*SP,13,4.5], ank:[-5.6*SP,15,-CHAIR_SEAT+2.5], toe:[0,5,0], up:true, tw:1.05+0.3*pr} ]
     : [ {hip:[5.4*SP,-4*pr,3-0.6*pr], knee:[6.8*SP,11,15], ank:[6.4*SP,15,2], toe:[0,5,0], up:true, tw:1.05+0.3*pr}, {hip:[-5.4*SP,-4*pr,3-0.6*pr], knee:[-6.8*SP,11,15], ank:[-6.4*SP,15,2], toe:[0,5,0], up:true, tw:1.05+0.3*pr} ];   // thighs from the floor at the seat, full at the top   // thighs from the seat, a gap between the knees
   const LG=LEGS.map(L=>{ const H=PJ(L.hip); { const w0=4.6*s*(L.tw||1); H[1]=B+0.8-w0+Math.min(0,H[2])*DF; }   // the thigh rests on the floor where the seat does
     const K=PJ(L.knee), A=PJ(L.ank), T=PJ([L.ank[0]+L.toe[0],L.ank[1]+L.toe[1],L.ank[2]+L.toe[2]]);
@@ -7508,7 +7512,7 @@ function drawSitting(c,x,B,opts,dir,mode){
   else backLegs.forEach(drawLeg);
   backArms.forEach(q=>drawArm(q,true));
   body();
-  if(!side && !lounge && !mer && front && frontLegs.length) underKnees(pr*3);
+  if(!side && !lounge && !mer && !chair && front && frontLegs.length) underKnees(pr*3);
   sitGenitals();
   frontLegs.forEach(g=>drawLeg(g,tuck)); frontArms.sort((a,b)=>a.d-b.d).forEach(q=>drawArm(q,false));
 }
@@ -14938,8 +14942,30 @@ function paintRoundHut(x,y){ const rx=72, ry=36, H=46, R=1.16;
     const k=ti+','+tj, was=blocked.has(k); blocked.delete(k); try{ return oFP(si,sj,ti,tj); } finally{ if(was) blocked.add(k); } }; }
 // whoever sits at a table sits on the chair, pulled in to it
 { const oDN=drawNPC; drawNPC=function(n){ const ch=n.sit && !n.moving && OBJECTS.find(o=>o.type==='chair' && o.i===n.i && o.j===n.j);
-    if(!ch) return oDN(n); const ox=n.x, oy=n.y, bx=(n.x??n.i+0.5), by=(n.y??n.j+0.5); n.x=bx+ch.face[0]*CHAIR_IN; n.y=by+ch.face[1]*CHAIR_IN; const od=n.dir; n.dir=dirFromDelta(ch.face[0],ch.face[1]);   // and faces the table
-    try{ return oDN(n); } finally{ n.x=ox; n.y=oy; n.dir=od; if((ch.face[0]+ch.face[1])<0) drawObject(ch); } }; }   // a chair facing away from us: its back is in front of the sitter
+    if(!ch) return oDN(n); const ox=n.x, oy=n.y, bx=(n.x??n.i+0.5), by=(n.y??n.j+0.5); n.x=bx+ch.face[0]*CHAIR_IN; n.y=by+ch.face[1]*CHAIR_IN; const od=n.dir, os=n.sit; n.dir=dirFromDelta(ch.face[0],ch.face[1]); if(n.sit===true) n.sit='chair';   // faces the table, sitting up on the seat
+    try{ return oDN(n); } finally{ n.x=ox; n.y=oy; n.dir=od; n.sit=os; if((ch.face[0]+ch.face[1])<0) drawObject(ch); } }; }   // a chair facing away from us: its back is in front of the sitter
+// you can sit on a chair too: click it, walk up, sit down facing the table; any move gets you up again
+let pendingChair=null;
+const chairFree=ch=> !NPCS.some(n=>n.i===ch.i && n.j===ch.j);
+function sitOnChair(ch){ if(!chairFree(ch)) return; player.sitChair=ch; player.path=[]; player.moving=false; player.i=ch.i; player.j=ch.j; player.x=ch.i+0.5; player.y=ch.j+0.5; player.dir=dirFromDelta(ch.face[0],ch.face[1]); }
+{ const oPU=pointerUp; pointerUp=function(px,py){
+    if(drag.active && drag.moved<6 && !combat.active && !CS.on){ const r=gc.getBoundingClientRect(), gp=fromIso(px-r.left,py-r.top), ti=Math.floor(gp.x), tj=Math.floor(gp.y);
+      const ch=OBJECTS.find(o=>o.type==='chair' && o.i===ti && o.j===tj);
+      if(ch && ch!==player.sitChair && chairFree(ch)){ drag.active=false; gc.style.cursor='grab'; if(player.sitChair) player.sitChair=null;
+        if(cheb([ch.i,ch.j],[player.i,player.j])<=1){ sitOnChair(ch); return; }
+        let best=null; for(const [di,dj] of DIR_DELTA){ const p=findPath(player.i,player.j,ch.i+di,ch.j+dj); if(p && (!best||p.length<best.length)) best=p; }
+        if(best){ player.path=best; pendingChair=ch; } return; } }
+    return oPU(px,py); }; }
+{ const oU=update; update=function(dt){
+    if(player.sitChair && (player.path.length || combat.active || !OBJECTS.includes(player.sitChair))) player.sitChair=null;     // up again the moment you go anywhere
+    oU(dt);
+    if(pendingChair){ if(player.path.length){} else { const ch=pendingChair; pendingChair=null; if(OBJECTS.includes(ch) && cheb([ch.i,ch.j],[player.i,player.j])<=1) sitOnChair(ch); } }
+    if(player.sitChair && (player.path.length || player.i!==player.sitChair.i || player.j!==player.sitChair.j)) player.sitChair=null; }; }
+{ const oSA=switchArea; switchArea=function(...a){ player.sitChair=null; pendingChair=null; return oSA(...a); }; }
+{ const oDA=drawActor; drawActor=function(e){ const ch=e===player && player.sitChair; if(!ch) return oDA(e);
+    const q=P(ch.i+0.5+ch.face[0]*CHAIR_IN, ch.j+0.5+ch.face[1]*CHAIR_IN), d=dirFromDelta(ch.face[0],ch.face[1]);
+    drawLitSprite(q.x,q.y,()=>drawSitting(g,q.x,q.y,player.opts,d,'chair'));
+    if((ch.face[0]+ch.face[1])<0) drawObject(ch); }; }
 </script>
 </body>
 </html>

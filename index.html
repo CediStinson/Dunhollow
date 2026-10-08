@@ -14714,8 +14714,8 @@ function paintBaronBanner(x,y){ const W=11, H=40, top=y-82; g.fillStyle='rgba(0,
 // ── whoever you are talking to stays put until you are done: no wandering off, no routine pulling them away mid-trade ──
 let TALK_NPC=null, TALK_DEPTH=0;
 const dlgIsOpen=()=>typeof dlgOverlay!=='undefined' && dlgOverlay.classList.contains('open');
-let TALK_STATE='';
-{ const oT=talkTo; talkTo=function(n){ TALK_NPC=n; TALK_DEPTH=0; try{ TALK_STATE=JSON.stringify(CHOICE); }catch(e){ TALK_STATE=''; } return oT(n); }; }
+let TALK_STATE='', TALK_ROOT_REAL=0;
+{ const oT=talkTo; talkTo=function(n){ TALK_NPC=n; TALK_DEPTH=0; TALK_ROOT_REAL=-1; try{ TALK_STATE=JSON.stringify(CHOICE); }catch(e){ TALK_STATE=''; } return oT(n); }; }
 { const oU=update; update=function(dt){ const n=TALK_NPC, hold=n && dlgIsOpen() && NPCS.includes(n);
     let saved=null; if(hold){ saved={goto:n.goto, path:n.path}; n.goto=null; n.path=[]; n.moving=false; if(n.wander) n.wait=Math.max(n.wait||0,1); }
     oU(dt);
@@ -14724,12 +14724,13 @@ let TALK_STATE='';
 const RT_HOLD=()=> TALK_NPC && dlgIsOpen() ? TALK_NPC : null;
 // "Back." on every reply that would otherwise only say goodbye, inside a conversation you started
 { const oSD=showDialog; showDialog=function(name,text,opts,...r){
+    if(TALK_NPC && Array.isArray(opts) && TALK_ROOT_REAL<0){ TALK_ROOT_REAL=opts.filter(o=>!(o===bye || o.fn===closeDialog || /^(Farewell|Leave|Not now|Close|Bow and leave|Back)/.test(String(o.label)))).length; }   // what the first screen offered
     if(TALK_NPC && dlgIsOpen() && Array.isArray(opts)){ TALK_DEPTH++;
       const onlyBye=opts.length && opts.every(o=>o===bye || o.fn===closeDialog || /^(Farewell|Leave|Not now|Close|Bow and leave)/.test(String(o.label)));
       const hasBack=opts.some(o=>/^Back\b/.test(String(o.label)));
       const root=TALKERS[TALK_NPC.id], who=TALK_NPC;
       let changed=false; try{ changed=TALK_STATE!=='' && JSON.stringify(CHOICE)!==TALK_STATE; }catch(e){}         // something was decided: going 'back' would replay the question
-      if(onlyBye && !hasBack && !changed && root && name===who.name) opts=[{label:'Back.', fn:()=>{ TALK_NPC=who; TALK_DEPTH=0; root(); }}, ...opts]; }
+      if(onlyBye && !hasBack && !changed && TALK_ROOT_REAL>0 && root && name===who.name) opts=[{label:'Back.', fn:()=>{ TALK_NPC=who; TALK_DEPTH=0; root(); }}, ...opts]; }
     else TALK_DEPTH=0;
     return oSD(name,text,opts,...r); }; }
 // a cutscene clears the screen: inventory, notes, the map, a signpost you were reading (never the menu)

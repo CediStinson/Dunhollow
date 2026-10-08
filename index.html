@@ -2403,6 +2403,26 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
     c.fillStyle='#2a1a10'; c.fillRect(x+LN-WA-2,B+Y.WAIST-3,(WA+2)*2,2.2);
     if(F) femBreastplate(Bc);                                              // shaped for a woman
   }
+  function drawTabard(){                                 // the Baron's tabard: a faded red panel over whatever armour, his boar flaking off the chest, the hem gone to threads
+    const T='#8a3a30', k=1-pr*0.45, hem=F?-27:-25, top=Y.SHOULDER-0.6, sw=(CH-1.4)*k, ww=(WA+1.2)*k, hw2=(WA+2.6)*k, cx=LN+(front?po*0.7:0);
+    const pts=[[cx-sw,top],[cx+sw+bR*0.3,top],[cx+sw+bR*0.4,Y.SHOULDER+7],[cx+ww+bR*0.3,Y.WAIST],...torn(cx+hw2,cx-hw2,hem,9,2.4),[cx-ww,Y.WAIST],[cx-sw,Y.SHOULDER+7]];
+    const poly=()=>{ c.beginPath(); pts.forEach(([u,v],i)=>i?c.lineTo(x+u,B+v):c.moveTo(x+u,B+v)); c.closePath(); };   // straight edges: the rounded path spikes on so narrow a shape side-on
+    poly(); c.fillStyle=T; c.fill(); c.strokeStyle=tone(T,-0.5); c.lineWidth=1; c.lineJoin='round'; c.stroke();
+    c.save(); poly(); c.clip();
+      litFill(pts,T,Y.SHOULDER,hem);
+      for(let i=0;i<9;i++){ const u=rnd01(i,3,940), v=rnd01(i,4,941); c.fillStyle=`rgba(230,190,160,${0.08+0.08*rnd01(i,5,942)})`;       // sun-faded blotches
+        c.beginPath(); c.ellipse(x+cx-hw2+u*hw2*2,B+top+v*(hem-top),2+u*3,3+v*4,u,0,Math.PI*2); c.fill(); }
+      c.fillStyle='rgba(240,200,170,0.10)'; c.fillRect(x+cx-sw,B+top,sw*0.7,hem-top);                                                   // the side the sun found
+      c.fillStyle='rgba(40,20,10,0.22)'; c.fillRect(x+cx-hw2-2,B+hem-5,hw2*2+4,5);                                                       // grime at the hem
+      c.strokeStyle=tone(T,-0.35,0.6); c.lineWidth=0.6; [-0.5,0.4].forEach(t=>{ c.beginPath(); c.moveTo(x+cx+t*ww,B+Y.WAIST+1); c.lineTo(x+cx+t*hw2*1.1,B+hem); c.stroke(); });   // creases
+      c.strokeStyle='rgba(30,14,8,0.45)'; c.lineWidth=0.5; c.setLineDash([0.9,0.9]); c.strokeRect(x+cx-sw*0.5+3,B+Y.WAIST+5,4,4); c.setLineDash([]);   // a darned patch
+      c.strokeStyle='rgba(200,160,80,0.5)'; c.lineWidth=0.7; c.strokeRect(x+cx-sw+1.4,B+top+1.4,(sw*2+bR*0.3)-2.8,(Y.WAIST-top)-2);       // a gold border, mostly gone
+      drawBaronSigil(c,x+cx,B+Y.SHOULDER+12.5,front?12.5:11,'#c8a050','#3a0c0a',1);
+    c.restore();
+    if(front && pr<0.8){ c.fillStyle=tone(T,-0.55); c.beginPath(); c.ellipse(x+cx,B+top+0.6,P.neckW/2+1.2,1.6,0,0,Math.PI); c.fill(); }   // the neck slit
+    c.strokeStyle='#4a3420'; c.lineWidth=1.3; c.beginPath(); c.moveTo(x+cx-ww-1.5,B+Y.WAIST-1); c.quadraticCurveTo(x+cx,B+Y.WAIST+0.8,x+cx+ww+1.5+bR*0.3,B+Y.WAIST-1); c.stroke();   // a cord at the waist
+    if(front){ c.beginPath(); c.moveTo(x+cx+ww*0.5,B+Y.WAIST); c.lineTo(x+cx+ww*0.5-0.6,B+Y.WAIST+6); c.stroke(); }
+  }
   function drawSurcoat(){                                // a white surcoat with a red cross over the long hauberk
     const Sc=ITEMS.brightmail.col, hem=F?-30:-28, hw=HI+1.6;
     const pts=[[LN-CH+2.4,Y.SHOULDER-0.6],[LN+CH-2.4,Y.SHOULDER-0.6],[LN+CH+bR-1.4,Y.SHOULDER+8],[LN+WA+0.6,Y.WAIST-2],[LN+hw,hem],[LN+0.8,hem],[LN+0.4,-36],[LN-0.4,-36],[LN-0.8,hem],[LN-hw,hem],[LN-WA-0.6,Y.WAIST-2],[LN-CH-bL+1.4,Y.SHOULDER+8]];
@@ -2668,6 +2688,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
     c.restore();
     drawBelt(by-0.4,bw+0.3,vL==='necro_leggings'?{col:'#1a1816',h:1.1,dagger:true,metal:'#4a4234'}:{col:'#6a4426',h:1.3,dagger:true}); }
   if(E.torso==='shirt'){ if(TUN) drawTunic(); else if(SMOCK) drawSmock(); else if(F) drawTop(C.shirt); else drawShirt(); }
+  else if(E.torso==='baron_tabard'){ if(F) drawTop(C.shirt); else drawShirt(); }       // a plain shirt under it; the tabard itself goes on over the armour
   else if(ETUN) drawElfTunic();
   else if(ROBE) sheerLayer(0.58,drawElfRobe);
   else if(BUST) drawElfBustier();
@@ -2676,6 +2697,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   else if(E.armor==='mail'){ drawMail(vA==='brightmail' ? (F?-29:-27) : 0); if(vA==='blackmail') drawBrigandine(); if(vA==='brightmail') drawSurcoat(); }
   else if(E.armor==='elf_scale') drawElfScale();
   else if(E.armor==='robe') drawOpenRobe();
+  if(E.torso==='baron_tabard') drawTabard();
   if((E.neck==='moon_amulet'||E.offhand==='moon_amulet') && front){ const ax=LN+(pr>0.8?CH*0.45:po), ay=Y.SHOULDER+(F?6.4:7);   // the moonsilver focus on a cord of light
     // the cord's lowest point (the middle of a quadratic) sits exactly on the bail at the top of the orb
     const bailY=ay+1.2-1.5-0.6, ctrlY=2*bailY-(Y.SHOULDER-0.4);
@@ -5603,7 +5625,7 @@ function paintBanner(x,y){
   g.fillStyle='rgba(10,6,2,0.3)'; g.beginPath(); g.ellipse(x+6,y+2,12,4,0,0,Math.PI*2); g.fill();
   g.fillStyle='#3a2412'; g.fillRect(x-1.8,y-78,3.6,78); g.fillRect(x-1.8,y-78,26,3);
   g.fillStyle='#6a1a1a'; g.beginPath(); g.moveTo(x+2,y-75); g.lineTo(x+24,y-75); g.lineTo(x+24,y-38); g.lineTo(x+13,y-44); g.lineTo(x+2,y-38); g.closePath(); g.fill();
-  g.fillStyle='#e8c060'; g.font='bold 14px Georgia, serif'; g.fillText('B',x+8,y-52);
+  drawBaronSigil(g,x+13,y-57,15);
 }
 function paintKiln(x,y,cold){
   g.fillStyle='rgba(10,6,2,0.32)'; g.beginPath(); g.ellipse(x+5,y+3,34,14,0,0,Math.PI*2); g.fill();
@@ -6410,6 +6432,22 @@ function paintBuilding(X,Y,o){
     g.fillStyle=tone(pal.st,-0.1); g.fillRect(c0.x-7,c0.y-26,14,28); g.fillStyle=tone(pal.st,-0.4); g.fillRect(c0.x,c0.y-26,7,28); g.fillStyle='#2a2622'; g.fillRect(c0.x-8,c0.y-29,16,4); }
 }
 function cityBuildingSize(o){ const fw=o.fp[0], fh=o.fp[1], WH=o.h||150, RH=o.rh||(o.ridge==='j'?fw:fh)*30; return { w:(fw+fh)*64+80, h:(fw+fh)*32+WH+RH+90, ax:fw*64+40, ay:(fw+fh)*32+WH+RH+50 }; }
+// the Baron's arms: a gold boar's head, couped, tusk bared, looking to the left (sinister) — on every banner, flag, seal and tabard of his
+function drawBaronSigil(c,cx,cy,sz,gold='#e2b84e',dark='#4a1210',worn=0){
+  const k=sz/2, P_=(u,v)=>[cx+u*k,cy+v*k];
+  const head=[[0.62,0.78],[0.78,0.18],[0.7,-0.18],[0.58,-0.9],[0.32,-0.36],[0.06,-0.42],[-0.42,-0.3],[-0.78,-0.18],[-0.98,-0.12],[-1,0.14],[-0.78,0.2],[-0.56,0.3],[-0.22,0.46],[-0.04,0.74],[0.14,0.92],[0.26,0.74],[0.4,0.92],[0.5,0.74]];
+  c.save(); c.lineJoin='round';
+  c.beginPath(); head.forEach(([u,v],i)=>{ const [X,Y]=P_(u,v); i?c.lineTo(X,Y):c.moveTo(X,Y); }); c.closePath();
+  c.fillStyle=gold; c.fill(); c.strokeStyle=dark; c.lineWidth=Math.max(0.5,sz*0.045); c.stroke();
+  c.fillStyle=dark;                                                                                  // the bristles of the mane
+  for(let t=0;t<4;t++){ const a=P_(0.36+t*0.11,-0.32+t*0.14), b=P_(0.6+t*0.12,-0.46+t*0.16), d=P_(0.42+t*0.11,-0.18+t*0.14); c.beginPath(); c.moveTo(a[0],a[1]); c.lineTo(b[0],b[1]); c.lineTo(d[0],d[1]); c.closePath(); c.fill(); }
+  const ey=P_(-0.16,-0.14); c.beginPath(); c.ellipse(ey[0],ey[1],sz*0.06,sz*0.045,0,0,Math.PI*2); c.fill();      // a small hard eye
+  c.lineWidth=Math.max(0.45,sz*0.04); c.strokeStyle=dark; const b0=P_(-0.3,-0.3), b1=P_(-0.02,-0.22); c.beginPath(); c.moveTo(b0[0],b0[1]); c.lineTo(b1[0],b1[1]); c.stroke();   // and a scowl
+  const nm=P_(-0.9,0.0); c.beginPath(); c.arc(nm[0],nm[1],sz*0.035,0,Math.PI*2); c.fill();          // the snout's nostril
+  c.fillStyle='#f4ecd8'; const t0=P_(-0.62,0.28), t1=P_(-0.86,-0.36), t2=P_(-0.5,0.16);               // the tusk, curving up
+  c.beginPath(); c.moveTo(t0[0],t0[1]); c.quadraticCurveTo(...P_(-0.9,0.12),t1[0],t1[1]); c.quadraticCurveTo(...P_(-0.66,0.02),t2[0],t2[1]); c.closePath(); c.fill(); c.strokeStyle=dark; c.lineWidth=Math.max(0.4,sz*0.03); c.stroke();
+  if(worn>0){ c.globalCompositeOperation='destination-out'; for(let i=0;i<10;i++){ const r=rnd01(i,Math.round(sz),930), q=rnd01(i,7,931); c.fillStyle=`rgba(0,0,0,${0.35*worn})`; c.beginPath(); c.ellipse(cx+(r-0.5)*sz,cy+(q-0.5)*sz,sz*0.08,sz*0.05,r*3,0,Math.PI*2); c.fill(); } }   // flaked, where it has been worn
+  c.restore(); }
 function paintTower(x,y,rad,ht,flag){
   g.fillStyle='rgba(8,5,2,0.4)'; g.beginPath(); g.ellipse(x+10,y+6,rad*1.15,rad*0.55,0,0,Math.PI*2); g.fill();
   const tg=g.createLinearGradient(x-rad,0,x+rad,0); tg.addColorStop(0,'#aaa292'); tg.addColorStop(0.45,'#8a8274'); tg.addColorStop(1,'#4a463e');
@@ -6419,7 +6457,7 @@ function paintTower(x,y,rad,ht,flag){
   for(let k=0;k<3;k++){ g.fillStyle='#1a1814'; g.fillRect(x-rad*0.5+k*rad*0.45,y-ht*0.55-k*4,3,14); }                  // arrow slits
   g.fillStyle='#9a9282'; g.beginPath(); g.ellipse(x,y-ht,rad+5,(rad+5)*0.5,0,0,Math.PI*2); g.fill();
   for(let k=0;k<8;k++){ const a=Math.PI*(k+0.5)/8, cx=x-Math.cos(a)*(rad+3), cy=y-ht+Math.sin(a)*(rad+3)*0.5; g.fillStyle=k<4?'#b0a898':'#6e685c'; g.fillRect(cx-5,cy-12,10,12); }   // crenellations
-  if(flag){ g.fillStyle='#3a2412'; g.fillRect(x-1.5,y-ht-70,3,60); g.fillStyle=flag; g.beginPath(); g.moveTo(x+1.5,y-ht-70); g.quadraticCurveTo(x+22,y-ht-66,x+36,y-ht-62); g.lineTo(x+1.5,y-ht-50); g.closePath(); g.fill(); }
+  if(flag){ g.fillStyle='#3a2412'; g.fillRect(x-1.5,y-ht-70,3,60); g.fillStyle=flag; g.beginPath(); g.moveTo(x+1.5,y-ht-70); g.quadraticCurveTo(x+22,y-ht-66,x+36,y-ht-62); g.lineTo(x+1.5,y-ht-50); g.closePath(); g.fill(); if(/7a1a1a|8a1e1e|7a1e1a/i.test(flag)) drawBaronSigil(g,x+11,y-ht-61,10); }
 }
 function paintGateArch(x,y){                               // the gatehouse between two towers, spanning three tiles along i
   const a=P(0,0), dx=TW/2, dy=TH/2, ht=150, span=[{x:x-dx*1.5,y:y-dy*1.5},{x:x+dx*1.5,y:y+dy*1.5}];
@@ -6430,7 +6468,7 @@ function paintGateArch(x,y){                               // the gatehouse betw
   for(let t=0.02;t<1;t+=0.1){ poly([q(t,ht),q(t+0.05,ht),q(t+0.05,ht+11),q(t,ht+11)],'#9a9282'); }
   g.strokeStyle='#6e685c'; g.lineWidth=7; g.beginPath(); g.moveTo(q(0.06,ht-60).x,q(0.06,ht-60).y); g.quadraticCurveTo(q(0.5,ht-40).x,q(0.5,ht-40).y-26,q(0.94,ht-60).x,q(0.94,ht-60).y); g.stroke();
   g.strokeStyle='#3a3a3a'; g.lineWidth=2; for(let t=0.12;t<0.9;t+=0.09){ g.beginPath(); g.moveTo(q(t,ht-62).x,q(t,ht-62).y); g.lineTo(q(t,ht-78).x,q(t,ht-78).y); g.stroke(); }   // raised portcullis teeth
-  g.fillStyle='#7a1a1a'; const bm=q(0.5,ht-8); g.fillRect(bm.x-14,bm.y-4,28,40); g.fillStyle='#e8c060'; g.font='bold 16px Georgia,serif'; g.textAlign='center'; g.fillText('B',bm.x,bm.y+22); g.textAlign='left';
+  g.fillStyle='#7a1a1a'; const bm=q(0.5,ht-8); g.fillRect(bm.x-14,bm.y-4,28,40); drawBaronSigil(g,bm.x,bm.y+15,22);
 }
 function paintOuterWall(x,y,len,seed=0,end=false){            // Hollowmere's outer wall: old, thin, patched; moss and ivy, cracks, gaps in the battlements
   const dx=TW/2, dy=TH/2, H=92, BK={x:dx*0.3,y:-dy*0.3}, R=(k,n)=>rnd01(k*7+seed*31,n,150+seed);
@@ -6522,7 +6560,7 @@ function paintKeep(X,Y,fw,fh){                             // the Baron's keep: 
   for(let t=0;t<fh;t+=0.5){ const a=pt(0,-fh+t,262), b=pt(0,-fh+t+0.25,262); poly([a,b,{x:b.x,y:b.y-14},{x:a.x,y:a.y-14}],'#6a665e'); }
   [[-fw,0],[0,0],[0,-fh]].forEach(([gi,gj])=>{ const q=pt(gi,gj); paintTower(q.x,q.y+10,40,320,'#7a1a1a'); });
   const gate=pt(-fw/2,0); g.fillStyle='#1a1410'; g.beginPath(); g.moveTo(gate.x-40,gate.y+18); g.lineTo(gate.x-40,gate.y-60); g.quadraticCurveTo(gate.x-6,gate.y-110,gate.x+30,gate.y-80); g.lineTo(gate.x+30,gate.y-12); g.closePath(); g.fill();
-  [-fw*0.25,-fw*0.75].forEach(gi=>{ const b=pt(gi,0,230); g.fillStyle='#7a1a1a'; g.fillRect(b.x-16,b.y,32,90); g.fillStyle='#e8c060'; g.font='bold 22px Georgia,serif'; g.textAlign='center'; g.fillText('B',b.x,b.y+50); g.textAlign='left'; });
+  [-fw*0.25,-fw*0.75].forEach(gi=>{ const b=pt(gi,0,230); g.fillStyle='#7a1a1a'; g.fillRect(b.x-16,b.y,32,90); drawBaronSigil(g,b.x,b.y+42,26); });
 }
 function paintChapel(X,Y,fw,fh){
   paintBuilding(X,Y,{fw,fh,h:140,rh:110,v:2,stone:true,nochim:true,ridge:'i',door:'l',dt:1});
@@ -8970,7 +9008,7 @@ function paintItemArt(g2,id,size){
       g2.strokeStyle='rgba(90,64,28,0.45)'; g2.strokeRect(-15,-11,31,23);
       g2.fillStyle='#8a1c18'; g2.beginPath(); g2.arc(0,2,5,0,Math.PI*2); g2.fill();                  // wax seal
       g2.fillStyle='#b2322a'; g2.beginPath(); g2.arc(-1,1,3.2,0,Math.PI*2); g2.fill();
-      g2.fillStyle='#6a1210'; g2.font='bold 5px serif'; g2.textAlign='center'; g2.textBaseline='middle'; g2.fillText('B',0,2.3);
+      drawBaronSigil(g2,0,1.8,5.6,'#6a1210','#4a0c0a');
       g2.restore(); break; }
     case 'pelt': {
       g2.save(); g2.translate(20,21);
@@ -9506,8 +9544,8 @@ Object.assign(AREAS,{
     npcs:()=> (!CHOICE.stones || CHOICE.stones==='fight') ? [{ id:'surveyor', name:'Surveyor Quill', i:3, j:4, dir:1,
       opts:{gender:'m',skin:1,hair:1,hairColor:6,beard:2,face:2,equip:{head:null,torso:'tunic_linen',armor:null,hands:'gloves',legs:'hose_grey',feet:'riding_boots',weapon:null,offhand:null}} }] : [],
     mobs:()=> CHOICE.stones==='fight' ? [
-      { name:"Baron's Guard", type:'bandit', i:6, j:8, faction:'guard', opts:BANDIT({skin:1,hair:0,hairColor:3,equip:{head:'coif',torso:'shirt',armor:'blackmail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'spear',offhand:'shield_iron'}}) },
-      { name:"Baron's Sergeant", type:'brute', i:8, j:7, faction:'guard', opts:BANDIT({skin:3,hair:2,beard:5,equip:{head:'helm_full',torso:'shirt',armor:'blackmail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'longsword',offhand:null}}) } ] : [],
+      { name:"Baron's Guard", type:'bandit', i:6, j:8, faction:'guard', opts:BANDIT({skin:1,hair:0,hairColor:3,equip:{head:'coif',torso:'baron_tabard',armor:'blackmail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'spear',offhand:'shield_iron'}}) },
+      { name:"Baron's Sergeant", type:'brute', i:8, j:7, faction:'guard', opts:BANDIT({skin:3,hair:2,beard:5,equip:{head:'helm_full',torso:'baron_tabard',armor:'blackmail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'longsword',offhand:null}}) } ] : [],
     entries:{ fromGraves:{i:4,j:8} } },
   // The Charcoal Pits: where Mara's people lived, before the Baron
   pits:{ fence:{r:false,l:false}, w:12, h:9, theme:'wood', label:'The Charcoal Pits', mini:{x:0,y:0},
@@ -9782,7 +9820,7 @@ function townsfolk(seed,n,points){                       // passers-by: seeded l
           equip:{head:heads[Math.floor(r(11)*heads.length)], torso:tops[Math.floor(r(12)*tops.length)], armor:r(13)<0.12?'jerkin':null, hands:null, legs:legs[Math.floor(r(14)*legs.length)], feet:feet[Math.floor(r(15)*feet.length)], weapon:null, offhand:null}} }); }
   return out;
 }
-const GUARD=(o)=>BANDIT({skin:1,hair:0,hairColor:3,beard:1,equip:{head:BARON_DOWN()?'kettle':'coif',torso:'tunic_red',armor:BARON_DOWN()?'brightmail':'blackmail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'spear',offhand:BARON_DOWN()?'shield':'shield_iron'},...o});
+const GUARD=(o)=>BANDIT({skin:1,hair:0,hairColor:3,beard:1,equip:{head:BARON_DOWN()?'kettle':'coif',torso:BARON_DOWN()?'tunic_red':'baron_tabard',armor:BARON_DOWN()?'brightmail':'blackmail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'spear',offhand:BARON_DOWN()?'shield':'shield_iron'},...o});
 const B=(i,j,fw,fh,v,extra)=>({type:'bldg', i, j, fp:[fw,fh], v, ...extra});
 const streetPts=(list)=>list;
 Object.assign(AREAS,{
@@ -10245,7 +10283,7 @@ Object.assign(AREAS,{
   kingsroad:{ fence:{r:false,l:false}, w:8, h:49, theme:'road', label:"The King's Road", mini:{x:0,y:0}, noTree:['0,0','1,0','2,0','3,0','5,0','6,0','7,0','0,1','1,1','2,1','6,1','7,1','0,2','7,2'],
     notches:()=>[], dummy:null,
     objects:()=>[ {type:'teleporter', i:4, j:48, to:'road', entry:'fromCity'}, {type:'milestone', i:6, j:44, t:'HOL 3'}, {type:'rocks', i:1, j:38, noblock:true}, {type:'rocks', i:6, j:33, noblock:true},
-      ...(MAP_ALL || (wildDone() && cityOpen()) ? [{type:'teleporter', i:4, j:0, to:'citygate', entry:'fromRoad'}] : []),   // the way into Hollowmere is there only once the gate is open to you
+      ...(MAP_ALL || (wildDone() && cityOpen()) || (typeof tabardOn==='function' && tabardOn() && !BARON_DOWN()) ? [{type:'teleporter', i:4, j:0, to:'citygate', entry:'fromRoad'}] : []),   // the way into Hollowmere is there only once the gate is open to you
       {type:'milestone', i:6, j:27, t:'HOL 2'}, {type:'milestone', i:1, j:12, t:'HOL 1'},
       B(0,19,2,2,2,{stone:true,h:90,rh:40,door:'r',dt:0,sign:'⚖'}), {type:'banner', i:2, j:18},
       {type:'gallows', i:6, j:7}, {type:'cart', i:1, j:24}, {type:'barrel', i:0, j:23}, {type:'lamp', i:2, j:21}, {type:'lamp', i:6, j:4},
@@ -11517,7 +11555,7 @@ refreshDuelLabels();
 const FOOLED={};                                         // "area:name" -> true (believed you) / false (saw through you)
 const disguised=()=>!!(player.opts && unWoven(player.opts.equip.head)==='bandana' && !player.opts.hideHelm);
 const isThug=m=>!!(m && m.opts && m.opts.equip && m.opts.equip.head==='bandana' && m.type!=='dummy');
-const calmThug=m=> !!m && m.hostile && !m.dead && disguised() && FOOLED[areaId+':'+m.name]!==false && (isThug(m) || OUTLAWS.has(m.faction) || mobs.some(o=>o.faction===m.faction && isThug(o)));   // in the purple, the Baron's crews never start a fight with you: not even their mates without a bandana. Only your own blow ends it
+const calmThug=m=> !!m && m.hostile && !m.dead && FOOLED[areaId+':'+m.name]!==false && ((disguised() && (isThug(m) || OUTLAWS.has(m.faction) || mobs.some(o=>o.faction===m.faction && isThug(o)))) || (typeof tabardOn==='function' && tabardOn() && m.faction==='guard'));   // the purple fools the thugs; the Baron's red fools his soldiers   // in the purple, the Baron's crews never start a fight with you: not even their mates without a bandana. Only your own blow ends it
 const OUTLAWS=new Set(['thieves','unpaid','roadthief','highway']);   // other rough folk: they know the purple, and want no trouble with the Baron's men
 const REFUSED={};                                        // "area:name" -> they've already said no to handing their papers over
 // story items a hired thug is carrying, and how a disguised wanderer might get them off him
@@ -12960,8 +12998,8 @@ function stonesAfter(){ if(!CHOICE.stq || CHOICE.stq==='asked') CHOICE.stq='wenn
 Object.assign(ITEMS,{ charter:{ name:"Dunhollow's Stone Charter", slot:'misc', read:true, title:'A lead case, green with age',
   body:["Inside, a parchment gone brown as a leaf, under the old king's seal.","<i>“Be it known that we grant to the free folk of the hollow the land below the stones, the pasture and the wood, for them and their children, for as long as the stones stand.”</i>","Below it, forty names and marks. One of them is a small drawn goat."] } });
 wrap('stones','npcs',l=> CHOICE.stones ? l : [...l,
-  { id:'stguard1', name:"Baron's Guard", i:6, j:8, dir:7, opts:BANDIT({skin:1,hair:0,hairColor:3,equip:{head:'coif',torso:'shirt',armor:'blackmail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'spear',offhand:'shield_iron'}}) },
-  { id:'stguard2', name:"Baron's Sergeant", i:8, j:7, dir:6, opts:BANDIT({skin:3,hair:2,beard:5,equip:{head:'helm_full',torso:'shirt',armor:'blackmail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'longsword',offhand:null}}) } ]);
+  { id:'stguard1', name:"Baron's Guard", i:6, j:8, dir:7, opts:BANDIT({skin:1,hair:0,hairColor:3,equip:{head:'coif',torso:'baron_tabard',armor:'blackmail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'spear',offhand:'shield_iron'}}) },
+  { id:'stguard2', name:"Baron's Sergeant", i:8, j:7, dir:6, opts:BANDIT({skin:3,hair:2,beard:5,equip:{head:'helm_full',torso:'baron_tabard',armor:'blackmail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'longsword',offhand:null}}) } ]);
 TALKERS.stguard1=TALKERS.stguard2=()=>say("Baron's Sergeant","“Talk to the clerk. We just stand here and look large.”",[bye]);
 wrap('stones','objects',l=> STQ()==='night' && nightAmt()>0.4 && !collectedPickups.has('stones:6,7') ? [...l.filter(o=>!(o.i===6&&o.j===7&&o.type==='critter')),{type:'pickup', i:6, j:7, item:'charter'}] : l);
 { const oldC=collectPickup; collectPickup=function(o){ const had=hasItem(o.item);
@@ -12976,7 +13014,7 @@ wrap('stones','objects',l=> STQ()==='night' && nightAmt()>0.4 && !collectedPicku
 // the roads open in order
 const cityOpen=()=> !!visitedAreas.citygate || STQ()==='done' || BARON_DOWN();
 wrap('graveyard','objects',l=>l.map(o=> o.type==='teleporter' && o.to==='stones' ? {...o, locked:()=>!(STQ()||CHOICE.stones), onLocked:()=>setTimeout(()=>say('Old Tobb',"A rope is tied across the path north, hung with a sign: <i>By order of the Baron. Keep out.</i> Tobb shrugs. “Baron's men up at the old stones. Hamond's the one to ask about it, not me.”",[bye]),200)} : o));
-wrap('kingsroad','objects',l=>l.map(o=> o.type==='teleporter' && o.to==='citygate' ? {...o, locked:()=>!cityOpen(), onLocked:()=>setTimeout(()=>say("Baron's Gate Guard",["The gate of Hollowmere is shut. A guard leans out of the wicket door.","“Nobody in from the valley without papers. A letter from your elder, a lord, anybody. No letter, no Hollowmere.”"],[bye]),200)} : o));
+wrap('kingsroad','objects',l=>l.map(o=> o.type==='teleporter' && o.to==='citygate' ? {...o, locked:()=>!cityOpen() && !(typeof tabardOn==='function' && tabardOn() && !BARON_DOWN()), onLocked:()=>setTimeout(()=>say("Baron's Gate Guard",["The gate of Hollowmere is shut. A guard leans out of the wicket door.","“Nobody in from the valley without papers. A letter from your elder, a lord, anybody. No letter, no Hollowmere.”"],[bye]),200)} : o));
 wrap('clearing','objects',l=>l.map(o=> o.type==='teleporter' && o.to==='mistmere' ? {...o, locked:()=>QUEST.wolves<2 && !visitedAreas.mistmere, onLocked:()=>setTimeout(()=>say('Brann the Hunter',"Grey mist rolls out of the reeds to the east, and somewhere in it wolves are calling to each other. Brann puts a hand on your arm. “Not while Greymaw's pack runs. Kill the old wolf, then the mere will let you through.”",[bye]),200)} : o));
 // the main story: always one clear next step
 function storyStep(){
@@ -14798,7 +14836,7 @@ function paintBaronBanner(x,y){ const W=11, H=40, top=y-82; g.fillStyle='rgba(0,
   const gr=g.createLinearGradient(x-W,0,x+W,0); gr.addColorStop(0,'#8a1e1e'); gr.addColorStop(1,'#5a1212'); g.fillStyle=gr;
   g.beginPath(); g.moveTo(x-W,top); g.lineTo(x+W,top); g.lineTo(x+W,top+H); g.lineTo(x+W*0.4,top+H-5); g.lineTo(x,top+H+2); g.lineTo(x-W*0.5,top+H-4); g.lineTo(x-W,top+H); g.closePath(); g.fill();
   g.strokeStyle='#c8a040'; g.lineWidth=1; g.strokeRect(x-W+2.5,top+2.5,W*2-5,H-9);
-  g.fillStyle='#e0b850'; g.font='bold 15px Georgia,serif'; g.textAlign='center'; g.fillText('B',x,top+24); g.textAlign='left';
+  drawBaronSigil(g,x,top+21,24,'#e0b850','#3a0c0a');
   g.fillStyle='rgba(0,0,0,0.18)'; g.fillRect(x+W*0.3,top,W*0.7,H-4); }
 { const oDO=drawObject; drawObject=function(o){ if(o.type!=='baronbanner') return oDO(o); const q=P(o.i,o.j+0.5); drawCached('baronbanner',q.x,q.y,40,110,20,100,paintBaronBanner); }; }
 // ── whoever you are talking to stays put until you are done: no wandering off, no routine pulling them away mid-trade ──
@@ -15136,6 +15174,30 @@ const lanternLit=()=> hasLantern() && unWoven((player.opts.equip.offhand)||'')==
     glow(pp.x,pp.y-10,210*fl,120*fl,'236,226,150',0.30*n);                                          // a warm pool round your feet, a few steps each way
     glow(pp.x,pp.y-36,120*fl,90*fl,'226,236,160',0.22*n);
     g.restore(); }; }
+// ════════ the Baron's tabard: his men wear it, sometimes drop it; wear it yourself and his soldiers take you for one of theirs ════════
+Object.assign(ITEMS,{ baron_tabard:{ name:"Baron's Tabard", slot:'torso' } }); Object.assign(PRICES,{ baron_tabard:12 }); Object.assign(ITEM_STATS,{ baron_tabard:{hp:1} }); GEAR_HP.baron_tabard=1;
+const tabardOn=()=>!!(player.opts && player.opts.equip && unWoven(player.opts.equip.torso||'')==='baron_tabard' && !(player.opts.hide&&player.opts.hide.torso));
+{ const oPIA=paintItemArt; paintItemArt=function(g2,id,size){ if(unWoven(id)!=='baron_tabard') return oPIA(g2,id,size);
+    g2.save(); g2.scale(size/40,size/40);
+    const T='#8a3a30'; g2.fillStyle='rgba(0,0,0,0.3)'; g2.beginPath(); g2.ellipse(20,35,11,2.5,0,0,Math.PI*2); g2.fill();
+    g2.beginPath(); g2.moveTo(11,5); g2.lineTo(16,5); g2.quadraticCurveTo(20,9,24,5); g2.lineTo(29,5); g2.lineTo(29,13); g2.lineTo(28,20); g2.lineTo(30,33);
+    for(let k=0;k<7;k++) g2.lineTo(30-k*20/6, 33+(k%2?-1.6:0.6)); g2.lineTo(10,33); g2.lineTo(12,20); g2.lineTo(11,13); g2.closePath();
+    const gr=g2.createLinearGradient(10,0,30,0); gr.addColorStop(0,'#a8564a'); gr.addColorStop(0.5,T); gr.addColorStop(1,'#5e2620'); g2.fillStyle=gr; g2.fill(); g2.strokeStyle='#3a1410'; g2.lineWidth=0.9; g2.stroke();
+    g2.fillStyle='rgba(235,200,170,0.16)'; g2.beginPath(); g2.ellipse(15,24,3,5,0.3,0,Math.PI*2); g2.fill(); g2.beginPath(); g2.ellipse(25,12,2.4,3,0,0,Math.PI*2); g2.fill();   // faded patches
+    g2.strokeStyle='#4a3420'; g2.lineWidth=1.1; g2.beginPath(); g2.moveTo(12,20.5); g2.quadraticCurveTo(20,22,28,20.5); g2.stroke();
+    drawBaronSigil(g2,20,13.5,10,'#c8a050','#3a0c0a',1);
+    g2.restore(); }; }
+{ const oV=victory; victory=function(faction,...r){ const res=oV(faction,...r);
+    if(faction==='guard' && Math.random()<0.4 && giveQuestItem('baron_tabard')) logMsg("One of them wore the Baron's tabard. You take it: faded, frayed, and still his.",'#e8c060');
+    return res; }; }
+// his soldiers, when you wear his red
+const TABARD_LINES=["“Back to your post, soldier. Sergeant's in a mood.”","“You're new. Keep your head down and your mouth shut, that's the whole job.”","“Heard the Baron's paying late again. Course he is.”","“If anyone asks, you saw nothing. That's an order. Probably.”"];
+['gateguard','krgateguard0','krgateguard1','mguard','kguard1','kguard2','stguard1','stguard2','recruit'].forEach(id=>{ const old=TALKERS[id]; TALKERS[id]=(...a)=>{
+    if(!tabardOn() || BARON_DOWN()) return old&&old(...a);
+    const n=NPCS.find(q=>q.id===id); const nm=(n&&n.name)||"Baron's Guard";
+    if(id==='gateguard' && !CHOICE.toll){ remember('toll','paid'); say(nm,["The guard glances at the boar on your chest and straightens up a little.","“Didn't know they'd sent another. Go on in. And get that tabard washed, you look like you slept in a ditch.”"],[bye]); return; }
+    say(nm,["He sees the boar on your chest and nods, one of the Baron's own to another.",TABARD_LINES[(hsh(id.length,Math.floor(dayClock/DAY_LEN))%TABARD_LINES.length)]],[bye]); }; });
+{ const oT=TALKERS.tollman; TALKERS.tollman=(...a)=>{ if(tabardOn() && !BARON_DOWN()){ say("Toll-keeper Brisk",["Brisk looks at the tabard, then at your face, then back at the tabard. He waves you on with his onion.","“Soldiers don't pay. Even ones that smell like that.”"],[bye]); return; } return oT&&oT(...a); }; }
 </script>
 </body>
 </html>

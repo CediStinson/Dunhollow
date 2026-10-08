@@ -4437,7 +4437,7 @@ Object.assign(AREAS,{
     objects:()=>[
       {type:'teleporter', i:4, j:6, to:'village', entry:'fromHouse'},
       // the sleeping side: the beds side by side, heads to the back wall, two either side of the hearth for the warmth
-      {type:'bed', i:0, j:1, fp:[2,1], owner:'elder'}, {type:'bed', i:0, j:2, fp:[2,1], owner:'wenna'},
+      {type:'bed', i:0, j:0, fp:[2,1], owner:'elder'}, {type:'bed', i:0, j:1, fp:[2,1], owner:'wenna'},   // in the corner, a pace from the hearth
       {type:'hearth', i:0, j:3},
       {type:'bed', i:0, j:5, fp:[2,1], owner:'ada'}, {type:'bed', i:0, j:6, fp:[2,1], edric:true},     // Ada's, and Edric's beside it, still made up
       // the living side: a table in the middle of the room, stores along the far wall
@@ -14952,7 +14952,11 @@ function bedBlanket(o){ const k=o.col!=null ? o.col : ([...areaId].reduce((h,ch)
     g.restore();
     const pt=(gi,gj,h)=>{ const q=P(bed.i+0.5+gi,bed.j+0.5+gj); return {x:q.x,y:q.y-h}; };
     const z=pt(-0.2,-0.2,48); g.save(); g.font='italic 600 11px Georgia,serif'; g.fillStyle=`rgba(220,226,250,${0.5+0.3*Math.sin(gt*1.4)})`; g.fillText('z',z.x+((gt*6)%8),z.y-((gt*6)%8)); g.font='italic 600 8px Georgia,serif'; g.fillText('z',z.x+8,z.y-12); g.restore(); }; }
-{ const oBP=bedPrompt; bedPrompt=function(){ let bed=null, bd=1e9; OBJECTS.filter(o=>o.type==='bed').forEach(o=>{ const d=Math.hypot(o.i+1-player.x,o.j+0.5-player.y); if(d<bd){ bd=d; bed=o; } });
+let CLICKED_BED=null;                                                                    // the bed you actually clicked, not just the nearest one
+{ const oPU=pointerUp; pointerUp=function(px,py){ if(drag.active && drag.moved<6){ const r=gc.getBoundingClientRect(), gp=fromIso(px-r.left,py-r.top), ti=Math.floor(gp.x), tj=Math.floor(gp.y);
+      const b=OBJECTS.find(o=>o.type==='bed' && ti>=o.i && ti<o.i+(o.fp?o.fp[0]:1) && tj>=o.j && tj<o.j+(o.fp?o.fp[1]:1)); if(b) CLICKED_BED=b; } return oPU(px,py); }; }
+{ const oBP=bedPrompt; bedPrompt=function(){ let bed=CLICKED_BED && OBJECTS.includes(CLICKED_BED) ? CLICKED_BED : null, bd=1e9; CLICKED_BED=null;
+    if(!bed) OBJECTS.filter(o=>o.type==='bed').forEach(o=>{ const d=Math.hypot(o.i+1-player.x,o.j+0.5-player.y); if(d<bd){ bd=d; bed=o; } });
     const sl=bed && NPCS.find(n=>n.sleepBed && n.sleepBed.i===bed.i && n.sleepBed.j===bed.j);
     if(sl){ say(sl.name,[sl.name+" is asleep in that one. The bed by the far wall is free."],[{label:'Leave them be.',fn:closeDialog}]); return; }
     if(bed && bed.owner && areaId==='elderhouse'){ say('A Bed',["That is "+({elder:"Hamond's",wenna:"Old Wenna's",ada:"Ada's"}[bed.owner])+" bed. Better not."],[{label:'Not now.',fn:closeDialog}]); return; }

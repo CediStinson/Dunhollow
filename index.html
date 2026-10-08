@@ -2404,7 +2404,19 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
     if(F) femBreastplate(Bc);                                              // shaped for a woman
   }
   function drawTabard(){                                 // the Baron's tabard: a faded red panel over whatever armour, his boar flaking off the chest, the hem gone to threads
-    const T='#8a3a30', k=1-pr*0.45, hem=F?-27:-25, top=Y.SHOULDER-0.6, sw=(CH-1.4)*k, ww=(WA+1.2)*k, hw2=(WA+2.6)*k, cx=LN+(front?po*0.7:0);
+    const T='#8a3a30', k=1-pr*0.45, hem=F?-27:-25, top=Y.SHOULDER-0.6, sw=(CH-2.6)*k, ww=(WA-0.2)*k, hw2=(WA+1.2)*k, cx=LN+(front?po*0.7:0);
+    if(pr>0.8){                                          // side-on: a front panel and a back panel, open at the side, the armour showing between
+      const fr=LN+CH+bR, bk=LN-CH;
+      const panels=[[[fr-3.6,top],[fr-0.8-bR,top],[fr+0.4,Y.SHOULDER+7],[fr+0.6-bR*0.5,Y.WAIST],...torn(fr+1.2-bR*0.4,fr-3.8-bR*0.4,hem,3,2.2),[fr-3.8-bR*0.2,Y.WAIST]],
+                    [[bk-0.4,top],[bk+2.8,top],[bk+2.6,Y.WAIST],...torn(bk+3.2,bk-1.2,hem+1,3,2.2),[bk-0.8,Y.WAIST]]];
+      panels.forEach((pts,pi)=>{ const poly=()=>{ c.beginPath(); pts.forEach(([u,v],i)=>i?c.lineTo(x+u,B+v):c.moveTo(x+u,B+v)); c.closePath(); };
+        const col=pi?tone(T,-0.12):T; poly(); c.fillStyle=col; c.fill(); c.strokeStyle=tone(T,-0.5); c.lineWidth=1; c.lineJoin='round'; c.stroke();
+        c.save(); poly(); c.clip(); litFill(pts,col,Y.SHOULDER,hem);
+          for(let i=0;i<3;i++){ const v=rnd01(i,4+pi,941); c.fillStyle='rgba(230,190,160,0.12)'; c.beginPath(); c.ellipse(x+pts[0][0]+2,B+top+v*(hem-top),2,3.5,0,0,Math.PI*2); c.fill(); }
+          c.fillStyle='rgba(40,20,10,0.22)'; c.fillRect(x+pts[0][0]-4,B+hem-5,12,6);
+        c.restore(); });
+      c.strokeStyle='#4a3420'; c.lineWidth=1.3; c.beginPath(); c.moveTo(x+bk-0.8,B+Y.WAIST-0.6); c.quadraticCurveTo(x+LN,B+Y.WAIST+1.2,x+fr+0.6-bR*0.5,B+Y.WAIST-0.6); c.stroke();   // the cord closes it at the waist
+      return; }
     const pts=[[cx-sw,top],[cx+sw+bR*0.3,top],[cx+sw+bR*0.4,Y.SHOULDER+7],[cx+ww+bR*0.3,Y.WAIST],...torn(cx+hw2,cx-hw2,hem,9,2.4),[cx-ww,Y.WAIST],[cx-sw,Y.SHOULDER+7]];
     const poly=()=>{ c.beginPath(); pts.forEach(([u,v],i)=>i?c.lineTo(x+u,B+v):c.moveTo(x+u,B+v)); c.closePath(); };   // straight edges: the rounded path spikes on so narrow a shape side-on
     poly(); c.fillStyle=T; c.fill(); c.strokeStyle=tone(T,-0.5); c.lineWidth=1; c.lineJoin='round'; c.stroke();
@@ -10283,7 +10295,7 @@ Object.assign(AREAS,{
   kingsroad:{ fence:{r:false,l:false}, w:8, h:49, theme:'road', label:"The King's Road", mini:{x:0,y:0}, noTree:['0,0','1,0','2,0','3,0','5,0','6,0','7,0','0,1','1,1','2,1','6,1','7,1','0,2','7,2'],
     notches:()=>[], dummy:null,
     objects:()=>[ {type:'teleporter', i:4, j:48, to:'road', entry:'fromCity'}, {type:'milestone', i:6, j:44, t:'HOL 3'}, {type:'rocks', i:1, j:38, noblock:true}, {type:'rocks', i:6, j:33, noblock:true},
-      ...(MAP_ALL || (wildDone() && cityOpen()) || (typeof tabardOn==='function' && tabardOn() && !BARON_DOWN()) ? [{type:'teleporter', i:4, j:0, to:'citygate', entry:'fromRoad'}] : []),   // the way into Hollowmere is there only once the gate is open to you
+      ...(MAP_ALL || (wildDone() && cityOpen()) || (typeof tabardOn==='function' && tabardOn() && !BARON_DOWN() && CHOICE.tabGate!=='refused') ? [{type:'teleporter', i:4, j:0, to:'citygate', entry:'fromRoad'}] : []),   // the way into Hollowmere is there only once the gate is open to you
       {type:'milestone', i:6, j:27, t:'HOL 2'}, {type:'milestone', i:1, j:12, t:'HOL 1'},
       B(0,19,2,2,2,{stone:true,h:90,rh:40,door:'r',dt:0,sign:'⚖'}), {type:'banner', i:2, j:18},
       {type:'gallows', i:6, j:7}, {type:'cart', i:1, j:24}, {type:'barrel', i:0, j:23}, {type:'lamp', i:2, j:21}, {type:'lamp', i:6, j:4},
@@ -11555,7 +11567,8 @@ refreshDuelLabels();
 const FOOLED={};                                         // "area:name" -> true (believed you) / false (saw through you)
 const disguised=()=>!!(player.opts && unWoven(player.opts.equip.head)==='bandana' && !player.opts.hideHelm);
 const isThug=m=>!!(m && m.opts && m.opts.equip && m.opts.equip.head==='bandana' && m.type!=='dummy');
-const calmThug=m=> !!m && m.hostile && !m.dead && FOOLED[areaId+':'+m.name]!==false && ((disguised() && (isThug(m) || OUTLAWS.has(m.faction) || mobs.some(o=>o.faction===m.faction && isThug(o)))) || (typeof tabardOn==='function' && tabardOn() && m.faction==='guard'));   // the purple fools the thugs; the Baron's red fools his soldiers   // in the purple, the Baron's crews never start a fight with you: not even their mates without a bandana. Only your own blow ends it
+const tabardAwes=m=>{ let h=7; for(const ch of areaId+':'+m.name) h=(h*31+ch.charCodeAt(0))>>>0; return h%2===0; };   // the purple crews aren't his men, officially: half of them will not raise a hand against his red, the other half don't care
+const calmThug=m=> !!m && m.hostile && !m.dead && FOOLED[areaId+':'+m.name]!==false && ((disguised() && (isThug(m) || OUTLAWS.has(m.faction) || mobs.some(o=>o.faction===m.faction && isThug(o)))) || (typeof tabardOn==='function' && tabardOn() && (m.faction==='guard' || ((isThug(m) || mobs.some(o=>o.faction===m.faction && isThug(o))) && tabardAwes(m)))));   // the purple fools the thugs; the Baron's red fools his soldiers   // in the purple, the Baron's crews never start a fight with you: not even their mates without a bandana. Only your own blow ends it
 const OUTLAWS=new Set(['thieves','unpaid','roadthief','highway']);   // other rough folk: they know the purple, and want no trouble with the Baron's men
 const REFUSED={};                                        // "area:name" -> they've already said no to handing their papers over
 // story items a hired thug is carrying, and how a disguised wanderer might get them off him
@@ -11574,6 +11587,7 @@ function thugTalk(m){
     say(m.name,[(F?'She':'He')+" sees the purple on your face and takes a step back.",["“The Baron's dog. We want no trouble with your lot. Walk on.”","“We've paid already this month. Tell your master that.”","“Easy. Nobody here's looking for a fight with the Baron.”","“Go bark somewhere else. We're not your business.”"][hsh(m.i,m.j)%4]],
       [{label:'Attack '+(F?'her':'him')+'.', fn:()=>{ mobs.filter(o=>o.faction===m.faction).forEach(o=>FOOLED[areaId+':'+o.name]=false); closeDialog(); startCombat(); }},bye]); return; }
   const attack={label:'Attack '+(F?'her':'him')+'.', fn:()=>{ mobs.filter(o=>o.faction===m.faction).forEach(o=>FOOLED[areaId+':'+o.name]=false); closeDialog(); startCombat(); }};
+  if(!disguised() && tabardOn()){ say(m.name,[(F?'She':'He')+" eyes the Baron's red on your chest and spits to one side.",["“We don't work for him. Everybody knows that.” A wink. “Walk on, soldier.”","“Tell the sergeant we've been good.”","“Nothing to see here. Just honest folk, sharpening things.”"][hsh(m.i,m.j)%3]],[attack,bye]); return; }
   const QC=THUG_CARRY[m.name];
   if(FOOLED[k]===true && QC && QC.cond()){ const blow=(line)=>{ REFUSED[k]=true; say(m.name,line,[bye]); };
     const got=(line)=>{ if(!giveQuestItem(QC.item)){ say(m.name,"“Your pack's full. Come back when you can carry it.”",[bye]); return false; } QC.after&&QC.after(); say(m.name,line,[bye]); if(ITEMS[QC.item].read) setTimeout(()=>openNote(QC.item),900); return true; };
@@ -13014,7 +13028,7 @@ wrap('stones','objects',l=> STQ()==='night' && nightAmt()>0.4 && !collectedPicku
 // the roads open in order
 const cityOpen=()=> !!visitedAreas.citygate || STQ()==='done' || BARON_DOWN();
 wrap('graveyard','objects',l=>l.map(o=> o.type==='teleporter' && o.to==='stones' ? {...o, locked:()=>!(STQ()||CHOICE.stones), onLocked:()=>setTimeout(()=>say('Old Tobb',"A rope is tied across the path north, hung with a sign: <i>By order of the Baron. Keep out.</i> Tobb shrugs. “Baron's men up at the old stones. Hamond's the one to ask about it, not me.”",[bye]),200)} : o));
-wrap('kingsroad','objects',l=>l.map(o=> o.type==='teleporter' && o.to==='citygate' ? {...o, locked:()=>!cityOpen() && !(typeof tabardOn==='function' && tabardOn() && !BARON_DOWN()), onLocked:()=>setTimeout(()=>say("Baron's Gate Guard",["The gate of Hollowmere is shut. A guard leans out of the wicket door.","“Nobody in from the valley without papers. A letter from your elder, a lord, anybody. No letter, no Hollowmere.”"],[bye]),200)} : o));
+wrap('kingsroad','objects',l=>l.map(o=> o.type==='teleporter' && o.to==='citygate' ? {...o, locked:()=>!cityOpen() && !tabardPass(), onLocked:()=>setTimeout(()=> tabardOn() && !BARON_DOWN() && !CHOICE.tabGate ? tabardGateAsk() : say("Baron's Gate Guard",["The gate of Hollowmere is shut. A guard leans out of the wicket door.","“Nobody in from the valley without papers. A letter from your elder, a lord, anybody. No letter, no Hollowmere.”"],[bye]),200)} : o));
 wrap('clearing','objects',l=>l.map(o=> o.type==='teleporter' && o.to==='mistmere' ? {...o, locked:()=>QUEST.wolves<2 && !visitedAreas.mistmere, onLocked:()=>setTimeout(()=>say('Brann the Hunter',"Grey mist rolls out of the reeds to the east, and somewhere in it wolves are calling to each other. Brann puts a hand on your arm. “Not while Greymaw's pack runs. Kill the old wolf, then the mere will let you through.”",[bye]),200)} : o));
 // the main story: always one clear next step
 function storyStep(){
@@ -13238,14 +13252,16 @@ QUEST_ITEMS.add('morwen_lantern');
 // icons for the fen, barrow and cave finds (they came after the inventory art and had none)
 { const oldPIA=paintItemArt;
   const EXTRA={
-    morwen_lantern(g2,E){                                                     // a small iron lantern, the flame inside burning green-gold
-      g2.strokeStyle='#3a3430'; g2.lineWidth=1.6; g2.beginPath(); g2.arc(20,7,3.2,Math.PI,0); g2.stroke();
-      g2.fillStyle='#2e2a26'; g2.beginPath(); g2.moveTo(13,13); g2.lineTo(27,13); g2.lineTo(24,9); g2.lineTo(16,9); g2.closePath(); g2.fill();
-      const gl=g2.createRadialGradient(20,22,0,20,22,9); gl.addColorStop(0,'rgba(230,240,140,0.95)'); gl.addColorStop(0.5,'rgba(150,200,90,0.6)'); gl.addColorStop(1,'rgba(60,90,50,0.35)');
-      g2.fillStyle=gl; g2.fillRect(14,13,12,17);
-      g2.fillStyle='#f4f0b0'; g2.beginPath(); g2.moveTo(20,16.5); g2.quadraticCurveTo(23.5,22,20,26); g2.quadraticCurveTo(16.5,22,20,16.5); g2.fill();
-      g2.strokeStyle='#3a3430'; g2.lineWidth=1.4; g2.strokeRect(14,13,12,17); g2.beginPath(); g2.moveTo(20,13); g2.lineTo(20,30); g2.stroke();
-      g2.fillStyle='#2e2a26'; g2.fillRect(12.5,30,15,3.5); g2.fillStyle='#5a524a'; g2.fillRect(12.5,30,15,1); },
+    morwen_lantern(g2,E){                                                     // the same lantern you carry: bail, iron hood, lit glass pale on the left going fen-green, a small white flame
+      E(20,36,10,2.2,'rgba(0,0,0,0.3)');
+      g2.strokeStyle='#2a2420'; g2.lineWidth=1.8; g2.beginPath(); g2.moveTo(16.4,10); g2.quadraticCurveTo(20,1.6,23.6,10); g2.stroke();
+      const gl=g2.createLinearGradient(12,0,28,0); gl.addColorStop(0,'#e8f4a8'); gl.addColorStop(0.55,'#b8d070'); gl.addColorStop(1,'#5e7a34');
+      g2.fillStyle=gl; g2.fillRect(12.2,13.4,15.6,18.8);
+      g2.fillStyle='rgba(255,250,220,0.95)'; g2.beginPath(); g2.ellipse(20,23.8,2.1,4.3,0,0,Math.PI*2); g2.fill();
+      g2.fillStyle='rgba(255,255,240,0.6)'; g2.beginPath(); g2.ellipse(20,24.6,1,2.2,0,0,Math.PI*2); g2.fill();
+      g2.strokeStyle='#2a2622'; g2.lineWidth=1.5; g2.strokeRect(12.2,13.4,15.6,18.8); g2.beginPath(); g2.moveTo(20,13.4); g2.lineTo(20,32.2); g2.stroke();
+      g2.fillStyle='#2a2622'; g2.beginPath(); g2.moveTo(10.8,13.6); g2.lineTo(17.2,8.6); g2.lineTo(22.8,8.6); g2.lineTo(29.2,13.6); g2.closePath(); g2.fill();
+      g2.fillRect(10.8,32.2,18.4,3.6); g2.fillStyle='#4a443e'; g2.fillRect(10.8,32.2,18.4,0.9); },
     bog_coins(g2,E){                                                          // a rotten leather purse, tarnished coins spilling out
       g2.fillStyle='#4a3a26'; g2.beginPath(); g2.moveTo(9,18); g2.quadraticCurveTo(7,33,18,34); g2.quadraticCurveTo(28,33,26,18); g2.quadraticCurveTo(17,14,9,18); g2.fill();
       g2.fillStyle='#5e4a30'; g2.beginPath(); g2.ellipse(17.5,18,8.5,3,0,0,Math.PI*2); g2.fill(); g2.strokeStyle='#2a2016'; g2.lineWidth=1.2; g2.beginPath(); g2.moveTo(10,19); g2.quadraticCurveTo(17.5,22,25,19); g2.stroke();
@@ -15169,10 +15185,11 @@ const hasLantern=()=> hasItem('morwen_lantern') || !!(player.opts && player.opts
 Object.assign(ITEM_STATS,{ morwen_lantern:{ magic:2, ap:2 } }); PRICES.morwen_lantern=PRICES.morwen_lantern||60;
 const lanternLit=()=> hasLantern() && unWoven((player.opts.equip.offhand)||'')==='morwen_lantern';
 { const oDN=drawNight; drawNight=function(){ oDN(); if(AREAS[areaId].inside || !lanternLit()) return; const n=nightAmt(); if(n<0.05) return;
-    const pp=P(player.x,player.y), fl=0.92+Math.sin(gt*7)*0.04+Math.sin(gt*13.3)*0.03;
+    const pp=P(player.x,player.y), fl=0.92+Math.sin(gt*7)*0.04+Math.sin(gt*13.3)*0.03, a=(player.dir||0)*Math.PI/4, lx=Math.cos(a), ly=-Math.sin(a);   // the off hand: to your left, whichever way you face
     g.save(); g.globalCompositeOperation='lighter';
-    glow(pp.x,pp.y-10,210*fl,120*fl,'236,226,150',0.30*n);                                          // a warm pool round your feet, a few steps each way
-    glow(pp.x,pp.y-36,120*fl,90*fl,'226,236,160',0.22*n);
+    glow(pp.x+lx*30,pp.y+ly*15+4,84*fl,40*fl,'236,226,150',0.30*n);                                 // a pool on the ground, thrown out to the lantern's side, not over you
+    glow(pp.x+lx*20,pp.y+ly*10+3,36*fl,17*fl,'240,236,170',0.22*n);
+    if(ly>-0.3) glow(pp.x+lx*9,pp.y-27,10*fl,10*fl,'230,240,160',0.30*n);                          // the glass itself, when it hangs on your near side
     g.restore(); }; }
 // ════════ the Baron's tabard: his men wear it, sometimes drop it; wear it yourself and his soldiers take you for one of theirs ════════
 Object.assign(ITEMS,{ baron_tabard:{ name:"Baron's Tabard", slot:'torso' } }); Object.assign(PRICES,{ baron_tabard:12 }); Object.assign(ITEM_STATS,{ baron_tabard:{hp:1} }); GEAR_HP.baron_tabard=1;
@@ -15195,8 +15212,21 @@ const TABARD_LINES=["“Back to your post, soldier. Sergeant's in a mood.”","�
 ['gateguard','krgateguard0','krgateguard1','mguard','kguard1','kguard2','stguard1','stguard2','recruit'].forEach(id=>{ const old=TALKERS[id]; TALKERS[id]=(...a)=>{
     if(!tabardOn() || BARON_DOWN()) return old&&old(...a);
     const n=NPCS.find(q=>q.id===id); const nm=(n&&n.name)||"Baron's Guard";
+    if(/^krgateguard/.test(id) && !cityOpen()){
+      if(CHOICE.tabGate==='refused'){ say(nm,["He looks at the tabard, then at your face, and his hand goes to his sword.","“You again. I know that face, and it's not on my roster. Off my road, before I have you hanged in that rag.”"],[bye]); return; }
+      if(CHOICE.tabGate==='ok'){ say(nm,["He nods you through without looking up.","“Wicket's open. Don't dawdle.”"],[bye]); return; }
+      say(nm,["He sees the boar on your chest and nods, one of the Baron's own to another.",TABARD_LINES[(hsh(id.length,Math.floor(dayClock/DAY_LEN))%TABARD_LINES.length)]],[{label:'“Open the gate. I have business in the city.”', fn:()=>tabardGateAsk()},bye]); return; }
     if(id==='gateguard' && !CHOICE.toll){ remember('toll','paid'); say(nm,["The guard glances at the boar on your chest and straightens up a little.","“Didn't know they'd sent another. Go on in. And get that tabard washed, you look like you slept in a ditch.”"],[bye]); return; }
     say(nm,["He sees the boar on your chest and nods, one of the Baron's own to another.",TABARD_LINES[(hsh(id.length,Math.floor(dayClock/DAY_LEN))%TABARD_LINES.length)]],[bye]); }; });
+// the gate is another matter: a tabard opens it only if the man on the wicket believes your face goes with it. One try; after that he knows you
+const tabardPass=()=> tabardOn() && !BARON_DOWN() && CHOICE.tabGate==='ok';
+function tabardGateAsk(){ const N="Baron's Gate Guard";
+  const roll=(chance,ok,no)=>()=>{ if(Math.random()<chance){ remember('tabGate','ok'); say(N,ok,[bye]); }
+    else { remember('tabGate','refused'); say(N,[no,"He'll know your face now. If you want into Hollowmere, it will have to be with papers."],[bye]); } };
+  say(N,["The guard sees the boar and starts to lift the bar. Then he stops, and looks at your face a moment too long.","“Haven't seen you on the gate roster. Which company are you with?”"],[
+    {label:"“Sergeant Hask's. Sent up from the valley post.”", fn:roll(0.6,["“Hask's lot. That explains the state of you.” He lifts the bar and swings the wicket open.","“Go on, then.”"],"“Hask's?” He smiles without any warmth in it. “Hask hanged last spring. That tabard's off a dead man, I'd wager. Get away from my gate.”")},
+    {label:"“The Baron's own business. Ask him yourself, if you dare.”", fn:roll(0.45,["He goes a little pale and opens the wicket without another word."],"“Then he'll have given you a pass with his seal on it.” He holds out a hand. You have nothing to put in it. “No? Then off my road.”")},
+    {label:"“I'm new. They sent me down with dispatches.”", fn:roll(0.5,["“Dispatches. Nobody tells me anything.” He swings the wicket open. “In you go.”"],"“Dispatches, without a satchel?” He bars the gate again. “Off with you, before I find out where you really got that.”")} ]); }
 { const oT=TALKERS.tollman; TALKERS.tollman=(...a)=>{ if(tabardOn() && !BARON_DOWN()){ say("Toll-keeper Brisk",["Brisk looks at the tabard, then at your face, then back at the tabard. He waves you on with his onion.","“Soldiers don't pay. Even ones that smell like that.”"],[bye]); return; } return oT&&oT(...a); }; }
 </script>
 </body>

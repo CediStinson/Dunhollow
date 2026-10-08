@@ -14552,6 +14552,7 @@ function pupAdopt(v){
 }
 function goatScene(){
   const goat=OBJECTS.find(o=>o.type==='critter' && o.kind==='goat'), eaters=PUPS.filter(p=>p.mode==='home'), ma=NPCS.find(n=>n.id==='trader');
+  if(goat && goat.hx!=null){ goat.gx=goat.hx; goat.gy=goat.hy; goat.gs='idle'; goat.gt=gt+99; }   // he is standing where they find him
   if(!goat){ CHOICE.goatEaten=true; return; }
   if(!eaters.length) return;
   const gx=goat.i+0.5, gy=goat.j+0.5, ring=[[-0.75,0.45],[0.8,0.5],[0.1,-0.85]];
@@ -14560,10 +14561,10 @@ function goatScene(){
     csPar(eaters.map((p,k)=>pupMv(p,gx+ring[k%3][0],gy+ring[k%3][1],3.2))),
     csDo(()=>{ eaters.forEach(p=>{ p.dir=dirFromDelta(gx-p.x,gy-p.y); }); floatText([goat.i,goat.j],'Baa…?','#e8d8a0'); }), csWait(0.9),
     csDo(()=>{ eaters.forEach(p=>{ p.munch=true; }); floatText([goat.i,goat.j],'BAAA—!','#f0c890',true); }), csWait(1.0),
-    csDo(()=>{ const q=OBJECTS.indexOf(goat); if(q>=0) OBJECTS.splice(q,1); blocked.delete(goat.i+','+goat.j); CHOICE.goatEaten=true; logMsg("Marta's pups ate Barnabas the goat.",'#c8a0e0'); }), csWait(2.0),
+    csDo(()=>{ const q=OBJECTS.indexOf(goat); if(q>=0) OBJECTS.splice(q,1); blocked.delete(goat.i+','+goat.j); CHOICE.goatEaten=true; goatBlood(gx,gy); logMsg("Marta's pups ate Barnabas the goat.",'#c8a0e0'); }), csWait(2.0),
     csDo(()=>{ eaters.forEach(p=>{ p.munch=false; }); }), csBark(ma,"BARNABAS?!",1.8), csFocus(ma||player,0.6) ];
   const fin=()=>{ eaters.forEach(p=>{ p.munch=false; p.mode='home'; p.rest=true; p.wait=12+Math.random()*8; p.lie=1; p.walking=false; }); if(ma) goatDialog(); };
-  if(!cutscene(steps,fin)){ const q=OBJECTS.indexOf(goat); if(q>=0) OBJECTS.splice(q,1); blocked.delete(goat.i+','+goat.j); CHOICE.goatEaten=true; eaters.forEach(p=>{ p.mode='home'; }); }
+  if(!cutscene(steps,fin)){ const q=OBJECTS.indexOf(goat); if(q>=0) OBJECTS.splice(q,1); blocked.delete(goat.i+','+goat.j); CHOICE.goatEaten=true; goatBlood(gx,gy); eaters.forEach(p=>{ p.mode='home'; }); }
 }
 function goatDialog(){
   CHOICE.goatTold=true;
@@ -15019,6 +15020,11 @@ function sitOnChair(ch){ if(!chairFree(ch)) return; player.sitChair=ch; player.p
     const q=P(ch.i+0.5+ch.face[0]*CHAIR_IN, ch.j+0.5+ch.face[1]*CHAIR_IN), d=dirFromDelta(ch.face[0],ch.face[1]);
     drawLitSprite(q.x,q.y,()=>drawSitting(g,q.x,q.y,player.opts,d,'chair'));
     if((ch.face[0]+ch.face[1])<0) drawChairOver(ch); }; }
+// where the pups caught Barnabas: a dark pool and a spatter round it, fading after a couple of days
+function goatBlood(x,y){ const B=[{x:x+0.02,y:y+0.02,r:20,a:0.4}]; for(let k=0;k<6;k++) B.push({x:x+(Math.random()-0.5)*1.2,y:y+(Math.random()-0.5)*1.2,r:3+Math.random()*5,a:Math.random()*3});
+  CHOICE.goatBlood={t:dayClock,b:B}; }
+{ const oS=skelDrawItems; skelDrawItems=function(items){ oS(items); try{ const G=CHOICE.goatBlood; if(areaId!=='village' || !G) return; const age=dayClock-G.t, a=age<PUP_CORPSE_LIFE?1:Math.max(0,1-(age-PUP_CORPSE_LIFE)/200);
+      if(a>0.01) G.b.forEach(b=>items.push({d:b.x+b.y-0.9, fn:()=>drawBlood(b,a)})); }catch(e){} }; }
 </script>
 </body>
 </html>

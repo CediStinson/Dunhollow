@@ -14603,7 +14603,8 @@ Object.assign(ITEMS,{ shovel:{ name:'Spade', slot:'weapon' } }); Object.assign(W
     c.fillStyle='rgba(70,50,30,0.6)'; c.beginPath(); c.ellipse(28,1.5,3,1.6,0,0,Math.PI*2); c.fill();               // earth on it
     c.restore(); }; }
 // ── tables and benches, built in the room's own perspective so they sit square on the floor ──
-const CHAIR={L:0.17,D:0.16,H:17,BH:22}, CHAIR_IN=0.3;   // a chair: narrow, a little higher than a bench, pulled in toward its table by this much of a tile
+const CHAIR={L:0.17,D:0.16,H:17,BH:22}, CHAIR_OVER={...{L:0.17,D:0.16,H:17,BH:22}, part:'over'}, CHAIR_IN=0.3;
+function drawChairOver(ch){ const f=ch.face||[1,0], q=P(ch.i+0.5+f[0]*CHAIR_IN,ch.j+0.5+f[1]*CHAIR_IN); drawCached('chairover_'+f.join('_'),q.x,q.y,80,100,40,76,(X,Y)=>paintBench2(X,Y,f,CHAIR_OVER)); }   // a chair: narrow, a little higher than a bench, pulled in toward its table by this much of a tile
 function furnPt(x,y){ return (u,v,h=0)=>({x:x+(u-v)*TW/2, y:y+(u+v)*TH/2-h}); }
 function furnPoly(pts,fill,stroke){ g.beginPath(); pts.forEach((p,n)=>n?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); g.fillStyle=fill; g.fill(); if(stroke){ g.strokeStyle=stroke; g.lineWidth=0.8; g.stroke(); } }
 function paintTable2(x,y){                           // a plank table: four square legs, a thick top with the grain running along it, bread and a cup
@@ -14625,7 +14626,8 @@ function paintTable2(x,y){                           // a plank table: four squa
 function paintBench2(x,y,face,o={}){                 // a bench with a back, facing face=[du,dv]: the way someone sitting on it looks (o: a narrower, taller chair)
   const pt=furnPt(x,y), [fu,fv]=face, la=fu?[0,1]:[1,0], L=o.L??0.42, D=o.D??0.15, H=o.H??13, T=3, BH=o.BH??18;
   const at=(s1,s2,h)=>pt(la[0]*s1*L+fu*s2*D, la[1]*s1*L+fv*s2*D, h);
-  g.fillStyle='rgba(8,5,2,0.28)'; g.beginPath(); g.ellipse(x+3,y+3,30*Math.max(0.5,L/0.42),11*Math.max(0.6,L/0.42),0,0,Math.PI*2); g.fill();
+  const over=o.part==='over';                         // 'over': only what stands in front of someone sitting on it: the legs and the back, never the seat
+  if(!over){ g.fillStyle='rgba(8,5,2,0.28)'; g.beginPath(); g.ellipse(x+3,y+3,30*Math.max(0.5,L/0.42),11*Math.max(0.6,L/0.42),0,0,Math.PI*2); g.fill(); }
   const legs=[[-0.9,-0.8],[0.9,-0.8],[-0.9,0.8],[0.9,0.8]].map(([a,b])=>[at(a,b,0),at(a,b,H-T),la[0]*a*L+fu*b*D+la[1]*a*L+fv*b*D]).sort((p,q)=>p[2]-q[2]);
   const back=()=>{ [-0.95,0.95].forEach(a=>{ const b0=at(a,-1,H-T), b1=at(a,-1,H+BH); g.strokeStyle='#2a1a0c'; g.lineWidth=3.6; g.beginPath(); g.moveTo(b0.x,b0.y); g.lineTo(b1.x,b1.y); g.stroke(); g.strokeStyle='#6a4626'; g.lineWidth=2.2; g.stroke(); });
     [[H+7,H+11],[H+14,H+BH]].forEach(([h0,h1])=>furnPoly([at(-1,-1,h0),at(1,-1,h0),at(1,-1,h1),at(-1,-1,h1)],'#7a5230','rgba(30,16,6,0.6)')); };
@@ -14633,10 +14635,12 @@ function paintBench2(x,y,face,o={}){                 // a bench with a back, fac
   if(backFar) back();
   legs.forEach(([a,b])=>{ g.strokeStyle='#2a1a0c'; g.lineWidth=3.2; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); g.strokeStyle='#4a2f16'; g.lineWidth=1.8; g.stroke(); });
   const C=[at(-1,-1,H),at(1,-1,H),at(1,1,H),at(-1,1,H)], dn=p=>({x:p.x,y:p.y+T});
+  if(!over){
   for(let k=0;k<4;k++){ const a=C[k], b=C[(k+1)%4], mid=[(k===0?0:k===1?1:k===2?0:-1),(k===0?-1:k===1?0:k===2?1:0)];   // the slab's sides that face us
     const nu=la[0]*mid[0]+fu*mid[1], nv=la[1]*mid[0]+fv*mid[1]; if(nu+nv>0) furnPoly([a,b,dn(b),dn(a)], k%2?'#4a2d14':'#6e4620'); }
   furnPoly(C,'#9a6c3a','rgba(30,16,6,0.55)');
   g.strokeStyle='rgba(60,36,14,0.5)'; g.lineWidth=0.8; const m0=at(-1,0,H), m1=at(1,0,H); g.beginPath(); g.moveTo(m0.x,m0.y); g.lineTo(m1.x,m1.y); g.stroke();   // two planks
+  }
   if(!backFar) back();
 }
 { const oDO=drawObject; drawObject=function(o){
@@ -14944,7 +14948,7 @@ function paintRoundHut(x,y){ const rx=72, ry=36, H=46, R=1.16;
 // whoever sits at a table sits on the chair, pulled in to it
 { const oDN=drawNPC; drawNPC=function(n){ const ch=n.sit && !n.moving && OBJECTS.find(o=>o.type==='chair' && o.i===n.i && o.j===n.j);
     if(!ch) return oDN(n); const ox=n.x, oy=n.y, bx=(n.x??n.i+0.5), by=(n.y??n.j+0.5); n.x=bx+ch.face[0]*CHAIR_IN; n.y=by+ch.face[1]*CHAIR_IN; const od=n.dir, os=n.sit; n.dir=dirFromDelta(ch.face[0],ch.face[1]); if(n.sit===true) n.sit='chair';   // faces the table, sitting up on the seat
-    try{ return oDN(n); } finally{ n.x=ox; n.y=oy; n.dir=od; n.sit=os; if((ch.face[0]+ch.face[1])<0) drawObject(ch); } }; }   // a chair facing away from us: its back is in front of the sitter
+    try{ return oDN(n); } finally{ n.x=ox; n.y=oy; n.dir=od; n.sit=os; if((ch.face[0]+ch.face[1])<0) drawChairOver(ch); } }; }   // a chair facing away from us: its back (and legs) in front of the sitter
 // you can sit on a chair too: click it, walk up, sit down facing the table; any move gets you up again
 let pendingChair=null;
 const chairFree=ch=> !NPCS.some(n=>n.i===ch.i && n.j===ch.j);
@@ -14966,7 +14970,7 @@ function sitOnChair(ch){ if(!chairFree(ch)) return; player.sitChair=ch; player.p
 { const oDA=drawActor; drawActor=function(e){ const ch=e===player && player.sitChair; if(!ch) return oDA(e);
     const q=P(ch.i+0.5+ch.face[0]*CHAIR_IN, ch.j+0.5+ch.face[1]*CHAIR_IN), d=dirFromDelta(ch.face[0],ch.face[1]);
     drawLitSprite(q.x,q.y,()=>drawSitting(g,q.x,q.y,player.opts,d,'chair'));
-    if((ch.face[0]+ch.face[1])<0) drawObject(ch); }; }
+    if((ch.face[0]+ch.face[1])<0) drawChairOver(ch); }; }
 </script>
 </body>
 </html>

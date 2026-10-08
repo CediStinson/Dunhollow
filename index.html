@@ -2728,6 +2728,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   else if(E.armor==='robe') drawOpenRobe();
   else if(E.armor==='vest_black') drawVest();
   if(E.torso==='baron_tabard') drawTabard();
+  { const NL=NECK_LOOKS && NECK_LOOKS[unWoven(E.neck||'')]; if(NL && front){ drawNecklace(c,x+LN+(pr>0.8?CH*0.45:po),B+Y.SHOULDER,F?6.4:7,pr,NL); } }
   if((E.neck==='moon_amulet'||E.offhand==='moon_amulet') && front){ const ax=LN+(pr>0.8?CH*0.45:po), ay=Y.SHOULDER+(F?6.4:7);   // the moonsilver focus on a cord of light
     // the cord's lowest point (the middle of a quadratic) sits exactly on the bail at the top of the orb
     const bailY=ay+1.2-1.5-0.6, ctrlY=2*bailY-(Y.SHOULDER-0.4);
@@ -15341,6 +15342,56 @@ function wakeAfterDefeat(){
   if(lost>0) logMsg('Your purse is lighter: '+formatCoin(lost)+' missing.','#c0483a');
   logMsg('Bruised: your health stays at half until you sleep, bathe, or eat a proper meal.','#c8a080');
   if(typeof saveGame==='function') saveGame(); }
+// ════════ necklaces: cheap trinkets off the dead and out of crates, and Brann's wolf-tooth string ════════
+var NECK_LOOKS={ copper_chain:{cord:'#b8743c',w:0.7,p:'ring',col:'#c8844a'}, bone_charm:{cord:'#5a3a20',w:0.6,p:'bone',col:'#e8e0c8'},
+  glass_beads:{cord:'#7a6a58',w:0.4,p:'beads',cols:['#5a9ad0','#7ac08a','#d8a840','#c85a5a']}, tin_medal:{cord:'#6a6a70',w:0.5,p:'disc',col:'#a8aab0'},
+  wolf_necklace:{cord:'#4a3018',w:0.7,p:'fangs',col:'#ece4cc'} };
+function drawNecklace(c,ax,top,dip,pr,L){
+  const half=pr>0.8?1.6:4, bot=top+dip;            // the cord's lowest point sits on the breastbone
+  const at=t=>{ const u=1-t; return { x:u*u*(ax-half)+2*u*t*ax+t*t*(ax+half), y:u*u*(top-0.4)+2*u*t*(2*bot-top)+t*t*(top-0.4) }; };   // a quadratic through the cord
+  c.save(); c.translate(ax,top); c.scale(1.35,1.35); c.translate(-ax,-top);
+  c.strokeStyle=L.cord; c.lineWidth=L.w; c.beginPath(); c.moveTo(ax-half,top-0.4); c.quadraticCurveTo(ax,2*bot-top,ax+half,top-0.4); c.stroke();
+  const m=at(0.5); c.lineWidth=0.4; c.strokeStyle='rgba(0,0,0,0.5)';
+  if(L.p==='ring'){ c.strokeStyle=L.col; c.lineWidth=0.7; c.beginPath(); c.arc(m.x,m.y+1.1,1,0,Math.PI*2); c.stroke(); }
+  else if(L.p==='bone'){ c.fillStyle=L.col; c.beginPath(); c.ellipse(m.x,m.y+1.2,0.9,1.3,0,0,Math.PI*2); c.fill(); c.stroke(); }
+  else if(L.p==='disc'){ c.fillStyle=L.col; c.beginPath(); c.arc(m.x,m.y+1.2,1.2,0,Math.PI*2); c.fill(); c.stroke(); c.fillStyle='#6a6c72'; c.beginPath(); c.arc(m.x,m.y+1.2,0.4,0,Math.PI*2); c.fill(); }
+  else if(L.p==='beads'){ for(let k=1;k<8;k++){ const q=at(k/8); c.fillStyle=L.cols[k%L.cols.length]; c.beginPath(); c.arc(q.x,q.y,0.55,0,Math.PI*2); c.fill(); } }
+  else if(L.p==='fangs'){ [0.22,0.36,0.5,0.64,0.78].forEach((t,k)=>{ if(pr>0.8 && (k===0||k===4)) return; const q=at(t), l=k===2?2.6:1.8, lean=(t-0.5)*1.4;
+      c.fillStyle=L.col; c.beginPath(); c.moveTo(q.x-0.55,q.y); c.quadraticCurveTo(q.x+lean*0.3-0.2,q.y+l*0.7,q.x+lean,q.y+l); c.quadraticCurveTo(q.x+0.2,q.y+l*0.4,q.x+0.55,q.y); c.closePath(); c.fill(); c.strokeStyle='#4a3018'; c.lineWidth=0.45; c.stroke(); }); }
+  c.restore(); }
+Object.assign(ITEMS,{ copper_chain:{ name:'Copper Chain', slot:'neck' }, bone_charm:{ name:'Knucklebone Charm', slot:'neck' }, glass_beads:{ name:'Glass Bead Necklace', slot:'neck' },
+  tin_medal:{ name:"Tin Saint's Medal", slot:'neck' }, wolf_necklace:{ name:'Wolf-Tooth Necklace', slot:'neck' } });
+Object.assign(ITEM_STATS,{ copper_chain:{hp:1}, bone_charm:{agi:1}, glass_beads:{magic:1}, tin_medal:{hp:2}, wolf_necklace:{agi:3,hp:1} });
+Object.entries({copper_chain:1,tin_medal:2,wolf_necklace:1}).forEach(([k,v])=>GEAR_HP[k]=v);
+Object.assign(PRICES,{ copper_chain:6, bone_charm:4, glass_beads:8, tin_medal:7, wolf_necklace:40 });
+LOOT_TIERS[0].push('bone_charm','copper_chain'); LOOT_TIERS[1].push('glass_beads','tin_medal'); FARM_LOOT.push('bone_charm','copper_chain');
+{ const oV=victory; victory=function(faction,...r){ const grave=mobs.filter(m=>m.hostile && (!faction||m.faction===faction) && m.dead && (m.type==='skeleton'||m.type==='goblin'));
+    const res=oV(faction,...r);
+    grave.forEach(m=>{ if(Math.random()<0.07){ const id=m.type==='skeleton'?'tin_medal':'glass_beads', f=player.inv.indexOf(null); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } } });   // what the dead were buried with; what goblins stole
+    return res; }; }
+{ const oPIA=paintItemArt; paintItemArt=function(g2,id,size){ const L=NECK_LOOKS[unWoven(id)]; if(!L) return oPIA(g2,id,size);
+    g2.save(); g2.scale(size/40,size/40);
+    g2.fillStyle='rgba(0,0,0,0.25)'; g2.beginPath(); g2.ellipse(20,35,12,2.4,0,0,Math.PI*2); g2.fill();
+    g2.strokeStyle=L.cord; g2.lineWidth=L.w*2.6; g2.beginPath(); g2.ellipse(20,15,11,12,0,0.15*Math.PI,0.85*Math.PI,true); g2.stroke();   // the loop of cord, open at the top
+    g2.beginPath(); g2.ellipse(20,15,11,12,0,0.15*Math.PI,0.85*Math.PI,false); g2.stroke();
+    const at=a=>({x:20+Math.cos(a)*11,y:15+Math.sin(a)*12});
+    if(L.p==='ring'){ g2.strokeStyle=L.col; g2.lineWidth=2.4; g2.beginPath(); g2.arc(20,30,3.6,0,Math.PI*2); g2.stroke(); }
+    else if(L.p==='bone'){ g2.fillStyle=L.col; g2.beginPath(); g2.ellipse(20,30.5,3.2,4.4,0,0,Math.PI*2); g2.fill(); g2.strokeStyle='#8a8068'; g2.lineWidth=0.8; g2.stroke(); g2.beginPath(); g2.moveTo(17.5,30.5); g2.lineTo(22.5,30.5); g2.stroke(); }
+    else if(L.p==='disc'){ g2.fillStyle=L.col; g2.beginPath(); g2.arc(20,30.5,4.4,0,Math.PI*2); g2.fill(); g2.strokeStyle='#6a6c72'; g2.lineWidth=0.9; g2.stroke(); g2.beginPath(); g2.moveTo(20,27.5); g2.lineTo(20,33.5); g2.moveTo(17.5,29.6); g2.lineTo(22.5,29.6); g2.stroke(); }
+    else if(L.p==='beads'){ for(let k=0;k<14;k++){ const q=at(0.12*Math.PI+k*0.76*Math.PI/13); g2.fillStyle=L.cols[k%L.cols.length]; g2.beginPath(); g2.arc(q.x,q.y,1.9,0,Math.PI*2); g2.fill(); g2.fillStyle='rgba(255,255,255,0.5)'; g2.beginPath(); g2.arc(q.x-0.6,q.y-0.6,0.6,0,Math.PI*2); g2.fill(); } }
+    else if(L.p==='fangs'){ [0.3,0.4,0.5,0.6,0.7].forEach((t,k)=>{ const q=at(t*Math.PI), l=k===2?9:6.5, lean=(t-0.5)*5;
+        g2.fillStyle=L.col; g2.beginPath(); g2.moveTo(q.x-1.6,q.y); g2.quadraticCurveTo(q.x+lean*0.3-0.6,q.y+l*0.7,q.x+lean,q.y+l); g2.quadraticCurveTo(q.x+0.6,q.y+l*0.4,q.x+1.6,q.y); g2.closePath(); g2.fill(); g2.strokeStyle='#8a7a58'; g2.lineWidth=0.7; g2.stroke(); }); }
+    g2.restore(); }; }
+// Brann strings wolf teeth into a necklace: three fangs and a day's patience
+{ const oldBr=TALKERS.hunter; TALKERS.hunter=()=>{ const day=Math.floor(dayClock/DAY_LEN), fangs=player.inv.filter(x=>x==='wolf_fang').length, W=CHOICE.wolfNeck;
+    if(typeof W==='number'){ if(day<=W){ say('Brann the Hunter',["Three wolf teeth lie by his fire, one of them half-drilled. “Tomorrow. A tooth splits if you rush it.”"],[{label:'Something else.',fn:oldBr},bye]); return; }
+      if(player.inv.indexOf(null)<0){ say('Brann the Hunter',"“Your necklace is done, but your pack's full. Make room.”",[bye]); return; }
+      say('Brann the Hunter',["Brann tosses you a leather thong strung with wolf teeth, the biggest in the middle, each one drilled and lashed tight.","“Greymaw's cousins. Wear it and you'll move like them. Lighter on your feet.”"],[{label:'Put it on.', fn:()=>{ CHOICE.wolfNeck='done'; giveQuestItem('wolf_necklace'); logMsg('Brann made you a Wolf-Tooth Necklace. (Neck: +3 agility, +1 health)','#8ac070'); closeDialog(); }}]); return; }
+    if(W!=='done' && fangs>=3){ say('Brann the Hunter',["Brann sees the wolf teeth in your hand and holds out his own. “Good ones. Want them on a string? Three teeth, and come back tomorrow.”"],[
+        {label:'Give him three wolf fangs.', fn:()=>{ for(let k=0;k<3;k++) player.inv[player.inv.indexOf('wolf_fang')]=null; CHOICE.wolfNeck=day; updateHud(); logMsg('You give Brann three wolf fangs. He will string them by tomorrow.','#8ac070'); say('Brann the Hunter',"“Tomorrow, then.” He is already turning one over in his fingers, looking for where to drill.",[bye]); }},
+        {label:'Something else.', fn:oldBr}, bye]); return; }
+    if(W!=='done' && fangs>0 && !CHOICE.wolfNeckHint){ CHOICE.wolfNeckHint=true; say('Brann the Hunter',["“Wolf tooth?” He weighs it. “Bring me three and I'll string you a necklace. Hunters wear them for luck. It isn't luck. It's knowing you can.”"],[{label:'Something else.',fn:oldBr},bye]); return; }
+    return oldBr(); }; }
 </script>
 </body>
 </html>

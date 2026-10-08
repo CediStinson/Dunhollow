@@ -4384,7 +4384,7 @@ const AREAS = {
       {type:'teleporter', i:6, j:9, to:'lane', entry:'fromVillage'},
       {type:'teleporter', i:0, j:5, to:'tunnel', entry:'fromVillage'},
       {type:'teleporter', i:4, j:0, to:'graveyard', entry:'fromVillage'},
-      {type:'house', i:9, j:1, fp:[3,3], roof:'#c8a458', door:'l', inside:'elderhouse'},
+      {type:'house', i:9, j:0, fp:[4,4], roof:'#c8a458', door:'l', dt:1, inside:'elderhouse'},   // Hamond's: the biggest house in Dunhollow, a household under one roof
       {type:'well', i:6, j:3},
       {type:'stall', i:3, j:5, c:0},
       {type:'barrel', i:2, j:5, breakable:true},
@@ -4400,7 +4400,7 @@ const AREAS = {
         opts:{gender:'f',skin:1,hair:3,hairColor:8,beard:0,face:1,equip:{head:null,torso:'tunic_linen',armor:null,hands:null,legs:'hose_grey',feet:null,weapon:null,offhand:null}} },
       { id:'bard', name:'Pip the Bard', i:10, j:7, dir:1,
         opts:{gender:'m',skin:0,hair:1,hairColor:7,beard:2,face:2,equip:{head:'hood_red',torso:'tunic_red',armor:null,hands:null,legs:'hose_grey',feet:'boots',weapon:null,offhand:null}} },
-      { id:'wenna', name:'Old Wenna', i:12, j:3, dir:0,
+      { id:'wenna', name:'Old Wenna', i:13, j:4, dir:0,
         opts:{gender:'f',skin:0,hair:4,hairColor:13,beard:0,equip:{head:null,torso:'smock',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}} },
     ],
     mobs:()=>[],
@@ -7051,7 +7051,7 @@ function drawObject(o){
     if(o.kind==='pup'){ const pe={coat:['#7a6a58','#8a7a66','#5e5448'][o.v||0], moving:false};
       g.save(); g.translate(x,y); g.scale(0.5,0.5); g.translate(-x,-y); drawWolf(x,y,pe,(Math.floor(gt*0.5+(o.v||0)*2)%8),null); g.restore(); }
     else if(o.kind==='goat'){ drawCached('goat',x,y,50,40,25,34,paintGoat); }
-    else if(o.kind==='goatroof'){ const h=OBJECTS.find(q=>q.type==='house'); if(h){ const a=P(h.i+1.2,h.j+1.2); drawCached('goat',a.x,a.y-190+Math.sin(gt*0.7)*0.8,50,40,25,34,paintGoat); } }
+    else if(o.kind==='goatroof'){ const h=OBJECTS.find(q=>q.type==='house'); if(h){ const N=h.fp[0], a=P(h.i+1.2*N/3,h.j+1.2*N/3); drawCached('goat',a.x,a.y-190-(N-3)*42+Math.sin(gt*0.7)*0.8,50,40,25,34,paintGoat); } }
     else if(o.kind==='flowers'){ drawCached('flowers',x,y,60,30,30,20,paintFlowers); }
   } else if(o.type==='pool'){
     // baked into the ground; only a slow shimmer is live
@@ -7177,10 +7177,10 @@ function drawObject(o){
     drawTree(o);
   } else if(o.type==='house'){
     const a=P(o.i+o.fp[0],o.j+o.fp[1]);
-    drawCached('house'+o.roof+o.door,a.x,a.y,560,500,280,440,(ax,ay)=>paintCottage(ax,ay,o.roof,o.door)); if(o.inside) drawDoorMark(o);
+    const N=o.fp[0], dt=o.dt??1, big=N>3; drawCached('house'+o.roof+o.door+(big?'_'+N+'_'+dt:''),a.x,a.y,big?720:560,big?620:500,big?360:280,big?560:440,(ax,ay)=>paintCottage(ax,ay,o.roof,o.door,N,dt)); if(o.inside) drawDoorMark(o);
     // a thin curl of chimney smoke, live
     g.save(); g.globalCompositeOperation='source-over';
-    const cx=a.x+COTTAGE_CHIM.dx, cy=a.y+COTTAGE_CHIM.dy;
+    const CH=COTTAGE_CHIMS[o.fp[0]]||COTTAGE_CHIM, cx=a.x+CH.dx, cy=a.y+CH.dy;
     for(let k=0;k<6;k++){ const t=((gt*0.18+k/6)%1); g.fillStyle=`rgba(200,196,188,${0.22*(1-t)})`;
       g.beginPath(); g.arc(cx+Math.sin(t*5+k)*5+t*14, cy-t*60, 4+t*9, 0, Math.PI*2); g.fill(); }
     g.restore();
@@ -7564,9 +7564,9 @@ function drawNPC(n){
   g.textAlign='left'; g.textBaseline='alphabetic';
 }
 // A timber-framed cottage on a 2x2 footprint, painted once and cached per roof colour.
-let COTTAGE_CHIM={dx:0,dy:-300};
-function paintCottage(x,y,roof,door='r'){
-  const T=TW/2, H2=TH/2, ins=0.12, WH=118, RH=86, N=3;
+let COTTAGE_CHIM={dx:0,dy:-300}; const COTTAGE_CHIMS={};
+function paintCottage(x,y,roof,door='r',N=3,dt=1){        // N: the footprint's side in tiles; a bigger house stands a little taller and its roof climbs higher
+  const T=TW/2, H2=TH/2, ins=0.12, WH=118+(N-3)*14, RH=86*N/3;
   const pt=(gi,gj,h=0)=>({x:x+(gi-gj)*T, y:y+(gi+gj)*H2-h});          // local grid, (N,N) is the anchor at x,y
   const a=ins, b=N-ins;
   const Bm=pt(b-N,b-N), R=pt(b-N,a-N), L=pt(a-N,b-N), K=pt(a-N,a-N);
@@ -7614,7 +7614,7 @@ function paintCottage(x,y,roof,door='r'){
   });
   // door on the shaded face, window with a warm glow on the lit face
   const DF = door==='l' ? [L,Bm] : [Bm,R], WF = door==='l' ? [Bm,R] : [L,Bm];
-  const d0=lerp(DF[0],DF[1],0.42), d1=lerp(DF[0],DF[1],0.58), DH=92;
+  const dc=(dt+0.5)/N, dw=0.08*3/N, d0=lerp(DF[0],DF[1],dc-dw), d1=lerp(DF[0],DF[1],dc+dw), DH=92;   // the door over its doorstep tile
   quad([up2(d0,8),up2(d1,8),up2(d1,DH+2),up2(d0,DH+2)],'#3a2412');
   quad([up2(d0,9),up2(d1,9),up2(d1,DH),up2(d0,DH)],'#6a4624');
   g.strokeStyle='rgba(20,10,4,0.6)'; g.lineWidth=0.8; for(let t=0.25;t<1;t+=0.25){ const q0=lerp(d0,d1,t); g.beginPath(); g.moveTo(q0.x,q0.y-9); g.lineTo(q0.x,q0.y-DH); g.stroke(); }
@@ -7622,10 +7622,10 @@ function paintCottage(x,y,roof,door='r'){
   [0.25,0.75].forEach(t=>{ const hp=lerp(d0,d1,0.05); g.fillStyle='#2a2622'; g.fillRect(hp.x-1,hp.y-DH*t-2,9,2.4); });                 // iron hinges
   beam(up2(d0,8),up2(d0,DH+4),3.6,'#2e1c0c'); beam(up2(d1,8),up2(d1,DH+4),3.6,'#2e1c0c'); beam(up2(d0,DH+4),up2(d1,DH+4),4,'#2e1c0c');  // frame
   quad([up2(lerp(d0,d1,-0.2),8),up2(lerp(d0,d1,1.2),8),up2(lerp(d0,d1,1.2),4),up2(lerp(d0,d1,-0.2),4)],'#8a8274');                  // step
-  { const lp=up2(lerp(DF[0],DF[1],0.66),DH-10);                                                                                        // lantern beside the door
+  { const lp=up2(lerp(DF[0],DF[1],dc+dw+0.08*3/N),DH-10);                                                                                        // lantern beside the door
     g.strokeStyle='#2a2622'; g.lineWidth=1.2; g.beginPath(); g.moveTo(lp.x,lp.y); g.lineTo(lp.x+6,lp.y-3); g.stroke();
     g.fillStyle='#2a2622'; g.fillRect(lp.x+3,lp.y-2,6,9); g.fillStyle='#ffc860'; g.fillRect(lp.x+4,lp.y-0.5,4,6); }
-  [[0.3,0.46],[0.6,0.76]].forEach(([t0,t1])=>{
+  (N>3?[[0.18,0.31],[0.44,0.57],[0.7,0.83]]:[[0.3,0.46],[0.6,0.76]]).forEach(([t0,t1])=>{
     const w0=lerp(WF[0],WF[1],t0), w1=lerp(WF[0],WF[1],t1), lo=50, hi=80;
     quad([up2(w0,lo-2),up2(w1,lo-2),up2(w1,hi+2),up2(w0,hi+2)],'#3a2412');
     const wg=g.createLinearGradient(w0.x,w0.y-hi,w1.x,w1.y-lo); wg.addColorStop(0,'#ffd88a'); wg.addColorStop(1,'#d88a30');
@@ -7675,7 +7675,7 @@ function paintCottage(x,y,roof,door='r'){
   g.strokeStyle=tone(roof,-0.25); g.lineWidth=4; g.beginPath(); g.moveTo(M1.x,M1.y); g.lineTo(M2.x,M2.y); g.stroke();   // ridge
   g.strokeStyle=tone(roof,0.2,0.6); g.lineWidth=1.2; g.beginPath(); g.moveTo(M1.x,M1.y-1.5); g.lineTo(M2.x,M2.y-1.5); g.stroke();
   // stone chimney near the back of the ridge
-  const cB=lerp(M1,M2,0.72), cw=9; COTTAGE_CHIM={dx:cB.x-x, dy:cB.y-22-y};
+  const cB=lerp(M1,M2,0.72), cw=9; COTTAGE_CHIM={dx:cB.x-x, dy:cB.y-22-y}; COTTAGE_CHIMS[N]=COTTAGE_CHIM;
   quad([{x:cB.x-cw,y:cB.y+10},{x:cB.x,y:cB.y+13},{x:cB.x,y:cB.y-16},{x:cB.x-cw,y:cB.y-19}],'#7a7266');
   quad([{x:cB.x,y:cB.y+13},{x:cB.x+cw,y:cB.y+10},{x:cB.x+cw,y:cB.y-19},{x:cB.x,y:cB.y-16}],'#555046');
   quad([{x:cB.x-cw,y:cB.y-19},{x:cB.x,y:cB.y-16},{x:cB.x+cw,y:cB.y-19},{x:cB.x,y:cB.y-22}],'#2a2622');
@@ -13742,9 +13742,9 @@ const ROUTINES={
     { h:[17,17.5], area:'village', walk:[[10,7],[3,2]] },
     { h:[17.5,26], area:'wheatsheaf', at:[2,3], dir:1 } ] },                                              // singing for his supper till well past midnight
   wenna:{ name:'Old Wenna', ids:{village:'wenna'}, opts:{gender:'f',skin:0,hair:4,hairColor:13,beard:0,equip:{head:null,torso:'smock',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}}, slots:[
-    { h:[7,11],    area:'village', at:[12,3], dir:0, wander:[[12,3],[12,6],[10,4]] },                   // calling for that goat
+    { h:[7,11],    area:'village', at:[13,4], dir:0, wander:[[13,4],[12,6],[11,5]] },                   // calling for that goat
     { h:[11,13],   area:'village', at:[6,4], dir:0 },                                                     // gossip at the well
-    { h:[13,20],   area:'village', at:[12,3], dir:0, wander:[[12,3],[12,6],[10,4]] } ] },
+    { h:[13,20],   area:'village', at:[13,4], dir:0, wander:[[13,4],[12,6],[11,5]] } ] },
   gunnar:{ name:'Gunnar the Ploughman', ids:{wheatsheaf:'gunnar'}, opts:{gender:'m',skin:2,hair:1,hairColor:3,beard:4,face:1,equip:{head:null,torso:'shirt',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}}, slots:[
     { h:[12,13.5], area:'wheatsheaf', at:[3,1], dir:1 },
     { h:[17,25],   area:'wheatsheaf', at:[3,1], dir:1 } ] },                                              // the plough by day, the bench by night

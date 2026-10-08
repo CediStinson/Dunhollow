@@ -12857,9 +12857,12 @@ function giveQuestItem(id,keep){                 // story papers always fit: som
 const STQ=()=> CHOICE.stq || (CHOICE.stones && CHOICE.stones!=='fight' ? 'wenna' : null);
 const WRIT_TEXT="In the grass lies the surveyor's writ. <i>“…the village of Dunhollow holding no charter to the land below the stones, the said land reverts to the Baron…”</i> No charter? Old Wenna in the village is the oldest soul in Dunhollow. She may know.";
 // the Baron's people leave the stones: down the path toward Dunhollow and out of sight
-function stonesLeave(ids,speed,flee){ const go=()=>{ if(areaId!=='stones') return; if(typeof dlgOverlay!=='undefined' && dlgOverlay.classList.contains('open')){ setTimeout(go,300); return; }
-    const who=NPCS.filter(n=>ids.includes(n.id)); if(!who.length) return; const ex=[4,9];
-    const steps=[ csFocus(who[0],0.4) ];
+const STONES_WHO=[];
+function stonesLeave(ids,speed,flee){ if(areaId==='stones'){ STONES_WHO.length=0; STONES_WHO.push(...NPCS.filter(n=>ids.includes(n.id))); }   // remember exactly who, in case the room is rebuilt before they go
+  const go=()=>{ if(areaId!=='stones') return; if(typeof dlgOverlay!=='undefined' && dlgOverlay.classList.contains('open')){ setTimeout(go,300); return; }
+    const who=STONES_WHO.length?STONES_WHO.splice(0):NPCS.filter(n=>ids.includes(n.id)); if(!who.length) return; const ex=[4,9];
+    who.forEach(n=>{ if(!NPCS.includes(n)) NPCS.push(n); });                    // whoever walks off must still be there to be seen walking
+    const steps=[ csDo(()=>who.forEach(n=>{ if(!NPCS.includes(n)) NPCS.push(n); })), csFocus(who[0],0.4) ];
     if(flee) steps.push(csBark(who[0],"Don't— don't hurt me! The Baron will hear of this!",1.4));
     steps.push(csPar(who.map((n,k)=>csWalk(n,ex[0]+(k===1?1:k===2?-1:0),ex[1]-(k?1:0),speed))), csDo(()=>{ NPCS.splice(0,NPCS.length,...NPCS.filter(n=>!ids.includes(n.id))); }), csFocus(player,0.4));
     if(!cutscene(steps)) NPCS.splice(0,NPCS.length,...NPCS.filter(n=>!ids.includes(n.id))); };
@@ -14711,7 +14714,8 @@ function paintBaronBanner(x,y){ const W=11, H=40, top=y-82; g.fillStyle='rgba(0,
 // ── whoever you are talking to stays put until you are done: no wandering off, no routine pulling them away mid-trade ──
 let TALK_NPC=null, TALK_DEPTH=0;
 const dlgIsOpen=()=>typeof dlgOverlay!=='undefined' && dlgOverlay.classList.contains('open');
-{ const oT=talkTo; talkTo=function(n){ TALK_NPC=n; TALK_DEPTH=0; return oT(n); }; }
+let TALK_STATE='';
+{ const oT=talkTo; talkTo=function(n){ TALK_NPC=n; TALK_DEPTH=0; try{ TALK_STATE=JSON.stringify(CHOICE); }catch(e){ TALK_STATE=''; } return oT(n); }; }
 { const oU=update; update=function(dt){ const n=TALK_NPC, hold=n && dlgIsOpen() && NPCS.includes(n);
     let saved=null; if(hold){ saved={goto:n.goto, path:n.path}; n.goto=null; n.path=[]; n.moving=false; if(n.wander) n.wait=Math.max(n.wait||0,1); }
     oU(dt);
@@ -14724,7 +14728,8 @@ const RT_HOLD=()=> TALK_NPC && dlgIsOpen() ? TALK_NPC : null;
       const onlyBye=opts.length && opts.every(o=>o===bye || o.fn===closeDialog || /^(Farewell|Leave|Not now|Close|Bow and leave)/.test(String(o.label)));
       const hasBack=opts.some(o=>/^Back\b/.test(String(o.label)));
       const root=TALKERS[TALK_NPC.id], who=TALK_NPC;
-      if(onlyBye && !hasBack && root && name===who.name) opts=[{label:'Back.', fn:()=>{ TALK_NPC=who; TALK_DEPTH=0; root(); }}, ...opts]; }
+      let changed=false; try{ changed=TALK_STATE!=='' && JSON.stringify(CHOICE)!==TALK_STATE; }catch(e){}         // something was decided: going 'back' would replay the question
+      if(onlyBye && !hasBack && !changed && root && name===who.name) opts=[{label:'Back.', fn:()=>{ TALK_NPC=who; TALK_DEPTH=0; root(); }}, ...opts]; }
     else TALK_DEPTH=0;
     return oSD(name,text,opts,...r); }; }
 // a cutscene clears the screen: inventory, notes, the map, a signpost you were reading (never the menu)

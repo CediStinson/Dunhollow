@@ -10865,7 +10865,7 @@ function berthaTalk(){ const day=Math.floor(dayClock/DAY_LEN);
   if(BARON_DOWN()) news.push("“No more Baron's men drinking on credit! I've had to learn what coin looks like again.”"); if(CHOICE.hobb==='done') news.push("“Hobb's mule bit the smith. Everybody's very happy about it.”");
   news.push(["“The ale's brown and wet. That's the whole menu.”","“Gunnar's been arm-wrestling for pennies again. He's never lost. Never.”","“Tobb drinks here after dark. Says the graveyard's too quiet, or too loud. Depends.”"][day%3]);
   say('Bertha of the Wheatsheaf',["A big woman polishing a cup that will never be clean.",news[0],...news.slice(1,2)],[
-    {label:CHOICE.innDay===day?'Rent a bed (slept already)':'Rent a bed and sleep. (2 copper)', off:player.purse<2||CHOICE.innDay===day, note:'-2c', fn:()=>{ player.purse-=2; CHOICE.innDay=day; player.hp=player.maxHp; dayClock+=DAY_LEN*0.3; updateHud(); say('Bertha of the Wheatsheaf',"The straw is fresh and the blanket smells of smoke. You sleep like the dead, which in Dunhollow is saying something. <i>You are fully healed.</i>",[bye]); }},
+    {label:CHOICE.innDay===day?'Rent a bed (slept already)':'Rent a bed and sleep. (2 copper)', off:player.purse<2||CHOICE.innDay===day, note:'-2c', fn:()=>{ player.purse-=2; CHOICE.innDay=day; cureBruise(); CHOICE.lastBed={a:areaId,i:player.i,j:player.j}; player.hp=player.maxHp; dayClock+=DAY_LEN*0.3; updateHud(); say('Bertha of the Wheatsheaf',"The straw is fresh and the blanket smells of smoke. You sleep like the dead, which in Dunhollow is saying something. <i>You are fully healed.</i>",[bye]); }},
     bye]); }
 function gunnarTalk(){
   say('Gunnar the Ploughman',["A man with forearms like hams plants an elbow on the table.","“Arm-wrestle? Five coppers says you can't hold me for a count of three.”"],[
@@ -11878,7 +11878,7 @@ function defeat(){
   setTimeout(()=>{ try{ refreshFoodBar(); }catch(e){} },0);
   combat.active=false; combat.phase='down'; combat.downT=2.6; combat.foe=null;
   duelHud.classList.remove('open');
-  banner('Defeated','#c0483a'); logMsg('You collapse… and wake up at the square.','#c0483a');
+  banner('Defeated','#c0483a'); logMsg('You collapse. The world goes dark.','#c0483a');
 }
 function endCombatSilently(){
   combat.active=false; combat.phase='idle'; combat.foe=null;
@@ -11923,11 +11923,11 @@ function combatUpdate(dt){
   if(!combat.active){
     if(combat.phase==='down'){
       combat.downT-=dt;
-      if(combat.downT<=0){ endCombatSilently(); switchArea('farm','start'); }
+      if(combat.downT<=0){ endCombatSilently(); wakeAfterDefeat(); }
       return;
     }
     if(player.opts){ refreshPlayerHp(false);
-      if(player.hp<player.maxHp){ hpTick+=dt; if(hpTick>2){ hpTick=0; player.hp++; updateHud(); } } }
+      if(player.hp<hpCap()){ hpTick+=dt; if(hpTick>2){ hpTick=0; player.hp++; updateHud(); } } }
     if(combat.respawnT>0){
       combat.respawnT-=dt;
       if(combat.respawnT<=0){
@@ -15313,6 +15313,34 @@ function paintGbtcBanner(x,y){                             // a gallows-pole wit
   drawGbtcEmblem(g,(L+R)/2,T+H/2,0.9,'#d8b050');
   g.fillStyle='rgba(255,255,255,0.05)'; g.fillRect(L,T,6,H); }
 { const oDO=drawObject; drawObject=function(o){ if(o.type!=='gbtcbanner') return oDO(o); const q=P(o.i+0.5,o.j+0.5); drawCached('gbtcbanner',q.x,q.y,80,140,20,130,paintGbtcBanner); }; }
+// ════════ losing a fight costs something: half a day, a share of your purse, and you wake bruised in your last bed ════════
+//   CHOICE.bruised : true until you sleep, bathe, or eat a proper meal (roast meat or a healing draught); health stays at half until then
+//   CHOICE.lastBed : {a,i,j} where you last slept; you are carried back there (the farm, if you have never slept anywhere)
+const hpCap=()=> CHOICE.bruised ? Math.max(1,Math.ceil(player.maxHp*0.5)) : player.maxHp;
+function cureBruise(){ if(!CHOICE.bruised) return; CHOICE.bruised=false; logMsg('The bruises fade. You feel like yourself again.','#8ad07a'); }
+{ const oR=refreshPlayerHp; refreshPlayerHp=function(full){ const r=oR(full); if(CHOICE.bruised) player.hp=Math.min(player.hp,hpCap()); return r; }; }
+{ const oU=updateHud; updateHud=function(...a){ const r=oU(...a); if(CHOICE.bruised){ const t=document.getElementById('hp-mini-text'); if(t) t.textContent+=' · bruised'; } return r; }; }
+{ const oS=sleepUntil; sleepUntil=function(...a){ cureBruise(); CHOICE.lastBed={a:areaId,i:player.i,j:player.j}; return oS(...a); }; }
+{ const oB=bathStrip; bathStrip=function(...a){ cureBruise(); return oB(...a); }; }
+{ const oE=eatItem; eatItem=function(k){ const id=player.inv[k]; if(id==='cooked_meat'||id==='potion'){ const was=CHOICE.bruised; cureBruise(); const r=oE(k); if(!r && was){ refreshPlayerHp(false); updateHud(); } return r; }
+    if(CHOICE.bruised && player.hp>=hpCap()){ if(typeof flash==='function') flash('Bread won\'t mend this. Sleep, a bath, or a proper meal.'); return false; }
+    const r=oE(k); refreshPlayerHp(false); updateHud(); return r; }; }
+let QUEST_FIGHT_LOST=false;
+{ const oD=defeat; defeat=function(...a){ QUEST_FIGHT_LOST=!!FIGHT_UNDO; return oD.apply(this,a); }; }   // read before the quest fight's own undo clears it
+function wakeAfterDefeat(){
+  const lost=QUEST_FIGHT_LOST ? 0 : Math.floor(player.purse*0.25); QUEST_FIGHT_LOST=false;
+  player.purse-=lost; dayClock+=DAY_LEN*0.5; CHOICE.bruised=true;
+  const B=CHOICE.lastBed && AREAS[CHOICE.lastBed.a] ? CHOICE.lastBed : null;
+  if(B){ switchArea(B.a,Object.keys(AREAS[B.a].entries)[0]);
+    let best=null, bd=1e9; for(let i=0;i<ROOM.w;i++) for(let j=0;j<ROOM.h;j++){ if(!walkable(i,j)) continue; const d=Math.hypot(i-B.i,j-B.j); if(d<bd){ bd=d; best=[i,j]; } }
+    if(best){ player.i=best[0]; player.j=best[1]; player.x=best[0]+0.5; player.y=best[1]+0.5; player.path=[]; centerCam(); } }
+  else switchArea('farm','start');
+  refreshPlayerHp(false); player.hp=hpCap(); updateHud();
+  banner('You wake, bruised','#c8a080',1800);
+  logMsg('Someone found you before the crows did and carried you back to your bed. Half a day is gone.','#c8a080');
+  if(lost>0) logMsg('Your purse is lighter: '+formatCoin(lost)+' missing.','#c0483a');
+  logMsg('Bruised: your health stays at half until you sleep, bathe, or eat a proper meal.','#c8a080');
+  if(typeof saveGame==='function') saveGame(); }
 </script>
 </body>
 </html>

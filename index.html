@@ -10492,9 +10492,6 @@ Object.assign(ITEMS,{ trapnote:{ name:"A Trapper's Tally", slot:'misc', read:tru
     body:["A list in a clumsy hand: <i>elf-silver, 3 bracelets · 1 blade, fine · 2 ears of the moon-folk (cloaks) ·</i> and beside each line a price.","At the bottom: <i>Paid in full at the Keep. O.</i> The O is written with a flourish, the way a steward signs his accounts."] },
   cartwheel:{ name:"Hobb's Cart Wheel", slot:'misc' }, brooch:{ name:'A Silver Brooch', slot:'misc' } });
 PRICES.brooch=40;
-{ const oldFD=foeDown; foeDown=function(f,...r){ const res=oldFD(f,...r);                // the tally comes straight off his body into your pack
-    if(f && f.name==="Baron's Trapper" && areaId==='elfroad' && !collectedPickups.has('elfroad:1,13') && !hasItem('trapnote')){ collectedPickups.add('elfroad:1,13'); giveQuestItem('trapnote',true); logMsg("In the trapper's coat: a greasy tally of pelts and payments, paid at the Baron's keep.",'#d8c890'); }
-    return res; }; }
 function hobbQuest(){
   const takeW=()=>{ player.inv[player.inv.indexOf('cartwheel')]=null; };
   if(!CHOICE.hobb){ say('Hobb the Carter',["A man sits on the shaft of a cart with three wheels, an ox chewing patiently beside him and a mule glaring at everything.","“Goblins. Came out of the Wolfwood at dusk, took a wheel off my cart and rolled it away, cackling like it was the best joke ever told. What does a goblin want with a wheel?”","“Find it and I'm back in business. And you'll ride with me whenever you like.”"],[
@@ -11360,6 +11357,30 @@ function resetMobs(){
     else if(CHOICE.camp==='bribed' || !CHOICE.camp) mobs.forEach(m=>{ if(!m.dead) m.hostile=false; });
     else mobs.forEach(m=>{ if(!m.dead) m.hostile=true; });
   }
+  const A=AREAS[areaId];
+  mobs.forEach((m,k)=>{ if(m.name==='Old Greymaw' && !m.dead){ m.maxHp=m.hp=78; m.boss=true; }
+    const s=MOB_SPAWNS[k]; if(s && s.chop){ m.chop=true; m.chopPh=s.chopPh||0; }
+    if(m.dead && corpseGone(areaId,m)) m.gone=true; });
+  const t=tierOf(areaId);                              // further from home, tougher kin
+  mobs.forEach(m=>{ if(m.type==='dummy') return; m.tier=t; const hp=Math.round(m.maxHp*(1+0.2*(t-1))); m.maxHp=hp; if(!m.dead) m.hp=hp; });
+  if(!(A.mobsGone && A.mobsGone())){                   // some foes come back after a while (an old corpse is marked gone; that is fine)
+    const D=CHOICE.deadAt||{};
+    mobs.forEach(m=>{ if(!m.dead || !RESPAWNS.has(m.name)) return; const k=areaId+':'+m.key, at=D[k];
+      if(at==null || dayClock-at<RESPAWN_AFTER) return;
+      defeatedMobs.delete(k); delete D[k]; Object.assign(m,{dead:false, gone:false, fade:1, hp:m.maxHp, state:'guard', hostile:!(A.mobsCalm&&A.mobsCalm()), fallT:0, t:0, k:0, flash:0, st:[]}); }); }
+  if(!(A.inside && !A.cave && !A.under)){              // nobody lies in wait right at a doorway or beside a townsfolk
+    const ents=Object.values(A.entries||{}), tps=OBJECTS.filter(o=>o.type==='teleporter');
+    const tooClose=(i,j)=> NPCS.some(n=>Math.max(Math.abs(n.i-i),Math.abs(n.j-j))<=3) || [...ents,...tps].some(e=>Math.max(Math.abs(e.i-i),Math.abs(e.j-j))<=2);
+    mobs.forEach(m=>{ if(m.dead || m.hostile===false || m.type==='dummy' || !tooClose(m.i,m.j)) return;
+      let best=null, bd=1e9;
+      for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++){ if(blocked.has(i+','+j) || inNotch(i,j) || tooClose(i,j) || mobs.some(o=>o!==m && !o.dead && o.i===i && o.j===j)) continue;
+        const d=Math.abs(i-m.i)+Math.abs(j-m.j); if(d<bd){ bd=d; best=[i,j]; } }
+      if(best){ m.i=best[0]; m.j=best[1]; m.x=m.i+0.5; m.y=m.j+0.5; m.spawn=[m.i,m.j]; } }); }
+  const day=Math.floor(dayClock/DAY_LEN);              // now and then a road tough is a hedge-caster instead
+  mobs.forEach((m,k)=>{ if(m.dead || !ROAD_TOUGHS.has(m.name) || m.type!=='bandit') return;
+    const fr=x=>{ const v=Math.sin(x)*43758.5453; return v-Math.floor(v); }, r=fr(day*12.9898+k*78.233+m.spawn[0]*3.7+m.spawn[1]*1.3+m.name.length); if(r<0.64) return;     // mostly the usual cutthroat
+    const C=ROAD_CASTERS[(r<0.82?0:2)+(fr(day*4.1+k*9.7)<0.5?0:1)];
+    m.type='mage'; m.caster=C.tag; m.name=C.title; m.opts=C.o; const hp=maxHpOf(C.o.equip,FOES.mage.base); m.hp=hp; m.maxHp=hp; });
 }
 function makeDummy(){
   const s=DUMMY_SPAWN, hp=FOES.dummy.base;
@@ -11869,7 +11890,17 @@ function woundRaw(f,n,label,col){
     if(W.ember) addStatus(f,'burn',3.6,1+Math.round(gearSum('magic')/5));
     else if(W.burn && Math.random()<W.burn) addStatus(f,'burn',3,2); }
 }
-function playerHit(){
+function playerHit(){                                // your attack lands: a spell if you hold a staff, else steel
+  const f=combat.foe, W=WEAPONS[player.opts.equip.weapon]||{};
+  if(W.magic && f && SPELL_IMMUNE(f)){ const SP=spellsFor(), S=SP[playerGuard]||SP.right;    // the undead shrug off drain and frost
+    if((S.name==='Drain'||S.name==='Frost') && player.mana>=S.cost){ const hp0=f.hp, m0=player.hp, t0=f.t, w0=f.wind;
+      strike(); const lost=hp0-f.hp; if(lost>0 && !f.dead){ f.hp=Math.min(f.maxHp,f.hp+Math.ceil(lost*0.7)); }       // it barely feels it
+      f.st=(f.st||[]).filter(x=>x.kind!=='chill'); if(S.name==='Drain'){ player.hp=Math.min(player.hp,m0); updateHud(); } if(S.name==='Frost'){ f.t=Math.min(f.t,t0+0.01); f.wind=w0; }
+      floatText(tileOf(f),'Resisted','#c8c0b0'); return; } }
+  strike();
+}
+function strike(){ HIT_SRC='melee'; try{ if(!castSpell()) meleeHit(); } finally{ HIT_SRC=null; } }
+function meleeHit(){
   const f=combat.foe; lunge(player,f); duel.caught=false;
   const dmg=weaponOf(player).dmg;
   if(f.state==='recover' || f.state==='stagger'){ wound(f,dmg); return; }
@@ -11903,6 +11934,10 @@ function foeDown(f){
   defeatedMobs.add(areaId+':'+(f.key||f.name)); (CHOICE.deadAt=CHOICE.deadAt||{})[areaId+':'+(f.key||f.name)]=dayClock;
   logMsg(`${f.name} falls.`,'#d8b24a'); banner('Down!','#f0c060',900);
   combat.phase='between'; combat.betweenT=1.3; duel.st='ready'; combat.lastFaction=f.faction;
+  if(f.name==="Baron's Trapper" && areaId==='elfroad' && !collectedPickups.has('elfroad:1,13') && !hasItem('trapnote')){ collectedPickups.add('elfroad:1,13'); giveQuestItem('trapnote',true); logMsg("In the trapper's coat: a greasy tally of pelts and payments, paid at the Baron's keep.",'#d8c890'); }   // the tally comes straight off his body into your pack
+  if(!mobs.some(m=>m.hostile && !m.dead && m.faction===f.faction)){ slowmo.scale=0.18; slowmo.t=0.7; shake=Math.max(shake,9); burst(f,player,'#fff0c0',22); banner('Finished!','#f8e0a0',1100); }   // the last of them
+  if(f.type==='skeleton' && CHOICE.necroQ==='bones'){ const k=areaId+':'+f.name; CHOICE.bonesDown=CHOICE.bonesDown||[];
+    if(FEN_BONES.includes(k) && !CHOICE.bonesDown.includes(k)){ CHOICE.bonesDown.push(k); logMsg(`The bones lie down. (${bonesDown()}/4 for Vesna)`,'#b8a8e8'); } }
 }
 function afterFoe(faction){
   if(combat.practice){ endPractice(); return; }
@@ -12050,6 +12085,13 @@ function stepAlong(e,dt,speed){
 }
 let hpTick=0;
 function combatUpdate(dt){
+  tickStatus(player,dt); if(combat.active && combat.phase==='fight' && combat.foe) tickStatus(combat.foe,dt);
+  if(player.maxMana){ player.mana=Math.min(player.maxMana,(player.mana??player.maxMana)+dt*(combat.active?7:40)); }
+  combatStep(dt);
+  skelTick(dt);
+  if(!combat.active && pendingPuz && !player.path.length){ const o=pendingPuz; pendingPuz=null; if(OBJECTS.includes(o) && cheb([o.i,o.j],[player.i,player.j])<=1) puzAct(o); }
+}
+function combatStep(dt){
   [player,...mobs].forEach(e=>{
     if(e.flash>0) e.flash-=dt;
     if(e.lunge){ e.lunge.t+=dt; if(e.lunge.t>0.3) e.lunge=null; }
@@ -12437,8 +12479,6 @@ function tickStatus(e,dt){ if(!e.st||!e.st.length) return;
         if(player.hp<=0){ if(combat.active) { player.hp=0; defeat(); } else player.hp=1; } }
       else if(!e.dead){ e.hp-=s.dmg; floatText(tileOf(e),'-'+s.dmg,D.col); if(e.hp<=0 && e===combat.foe) foeDown(e); } } });
   e.st=e.st.filter(s=>s.t>0); }
-{ const oldCU=combatUpdate; combatUpdate=function(dt){ tickStatus(player,dt); if(combat.active && combat.phase==='fight' && combat.foe) tickStatus(combat.foe,dt);
-    if(player.maxMana){ player.mana=Math.min(player.maxMana,(player.mana??player.maxMana)+dt*(combat.active?7:40)); } return oldCU(dt); }; }
 // wolves' bites (and edged weapons) open wounds that keep bleeding; mages' fire keeps burning
 const BLEEDERS=new Set(['dagger','hatchet','axe','elf_blade','spear']);
 // chilled foes wind up slower
@@ -12466,17 +12506,17 @@ function raiseSkeleton(f){ const m=SPM(), T=Math.round(9*m*10)/10, fx=f?f.x-play
 function crumbleSkel(){ const S=SKEL; if(!S || S.crumble) return; S.crumble=1; S.asm=Math.min(S.asm,1);
   floatText([Math.floor(S.x),Math.floor(S.y)],'The bones fall apart','#a8a490'); }
 // withered foes hit for half
-{ const oldCU=combatUpdate; combatUpdate=function(dt){ const r=oldCU(dt);
+function skelTick(dt){                              // your risen skeleton: climbs out, follows, fights, falls apart
     SKEL_PILES.forEach(p=>p.age+=dt); SKEL_PILES=SKEL_PILES.filter(p=>p.age<SKEL_PILE_LIFE && p.area===areaId);
-    const S=SKEL; if(!S) return r;
+    const S=SKEL; if(!S) return;
     S.anim=Math.max(0,S.anim-dt);
-    if(S.crumble){ S.asm-=dt*1.5; if(S.asm<=0.25){ SKEL_PILES.push({x:S.x,y:S.y,dir:S.dir,weapon:S.weapon,age:0,area:areaId}); SKEL=null; } return r; }   // falls into a heap that lies there like any body
+    if(S.crumble){ S.asm-=dt*1.5; if(S.asm<=0.25){ SKEL_PILES.push({x:S.x,y:S.y,dir:S.dir,weapon:S.weapon,age:0,area:areaId}); SKEL=null; } return; }   // falls into a heap that lies there like any body
     S.asm=Math.min(1,S.asm+dt/1.5);                                                  // out of the ground, then bone by bone
-    if(!combat.active && combat.phase==='down'){ crumbleSkel(); return r; }          // you fell: so does it
+    if(!combat.active && combat.phase==='down'){ crumbleSkel(); return; }          // you fell: so does it
     if(combat.active) S.fought=true;
     else if(S.fought){ S.fought=false; S.t=Math.max(S.t,12); S.max=Math.max(S.max,S.t); logMsg('Your skeleton rattles along behind you until the magic runs out.','#e8e4d0'); }
     S.t-=dt*(combat.active?1:0.5);                                                   // between fights the magic drains slower
-    if(S.t<=0){ crumbleSkel(); return r; }
+    if(S.t<=0){ crumbleSkel(); return; }
     const f=combat.active?combat.foe:null; let tx=S.x, ty=S.y;
     if(S.asm>=1){
       if(f && !f.dead){ const fx=f.x-player.x, fy=f.y-player.y, fl=Math.hypot(fx,fy)||1; tx=player.x-fy/fl*0.95+fx/fl*0.25; ty=player.y+fx/fl*0.95+fy/fl*0.25; }   // beside you, flanking the foe
@@ -12485,8 +12525,7 @@ function crumbleSkel(){ const S=SKEL; if(!S || S.crumble) return; S.crumble=1; S
     S.moving=md>0.04; if(md>0.001){ S.x+=mx/md*sp; S.y+=my/md*sp; }
     if(S.moving) S.walk+=dt*Math.min(12,6+sp/dt*1.5);
     if(f && !f.dead) S.dir=dirFromDelta(f.x-S.x,f.y-S.y); else if(S.moving && md>0.08) S.dir=dirFromDelta(mx,my);   // faces its foe, or the way it walks
-    if(f && !f.dead && combat.phase==='fight' && S.asm>=1 && md<0.5){ S.cd-=dt; if(S.cd<=0){ S.cd=1.5; S.anim=0.3; wound(f,S.dmg||3,'Bones!','#e8e4d0'); } }
-    return r; }; }
+    if(f && !f.dead && combat.phase==='fight' && S.asm>=1 && md<0.5){ S.cd-=dt; if(S.cd<=0){ S.cd=1.5; S.anim=0.3; wound(f,S.dmg||3,'Bones!','#e8e4d0'); } } }
 // it comes along through doors and gates
 function skelFollowArea(){ if(SKEL){ if(SKEL.crumble) SKEL=null; else { SKEL.x=player.x+0.7; SKEL.y=player.y+0.35; } } }   // the risen one follows you through doors
 // the skeleton as a little model of bones in 3D (x across, y up the screen, z toward you when it faces south), so it can turn to all eight facings like anyone else
@@ -12625,13 +12664,14 @@ function skelDrawItems(items){
   if(SKEL) items.push({d:SKEL.x+SKEL.y+0.01, ax:SKEL.x, ay:SKEL.y, fn:()=>drawSkel(SKEL)}); }
 const isMagicWeapon=()=>!!(WEAPONS[player.opts&&player.opts.equip.weapon]||{}).magic;
 let bolts=[];
-{ const oldHit=playerHit; playerHit=function(){ const W=WEAPONS[player.opts.equip.weapon]||{}, f=combat.foe;
-    if(!W.magic || !f) return oldHit();
+function castSpell(){                            // a staff casts the spell for the side you hold; false: it is only a stick this time
+    const W=WEAPONS[player.opts.equip.weapon]||{}, f=combat.foe;
+    if(!W.magic || !f) return false;
     player.maxMana=100; if(player.mana==null) player.mana=100;
     const SP=spellsFor(), S=SP[playerGuard]||SP.right;
-    if(SP===HEX_SPELLS && !HEX_KNOWN(playerGuard)) return oldHit();          // a necromancer's staff is just a stick until someone teaches you its words
-    if(S===HEX_SPELLS.left && SKEL && !SKEL.crumble){ floatText(tileOf(player),'Already risen','#e8e4d0'); return; }   // one skeleton at a time
-    if(player.mana<S.cost){ floatText(tileOf(player),'Out of mana','#a8a0c8'); return oldHit(); }      // a plain whack with the staff
+    if(SP===HEX_SPELLS && !HEX_KNOWN(playerGuard)) return false;          // a necromancer's staff is just a stick until someone teaches you its words
+    if(S===HEX_SPELLS.left && SKEL && !SKEL.crumble){ floatText(tileOf(player),'Already risen','#e8e4d0'); return true; }   // one skeleton at a time
+    if(player.mana<S.cost){ floatText(tileOf(player),'Out of mana','#a8a0c8'); return false; }      // a plain whack with the staff
     player.mana-=S.cost; lunge(player,f); duel.caught=false;
     bolts.push({from:{x:player.x,y:player.y}, to:f, t:0, S});
     let dmg=Math.round(S.dmg*SPM()), lbl=S.name+'!', col=S.col, fx=true; HIT_SRC='spell';
@@ -12646,7 +12686,7 @@ let bolts=[];
     if(dmg>0) wound(f,dmg,lbl,col); else floatText(tileOf(f),lbl,col);
     if(!f.dead && S.fx && fx) S.fx(f);
     if(f.state==='windup' && !f.dead && playerGuard===f.swingDir && (f.wind-f.t)<=PARRY.punish){ f.state='stagger'; f.t=PARRY.interruptStun; floatText(tileOf(f),'Interrupted!','#ffd070'); }
-  }; }
+    return true; }
 { const oldDA=drawActor; drawActor=function(e){ oldDA(e);
     if(!e.opts && e.type!=='wolf') return; if(e.dead) return;
     const s=P(e.x+(e.ox||0),e.y+(e.oy||0)), ty=s.y-(e.type==='wolf'?66:114);
@@ -12871,8 +12911,6 @@ function puzAct(o){
     if(P.seq.length===3){ P.c3=true; const g0=OBJECTS.find(x=>x.type==='gate'); if(g0) OBJECTS.splice(OBJECTS.indexOf(g0),1); pzRebuild(); banner('The crystals sing together','#b8f0c8',1800); logMsg('Deeper in, stone slides aside.','#e8c060'); }
     return; }
 }
-{ const oldCU2=combatUpdate; combatUpdate=function(dt){ const r=oldCU2(dt);
-    if(!combat.active && pendingPuz && !player.path.length){ const o=pendingPuz; pendingPuz=null; if(OBJECTS.includes(o) && cheb([o.i,o.j],[player.i,player.j])<=1) puzAct(o); } return r; }; }
 
 // ── how the puzzle pieces look ──
 const tileQuad=(i,j,inset=0)=>{ const a=P(i+inset,j+inset), b=P(i+1-inset,j+inset), c=P(i+1-inset,j+1-inset), d=P(i+inset,j+1-inset); return [a,b,c,d]; };
@@ -13083,8 +13121,6 @@ let RAIN=[], lightningT=0, lastWeather=null;
 const STORM={flash:0};
 
 // ════════ Finishers: the last blow of a fight lands in slow motion ════════
-{ const oldFD=foeDown; foeDown=function(f){ oldFD(f); if(f.type==='dummy') return;
-    if(!mobs.some(m=>m.hostile && !m.dead && m.faction===f.faction)){ slowmo.scale=0.18; slowmo.t=0.7; shake=Math.max(shake,9); burst(f,player,'#fff0c0',22); banner('Finished!','#f8e0a0',1100); } }; }
 
 // ════════ Daily routines: the valley keeps hours ════════
 const NIGHT=()=>nightAmt()>0.55;
@@ -13198,7 +13234,6 @@ PUZ_DRAW.moonaltar=o=>{ const c=P(o.i+0.5,o.j+0.5), lit=PZ().moon||(nightAmt()>0
     g.restore(); if(b.hit && !PZ().moon) moonCheck(); }; }
 
 // ════════ Old Greymaw, a proper boss: bigger, and savage when wounded ════════
-{ const oldRM=resetMobs; resetMobs=function(){ oldRM(); mobs.forEach(m=>{ if(m.name==='Old Greymaw' && !m.dead){ m.maxHp=m.hp=78; m.boss=true; } }); }; }
 
 // ════════ Water that lives: glints of light on every pond ════════
 function drawPoolGlints(o){ if(LOW_FX) return; const [fw,fh]=o.fp;   // sun glints on open water
@@ -13418,7 +13453,6 @@ function deadSil(x,y,ht,col,lit,seed){ const r=k=>rnd01(seed,k,760);
 function chopPose(e){ const ph=((gt*0.9+(e.chopPh||0))%1); if(ph<0.7) return {kind:'raise', t:ph/0.7, dir:'up'}; return {kind:'strike', t:(ph-0.7)/0.1, dir:'up'}; }
 function NPC_POSE(n){ return n && n.chop ? chopPose(n) : null; }
 { const oldPF=poseFor; poseFor=function(e){ const p=oldPF(e); if(p) return p; if(e && e.chop && !e.dead && !(combat.active && combat.foe===e)) return chopPose(e); return p; }; }
-{ const oldRM=resetMobs; resetMobs=function(...a){ const r=oldRM.apply(this,a); mobs.forEach((m,k)=>{ const s=MOB_SPAWNS[k]; if(s && s.chop){ m.chop=true; m.chopPh=s.chopPh||0; } }); return r; }; }
 // the loggers in the Fellings are at work until you interrupt them
 wrap('fellings','mobs',l=>l.map((m,k)=> m.name==='Logger Wat' ? {...m, chop:true, chopPh:0.1} : m.name==='Logger Hobb' ? {...m, chop:true, chopPh:0.55} : m));
 // chips fly when the axe bites
@@ -13841,7 +13875,6 @@ const corpseGone=(id,m)=>{ const t=(CHOICE.deadAt||{})[id+':'+(m.key||m.name)]; 
     if(typeof W.clock==='number') dayClock=W.clock; else if(latest>dayClock) dayClock=latest+DAY_LEN*0.6;
     try{ if(worldCache) worldCache.area=null; if(!combat.active) resetMobs(); }catch(e){}   // with the right clock: old corpses go, foes due back come back
     return res; }; }
-{ const oldRM2=resetMobs; resetMobs=function(...a){ const r=oldRM2.apply(this,a); mobs.forEach(m=>{ if(m.dead && corpseGone(areaId,m)) m.gone=true; }); return r; }; }
 setInterval(()=>{ try{ if(!running || combat.active) return; mobs.forEach(m=>{ if(m.dead && !m.gone && corpseGone(areaId,m)) m.gone=true; }); }catch(e){} },2000);
 
 // towels round the hips: painted onto the body itself, so they follow every pose (standing, lounging, kneeling, side-on)
@@ -14148,15 +14181,12 @@ Object.entries(AP_STATS).forEach(([id,v])=>{ ITEM_STATS[id]={...(ITEM_STATS[id]|
 ITEM_STATS.elf_cloak={...ITEM_STATS.elf_cloak, magic:1};
 const APM=()=>1+gearSum('ap')*0.04;
 var HIT_SRC=null;                       // who caused the wound being dealt right now: 'melee', 'spell' or null (bones, burns)
-{ const oldPH=playerHit; playerHit=function(...a){ HIT_SRC='melee'; try{ return oldPH.apply(this,a); } finally{ HIT_SRC=null; } }; }
 let playerHitDmg=()=> isMagicWeapon() ? SPELLS.right.dmg*SPM() : weaponOf(player).dmg*APM();
 const AREA_TIER={ farm:1, road:1, lane:1, millroad:2, wolfwood:2, camp:2, southtrail:2, mistmere:2, clearing:2,
   fellings:3, ruin:3, lowstreets:3, warren:3, kingsroad:3, elfroad:3, cave1:3, cave2:4, cave3:4, cave4:4,
   fen:4, fenlow:4, fenpath:4, barrow:5 };
 const tierOf=area=>AREA_TIER[area]||(AREAS[area]&&AREAS[area].tier)||2;
 const tierDmg=f=> 1+0.12*(((f&&f.tier)||1)-1);
-{ const oldRM=resetMobs; resetMobs=function(){ oldRM(); const t=tierOf(areaId);
-    mobs.forEach(m=>{ if(m.type==='dummy') return; m.tier=t; const hp=Math.round(m.maxHp*(1+0.2*(t-1))); m.maxHp=hp; if(!m.dead) m.hp=hp; }); }; }
 
 // ════════════════════════════════════════════════════════════
 //  CINDER PASS and THE SUNKEN FORGE: west of the goblin warren, a volcanic valley
@@ -14351,20 +14381,8 @@ function crateTalk(){ const u=CHOICE.stashUp||0, cost=STASH_UPS[u];
 const RESPAWNS=new Set(['Forest Wolf','Mist Wolf','Pale Mist Wolf','Barrow Wolf','Old Barrow Wolf','Hungry Wolf','Ridge Wolf','Night Wolf','Prowling Wolf','Lean Wolf',
   'Goblin Sneak','Goblin Stabber','Bog Lurker','Mire Lurker','Ash Hound','Ash Hound Alpha','Road Thief','Timber Wolf','Timber Wolf Bitch']);
 const RESPAWN_AFTER=DAY_LEN;               // one full day
-{ const oldRM=resetMobs; resetMobs=function(){ oldRM(); const D=CHOICE.deadAt||{}, A=AREAS[areaId]; if(A.mobsGone && A.mobsGone()) return;   // (an old corpse is marked gone; that is fine)
-    mobs.forEach(m=>{ if(!m.dead || !RESPAWNS.has(m.name)) return; const k=areaId+':'+m.key, at=D[k];
-      if(at==null || dayClock-at<RESPAWN_AFTER) return;
-      defeatedMobs.delete(k); delete D[k]; Object.assign(m,{dead:false, gone:false, fade:1, hp:m.maxHp, state:'guard', hostile:!(A.mobsCalm&&A.mobsCalm()), fallT:0, t:0, k:0, flash:0, st:[]}); }); }; }
 // ── no foe stands right beside a friendly face or on a doorstep: anyone spawning within 3 tiles of an
 //    NPC (or 2 of an entrance) is moved to the nearest open spot that is clear of both
-{ const oldRM=resetMobs; resetMobs=function(){ oldRM(); const A=AREAS[areaId]; if(A.inside && !A.cave && !A.under) return;
-    const ents=Object.values(A.entries||{}), tps=OBJECTS.filter(o=>o.type==='teleporter');
-    const tooClose=(i,j)=> NPCS.some(n=>Math.max(Math.abs(n.i-i),Math.abs(n.j-j))<=3) || [...ents,...tps].some(e=>Math.max(Math.abs(e.i-i),Math.abs(e.j-j))<=2);
-    mobs.forEach(m=>{ if(m.dead || m.hostile===false || m.type==='dummy' || !tooClose(m.i,m.j)) return;
-      let best=null, bd=1e9;
-      for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++){ if(blocked.has(i+','+j) || inNotch(i,j) || tooClose(i,j) || mobs.some(o=>o!==m && !o.dead && o.i===i && o.j===j)) continue;
-        const d=Math.abs(i-m.i)+Math.abs(j-m.j); if(d<bd){ bd=d; best=[i,j]; } }
-      if(best){ m.i=best[0]; m.j=best[1]; m.x=m.i+0.5; m.y=m.j+0.5; m.spawn=[m.i,m.j]; } }); }; }
 // elves: most carry face marks, some body marks and earrings too (the same ones every time you meet them)
 function markElves(){
     NPCS.forEach(n=>{ const o=n.opts; if(!o || o.race!=='elf' || o._marked) return; o._marked=true; if(o.marks && Object.values(o.marks).some(Boolean)) return;
@@ -14468,10 +14486,6 @@ setInterval(()=>{ try{ if(CHOICE.skelWeapon && !skelArmsOn()) skelWeaponHome(); 
 // Vesna's last lesson: the bones you raise fight with their fists, until the fen's own dead teach you how to put a weapon back in a dead hand
 const FEN_BONES=['fen:Risen Bones','fen:Rattling Bones','fen:Restless Bones','fenlow:Drowned Bones'];
 const bonesDown=()=>FEN_BONES.filter(k=>(CHOICE.bonesDown||[]).includes(k)).length;
-{ const oF=foeDown; foeDown=function(f){ const r=oF(f);
-    if(f && f.type==='skeleton' && CHOICE.necroQ==='bones'){ const k=areaId+':'+f.name; CHOICE.bonesDown=CHOICE.bonesDown||[];
-      if(FEN_BONES.includes(k) && !CHOICE.bonesDown.includes(k)){ CHOICE.bonesDown.push(k); logMsg(`The bones lie down. (${bonesDown()}/4 for Vesna)`,'#b8a8e8'); } }
-    return r; }; }
 { const oV=TALKERS.vesna; TALKERS.vesna=function(){
     if(NECRO()<3 || CHOICE.skelArms) return oV();
     const V='Vesna the Grave-Speaker';
@@ -14905,13 +14919,7 @@ JOURNAL.push(['A Wolf of Your Own', ()=>{
 { const oAS=applySave; applySave=function(sv){ const r=oAS(sv); if('wynn' in CHOICE){ if(CHOICE.maren==null) CHOICE.maren=CHOICE.wynn; delete CHOICE.wynn; } if('wynnThanked' in CHOICE){ if(CHOICE.marenThanked==null) CHOICE.marenThanked=CHOICE.wynnThanked; delete CHOICE.wynnThanked; } return r; }; }
 // skeletons are dead already: Drain finds nothing to drink, and frost means nothing to bones
 const SPELL_IMMUNE=f=>!!f && f.type==='skeleton';
-{ const oPH=playerHit; playerHit=function(){ const f=combat.foe, W=WEAPONS[player.opts.equip.weapon]||{};
-    if(W.magic && f && SPELL_IMMUNE(f)){ const SP=spellsFor(), S=SP[playerGuard]||SP.right;
-      if((S.name==='Drain'||S.name==='Frost') && player.mana>=S.cost){ const hp0=f.hp, st0=(f.st||[]).length, m0=player.hp, sk=f.state, t0=f.t, w0=f.wind;
-        oPH(); const lost=hp0-f.hp; if(lost>0 && !f.dead){ f.hp=Math.min(f.maxHp,f.hp+Math.ceil(lost*0.7)); }       // it barely feels it
-        f.st=(f.st||[]).filter(x=>x.kind!=='chill'); if(S.name==='Drain'){ player.hp=Math.min(player.hp,m0); updateHud(); } if(S.name==='Frost'){ f.t=Math.min(f.t,t0+0.01); f.wind=w0; }
-        floatText(tileOf(f),'Resisted','#c8c0b0'); return; } }
-    return oPH(); }; }
+
 // Old Tobb's spade
 Object.assign(ITEMS,{ shovel:{ name:'Spade', slot:'weapon' } }); Object.assign(WEAPONS,{ shovel:{ wind:0.26, dmg:6, len:26 } }); Object.assign(PRICES,{ shovel:8 });
 { const oDW=drawWeapon; drawWeapon=function(c,hx,hy,ang,id,s=1){ if(id!=='shovel') return oDW(c,hx,hy,ang,id,s);
@@ -15082,11 +15090,6 @@ const ROAD_CASTERS=[
   { tag:'witch', title:'Bone-Witch', o:{gender:'f',skin:1,hair:4,hairColor:1,beard:0,face:0,equip:{head:'bandana',torso:'tunic_green',armor:'robe_black',hands:null,legs:'trousers',feet:'boots',weapon:'staff_hex',offhand:null}} },
   { tag:'mage', title:'Hedge-Mage', o:{gender:'m',skin:2,hair:2,hairColor:4,beard:3,face:0,equip:{head:'hood',torso:'shirt',armor:'robe_blue',hands:null,legs:'trousers',feet:'boots',weapon:'staff_oak',offhand:null}} },
   { tag:'mage', title:'Renegade Magus', o:{gender:'m',skin:0,hair:1,hairColor:7,beard:1,face:2,equip:{head:null,torso:'tunic_linen',armor:'robe',hands:'gloves',legs:'hose_grey',feet:'boots',weapon:'staff_cinder',offhand:null}} } ];
-{ const oldRM=resetMobs; resetMobs=function(){ oldRM(); const day=Math.floor(dayClock/DAY_LEN);
-    mobs.forEach((m,k)=>{ if(m.dead || !ROAD_TOUGHS.has(m.name) || m.type!=='bandit') return;
-      const fr=x=>{ const v=Math.sin(x)*43758.5453; return v-Math.floor(v); }, r=fr(day*12.9898+k*78.233+m.spawn[0]*3.7+m.spawn[1]*1.3+m.name.length); if(r<0.64) return;     // mostly the usual cutthroat
-      const C=ROAD_CASTERS[(r<0.82?0:2)+(fr(day*4.1+k*9.7)<0.5?0:1)];
-      m.type='mage'; m.caster=C.tag; m.name=C.title; m.opts=C.o; const hp=maxHpOf(C.o.equip,FOES.mage.base); m.hp=hp; m.maxHp=hp; }); }; }
 // the mill-pond wolf is there whether or not anyone asked: kill it first and Gisla comes to thank you on her own
 setInterval(()=>{ try{ if(!running || CS.on || combat.active || areaId!=='millroad' || CHOICE.gisla || !defeatedMobs.has('millroad:Mill-Pond Wolf') || dlgIsOpen()) return;
   const n=NPCS.find(n=>n.id==='gisla'); if(n) talkTo(n); }catch(e){} },1500);

@@ -5217,6 +5217,7 @@ function breakObject(o){
 // a bed: sleep until a chosen time of day. Day phase t=(dayClock%DAY_LEN)/DAY_LEN: 0 is noon, 0.5 midnight.
 const SLEEP_TO={ morning:0.86, midday:0.0, evening:0.17 };
 function sleepUntil(which){
+  cureBruise(); CHOICE.lastBed={a:areaId,i:player.i,j:player.j};   // this is where you wake if you lose a fight
   const ph=SLEEP_TO[which]*DAY_LEN; let tgt=Math.ceil((dayClock-ph)/DAY_LEN)*DAY_LEN+ph; if(tgt-dayClock<DAY_LEN*0.05) tgt+=DAY_LEN;
   closeDialog(); dayClock=tgt; player.hp=player.maxHp; updateHud();
   banner({morning:'You wake at dawn',midday:'You wake at midday',evening:'You wake as evening falls'}[which],'#e8d8a8',1600);
@@ -9290,7 +9291,11 @@ function askDiscard(loc){
   document.getElementById('dis-no').onclick=()=>{ invMsg.textContent=''; };
 }
 // provisions: eat or drink to win back health, in or out of a fight
-function eatItem(k){ const id=player.inv[k]; if(!id||!ITEMS[id]||!ITEMS[id].heal) return false;
+function eatItem(k){ const id=player.inv[k];           // only a proper meal or a draught mends a bruise
+  if(id==='cooked_meat'||id==='potion'){ const was=CHOICE.bruised; cureBruise(); const r=eatItemRaw(k); if(!r && was){ refreshPlayerHp(false); updateHud(); } return r; }
+  if(CHOICE.bruised && player.hp>=hpCap()){ if(typeof flash==='function') flash('Bread won\'t mend this. Sleep, a bath, or a proper meal.'); return false; }
+  const r=eatItemRaw(k); refreshPlayerHp(false); updateHud(); return r; }
+function eatItemRaw(k){ const id=player.inv[k]; if(!id||!ITEMS[id]||!ITEMS[id].heal) return false;
   if(player.hp>=player.maxHp){ if(typeof flash==='function') flash('You are not hurt.'); return false; }
   const h=Math.min(ITEMS[id].heal, player.maxHp-player.hp); player.hp+=h; player.inv[k]=null;
   floatText(tileOf(player),'+'+h+' HP','#8ad07a'); if(id==='raw_meat') logMsg('You chew the raw meat. It is not a good idea, but it is something. Better cooked, at an inn.','#c8a070'); else logMsg((id==='potion'?'You drink the ':'You eat the ')+ITEMS[id].name.toLowerCase().replace(/^loaf of /,'bread')+'. (+'+h+' HP)','#8ad07a');
@@ -11446,7 +11451,9 @@ let lastRenown=-1;
 function renownDone(){ try{ return JOURNAL.filter(([t,f])=>{ if(t==='The Fallen Oak') return false; const r=f(); return r && r[0]==='done'; }).length; }catch(e){ return 0; } }
 function renownRank(){ return Math.min(RENOWN.length-1, Math.floor(renownDone()/3)); }
 function refreshPlayerHp(full){ const rk=renownRank(); if(lastRenown>=0 && rk>lastRenown && running) logMsg('Renown: you are now "'+RENOWN[rk]+'" in the valley. (+4 max HP)','#e8c060'); lastRenown=rk;
-  player.maxHp=maxHpOf(player.opts?player.opts.equip:defaultEquip(),PARRY.hpBase)+rk*4+(CHOICE.moonBless?10:0)+(CHOICE.bless||0)*5; if(full||player.hp==null) player.hp=player.maxHp; player.hp=Math.min(player.hp,player.maxHp); }
+  player.maxHp=maxHpOf(player.opts?player.opts.equip:defaultEquip(),PARRY.hpBase)+rk*4+(CHOICE.moonBless?10:0)+(CHOICE.bless||0)*5; if(full||player.hp==null) player.hp=player.maxHp; player.hp=Math.min(player.hp,player.maxHp);
+  if(bathBuffOn()){ player.maxHp+=10; if(full) player.hp=player.maxHp; } player.hp=Math.min(player.hp,player.maxHp);   // fresh from a bath
+  if(CHOICE.bruised) player.hp=Math.min(player.hp,hpCap()); }
 
 // ── HUD ──
 const duelHud=document.getElementById('duel-hud'), clog=document.getElementById('combat-log'), cbanner=document.getElementById('combat-banner');
@@ -11595,7 +11602,7 @@ function updateHud(){
   const sn=document.getElementById('p-shield-note'); if(sn) sn.style.display = (player.opts && isShieldId(player.opts.equip.offhand)) ? '' : 'none';
   const hh=Math.max(0,player.hp), pct=100*hh/player.maxHp;
   document.getElementById('hp-mini-fill').style.width=pct+'%';
-  document.getElementById('hp-mini-text').textContent=Math.ceil(hh)+' / '+player.maxHp;
+  document.getElementById('hp-mini-text').textContent=Math.ceil(hh)+' / '+player.maxHp+(CHOICE.bruised?' · bruised':'');
   document.querySelectorAll('.p-dir').forEach(el=>el.classList.toggle('held', el.dataset.dir===playerGuard));
 }
 function pressFx(id){ const b=document.getElementById(id); b.classList.add('flash'); setTimeout(()=>b.classList.remove('flash'),90); }
@@ -13841,7 +13848,13 @@ function drawPlayerWading(e){                       // out of a fight: you sink 
 // "take a bath": everything you wear goes in a chest on the bank, and you go into the water
 const BATH_NOTES={ 'Maud':"“Leave your things in the chest on the bank. Nobody here's going to steal your boots.”", 'Ithilwen':"“Your things go in the chest by the stones. The water does not like cloth.”", 'Yselde, Bath-mistress':"“Clothes in the chest, not on the floor. I'm not your mother.”", 'Nimuë, Keeper of the Bath':"“Your things will wait in the chest beside the pool. Nobody here wants them.”" };
 let BATH_NOTE=null;
-function bathStrip(who){
+function bathStrip(who){                             // into the bath: your things go in a chest, and you come out refreshed
+  cureBruise();
+  undressForBath(who);
+  CHOICE.bathBuff=dayClock+BATH_BUFF_LEN(); refreshPlayerHp(false); player.hp=player.maxHp; updateHud();
+  logMsg('Refreshed: clean, warm and loose-limbed. +10 max health for half a day.','#a8d8f0');
+}
+function undressForBath(who){
   const E=player.opts.equip, items={}; SLOTS.forEach(sl=>{ if(E[sl]) items[sl]=E[sl]; });            // they come off at the chest, in the scene
   let pool=null, best=1e9; OBJECTS.filter(o=>o.type==='pool').forEach(o=>{ const d=Math.hypot(o.i+o.fp[0]/2-player.x,o.j+o.fp[1]/2-player.y); if(d<best){ best=d; pool=o; } });
   if(!pool) return;
@@ -15153,9 +15166,6 @@ function temperSpark(g2,size){                    // a hammer-spark in the botto
     g2.restore(); }
 // ── a proper bath does more than heal: for half a day afterwards you are "Refreshed" (+10 max health)
 const BATH_BUFF_LEN=()=>DAY_LEN*0.5, bathBuffOn=()=> CHOICE.bathBuff!=null && dayClock<CHOICE.bathBuff && dayClock>CHOICE.bathBuff-BATH_BUFF_LEN()-1;
-{ const oB=bathStrip; bathStrip=function(...a){ const r=oB(...a); CHOICE.bathBuff=dayClock+BATH_BUFF_LEN(); refreshPlayerHp(false); player.hp=player.maxHp; updateHud();
-    logMsg('Refreshed: clean, warm and loose-limbed. +10 max health for half a day.','#a8d8f0'); return r; }; }
-{ const oR=refreshPlayerHp; refreshPlayerHp=function(full){ const r=oR(full); if(bathBuffOn()){ player.maxHp+=10; if(full) player.hp=player.maxHp; } player.hp=Math.min(player.hp,player.maxHp); return r; }; }
 let BATH_WAS=false; setInterval(()=>{ try{ const on=bathBuffOn(); if(BATH_WAS && !on && running){ refreshPlayerHp(false); updateHud(); logMsg('The glow of the bath has worn off.','#8aa8b8'); } BATH_WAS=on; }catch(e){} },2000);
 // ── goats are goats: they amble about near home, crop the grass, lie down in the sun and stare at nothing
 function goatTick(o){ const now=gt; if(o.gx==null){ o.hx=o.i+0.5; o.hy=o.j+0.5; o.gx=o.hx; o.gy=o.hy; o.gs='idle'; o.gt=now+1+Math.random()*2; o.face=1; o.lt=now; }
@@ -15451,13 +15461,6 @@ function drawGbtcBanner(o){ const q=P(o.i+0.5,o.j+0.5); drawCached('gbtcbanner',
 //   CHOICE.lastBed : {a,i,j} where you last slept; you are carried back there (the farm, if you have never slept anywhere)
 const hpCap=()=> CHOICE.bruised ? Math.max(1,Math.ceil(player.maxHp*0.5)) : player.maxHp;
 function cureBruise(){ if(!CHOICE.bruised) return; CHOICE.bruised=false; logMsg('The bruises fade. You feel like yourself again.','#8ad07a'); }
-{ const oR=refreshPlayerHp; refreshPlayerHp=function(full){ const r=oR(full); if(CHOICE.bruised) player.hp=Math.min(player.hp,hpCap()); return r; }; }
-{ const oU=updateHud; updateHud=function(...a){ const r=oU(...a); if(CHOICE.bruised){ const t=document.getElementById('hp-mini-text'); if(t) t.textContent+=' · bruised'; } return r; }; }
-{ const oS=sleepUntil; sleepUntil=function(...a){ cureBruise(); CHOICE.lastBed={a:areaId,i:player.i,j:player.j}; return oS(...a); }; }
-{ const oB=bathStrip; bathStrip=function(...a){ cureBruise(); return oB(...a); }; }
-{ const oE=eatItem; eatItem=function(k){ const id=player.inv[k]; if(id==='cooked_meat'||id==='potion'){ const was=CHOICE.bruised; cureBruise(); const r=oE(k); if(!r && was){ refreshPlayerHp(false); updateHud(); } return r; }
-    if(CHOICE.bruised && player.hp>=hpCap()){ if(typeof flash==='function') flash('Bread won\'t mend this. Sleep, a bath, or a proper meal.'); return false; }
-    const r=oE(k); refreshPlayerHp(false); updateHud(); return r; }; }
 let QUEST_FIGHT_LOST=false;
 function wakeAfterDefeat(){
   const lost=QUEST_FIGHT_LOST ? 0 : Math.floor(player.purse*0.25); QUEST_FIGHT_LOST=false;
@@ -15472,7 +15475,15 @@ function wakeAfterDefeat(){
   logMsg('Someone found you before the crows did and carried you back to your bed. Half a day is gone.','#c8a080');
   if(lost>0) logMsg('Your purse is lighter: '+formatCoin(lost)+' missing.','#c0483a');
   logMsg('Bruised: your health stays at half until you sleep, bathe, or eat a proper meal.','#c8a080');
-  if(typeof saveGame==='function') saveGame(); }
+  if(typeof saveGame==='function') saveGame();
+  CHOICE.taught=CHOICE.taught||{};
+  if(!CHOICE.taught.death){ CHOICE.taught.death=true;           // the first time: what losing costs, in full
+      setTimeout(()=>say('What Losing Costs',["You lost the fight. You are not dead, but it cost you:",
+        "• <b>You wake in the last bed you slept in</b> (the farm, if you have never slept anywhere else). Sleep somewhere new to change it.",
+        "• <b>Half a day has passed.</b> Anything with a deadline kept ticking.",
+        "• <b>A quarter of the coin you carried is gone</b>"+(lost>0?" ("+formatCoin(lost)+" this time)":"")+". Not when a quest fight simply resets itself.",
+        "• <b>You are Bruised:</b> your health stays at <b>half</b> and will not heal past it until you <b>sleep</b> in a bed, take a <b>bath</b>, or eat <b>roast meat</b> or drink a <b>healing draught</b>. Bread and apples will not mend it."],[{label:'Understood.',fn:closeDialog}]),1600); }
+}
 // ════════ necklaces: cheap trinkets off the dead and out of crates, and Brann's wolf-tooth string ════════
 var NECK_LOOKS={ copper_chain:{cord:'#b8743c',w:0.7,p:'ring',col:'#c8844a'}, bone_charm:{cord:'#5a3a20',w:0.6,p:'bone',col:'#e8e0c8'},
   glass_beads:{cord:'#7a6a58',w:0.4,p:'beads',cols:['#5a9ad0','#7ac08a','#d8a840','#c85a5a']}, tin_medal:{cord:'#6a6a70',w:0.5,p:'disc',col:'#a8aab0'},
@@ -15577,13 +15588,18 @@ function ckBreakDuel(K){ combat.active=false; combat.phase='idle'; combat.foe=nu
   K.hostile=false; K.state='guard'; K.path=[]; K.moving=false; }
 function ckPlace(K,i,j){ for(let n=0;n<10;n++) sparks.push({wx:K.x,wy:K.y,vx:(Math.random()-0.5)*160,vy:-40-Math.random()*90,t:0,col:'#8ab8c8'});
   K.i=i; K.j=j; K.x=i+0.5; K.y=j+0.5; K.dir=dirTo([i,j],tileOf(player)); for(let n=0;n<14;n++) sparks.push({wx:K.x,wy:K.y,vx:(Math.random()-0.5)*160,vy:-40-Math.random()*90,t:0,col:'#b8e0f0'}); }
-function ckResume(K,msg){ CK=null; K.hostile=true; K.warded=false; if(msg) banner(msg,'#c8e0f0',1600); setTimeout(()=>{ if(areaId===BK_AREA && !K.dead && player.hp>0) startCombat(); },700); }
+function ckResume(K,msg){ CK=null; K.hostile=true; K.warded=false; if(msg) banner(msg,'#c8e0f0',1600); setTimeout(()=>{ if(areaId===BK_AREA && !K.dead && player.hp>0) startCombat(); },700);
+  if(K && K.cphase>=3 && !K.warded) setTimeout(()=>teach('enrage','Enraged',["He swings <b>faster</b> now, and <b>every blow he lands heals him</b>.","Parry, and strike only while he recovers. Every hit you take makes the fight longer."]),900); }
 function ckStorm(K){ ckBreakDuel(K); ckPlace(K,BK_HOME[0],BK_HOME[1]);
   banner('The Drowning Wail! Hide behind a standing stone!','#9ad0e8',2200); logMsg('The Barrow-King opens his mouth, and the roar of black water fills the barrow. Get a standing stone between you and him!','#9ad0e8');
-  CK={mode:'storm', src:[BK_HOME[0]+0.5,BK_HOME[1]+0.5], t:5, blasts:0}; }
+  CK={mode:'storm', src:[BK_HOME[0]+0.5,BK_HOME[1]+0.5], t:5, blasts:0};
+  teach('wail','The Drowning Wail',["When the count above him reaches zero, black water floods the barrow.",
+    "The <b>green tiles</b> are the lee of the standing stones: <b>click one to walk there</b> before the count runs out.","He does it <b>twice</b>, from two different places, so be ready to move to another stone."]); }
 function ckRings(K){ ckBreakDuel(K); ckPlace(K,BK_HOME[0],BK_HOME[1]);
   banner('Black thorns! Step off the dark stones!','#c8c0b8',2200); logMsg('The stones go black, one patch after another, and thorns of black bog-oak push up through them. Keep moving!','#c8c0b8');
-  CK={mode:'rings', wave:0, t:0.8, tiles:null, tele:0}; }
+  CK={mode:'rings', wave:0, t:0.8, tiles:null, tele:0};
+  teach('thorns','Black thorns',["Patches of stone turn <b>black</b>, and thorns burst up out of them a moment later.",
+    "Step onto a tile that is <b>not</b> dark before they erupt. There is always a free one beside you.","Four waves, each a little quicker than the last."]); }
 function ckRingTiles(K){ const A=AREAS[areaId], out=[], pi=Math.floor(player.x), pj=Math.floor(player.y);
   for(let i=0;i<A.w;i++) for(let j=0;j<A.h;j++){ if(blocked.has(i+','+j) || (i===K.i&&j===K.j)) continue; if(Math.random()<0.42) out.push(i+','+j); }
   const near=[[pi,pj],...DIR_DELTA.map(([a,b])=>[pi+a,pj+b])].filter(([a,b])=>walkable(a,b)||(a===pi&&b===pj));
@@ -15623,7 +15639,8 @@ function ckAdds(K){ CK={mode:'adds'}; K.warded=true;
   BK_HOUSE.forEach(([n,i,j,o],k)=>{ const op=o(), hp=maxHpOf(op.equip,FOES.bandit.base)+8;
     mobs.push({ id:200+k, key:n+'@'+dayClock.toFixed(0), name:n, type:'bandit', opts:op, faction:'wightguard', spawn:[i,j], i, j, x:i+0.5, y:j+0.5, dir:k?6:1, hp, maxHp:hp, path:[], moving:false, dead:false, gone:false, fade:1, flash:0, lunge:null,
       state:'guard', t:0, k:0, wind:1, quick:false, guardDir:'up', ox:0, oy:0, hostile:true, fallT:0 }); });
-  setTimeout(()=>{ if(areaId===BK_AREA && player.hp>0) startCombat(); },1200); }
+  setTimeout(()=>{ if(areaId===BK_AREA && player.hp>0) startCombat(); },1200);
+  teach('ward','His household rises',["While the <b>ward of cold light</b> surrounds him, the king cannot be hurt.","Defeat the <b>Housecarl</b> and the <b>Shieldmaid</b> first, and the ward breaks."]); }
 // in the last phase every blow he lands feeds him
 // a warded king cannot be hurt; nor can he be killed through a phase
 // what the set pieces look like: the lee of the stones, the gas about to burn, the wave when it breaks, the ward
@@ -15852,21 +15869,7 @@ function showTeach(title,lines){ let el=document.getElementById('teach-card');
 document.addEventListener('keydown',e=>{ if(TEACH_OPEN && e.key==='Enter' && showTeach.close){ e.preventDefault(); showTeach.close(); } });
 // ── the first fight (on the farm, for most) ──
 // ── the Barrow-King ──
-{ const o=ckStorm; ckStorm=function(K){ const r=o(K); teach('wail','The Drowning Wail',["When the count above him reaches zero, black water floods the barrow.",
-    "The <b>green tiles</b> are the lee of the standing stones: <b>click one to walk there</b> before the count runs out.","He does it <b>twice</b>, from two different places, so be ready to move to another stone."]); return r; }; }
-{ const o=ckRings; ckRings=function(K){ const r=o(K); teach('thorns','Black thorns',["Patches of stone turn <b>black</b>, and thorns burst up out of them a moment later.",
-    "Step onto a tile that is <b>not</b> dark before they erupt. There is always a free one beside you.","Four waves, each a little quicker than the last."]); return r; }; }
-{ const o=ckAdds; ckAdds=function(K){ const r=o(K); teach('ward','His household rises',["While the <b>ward of cold light</b> surrounds him, the king cannot be hurt.","Defeat the <b>Housecarl</b> and the <b>Shieldmaid</b> first, and the ward breaks."]); return r; }; }
-{ const o=ckResume; ckResume=function(K,msg){ const r=o(K,msg); if(K && K.cphase>=3 && !K.warded) setTimeout(()=>teach('enrage','Enraged',["He swings <b>faster</b> now, and <b>every blow he lands heals him</b>.","Parry, and strike only while he recovers. Every hit you take makes the fight longer."]),900); return r; }; }
 // ── the first time you lose a fight ──
-{ const oW=wakeAfterDefeat; wakeAfterDefeat=function(...a){ const lost0=player.purse; const r=oW(...a); CHOICE.taught=CHOICE.taught||{};
-    if(!CHOICE.taught.death){ CHOICE.taught.death=true; const lost=lost0-player.purse;
-      setTimeout(()=>say('What Losing Costs',["You lost the fight. You are not dead, but it cost you:",
-        "• <b>You wake in the last bed you slept in</b> (the farm, if you have never slept anywhere else). Sleep somewhere new to change it.",
-        "• <b>Half a day has passed.</b> Anything with a deadline kept ticking.",
-        "• <b>A quarter of the coin you carried is gone</b>"+(lost>0?" ("+formatCoin(lost)+" this time)":"")+". Not when a quest fight simply resets itself.",
-        "• <b>You are Bruised:</b> your health stays at <b>half</b> and will not heal past it until you <b>sleep</b> in a bed, take a <b>bath</b>, or eat <b>roast meat</b> or drink a <b>healing draught</b>. Bread and apples will not mend it."],[{label:'Understood.',fn:closeDialog}]),1600); }
-    return r; }; }
 </script>
 </body>
 </html>

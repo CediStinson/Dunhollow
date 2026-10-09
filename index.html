@@ -13244,9 +13244,13 @@ function paintCrag(X,Y,o){ const [w,h]=o.fp, sd=o.i*31+o.j*17+(o.v||0)*7, R=(k,s
         g.strokeStyle=`rgb(${Math.round(c[0]*(1+tn))},${Math.round(c[1]*(1+tn))},${Math.round(c[2]*(1+tn))})`; g.lineWidth=1.2; g.beginPath(); g.moveTo(bx,p.y+2); g.quadraticCurveTo(bx+lean*0.3,p.y+2-hh*0.6,bx+lean,p.y+2-hh); g.stroke(); } });
   else { g.fillStyle='rgba(60,84,34,0.5)'; base.forEach((p,k)=>{ if(R(k,810)<0.4){ g.beginPath(); g.ellipse(p.x,p.y-2,5+R(k,811)*5,2.5,0,0,Math.PI*2); g.fill(); } }); } }   // grass and moss at its foot
 // the colour of the painted ground just outside each point of a rock's foot (from the cached ground layer), or null
-function cragGround(base){ try{ if(!worldCache || worldCache.area!==areaId) return null; const c=worldCache.ctx, ox=worldCache.ox, oy=worldCache.oy, W=c.canvas.width, H=c.canvas.height;
-    return base.map(p=>{ const x=Math.round(ox+(p.gi-p.gj)*TW/2), y=Math.round(oy+(p.gi+p.gj)*TH/2); if(x<3||y<3||x>W-4||y>H-4) return [90,100,60];
-      const d=c.getImageData(x-3,y-3,7,7).data; let r=0,gg=0,b=0,n=0; for(let q=0;q<d.length;q+=4){ if(d[q+3]<200) continue; r+=d[q]; gg+=d[q+1]; b+=d[q+2]; n++; }
+let CRAG_GROUND=null;                                                            // a quarter-size copy of the ground layer, read back once per area
+function cragGround(base){ try{ if(!worldCache || worldCache.area!==areaId) return null;
+    if(!CRAG_GROUND || CRAG_GROUND.cv!==worldCache.cv){ const k=0.25, W=Math.ceil(worldCache.cv.width*k), H=Math.ceil(worldCache.cv.height*k), c=document.createElement('canvas'); c.width=W; c.height=H;
+      const x=c.getContext('2d',{willReadFrequently:true}); x.drawImage(worldCache.cv,0,0,W,H); CRAG_GROUND={cv:worldCache.cv, k, W, H, d:x.getImageData(0,0,W,H).data}; }
+    const G=CRAG_GROUND, ox=worldCache.ox, oy=worldCache.oy;
+    return base.map(p=>{ const x=Math.round((ox+(p.gi-p.gj)*TW/2)*G.k), y=Math.round((oy+(p.gi+p.gj)*TH/2)*G.k); if(x<1||y<1||x>G.W-2||y>G.H-2) return [90,100,60];
+      let r=0,gg=0,b=0,n=0; for(let yy=y-1;yy<=y+1;yy++) for(let xx=x-1;xx<=x+1;xx++){ const q=(yy*G.W+xx)*4; if(G.d[q+3]<200) continue; r+=G.d[q]; gg+=G.d[q+1]; b+=G.d[q+2]; n++; }
       return n ? [Math.round(r/n),Math.round(gg/n),Math.round(b/n)] : [90,100,60]; }); }catch(e){ return null; } }
 function drawRockRidge(o){ const L=o.fp[0], a=P(o.i+0.08,o.j+0.55), b=P(o.i+L-0.08,o.j+0.55), N=L*3, seed=o.i*7+o.j*13+o.v;
   const at=t=>({x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t}), H=t=>40+28*Math.sin(t*Math.PI)*0.6+22*rnd01(Math.floor(t*N),seed,750);

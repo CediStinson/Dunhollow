@@ -11778,7 +11778,8 @@ function hurtPlayer(n,label){
 function timingNote(since){
   return since<=perfectFor(player)+0.08 ? 'a hair early' : since<=windowFor(player) ? 'early' : null;
 }
-function impact(f){
+function impact(f){                                   // a foe's swing lands (or meets your parry)
+  const hp0=player.hp, S=foeSpell(f);
   const s=curStep(f);
   lunge(f,player); f.strikeAt=clock;
   if(f.type==='wolf') f.guardDir=null;   // never guards, even briefly between lunges
@@ -11792,21 +11793,47 @@ function impact(f){
     burst(player,f,'#fff4c0',16);
     logMsg(`Perfect parry! ${shortName(f)} staggers.`,'#f0c060');
     if(!f.quick) f.k++;
-    return;
-  }
-  const fdmg=weaponOf(f).dmg;
-  if(sideOk && since<=windowFor(player)){
-    const note=timingNote(since); floatText(tileOf(player),'Blocked'+(note?' · '+note:''),'#a8c8f0'); burst(player,f,'#c8d8f0',7);
-  } else if(duel.st==='parry'){
-    hurtPlayer(fdmg, 'Wrong side!');
   } else {
-    hurtPlayer(fdmg);
+    const fdmg=weaponOf(f).dmg;
+    if(sideOk && since<=windowFor(player)){
+      const note=timingNote(since); floatText(tileOf(player),'Blocked'+(note?' · '+note:''),'#a8c8f0'); burst(player,f,'#c8d8f0',7);
+    } else if(duel.st==='parry'){
+      hurtPlayer(fdmg, 'Wrong side!');
+    } else {
+      hurtPlayer(fdmg);
+    }
+    f.state='recover'; f.t=f.quick?0.5:s.after;
+    if(!f.quick) f.k++;
+    if(player.hp<=0) defeat();
   }
-  f.state='recover'; f.t=f.quick?0.5:s.after;
-  if(!f.quick) f.k++;
-  if(player.hp<=0) defeat();
+  const hurt=player.hp<hp0 && player.hp>0;
+  if(hurt && !combat.practice){                     // what the blow leaves behind
+    if(f.type==='wolf'){ addStatus(player,'bleed',4.2,1); logMsg('The bite tears. You are bleeding.','#d0342c'); }
+    else if(f.opts && FIRE_STAFF(f.opts.equip&&f.opts.equip.weapon)) addStatus(player,'burn',3,1);
+    else if(f.opts && BLEEDERS.has(f.opts.equip&&f.opts.equip.weapon) && Math.random()<0.25) addStatus(player,'bleed',3.2,1); }
+  if(S){ f.lunge=null; bolts.push({from:{x:f.x,y:f.y}, to:player, t:0, S}); floatText(tileOf(f),S.name+'!',S.col);   // a caster's swing is a spell
+    if(hurt){
+      if(S.name==='Drain'){ const h=Math.min(3,f.maxHp-f.hp); if(h>0){ f.hp+=h; floatText([f.i,f.j-0.003],'+'+h,'#8ad07a'); } }
+      else if(S.name==='Wither') addStatus(player,'weak',4,0);
+      else if(S.name==='Frost') addStatus(player,'chill',3,0); } }
+  if(f.phase2 && hurt) addStatus(player,'bleed',5,2);
+  if(hurt && FIRE_FOE(f) && Math.random()<(/Slag/.test(f.name)?1:0.35)) addStatus(player,'burn',3,2);
+  if(f.type==='barrowking' && f.cphase>=3 && player.hp<hp0 && !f.dead){ const h=Math.min(5,f.maxHp-f.hp); if(h>0){ f.hp+=h; floatText(tileOf(f),'+'+h,'#9ad0e8'); } }
+  if(hurt && f.opts && f.opts.equip && f.opts.equip.weapon==='barrow_blade' && Math.random()<0.3) addStatus(player,'weak',3,0);
 }
-function wound(f,n,label,col){
+function wound(f,n,label,col){                       // a blow lands on a foe
+  const W=WEAPONS[player.opts&&player.opts.equip.weapon]||{};
+  if(f && f.warded) floatText(tileOf(f),'Warded','#c8e0f0');
+  else if(f && f.type==='barrowking' && (f.cphase||1)<3){ const th=ckTh(f), pre=f.hp; f.hp+=1000; woundRaw(f,n,label,col); const dealt=pre+1000-f.hp; f.hp=Math.max(th,pre-dealt); }   // his phases end at fixed thresholds, however hard the blow
+  else woundRaw(f,n,label,col);
+  if(f!==player && HIT_SRC==='melee' && W.wither && n>0 && !f.dead && f.hp>0){ const sp=1+gearSum('magic')*0.04;     // the Drowned Blade: wither and drain, stronger with spell power
+    if(Math.random()<W.wither*sp) addStatus(f,'weak',Math.round(3*sp*10)/10,0);
+    if(Math.random()<W.drain*sp){ const h=Math.min(Math.round(3*sp),player.maxHp-player.hp); if(h>0){ player.hp+=h; floatText(tileOf(player),'+'+h,'#8ae07a'); updateHud(); } } }
+}
+function woundRaw(f,n,label,col){
+  const W=WEAPONS[player.opts&&player.opts.equip.weapon]||{};
+  if(f!==player && HIT_SRC==='melee' && n>0) n=Math.round(W.ember ? n*emberMult() : n*APM());     // attack power; an ember blade scales with spell power instead
+  if(f!==player && hasStatus(player,'weak') && n>0) n=Math.max(1,Math.ceil(n*0.6));
   const crit = Math.random()<PARRY.critChance;
   if(crit) n=Math.round(n*PARRY.critMult);
   f.hp-=n; f.flash=0.35; shake=Math.max(shake,crit?7:3);
@@ -11815,6 +11842,11 @@ function wound(f,n,label,col){
   else burst(f,player,'#ffd070',9);
   if(label) floatText([f.i,f.j-0.002],label,col||'#ffe0a0');
   if(f.hp<=0) foeDown(f);
+  if(f.boss && !f.phase2 && f.hp>0 && f.hp<=f.maxHp*0.5){ f.phase2=true; f.state='stagger'; f.t=1.1; slowmo.scale=0.3; slowmo.t=0.5; shake=Math.max(shake,8);
+    banner('Greymaw howls!','#e05a3a',1600); logMsg('Old Greymaw throws back his head and howls. His eyes go red. He is faster now, and every bite tears.','#e05a3a'); f.coat='#3a2c28'; }
+  if(f!==player && HIT_SRC==='melee' && !f.dead && f.hp>0){
+    if(W.ember) addStatus(f,'burn',3.6,1+Math.round(gearSum('magic')/5));
+    else if(W.burn && Math.random()<W.burn) addStatus(f,'burn',3,2); }
 }
 function playerHit(){
   const f=combat.foe; lunge(player,f); duel.caught=false;
@@ -12387,10 +12419,6 @@ function tickStatus(e,dt){ if(!e.st||!e.st.length) return;
 { const oldStart=startCombat; startCombat=function(t){ player.st=(player.st||[]).filter(s=>s.kind==='bleed'); return oldStart(t); }; }
 // wolves' bites (and edged weapons) open wounds that keep bleeding; mages' fire keeps burning
 const BLEEDERS=new Set(['dagger','hatchet','axe','elf_blade','spear']);
-{ const oldImpact=impact; impact=function(f){ const hp0=player.hp; oldImpact(f); if(player.hp<hp0 && player.hp>0 && !combat.practice){
-    if(f.type==='wolf'){ addStatus(player,'bleed',4.2,1); logMsg('The bite tears. You are bleeding.','#d0342c'); }
-    else if(f.opts && FIRE_STAFF(f.opts.equip&&f.opts.equip.weapon)) addStatus(player,'burn',3,1);
-    else if(f.opts && BLEEDERS.has(f.opts.equip&&f.opts.equip.weapon) && Math.random()<0.25) addStatus(player,'bleed',3.2,1); } }; }
 // chilled foes wind up slower
 { const oldWind=beginWind; beginWind=function(f,quick){ oldWind(f,quick); if(hasStatus(f,'chill')){ f.wind*=1.45; f.t=f.wind; } }; }
 
@@ -12622,19 +12650,10 @@ function foeSpell(f){ const w=f && f.opts && f.opts.equip && f.opts.equip.weapon
   if(['staff_hex','staff_bone','staff_bog','staff_barrow'].includes(w)) return f.swingDir==='left' ? FOE_HEX_LEFT : (HEX_SPELLS[f.swingDir]||HEX_SPELLS.right);
   if(w==='staff_cinder') return SPELLS.left; return SPELLS[f.swingDir]||SPELLS.right; }
 { const oldPose=poseFor; poseFor=function(e){ const p=oldPose(e); if(p && foeSpell(e) && (p.kind==='raise'||p.kind==='strike')) return {kind:'guard', dir:'up'}; return p; }; }
-{ const oldImp=impact; impact=function(f){ const S=foeSpell(f); if(!S) return oldImp(f);
-    const hp0=player.hp; oldImp(f); f.lunge=null;
-    bolts.push({from:{x:f.x,y:f.y}, to:player, t:0, S});
-    floatText(tileOf(f),S.name+'!',S.col);
-    if(player.hp<hp0 && player.hp>0){
-      if(S.name==='Drain'){ const h=Math.min(3,f.maxHp-f.hp); if(h>0){ f.hp+=h; floatText([f.i,f.j-0.003],'+'+h,'#8ad07a'); } }
-      else if(S.name==='Wither') addStatus(player,'weak',4,0);
-      else if(S.name==='Frost') addStatus(player,'chill',3,0); } }; }
 { const oldOv=drawCombatOver; drawCombatOver=function(){ oldOv(); const f=combat.foe; if(!combat.active || !f || f.dead || f.state!=='windup') return; const S=foeSpell(f); if(!S) return;
     const k=Math.max(0,Math.min(1,1-f.t/f.wind)), q=P(f.x+(f.ox||0),f.y+(f.oy||0)), r=6+k*16;
     g.save(); g.globalCompositeOperation='lighter'; glow(q.x+6,q.y-112,r,r,S.rgb,0.35+0.55*k); g.fillStyle='rgba(255,255,255,'+(0.3+0.6*k)+')'; g.beginPath(); g.arc(q.x+6,q.y-112,1.5+2.5*k,0,Math.PI*2); g.fill(); g.restore(); }; }
 // a withered player hits for half, too
-{ const oldW=wound; wound=function(f,n,...r){ if(f!==player && hasStatus(player,'weak') && n>0) n=Math.max(1,Math.ceil(n*0.6)); return oldW(f,n,...r); }; }
 // how a staff looks in the hand and in the pack
 { const oldDW=drawWeapon; drawWeapon=function(c,hx,hy,ang,id,s=1){ if(!id || !id.startsWith('staff_')) return oldDW(c,hx,hy,ang,id,s);
     const gem={staff_bog:'#c8d860',staff_hex:'#8ae07a',staff_oak:'#9adcf0',staff_star:'#e8e0ff',staff_cinder:'#ff8a3a',staff_crystal:'#8ae0a8'}[id]||'#9adcf0', wood=id==='staff_bog'?'#2a2618':id==='staff_star'?'#d8d0b8':id==='staff_cinder'?'#3a2418':id==='staff_hex'?'#3e3a2a':'#7a5a30';
@@ -13160,11 +13179,7 @@ PUZ_DRAW.moonaltar=o=>{ const c=P(o.i+0.5,o.j+0.5), lit=PZ().moon||(nightAmt()>0
 
 // ════════ Old Greymaw, a proper boss: bigger, and savage when wounded ════════
 { const oldRM=resetMobs; resetMobs=function(){ oldRM(); mobs.forEach(m=>{ if(m.name==='Old Greymaw' && !m.dead){ m.maxHp=m.hp=78; m.boss=true; } }); }; }
-{ const oldWound=wound; wound=function(f,n,label,col){ oldWound(f,n,label,col);
-    if(f.boss && !f.phase2 && f.hp>0 && f.hp<=f.maxHp*0.5){ f.phase2=true; f.state='stagger'; f.t=1.1; slowmo.scale=0.3; slowmo.t=0.5; shake=Math.max(shake,8);
-      banner('Greymaw howls!','#e05a3a',1600); logMsg('Old Greymaw throws back his head and howls. His eyes go red. He is faster now, and every bite tears.','#e05a3a'); f.coat='#3a2c28'; } }; }
 { const oldBW=beginWind; beginWind=function(f,quick){ oldBW(f,quick); if(f.phase2){ f.wind*=0.8; f.t=f.wind; } }; }
-{ const oldImp2=impact; impact=function(f){ const hp0=player.hp; oldImp2(f); if(f.phase2 && player.hp<hp0 && player.hp>0) addStatus(player,'bleed',5,2); }; }
 
 // ════════ Water that lives: glints of light on every pond ════════
 function drawPoolGlints(o){ if(LOW_FX) return; const [fw,fh]=o.fp;   // sun glints on open water
@@ -14120,7 +14135,6 @@ ITEM_STATS.elf_cloak={...ITEM_STATS.elf_cloak, magic:1};
 const APM=()=>1+gearSum('ap')*0.04;
 var HIT_SRC=null;                       // who caused the wound being dealt right now: 'melee', 'spell' or null (bones, burns)
 { const oldPH=playerHit; playerHit=function(...a){ HIT_SRC='melee'; try{ return oldPH.apply(this,a); } finally{ HIT_SRC=null; } }; }
-{ const oldW=wound; wound=function(f,n,...r){ if(f!==player && HIT_SRC==='melee' && n>0) n=Math.round(n*APM()); return oldW(f,n,...r); }; }
 let playerHitDmg=()=> isMagicWeapon() ? SPELLS.right.dmg*SPM() : weaponOf(player).dmg*APM();
 const AREA_TIER={ farm:1, road:1, lane:1, millroad:2, wolfwood:2, camp:2, southtrail:2, mistmere:2, clearing:2,
   fellings:3, ruin:3, lowstreets:3, warren:3, kingsroad:3, elfroad:3, cave1:3, cave2:4, cave3:4, cave4:4,
@@ -14154,20 +14168,12 @@ Object.entries(ITEM_STATS).forEach(([id,st])=>{ if(st.hp) GEAR_HP[id]=st.hp; });
 Object.assign(PRICES,{ fire_blade:90, emberbrand:260, ember_core:25, ash_mantle:120, cinder_gloves:55, obsidian_helm:90, scorched_greaves:80, emberstep_boots:75 });
 QUEST_ITEMS.add('ember_core');
 // Emberbrand: weapon damage × Attack Power, plus a tongue of fire × Spell Power, and every cut burns
-{ const oldW=wound; wound=function(f,n,...r){ const W=WEAPONS[player.opts&&player.opts.equip.weapon]||{};
-    if(f!==player && HIT_SRC==='melee' && n>0 && W.ember) n=n*emberMult()/APM();   // the Attack Power wrapper inside multiplies by APM again, so this comes out at dmg × emberMult
-    const r0=oldW(f,n,...r);
-    if(f!==player && HIT_SRC==='melee' && !f.dead && f.hp>0){
-      if(W.ember) addStatus(f,'burn',3.6,1+Math.round(gearSum('magic')/5));
-      else if(W.burn && Math.random()<W.burn) addStatus(f,'burn',3,2); }
-    return r0; }; }
 // one rule: +4% per point of Attack Power AND per point of Spell Power, so every point you wear counts
 const emberMult=()=>1+(gearSum('ap')+gearSum('magic'))*0.04;
 const emberHit=()=>WEAPONS.emberbrand.dmg*emberMult();
 { const oldPHD=playerHitDmg; playerHitDmg=()=> (player.opts && player.opts.equip.weapon==='emberbrand') ? emberHit() : oldPHD(); }
 // foes with fire set you alight
 const FIRE_FOE=f=> f && ((f.opts&&f.opts.equip&&['fire_blade','emberbrand'].includes(f.opts.equip.weapon)) || /^Ash Hound|^The Slag Warden/.test(f.name||''));
-{ const oldImp=impact; impact=function(f){ const hp0=player.hp; oldImp(f); if(player.hp<hp0 && player.hp>0 && FIRE_FOE(f) && Math.random()<(/Slag/.test(f.name)?1:0.35)) addStatus(player,'burn',3,2); }; }
 
 // ── the look: a blade with a glowing edge, embers on the Emberbrand ──
 { const oldDW=drawWeapon; drawWeapon=function(c,hx,hy,ang,id,s=1){ if(id!=='fire_blade' && id!=='emberbrand') return oldDW(c,hx,hy,ang,id,s);
@@ -15574,11 +15580,7 @@ function ckAdds(K){ CK={mode:'adds'}; K.warded=true;
       state:'guard', t:0, k:0, wind:1, quick:false, guardDir:'up', ox:0, oy:0, hostile:true, fallT:0 }); });
   setTimeout(()=>{ if(areaId===BK_AREA && player.hp>0) startCombat(); },1200); }
 // in the last phase every blow he lands feeds him
-{ const oI=impact; impact=function(f){ const hp0=player.hp; const r=oI(f); if(f.type==='barrowking' && f.cphase>=3 && player.hp<hp0 && !f.dead){ const h=Math.min(5,f.maxHp-f.hp); if(h>0){ f.hp+=h; floatText(tileOf(f),'+'+h,'#9ad0e8'); } } return r; }; }
 // a warded king cannot be hurt; nor can he be killed through a phase
-{ const oW=wound; wound=function(f,n,...r){ if(f && f.warded){ floatText(tileOf(f),'Warded','#c8e0f0'); return; }
-    if(f && f.type==='barrowking' && (f.cphase||1)<3){ const th=ckTh(f), pre=f.hp; f.hp+=1000; oW(f,n,...r); const dealt=pre+1000-f.hp; f.hp=Math.max(th,pre-dealt); return; }
-    return oW(f,n,...r); }; }
 // what the set pieces look like: the lee of the stones, the gas about to burn, the wave when it breaks, the ward
 { const oSDI=typeof skelDrawItems==='function'?skelDrawItems:null; skelDrawItems=function(items){ if(oSDI) oSDI(items); if(!CK || areaId!==BK_AREA) return;
     items.push({d:-1e6, fn:()=>{ const A=AREAS[areaId], dia=(i,j,fill,inset=0.06)=>{ const a=P(i+inset,j+inset), b=P(i+1-inset,j+inset), c=P(i+1-inset,j+1-inset), d=P(i+inset,j+1-inset); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c.x,c.y); g.lineTo(d.x,d.y); g.closePath(); g.fillStyle=fill; g.fill(); };
@@ -15615,13 +15617,7 @@ var GEAR_LORE={
   barrow_blade:"Bertil's sword. A thousand years under black water and the edge is still keen, the steel gone the green-black of a drowned man's ring. Old letters run down the fuller: <i>“I was the hollow's king. The water took the land; it did not take me.”</i> It hungers. Now and then a cut withers whoever takes it, or draws a mouthful of their life back up the blade into yours.<br><br>There is a skull worked into the pommel, and the blade hums faintly near a grave. <b>Vesna</b> might know how such a thing could be reforged into what it wants to be: the Barrow-King's Rod.",
   bog_crown:"No goldsmith made this. Bog-oak, black as the water it grew in, twisted round the Barrow-King's brow over a thousand years until it took the shape of a crown. Its points are sharp, and it is heavy, and it is cold. It sharpens the mind and the arm alike, and asks a little of your blood for the favour." };
 // the blade: a cut that withers, a cut that drinks
-{ const oldW=wound; wound=function(f,n,...r){ const W=WEAPONS[player.opts&&player.opts.equip.weapon]||{}; const r0=oldW(f,n,...r);
-    if(f!==player && HIT_SRC==='melee' && W.wither && n>0 && !f.dead && f.hp>0){ const sp=1+gearSum('magic')*0.04;
-      if(Math.random()<W.wither*sp) addStatus(f,'weak',Math.round(3*sp*10)/10,0);
-      if(Math.random()<W.drain*sp){ const h=Math.min(Math.round(3*sp),player.maxHp-player.hp); if(h>0){ player.hp+=h; floatText(tileOf(player),'+'+h,'#8ae07a'); updateHud(); } } }
-    return r0; }; }
 // in his hands it does the same to you
-{ const oldImp=impact; impact=function(f){ const hp0=player.hp; oldImp(f); if(player.hp<hp0 && player.hp>0 && f.opts && f.opts.equip && f.opts.equip.weapon==='barrow_blade' && Math.random()<0.3) addStatus(player,'weak',3,0); }; }
 // the look: a long blade gone green-black, a drowned shine on the edge, a little black water running off it
 { const oldDW=drawWeapon; drawWeapon=function(c,hx,hy,ang,id,s=1){ if(id!=='barrow_blade') return oldDW(c,hx,hy,ang,id,s);
     const t=(typeof gt!=='undefined'?gt:0), L=30;

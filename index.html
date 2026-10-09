@@ -8941,7 +8941,7 @@ window.addEventListener('keydown',e=>{
 //  INVENTORY
 // ════════════════════════════════════════════════════════════
 // Item icons are drawn in a 40x40 box, same palette as the sprites.
-const OWN_ART=new Set(['raw_meat','cooked_meat','wolf_fang','apple','bread','potion','mana_potion','robe_elf','moonthread','silver_setting','moon_amulet','elf_bustier','plate_boots','bandana','coif','helm_full','tunic_linen','tunic_blue','tunic_green','tunic_red','smock','hose_grey','breeches','riding_boots','hood_red','straw_hat','gambeson','studded','blackmail','brightmail','gauntlets','shield_red','shield_iron']);
+const OWN_ART=new Set(['raw_meat','cooked_meat','wolf_fang','apple','bread','potion','mana_potion','warm_tonic','burn_salve','rue_water','linen_wrap','robe_elf','moonthread','silver_setting','moon_amulet','elf_bustier','plate_boots','bandana','coif','helm_full','tunic_linen','tunic_blue','tunic_green','tunic_red','smock','hose_grey','breeches','riding_boots','hood_red','straw_hat','gambeson','studded','blackmail','brightmail','gauntlets','shield_red','shield_iron']);
 function paintItemArt(g2,id,size){                   // an item's inventory icon: special pieces first, then the common art
   const u=unWoven(id), L=NECK_LOOKS && NECK_LOOKS[u];
   if(u==='beret' || u==='vest_black' || u==='cowl_black') return paintBlackwearIcon(g2,u,size);
@@ -9130,7 +9130,8 @@ function paintItemArtBase(g2,id,size){
     case 'apple': { E(20,23,10,10,'#b8322a'); E(16,19,3,4,'rgba(255,200,180,0.5)'); R(19.4,9,1.4,6,'#5a3a1e'); g2.fillStyle='#5a8a3a'; g2.beginPath(); g2.ellipse(24,11,4,2,-0.5,0,Math.PI*2); g2.fill(); break; }
     case 'bread': { P2([[5,26],[8,16],[20,11],[32,16],[35,26],[30,30],[10,30]],'#c8904a',tone('#c8904a',-0.5)); g2.strokeStyle='#8a5a28'; g2.lineWidth=1.2; [[12,15,15,25],[19,13,21,26],[26,15,27,25]].forEach(([a1,b1,c1,d1])=>{ g2.beginPath(); g2.moveTo(a1,b1); g2.lineTo(c1,d1); g2.stroke(); }); E(14,17,4,1.6,'rgba(255,230,180,0.45)'); break; }
     // same flask for both draughts; the mana draught is only bluer inside
-    case 'potion': case 'mana_potion': { const mana=id==='mana_potion'; P2([[17,6],[23,6],[23,13],[31,22],[31,33],[9,33],[9,22],[17,13]],'rgba(200,220,230,0.5)','#5a6a72'); P2([[9.6,22],[30.4,22],[30.4,32.4],[9.6,32.4]],mana?'#3a6ad8':'#c83a4a',mana?'#1a2a7a':'#7a1a24'); R(16,3,8,4,'#7a5a30'); E(14,25,2,3,'rgba(255,255,255,0.5)'); break; }
+    case 'linen_wrap': { E(20,22,11,9,'#e8e0cc'); E(20,22,11,9,'rgba(0,0,0,0)'); g2.strokeStyle='#a89c80'; g2.lineWidth=1; for(let r=3;r<10;r+=2.4){ g2.beginPath(); g2.ellipse(20,22,r*1.2,r,0,0,Math.PI*2); g2.stroke(); } P2([[28,24],[36,30],[33,33],[26,27]],'#e8e0cc','#a89c80'); break; }   // a roll of clean linen, a tail hanging loose
+    case 'potion': case 'mana_potion': case 'warm_tonic': case 'burn_salve': case 'rue_water': { const LQ={potion:['#c83a4a','#7a1a24'],mana_potion:['#3a6ad8','#1a2a7a'],warm_tonic:['#e0902a','#7a4410'],burn_salve:['#6ad0b0','#2a6a58'],rue_water:['#9a7ad0','#4a2a7a']}[id]; P2([[17,6],[23,6],[23,13],[31,22],[31,33],[9,33],[9,22],[17,13]],'rgba(200,220,230,0.5)','#5a6a72'); P2([[9.6,22],[30.4,22],[30.4,32.4],[9.6,32.4]],LQ[0],LQ[1]); R(16,3,8,4,'#7a5a30'); E(14,25,2,3,'rgba(255,255,255,0.5)'); break; }
     case 'moonthread': { E(20,22,9,11,'#c8b080'); E(20,22,7,9,'#e8eef8'); g2.strokeStyle='rgba(160,180,210,0.7)'; g2.lineWidth=0.7; for(let k=0;k<6;k++){ g2.beginPath(); g2.moveTo(13,14+k*3); g2.lineTo(27,15+k*3); g2.stroke(); } R(11,10,18,2.4,'#8a6a3a'); R(11,32,18,2.4,'#8a6a3a'); break; }
     case 'silver_setting': { g2.strokeStyle='#dfe6ee'; g2.lineWidth=1.4; g2.beginPath(); g2.ellipse(20,22,8,9,0,0,Math.PI*2); g2.stroke(); g2.lineWidth=0.8; [-0.6,0,0.6].forEach(a=>{ g2.beginPath(); g2.ellipse(20,22,8*Math.cos(a),9,0,0,Math.PI*2); g2.stroke(); }); g2.beginPath(); g2.arc(20,11,2,0,Math.PI*2); g2.stroke(); break; }
     case 'moon_amulet': { g2.strokeStyle='rgba(220,232,245,0.9)'; g2.lineWidth=1.2; g2.beginPath(); g2.moveTo(8,4); g2.quadraticCurveTo(20,26,32,4); g2.stroke();   // bottoms out at y=15, on the bail
@@ -9416,6 +9417,11 @@ function askDiscard(loc){
 }
 // provisions: eat or drink to win back health, in or out of a fight
 function eatItem(k){ const id=player.inv[k];
+  if(id && ITEMS[id] && ITEMS[id].cure){ const c=ITEMS[id].cure, D=STATUS_DEF[c];   // a remedy: takes one affliction off you
+    if(!hasStatus(player,c)){ if(typeof flash==='function') flash('You are not '+D.name.toLowerCase()+'.'); return false; }
+    player.st=player.st.filter(x=>x.kind!==c); player.inv[k]=null; const h=Math.min(ITEMS[id].heal||0,hpCap()-player.hp); if(h>0) player.hp+=h;
+    floatText(tileOf(player),'No longer '+D.name.toLowerCase(),'#c8e8b0'); logMsg('You use the '+ITEMS[id].name.toLowerCase()+'. You are no longer '+D.name.toLowerCase()+'.','#c8e8b0');
+    updateHud(); if(invOverlay.classList.contains('open')) refreshInventory(); refreshFoodBar(); return true; }
   if(id && ITEMS[id] && ITEMS[id].mana){ player.maxMana=player.maxMana||100; const m=player.mana??player.maxMana;   // a mana draught: power, not health
     if(m>=player.maxMana){ if(typeof flash==='function') flash('Your mana is full.'); return false; }
     const g=Math.min(ITEMS[id].mana,player.maxMana-m); player.mana=m+g; player.inv[k]=null; floatText(tileOf(player),'+'+Math.round(g)+' mana','#8ab0f0'); logMsg('You drink the '+ITEMS[id].name.toLowerCase()+'. (+'+Math.round(g)+' mana)','#8ab0f0');
@@ -9432,7 +9438,7 @@ let foodCD=0;
 function refreshFoodBar(){
   let bar=document.getElementById('food-bar'); if(!bar){ bar=document.createElement('div'); bar.id='food-bar'; const hud=document.getElementById('duel-hud'); hud.insertBefore(bar,hud.firstChild); }
   bar.style.display=combat.active && !combat.practice ? 'flex' : 'none'; bar.innerHTML='';
-  beltIds().filter(Boolean).forEach(id=>{ const n=player.inv.filter(x=>x===id).length; const b=document.createElement('button'); b.className='fb'+(n?'':' empty'); b.title=ITEMS[id].name+(ITEMS[id].mana?' (+'+ITEMS[id].mana+' mana)':' (+'+ITEMS[id].heal+' HP)');
+  beltIds().filter(Boolean).forEach(id=>{ const n=player.inv.filter(x=>x===id).length; const b=document.createElement('button'); b.className='fb'+(n?'':' empty'); b.title=ITEMS[id].name+(ITEMS[id].cure?' (cures '+STATUS_DEF[ITEMS[id].cure].name.toLowerCase()+')':ITEMS[id].mana?' (+'+ITEMS[id].mana+' mana)':' (+'+ITEMS[id].heal+' HP)');
     const cv=document.createElement('canvas'); cv.width=cv.height=120; cv.style.width=cv.style.height='56px'; drawItemIcon(cv.getContext('2d'),id,120); b.appendChild(cv);
     const c2=document.createElement('span'); c2.textContent=n; b.appendChild(c2);
     b.addEventListener('pointerdown',e=>{ e.stopPropagation(); e.preventDefault(); if(!n || performance.now()<foodCD) return; const k=player.inv.indexOf(id); if(eatItem(k)) foodCD=performance.now()+1500; });
@@ -10649,7 +10655,7 @@ function gislaTalk(){
   if(CHOICE.gisla==='asked' && done){ say('Gisla the Herb-Wife',["She is already up to her knees in the mint. “I heard it. Good.”","“Here. Thistle, honey, a little of this mint. Better than what the priests sell, and I'll tell them I said so.” <i>You receive 2 Healing Draughts.</i>"],[
       {label:'Take them.', fn:()=>{ remember('gisla','done','You cleared the mill-pond for Gisla the herb-wife. She sells draughts on the Mill Track.'); giveQuestItem('potion'); giveQuestItem('potion'); closeDialog(); }}]); return; }
   if(CHOICE.gisla==='asked'){ say('Gisla the Herb-Wife',"“The wolf, love. West end of the pond.”",[bye]); return; }
-  say('Gisla the Herb-Wife',["Gisla hums over her basket."],[{label:'Buy draughts and herbs.', fn:()=>shopFrom('Gisla the Herb-Wife',['potion','mana_potion','apple'],0.85,"“Friend's price.”",gislaTalk)},bye]);
+  say('Gisla the Herb-Wife',["Gisla hums over her basket."],[{label:'Buy draughts and herbs.', fn:()=>shopFrom('Gisla the Herb-Wife',['potion','mana_potion','warm_tonic','burn_salve','linen_wrap','apple'],0.85,"“Friend's price.”",gislaTalk)},bye]);
 }
 TALKERS.gisla=gislaTalk;
 AREA_PATHS.kingsroad=[ [[4.5,-0.5],[4.2,8],[4.8,16],[4.1,24],[4.4,31],[3.8,38],[4.6,44],[4.5,49.5]] ];
@@ -11346,7 +11352,7 @@ function traderTalk(){
 function shopBuy(){
   const disc = CHOICE.pups==='marta' || CHOICE.goat==='sold' ? 0.85 : 1;
   // whatever came on today's cart: three or four things, different each day
-  const MARTA_POOL=['potion','mana_potion','tunic_blue','tunic_green','tunic_red','tunic_linen','smock','breeches','hose_grey','hood','hood_red','straw_hat','gambeson','jerkin','studded','gloves','boots','riding_boots','kettle','coif','mail','shield','shield_red','shield_iron','dagger','hatchet','club','spear','sword','axe','mace','robe'];
+  const MARTA_POOL=['potion','mana_potion','warm_tonic','linen_wrap','tunic_blue','tunic_green','tunic_red','tunic_linen','smock','breeches','hose_grey','hood','hood_red','straw_hat','gambeson','jerkin','studded','gloves','boots','riding_boots','kettle','coif','mail','shield','shield_red','shield_iron','dagger','hatchet','club','spear','sword','axe','mace','robe'];
   const day=Math.floor(dayClock/DAY_LEN), n=3+(rnd01(day,5,412)<0.5?1:0);                                   // three or four things a day, food included
   const stock=todaysStock('marta',['apple','bread',...MARTA_POOL].filter(id=>ITEMS[id]),n); stock.key='marta';
   if(CHOICE.pact==='trade' && !havenBurnt() && !SOLD_TODAY.has('marta'+Math.floor(dayClock/DAY_LEN)+'elf_boots')) stock.push('elf_boots');   // only once the elves trade with the valley
@@ -13620,9 +13626,9 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
     return `<b>${ITEMS[id].name}</b><i>${SLOT_NAMES[ITEMS[id].slot]||''}</i>`+(L.length?L.map(([k,v])=>{ let d='';
       if(M){ const df=num(v)-num(M[k]||0); if(Math.abs(df)>0.001 && !/Special|×/.test(k+v)){ const inv=/Swing/.test(k), dd=inv?df.toFixed(2):df; d=` <em class="${(inv?df<0:df>0)?'up':'dn'}">(${df>0?'+':''}${dd}${inv?'s':''})</em>`; } }
       return `<div class="r">${k}<span>${v}${d}</span></div>`; }).join(''):ITEMS[id].slot==='food'?'':'<small>No bonuses. Looks good, though.</small>')+extraTip(id)+(eq?'<div class="eqfoot"><span class="eqh">equipped</span></div>':''); };
-  const FOOD_TIP={ apple:'A crisp apple. A small bite between fights.', bread:'A dense brown loaf. Fills the belly.', potion:'Red, bitter, and it works fast. The best thing to have in a bad fight.', raw_meat:'Edible, barely. Cook it at an inn or a hunter\'s fire and it heals far more.', cooked_meat:'Spit-roasted and salted. A proper meal.', mana_potion:'Cold, blue, and it tastes of tin and thunder. The power comes back into your fingers.' };
+  const FOOD_TIP={ warm_tonic:'Ginger, pepper and strong spirit. It burns going down, and the cold goes out of your hands.', burn_salve:'A cold green salve of comfrey and fen-moss. Smear it on and the burning stops.', rue_water:'Bitter rue steeped in well water. It drives the withering out of your blood.', linen_wrap:'A roll of clean linen. Bind a bleeding wound and it closes.', apple:'A crisp apple. A small bite between fights.', bread:'A dense brown loaf. Fills the belly.', potion:'Red, bitter, and it works fast. The best thing to have in a bad fight.', raw_meat:'Edible, barely. Cook it at an inn or a hunter\'s fire and it heals far more.', cooked_meat:'Spit-roasted and salted. A proper meal.', mana_potion:'Cold, blue, and it tastes of tin and thunder. The power comes back into your fingers.' };
   const extraTip=id=>{ const it=ITEMS[id];
-    if(it.slot==='food') return `<div class="r">Restores<span>${it.mana?'+'+it.mana+' Mana':'+'+it.heal+' Health'}</span></div><div class="fl">${FOOD_TIP[id]||''}</div><small>Double-click to ${(id==='potion'||it.mana)?'drink':'eat'} it. In a fight, use the food bar beside the attack buttons.</small>`;
+    if(it.slot==='food') return (it.cure?`<div class="r">Cures<span>${STATUS_DEF[it.cure].name}</span></div>`:'')+`<div class="r">Restores<span>${it.mana?'+'+it.mana+' Mana':'+'+it.heal+' Health'}</span></div><div class="fl">${FOOD_TIP[id]||''}</div><small>Double-click to ${(id==='potion'||it.mana)?'drink':'eat'} it. In a fight, use the food bar beside the attack buttons.</small>`;
     if(typeof NECRO_STAVES!=='undefined' && NECRO_STAVES.includes(id)){ const n=NECRO();
       if(n===0) return `<div class="fl" style="color:#b8a8e8">You don't know how to use this staff properly. In your hands it is just a heavy stick. Maybe look for someone who hangs around graveyards...?</div>`;
       if(n<3) return `<div class="fl" style="color:#b8a8e8">You know ${n===1?'one word':'two words'} of this staff (${['Drain: lean up','Wither: lean right'].slice(0,n).join(', ')}). Vesna can teach you the rest.</div>`;
@@ -13679,7 +13685,7 @@ function cookAt(who,back){ const n=player.inv.filter(x=>x==='raw_meat').length; 
     {label:`Have it cooked. (${cost} copper)`, off:player.purse<cost, note:'-'+cost+'c', fn:()=>{ player.purse-=cost; player.inv=player.inv.map(x=>x==='raw_meat'?'cooked_meat':x); updateHud(); refreshFoodBar(); logMsg(`${who} roasts your meat. (${n}× Roast Meat, +28 HP each)`,'#8ad07a'); say(who,"The smell fills the room. Someone at a table looks up hopefully.",[{label:'Back.',fn:back},bye]); }},
     {label:'Back.', fn:back}]); }
 { const oldB=TALKERS.bertha; TALKERS.bertha=()=>{ say('Bertha of the Wheatsheaf',["Bertha wipes the counter with a cloth that has seen better decades."],[...(hasItem('raw_meat')?[{label:'“Could you cook this meat?”', fn:()=>cookAt('Bertha of the Wheatsheaf',TALKERS.bertha)}]:[]),{label:'Buy bread for the road.', fn:()=>shopFrom('Bertha of the Wheatsheaf',['bread','apple'],1,"“Baked this morning. Or yesterday.”",TALKERS.bertha)},{label:'Talk.', fn:oldB},bye]); }; }
-{ const oldP=TALKERS.priest; TALKERS.priest=()=>{ say('Mother Hild',["An old priestess sweeps the chapel steps. A shelf behind her holds small corked bottles of something red."],[{label:'Buy healing draughts.', fn:()=>shopFrom('Mother Hild',['potion','mana_potion'],1,"“Thistle, honey and a prayer. Drink it when it hurts, not before.”",TALKERS.priest)},{label:'Talk.', fn:oldP},bye]); }; }
+{ const oldP=TALKERS.priest; TALKERS.priest=()=>{ say('Mother Hild',["An old priestess sweeps the chapel steps. A shelf behind her holds small corked bottles of something red."],[{label:'Buy healing draughts.', fn:()=>shopFrom('Mother Hild',['potion','mana_potion','rue_water','linen_wrap'],1,"“Thistle, honey and a prayer. Drink it when it hurts, not before.”",TALKERS.priest)},{label:'Talk.', fn:oldP},bye]); }; }
 // story items left behind for lack of room come to hand as soon as there is space
 setInterval(()=>{ try{ if(!running||!CHOICE.pendingQ||!CHOICE.pendingQ.length) return; const f=player.inv.indexOf(null); if(f<0) return;
   const id=CHOICE.pendingQ.shift(); player.inv[f]=id; logMsg('You go back for the '+ITEMS[id].name+' and take it.','#e8c060'); updateHud(); if(ITEMS[id].read) setTimeout(()=>openNote(id),400); }catch(e){} },1500);
@@ -14790,7 +14796,7 @@ function vesnaFen(){
   if(CHOICE.morwen==='asked') opts.push({label:'Ask about Hesk.', fn:()=>say(VESNA_N,hag?"“Hesk is gone? Then where is my lantern? She will have dropped it where she fell. Go and look.”":"“Hesk lives on the island to the south-west, past the old ruin. You will hear her before you see her. She sings.”",[{label:'Back.',fn:back},bye])});
   if(CHOICE.necro){ const nw=npcHasNews({id:'vesna',_lesson:true}); opts.push({label:'Talk about the dead.'+(nw?' ('+nw+')':''), fn:necroTalk}); }
   opts.push({label:'Sell her bones and grave-finds.', fn:()=>sellTo(VESNA_N,back,VESNA_BUYS)});
-  if(CHOICE.morwen==='done') opts.push({label:'“Show me your draughts.”', fn:()=>shopFrom(VESNA_N,['potion','mana_potion','grave_salt','bread','apple'],0.9,"“Bog-myrtle and honey. Better than the city stuff.”",back)});
+  if(CHOICE.morwen==='done') opts.push({label:'“Show me your draughts.”', fn:()=>shopFrom(VESNA_N,['potion','mana_potion','rue_water','grave_salt','bread','apple'],0.9,"“Bog-myrtle and honey. Better than the city stuff.”",back)});
   opts.push({label:'“What is this place?”', fn:()=>say(VESNA_N,["“The hollow, before the water. Kings lived here. Little kings, of a little land, but they had gold. When the river moved, they stayed. They are still here, most of them.”","“Mind the mud that stands up. It is hungry, not clever. Hit it where it isn't looking. And the bones that walk at night: lay them down, and bring me what they leave.”"],[{label:'Back.',fn:back},bye])});
   opts.push(bye);
   const first=!CHOICE.vesnaHut; CHOICE.vesnaHut=true;
@@ -16197,6 +16203,12 @@ function fskelTick(dt){ const S=FSKEL; if(!S) return; S.anim=Math.max(0,S.anim-d
   S.dir=dirFromDelta(player.x-S.x,player.y-S.y);
   if(combat.phase==='fight' && S.asm>=1 && md<0.5){ S.cd-=dt; if(S.cd<=0){ S.cd=1.5; S.anim=0.3; let n=S.dmg; if(own.tier) n=Math.round(n*tierDmg(own)); if(combat.practice) n=0;
       player.hp-=n; player.flash=0.2; floatText(tileOf(player),'-'+n,'#e8e4d0'); floatText([player.i,player.j-0.001],'Bones!','#e8e4d0'); updateHud(); if(player.hp<=0){ player.hp=0; defeat(); } } } }
+
+// ════════ Remedies: each takes one affliction off you (and they fit on the fight belt) ════════
+Object.assign(ITEMS,{ warm_tonic:{ name:'Warming Tonic', slot:'food', heal:4, cure:'chill' }, burn_salve:{ name:'Cooling Salve', slot:'food', heal:4, cure:'burn' },
+  rue_water:{ name:'Rue Water', slot:'food', heal:4, cure:'weak' }, linen_wrap:{ name:'Linen Wrap', slot:'food', heal:4, cure:'bleed' } });
+Object.assign(PRICES,{ warm_tonic:9, burn_salve:9, rue_water:11, linen_wrap:6 });
+LOOT_TIERS[0].push('linen_wrap'); LOOT_TIERS[1].push('warm_tonic','burn_salve','linen_wrap'); LOOT_TIERS[2].push('rue_water','burn_salve');
 </script>
 </body>
 </html>

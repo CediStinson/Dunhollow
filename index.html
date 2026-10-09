@@ -12382,7 +12382,7 @@ function drawLitSprite(x,B,paint,tall=1){
   g.shadowBlur=sb; g.shadowColor=sc;
   g.drawImage(SPR.bc,dx,dy,W2,H2);
 }
-function drawActor(e){
+function drawActorBase(e){
   const isP=e===player;
   if(isP && !e.opts) return;
   let wx=e.x+(e.ox||0), wy=e.y+(e.oy||0);
@@ -12481,6 +12481,7 @@ function drawCombatOver(){
     g.strokeText(fl.text,s.x,y); g.fillStyle=fl.col; g.fillText(fl.text,s.x,y);
     g.restore();
   });
+  drawBolts(); drawSpellCharge(); drawMoonBeam(); drawChopChips(); drawBarrowKingFX();
 }
 
 // ════════════════════════════════════════════════════════════
@@ -12711,7 +12712,7 @@ function castSpell(){                            // a staff casts the spell for 
     if(!f.dead && S.fx && fx) S.fx(f);
     if(f.state==='windup' && !f.dead && playerGuard===f.swingDir && (f.wind-f.t)<=PARRY.punish){ f.state='stagger'; f.t=PARRY.interruptStun; floatText(tileOf(f),'Interrupted!','#ffd070'); }
     return true; }
-{ const oldDA=drawActor; drawActor=function(e){ oldDA(e);
+function drawActorFigure(e){ drawActorBase(e);         // then status pips over the name, and your mana bar
     if(!e.opts && e.type!=='wolf') return; if(e.dead) return;
     const s=P(e.x+(e.ox||0),e.y+(e.oy||0)), ty=s.y-(e.type==='wolf'?66:114);
     if(e.st && e.st.length){ e.st.forEach((st,k)=>{ const D=STATUS_DEF[st.kind], x=s.x-((e.st.length-1)*9)/2+k*9, y=ty-(e===player&&combat.phase==='fight'?30:12);   // status pips over the name
@@ -12723,10 +12724,10 @@ function castSpell(){                            // a staff casts the spell for 
     if(e===player && combat.active && isMagicWeapon()){ const mw=40, y=ty+32, r=Math.max(0,(player.mana??100)/100);          // the mana bar, under the health bar
       g.fillStyle='rgba(10,8,20,0.85)'; g.fillRect(s.x-mw/2,y,mw,4); g.fillStyle='#6a78e8'; g.fillRect(s.x-mw/2,y,mw*r,4); g.strokeStyle='rgba(0,0,0,0.6)'; g.strokeRect(s.x-mw/2+0.5,y+0.5,mw-1,3);
       const S=(spellsFor()===HEX_SPELLS && !HEX_KNOWN(playerGuard)) ? {name:'Staff strike', cost:0} : spellsFor()[playerGuard]; if(S && combat.phase==='fight'){ g.font='600 9px "Segoe UI", system-ui, sans-serif'; g.textAlign='center'; g.textAlign='left'; g.fillStyle='rgba(12,8,3,0.8)'; const lbl=S.name+(player.mana<S.cost?' (no mana)':''), lw=g.measureText(lbl).width; g.fillRect(s.x+mw/2+3,y-3,lw+6,11); g.fillStyle=S.col; g.fillText(lbl,s.x+mw/2+6,y+5); } }
-  }; }
-{ const oldOver=drawCombatOver; drawCombatOver=function(){ oldOver();
+  }
+function drawBolts(){                               // spells in flight
     bolts=bolts.filter(b=>b.t<0.28); bolts.forEach(b=>{ b.t+=1/60; const k=Math.min(1,b.t/0.18), a=P(b.from.x,b.from.y), z=P(b.to.x,b.to.y), x=a.x+(z.x-a.x)*k, y=a.y-70+(z.y-a.y)*k+20*k;
-      g.save(); g.globalCompositeOperation='lighter'; glow(x,y,18,18,b.S.rgb,0.9); g.fillStyle='#fff'; g.beginPath(); g.arc(x,y,3,0,Math.PI*2); g.fill(); g.restore(); }); }; }
+      g.save(); g.globalCompositeOperation='lighter'; glow(x,y,18,18,b.S.rgb,0.9); g.fillStyle='#fff'; g.beginPath(); g.arc(x,y,3,0,Math.PI*2); g.fill(); g.restore(); }); }
 var STAFF_REST=false;
 // ── foes with a staff cast, they don't club you: the staff stays raised, a spell gathers at its tip and flies ──
 const FOE_HEX_LEFT={ name:'Grave Chill', col:'#e8e4d0', rgb:'230,225,200' };
@@ -12734,9 +12735,10 @@ function foeSpell(f){ const w=f && f.opts && f.opts.equip && f.opts.equip.weapon
   if(['staff_hex','staff_bone','staff_bog','staff_barrow'].includes(w)) return f.swingDir==='left' ? FOE_HEX_LEFT : (HEX_SPELLS[f.swingDir]||HEX_SPELLS.right);
   if(w==='staff_cinder') return SPELLS.left; return SPELLS[f.swingDir]||SPELLS.right; }
 { const oldPose=poseFor; poseFor=function(e){ const p=oldPose(e); if(p && foeSpell(e) && (p.kind==='raise'||p.kind==='strike')) return {kind:'guard', dir:'up'}; return p; }; }
-{ const oldOv=drawCombatOver; drawCombatOver=function(){ oldOv(); const f=combat.foe; if(!combat.active || !f || f.dead || f.state!=='windup') return; const S=foeSpell(f); if(!S) return;
+// a caster's spell gathering in his hand
+function drawSpellCharge(){ const f=combat.foe; if(!combat.active || !f || f.dead || f.state!=='windup') return; const S=foeSpell(f); if(!S) return;
     const k=Math.max(0,Math.min(1,1-f.t/f.wind)), q=P(f.x+(f.ox||0),f.y+(f.oy||0)), r=6+k*16;
-    g.save(); g.globalCompositeOperation='lighter'; glow(q.x+6,q.y-112,r,r,S.rgb,0.35+0.55*k); g.fillStyle='rgba(255,255,255,'+(0.3+0.6*k)+')'; g.beginPath(); g.arc(q.x+6,q.y-112,1.5+2.5*k,0,Math.PI*2); g.fill(); g.restore(); }; }
+    g.save(); g.globalCompositeOperation='lighter'; glow(q.x+6,q.y-112,r,r,S.rgb,0.35+0.55*k); g.fillStyle='rgba(255,255,255,'+(0.3+0.6*k)+')'; g.beginPath(); g.arc(q.x+6,q.y-112,1.5+2.5*k,0,Math.PI*2); g.fill(); g.restore(); }
 // a withered player hits for half, too
 // how a staff looks in the hand and in the pack
 function drawStaff(c,hx,hy,ang,id,s){            // a mage's staff: a shaft, two claws and a glowing stone
@@ -13251,11 +13253,12 @@ PUZ_DRAW.moonaltar=o=>{ const c=P(o.i+0.5,o.j+0.5), lit=PZ().moon||(nightAmt()>0
   g.fillStyle='#d8d4c8'; g.beginPath(); g.moveTo(c.x,c.y-33); g.lineTo(c.x+22,c.y-22); g.lineTo(c.x,c.y-11); g.lineTo(c.x-22,c.y-22); g.closePath(); g.fill();
   if(lit){ g.save(); g.globalCompositeOperation='lighter'; glow(c.x,c.y-26,40,30,'200,220,255',0.7); g.restore(); } };
 // the beam itself, drawn over everything after dark
-{ const oldOv=drawCombatOver; drawCombatOver=function(){ oldOv(); if(areaId!=='ruin' || nightAmt()<=0.4) return;
+// the ruin's moonlight, bounced off the mirrors
+function drawMoonBeam(){ if(areaId!=='ruin' || nightAmt()<=0.4) return;
     const b=moonBeam(); if(b.path.length<2) return; g.save(); g.globalCompositeOperation='lighter'; g.lineCap='round';
     [[10,'rgba(170,200,255,0.18)'],[4,'rgba(210,225,255,0.45)'],[1.5,'rgba(255,255,255,0.8)']].forEach(([w,col])=>{ g.strokeStyle=col; g.lineWidth=w; g.beginPath();
       b.path.forEach(([i,j],k)=>{ const q=P(i+0.5,j+0.5); k?g.lineTo(q.x,q.y-38):g.moveTo(q.x,q.y-38); }); g.stroke(); });
-    g.restore(); if(b.hit && !PZ().moon) moonCheck(); }; }
+    g.restore(); if(b.hit && !PZ().moon) moonCheck(); }
 
 // ════════ Old Greymaw, a proper boss: bigger, and savage when wounded ════════
 
@@ -13480,13 +13483,13 @@ function NPC_POSE(n){ return n && n.chop ? chopPose(n) : null; }
 // the loggers in the Fellings are at work until you interrupt them
 wrap('fellings','mobs',l=>l.map((m,k)=> m.name==='Logger Wat' ? {...m, chop:true, chopPh:0.1} : m.name==='Logger Hobb' ? {...m, chop:true, chopPh:0.55} : m));
 // chips fly when the axe bites
-{ const oldOv=drawCombatOver; drawCombatOver=function(){ oldOv();
+function drawChopChips(){                          // wood chips and spadefuls of earth flying off whoever is working
     const list=[...NPCS.filter(n=>n.chop), ...mobs.filter(m=>m.chop && !m.dead && !(combat.active && combat.foe===m))];
     list.forEach(e=>{ const ph=((gt*0.9+(e.chopPh||0))%1); if(ph<0.8 || ph>0.95) return; const q=P(e.x??e.i+0.5,e.y??e.j+0.5), k=(ph-0.8)/0.15;
       const W=e.opts&&e.opts.equip&&e.opts.equip.weapon;
       if(W==='shovel'){ const side=(e.dir>=4?-1:1); for(let n=0;n<6;n++){ const a=-1.0-n*0.32, d=4+k*(18+n*2); g.fillStyle='rgba('+(78+n*6)+','+(58+n*4)+',36,'+(1-k*0.8)+')';   // a spadeful of earth over his shoulder
           g.beginPath(); g.arc(q.x-side*(4+Math.cos(a)*d),q.y-14+Math.sin(a)*d+k*k*18,1.4+(n%3)*0.6,0,Math.PI*2); g.fill(); } return; }
-      for(let n=0;n<4;n++){ const a=-1.2-n*0.5, d=6+k*16; g.fillStyle='rgba(222,196,140,'+(1-k)+')'; g.fillRect(q.x+14+Math.cos(a)*d,q.y-30+Math.sin(a)*d+k*k*10,2.4,1.6); } }); }; }
+      for(let n=0;n<4;n++){ const a=-1.2-n*0.5, d=6+k*16; g.fillStyle='rgba(222,196,140,'+(1-k)+')'; g.fillRect(q.x+14+Math.cos(a)*d,q.y-30+Math.sin(a)*d+k*k*10,2.4,1.6); } }); }
 
 // ── the Bog Lurker: a heap of mud and reeds that stands up and reaches for you ──
 FOES.lurker={ label:'Lurker', base:62, stagger:1.25, pattern:[
@@ -13788,7 +13791,7 @@ function poolsArea(id){ OBJECTS.forEach(o=>{ if(o.type!=='pool') return; for(let
     if(CHOICE.bathChest && CHOICE.bathChest.area===id){ const c=CHOICE.bathChest; OBJECTS.push({type:'bathchest', i:c.i, j:c.j}); blocked.add(c.i+','+c.j); }
     player.sink=poolDepth(player.x,player.y)*56; }
 // the player sinks as deep as the bathers do
-{ const oldDA=drawActor; drawActor=function(e){ if(e!==player || combat.active) return oldDA(e);
+function drawPlayerWading(e){                       // out of a fight: you sink into pools, get wet, and drip
     const tgt=poolDepth(player.x,player.y)*56; player.sink=(player.sink||0)+(tgt-(player.sink||0))*0.12; const sk=player.sink;
     const now=gt, dt=Math.min(0.1,now-(player.wetT||now)); player.wetT=now;
     const A0=AREAS[areaId], rain=A0 && !A0.inside && typeof weatherToday==='function' && weatherToday()==='rain';
@@ -13799,15 +13802,15 @@ function poolsArea(id){ OBJECTS.forEach(o=>{ if(o.type!=='pool') return; for(let
     if(sk>18 || (rain && (player.wet||0)>0.05)) player.wetKind = clad ? 'cloth' : 'skin';
     if(player.wetKind==='skin' && clad) player.wetKind='cloth';                // dressing while wet: the clothes soak it up, the shimmer is gone                // what got wet: bare skin, or the clothes you waded in with
     const wet=player.wet||0;
-    if(sk<0.8){ if(wet>0.02) drawWetPlayer(e,oldDA,wet,player.wetKind,clad); else oldDA(e);
+    if(sk<0.8){ if(wet>0.02) drawWetPlayer(e,drawActorFigure,wet,player.wetKind,clad); else drawActorFigure(e);
       if(wet>0){ const q=P(player.x,player.y);                                                    // a few drips, a damp patch under the feet
         for(let k=0;k<4;k++){ const ph=((gt*(0.9+k*0.13)+k*0.31)%1); if(Math.sin(k*7.1+Math.floor(gt*(0.9+k*0.13)+k*0.31)*3.3)>wet*1.6-0.6) continue;
           const dx=[-7,5,-2,8][k], y0=q.y-[60,48,36,70][k]; g.fillStyle=`rgba(190,220,235,${0.8*(1-ph)})`; g.beginPath(); g.ellipse(q.x+dx,y0+ph*(q.y-y0),1.1,1.9,0,0,Math.PI*2); g.fill(); }
         g.fillStyle=`rgba(40,60,70,${0.22*wet})`; g.beginPath(); g.ellipse(q.x,q.y+1,8+2*wet,2.6,0,0,Math.PI*2); g.fill(); }
       return; }
-    const q=P(player.x,player.y); g.save(); g.beginPath(); g.rect(q.x-80,q.y-260,160,259+0); g.clip(); g.translate(0,sk); if((player.wet||0)>0.02) drawWetPlayer(e,oldDA,player.wet,player.wetKind,clad); else oldDA(e); g.restore();
+    const q=P(player.x,player.y); g.save(); g.beginPath(); g.rect(q.x-80,q.y-260,160,259+0); g.clip(); g.translate(0,sk); if((player.wet||0)>0.02) drawWetPlayer(e,drawActorFigure,player.wet,player.wetKind,clad); else drawActorFigure(e); g.restore();
     const t=(gt*0.5)%1; g.strokeStyle=`rgba(220,240,245,${0.5*(1-t)*Math.min(1,sk/20)})`; g.lineWidth=1; g.beginPath(); g.ellipse(q.x,q.y,10+t*10,3.5+t*3.5,0,0,Math.PI*2); g.stroke();
-    g.fillStyle='rgba(60,100,110,0.35)'; g.beginPath(); g.ellipse(q.x,q.y,11,3.6,0,0,Math.PI*2); g.fill(); }; }
+    g.fillStyle='rgba(60,100,110,0.35)'; g.beginPath(); g.ellipse(q.x,q.y,11,3.6,0,0,Math.PI*2); g.fill(); }
 // "take a bath": everything you wear goes in a chest on the bank, and you go into the water
 const BATH_NOTES={ 'Maud':"“Leave your things in the chest on the bank. Nobody here's going to steal your boots.”", 'Ithilwen':"“Your things go in the chest by the stones. The water does not like cloth.”", 'Yselde, Bath-mistress':"“Clothes in the chest, not on the floor. I'm not your mother.”", 'Nimuë, Keeper of the Bath':"“Your things will wait in the chest beside the pool. Nobody here wants them.”" };
 let BATH_NOTE=null;
@@ -14287,7 +14290,13 @@ function drawLava(o){ const [fw,fh]=o.fp, t=(typeof gt!=='undefined'?gt:0);
     g.globalCompositeOperation='lighter'; for(let k=0;k<40;k++){ const ph=(gt*(0.05+rnd01(k,1,776)*0.06)+rnd01(k,2,777))%1, x=rnd01(k,3,778)*W+Math.sin(gt*0.7+k)*20, y=H*(1.05-ph*1.2);
       g.fillStyle=`rgba(255,${120+Math.round(rnd01(k,4,779)*80)},40,${0.7*Math.sin(ph*Math.PI)})`; g.fillRect(x,y,2,2); } g.restore(); }; }
 // ash hounds glow from inside
-{ const oldDA=drawActor; drawActor=function(e){ if(!e.dead && /^Ash Hound/.test(e.name||'')){ const s=P(e.x+(e.ox||0),e.y+(e.oy||0)); g.save(); g.globalCompositeOperation='lighter'; glow(s.x,s.y-26,40,26,'255,110,30',0.4+Math.sin(gt*4+e.id)*0.08); g.restore(); } return oldDA(e); }; }
+function drawActor(e){                               // you, a foe, a wolf
+  const ch=e===player && player.sitChair;
+  if(ch) return drawPlayerOnChair(ch);
+  if(!e.dead && /^Ash Hound/.test(e.name||'')){ const s=P(e.x+(e.ox||0),e.y+(e.oy||0)); g.save(); g.globalCompositeOperation='lighter'; glow(s.x,s.y-26,40,26,'255,110,30',0.4+Math.sin(gt*4+e.id)*0.08); g.restore(); }   // ash hounds smoulder
+  if(e===player && !combat.active) return drawPlayerWading(e);
+  drawActorFigure(e);
+}
 
 // ── the places ──
 const FLAMESWORN=(o)=>({gender:'m',race:'human',skin:4,hair:2,hairColor:0,beard:0,face:3,marks:{warPaint:2},equip:{head:'obsidian_helm',torso:'shirt',armor:'ash_mantle',hands:'cinder_gloves',legs:'scorched_greaves',feet:'emberstep_boots',weapon:'fire_blade',offhand:null},...o});
@@ -15338,10 +15347,10 @@ function sitOnChair(ch){ if(!chairFree(ch)) return; player.sitChair=ch; player.p
         if(best){ player.path=best; pendingChair=ch; } return; } }
     return oPU(px,py); }; }
 
-{ const oDA=drawActor; drawActor=function(e){ const ch=e===player && player.sitChair; if(!ch) return oDA(e);
+function drawPlayerOnChair(ch){
     const q=P(ch.i+0.5+ch.face[0]*CHAIR_IN, ch.j+0.5+ch.face[1]*CHAIR_IN), d=dirFromDelta(ch.face[0],ch.face[1]);
     drawLitSprite(q.x,q.y,()=>drawSitting(g,q.x,q.y,player.opts,d,'chair'));
-    if((ch.face[0]+ch.face[1])<0) drawChairOver(ch); }; }
+    if((ch.face[0]+ch.face[1])<0) drawChairOver(ch); }
 // where the pups caught Barnabas: a dark pool and a spatter round it, fading after a couple of days
 function goatBlood(x,y){ const B=[{x:x+0.02,y:y+0.02,r:12,a:0.35}]; for(let k=0;k<4;k++) B.push({x:x+(Math.random()-0.5)*0.8,y:y+(Math.random()-0.5)*0.8,r:2.5+Math.random()*3,a:Math.random()*3});
   CHOICE.goatBlood={t:dayClock,b:B}; }
@@ -15637,14 +15646,15 @@ function ckAdds(K){ CK={mode:'adds'}; K.warded=true;
             thorns(c,i,j,4+10*p,0.6+0.4*p); }); }
         if(CK.burst && CK.burstTiles){ const a=CK.burst/0.45; CK.burstTiles.forEach(k=>{ const [i,j]=k.split(',').map(Number), c=P(i+0.5,j+0.5);   // and then they burst up, long and black
             thorns(c,i,j,34*(0.4+0.6*a),0.9*a); g.fillStyle=`rgba(20,16,14,${0.35*a})`; g.beginPath(); g.ellipse(c.x,c.y-20*(1-a),26,20*(1.2-a),0,0,Math.PI*2); g.fill(); }); } } } }); }; }
-{ const oDCO=drawCombatOver; drawCombatOver=function(){ oDCO(); if(areaId!==BK_AREA) return; const K=ckKing(); if(!K) return; const s=P(K.x,K.y);
+// the Barrow-King: his ward, the count before the wail, the flash of black water
+function drawBarrowKingFX(){ if(areaId!==BK_AREA) return; const K=ckKing(); if(!K) return; const s=P(K.x,K.y);
     if(K.warded){ g.save(); g.globalCompositeOperation='lighter'; glow(s.x,s.y-56,58,86,'130,190,230',0.42+Math.sin(gt*5)*0.08); g.restore();
       g.strokeStyle=`rgba(170,220,255,${0.55+Math.sin(gt*5)*0.2})`; g.lineWidth=2; g.beginPath(); g.ellipse(s.x,s.y-54,36,64,0,0,Math.PI*2); g.stroke(); }
     if(!CK) return;
     if(CK.mode==='storm' && CK.t<20){ const rr=18+CK.t*12; g.save(); g.strokeStyle=`rgba(150,210,240,${0.6+Math.sin(gt*10)*0.2})`; g.lineWidth=3; g.beginPath(); g.ellipse(s.x,s.y-60,rr,rr*0.9,0,0,Math.PI*2); g.stroke();
       g.font='bold 22px Georgia,serif'; g.textAlign='center'; g.fillStyle='#e0f2ff'; g.fillText(Math.ceil(CK.t),s.x,s.y-52); g.textAlign='left'; g.restore();
       g.save(); g.globalCompositeOperation='lighter'; glow(s.x,s.y-60,70+Math.sin(gt*8)*8,90,'110,170,220',0.35); g.restore(); }
-    if(CK.flash){ g.save(); g.setTransform(1,0,0,1,0,0); g.fillStyle=`rgba(150,200,230,${CK.flash*0.8})`; g.fillRect(0,0,gc.width,gc.height); g.restore(); } }; }
+    if(CK.flash){ g.save(); g.setTransform(1,0,0,1,0,0); g.fillStyle=`rgba(150,200,230,${CK.flash*0.8})`; g.fillRect(0,0,gc.width,gc.height); g.restore(); } }
 // ── TESTING ONLY: a way from the farm straight into the Barrow-King's lair. Each trip puts him back on his feet. Remove before release. ──
 wrap('farm','objects',l=>[...l,{type:'teleporter', i:9, j:4, to:'barrow', entry:'fromLow'}]);
 // ════════ the Barrow-King's things: Bertil's sword, and the crown the bog grew round his head ════════

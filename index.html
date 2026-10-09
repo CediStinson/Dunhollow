@@ -12041,6 +12041,7 @@ function impact(f){                                   // a foe's swing lands (or
   const sideOk = duel.st==='parry' && duel.parryDir===f.swingDir;
   const since=clock-duel.parryAt;
   duel.lastImpact=clock;
+  if(S){ spellImpact(f,S,s,sideOk,since,hp0); return; }   // a spell is not a sword: it lands by the same rules as yours do on him
   if(sideOk && since<=perfectFor(player)){
     f.state='stagger'; f.t=foeDef(f).stagger;
     slowmo.scale=0.25; slowmo.t=0.22; shake=Math.max(shake,5);
@@ -12064,14 +12065,7 @@ function impact(f){                                   // a foe's swing lands (or
   const hurt=player.hp<hp0 && player.hp>0;
   if(hurt && !combat.practice){                     // what the blow leaves behind
     if(f.type==='wolf'){ addStatus(player,'bleed',4.2,1); logMsg('The bite tears. You are bleeding.','#d0342c'); }
-    else if(f.opts && FIRE_STAFF(f.opts.equip&&f.opts.equip.weapon)) addStatus(player,'burn',3,1);
     else if(f.opts && BLEEDERS.has(f.opts.equip&&f.opts.equip.weapon) && Math.random()<0.25) addStatus(player,'bleed',3.2,1); }
-  if(S){ f.lunge=null; bolts.push({from:{x:f.x,y:f.y}, to:player, t:0, S}); floatText(tileOf(f),S.name+'!',S.col);   // a caster's swing is a spell
-    if(hurt){
-      if(S.name==='Drain'){ const h=Math.min(4,f.maxHp-f.hp); floatText([player.i,player.j-0.004],'Life drained','#8ad07a'); if(h>0){ f.hp+=h; floatText([f.i,f.j-0.003],'+'+h,'#8ad07a'); } logMsg(shortName(f)+' drains your life'+(h>0?' and heals '+h+'.':'.'),'#8ad07a'); }
-      else if(S.name==='Wither') addStatus(player,'weak',4,0);
-      else if(S.name==='Frost' || S===FOE_HEX_LEFT) addStatus(player,'chill',3,0);
-      else if(S.name==='Fire' && !FIRE_STAFF(f.opts&&f.opts.equip&&f.opts.equip.weapon) && Math.random()<0.6) addStatus(player,'burn',3,1); } }
   if(f.phase2 && hurt) addStatus(player,'bleed',5,2);
   if(hurt && FIRE_FOE(f) && Math.random()<(/Slag/.test(f.name)?1:0.35)) addStatus(player,'burn',3,2);
   if(f.type==='barrowking' && f.cphase>=3 && player.hp<hp0 && !f.dead){ const h=Math.min(5,f.maxHp-f.hp); if(h>0){ f.hp+=h; floatText(tileOf(f),'+'+h,'#9ad0e8'); } }
@@ -12090,7 +12084,7 @@ function woundRaw(f,n,label,col){
   const W=WEAPONS[player.opts&&player.opts.equip.weapon]||{};
   if(f!==player && HIT_SRC==='melee' && n>0) n=Math.round(W.ember ? n*emberMult() : n*APM());     // attack power; an ember blade scales with spell power instead
   if(f.type==='barrowking' && HIT_SRC==='melee' && !isMagicWeapon() && n>0) n=Math.max(1,Math.round(n*BK_STEEL));   // his bog-iron mail turns plain steel
-  if(f!==player && hasStatus(player,'weak') && n>0) n=Math.max(1,Math.ceil(n*0.6));
+  if(f!==player && hasStatus(player,'weak') && n>0) n=Math.max(1,Math.ceil(n*0.5));   // withered: half, as a withered foe
   const crit = Math.random()<PARRY.critChance;
   if(crit) n=Math.round(n*PARRY.critMult);
   f.hp-=n; f.flash=0.35; shake=Math.max(shake,crit?7:3);
@@ -12304,7 +12298,7 @@ function combatUpdate(dt){
   tickStatus(player,dt); if(combat.active && combat.phase==='fight' && combat.foe) tickStatus(combat.foe,dt);
   if(player.maxMana){ player.mana=Math.min(player.maxMana,(player.mana??player.maxMana)+dt*(combat.active?7+gearSum('mreg'):40)); }   // necromancer staves and some trinkets bring the power back faster
   combatStep(dt);
-  skelTick(dt);
+  skelTick(dt); fskelTick(dt);
   if(!combat.active && pendingPuz && !player.path.length){ const o=pendingPuz; pendingPuz=null; if(OBJECTS.includes(o) && cheb([o.i,o.j],[player.i,player.j])<=1) puzAct(o); }
 }
 function combatStep(dt){
@@ -12752,7 +12746,7 @@ function skelTick(dt){                              // your risen skeleton: clim
     if(f && !f.dead) S.dir=dirFromDelta(f.x-S.x,f.y-S.y); else if(S.moving && md>0.08) S.dir=dirFromDelta(mx,my);   // faces its foe, or the way it walks
     if(f && !f.dead && combat.phase==='fight' && S.asm>=1 && md<0.5){ S.cd-=dt; if(S.cd<=0){ S.cd=1.5; S.anim=0.3; wound(f,S.dmg||3,'Bones!','#e8e4d0'); } } }
 // it comes along through doors and gates
-function skelFollowArea(){ if(SKEL){ if(SKEL.crumble) SKEL=null; else { SKEL.x=player.x+0.7; SKEL.y=player.y+0.35; } } }   // the risen one follows you through doors
+function skelFollowArea(){ FSKEL=null; if(SKEL){ if(SKEL.crumble) SKEL=null; else { SKEL.x=player.x+0.7; SKEL.y=player.y+0.35; } } }   // the risen one follows you through doors
 // the skeleton as a little model of bones in 3D (x across, y up the screen, z toward you when it faces south), so it can turn to all eight facings like anyone else
 // and its pieces can lie in a real heap on the ground: each group of bones has a resting place in the heap, and flies up into place (or back down) bone by bone
 const SKEL_HEAP=[   // per group: centre, then how it lies in the heap: tipped over x, tipped over z, turned, and where (in degrees and px)
@@ -12876,10 +12870,10 @@ function drawSkelFig(x0,y0,o){
   g.lineCap='round'; g.lineJoin='round';
   prims.sort((a,b)=>a.z-b.z).forEach(p=>p.fn());
   g.restore(); }
-function drawSkel(S){ const base=P(S.x,S.y), f=combat.active?combat.foe:null, tgt=f?P(f.x,f.y):base, k=S.anim>0?Math.sin((0.3-S.anim)/0.3*Math.PI)*0.35:0;
+function drawSkel(S){ const base=P(S.x,S.y), f=S.hostile?player:(combat.active?combat.foe:null), tgt=f?P(f.x,f.y):base, k=S.anim>0?Math.sin((0.3-S.anim)/0.3*Math.PI)*0.35:0;
   const x=base.x+(tgt.x-base.x)*k, y=base.y+(tgt.y-base.y)*k, stand=!S.crumble && S.asm>=1;
   const mound=S.crumble?0:Math.min(1,S.asm*5)*(1-clamp01((S.asm-0.8)/0.2));
-  if(!S.crumble) S.weapon=skelArmsOn()?CHOICE.skelWeapon||null:null;                                   // change what it holds and it changes hands at once
+  if(!S.crumble && !S.hostile) S.weapon=skelArmsOn()?CHOICE.skelWeapon||null:null;                                   // change what it holds and it changes hands at once
   drawSkelFig(x,y,{asm:S.asm, emerge:S.crumble?1:clamp01(S.asm/0.25), k, stand, moving:S.moving, walk:S.walk, dir:S.dir, mound, weapon:S.weapon});
   if(stand){ const w=26, r2=Math.max(0,S.t/(S.max||9)); g.fillStyle='rgba(10,8,4,0.8)'; g.fillRect(x-w/2,y-100,w,3); g.fillStyle='#d8d4c0'; g.fillRect(x-w/2,y-100,w*r2,3); } }
 // into the world's draw order, so it stands behind and before things and takes the day's light and the night's dark like everyone else
@@ -12887,6 +12881,7 @@ function skelDrawItems(items){
   SKEL_PILES.forEach(p=>{ if(p.area!==areaId) return; const a=Math.min(1,(SKEL_PILE_LIFE-p.age)/4);
     items.push({d:p.x+p.y-0.2, fn:()=>{ const q=P(p.x,p.y); drawSkelFig(q.x,q.y,{pile:true, alpha:a, dir:p.dir, weapon:p.weapon}); }}); });
   if(SKEL) items.push({d:SKEL.x+SKEL.y+0.01, ax:SKEL.x, ay:SKEL.y, fn:()=>drawSkel(SKEL)});
+  if(FSKEL) items.push({d:FSKEL.x+FSKEL.y+0.01, ax:FSKEL.x, ay:FSKEL.y, fn:()=>drawSkel(FSKEL)});
   try{ pupDrawItems(items); }catch(e){ console.error(e); }
   try{ const G=CHOICE.goatBlood; if(areaId==='village' && G){ const days=(dayClock-G.t)/DAY_LEN, a=days<2?1:Math.max(0,1-(days-2)/3);   // the goat's blood: full for two days, then gone over three more
       if(a>0.01) G.b.forEach(b=>items.push({d:b.x+b.y-0.9, fn:()=>drawSoftBlood(b,a)})); } }catch(e){} }
@@ -12933,9 +12928,8 @@ function drawBolts(){                               // spells in flight
       g.save(); g.globalCompositeOperation='lighter'; glow(x,y,18,18,b.S.rgb,0.9); g.fillStyle='#fff'; g.beginPath(); g.arc(x,y,3,0,Math.PI*2); g.fill(); g.restore(); }); }
 var STAFF_REST=false;
 // ── foes with a staff cast, they don't club you: the staff stays raised, a spell gathers at its tip and flies ──
-const FOE_HEX_LEFT={ name:'Grave Chill', col:'#e8e4d0', rgb:'230,225,200' };
 function foeSpell(f){ const w=f && f.opts && f.opts.equip && f.opts.equip.weapon; if(!w || !w.startsWith('staff_')) return null;
-  if(['staff_hex','staff_bone','staff_bog','staff_barrow'].includes(w)) return f.swingDir==='left' ? FOE_HEX_LEFT : (HEX_SPELLS[f.swingDir]||HEX_SPELLS.right);
+  if(NECRO_STAVES.includes(w)) return HEX_SPELLS[f.swingDir]||HEX_SPELLS.right;                         // a necromancer: Drain, Raise Dead, Wither, as yours
   if(w==='staff_cinder') return SPELLS.left; return SPELLS[f.swingDir]||SPELLS.right; }
 // a caster's spell gathering in his hand
 function drawSpellCharge(){ const f=combat.foe; if(!combat.active || !f || f.dead || f.state!=='windup') return; const S=foeSpell(f); if(!S) return;
@@ -16166,6 +16160,43 @@ function refreshEffects(){ buildBeltUI(); const box=document.getElementById('fx-
 const ROCK_DARK=()=>!!(AREAS[areaId] && AREAS[areaId].cave);                  // under the earth the stone is darker
 OBJ_DRAW.rockridge=o=>drawCrag({...o, fp:[o.fp[0],1], v:(o.v||0)+11, dark:ROCK_DARK()});
 OBJ_DRAW.boulder=o=>drawCrag({...o, fp:[1,1], v:(o.v||0)+21, dark:ROCK_DARK()});
+
+// ════════ Foe spells land by your rules: ward with a staff, catch with a shield, or step aside; and they do what yours do ════════
+function spellImpact(f,S,s,sideOk,since,hp0){
+  f.lunge=null; bolts.push({from:{x:f.x,y:f.y}, to:player, t:0, S}); floatText(tileOf(f),S.name+'!',S.col);
+  const fdmg=weaponOf(f).dmg; let fx=true;
+  const chip=(n,lbl,col)=>{ if(f.tier) n=Math.round(n*tierDmg(f)); if(combat.practice) n=0; player.hp-=n; player.flash=0.25; floatText(tileOf(player),n?'-'+n:'0','#ff9a8a',true); floatText([player.i,player.j-0.001],lbl,col); updateHud(); };
+  if(sideOk && since<=windowFor(player)){                  // you met it on the right side, in time
+    if(isMagicWeapon()){ fx=false; chip(Math.max(1,Math.round(fdmg*0.3)),'Warded','#b8b0e8'); burst(player,f,'#b8b0e8',6);   // a staff wards most of it
+      if(since<=perfectFor(player)){ f.state='stagger'; f.t=foeDef(f).stagger; floatText(tileOf(f),'Interrupted!','#ffd070'); if(!f.quick) f.k++; if(player.hp<=0) defeat(); return; } }
+    else if(hasShield(player)){ fx=false; chip(Math.max(1,Math.round(fdmg*0.45)),'Shield!','#b8c8d8'); burst(player,f,'#b8c8d8',6); }
+    else if(Math.random()<0.4){ fx=false; floatText(tileOf(player),'Dodged','#c8c0a8'); }          // a sword can't parry fire: but you can duck it
+    else hurtPlayer(fdmg,'No ward!'); }
+  else hurtPlayer(fdmg, duel.st==='parry'?'Wrong side!':null);
+  f.state='recover'; f.t=f.quick?0.5:s.after; if(!f.quick) f.k++;
+  if(player.hp<=0){ defeat(); return; }
+  if(fx && player.hp<hp0 && !combat.practice && !f.dead) foeSpellFx(f,S); }
+function foeSpellFx(f,S){                                  // the same effect your own spell has on him
+  if(S.name==='Fire') addStatus(player,'burn',3.6,2);
+  else if(S.name==='Frost'){ addStatus(player,'chill',5,0); if(duel.st==='attack'){ duel.t+=0.35; duel.atkWind+=0.35; } }
+  else if(S.name==='Wither') addStatus(player,'weak',5,0);
+  else if(S.name==='Drain'){ const h=Math.min(3,f.maxHp-f.hp); floatText([player.i,player.j-0.004],'Life drained','#8ad07a'); if(h>0){ f.hp+=h; floatText([f.i,f.j-0.003],'+'+h,'#8ad07a'); } logMsg(shortName(f)+' drains your life'+(h>0?' and heals '+h+'.':'.'),'#8ad07a'); }
+  else if(S.name==='Raise Dead') foeRaise(f); }
+// a foe necromancer's risen dead: climbs out beside you, claws at you a while, then falls apart
+let FSKEL=null;
+function foeRaise(f){ if(FSKEL && !FSKEL.crumble){ return; } const fx=f.x-player.x, fy=f.y-player.y, fl=Math.hypot(fx,fy)||1;
+  FSKEL={x:player.x+fy/fl*0.95+fx/fl*0.25, y:player.y-fx/fl*0.95+fy/fl*0.25, t:9, max:9, dmg:2, cd:1.2, anim:0, asm:0, crumble:0, walk:0, moving:false, dir:dirFromDelta(-fx,-fy), hostile:true, owner:f, weapon:null};
+  floatText(tileOf(player),'The dead rise!','#e8e4d0'); logMsg(shortName(f)+' raises the dead against you: bones claw out of the earth at your side.','#e8e4d0'); }
+function fskelTick(dt){ const S=FSKEL; if(!S) return; S.anim=Math.max(0,S.anim-dt);
+  if(S.crumble){ S.asm-=dt*1.5; if(S.asm<=0.25){ SKEL_PILES.push({x:S.x,y:S.y,dir:S.dir,weapon:null,age:0,area:areaId}); FSKEL=null; } return; }
+  S.asm=Math.min(1,S.asm+dt/1.5);
+  const own=S.owner; if(!combat.active || !own || own.dead || combat.foe!==own){ S.crumble=1; S.asm=Math.min(S.asm,1); floatText([Math.floor(S.x),Math.floor(S.y)],'The bones fall apart','#a8a490'); return; }   // its master falls, or the fight ends: so does it
+  S.t-=dt; if(S.t<=0){ S.crumble=1; S.asm=Math.min(S.asm,1); return; }
+  const fx=own.x-player.x, fy=own.y-player.y, fl=Math.hypot(fx,fy)||1, tx=player.x+fy/fl*0.95+fx/fl*0.25, ty=player.y-fx/fl*0.95+fy/fl*0.25;   // at your other shoulder
+  const mx=tx-S.x, my=ty-S.y, md=Math.hypot(mx,my), sp=Math.min(md,dt*Math.max(2.2,md*3)); S.moving=md>0.04; if(md>0.001){ S.x+=mx/md*sp; S.y+=my/md*sp; } if(S.moving) S.walk+=dt*8;
+  S.dir=dirFromDelta(player.x-S.x,player.y-S.y);
+  if(combat.phase==='fight' && S.asm>=1 && md<0.5){ S.cd-=dt; if(S.cd<=0){ S.cd=1.5; S.anim=0.3; let n=S.dmg; if(own.tier) n=Math.round(n*tierDmg(own)); if(combat.practice) n=0;
+      player.hp-=n; player.flash=0.2; floatText(tileOf(player),'-'+n,'#e8e4d0'); floatText([player.i,player.j-0.001],'Bones!','#e8e4d0'); updateHud(); if(player.hp<=0){ player.hp=0; defeat(); } } } }
 </script>
 </body>
 </html>

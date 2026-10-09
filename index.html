@@ -9386,7 +9386,10 @@ function showDialog(name,text,opts,purse){
 function closeDialog(){ dlgOverlay.classList.remove('open'); }
 const hasItem=id=>player.inv.includes(id);
 const bye={label:'Farewell.', fn:closeDialog};
-function npcHasNews(n){
+function npcHasNews(n){                                // '!' new business, '?' something to hand in, null nothing
+  if(n.sleepBed) return null;
+  if(n.id==='vesna' && !n._lesson && areaId==='fen'){ if(!CHOICE.morwen) return '!'; if(CHOICE.morwen==='asked' && hasLantern()) return '?'; }
+  if(n.id==='vesna' && NECRO()>=3 && !CHOICE.skelArms) return CHOICE.necroQ==='bones' ? (bonesDown()>=4?'?':null) : '!';
   if((n.id==='digger' && !CHOICE.grave && EDRIC_FOUND()) || (n.id==='hunter' && (!CHOICE.brannMet && !CHOICE.hunter))) return '!';
   if(n.id==='gisla' && (!CHOICE.gisla || (CHOICE.gisla==='asked' && defeatedMobs.has('millroad:Mill-Pond Wolf')))) return CHOICE.gisla?'?':'!';
   if(n.id==='hunter' && CHOICE.brannTrap==='asked' && defeatedMobs.has("elfroad:Baron's Trapper")) return '?';
@@ -9427,6 +9430,20 @@ function npcHasNews(n){
   if(n.id==='elder'){ const holdL=QUEST.letter<2 && hasItem('letter') && CHOICE.letter!=='sold';
     if(holdL || QUEST.camp===2 || QUEST.wolves===2 || (STQ()==='found' && hasItem('charter')) || (CHOICE.ruler && !CHOICE.epiDone)) return '?';
     if(QUEST.camp===0) return '!'; if(QUEST.camp>=3 && QUEST.wolves===0) return '!'; if(QUEST.camp>=3 && QUEST.wolves>=3 && !STQ()) return '!'; }
+  if(n.id==='gerd' && !CHOICE.gerdMet) return '!';
+  if(n.id==='gerd' && FEN_OPEN() && (!CHOICE.pim || CHOICE.pim==='found')) return CHOICE.pim==='found'?'?':'!';
+  if(n.id==='pim_lost') return '!';
+  if(n.id==='vesna'){ const N=NECRO(), r=(()=>{
+      if(CHOICE.necro==='met' && !CHOICE.necroQ) return '!';
+      if(CHOICE.necroQ==='motes') return player.inv.filter(x=>x==='grave_mote').length>=3 && !vesnaWait(0)?'?':null;
+      if(N===1 && FEN_OPEN() && !CHOICE.necroQ && !vesnaWait(1)) return '!';
+      if(N===1 && CHOICE.necroQ==='lurkers' && ['fen:Bog Lurker','fen:Mire Lurker','fenlow:Old Mudmaw'].every(k=>defeatedMobs.has(k))) return '?';
+      if(N===2 && CHOICE.barrow==='done' && !vesnaWait(2)) return '?'; })();
+    if(r) return r; }
+  if(n.id==='ilka' && !CHOICE.emberbrand) return (hasItem('fire_blade')||player.opts.equip.weapon==='fire_blade') && coreCount()>=3 ? '?' : '!';
+  if(n.id==='trader'){ if(CHOICE.pupSt==='follow') return '!'; if(CHOICE.goatEaten && !CHOICE.goatTold) return '!'; }   // (a fed pup at home is told in conversation, not by a mark)
+  if(n.id==='digger' && CHOICE.moundSeen && !ownsSpade() && !CHOICE.spadeQ) return '?';
+  if(n.id==='vesna' && CHOICE.spadeQ==='tobb' && !ownsSpade() && barrowKnown()) return '?';
   return null;
 }
 const TALKERS={};
@@ -13626,9 +13643,6 @@ function fenRumour(id){ try{ rumourCd--; if(id==='fenpath' || AREAS[id].inside &
     if(!want) return;
     setTimeout(()=>{ if(areaId!==id) return; const who=NPCS.filter(n=>n.name && !n.shop && !n.sit && n.id!=='shade' && n.id!=='vesna').sort((a,b)=>Math.hypot(a.i-player.i,a.j-player.j)-Math.hypot(b.i-player.i,b.j-player.j))[0]; if(!who) return;
       who.bark={text:want.replace(/[“”]/g,''),t:0}; logMsg(who.name+': '+want,'#d8c8a0'); if(mid) CHOICE.fenMidHeard=true; else CHOICE.fenRumours=(CHOICE.fenRumours||0)+1; rumourCd=3; },1800); }catch(err){} }
-{ const oldN=npcHasNews; npcHasNews=function(n){ const r=oldN(n); if(r) return r;
-    if(n.id==='gerd' && !CHOICE.gerdMet){ return '!'; }
-    return null; }; }
 { const oldG=gerdTalk; TALKERS.gerd=()=>{ CHOICE.gerdMet=true; oldG(); }; }
 // ── journal ──
 JOURNAL.push(
@@ -13819,7 +13833,6 @@ JOURNAL.push(['The Heart of the Cave', ()=> !(hasItem('heartshard')||CHOICE.shar
 wrap('fenlow','npcs',l=> CHOICE.pim==='asked' ? [...l,{ id:'pim_lost', name:'Young Pim', i:9, j:3, dir:1, opts:LOGGER({skin:2,hair:1,hairColor:8,beard:0,face:2,equip:{weapon:null}}) }] : l);
 TALKERS.pim_lost=()=>say('Young Pim',["Pim is standing knee-deep in the mud, staring at the reeds by the old stones with his mouth open.","“They go in there! The lights! Into the reeds, and then they're gone. There's a door, I swear there's a door behind them.”","He finally looks at you. “…Is Gerd angry?”"],[
   {label:'“Furious. Come on, back to the cart.”', fn:()=>{ remember('pim','found',"You found Young Pim in the Sunken Hollow. He swears there is a door behind the reeds."); NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='pim_lost')); say('Young Pim',"He wades out after you, still looking back over his shoulder at the reeds.",[bye]); }}]);
-{ const oldN2=npcHasNews; npcHasNews=function(n){ const r=oldN2(n); if(r) return r; if(n.id==='gerd' && FEN_OPEN() && (!CHOICE.pim || CHOICE.pim==='found')) return CHOICE.pim==='found'?'?':'!'; if(n.id==='pim_lost') return '!'; return null; }; }
 wrap('fenpath','npcs',l=> FEN_OPEN() && CHOICE.pim==='done' ? [...l,{ id:'logger4', name:'Young Pim', i:4, j:15, dir:1, sit:'knees', opts:LOGGER({skin:2,hair:1,hairColor:8,beard:0,face:2,equip:{weapon:null}}) }] : l);
 JOURNAL.push(['Lights in the Fen', ()=> !CHOICE.pim ? null : CHOICE.pim==='done' ? ['done',"You brought Young Pim back from the fen. Gerd gave you his felling axe."] : CHOICE.pim==='found' ? ['active',"Pim is safe. Tell Foreman Gerd on the Fen Causeway."] : ['active',"Young Pim ran into the Drowning Fen after the lights. Gerd thinks he went south, to the Sunken Hollow."]]);
 
@@ -13980,13 +13993,6 @@ function vesnaTalk(){ const n=NECRO(), st=NECRO_STAVES.some(w=>player.opts.equip
       {label:'Learn Raise Dead.', fn:()=>{ CHOICE.necro=3; giveQuestItem('necro_robe',true); logMsg('You learned Raise Dead: lean left with a necromancer\'s staff. Vesna gives you her old robe.','#b8a8e8'); say('Vesna the Grave-Speaker',"“That is all I have. Use it kindly. Or at least use it on people who deserve it.”",[bye]); }}]); return; }
   say('Vesna the Grave-Speaker',["“The fen is quieter since you came. I don't know if that is good.”"],[bye]); }
 TALKERS.vesna=vesnaTalk;
-{ const oldN3=npcHasNews; npcHasNews=function(n){ const r=oldN3(n); if(r) return r; if(n.id!=='vesna') return null; const N=NECRO();
-    if(CHOICE.necro==='met' && !CHOICE.necroQ) return '!';
-    if(CHOICE.necroQ==='motes') return player.inv.filter(x=>x==='grave_mote').length>=3 && !vesnaWait(0)?'?':null;
-    if(N===1 && FEN_OPEN() && !CHOICE.necroQ && !vesnaWait(1)) return '!';
-    if(N===1 && CHOICE.necroQ==='lurkers' && ['fen:Bog Lurker','fen:Mire Lurker','fenlow:Old Mudmaw'].every(k=>defeatedMobs.has(k))) return '?';
-    if(N===2 && CHOICE.barrow==='done' && !vesnaWait(2)) return '?';
-    return null; }; }
 JOURNAL.push(["The Grave-Speaker", ()=> !CHOICE.necro ? null : NECRO()>=3 ? ['done',"Vesna taught you all three words of the necromancer's staff: Drain, Wither and Raise Dead."]
   : CHOICE.necroQ==='motes' ? ['active', player.inv.filter(x=>x==='grave_mote').length>=3 && vesnaWait(0) ? "You have the grave-motes, but Vesna will not teach a stranger. Make a name for yourself in the valley first." : "Gather three grave-motes for Vesna. They rise over the old graves of the Dunhollow graveyard at night. ("+player.inv.filter(x=>x==='grave_mote').length+"/3)"]
   : NECRO()===0 ? ['active',"A necromancer named Vesna came to the graveyard after Edric's shade was gone. She offered to teach you the words in a necromancer's staff."]
@@ -14248,7 +14254,6 @@ function ilkaTalk(){
         if(player.opts.equip.weapon==='fire_blade') player.opts.equip.weapon='emberbrand'; else { const k=player.inv.indexOf('fire_blade'); if(k>=0) player.inv[k]='emberbrand'; }
         CHOICE.emberbrand=true; CHOICE.ilka='done'; updateHud(); try{ refreshInventory(); }catch(e){} banner('The Emberbrand','#ffb060',1800); logMsg('You receive the Emberbrand: it grows with Attack Power and Spell Power, and every cut burns.','#ffb060'); closeDialog(); }}]); }
 TALKERS.ilka=ilkaTalk;
-{ const oldN=npcHasNews; npcHasNews=function(n){ const r=oldN(n); if(r) return r; if(n.id==='ilka' && !CHOICE.emberbrand) return (hasItem('fire_blade')||player.opts.equip.weapon==='fire_blade') && coreCount()>=3 ? '?' : '!'; return null; }; }
 JOURNAL.push(['The Sunken Forge', ()=> !(visitedAreas.emberpass) ? null : CHOICE.emberbrand ? ['done',"Ilka, the spirit of the Sunken Forge, woke the Fire Blade into the Emberbrand."]
   : ['active', !CHOICE.fireBlade ? "West of the goblin warren lies Cinder Pass. The Flamesworn there follow a captain with a burning sword. A carving says it was quenched in an old forge further west."
     : !CHOICE.warden ? "You took the Fire Blade from the Flamesworn captain. Somewhere west, in the Sunken Forge, something guards the old smithy."
@@ -14439,7 +14444,6 @@ const bonesDown=()=>FEN_BONES.filter(k=>(CHOICE.bonesDown||[]).includes(k)).leng
     if(n<4){ say(V,`“${n} of four. The rest still walk. Two of them only after dark.”`,[bye]); return; }
     say(V,["Vesna takes your hand and closes your fingers around nothing, as if around a hilt. Her hand is very cold.","“There. That is how they held them. Now, when you carry a grave-speaker's staff, you can give the dead you raise a weapon of your own choosing. It will not make them hit any harder. The dead do not care about steel. But they look the part, and that matters more than you'd think.”"],[
       {label:'Learn to arm the dead.', fn:()=>{ CHOICE.skelArms=true; CHOICE.necroQ=null; logMsg("You can now give your skeleton a weapon: hold a necromancer's staff and use the small slot under your weapon in the inventory. It is only for show.",'#b8a8e8'); say(V,"“Pick something with a bit of style. They have been lying in the dark a long time.”",[bye]); }}]); }; }
-{ const oN=npcHasNews; npcHasNews=function(n){ if(n && n.id==='vesna' && NECRO()>=3 && !CHOICE.skelArms) return CHOICE.necroQ==='bones' ? (bonesDown()>=4?'?':null) : '!'; return oN(n); }; }
 JOURNAL.push(["Arms for the Dead", ()=> NECRO()<3 ? null : CHOICE.skelArms ? ['done',"Vesna showed you how to put a weapon back in a dead hand. Hold a necromancer's staff and give your skeleton a weapon in the small slot under your own."]
   : CHOICE.necroQ==='bones' ? ['active', bonesDown()>=4 ? "Four of the fen's risen dead lie still. Go back to Vesna." : "Lay four of the fen's risen dead to rest for Vesna: Risen Bones, Rattling Bones and Restless Bones in the Drowning Fen (the last two walk only at night), and Drowned Bones in the Sunken Hollow. ("+bonesDown()+"/4)"]
   : ['active',"Your skeletons fight with their fists. Vesna, in the fen, may know how to change that."]]);
@@ -14492,9 +14496,6 @@ function vesnaFen(){
   say(VESNA_N,line,opts); }
 const VESNA_NECRO=TALKERS.vesna;                                                   // her lessons, as they were
 TALKERS.vesna=function(){ if(areaId==='fen') return vesnaFen(); return VESNA_NECRO(); };
-{ const oN=npcHasNews; npcHasNews=function(n){ if(n && n.id==='vesna' && !n._lesson && areaId==='fen'){
-      if(!CHOICE.morwen) return '!'; if(CHOICE.morwen==='asked' && hasLantern()) return '?'; }
-    return oN(n); }; }
 // the two guards at the gate on the King's Road
 ['krgateguard0','krgateguard1'].forEach(id=>{ TALKERS[id]=()=>{ const N=BARON_DOWN()?'Crown Soldier':"Baron's Gate Guard";
     if(!wildDone()){ gateDenied(); return; }
@@ -14851,9 +14852,6 @@ function goatDialog(){
     {label:'Show me your wares.',fn:shopBuy},
     {label:'“Wenna must never know.”',fn:()=>say('Marta the Trader',"“Wenna knows everything. She is simply waiting.”",[bye])}, bye],true);
 }
-{ const oN=npcHasNews; npcHasNews=function(n){ const r=oN(n); if(r) return r;
-    if(n && n.id==='trader'){ if(CHOICE.pupSt==='follow') return '!'; if(CHOICE.pupSt==='home' && (CHOICE.pupDays||0)>=PUP_FEED_NEED) return '?'; if(CHOICE.goatEaten && !CHOICE.goatTold) return '!'; }
-    return r; }; }
 
 // ── the journal ──
 JOURNAL.push(['A Den Under the Roots', ()=>{
@@ -15184,7 +15182,6 @@ function pupFosterSet(on){ const v=CHOICE.pupAdopt, nm=PUP_NAMES[v];
       if(box && !box.querySelector('.dlg-opt.foster') && /Marta/i.test(document.getElementById('dlg-name')?.textContent||'Marta')){ const b=document.createElement('button'); b.className='dlg-opt foster';
         b.innerHTML=`<span>${CHOICE.pupFoster?'“I have come for '+nm+'.”':'“Could you keep '+nm+' for me a while?”'}</span>`; b.addEventListener('click',()=>pupFosterSet(!CHOICE.pupFoster)); box.insertBefore(b,box.lastElementChild); } }
     return r; }; }
-{ const oN=npcHasNews; npcHasNews=function(n){ const r=oN(n); if(r==='?' && n && n.id==='trader' && CHOICE.pupSt==='home') return null; return r; }; }   // the feeding is nobody's quest: no marker
 // in a fight, your wolf goes for the foe's legs: a bite every few seconds, wherever his guard is
 const WOLF_BITE=()=>5+(pupStage()>=2?2:0);
 let wolfBiteT=2.2;
@@ -15220,7 +15217,6 @@ wrap('elderhouse','npcs',l=>{ if(!SLEEP_HRS()) return l; const out=[...l];
   return out; });
 SLEEPERS.forEach(([id,name])=>{ TALKERS['sleep_'+id]=()=>{ const real={elder:'elder',wenna:'wenna',ada:'ada'}[id], news=(()=>{ try{ return npcHasNews({id:real,name}); }catch(e){ return null; } })();
   say(name,[{elder:"Hamond is asleep on his back with his hands folded on his chest, snoring like a slow saw.",wenna:"Old Wenna sleeps with her stick beside her, one hand still on it. Now and then she mutters something about a goat.",ada:"Ada is asleep, turned toward the empty bed by the far wall."}[id]],[...(news?[{label:'Wake '+(id==='elder'?'him':'her')+' gently.', fn:()=>{ const n=NPCS.find(q=>q.id==='sleep_'+id); TALK_NPC=null; closeDialog(); const t=TALKERS[real]; if(t) t(); }}]:[]),{label:'Let them sleep.',fn:closeDialog}]); }; });
-{ const oN=npcHasNews; npcHasNews=function(n){ if(n && n.sleepBed) return null; return oN(n); }; }
 function bedBlanket(o){ const k=o.col!=null ? o.col : ([...areaId].reduce((h,ch)=>h*31+ch.charCodeAt(0)|0,7)+o.i*13+o.j*7)>>>0; return BED_BLANKETS[k%BED_BLANKETS.length]; }
 { const oDN=drawNPC; drawNPC=function(n){ if(!n.sleepBed) return oDN(n);
     const bed=n.sleepBed, br=Math.sin(gt*1.1+bed.i)*0.5;
@@ -15779,10 +15775,6 @@ const barrowKnown=()=> NECRO()>=2 || CHOICE.morwen==='done' || !!CHOICE.barrow;
           else { CHOICE.spadeVesnaWait=true; say('Vesna the Grave-Speaker',["“I know of one. It lies with a king, and you are not ready to meet him.”","“Do something for me first, and then ask me again.”"],[bye]); } }},
         {label:'Something else.', fn:()=>oldV(...a)}, bye]); return; }
     return oldV(...a); }; }
-{ const oldN=npcHasNews; npcHasNews=function(n){ const r=oldN(n); if(r) return r;
-    if(n.id==='digger' && CHOICE.moundSeen && !ownsSpade() && !CHOICE.spadeQ) return '?';
-    if(n.id==='vesna' && CHOICE.spadeQ==='tobb' && !ownsSpade() && barrowKnown()) return '?';
-    return null; }; }
 JOURNAL.push(['Buried Things', ()=> !CHOICE.moundSeen && !ownsSpade() ? null : Object.keys(CHOICE.dug||{}).length>=MOUNDS.length ? ['done',"You dug up every buried thing in the valley."] :
   ownsSpade() ? ['active',"You have a spade. Hold it and dig up the mounds of stamped earth hidden around the valley, behind trees and in quiet corners. ("+Object.keys(CHOICE.dug||{}).length+"/"+MOUNDS.length+")"] :
   CHOICE.spadeQ==='vesna' ? ['active',"Vesna says the spade that dug the Barrow-King's barrow lies in his hall, under the reeds of the Sunken Hollow."] :

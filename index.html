@@ -3603,6 +3603,7 @@ function drawHead(c, x, B, opts, view=0){
       [-1,1].forEach(sd=>{ c.beginPath(); c.moveTo(x+LN,B+top+2); c.quadraticCurveTo(x+LN+sd*2.5,B+top+5,x+LN+sd*1.5,B+top+8); c.lineTo(x+LN+sd*0.4,B+top+7); c.closePath(); c.fill(); });
     }
   }
+  if(EQ.head==='bog_crown') drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V);
   if(EQ.head==='elf_circlet'){                          // a fine silver band across the brow
     const cy=Y.HAIRLINE+0.6, rx=HW+0.4, ry=2.3;
     c.strokeStyle=tone(ELFC.silver,-0.45); c.lineWidth=1.7; c.beginPath(); c.ellipse(x+LN,B+cy,rx,ry,0,0.08,Math.PI-0.08); c.stroke();
@@ -13138,8 +13139,9 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
   if(id==='fen_boots') L.push(['Walking speed','+15%']);
   if(WEAPONS[id] && WEAPONS[id].ember) L.push(['Grows with','Attack + Spell Power <small>(+4% each point); every cut burns</small>']);
   if(WEAPONS[id] && WEAPONS[id].burn) L.push(['Special',Math.round(WEAPONS[id].burn*100)+'% to set the foe burning']);
+  if(WEAPONS[id] && WEAPONS[id].wither) L.push(['Special',Math.round(WEAPONS[id].wither*100)+'% to wither the foe, '+Math.round(WEAPONS[id].drain*100)+'% to drain life <small>(both grow with spell power)</small>']);
   if(WEAPONS[id]){ L.push(['Damage',WEAPONS[id].dmg]); L.push(['Swing time',WEAPONS[id].wind.toFixed(2)+'s <small>('+(WEAPONS[id].wind<=0.17?'fast':WEAPONS[id].wind<=0.22?'steady':'slow')+')</small>']); } if(WEAPONS[id]&&WEAPONS[id].magic) L.push(['Spell power','×'+WEAPONS[id].magic]);
-  const hp=GEAR_HP[id]||0; if(hp) L.push(['Health','+'+hp]);
+  const hp=GEAR_HP[id]||0; if(hp) L.push(['Health',(hp>0?'+':'')+hp]);
   if(st.agi) L.push(['Agility','+'+st.agi+' <small>('+Math.round(st.agi*AGI_DODGE*100)+'% dodge)</small>']);
   if(st.ap) L.push(['Attack power','+'+st.ap+' <small>(+'+st.ap*4+'% weapon damage)</small>']);
   if(st.magic) L.push(['Spell power','+'+st.magic+' <small>(+'+st.magic*4+'% spell damage)</small>']);
@@ -13165,6 +13167,7 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
       if(n<3) return `<div class="fl" style="color:#b8a8e8">You know ${n===1?'one word':'two words'} of this staff (${['Drain: lean up','Wither: lean right'].slice(0,n).join(', ')}). Vesna can teach you the rest.</div>`;
       const m=WEAPONS[id].magic*(1+(typeof gearSum==='function'?gearSum('magic'):0)*0.04), d=k=>Math.round(HEX_SPELLS[k].dmg*m);
       return `<div class="fl" style="color:#b8a8e8">Drain (up): ${d('up')} damage, heals ${Math.round(3*m)}<br>Wither (right): ${d('right')} damage, foe hits for half<br>Raise Dead (left): a skeleton for ${Math.round(9*m)}s, ${Math.max(2,Math.round(3*m))} per blow</div>`; }
+    if(typeof GEAR_LORE!=='undefined' && GEAR_LORE && GEAR_LORE[id]) return `<div class="fl" style="color:#b8c8a8">${GEAR_LORE[id]}</div>`;
     return ''; };
   const FLAVOR={ necro_robe:'Vesna\'s old robe: black wool worn thin and grey, the hem gone to long rags, fen mud soaked into it, a sprig of dried bog-myrtle in the cord at the throat.', necro_bustier:'A black bodice, frayed at every edge and laced with a leather cord. It smells of peat smoke.', necro_leggings:'Black knitted stockings, laddered and worn through at the knee, muddy to the shin. A fen-witch does not care.', grave_mote:'A little cold light that sits in your palm like a moth. It came up out of an old grave.', heartshard:'A cracked crystal the size of a fist, from the heart of the goblin cave. Green light turns inside it. Someone who knows staves could use it.', raw_meat:'A bloody cut. Better roasted: an inn, or a hunter\'s fire, will cook it.', cooked_meat:'Spit-roasted, salted, still warm. Keeps you going.', wolf_fang:'A long yellow fang. Traders buy them for charms.', morwen_lantern:'A little iron lantern with a green flame that never goes out. Old Morwen wants it back.', bog_coins:'Coins so old the faces on them have no names. Still silver, though.', silver_torc:'A twisted silver neck-ring, black with bog water. A trader would pay well.', amber_brooch:'A lump of amber in a bronze setting, with a fly caught inside it forever.', wight_ring:'Black gold, cold as the barrow. The Barrow-King wore it for a thousand years.', pelt:'A grey wolf hide, still smelling of the wood. Someone will pay for it.',
     letter:"Found on the bandits at the farm. The seal on it belongs to the Baron.",
@@ -13491,9 +13494,8 @@ AREAS.barrow=CAVE('The Drowned Barrow',10,9,()=>{ const l=[{type:'teleporter', i
     {type:'ruin', i:4, j:1, v:0}, {type:'menhir', i:1, j:2, v:1}, {type:'menhir', i:8, j:2, v:2}, {type:'menhir', i:1, j:5, v:0}, {type:'menhir', i:8, j:5, v:1}, {type:'pillar', i:6, j:1, broken:true},
     {type:'bones', i:3, j:4, noblock:true}, {type:'bones', i:6, j:6, noblock:true}, {type:'lantern', i:2, j:7}, {type:'lantern', i:7, j:7},
     {type:'rune', i:0, j:4, text:"Old letters cut deep into the wet stone: <i>“Bertil, last king of the hollow, and his household. The water took the land. Let the water keep us.”</i>"}];
-  if(CHOICE.barrow==='done' && !destroyedBreakables.has('barrow:5,1')) l.push({type:'crate', i:5, j:1, breakable:true, rich:true});
   return l; }, { entries:{ fromLow:{i:4,j:7} },
-  mobs:()=> CHOICE.barrow==='done' ? [] : [ { name:'The Barrow-King', type:'barrowking', i:4, j:3, faction:'wight', opts:{gender:'m',skin:0,hair:4,hairColor:13,beard:5,face:0,ghost:true,equip:{head:'helm_full',torso:'tunic_red',armor:'blackmail',hands:'gauntlets',legs:'trousers',feet:'plate_boots',weapon:'longsword',offhand:'shield_iron'}} } ] });
+  mobs:()=> CHOICE.barrow==='done' ? [] : [ { name:'The Barrow-King', type:'barrowking', i:4, j:3, faction:'wight', opts:{gender:'m',skin:0,hair:4,hairColor:13,beard:5,face:0,ghost:true,equip:{head:'bog_crown',torso:'tunic_red',armor:'blackmail',hands:'gauntlets',legs:'trousers',feet:'plate_boots',weapon:'barrow_blade',offhand:'shield_iron'}} } ] });
 wrap('stones','objects',l=>[...l,{type:'teleporter', i:1, j:0, to:'fenpath', entry:'fromStones'}]);
 AREAS.stones.entries.fromFen={i:1,j:1};
 AREA_PATHS.fenpath=[ [[1.5,19.5],[1.8,15],[2.4,10],[2.6,6.5],[3.8,4.6],[5.5,4.5]] ];
@@ -13511,9 +13513,9 @@ PUZ_TYPES.add('reedbank');
 function fenCache(){ CHOICE.fenCaches=(CHOICE.fenCaches||0)+1; const c=8+Math.floor(Math.random()*10); player.purse+=c; updateHud(); logMsg('Something buried in the mud, and '+formatCoin(c)+' with it. ('+CHOICE.fenCaches+'/3 fen caches)','#e8c060'); }
 // the barrow-king falls
 { const oldV=victory; victory=function(faction){ oldV(faction);
-    if(faction==='wight'){ CHOICE.barrow='done'; giveQuestItem('fen_boots',true); giveQuestItem('wight_ring',true); giveQuestItem('staff_barrow'); logMsg("The Barrow-King's rod clatters onto the stones, its crowned skull still grinning: The Barrow-King's Rod.",'#b8a8e8'); const c=30+Math.floor(Math.random()*15); player.purse+=c; updateHud();
-      logMsg('The Barrow-King lies still at last. On his feet, boots that never rotted; on his finger, a ring of black gold. And '+formatCoin(c)+'.','#e8c060');
-      setTimeout(()=>{ if(!combat.active && areaId==='barrow') switchArea('barrow','fromLow'); },1500); }
+    if(faction==='wight'){ CHOICE.barrow='done'; ['barrow_blade','bog_crown','fen_boots','wight_ring','potion'].forEach(id=>giveQuestItem(id,true)); const c=45+Math.floor(Math.random()*16); player.purse+=c; updateHud();
+      logMsg("The Barrow-King lies still at last. His sword falls from his hand, black water still running off the blade: Bertil's Drowned Blade.",'#b8c8a8');
+      logMsg('From his head, a crown of bog-black wood. On his feet, boots that never rotted; on his finger, a ring of black gold. In his purse, '+formatCoin(c)+' and a healing draught.','#e8c060'); }
     if(faction==='hag') logMsg("Hesk falls into the reeds. Something glints where she stood: a lantern.",'#e8c060'); }; }
 // on first walking the clear causeway
 { const oldSA=switchArea; switchArea=function(id,e){ const r=oldSA(id,e); if(id==='fenpath' && CHOICE.fenSeen==null){ CHOICE.fenSeen=renownDone(); } if(id==='fenpath' && FEN_OPEN() && !CHOICE.fenOpen){ CHOICE.fenOpen=true; setTimeout(()=>{ banner('The causeway is clear','#c8d8a8',1800); logMsg('The fallen oak is gone. The Fen Causeway runs north, into the mist.','#e8c060'); },600); } return r; }; }
@@ -15532,6 +15534,83 @@ function ckAdds(K){ CK={mode:'adds'}; K.warded=true;
 // ── TESTING ONLY: a way from the farm straight into the Barrow-King's lair. Each trip puts him back on his feet. Remove before release. ──
 wrap('farm','objects',l=>[...l,{type:'teleporter', i:9, j:4, to:'barrow', entry:'fromLow'}]);
 { const oSA=switchArea; switchArea=function(to,...r){ if(to==='barrow' && areaId==='farm'){ if(!CHOICE.barrow || CHOICE.barrow==='done') CHOICE.barrow='open'; defeatedMobs.delete('barrow:The Barrow-King'); } return oSA(to,...r); }; }
+// ════════ the Barrow-King's things: Bertil's sword, and the crown the bog grew round his head ════════
+Object.assign(ITEMS,{ barrow_blade:{ name:"Bertil's Drowned Blade", slot:'weapon' }, bog_crown:{ name:'Crown of the Drowned King', slot:'head' } });
+Object.assign(WEAPONS,{ barrow_blade:{ wind:0.21, dmg:15, len:27, wither:0.25, drain:0.22 } });
+Object.assign(ITEM_STATS,{ bog_crown:{ hp:-3, magic:3, ap:3 } }); GEAR_HP.bog_crown=-3;
+Object.assign(PRICES,{ barrow_blade:240, bog_crown:180 });
+var GEAR_LORE={
+  barrow_blade:"Bertil's sword. A thousand years under black water and the edge is still keen, the steel gone the green-black of a drowned man's ring. Old letters run down the fuller: <i>“I was the hollow's king. The water took the land; it did not take me.”</i> It hungers. Now and then a cut withers whoever takes it, or draws a mouthful of their life back up the blade into yours.<br><br>There is a skull worked into the pommel, and the blade hums faintly near a grave. <b>Vesna</b> might know how such a thing could be reforged into what it wants to be: the Barrow-King's Rod.",
+  bog_crown:"No goldsmith made this. Bog-oak, black as the water it grew in, twisted round the Barrow-King's brow over a thousand years until it took the shape of a crown. Its points are sharp, and it is heavy, and it is cold. It sharpens the mind and the arm alike, and asks a little of your blood for the favour." };
+// the blade: a cut that withers, a cut that drinks
+{ const oldW=wound; wound=function(f,n,...r){ const W=WEAPONS[player.opts&&player.opts.equip.weapon]||{}; const r0=oldW(f,n,...r);
+    if(f!==player && HIT_SRC==='melee' && W.wither && n>0 && !f.dead && f.hp>0){ const sp=1+gearSum('magic')*0.04;
+      if(Math.random()<W.wither*sp) addStatus(f,'weak',Math.round(3*sp*10)/10,0);
+      if(Math.random()<W.drain*sp){ const h=Math.min(Math.round(3*sp),player.maxHp-player.hp); if(h>0){ player.hp+=h; floatText(tileOf(player),'+'+h,'#8ae07a'); updateHud(); } } }
+    return r0; }; }
+// in his hands it does the same to you
+{ const oldImp=impact; impact=function(f){ const hp0=player.hp; oldImp(f); if(player.hp<hp0 && player.hp>0 && f.opts && f.opts.equip && f.opts.equip.weapon==='barrow_blade' && Math.random()<0.3) addStatus(player,'weak',3,0); }; }
+// the look: a long blade gone green-black, a drowned shine on the edge, a little black water running off it
+{ const oldDW=drawWeapon; drawWeapon=function(c,hx,hy,ang,id,s=1){ if(id!=='barrow_blade') return oldDW(c,hx,hy,ang,id,s);
+    oldDW(c,hx,hy,ang,'longsword',s);
+    c.save(); c.translate(hx,hy); c.rotate(ang); c.scale(s,s);
+    c.fillStyle='rgba(16,34,24,0.72)'; c.beginPath(); c.moveTo(5,-1.9); c.lineTo(24.5,-1.5); c.lineTo(28,0); c.lineTo(24.5,1.5); c.lineTo(5,1.9); c.closePath(); c.fill();   // the steel gone green-black
+    c.strokeStyle='rgba(20,36,26,0.9)'; c.lineWidth=0.7; c.beginPath(); c.moveTo(7,0); c.lineTo(25,0); c.stroke();                                 // the fuller, with old letters
+    c.fillStyle='rgba(140,210,170,0.6)'; for(let k=0;k<5;k++){ c.fillRect(9+k*3.3,-0.3,1.1,0.6); }
+    c.globalCompositeOperation='lighter'; c.strokeStyle='rgba(120,220,170,0.35)'; c.lineWidth=1; c.beginPath(); c.moveTo(6,-1.6); c.lineTo(26,-0.4); c.stroke();   // a drowned shine on the edge
+    const t=(typeof gt!=='undefined'?gt:0); c.globalCompositeOperation='source-over';
+    for(let k=0;k<2;k++){ const u=((t*0.6+k*0.5)%1); c.fillStyle=`rgba(40,60,50,${0.8*(1-u)})`; c.beginPath(); c.ellipse(12+k*8,1.5+u*7,0.7,1.1,0,0,Math.PI*2); c.fill(); }   // black water dripping off it
+    c.fillStyle='#d8d0b8'; c.beginPath(); c.arc(-3.2,0,1.5,0,Math.PI*2); c.fill(); c.fillStyle='#2a2620'; c.fillRect(-3.8,-0.5,0.5,0.5); c.fillRect(-3,-0.5,0.5,0.5);   // a little skull on the pommel
+    c.restore(); }; }
+// the crown: bog-oak twisted into points, moss in the crooks, one pale light set in the front
+function drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V){
+  const cy=Y.HAIRLINE-0.4, rx=HW+1.3, ry=2.6, front=V.turn>-0.25, fx=front?(pr>0.8?HW*0.5:faceOff(pr)):0;
+  const spikes=[0.08,0.22,0.36,0.5,0.64,0.78,0.92].map((t,k)=>({a:Math.PI*(1+t), L:[5.5,7.5,6,9,6.5,7.8,5.2][k]})).concat([0.15,0.5,0.85].map((t,k)=>({a:Math.PI*t, L:[4.5,6,4.8][k], fr:true})));
+  const spike=(sp,col)=>{ const bx=x+LN+Math.cos(sp.a)*rx, by=B+cy+Math.sin(sp.a)*ry, lean=Math.cos(sp.a)*1.6;
+    c.fillStyle=col; c.beginPath(); c.moveTo(bx-1.3,by); c.quadraticCurveTo(bx+lean*0.3-0.8,by-sp.L*0.6,bx+lean,by-sp.L); c.quadraticCurveTo(bx+lean*0.2+0.7,by-sp.L*0.45,bx+1.3,by); c.closePath(); c.fill(); };
+  spikes.filter(sp=>!sp.fr).forEach(sp=>spike(sp,'#1a1610'));                                                  // the far points, behind the band
+  c.strokeStyle='#14100c'; c.lineWidth=3.4; c.beginPath(); c.ellipse(x+LN,B+cy,rx,ry,0,0,Math.PI*2); c.stroke();   // the band of black bog-oak
+  c.strokeStyle='#3a3020'; c.lineWidth=1.2; c.beginPath(); c.ellipse(x+LN,B+cy-0.4,rx,ry,0,0.1,Math.PI-0.1); c.stroke();
+  spikes.filter(sp=>sp.fr).forEach(sp=>spike(sp,'#2a2216'));                                                   // the near points
+  c.fillStyle='rgba(90,120,60,0.85)'; [[-0.6,0.6],[0.45,0.8],[0.9,0.2]].forEach(([u,v])=>{ c.beginPath(); c.ellipse(x+LN+u*rx,B+cy+v*ry,1.4,0.8,0,0,Math.PI*2); c.fill(); });   // moss
+  if(front && showFace && pr<0.9){ c.save(); c.globalCompositeOperation='lighter'; const gl=c.createRadialGradient(x+LN+fx,B+cy+ry,0,x+LN+fx,B+cy+ry,4); gl.addColorStop(0,'rgba(180,255,200,0.9)'); gl.addColorStop(1,'rgba(120,220,160,0)'); c.fillStyle=gl; c.fillRect(x+LN+fx-4,B+cy+ry-4,8,8); c.restore();
+    c.fillStyle='#c8f0d0'; c.beginPath(); c.arc(x+LN+fx,B+cy+ry,0.9,0,Math.PI*2); c.fill(); } }
+// icons
+{ const oPIA=paintItemArt; paintItemArt=function(g2,id,size){
+    if(id==='barrow_blade'){ g2.save(); g2.scale(size/40,size/40); drawWeapon(g2,7,33,-Math.PI/4,id,1.3); g2.restore(); return; }
+    if(id==='bog_crown'){ g2.save(); g2.scale(size/40,size/40);
+      g2.fillStyle='rgba(0,0,0,0.3)'; g2.beginPath(); g2.ellipse(20,31,14,3,0,0,Math.PI*2); g2.fill();
+      const sp=(x0,y0,L,lean,col)=>{ g2.fillStyle=col; g2.beginPath(); g2.moveTo(x0-2.4,y0); g2.quadraticCurveTo(x0+lean*0.3-1.4,y0-L*0.6,x0+lean,y0-L); g2.quadraticCurveTo(x0+lean*0.2+1.3,y0-L*0.45,x0+2.4,y0); g2.closePath(); g2.fill(); };
+      [[11,21,9,-2],[17,19,12,-1],[24,19,11,1],[30,21,8,2.5]].forEach(([a,b,L,l])=>sp(a,b,L,l,'#1e1a12'));
+      g2.strokeStyle='#14100c'; g2.lineWidth=5; g2.beginPath(); g2.ellipse(20,25,13,5,0,0,Math.PI*2); g2.stroke();
+      g2.strokeStyle='#4a3e28'; g2.lineWidth=1.4; g2.beginPath(); g2.ellipse(20,24.4,13,5,0,0.15,Math.PI-0.15); g2.stroke();
+      [[8,27,8,-2.5],[14,29.5,10,-1],[20,30,13,0],[26,29.5,10,1],[32,27,8,2.5]].forEach(([a,b,L,l])=>sp(a,b,L,l,'#2e2618'));
+      g2.fillStyle='#6a8a48'; [[11,28],[27,29],[31,25]].forEach(([a,b])=>{ g2.beginPath(); g2.ellipse(a,b,2.2,1.2,0,0,Math.PI*2); g2.fill(); });
+      const gl=g2.createRadialGradient(20,29,0,20,29,6); gl.addColorStop(0,'rgba(190,255,210,0.95)'); gl.addColorStop(1,'rgba(120,220,160,0)'); g2.fillStyle=gl; g2.fillRect(13,22,14,14);
+      g2.fillStyle='#d8fae0'; g2.beginPath(); g2.arc(20,29,1.6,0,Math.PI*2); g2.fill(); g2.restore(); return; }
+    return oPIA(g2,id,size); }; }
+// icons for the Gold Brothers' clothes
+{ const oPIA=paintItemArt; paintItemArt=function(g2,id,size){ const u=unWoven(id);
+    if(u!=='beret' && u!=='vest_black' && u!=='cowl_black') return oPIA(g2,id,size);
+    g2.save(); g2.scale(size/40,size/40); g2.fillStyle='rgba(0,0,0,0.28)'; g2.beginPath(); g2.ellipse(20,35,12,2.6,0,0,Math.PI*2); g2.fill();
+    if(u==='beret'){ g2.fillStyle='#141318'; g2.beginPath(); g2.ellipse(20,27,10,3.4,0,0,Math.PI*2); g2.fill();
+      const gr=g2.createRadialGradient(16,17,1,20,21,15); gr.addColorStop(0,'#4a4852'); gr.addColorStop(0.6,'#25242a'); gr.addColorStop(1,'#111014');
+      g2.fillStyle=gr; g2.beginPath(); g2.moveTo(9,26); g2.bezierCurveTo(5,18,14,11,23,12); g2.bezierCurveTo(33,13,37,21,31,26); g2.quadraticCurveTo(20,29,9,26); g2.fill();
+      g2.fillStyle='#0c0b0e'; g2.beginPath(); g2.arc(23,12.4,1.4,0,Math.PI*2); g2.fill();
+      g2.fillStyle='#f0ece2'; g2.beginPath(); g2.moveTo(13,25); g2.quadraticCurveTo(7,19,9,11); g2.quadraticCurveTo(13,17,15,24); g2.closePath(); g2.fill();   // the white feather
+      g2.strokeStyle='#bdb8ac'; g2.lineWidth=0.6; g2.beginPath(); g2.moveTo(14,25); g2.quadraticCurveTo(9.5,19,9.5,12); g2.stroke();
+      g2.fillStyle='#c8a44a'; g2.beginPath(); g2.arc(14,25,1.4,0,Math.PI*2); g2.fill(); }
+    else if(u==='vest_black'){ [-1,1].forEach(sd=>{ g2.fillStyle=sd<0?'#25242a':'#1a191e'; g2.beginPath(); g2.moveTo(20+sd*2.5,6); g2.lineTo(20+sd*10,7); g2.lineTo(20+sd*12,13); g2.lineTo(20+sd*11,33); g2.lineTo(20+sd*3.5,33); g2.lineTo(20+sd*2,19); g2.closePath(); g2.fill();
+        g2.strokeStyle='#c8a44a'; g2.lineWidth=1.6; g2.beginPath(); g2.moveTo(20+sd*2.5,6); g2.lineTo(20+sd*2,19); g2.lineTo(20+sd*3.5,33); g2.lineTo(20+sd*11,33); g2.stroke();
+        g2.strokeStyle='#3e6a44'; g2.lineWidth=0.6; g2.stroke(); });
+      g2.fillStyle='#e8e4da'; g2.beginPath(); g2.moveTo(17.5,6); g2.lineTo(22.5,6); g2.lineTo(22,19); g2.lineTo(23.5,33); g2.lineTo(16.5,33); g2.lineTo(18,19); g2.closePath(); g2.fill();   // the shirt between
+      g2.fillStyle='#141418'; g2.fillRect(8,22,24,3.2); g2.beginPath(); g2.moveTo(13,25); g2.lineTo(11,31); g2.lineTo(15,30); g2.closePath(); g2.fill(); }   // the sash
+    else { g2.fillStyle='#121116'; g2.beginPath(); g2.ellipse(20,10,9,5,0,0,Math.PI*2); g2.fill();               // the hood, bunched behind
+      const gr=g2.createLinearGradient(5,0,35,0); gr.addColorStop(0,'#3a3842'); gr.addColorStop(1,'#16151a'); g2.fillStyle=gr;
+      g2.beginPath(); g2.moveTo(15,10); g2.bezierCurveTo(6,11,4,18,4,28); g2.quadraticCurveTo(12,32,18.5,28); g2.lineTo(19,12); g2.lineTo(21,12); g2.lineTo(21.5,28); g2.quadraticCurveTo(28,32,36,28); g2.bezierCurveTo(36,18,34,11,25,10); g2.closePath(); g2.fill();
+      g2.strokeStyle='#07070a'; g2.lineWidth=0.9; g2.stroke();
+      g2.fillStyle='#c8ccd4'; g2.beginPath(); g2.arc(20,13.5,1.6,0,Math.PI*2); g2.fill(); }   // the pewter pin
+    g2.restore(); }; }
 </script>
 </body>
 </html>

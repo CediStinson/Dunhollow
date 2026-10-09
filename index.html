@@ -5197,6 +5197,9 @@ function drawTileMarker(i,j,fill,stroke){
 // A barrel or crate: usually just splinters, occasionally a scrap of gear.
 const FARM_LOOT = ['apple','bread','apple','dagger','boots','jerkin','pitchfork','smock','hatchet','club','hose_grey'];
 function collectPickup(o){ const had=hasItem(o.item);
+  if(o.bogmound && !hasSpade()){ CHOICE.moundSeen=true;                 // the fen caches are buried: like any mound, they need a spade in your hands
+    say('A Mound of Mud',["The mud here has been heaped up and patted down, and the reeds will not grow on it. Something is buried under there.",
+      ownsSpade() ? "<i>You have a spade. Take it in your hands first.</i>" : "<i>You need a spade to dig this up. Maybe find one.</i>"],[{label:'Leave it.', fn:closeDialog}]); return; }
   if(QUEST_ITEMS.has(o.item) && player.inv.indexOf(null)<0){ for(let k=player.inv.length-1;k>=0;k--){ const it=player.inv[k]; if(it && !QUEST_ITEMS.has(it)){ logMsg('No room: you leave the '+ITEMS[it].name+' behind.','#e0b070'); player.inv[k]=null; break; } } }   // story things always fit
   const idx=OBJECTS.indexOf(o); if(idx<0) return;
   OBJECTS.splice(idx,1); blocked.delete(o.i+','+o.j);
@@ -9247,9 +9250,15 @@ function paintItemArtBase(g2,id,size){
 }
 const ICON={};
 const ICON_FIT={};
+const ICON_CACHE=new Map();                          // finished icons, one per item, size and look: painting one costs a pixel read-back and a blur
 function drawItemIcon(g2,id,size){
   g2.setTransform(1,0,0,1,0,0); g2.clearRect(0,0,size,size);
   if(!id) return;
+  const key=id+'|'+size+'|'+(iconMale()?'m':'f'); let cv=ICON_CACHE.get(key);
+  if(!cv){ cv=document.createElement('canvas'); cv.width=cv.height=size; paintItemIcon(cv.getContext('2d'),id,size); ICON_CACHE.set(key,cv); }
+  g2.drawImage(cv,0,0);
+}
+function paintItemIcon(g2,id,size){
   if(!ICON[size]){ const a=document.createElement('canvas'); a.width=a.height=size; const o=document.createElement('canvas'); o.width=o.height=size;
     ICON[size]={a:a.getContext('2d'),o:o.getContext('2d')}; }
   const {a,o}=ICON[size];
@@ -9339,7 +9348,6 @@ function moveItem(from,to){                           // your skeleton's weapon 
     if((from.kind==='skel'&&to.kind==='eq') || (from.kind==='eq'&&to.kind==='skel')){ flash('Put it in your pack first.'); return false; }
     const had=skelArmsOn(), ok=moveItemRaw(from,to);
     if(ok && had && !skelArmsOn() && CHOICE.skelWeapon && !skelWeaponHome()){ moveItemRaw(to,from); flash("Make room in your pack first: your skeleton's weapon has to go somewhere."); return false; }
-    if(ok) refreshInventory();
     return ok;
 }
 function moveItemRaw(from,to){
@@ -9470,7 +9478,7 @@ function refreshInventory(){
   skelWeaponHome();
   document.querySelectorAll('#inv-overlay .slot').forEach(el=>{
     const id=getAt(slotLoc(el));
-    const icv=el.querySelector('canvas'); drawItemIcon(icv.getContext('2d'),id,icv.width);
+    const icv=el.querySelector('canvas'), ik=(id||'')+'|'+iconMale(); if(icv._ik!==ik){ icv._ik=ik; drawItemIcon(icv.getContext('2d'),id,icv.width); }   // only slots that changed
     el.classList.toggle('filled',!!id);
     el.title = id ? `${ITEMS[id].name}  (${SLOT_NAMES[ITEMS[id].slot]})${(itemStat(id)&&itemStat(id).short) ? ' — '+itemStat(id).short : ''}` : (el.dataset.kind==='eq' ? SLOT_NAMES[el.dataset.key] : '');
     const lbl=el.querySelector('.lbl'); if(lbl) lbl.style.display = id ? 'none' : '';
@@ -13804,7 +13812,7 @@ Object.assign(AREAS,{
       if(!collectedPickups.has('fen:21,15')) l.push({type:'pickup', i:21, j:15, item:'silver_torc', onTake:fenCache});
       if(!collectedPickups.has('fen:1,22')) l.push({type:'pickup', i:1, j:22, item:'bog_coins', onTake:fenCache});
       if(defeatedMobs.has('fen:Hesk the Fen Hag') && !collectedPickups.has('fen:4,20') && CHOICE.morwen!=='done') l.push({type:'pickup', i:4, j:20, item:'morwen_lantern'});
-      l.filter(o=>o.type==='pickup').forEach(o=>{o.bogmound=true; l.push({type:'bogmound', i:o.i, j:o.j, noblock:true});});
+      l.filter(o=>o.type==='pickup' && o.item!=='morwen_lantern').forEach(o=>{o.bogmound=true; l.push({type:'bogmound', i:o.i, j:o.j, noblock:true});});
       return l; },
     npcs:()=>[],                                     // Old Morwen's stilt-hut is Vesna's now
     mobs:()=>{ const l=[ { name:'Bog Lurker', type:'lurker', i:12, j:6, faction:'bog', opts:LURK({}) },
@@ -14752,6 +14760,7 @@ function pupUpdate(dt){
   let k=0;
   for(const p of PUPS){
     if(p.bark){ p.bark.t+=dt; if(p.bark.t>p.bark.d) p.bark=null; }
+    if(p.mode==='comp' && pupFighting()){ k++; continue; }   // in a fight it goes for the foe instead (pupCompanion)
     if(p.mode==='follow' || p.mode==='comp'){
       let t=null;
       if(pupIdle>0.9){ const a=[2.4,4.4,0.5][p.v%3], tx=player.x+Math.cos(a)*0.95, ty=player.y+Math.sin(a)*0.95; if(walkable(Math.floor(tx),Math.floor(ty))) t={x:tx,y:ty}; }   // gather round your feet when you stop
@@ -14760,6 +14769,7 @@ function pupUpdate(dt){
       if(d>7){ p.x=t.x; p.y=t.y; p.moving=false; }
       else if(d>0.06){ const sp=Math.min(5,1.3+d*3.2), st=Math.min(d,sp*dt); p.x+=dx/d*st; p.y+=dy/d*st; if(d>0.12) p.dir=dirFromDelta(dx,dy); p.moving=true; }
       else p.moving=false;
+      pupKeepClear(p);
       p.i=Math.floor(p.x); p.j=Math.floor(p.y);
       if(!p.moving && pupIdle>5){ p.lie=Math.min(1,p.lie+dt*2); p.sleep=pupIdle>12; } else { p.lie=0; p.sleep=false; }
       if(p.alpha<1) p.alpha=Math.min(1,p.alpha+dt*2);
@@ -15303,16 +15313,24 @@ function pupFosterSet(on){ const v=CHOICE.pupAdopt, nm=PUP_NAMES[v];
     logMsg(nm+' is with you again.','#c8a0e0'); say('Marta the Trader',["You whistle once. "+nm+" is at your side before Marta has finished turning round, tail going like a flail.","“Yes, yes. I fed "+pupHim(v)+" twice a day and "+pupHe(v)+" still looks at you like that. Go on.”"],[bye]); } }
 // in a fight, your wolf goes for the foe's legs: a bite every few seconds, wherever his guard is
 const WOLF_BITE=()=>5+(pupStage()>=2?2:0);
+function pupKeepClear(p){ if(!SKEL || SKEL.crumble) return;                // never in the same spot as your skeleton: the wolf steps aside
+  const sx=p.x-SKEL.x, sy=p.y-SKEL.y, sd=Math.hypot(sx,sy); if(sd>=0.75) return;
+  const ux=sd>0.01?sx/sd:0.7, uy=sd>0.01?sy/sd:0.7; p.x+=ux*(0.75-sd); p.y+=uy*(0.75-sd); }
+const pupFighting=()=>{ const f=combat.foe; return !!(combat.active && f && !f.dead && f.type!=='dummy' && !combat.practice); };
 let wolfBiteT=2.2;
 function pupCompanion(dt){ try{                // your grown wolf fights at your side
     const p=PUPS.find(q=>q.mode==='comp'), f=combat.foe;
-    if(!p || !combat.active || !f || f.dead || f.type==='dummy' || combat.practice){ wolfBiteT=2.2; if(p) p.fight=null; return; }
-    const side=((f.x??f.i+0.5)-player.x)>=0?1:-1, tx=(f.x??f.i+0.5)-0.15*side, ty=(f.y??f.j+0.5)+0.85;    // at the foe's flank, just off your shoulder
+    if(!p || !pupFighting()){ wolfBiteT=2.2; if(p) p.fight=null; return; }
+    const side=((f.x??f.i+0.5)-player.x)>=0?1:-1, tx=(f.x??f.i+0.5)-0.15*side;    // at the foe's flank, just off your shoulder
+    let ty=(f.y??f.j+0.5)+0.85;
+    if(SKEL && !SKEL.crumble && Math.hypot(tx-SKEL.x,ty-SKEL.y)<0.9) ty=(f.y??f.j+0.5)-0.85;   // your skeleton has that side: take the other one
     const dx=tx-p.x, dy=ty-p.y, d=Math.hypot(dx,dy); if(d>0.05){ const st=Math.min(d,4.5*dt); p.x+=dx/d*st; p.y+=dy/d*st; p.moving=d>0.15; } else p.moving=false;
+    pupKeepClear(p);
     p.i=Math.floor(p.x); p.j=Math.floor(p.y); p.lie=0; p.sleep=false; if(!p.moving) p.dir=dirFromDelta((f.x??f.i+0.5)-p.x,(f.y??f.j+0.5)-p.y);
     p.fight=p.fight||{bite:0}; if(p.fight.bite>0) p.fight.bite=Math.max(0,p.fight.bite-dt*3.5);
-    if(combat.phase!=='fight' || d>0.6) return;
+    if(combat.phase!=='fight' || Math.hypot(tx-p.x,ty-p.y)>0.6) return;
     wolfBiteT-=dt; if(wolfBiteT>0) return; wolfBiteT=2.6+Math.random()*1.4;
+    if(f.warded){ floatText(tileOf(f),'Warded','#c8e0f0'); return; }   // the king's ward turns teeth too
     const n=WOLF_BITE(); p.fight.bite=1; f.hp-=n; f.flash=0.3; floatText([f.i+0.3,f.j+0.3],'-'+n,'#c8d8a0',true);
     if(Math.random()<0.3) p.bark={text:'Grrr!',t:0,d:0.8};
     if(f.hp<=0) foeDown(f); }catch(e){ console.error(e); } }

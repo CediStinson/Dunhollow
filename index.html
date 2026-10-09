@@ -7967,6 +7967,11 @@ function walkTo(ti,tj){
 
 // ── update / draw
 function update(dt){
+  if(TEACH_OPEN) dt*=0.12;                          // a teaching card is open: the world runs slow while you read
+  if(player.sitChair && (player.path.length || combat.active || !OBJECTS.includes(player.sitChair))) player.sitChair=null;     // up again the moment you go anywhere
+  const leaving=NPCS.filter(n=>n.route && n.vanish);
+  const talkN=TALK_NPC, hold=talkN && dlgIsOpen() && NPCS.includes(talkN);      // whoever you are talking to stands still
+  let saved=null; if(hold){ saved={goto:talkN.goto, path:talkN.path}; talkN.goto=null; talkN.path=[]; talkN.moving=false; if(talkN.wander) talkN.wait=Math.max(talkN.wait||0,1); }
   gt+=dt; dayClock+=dt; if(typeof cityBarks==='function') cityBarks(dt);
   const p=player;
   if(p.path.length){
@@ -7988,6 +7993,16 @@ function update(dt){
     if(n.wait<=0){ const w=n.wander[Math.floor(Math.random()*n.wander.length)]; const pth=findPath(n.i,n.j,w[0],w[1]);
       n.path=(pth||[]).slice(0,40); n.wait=2+Math.random()*6; } }
   combatUpdate(dt);
+  try{ csTick(dt); }catch(e){ console.error(e); csSkip(); }
+  walkRoutes(dt);
+  try{ pupUpdate(dt); }catch(e){ console.error(e); }
+  if(hold){ talkN.goto=saved.goto; talkN.path=saved.path||[]; }
+  if(talkN && !dlgIsOpen()) TALK_NPC=null;
+  recordTransit(leaving);
+  pupCompanion(dt);
+  if(pendingChair && !player.path.length){ const ch=pendingChair; pendingChair=null; if(OBJECTS.includes(ch) && cheb([ch.i,ch.j],[player.i,player.j])<=1) sitOnChair(ch); }
+  if(player.sitChair && (player.path.length || player.i!==player.sitChair.i || player.j!==player.sitChair.j)) player.sitChair=null;
+  try{ ckTick(dt*slowmo.scale); }catch(e){ console.error(e); }
 }
 
 // ════════════════════════════════════════════════════════════
@@ -13856,7 +13871,6 @@ function csTick(dt){ if(!CS.on) return; const s=CS.steps[CS.k]; if(!s){ csEnd();
   if(CS.focus){ const f=CS.focus, fx=f.x??f.i+0.5, fy=f.y??f.j+0.5, tx=-(fx-fy)*TW/2, ty=gc.height/2-ORIGIN_Y-(fx+fy)*TH/2-40, r=Math.min(1,dt*2.6); cam.x+=(tx-cam.x)*r; cam.y+=(ty-cam.y)*r; }
   if(s.until && CS.t>10){ if(s.skip) s.skip(); else if(s.end) s.end(); CS.k++; CS.t=0; return; }     // never get stuck
   if(s.until ? s.until() : CS.t>=(s.dur||0)){ if(s.end) s.end(); CS.k++; CS.t=0; } }
-{ const oldU=update; update=function(dt){ oldU(dt); try{ csTick(dt); }catch(e){ console.error(e); csSkip(); } }; }
 { const oldSC=startCombat; startCombat=function(...a){ if(CS.on) return; return oldSC.apply(this,a); }; }
 { const oldSD2=showDialog; showDialog=function(...a){ if(CS.on){ CS.queued.push(a); return; } return oldSD2(...a); }; }
 window.addEventListener('keydown',e=>{ if(!CS.on) return; if(e.key==='Escape'||e.key===' '||e.key==='Enter') csSkip(); e.stopImmediatePropagation(); e.preventDefault(); },true);
@@ -14066,7 +14080,7 @@ setInterval(()=>{ try{ if(!running || CS.on) return; const h=HOUR();
       NPCS.push(m); } }
 }catch(e){} },1000);
 // moving them along: a path to the goal, then settle into whatever they came to do (or step through the door)
-{ const oldU=update; update=function(dt){ oldU(dt);
+function walkRoutes(dt){                       // townsfolk on their daily rounds walk to where their routine says
     for(let q=NPCS.length-1;q>=0;q--){ const n=NPCS[q]; if(!n.route || !n.goto) continue; if(n.x==null){ n.x=n.i+0.5; n.y=n.j+0.5; } if(!n.path) n.path=[];
       if(!n.path.length){ if(n.i===n.goto[0] && n.j===n.goto[1]){ n.moving=false;
           if(n.vanish){ ROUTINES[n.route].gone={slot:n.slot, at:Math.floor(dayClock/(DAY_LEN/48))}; NPCS.splice(q,1); continue; }
@@ -14075,7 +14089,7 @@ setInterval(()=>{ try{ if(!running || CS.on) return; const h=HOUR();
         n.path=(findPath(n.i,n.j,n.goto[0],n.goto[1])||[]).slice(0,60); if(was) blocked.add(n.goto[0]+','+n.goto[1]);
         if(!n.path.length){ n.i=n.goto[0]; n.j=n.goto[1]; n.x=n.i+0.5; n.y=n.j+0.5; } continue; }
       const [ni,nj]=n.path[0]; if(player.i===ni && player.j===nj && (n.blockT||0)<0.6){ n.moving=false; n.blockT=(n.blockT||0)+dt; continue; }   // waits a moment, then squeezes past you
-      if(!(player.i===ni && player.j===nj)) n.blockT=0; stepAlong(n,dt,1.3); } }; }
+      if(!(player.i===ni && player.j===nj)) n.blockT=0; stepAlong(n,dt,1.3); } }
 
 // torso garments (shirts, tunics, bodices, robes worn as the torso layer) are cosmetic only: no stats at all
 for(const id in ITEMS){ const it=ITEMS[id]; if(it && it.slot==='torso'){ delete ITEM_STATS[id]; if(GEAR_HP[id]) GEAR_HP[id]=0; } }
@@ -14595,7 +14609,6 @@ function pupUpdate(dt){
     } else if(p.mode==='home') pupHome(p,dt);
   }
 }
-{ const oU=update; update=function(dt){ oU(dt); try{ pupUpdate(dt); }catch(e){ console.error(e); } }; }
 
 // ── drawing: little wolves, little bodies, and the blood in the wood ──
 function drawPup(p){
@@ -14988,11 +15001,7 @@ let TALK_NPC=null, TALK_DEPTH=0;
 const dlgIsOpen=()=>typeof dlgOverlay!=='undefined' && dlgOverlay.classList.contains('open');
 let TALK_STATE='', TALK_ROOT_REAL=0;
 { const oT=talkTo; talkTo=function(n){ TALK_NPC=n; TALK_DEPTH=0; TALK_ROOT_REAL=-1; try{ TALK_STATE=JSON.stringify(CHOICE); }catch(e){ TALK_STATE=''; } return oT(n); }; }
-{ const oU=update; update=function(dt){ const n=TALK_NPC, hold=n && dlgIsOpen() && NPCS.includes(n);
-    let saved=null; if(hold){ saved={goto:n.goto, path:n.path}; n.goto=null; n.path=[]; n.moving=false; if(n.wander) n.wait=Math.max(n.wait||0,1); }
-    oU(dt);
-    if(hold){ n.goto=saved.goto; n.path=saved.path||[]; }
-    if(n && !dlgIsOpen()) TALK_NPC=null; }; }
+
 const RT_HOLD=()=> TALK_NPC && dlgIsOpen() ? TALK_NPC : null;
 // "Back." on every reply that would otherwise only say goodbye, inside a conversation you started
 { const oSD=showDialog; showDialog=function(name,text,opts,...r){
@@ -15013,10 +15022,10 @@ const RT_HOLD=()=> TALK_NPC && dlgIsOpen() ? TALK_NPC : null;
 const TRANSIT={};
 const doorDest=n=>{ const t=n.goto||[n.i,n.j]; const o=OBJECTS.find(o=>o.type==='teleporter' && Math.abs(o.i-t[0])+Math.abs(o.j-t[1])<=1); if(o) return o.to;
   const hs=OBJECTS.find(o=>o.inside && o.fp && (d=>d && Math.abs(d[0]-t[0])+Math.abs(d[1]-t[1])<=1)(doorTile(o))); return hs?hs.inside:null; };
-{ const oU=update; update=function(dt){ const before=NPCS.filter(n=>n.route && n.vanish); oU(dt);
+function recordTransit(before){                 // someone walked out of this area: remember where they were headed
     before.forEach(n=>{ if(NPCS.includes(n)) return; const R=ROUTINES[n.route], s=n.walkSlot||slotOf(R)||n.slot, dest=s&&(s.walk?(nextArea(R,s)||doorDest(n)):s.area);
       if(n.transit && n._gone!==undefined) R.gone=n._gone;                                   // passing through does not count as having arrived anywhere
-      if(dest && dest!==areaId) TRANSIT[n.route]={from:areaId, dest, t:gt, slot:s}; }); }; }
+      if(dest && dest!==areaId) TRANSIT[n.route]={from:areaId, dest, t:gt, slot:s}; }); }
 function transitArea(prev,id){                 // someone was walking between areas when you left: they cross your path, or follow you in
     try{ for(const k in TRANSIT){ const T=TRANSIT[k]; delete TRANSIT[k]; if(T.from!==prev || gt-T.t>25 || NPCS.some(n=>n.route===k)) continue;
         const R=ROUTINES[k], en=exitToward(prev);
@@ -15185,7 +15194,7 @@ function pupFosterSet(on){ const v=CHOICE.pupAdopt, nm=PUP_NAMES[v];
 // in a fight, your wolf goes for the foe's legs: a bite every few seconds, wherever his guard is
 const WOLF_BITE=()=>5+(pupStage()>=2?2:0);
 let wolfBiteT=2.2;
-{ const oU=update; update=function(dt){ oU(dt); try{
+function pupCompanion(dt){ try{                // your grown wolf fights at your side
     const p=PUPS.find(q=>q.mode==='comp'), f=combat.foe;
     if(!p || !combat.active || !f || f.dead || f.type==='dummy' || combat.practice){ wolfBiteT=2.2; if(p) p.fight=null; return; }
     const side=((f.x??f.i+0.5)-player.x)>=0?1:-1, tx=(f.x??f.i+0.5)-0.15*side, ty=(f.y??f.j+0.5)+0.85;    // at the foe's flank, just off your shoulder
@@ -15196,7 +15205,7 @@ let wolfBiteT=2.2;
     wolfBiteT-=dt; if(wolfBiteT>0) return; wolfBiteT=2.6+Math.random()*1.4;
     const n=WOLF_BITE(); p.fight.bite=1; f.hp-=n; f.flash=0.3; floatText([f.i+0.3,f.j+0.3],'-'+n,'#c8d8a0',true);
     if(Math.random()<0.3) p.bark={text:'Grrr!',t:0,d:0.8};
-    if(f.hp<=0) foeDown(f); }catch(e){ console.error(e); } }; }
+    if(f.hp<=0) foeDown(f); }catch(e){ console.error(e); } }
 // in the water: only head and back show, legs paddling under, rings spreading out
 { const oDP=drawPup; drawPup=function(p){ const dep=(typeof poolDepth==='function')?poolDepth(p.x,p.y):0, bt=p.fight&&p.fight.bite||0;
     if(bt>0){ const f=combat.foe; if(f){ const dx=(f.x??f.i+0.5)-p.x, dy=(f.y??f.j+0.5)-p.y, d=Math.hypot(dx,dy)||1, k=Math.sin(bt*Math.PI)*0.35; p.x+=dx/d*k; p.y+=dy/d*k; try{ oDP(p); } finally{ p.x-=dx/d*k; p.y-=dy/d*k; } return; } }
@@ -15278,11 +15287,7 @@ function sitOnChair(ch){ if(!chairFree(ch)) return; player.sitChair=ch; player.p
         let best=null; for(const [di,dj] of DIR_DELTA){ const p=findPath(player.i,player.j,ch.i+di,ch.j+dj); if(p && (!best||p.length<best.length)) best=p; }
         if(best){ player.path=best; pendingChair=ch; } return; } }
     return oPU(px,py); }; }
-{ const oU=update; update=function(dt){
-    if(player.sitChair && (player.path.length || combat.active || !OBJECTS.includes(player.sitChair))) player.sitChair=null;     // up again the moment you go anywhere
-    oU(dt);
-    if(pendingChair){ if(player.path.length){} else { const ch=pendingChair; pendingChair=null; if(OBJECTS.includes(ch) && cheb([ch.i,ch.j],[player.i,player.j])<=1) sitOnChair(ch); } }
-    if(player.sitChair && (player.path.length || player.i!==player.sitChair.i || player.j!==player.sitChair.j)) player.sitChair=null; }; }
+
 { const oDA=drawActor; drawActor=function(e){ const ch=e===player && player.sitChair; if(!ch) return oDA(e);
     const q=P(ch.i+0.5+ch.face[0]*CHAIR_IN, ch.j+0.5+ch.face[1]*CHAIR_IN), d=dirFromDelta(ch.face[0],ch.face[1]);
     drawLitSprite(q.x,q.y,()=>drawSitting(g,q.x,q.y,player.opts,d,'chair'));
@@ -15583,7 +15588,6 @@ function ckAdds(K){ CK={mode:'adds'}; K.warded=true;
 { const oW=wound; wound=function(f,n,...r){ if(f && f.warded){ floatText(tileOf(f),'Warded','#c8e0f0'); return; }
     if(f && f.type==='barrowking' && (f.cphase||1)<3){ const th=ckTh(f), pre=f.hp; f.hp+=1000; oW(f,n,...r); const dealt=pre+1000-f.hp; f.hp=Math.max(th,pre-dealt); return; }
     return oW(f,n,...r); }; }
-{ const oU=update; update=function(dt){ const r=oU(dt); try{ ckTick(dt*slowmo.scale); }catch(e){ console.error(e); } return r; }; }
 // what the set pieces look like: the lee of the stones, the gas about to burn, the wave when it breaks, the ward
 { const oSDI=typeof skelDrawItems==='function'?skelDrawItems:null; skelDrawItems=function(items){ if(oSDI) oSDI(items); if(!CK || areaId!==BK_AREA) return;
     items.push({d:-1e6, fn:()=>{ const A=AREAS[areaId], dia=(i,j,fill,inset=0.06)=>{ const a=P(i+inset,j+inset), b=P(i+1-inset,j+inset), c=P(i+1-inset,j+1-inset), d=P(i+inset,j+1-inset); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c.x,c.y); g.lineTo(d.x,d.y); g.closePath(); g.fillStyle=fill; g.fill(); };
@@ -15814,7 +15818,6 @@ function showTeach(title,lines){ let el=document.getElementById('teach-card');
   const close=()=>{ if(!TEACH_OPEN) return; TEACH_OPEN=false; el.style.display='none'; clearTimeout(close.t); const n=TEACH_Q.shift(); if(n) setTimeout(()=>showTeach(n[0],n[1]),400); };
   el.querySelector('#teach-ok').onclick=e=>{ e.stopPropagation(); close(); }; close.t=setTimeout(close,16000); showTeach.close=close; }
 document.addEventListener('keydown',e=>{ if(TEACH_OPEN && e.key==='Enter' && showTeach.close){ e.preventDefault(); showTeach.close(); } });
-{ const oU=update; update=function(dt){ return oU(TEACH_OPEN ? dt*0.12 : dt); }; }
 // ── the first fight (on the farm, for most) ──
 { const oBF=beginFight; beginFight=function(...a){ const r=oBF(...a); const f=combat.foe;
     if(f && foeDef(f) && foeDef(f).unguarded) teach('wolf','No guard',["This one has <b>no guard</b>: every side is open. Just <b>Attack</b>.","But it lunges fast and with little warning. Watch for the ring and <b>Parry</b> the side it lunges from."]);

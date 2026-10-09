@@ -16550,20 +16550,27 @@ function drawMule3D(X,Y,phi,ph,moving,pack,harness,seed){
   const pr=(x,y,z)=>({ x:X+(x*cf - z*sf)*S, y:Y+((x*sf + z*cf)*0.5 - y)*S, d:(x*sf + z*cf) });         // to the screen, and how near the camera it is
   const bob=moving?Math.abs(Math.cos(ph))*1.1:0, idle=Math.sin(gt*0.9+seed), graze=moving?0:Math.max(0,Math.sin(gt*0.32+seed*3)-0.35)*0.9;
   const parts=[];      // {d, draw(pass)}: pass 0 draws a dark rim, pass 1 the fill
+  let coatG=null; const coat=()=>{ if(!coatG){ coatG=g.createLinearGradient(X-34*S,Y-74*S,X+28*S,Y-4*S); coatG.addColorStop(0,K.l); coatG.addColorStop(0.42,K.c); coatG.addColorStop(0.78,tone(K.c,-0.16)); coatG.addColorStop(1,K.d); } return coatG; };   // one light over the whole coat: overlapping parts are the very same colour, so no seams
+  const softFX=!(typeof LOW_FX!=='undefined' && LOW_FX);
+  const sepShadow=(path,k2)=>{ if(!softFX || drawMule3D.noSep) return; g.save(); g.globalCompositeOperation='source-atop'; g.translate(0.5,0.8); path(); g.strokeStyle='rgba(18,10,4,0.11)'; g.lineJoin='round'; [5.2,3.6,2.2].forEach(w=>{ g.lineWidth=w; g.stroke(); }); g.restore(); };   // a soft fringe of shadow cast on what lies behind (stacked strokes: cheap, no blur)
   const cap=(a,b,ra,rb,col,dark,light,opt={})=>{ const A=pr(...a), B=pr(...b); parts.push({ d:opt.D!=null?opt.D:(A.d+B.d)/2+(opt.dz||0), sharp:opt.sharp, fn:pass=>{
       const dx=B.x-A.x, dy=B.y-A.y, L=Math.hypot(dx,dy)||0.001, nx=-dy/L, ny=dx/L, r1=ra*S+(pass?0:0.9), r2=rb*S+(pass?0:0.9);
       g.beginPath(); const an=Math.atan2(dy,dx); g.arc(A.x,A.y,r1,an+Math.PI/2,an-Math.PI/2); g.arc(B.x,B.y,r2,an-Math.PI/2,an+Math.PI/2); g.closePath();
       if(!pass){ g.fillStyle='rgba(22,14,8,0.75)'; g.fill(); return; }
+      const isCoat=col===C && !opt.flat, pathF=()=>{ g.beginPath(); g.arc(A.x,A.y,r1,an+Math.PI/2,an-Math.PI/2); g.arc(B.x,B.y,r2,an-Math.PI/2,an+Math.PI/2); g.closePath(); };
+      if(isCoat && !opt.nosep){ sepShadow(pathF,Math.max(1,Math.hypot(g.getTransform().a,g.getTransform().b))); pathF(); }
+      if(isCoat){ g.fillStyle=coat(); g.fill(); const far=(a[2]*cf)<-1; if(far){ g.fillStyle='rgba(20,12,6,0.18)'; g.fill(); } if(opt.along){ const ga=g.createLinearGradient(A.x,A.y,B.x,B.y); ga.addColorStop(0,'rgba(0,0,0,0)'); ga.addColorStop(0.45,'rgba(0,0,0,0)'); ga.addColorStop(1,opt.along); g.fillStyle=ga; g.fill(); } if(opt.after) opt.after(A,B); return; }
       const mx=(A.x+B.x)/2, my=(A.y+B.y)/2, rr=Math.max(r1,r2)*1.1, lx=-0.55, ly=-0.83;               // one light for the whole beast, from the upper left, so neighbouring parts shade alike
       const gr=g.createLinearGradient(mx+lx*rr,my+ly*rr,mx-lx*rr,my-ly*rr); gr.addColorStop(0,light); gr.addColorStop(0.45,col); gr.addColorStop(1,dark);
       g.fillStyle=opt.flat?col:gr; g.fill(); if(opt.along){ const ga=g.createLinearGradient(A.x,A.y,B.x,B.y); ga.addColorStop(0,'rgba(0,0,0,0)'); ga.addColorStop(0.45,'rgba(0,0,0,0)'); ga.addColorStop(1,opt.along); g.fillStyle=ga; g.fill(); } if(opt.after) opt.after(A,B); } }); };
   const ball=(c,r,col,dark,light,opt={})=>{ const P=pr(...c); parts.push({ d:opt.D!=null?opt.D:P.d+(opt.dz||0), sharp:opt.sharp, fn:pass=>{ const R=r*S+(pass?0:0.9); g.beginPath(); g.arc(P.x,P.y,R,0,Math.PI*2);
       if(!pass){ if(opt.norim) return; g.fillStyle='rgba(22,14,8,0.75)'; g.fill(); return; }
+      if(col===C && !opt.flat){ g.fillStyle=coat(); g.fill(); if((c[2]*cf)<-1){ g.fillStyle='rgba(20,12,6,0.18)'; g.fill(); } return; }
       const gr=g.createRadialGradient(P.x-R*0.35,P.y-R*0.45,R*0.1,P.x,P.y,R); gr.addColorStop(0,light); gr.addColorStop(0.55,col); gr.addColorStop(1,dark); g.fillStyle=opt.flat?col:gr; g.fill(); } }); };
   const line=(pts,col,w,dz=0,sharp=null)=>{ const Q=pts.map(p=>pr(...p)); parts.push({ d:Q.reduce((a,q)=>a+q.d,0)/Q.length+dz, sharp, fn:pass=>{ if(!pass) return; g.strokeStyle=col; g.lineWidth=w*S; g.lineCap='round'; g.lineJoin='round'; g.beginPath(); Q.forEach((q,k)=>k?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.stroke(); } }); };
   const C=K.c, D=K.d, Lc=K.l, by=bob;
   // the barrel, rump to chest, and the withers
-  cap([-18,31.5+by,0],[-3,30.5+by,0],10.6,11.4,C,D,Lc); cap([-3,30.5+by,0],[13,31.5+by,0],11.4,10.8,C,D,Lc); ball([14,37.5+by,0],6.6,C,D,Lc);
+  cap([-18,31.5+by,0],[-3,30.5+by,0],10.6,11.4,C,D,Lc,{nosep:true}); cap([-3,30.5+by,0],[13,31.5+by,0],11.4,10.8,C,D,Lc,{nosep:true}); ball([14,37.5+by,0],6.6,C,D,Lc);
   ball([-19,34+by,0],9.6,C,D,Lc,{dz:0.1}); [1,-1].forEach(sd=>{ ball([-21,32.5+by,4*sd],7.6,C,tone(C,-0.18),tone(C,0.06),{dz:0.05}); ball([15,28.8+by,3.8*sd],6.4,C,tone(C,-0.18),tone(C,0.06),{dz:0.05}); });   // the two halves of the rump, the breast muscles                                                              // the round of the rump
   line([[-25,42.4+by,0],[-12,42.4+by,0],[2,41.8+by,0],[14,43.8+by,0]],K.stripe,1.1,0.5);                   // dorsal stripe along the top
   // legs: hip/shoulder -> knee or hock -> fetlock -> hoof; a diagonal walk, the lifted leg folding at the knee
@@ -16581,7 +16588,7 @@ function drawMule3D(X,Y,phi,ph,moving,pack,harness,seed){
   const gN=graze, nb=[16,35+by,0], poll=[27-gN*2,50+by-gN*14,0], muz=[39-gN*1,43+by-gN*20,0];
   ball([17.5,37+by,0],7.4,C,D,Lc,{dz:-0.05});                                                            // the base of the neck, filling out into withers and chest
   cap(nb,poll,6.6,4.2,C,D,Lc);
-  cap([nb[0]+3.5,nb[1]-4,0],[poll[0]+2.6,poll[1]-4.6,0],5.2,3.4,C,D,Lc,{dz:-0.2});                     // the throat, from the jaw down into the chest: no notch under the head
+  cap([nb[0]+3.5,nb[1]-4,0],[poll[0]+2.6,poll[1]-4.6,0],5.2,3.4,C,D,Lc,{dz:-0.2,nosep:true});                     // the throat, from the jaw down into the chest: no notch under the head
   for(let m=0;m<8;m++){ const t=m/7, x=nb[0]+(poll[0]-nb[0])*t-1.2, y=nb[1]+(poll[1]-nb[1])*t+4.6-t*1.4; line([[x,y,0],[x-1.2,y+2.2,0]],K.stripe,0.9,0.2-2*sf); }   // a short upright mane
   const mid=[(poll[0]+muz[0])/2,(poll[1]+muz[1])/2-0.3,0];
   ball([poll[0]+0.6,poll[1]+0.4,0],4.5,C,D,Lc);                                                            // the broad forehead
@@ -16615,16 +16622,27 @@ function drawMule3D(X,Y,phi,ph,moving,pack,harness,seed){
   // draw: a soft shadow, then far to near, each part's rim before its fill so the whole beast gets one outline
   const sh=g.createRadialGradient(X,Y+1,2,X,Y+1,34*S/1.5*1.2); sh.addColorStop(0,'rgba(10,6,2,0.4)'); sh.addColorStop(1,'rgba(10,6,2,0)');
   g.fillStyle=sh; g.beginPath(); g.ellipse(X,Y+1,(Math.abs(cf)*30+12)*S,(Math.abs(sf)*14+7)*S,0,0,Math.PI*2); g.fill();
-  parts.sort((a,b)=>a.d-b.d);
   const T=g.getTransform(), k=Math.max(1,Math.hypot(T.a,T.b)), W=Math.ceil(120*S), H=Math.ceil(120*S), ox=X-W/2, oy=Y-H+16*S, pw=Math.ceil(W*k), ph2=Math.ceil(H*k);
+  const CK=moving?null:[phi.toFixed(2),pack?1:0,harness?1:0,seed,k.toFixed(2)].join('|'), CACHE=drawMule3D.cache=drawMule3D.cache||new Map();
+  if(CK){ const c=CACHE.get(CK); if(c && gt-c.t<0.12 && gt>=c.t){ g.drawImage(c.cv,0,0,pw,ph2,ox,oy,W,H); return; } }   // standing still: the last picture will do for a few frames (its idle motion is slow)
+  parts.sort((a,b)=>a.d-b.d);
   const O=drawMule3D.off=drawMule3D.off||{a:document.createElement('canvas'), t:document.createElement('canvas')};
   [O.a,O.t].forEach(c=>{ if(c.width<pw) c.width=pw; if(c.height<ph2) c.height=ph2; });
   const oa=O.a.getContext('2d'), ot=O.t.getContext('2d'); oa.setTransform(1,0,0,1,0,0); oa.clearRect(0,0,pw,ph2); oa.setTransform(k,0,0,k,-ox*k,-oy*k);
   const G=g; g=oa; try{ parts.forEach(p=>p.fn(0)); parts.forEach(p=>p.fn(1)); } finally{ g=G; }
+  if(!(typeof LOW_FX!=='undefined' && LOW_FX)){                                                          // roundness from the silhouette itself: lit edges toward the light, shaded edges away from it (no seams, it is one shape)
+    O.m=O.m||document.createElement('canvas'); if(O.m.width<pw) O.m.width=pw; if(O.m.height<ph2) O.m.height=ph2; const om=O.m.getContext('2d');
+    ot.setTransform(1,0,0,1,0,0); ot.clearRect(0,0,pw,ph2); ot.drawImage(O.a,0,0);
+    const band=(col,dx,dy,alpha,blur)=>{ om.setTransform(1,0,0,1,0,0); om.globalCompositeOperation='source-over'; om.clearRect(0,0,pw,ph2); om.fillStyle=col; om.fillRect(0,0,pw,ph2);
+      om.globalCompositeOperation='destination-out'; om.drawImage(O.t,dx*k,dy*k); om.globalCompositeOperation='source-over';
+      oa.setTransform(1,0,0,1,0,0); oa.globalCompositeOperation='source-atop'; oa.globalAlpha=alpha; oa.filter='blur('+(blur*k).toFixed(2)+'px)'; oa.drawImage(O.m,0,0); oa.filter='none'; oa.globalAlpha=1; oa.globalCompositeOperation='source-over'; };
+    band('rgba(16,10,4,1)',-3.4,-4.4,0.55,3.0);                                                          // the shaded side, lower right of every limb and the barrel
+    band('rgba(255,246,226,1)',2.6,3.4,0.3,2.6); }                                                       // and the lit side, upper left
   ot.setTransform(1,0,0,1,0,0); ot.clearRect(0,0,pw,ph2); ot.drawImage(O.a,0,0);                          // soften the inside: the blurred beast laid back over itself, only within its own outline
   oa.setTransform(1,0,0,1,0,0); oa.globalCompositeOperation='source-atop'; oa.globalAlpha=0.62; oa.filter='blur('+(1.05*k).toFixed(2)+'px)'; oa.drawImage(O.t,0,0); oa.filter='none'; oa.globalAlpha=1; oa.globalCompositeOperation='source-over';
   oa.setTransform(k,0,0,k,-ox*k,-oy*k); g=oa; try{ parts.forEach(p=>{ if(p.sharp && (p.sharp[0]*sf+p.sharp[1]*cf)>0.2) p.fn(1); }); } finally{ g=G; }   // and the fine detail that faces us, crisp again
-  g.drawImage(O.a,0,0,pw,ph2,ox,oy,W,H); }
+  g.drawImage(O.a,0,0,pw,ph2,ox,oy,W,H);
+  if(CK){ let c=CACHE.get(CK); if(!c){ if(CACHE.size>24) CACHE.delete(CACHE.keys().next().value); c={cv:document.createElement('canvas')}; CACHE.set(CK,c); } if(c.cv.width<pw) c.cv.width=pw; if(c.cv.height<ph2) c.cv.height=ph2; const cc=c.cv.getContext('2d'); cc.clearRect(0,0,c.cv.width,c.cv.height); cc.drawImage(O.a,0,0); c.t=gt; } }
 </script>
 </body>
 </html>

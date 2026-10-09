@@ -2810,6 +2810,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   fs(tone(skin,0.05));  r(LN-nw+0.2,Y.CHIN+1,1.4,4.2);
   fs(tone(skin,-0.22)); r(LN+nw-1.4,Y.CHIN+1,1.3,4.2);
   if(V.turn>-0.3) fs(tone(skin,-0.26,0.55)), r(LN-nw-1,Y.SHOULDER-0.5,nw*2+2,1.2);
+  if(unWoven(E.neck||'')==='bevor') drawBevor(c,x+LN,B+Y.SHOULDER,pr,front,B+Y.CHIN);   // over the neck, under the chin
 
   headUp(()=>drawHead(c,x+HIP_SHIFT,B+HD-BREATH*0.7,opts,view));
 
@@ -10305,7 +10306,7 @@ function crierTalk(){
   say('Town Crier',news,[bye]);
 }
 function drunkTalk(){ say('Wobbly Wendel',["A man hugging a lamp post tells you, very seriously, that the lamp post is his best friend.","“He never interrupts. Not like you.” You had not said anything."],[bye]); }
-function smithTalk(){ const disc=BARON_DOWN()?0.85:1; shopFrom('Oswin the Armourer',todaysStock('oswin',['kettle','coif','plate_boots','mail','gauntlets','shield','sword','mace','axe','spear','studded',...(BARON_DOWN()?['blackmail','helm_full']:[])],5),disc,
+function smithTalk(){ const disc=BARON_DOWN()?0.85:1; shopFrom('Oswin the Armourer',todaysStock('oswin',['kettle','coif','plate_boots','mail','gauntlets','shield','sword','mace','axe','spear','studded','bevor',...(BARON_DOWN()?['blackmail','helm_full']:[])],5),disc,
   BARON_DOWN() ? "“The Baron owed me for sixty swords. Now the Crown's paying. Discounts all round!”" : "“Hollowmere steel. The Baron buys most of it, but he pays late, so I sell to anyone.”"); }
 function tailorTalk(){ const stock=['tunic_linen','tunic_blue','tunic_green','tunic_red','smock','hose_grey','breeches','riding_boots','hood_red','gloves','robe','robe_blue','robe_black'];
   if(CHOICE.pact==='trade' && !havenBurnt()) stock.push('elf_tunic','elf_leggings','elf_boots');
@@ -15557,6 +15558,28 @@ function drawNecklace(c,ax,top,dip,pr,L){
   else if(L.p==='fangs'){ [0.22,0.36,0.5,0.64,0.78].forEach((t,k)=>{ if(pr>0.8 && (k===0||k===4)) return; const q=at(t), l=k===2?2.6:1.8, lean=(t-0.5)*1.4;
       c.fillStyle=L.col; c.beginPath(); c.moveTo(q.x-0.55,q.y); c.quadraticCurveTo(q.x+lean*0.3-0.2,q.y+l*0.7,q.x+lean,q.y+l); c.quadraticCurveTo(q.x+0.2,q.y+l*0.4,q.x+0.55,q.y); c.closePath(); c.fill(); c.strokeStyle='#4a3018'; c.lineWidth=0.45; c.stroke(); }); }
   c.restore(); }
+// the bevor: a steel collar of overlapping lames that guards the throat and chin
+function drawBevor(c,ax,top,pr,front,chin){
+  const w=pr>0.8?6.2:10.5; top+=2.2; const h=Math.max(6,top-(chin+0.6));
+  const shape=()=>{ c.beginPath(); c.moveTo(ax-w,top+1.6); c.quadraticCurveTo(ax-w*1.02,top-h*0.55,ax-w*0.72,top-h); c.quadraticCurveTo(ax,top-h-0.9,ax+w*0.72,top-h);
+    c.quadraticCurveTo(ax+w*1.02,top-h*0.55,ax+w,top+1.6); c.quadraticCurveTo(ax,top+3.6,ax-w,top+1.6); c.closePath(); };
+  c.save(); shape();
+  const gr=c.createLinearGradient(ax-w,0,ax+w,0); gr.addColorStop(0,front?'#e2e6ea':'#9aa0a8'); gr.addColorStop(0.45,front?'#aeb4bc':'#7a8088'); gr.addColorStop(1,front?'#6a7078':'#4e545c');
+  c.fillStyle=gr; c.fill(); c.strokeStyle='#2e3238'; c.lineWidth=0.5; c.stroke();
+  c.clip(); c.strokeStyle='rgba(30,34,40,0.55)'; c.lineWidth=0.45;                                      // the lames, one over the next
+  for(const k of [0.3,0.55,0.8]){ const yy=top-h+h*k; c.beginPath(); c.moveTo(ax-w,yy+1.2); c.quadraticCurveTo(ax,yy+2.4,ax+w,yy+1.2); c.stroke(); }
+  c.fillStyle='rgba(255,255,255,0.4)'; c.fillRect(ax-w*0.55,top-h+0.5,w*0.5,0.6);                      // a glint on the top edge
+  if(front){ c.fillStyle='#c8a050'; [-1,1].forEach(s=>{ c.beginPath(); c.arc(ax+s*w*0.7,top+0.6,0.45,0,Math.PI*2); c.fill(); }); }   // brass rivets at the strap
+  c.restore(); }
+Object.assign(ITEMS,{ bevor:{ name:'Steel Bevor', slot:'neck' } });
+Object.assign(ITEM_STATS,{ bevor:{hp:3,ap:1} }); GEAR_HP.bevor=5; PRICES.bevor=48; LOOT_TIERS[2].push('bevor');
+ICON_EXTRA.bevor=(g2,E)=>{                                               // a curved steel collar, three lames and a strap
+  E(20,34,12,2.4,'rgba(0,0,0,0.28)');
+  const lame=(y,w,h,c1,c2)=>{ g2.beginPath(); g2.moveTo(20-w,y+h); g2.quadraticCurveTo(20-w*1.05,y,20-w*0.7,y-h*0.4); g2.quadraticCurveTo(20,y-h,20+w*0.7,y-h*0.4); g2.quadraticCurveTo(20+w*1.05,y,20+w,y+h); g2.quadraticCurveTo(20,y+h*1.9,20-w,y+h); g2.closePath();
+    const gr=g2.createLinearGradient(20-w,0,20+w,0); gr.addColorStop(0,c1); gr.addColorStop(1,c2); g2.fillStyle=gr; g2.fill(); g2.strokeStyle='#2a2e34'; g2.lineWidth=1; g2.stroke(); };
+  lame(26,15,4.5,'#d8dde3','#5e646c'); lame(19,13,4,'#e4e8ec','#6a7078'); lame(12.5,11,3.6,'#eef1f4','#7a8088');
+  g2.fillStyle='rgba(255,255,255,0.55)'; g2.fillRect(11,9.4,7,1);
+  g2.fillStyle='#6a4a2a'; g2.fillRect(4,28,6,3); g2.fillRect(30,28,6,3); g2.fillStyle='#c8a050'; [[8,29.5],[32,29.5]].forEach(([a,b])=>{ g2.beginPath(); g2.arc(a,b,1.2,0,Math.PI*2); g2.fill(); }); };
 Object.assign(ITEMS,{ copper_chain:{ name:'Copper Chain', slot:'neck' }, bone_charm:{ name:'Knucklebone Charm', slot:'neck' }, glass_beads:{ name:'Glass Bead Necklace', slot:'neck' },
   tin_medal:{ name:"Tin Saint's Medal", slot:'neck' }, wolf_necklace:{ name:'Wolf-Tooth Necklace', slot:'neck' } });
 Object.assign(ITEM_STATS,{ copper_chain:{hp:1}, bone_charm:{agi:1}, glass_beads:{magic:1}, tin_medal:{hp:2}, wolf_necklace:{agi:3,hp:1} });

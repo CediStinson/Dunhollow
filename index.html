@@ -586,7 +586,7 @@ html,body{touch-action:none;overscroll-behavior:none;-webkit-tap-highlight-color
 //  DATA (all declarations first, no top-level code uses anything declared later)
 // ════════════════════════════════════════════════════════════
 const SKINS       = ['#FDDBB4','#F5C28A','#E8A96A','#D49858','#C68642','#8D5524','#5E3218'];  // +step between 2–3; deepest softened
-SKINS[20]='#8aa050'; SKINS[21]='#6f8a3e'; SKINS[22]='#9aa85a';   // goblin greens (never offered in the creator)
+SKINS[20]='#8aa050'; SKINS[21]='#6f8a3e'; SKINS[22]='#9aa85a'; SKINS[30]='#d8cdb0';   // 30: old bone, for the dead who still wear their gear   // goblin greens (never offered in the creator)
 // natural shades only: blacks, browns, reds, blondes, greys
 const HAIR_COLORS = ['#0f0a07','#241710','#3b2417','#5a3a24','#7a5132','#9a6b43','#7d3a1f',
                      '#a8522a','#c98a4e','#b08a58','#d8b56e','#e6d3a3','#8a8580','#d6d2c9'];
@@ -1103,7 +1103,9 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
     const shade=(col,d0)=>{ const gr=c.createLinearGradient(x+cx-h2-1,0,x+cx+h2+1,0);
       gr.addColorStop(0,tone(col,0.12*dim-d0)); gr.addColorStop(0.35,tone(col,-d0));
       gr.addColorStop(0.8,tone(col,-0.16-d0)); gr.addColorStop(1,tone(col,-0.32-d0)); return gr; };
-    {
+    if(opts.bones){ const bn=(y1,y2,w2,dx1=0,dx2=0)=>{ c.lineCap='round'; c.strokeStyle=tone(skin,-0.55-0.2*depth); c.lineWidth=w2+1.2; c.beginPath(); c.moveTo(x+cx+dx1,B+y1); c.lineTo(x+cx+dx2,B+y2); c.stroke(); c.strokeStyle=tone(skin,-0.05-0.25*depth); c.lineWidth=w2; c.stroke(); };   // the dead: a thighbone and two shinbones where the flesh was
+      bn(Y.WAIST+2,Y.KNEE-1.5,2.6); bn(Y.KNEE+2,Y.ANKLE,1.3,-0.7,-0.5); bn(Y.KNEE+2,Y.ANKLE,1.1,0.8,0.6); c.fillStyle=tone(skin,-0.1-0.2*depth); c.beginPath(); c.ellipse(x+cx,B+Y.KNEE,2.1,1.8,0,0,Math.PI*2); c.fill(); }
+    else {
       const lb=(BOOTS?bootTop+1:-3);
       legSil(0,Y.WAIST-1,BOOTS?lb:0);
       { // bare skin: the same body-wide light as torso and hips at the top, the leg's own roundness further down
@@ -1331,10 +1333,11 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       blob(pts);
       const gr=c.createLinearGradient(x+ac-a2-1,0,x+ac+a2+1,0);
       gr.addColorStop(0,tone(skin,0.12*dim-0.05-0.2*depth)); gr.addColorStop(0.4,tone(skin,-0.04-0.2*depth));
-      gr.addColorStop(1,tone(skin,-0.30-0.15*depth)); c.fillStyle=gr; c.fill();
+      gr.addColorStop(1,tone(skin,-0.30-0.15*depth)); c.fillStyle=gr; if(opts.bones){ const bn=(x1,y1,x2,y2,w2)=>{ c.strokeStyle=tone(skin,-0.55-0.2*depth); c.lineWidth=w2+1.2; c.lineCap='round'; c.beginPath(); c.moveTo(x+x1,B+y1); c.lineTo(x+x2,B+y2); c.stroke(); c.strokeStyle=tone(skin,-0.05-0.25*depth); c.lineWidth=w2; c.stroke(); };   // the dead: bone, not flesh
+        bn(ac,Ys(0.04),ac,Ys(0.47),2.4); bn(ac-0.8,Ys(0.53),ac-0.5,Ys(0.93),1.2); bn(ac+0.8,Ys(0.53),ac+0.6,Ys(0.93),1.2); c.fillStyle=tone(skin,-0.1-0.2*depth); c.beginPath(); c.arc(x+ac,B+Ys(0.5),1.7,0,Math.PI*2); c.fill(); c.beginPath(); c.rect(0,0,0,0); } else c.fill();
       // outline only where the arm meets the background: over the shoulder, down the outside, and the inner
       // edge below the armpit. Where the upper arm lies against the torso there is no line, so it grows out of the body.
-      { const outer=s>0 ? W.map(q=>[ac+q[1],Ys(q[0])]) : W.map(q=>[ac-q[1]+(q[0]>0.5?0.3:0),Ys(q[0])]);
+      if(!opts.bones){ const outer=s>0 ? W.map(q=>[ac+q[1],Ys(q[0])]) : W.map(q=>[ac-q[1]+(q[0]>0.5?0.3:0),Ys(q[0])]);
         const inner=(s>0 ? W.map(q=>[ac-q[1]+(q[0]>0.5?0.3:0),Ys(q[0])]) : W.map(q=>[ac+q[1],Ys(q[0])])).filter((p2,i)=>W[i][0]>=0.45);
         const openCurve=arr=>{ c.beginPath(); c.moveTo(x+arr[0][0],B+arr[0][1]);
           for(let i=1;i<arr.length-1;i++){ const mx=(arr[i][0]+arr[i+1][0])/2, my=(arr[i][1]+arr[i+1][1])/2; c.quadraticCurveTo(x+arr[i][0],B+arr[i][1],x+mx,B+my); }
@@ -2779,12 +2782,13 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
 
   // ── neck ──
   const nw=P.neckW/2*(1-V.prof*0.18);
-  path([[LN-nw,Y.CHIN-2],[LN+nw,Y.CHIN-2],[LN+nw+1.8,Y.SHOULDER+1],[LN-nw-1.8,Y.SHOULDER+1]]);
+  if(opts.bones){ for(let k=0;k<4;k++){ const yy=Y.CHIN-2+k*((Y.SHOULDER+1-(Y.CHIN-2))/4); c.fillStyle='#1a1612'; c.fillRect(x+LN-1.6,B+yy,3.2,1.6); c.fillStyle=tone(skin,-0.1-k*0.04); c.beginPath(); c.roundRect(x+LN-2.2,B+yy+0.3,4.4,2.4,1); c.fill(); } }
+  else { path([[LN-nw,Y.CHIN-2],[LN+nw,Y.CHIN-2],[LN+nw+1.8,Y.SHOULDER+1],[LN-nw-1.8,Y.SHOULDER+1]]);
   c.fillStyle=tone(skin,-0.12); c.fill();
   fs(tone(skin,V.turn>-0.3?-0.34:-0.20)); r(LN-nw,Y.CHIN-2,nw*2,2.8);
   fs(tone(skin,0.05));  r(LN-nw+0.2,Y.CHIN+1,1.4,4.2);
   fs(tone(skin,-0.22)); r(LN+nw-1.4,Y.CHIN+1,1.3,4.2);
-  if(V.turn>-0.3) fs(tone(skin,-0.26,0.55)), r(LN-nw-1,Y.SHOULDER-0.5,nw*2+2,1.2);
+  if(V.turn>-0.3) fs(tone(skin,-0.26,0.55)), r(LN-nw-1,Y.SHOULDER-0.5,nw*2+2,1.2); }
 
   headUp(()=>drawHead(c,x+HIP_SHIFT,B+HD-BREATH*0.7,opts,view));
 
@@ -3307,7 +3311,7 @@ function drawHead(c, x, B, opts, view=0){
     c.save(); c.beginPath(); c.rect(x-200,B+(closed?Y.SHOULDER+2:Y.HAIRLINE+1.2),400,300); c.clip(); fn(); c.restore(); };
   if(!hooded) underHat(()=>drawHair(c,x,B,opts.hair,hair,hairDark,F,P,view,LN,'back'));   // anything hanging behind the skull
   if(EQ.head==='bog_crown' && typeof drawBogCrown==='function') drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V,'far');   // the far side of a crown sits behind the head
-  if(!closed && !LATE_EARS) ears.filter(e=>Math.abs(e.x)>=HW-1).forEach(e=>drawEar(e,false));   // outside the silhouette: behind the head
+  if(!closed && !LATE_EARS && !opts.bones) ears.filter(e=>Math.abs(e.x)>=HW-1).forEach(e=>drawEar(e,false));   // outside the silhouette: behind the head
   if(!showFace && !F && !ELFISH && !GOB && !hooded && !closed){                 // from behind a beard shows past the jaw, beside the neck
     const bs=opts.beard ?? (opts.hair===1 ? 5 : 0);
     if(bs>=4){ const L=bs===5?4:1, cx=x+LN+(pr>0.3?2:0), bw=P.headHW+(bs===5?1.2:0.4), nw=P.neckW/2+0.3;
@@ -3362,7 +3366,7 @@ function drawHead(c, x, B, opts, view=0){
       c.fillStyle=gn; c.fillRect(x+LN-HW-1,B+Y.CHIN-10,HW*2+2,11);
     }
   c.restore();
-  if(!hooded && !closed) ears.filter(e=>Math.abs(e.x)<HW-1).forEach(e=>drawEar(e,true));   // a hood covers the ears      // turned onto the side of the skull
+  if(!hooded && !closed && !opts.bones) ears.filter(e=>Math.abs(e.x)<HW-1).forEach(e=>drawEar(e,true));   // a hood covers the ears      // turned onto the side of the skull
   const drawEarrings=()=>{ if(!(opts.marks && opts.marks.earrings && !hooded && !closed && !GOB)) return;
     if(!showFace && LONG_LOOSE) return;    // long loose hair covers the ears from behind
     ears.forEach(e=>{ const elf=ELFISH, side=Math.abs(e.x)>=HW-1.2?Math.sign(e.x):-1;
@@ -3378,7 +3382,8 @@ function drawHead(c, x, B, opts, view=0){
   };
   if(!ELFISH && !LATE_EARS) drawEarrings();       // round ears: before the hair, so a style that covers the ear covers the earring too
 
-  if(showFace){
+  if(showFace && opts.bones) drawSkullFace(c,x,B,LN,pr,F);
+  if(showFace && !opts.bones){
     const off=LN+faceOff(pr);
     const es=F?2.8:3.2, ew=4.6, eh=Y.EYE_H*(FC.eh||1), ET=Y.EYE_TOP+(Y.EYE_H-eh)*0.5;   // narrow or wide eyes keep their centre
     const nearW=ew, farW=ew*Math.max(0.15,faceOn);
@@ -3550,7 +3555,7 @@ function drawHead(c, x, B, opts, view=0){
     drawBeard(c,x,B,beard,hair,hairDark,P,pr,LN, -(HW+1)*ct-1.5*st-1.5);   // last arg: back edge of the ear
   }
   if(!hooded) underHat(()=>drawHair(c,x,B,opts.hair,hair,hairDark,F,P,view,LN,'front'));
-  if(LATE_EARS && !closed){ ears.forEach(e=>drawEar(e,false)); drawEarrings(); }
+  if(LATE_EARS && !closed && !opts.bones){ ears.forEach(e=>drawEar(e,false)); drawEarrings(); }
   if((ELFISH||GOB) && !hooded) ears.filter(e=>Math.abs(e.x)>=HW-1.2 || pr>0.3).forEach(e=>{     // elves: long leaf-shaped tips rising out of the hair
     const side = Math.abs(e.x)>=HW-1.2 ? Math.sign(e.x) : -1;   // seen from the side the tip sweeps back
     const ax=LN+e.x-1.5+1.6, y0=Y.EAR_TOP+Y.EAR_H*(GOB?0.8:0.5), y1=Y.EAR_TOP-(GOB?1:6), tx=ax+side*(GOB?9:2.7);   // goblins: big ears sticking out sideways
@@ -11833,7 +11838,7 @@ function victory(faction){
     if(m.type==='skeleton'){ if(R()<0.35) coin(1,5); if(R()<0.5) give('old_bone'); if(R()<0.15) give('old_skull'); if(R()<0.15) give(m.opts.equip.weapon);   // bones, a skull, the blade it held
       if(R()<0.08) give('rusted_blade'); if(R()<0.04) give('grave_ring'); return; }                                                                 // and now and then something it was buried with
     if(m.type==='lurker'){ if(R()<0.4) coin(2,5); if(R()<0.2){ const pool=LOOT_TIERS[0]; give(pool[Math.floor(R()*pool.length)]); logMsg('…something it swallowed, a while ago.','#a8a080'); } return; }
-    if(m.opts && m.opts.ghost){ if(R()<0.5) coin(4,12); return; }                // the dead carry nothing but old coin
+    if(m.opts && (m.opts.ghost||m.opts.bones)){ if(R()<0.5) coin(4,12); return; }                // the dead carry nothing but old coin
     if(m.type==='goblin'){ if(R()<0.35) coin(1,3); if(R()<0.15) give(['apple','apple','bread','raw_meat'][Math.floor(R()*4)]); if(R()<0.2) give(['dagger','hood','shirt','club'][Math.floor(R()*4)]); return; }
     const gearP=[0.3,0.2,0.12][tier]*(m.daily?0.4:1)*(m.faction==='guard'||m.type==='mage'?0:1);    // rarer the better it is; road toughs who come back every day carry less; guards and mages are handled on their own
     if(R()<gearP){ const pool=LOOT_TIERS[tier]; give(pool[Math.floor(R()*pool.length)]); }
@@ -13559,7 +13564,7 @@ AREAS.barrow=CAVE('The Drowned Barrow',10,9,()=>{ const l=[{type:'teleporter', i
     {type:'bones', i:3, j:4, noblock:true}, {type:'bones', i:6, j:6, noblock:true}, {type:'lantern', i:2, j:7}, {type:'lantern', i:7, j:7},
     {type:'rune', i:0, j:4, text:"Old letters cut deep into the wet stone: <i>“Bertil, last king of the hollow, and his household. The water took the land. Let the water keep us.”</i>"}];
   return l; }, { entries:{ fromLow:{i:4,j:7} },
-  mobs:()=> CHOICE.barrow==='done' ? [] : [ { name:'The Barrow-King', type:'barrowking', i:4, j:3, faction:'wight', opts:{gender:'m',skin:0,hair:4,hairColor:13,beard:5,face:0,ghost:true,equip:{head:'bog_crown',torso:'tunic_red',armor:'blackmail',hands:'gauntlets',legs:'trousers',feet:'plate_boots',weapon:'barrow_blade',offhand:'shield_iron'}} } ] });
+  mobs:()=> CHOICE.barrow==='done' ? [] : [ { name:'The Barrow-King', type:'barrowking', i:4, j:3, faction:'wight', opts:{gender:'m',skin:0,hair:4,hairColor:13,beard:5,face:0,bones:true,equip:{head:'bog_crown',torso:'tunic_red',armor:'blackmail',hands:'gauntlets',legs:'trousers',feet:'plate_boots',weapon:'barrow_blade',offhand:'shield_iron'}} } ] });
 wrap('stones','objects',l=>[...l,{type:'teleporter', i:1, j:0, to:'fenpath', entry:'fromStones'}]);
 AREAS.stones.entries.fromFen={i:1,j:1};
 AREA_PATHS.fenpath=[ [[1.5,19.5],[1.8,15],[2.4,10],[2.6,6.5],[3.8,4.6],[5.5,4.5]] ];
@@ -15506,7 +15511,7 @@ const BK_PAT1=FOES.barrowking.pattern, BK_PAT3=[
   {wait:0.8, wind:0.80, after:0.45, dir:'up'}, {wait:0.3, wind:0.55, after:0.30, dir:'right'}, {wait:0.0, wind:0.50, after:0.30, dir:'left'}, {wait:0.0, wind:0.50, after:0.60, dir:'right'},
   {wait:1.0, wind:1.05, after:0.50, dir:'left'}, {wait:0.6, wind:0.70, after:0.45, dir:'up'} ];
 const BK_AREA='barrow', BK_HOME=[4,2], BK_SPOTS=[[4,2],[4,6],[2,4],[7,4]];
-const BK_HOUSE=[['Drowned Housecarl',2,4,()=>({gender:'m',skin:0,hair:1,hairColor:13,beard:3,face:1,ghost:true,equip:{head:'kettle',torso:'shirt',armor:'mail',hands:null,legs:'trousers',feet:null,weapon:'spear',offhand:null}})],['Drowned Shieldmaid',7,4,()=>({gender:'f',skin:0,hair:5,hairColor:13,beard:0,face:2,ghost:true,equip:{head:null,torso:'shirt',armor:'gambeson',hands:null,legs:'trousers',feet:null,weapon:'sword',offhand:'shield'}})]];
+const BK_HOUSE=[['Drowned Housecarl',2,4,()=>({gender:'m',skin:0,hair:1,hairColor:13,beard:3,face:1,bones:true,equip:{head:'kettle',torso:'shirt',armor:'mail',hands:null,legs:'trousers',feet:null,weapon:'spear',offhand:null}})],['Drowned Shieldmaid',7,4,()=>({gender:'f',skin:0,hair:5,hairColor:13,beard:0,face:2,bones:true,equip:{head:null,torso:'shirt',armor:'gambeson',hands:null,legs:'trousers',feet:null,weapon:'sword',offhand:'shield'}})]];
 let CK=null;                                         // the set piece in progress: {mode:'storm'|'rings'|'adds'|'wait', ...}
 const ckTh=K=>{ const ph=K.cphase||1; return ph>=3 ? 0 : Math.floor(K.maxHp*(ph===1?0.66:0.33)); };   // where each phase ends
 const ckKing=()=>mobs.find(m=>m.type==='barrowking' && !m.dead);
@@ -15777,6 +15782,24 @@ JOURNAL.push(['Buried Things', ()=> !CHOICE.moundSeen && !ownsSpade() ? null : O
   CHOICE.spadeQ==='vesna' ? ['active',"Vesna says the spade that dug the Barrow-King's barrow lies in his hall, under the reeds of the Sunken Hollow."] :
   CHOICE.spadeQ==='tobb' ? ['active',"Old Tobb will not lend you his spade. He says Vesna, who talks to the dead, might know where one lies."] :
   ['active',"Somebody buried something under a mound of earth. You need a spade to dig it up. Maybe Old Tobb, the gravedigger, can help."]]);
+// ════════ the dead who still wear their gear: a skull for a face ════════
+function drawSkullFace(c,x,B,LN,pr,F){
+  const Y=BODY, off=LN+faceOff(pr), pf=pr>0.8, ey=Y.EYE_TOP+1.6, bone='#d8cdb0';
+  c.save();
+  c.fillStyle='rgba(60,50,36,0.35)'; c.beginPath(); c.ellipse(x+off+(pf?1:0),B+Y.NOSE+2.4,pf?3.2:5.4,2.2,0,0,Math.PI*2); c.fill();     // hollow cheeks
+  const sockets=pf?[[off+1.2,1]]:[[off-3.6,pr>0.3?0.75:1],[off+3.2,1]];
+  sockets.forEach(([sx,k])=>{ c.fillStyle='#14100c'; c.beginPath(); c.ellipse(x+sx,B+ey,2.5*k,2.3,0,0,Math.PI*2); c.fill();          // the sockets
+    c.save(); c.globalCompositeOperation='lighter'; const gl=c.createRadialGradient(x+sx,B+ey,0,x+sx,B+ey,2.4); gl.addColorStop(0,'rgba(140,230,190,0.9)'); gl.addColorStop(1,'rgba(80,180,140,0)'); c.fillStyle=gl; c.fillRect(x+sx-3,B+ey-3,6,6); c.restore();   // a cold light deep in each
+    c.fillStyle='#c8f4dc'; c.beginPath(); c.arc(x+sx,B+ey,0.55,0,Math.PI*2); c.fill(); });
+  const nx=off+(pf?2.6:-0.2); c.fillStyle='#1a1410'; c.beginPath(); c.moveTo(x+nx,B+Y.NOSE-2.2); c.lineTo(x+nx-1.3,B+Y.NOSE+0.8); c.lineTo(x+nx+1.3,B+Y.NOSE+0.8); c.closePath(); c.fill();   // where the nose was
+  const tw=pf?2.6:5.2, tx=off+(pf?1.6:-tw/2), ty=Y.MOUTH-1.2;                                                                    // the teeth, bared for good
+  c.fillStyle='#1a1410'; c.fillRect(x+tx-0.6,B+ty-0.6,tw+1.2,3.6);
+  c.fillStyle=bone; c.fillRect(x+tx,B+ty,tw,1.3); c.fillRect(x+tx,B+ty+1.6,tw,1.3);
+  c.strokeStyle='#3a3026'; c.lineWidth=0.35; for(let k=1;k<(pf?3:6);k++){ c.beginPath(); c.moveTo(x+tx+k*tw/(pf?3:6),B+ty); c.lineTo(x+tx+k*tw/(pf?3:6),B+ty+2.9); c.stroke(); }
+  c.strokeStyle='rgba(50,40,28,0.5)'; c.lineWidth=0.6; c.beginPath(); c.moveTo(x+off-1,B+Y.BROW-3); c.lineTo(x+off+0.6,B+Y.BROW-0.8); c.lineTo(x+off-0.4,B+Y.BROW+0.6); c.stroke();   // a crack in the brow
+  c.restore(); }
+{ const oDC=drawChar; drawChar=function(c,x,B,opts,...r){ if(opts && opts.bones && opts.skin!==30) opts={...opts, skin:30, beard:0, stubble:false, marks:null, hair:opts.gender==='f'?opts.hair:2, hairColor:13};
+    return oDC(c,x,B,opts,...r); }; }
 </script>
 </body>
 </html>

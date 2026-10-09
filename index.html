@@ -8824,7 +8824,26 @@ window.addEventListener('keydown',e=>{
 // ════════════════════════════════════════════════════════════
 // Item icons are drawn in a 40x40 box, same palette as the sprites.
 const OWN_ART=new Set(['raw_meat','cooked_meat','wolf_fang','apple','bread','potion','robe_elf','moonthread','silver_setting','moon_amulet','elf_bustier','plate_boots','bandana','coif','helm_full','tunic_linen','tunic_blue','tunic_green','tunic_red','smock','hose_grey','breeches','riding_boots','hood_red','straw_hat','gambeson','studded','blackmail','brightmail','gauntlets','shield_red','shield_iron']);
-function paintItemArt(g2,id,size){
+function paintItemArt(g2,id,size){                   // an item's inventory icon: special pieces first, then the common art
+  const u=unWoven(id), L=NECK_LOOKS && NECK_LOOKS[u];
+  if(u==='beret' || u==='vest_black' || u==='cowl_black') return paintBlackwearIcon(g2,u,size);
+  if(paintBarrowIcon(g2,id,size)) return;
+  if(L) return paintNecklaceIcon(g2,L,size);
+  if(u==='baron_tabard') return paintTabardIcon(g2,size);
+  paintItemArtPlain(g2,id,size);
+}
+function paintItemArtPlain(g2,id,size){              // a tempered or woven piece: the piece itself, with the smith's spark or the weaver's thread
+  if(isTempered(id)){ paintItemArtPlain(g2,id.slice(2),size); return temperSpark(g2,size); }
+  if(ICON_BONES[id]){ g2.save(); g2.scale(size/40,size/40); try{ ICON_BONES[id](g2); } finally{ g2.restore(); } return; }
+  if(isWoven(id)){ paintPieceArt(g2,unWoven(id),size); return wovenSpark(g2,size); }
+  paintPieceArt(g2,id,size);
+}
+function paintPieceArt(g2,id,size){
+  if(paintEmberArt(g2,id,size)) return;
+  paintIconExtras(g2,id,size);
+  necroMud(g2,id,size);
+}
+function paintItemArtBase(g2,id,size){
   if(!id) return;
   const IT=ITEMS[id];
   if(IT && IT.base && !OWN_ART.has(id)){                                     // the base garment's art, re-dyed
@@ -13506,8 +13525,7 @@ Object.assign(PRICES,{ raw_meat:2, cooked_meat:6, wolf_fang:4, fen_boots:110, bo
 ITEM_STATS.fen_boots={hp:3,agi:3,magic:1}; GEAR_HP.fen_boots=3;
 QUEST_ITEMS.add('morwen_lantern');
 // icons for the fen, barrow and cave finds (they came after the inventory art and had none)
-{ const oldPIA=paintItemArt;
-  const EXTRA={
+const ICON_EXTRA={
     morwen_lantern(g2,E){                                                     // the same lantern you carry: bail, iron hood, lit glass pale on the left going fen-green, a small white flame
       E(20,36,10,2.2,'rgba(0,0,0,0.3)');
       g2.strokeStyle='#2a2420'; g2.lineWidth=1.8; g2.beginPath(); g2.moveTo(16.4,10); g2.quadraticCurveTo(20,1.6,23.6,10); g2.stroke();
@@ -13554,10 +13572,10 @@ QUEST_ITEMS.add('morwen_lantern');
       E(20,19,3,3.6,'#ffffff'); },
   };
   // a man wears the bustiers as a waistcoat and the leggings as trousers, so his icons show that
-  const VEST={ elf_bustier:['#c8bc9c','#e8dcb8','#b89a50'], necro_bustier:['#26231e','#3e3a32','#7a6a4a'] };
-  const TROUSER={ elf_leggings:'#b3a283', necro_leggings:'#2a2a26', elf_leggings_worn:'#5c564a' };
-  const male=()=>typeof player!=='undefined' && player.opts && player.opts.gender!=='f' && running;
-  EXTRA.vest=(g2,E,id)=>{ const [base,lit,trim]=VEST[id];
+const ICON_VEST={ elf_bustier:['#c8bc9c','#e8dcb8','#b89a50'], necro_bustier:['#26231e','#3e3a32','#7a6a4a'] };
+const ICON_TROUSER={ elf_leggings:'#b3a283', necro_leggings:'#2a2a26', elf_leggings_worn:'#5c564a' };
+const iconMale=()=>typeof player!=='undefined' && player.opts && player.opts.gender!=='f' && running;
+ICON_EXTRA.vest=(g2,E,id)=>{ const [base,lit,trim]=ICON_VEST[id];
     const body=()=>{ g2.beginPath(); g2.moveTo(11,7); g2.lineTo(16,6); g2.lineTo(20,17); g2.lineTo(24,6); g2.lineTo(29,7); g2.lineTo(31,14); g2.lineTo(30,33);
       g2.quadraticCurveTo(25,36,21,34); g2.lineTo(19,34); g2.quadraticCurveTo(15,36,10,33); g2.lineTo(9,14); g2.closePath(); };
     body(); g2.fillStyle=base; g2.fill();
@@ -13567,18 +13585,17 @@ QUEST_ITEMS.add('morwen_lantern');
     if(id==='necro_bustier'){ g2.strokeStyle='#8a7a5a'; g2.lineWidth=0.8; for(let k=0;k<5;k++){ const y=19+k*3; g2.beginPath(); g2.moveTo(18.2,y); g2.lineTo(21.8,y+2); g2.moveTo(21.8,y); g2.lineTo(18.2,y+2); g2.stroke(); }   // lacing
       g2.fillStyle='#26231e'; for(let k=0;k<4;k++){ g2.beginPath(); g2.moveTo(11+k*5,33.5); g2.lineTo(13+k*5,38); g2.lineTo(15+k*5,34); g2.fill(); } }   // ragged hem
     else { [21,25,29].forEach(y=>{ E(21.6,y,0.9,0.9,'#e8e0c8'); }); g2.strokeStyle=trim; g2.lineWidth=0.7; g2.beginPath(); g2.moveTo(10,32.5); g2.quadraticCurveTo(15,35,19,33.5); g2.moveTo(21,33.5); g2.quadraticCurveTo(25,35,30,32.5); g2.stroke(); } };
-  paintItemArt=function(g2,id,size){
-    if(male() && VEST[id]){ g2.save(); g2.scale(size/40,size/40); try{ EXTRA.vest(g2,(x,y,rx,ry,c)=>{ g2.beginPath(); g2.ellipse(x,y,rx,ry,0,0,Math.PI*2); g2.fillStyle=c; g2.fill(); },id); } finally{ g2.restore(); } return; }
-    if(male() && TROUSER[id]){                                                  // the plain trousers, re-dyed
-      const cv=document.createElement('canvas'); cv.width=cv.height=Math.ceil(size); const t=cv.getContext('2d'); oldPIA(t,'trousers',size);
-      t.globalCompositeOperation='color'; t.fillStyle=TROUSER[id]; t.fillRect(0,0,cv.width,cv.height);
+function paintIconExtras(g2,id,size){
+    if(iconMale() && ICON_VEST[id]){ g2.save(); g2.scale(size/40,size/40); try{ ICON_EXTRA.vest(g2,(x,y,rx,ry,c)=>{ g2.beginPath(); g2.ellipse(x,y,rx,ry,0,0,Math.PI*2); g2.fillStyle=c; g2.fill(); },id); } finally{ g2.restore(); } return; }
+    if(iconMale() && ICON_TROUSER[id]){                                                  // the plain trousers, re-dyed
+      const cv=document.createElement('canvas'); cv.width=cv.height=Math.ceil(size); const t=cv.getContext('2d'); paintItemArtBase(t,'trousers',size);
+      t.globalCompositeOperation='color'; t.fillStyle=ICON_TROUSER[id]; t.fillRect(0,0,cv.width,cv.height);
       t.globalCompositeOperation='multiply'; t.globalAlpha=0.25; t.fillRect(0,0,cv.width,cv.height); t.globalAlpha=1;
-      const mk=document.createElement('canvas'); mk.width=mk.height=cv.width; oldPIA(mk.getContext('2d'),'trousers',size);
+      const mk=document.createElement('canvas'); mk.width=mk.height=cv.width; paintItemArtBase(mk.getContext('2d'),'trousers',size);
       t.globalCompositeOperation='destination-in'; t.drawImage(mk,0,0); g2.drawImage(cv,0,0); return; }
-    const f=EXTRA[id]; if(!f) return oldPIA(g2,id,size);
+    const f=ICON_EXTRA[id]; if(!f) return paintItemArtBase(g2,id,size);
     g2.save(); g2.scale(size/40,size/40);
-    try{ f(g2,(x,y,rx,ry,c)=>{ g2.beginPath(); g2.ellipse(x,y,rx,ry,0,0,Math.PI*2); g2.fillStyle=c; g2.fill(); }); } finally{ g2.restore(); } };
-}
+    try{ f(g2,(x,y,rx,ry,c)=>{ g2.beginPath(); g2.ellipse(x,y,rx,ry,0,0,Math.PI*2); g2.fillStyle=c; g2.fill(); }); } finally{ g2.restore(); } }
 
 
 // ── the fallen oak across the causeway ──
@@ -14090,10 +14107,10 @@ JOURNAL.push(["The Grave-Speaker", ()=> !CHOICE.necro ? null : NECRO()>=3 ? ['do
 Object.assign(ITEM_STATS,{ necro_robe:{hp:2,agi:1,magic:4}, necro_bustier:{agi:1,magic:2}, necro_leggings:{agi:2,magic:2} });
 Object.assign(GEAR_HP,{ necro_robe:2, necro_bustier:0, necro_leggings:0 });
 Object.assign(PRICES,{ necro_robe:140, necro_bustier:90, necro_leggings:60 });
-{ const oldPIA=paintItemArt; paintItemArt=function(g2,id,size){ oldPIA(g2,id,size); if(!id||!id.startsWith('necro_')) return; const k=size/40;     // frayed edges and fen mud on the icons too
+function necroMud(g2,id,size){ if(!id||!id.startsWith('necro_')) return; const k=size/40;     // frayed edges and fen mud on the icons too
     g2.save(); g2.scale(k,k); g2.fillStyle='rgba(70,76,46,0.55)'; [[14,30,4,2],[26,32,3,1.6]].forEach(([a,b,rx,ry])=>{ g2.beginPath(); g2.ellipse(a,b,rx,ry,0,0,Math.PI*2); g2.fill(); });
     g2.strokeStyle='rgba(60,58,50,0.95)'; g2.lineWidth=0.7; const y0=id==='necro_bustier'?27:id==='necro_leggings'?35:35; for(let q=8;q<=32;q+=2.2){ g2.beginPath(); g2.moveTo(q,y0-1); g2.lineTo(q+0.4,y0+1.5+((q*3)%3)); g2.stroke(); }
-    g2.restore(); }; }
+    g2.restore(); }
 
 // ════════ ROUTINES: folk keep hours, walk between places, and are only ever in one of them ════════
 const HOUR=()=>((dayClock%DAY_LEN)/DAY_LEN*24+12)%24;
@@ -14227,15 +14244,15 @@ const FIRE_FOE=f=> f && ((f.opts&&f.opts.equip&&['fire_blade','emberbrand'].incl
     if(id==='emberbrand'){ const t=(typeof gt!=='undefined'?gt:0); for(let k=0;k<4;k++){ const u=((t*0.8+k*0.25)%1); c.fillStyle=`rgba(255,${150+k*20},60,${0.8*(1-u)})`; c.beginPath(); c.arc(8+u*(L-6),-2-u*6+Math.sin(t*5+k)*1.5,0.9,0,Math.PI*2); c.fill(); }
       c.strokeStyle='rgba(255,140,40,0.35)'; c.lineWidth=5; c.beginPath(); c.moveTo(8,0); c.lineTo(L,0); c.stroke(); }
     c.restore(); }; }
-{ const oldPIA=paintItemArt; paintItemArt=function(g2,id,size){
-    if(id==='fire_blade' || id==='emberbrand'){ g2.save(); g2.scale(size/40,size/40); drawWeapon(g2,7,33,-Math.PI/4,id,1.3); g2.restore(); return; }
+function paintEmberArt(g2,id,size){             // true when drawn
+    if(id==='fire_blade' || id==='emberbrand'){ g2.save(); g2.scale(size/40,size/40); drawWeapon(g2,7,33,-Math.PI/4,id,1.3); g2.restore(); return true; }
     if(id==='ember_core'){ g2.save(); g2.scale(size/40,size/40);
       const gl=g2.createRadialGradient(20,21,0,20,21,15); gl.addColorStop(0,'rgba(255,170,60,0.7)'); gl.addColorStop(1,'rgba(255,90,20,0)'); g2.fillStyle=gl; g2.fillRect(4,5,32,32);
       g2.fillStyle='#2a1a16'; g2.beginPath(); g2.moveTo(20,7); g2.lineTo(30,15); g2.lineTo(28,30); g2.lineTo(17,35); g2.lineTo(10,25); g2.lineTo(12,12); g2.closePath(); g2.fill();   // a lump of cooled black rock
       g2.strokeStyle='#ffb050'; g2.lineWidth=1.4; g2.lineJoin='round'; g2.beginPath(); g2.moveTo(15,13); g2.lineTo(19,20); g2.lineTo(16,27); g2.moveTo(19,20); g2.lineTo(26,18); g2.moveTo(19,20); g2.lineTo(23,29); g2.stroke();   // fire in its cracks
       const core=g2.createRadialGradient(19,20,0,19,20,5); core.addColorStop(0,'#fff2c0'); core.addColorStop(1,'rgba(255,140,40,0)'); g2.fillStyle=core; g2.beginPath(); g2.arc(19,20,5,0,Math.PI*2); g2.fill();
-      g2.restore(); return; }
-    return oldPIA(g2,id,size); }; }
+      g2.restore(); return true; }
+    return false; }
 OWN_ART.delete('fire_blade');
 
 // ── lava: blocks the way, moves, glows; drawn over the ground, under everything standing ──
@@ -14421,12 +14438,11 @@ for(const id of Object.keys(ITEMS)){ const it=ITEMS[id]; if(id.startsWith('w_') 
   ITEM_STATS['w_'+id]={...(ITEM_STATS[id]||{}), magic:((ITEM_STATS[id]||{}).magic||0)+1};
   if(GEAR_HP[id]) GEAR_HP['w_'+id]=GEAR_HP[id];
   if(PRICES[id]) PRICES['w_'+id]=PRICES[id]+weaveCost(id); }
-{ const oldPIA=paintItemArt; paintItemArt=function(g2,id,size){ if(!isWoven(id)) return oldPIA(g2,id,size);
-    oldPIA(g2,unWoven(id),size);                                                                         // the piece itself, with a thread of moonlight in the corner
+function wovenSpark(g2,size){                     // a thread of moonlight in the corner
     g2.save(); g2.scale(size/40,size/40); g2.globalCompositeOperation='lighter';
     const gl=g2.createRadialGradient(6,6,0,6,6,7); gl.addColorStop(0,'rgba(210,230,255,0.9)'); gl.addColorStop(1,'rgba(210,230,255,0)'); g2.fillStyle=gl; g2.fillRect(0,0,13,13);   // top left: the hide toggle sits top right
     g2.strokeStyle='rgba(230,240,255,0.95)'; g2.lineWidth=1; g2.beginPath(); g2.moveTo(6,2); g2.lineTo(6,10); g2.moveTo(2,6); g2.lineTo(10,6); g2.stroke();
-    g2.restore(); }; }
+    g2.restore(); }
 // road bandits and footpads mostly wear the Baron's purple bandana (most days, not every day; the same all day long)
 const ROAD_THUGS=new Set(['roadthief','highway']);
 Object.keys(AREAS).forEach(a=>{ if(typeof AREAS[a].mobs!=='function') return;
@@ -14507,7 +14523,7 @@ const VESNA_BUYS={ only:new Set(['old_bone','old_skull','rusted_blade','grave_ri
   greet:"She turns each piece over as if it might still be listening. “Bones, skulls, what they were buried with. Nobody else will touch these. I pay fairly.”",
   none:"“Nothing from the dead on you. The fen's risen bones leave plenty behind, if you lay them down.”" };
 PRICES.grave_mote=PRICES.grave_mote||8;
-{ const oldPIA=paintItemArt; const ART={
+const ICON_BONES={
     old_bone(c){ c.lineCap='round'; c.strokeStyle='#4a4030'; c.lineWidth=6.5; c.beginPath(); c.moveTo(10,29); c.lineTo(30,11); c.stroke(); c.strokeStyle='#d8ccaa'; c.lineWidth=4.5; c.stroke();
       c.fillStyle='#d8ccaa'; c.strokeStyle='#4a4030'; c.lineWidth=1.2; [[8,27],[12,31],[28,9],[32,13]].forEach(([x,y])=>{ c.beginPath(); c.arc(x,y,3.6,0,Math.PI*2); c.fill(); c.stroke(); });
       c.strokeStyle='#d8ccaa'; c.lineWidth=4; c.beginPath(); c.moveTo(10,29); c.lineTo(30,11); c.stroke(); c.fillStyle='rgba(90,70,40,0.45)'; c.beginPath(); c.ellipse(21,20,3,1.4,-0.8,0,Math.PI*2); c.fill(); },
@@ -14523,7 +14539,6 @@ PRICES.grave_mote=PRICES.grave_mote||8;
     grave_ring(c){ c.strokeStyle='#5a4a2a'; c.lineWidth=5.2; c.beginPath(); c.ellipse(20,24,9,7.5,0,0,Math.PI*2); c.stroke(); c.strokeStyle='#c8a050'; c.lineWidth=3.4; c.stroke();
       c.fillStyle='#3a5a3a'; c.strokeStyle='#2a2016'; c.lineWidth=1; c.beginPath(); c.ellipse(20,15.5,4.4,3.6,0,0,Math.PI*2); c.fill(); c.stroke();
       c.fillStyle='rgba(180,255,180,0.6)'; c.beginPath(); c.arc(18.8,14.6,1.2,0,Math.PI*2); c.fill(); } };
-  paintItemArt=function(g2,id,size){ if(ART[id]){ g2.save(); g2.scale(size/40,size/40); try{ ART[id](g2); } finally{ g2.restore(); } return; } return oldPIA(g2,id,size); }; }
 const VESNA_N='Vesna the Grave-Speaker';
 function vesnaFen(){
   const hag=defeatedMobs.has('fen:Hesk the Fen Hag'), back=()=>vesnaFen(), necroTalk=VESNA_NECRO;
@@ -15113,12 +15128,11 @@ function temperTalk(){ const E=player.opts.equip, back=()=>TALKERS.smith();
     pieces.length ? "“One piece at a time. Each one I can true up once: rivets, straps, balance. After that it's as good as steel and leather get. Better kit costs more to do properly.”" : "“Come back wearing some steel or leather. I don't temper shirts.”",
     ...(CHOICE.temper ? [`<i>Your earlier training with him still counts: +${CHOICE.temper} Attack Power.</i>`] : [])],
     [...opts,{label:'Back.',fn:back},bye],true); }
-{ const oldPIA=paintItemArt; paintItemArt=function(g2,id,size){ if(!isTempered(id)) return oldPIA(g2,id,size);
-    oldPIA(g2,id.slice(2),size);                                                                          // the piece, with a hammer-spark in the bottom corner
+function temperSpark(g2,size){                    // a hammer-spark in the bottom corner
     g2.save(); g2.scale(size/40,size/40); g2.globalCompositeOperation='lighter';
     const gl=g2.createRadialGradient(6,34,0,6,34,7); gl.addColorStop(0,'rgba(255,200,120,0.9)'); gl.addColorStop(1,'rgba(255,160,60,0)'); g2.fillStyle=gl; g2.fillRect(0,27,13,13);
     g2.strokeStyle='rgba(255,226,170,0.95)'; g2.lineWidth=1; g2.beginPath(); g2.moveTo(3,31); g2.lineTo(9,37); g2.moveTo(9,31); g2.lineTo(3,37); g2.stroke();
-    g2.restore(); }; }
+    g2.restore(); }
 // ── a proper bath does more than heal: for half a day afterwards you are "Refreshed" (+10 max health)
 const BATH_BUFF_LEN=()=>DAY_LEN*0.5, bathBuffOn=()=> CHOICE.bathBuff!=null && dayClock<CHOICE.bathBuff && dayClock>CHOICE.bathBuff-BATH_BUFF_LEN()-1;
 { const oB=bathStrip; bathStrip=function(...a){ const r=oB(...a); CHOICE.bathBuff=dayClock+BATH_BUFF_LEN(); refreshPlayerHp(false); player.hp=player.maxHp; updateHud();
@@ -15349,7 +15363,7 @@ const lanternLit=()=> hasLantern() && unWoven((player.opts.equip.offhand)||'')==
 // ════════ the Baron's tabard: his men wear it, sometimes drop it; wear it yourself and his soldiers take you for one of theirs ════════
 Object.assign(ITEMS,{ baron_tabard:{ name:"Baron's Tabard", slot:'torso' } }); Object.assign(PRICES,{ baron_tabard:12 }); Object.assign(ITEM_STATS,{ baron_tabard:{hp:1} }); GEAR_HP.baron_tabard=1;
 const tabardOn=()=>!!(player.opts && player.opts.equip && unWoven(player.opts.equip.torso||'')==='baron_tabard' && !(player.opts.hide&&player.opts.hide.torso));
-{ const oPIA=paintItemArt; paintItemArt=function(g2,id,size){ if(unWoven(id)!=='baron_tabard') return oPIA(g2,id,size);
+function paintTabardIcon(g2,size){
     g2.save(); g2.scale(size/40,size/40);
     const T='#8a3a30'; g2.fillStyle='rgba(0,0,0,0.3)'; g2.beginPath(); g2.ellipse(20,35,11,2.5,0,0,Math.PI*2); g2.fill();
     g2.beginPath(); g2.moveTo(11,5); g2.lineTo(16,5); g2.quadraticCurveTo(20,9,24,5); g2.lineTo(29,5); g2.lineTo(29,13); g2.lineTo(28,20); g2.lineTo(30,33);
@@ -15358,7 +15372,7 @@ const tabardOn=()=>!!(player.opts && player.opts.equip && unWoven(player.opts.eq
     g2.fillStyle='rgba(235,200,170,0.16)'; g2.beginPath(); g2.ellipse(15,24,3,5,0.3,0,Math.PI*2); g2.fill(); g2.beginPath(); g2.ellipse(25,12,2.4,3,0,0,Math.PI*2); g2.fill();   // faded patches
     g2.strokeStyle='#4a3420'; g2.lineWidth=1.1; g2.beginPath(); g2.moveTo(12,20.5); g2.quadraticCurveTo(20,22,28,20.5); g2.stroke();
     drawBaronSigil(g2,20,13.5,10,'#c8a050','#3a0c0a',1);
-    g2.restore(); }; }
+    g2.restore(); }
 // his soldiers, when you wear his red
 const TABARD_LINES=["“Back to your post, soldier. Sergeant's in a mood.”","“You're new. Keep your head down and your mouth shut, that's the whole job.”","“Heard the Baron's paying late again. Course he is.”","“If anyone asks, you saw nothing. That's an order. Probably.”"];
 ['krgateguard0','krgateguard1','mguard','kguard1','kguard2','stguard1','stguard2','recruit'].forEach(id=>{ const old=TALKERS[id]; TALKERS[id]=(...a)=>{
@@ -15466,7 +15480,7 @@ Object.assign(ITEM_STATS,{ copper_chain:{hp:1}, bone_charm:{agi:1}, glass_beads:
 Object.entries({copper_chain:1,tin_medal:2,wolf_necklace:1}).forEach(([k,v])=>GEAR_HP[k]=v);
 Object.assign(PRICES,{ copper_chain:6, bone_charm:4, glass_beads:8, tin_medal:7, wolf_necklace:40 });
 LOOT_TIERS[0].push('bone_charm','copper_chain'); LOOT_TIERS[1].push('glass_beads','tin_medal'); FARM_LOOT.push('bone_charm','copper_chain');
-{ const oPIA=paintItemArt; paintItemArt=function(g2,id,size){ const L=NECK_LOOKS[unWoven(id)]; if(!L) return oPIA(g2,id,size);
+function paintNecklaceIcon(g2,L,size){
     g2.save(); g2.scale(size/40,size/40);
     g2.fillStyle='rgba(0,0,0,0.25)'; g2.beginPath(); g2.ellipse(20,35,12,2.4,0,0,Math.PI*2); g2.fill();
     g2.strokeStyle=L.cord; g2.lineWidth=L.w*2.6; g2.beginPath(); g2.ellipse(20,15,11,12,0,0.15*Math.PI,0.85*Math.PI,true); g2.stroke();   // the loop of cord, open at the top
@@ -15478,7 +15492,7 @@ LOOT_TIERS[0].push('bone_charm','copper_chain'); LOOT_TIERS[1].push('glass_beads
     else if(L.p==='beads'){ for(let k=0;k<14;k++){ const q=at(0.12*Math.PI+k*0.76*Math.PI/13); g2.fillStyle=L.cols[k%L.cols.length]; g2.beginPath(); g2.arc(q.x,q.y,1.9,0,Math.PI*2); g2.fill(); g2.fillStyle='rgba(255,255,255,0.5)'; g2.beginPath(); g2.arc(q.x-0.6,q.y-0.6,0.6,0,Math.PI*2); g2.fill(); } }
     else if(L.p==='fangs'){ [0.3,0.4,0.5,0.6,0.7].forEach((t,k)=>{ const q=at(t*Math.PI), l=k===2?9:6.5, lean=(t-0.5)*5;
         g2.fillStyle=L.col; g2.beginPath(); g2.moveTo(q.x-1.6,q.y); g2.quadraticCurveTo(q.x+lean*0.3-0.6,q.y+l*0.7,q.x+lean,q.y+l); g2.quadraticCurveTo(q.x+0.6,q.y+l*0.4,q.x+1.6,q.y); g2.closePath(); g2.fill(); g2.strokeStyle='#8a7a58'; g2.lineWidth=0.7; g2.stroke(); }); }
-    g2.restore(); }; }
+    g2.restore(); }
 // Brann strings wolf teeth into a necklace: three fangs and a day's patience
 { const oldBr=TALKERS.hunter; TALKERS.hunter=()=>{ const day=Math.floor(dayClock/DAY_LEN), fangs=player.inv.filter(x=>x==='wolf_fang').length, W=CHOICE.wolfNeck;
     if(typeof W==='number'){ if(day<=W){ say('Brann the Hunter',["Three wolf teeth lie by his fire, one of them half-drilled. “Tomorrow. A tooth splits if you rush it.”"],[{label:'Something else.',fn:oldBr},bye]); return; }
@@ -15678,8 +15692,8 @@ function drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V,part){
   if(front && showFace && pr<0.9){ c.save(); c.globalCompositeOperation='lighter'; const gl=c.createRadialGradient(x+LN+fx,B+cy+ry,0,x+LN+fx,B+cy+ry,4); gl.addColorStop(0,'rgba(180,255,200,0.9)'); gl.addColorStop(1,'rgba(120,220,160,0)'); c.fillStyle=gl; c.fillRect(x+LN+fx-4,B+cy+ry-4,8,8); c.restore();
     c.fillStyle='#c8f0d0'; c.beginPath(); c.arc(x+LN+fx,B+cy+ry,0.9,0,Math.PI*2); c.fill(); } }
 // icons
-{ const oPIA=paintItemArt; paintItemArt=function(g2,id,size){
-    if(id==='barrow_blade'){ g2.save(); g2.scale(size/40,size/40); drawWeapon(g2,7,33,-Math.PI/4,id,1.3); g2.restore(); return; }
+function paintBarrowIcon(g2,id,size){            // the Drowned Blade and the bog crown; true when drawn
+    if(id==='barrow_blade'){ g2.save(); g2.scale(size/40,size/40); drawWeapon(g2,7,33,-Math.PI/4,id,1.3); g2.restore(); return true; }
     if(id==='bog_crown'){ g2.save(); g2.scale(size/40,size/40);
       g2.fillStyle='rgba(0,0,0,0.3)'; g2.beginPath(); g2.ellipse(20,31,14,3,0,0,Math.PI*2); g2.fill();
       const sp=(x0,y0,L,lean,col)=>{ g2.fillStyle=col; g2.beginPath(); g2.moveTo(x0-2.4,y0); g2.quadraticCurveTo(x0+lean*0.3-1.4,y0-L*0.6,x0+lean,y0-L); g2.quadraticCurveTo(x0+lean*0.2+1.3,y0-L*0.45,x0+2.4,y0); g2.closePath(); g2.fill(); };
@@ -15689,11 +15703,10 @@ function drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V,part){
       [[8,27,8,-2.5],[14,29.5,10,-1],[20,30,13,0],[26,29.5,10,1],[32,27,8,2.5]].forEach(([a,b,L,l])=>sp(a,b,L,l,'#2e2618'));
       g2.fillStyle='#6a8a48'; [[11,28],[27,29],[31,25]].forEach(([a,b])=>{ g2.beginPath(); g2.ellipse(a,b,2.2,1.2,0,0,Math.PI*2); g2.fill(); });
       const gl=g2.createRadialGradient(20,29,0,20,29,6); gl.addColorStop(0,'rgba(190,255,210,0.95)'); gl.addColorStop(1,'rgba(120,220,160,0)'); g2.fillStyle=gl; g2.fillRect(13,22,14,14);
-      g2.fillStyle='#d8fae0'; g2.beginPath(); g2.arc(20,29,1.6,0,Math.PI*2); g2.fill(); g2.restore(); return; }
-    return oPIA(g2,id,size); }; }
+      g2.fillStyle='#d8fae0'; g2.beginPath(); g2.arc(20,29,1.6,0,Math.PI*2); g2.fill(); g2.restore(); return true; }
+    return false; }
 // icons for the Gold Brothers' clothes
-{ const oPIA=paintItemArt; paintItemArt=function(g2,id,size){ const u=unWoven(id);
-    if(u!=='beret' && u!=='vest_black' && u!=='cowl_black') return oPIA(g2,id,size);
+function paintBlackwearIcon(g2,u,size){          // the Gold Brothers' black: beret, vest and cowl
     g2.save(); g2.scale(size/40,size/40); g2.fillStyle='rgba(0,0,0,0.28)'; g2.beginPath(); g2.ellipse(20,35,12,2.6,0,0,Math.PI*2); g2.fill();
     if(u==='beret'){ g2.fillStyle='#141318'; g2.beginPath(); g2.ellipse(20,27,10,3.4,0,0,Math.PI*2); g2.fill();
       const gr=g2.createRadialGradient(16,17,1,20,21,15); gr.addColorStop(0,'#4a4852'); gr.addColorStop(0.6,'#25242a'); gr.addColorStop(1,'#111014');
@@ -15712,7 +15725,7 @@ function drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V,part){
       g2.beginPath(); g2.moveTo(15,10); g2.bezierCurveTo(6,11,4,18,4,28); g2.quadraticCurveTo(12,32,18.5,28); g2.lineTo(19,12); g2.lineTo(21,12); g2.lineTo(21.5,28); g2.quadraticCurveTo(28,32,36,28); g2.bezierCurveTo(36,18,34,11,25,10); g2.closePath(); g2.fill();
       g2.strokeStyle='#07070a'; g2.lineWidth=0.9; g2.stroke();
       g2.fillStyle='#c8ccd4'; g2.beginPath(); g2.arc(20,13.5,1.6,0,Math.PI*2); g2.fill(); }   // the pewter pin
-    g2.restore(); }; }
+    g2.restore(); }
 // ════════════════════════════════════════════════════════════════════════════
 //  BURIED THINGS: mounds of stamped-down earth in out-of-the-way corners, and a spade to dig them with
 //    CHOICE.moundSeen : you found a mound and had nothing to dig with

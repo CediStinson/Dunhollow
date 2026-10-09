@@ -218,6 +218,30 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0e0b06;color:#e8d5a
 #inv-trash .tr-ico{font-size:16px;filter:grayscale(0.4);}
 #inv-trash.over{border-color:#e07050;color:#f0a080;background:rgba(160,50,30,0.15);}
 #inv-trash.armed{border-color:#c09040;}
+#belt-box,#fx-box{margin-top:12px;}
+#fx-box{width:0;min-width:100%;}
+#belt-grid{display:flex;gap:6px;}
+.bslot{position:relative;width:56px;height:56px;box-sizing:border-box;border:1px solid #3a2810;border-radius:7px;background:radial-gradient(circle at 50% 40%,#2a1d0c,#120c05);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.bslot:hover{border-color:#8a6a30;}
+.bslot.valid{border-color:#c8a050;box-shadow:0 0 8px rgba(220,170,70,.45);}
+.bslot.over{border-color:#f0d080;background:radial-gradient(circle at 50% 40%,#3a2a10,#1a1206);}
+.bslot.none canvas{opacity:.35;filter:grayscale(.7);}
+.bslot .bn{position:absolute;right:4px;bottom:2px;font:bold 11px Georgia,serif;color:#f0dca0;text-shadow:0 1px 2px #000;}
+.bslot .bk{position:absolute;left:4px;top:2px;font:10px Georgia,serif;color:#7a6034;}
+.bslot .bplus{color:#5a4424;font:20px Georgia,serif;}
+#belt-pick{position:fixed;z-index:120;display:none;flex-wrap:wrap;gap:4px;max-width:230px;padding:6px;border:1px solid #6a4a20;border-radius:7px;background:#1a1208;box-shadow:0 6px 20px rgba(0,0,0,.6);}
+#belt-pick button{display:flex;align-items:center;gap:6px;width:100%;padding:3px 6px;border:1px solid transparent;border-radius:5px;background:none;color:#e8d4a8;font:12px Georgia,serif;cursor:pointer;text-align:left;}
+#belt-pick button:hover{border-color:#8a6a30;background:#2a1d0c;}
+#belt-pick button small{margin-left:auto;color:#a08050;}
+#fx-list{display:flex;flex-wrap:wrap;gap:6px;}
+.fx{display:flex;align-items:center;gap:6px;padding:4px 9px 4px 5px;border:1px solid #3e5a2c;border-radius:14px;background:rgba(60,90,40,.18);color:#d8e8c0;font:11px Georgia,serif;cursor:default;}
+.fx .fi{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;background:#2c4220;color:#cfe8a8;}
+.fx b{font-weight:normal;color:#f0e4c0;}
+.fx span.v{color:#a8c890;}
+.fx.bad{border-color:#6a3020;background:rgba(120,40,20,.2);color:#f0c0a8;}
+.fx.bad .fi{background:#4a2014;color:#f0a080;}
+.fx.bad span.v{color:#e09070;}
+.fx-none{color:#6a5430;font:italic 11px Georgia,serif;}
 #inv-msg button{margin-left:6px;background:#2a1c0c;border:1px solid #6a4a1c;color:#e8c878;border-radius:4px;font:11px Georgia,serif;padding:2px 8px;cursor:pointer;}
 #inv-msg button.danger{border-color:#a04030;color:#f0a080;}
 .bag .menu-label{font-family:Georgia,serif;font-size:11px;letter-spacing:3px;color:#c8a060;}
@@ -9407,7 +9431,7 @@ let foodCD=0;
 function refreshFoodBar(){
   let bar=document.getElementById('food-bar'); if(!bar){ bar=document.createElement('div'); bar.id='food-bar'; const hud=document.getElementById('duel-hud'); hud.insertBefore(bar,hud.firstChild); }
   bar.style.display=combat.active && !combat.practice ? 'flex' : 'none'; bar.innerHTML='';
-  ['apple','bread','cooked_meat','potion',...(isMagicWeapon()?['mana_potion']:[])].forEach(id=>{ const n=player.inv.filter(x=>x===id).length; const b=document.createElement('button'); b.className='fb'+(n?'':' empty'); b.title=ITEMS[id].name+(ITEMS[id].mana?' (+'+ITEMS[id].mana+' mana)':' (+'+ITEMS[id].heal+' HP)');
+  beltIds().filter(Boolean).forEach(id=>{ const n=player.inv.filter(x=>x===id).length; const b=document.createElement('button'); b.className='fb'+(n?'':' empty'); b.title=ITEMS[id].name+(ITEMS[id].mana?' (+'+ITEMS[id].mana+' mana)':' (+'+ITEMS[id].heal+' HP)');
     const cv=document.createElement('canvas'); cv.width=cv.height=120; cv.style.width=cv.style.height='56px'; drawItemIcon(cv.getContext('2d'),id,120); b.appendChild(cv);
     const c2=document.createElement('span'); c2.textContent=n; b.appendChild(c2);
     b.addEventListener('pointerdown',e=>{ e.stopPropagation(); e.preventDefault(); if(!n || performance.now()<foodCD) return; const k=player.inv.indexOf(id); if(eatItem(k)) foodCD=performance.now()+1500; });
@@ -9506,7 +9530,7 @@ function refreshInventory(){
     el.title = id ? `${ITEMS[id].name}  (${SLOT_NAMES[ITEMS[id].slot]})${(itemStat(id)&&itemStat(id).short) ? ' — '+itemStat(id).short : ''}` : (el.dataset.kind==='eq' ? SLOT_NAMES[el.dataset.key] : '');
     const lbl=el.querySelector('.lbl'); if(lbl) lbl.style.display = id ? 'none' : '';
   });
-  refreshStatPanel();
+  refreshStatPanel(); refreshBelt(); refreshEffects();
   if(typeof syncHideEyes==='function') syncHideEyes();
   drawDoll();
   const sl=document.querySelector('#inv-overlay .skel-slot'); if(sl){ sl.style.display=skelArmsOn()?'':'none'; sl.title=CHOICE.skelWeapon?ITEMS[CHOICE.skelWeapon].name+' (carried by the skeleton you raise, for show)':'Your skeleton\'s weapon: drop any weapon here. It is only for show.'; }   // your skeleton's weapon slot
@@ -9528,10 +9552,8 @@ function refreshStatPanel(){
   panel.innerHTML = rows.map(([k,v])=>`<div class="stat-row"><b>${k}</b><span>${v}</span></div>`).join('');
   const a=gearSum('agi'), m=gearSum('magic');
   panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Swing Time</b><span>${W.wind.toFixed(2)}s</span></div><div class="stat-row"><b>Agility</b><span>${a}${a?` (${Math.round(dodgeChance(a)*100)}% dodge)`:''}</span></div><div class="stat-row"><b>Attack Power</b><span>${gearSum('ap')} (×${APM().toFixed(2)} weapon)</span></div><div class="stat-row"><b>Spell Power</b><span>${m}${isMagicWeapon()?' (×'+SPM().toFixed(2)+' spells)':''}</span></div>`);
-  const t=[CHOICE.temper&&('Tempered '+CHOICE.temper),CHOICE.attune&&('Attuned '+CHOICE.attune),SLOTS.some(sl=>isWoven(player.opts.equip[sl]))&&('Woven pieces worn '+SLOTS.filter(sl=>isWoven(player.opts.equip[sl])).length),SLOTS.some(sl=>isTempered(player.opts.equip[sl]))&&('Tempered pieces worn '+SLOTS.filter(sl=>isTempered(player.opts.equip[sl])).length),CHOICE.bless&&('Blessed '+CHOICE.bless)].filter(Boolean);
-  if(t.length) panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Training</b><span>${t.join(' · ')}</span></div>`);
-  if(bathBuffOn()){
-    const h=Math.max(0,(CHOICE.bathBuff-dayClock)/DAY_LEN*24); panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Refreshed</b><span>+10 max health · ${h>=1?Math.round(h)+' h':'under an hour'} left</span></div>`); }
+  const t=[SLOTS.some(sl=>isWoven(player.opts.equip[sl]))&&('Woven pieces worn '+SLOTS.filter(sl=>isWoven(player.opts.equip[sl])).length),SLOTS.some(sl=>isTempered(player.opts.equip[sl]))&&('Tempered pieces worn '+SLOTS.filter(sl=>isTempered(player.opts.equip[sl])).length)].filter(Boolean);
+  if(t.length) panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Special gear</b><span>${t.join(' · ')}</span></div>`);
 }
 const noteOverlay=document.getElementById('note-overlay');
 // ── talking to people ──
@@ -11378,6 +11400,7 @@ function dropTargetAt(px,py){
   if(!hit) return null;
   if(hit===dollCanvas) return dollCanvas;
   if(hit.closest && hit.closest('#inv-trash')) return document.getElementById('inv-trash');
+  if(hit.closest && hit.closest('.bslot')) return hit.closest('.bslot');
   return hit.closest ? hit.closest('#inv-overlay .slot') : null;
 }
 function onDragMove(e){ const was=invDrag&&invDrag.moved; dragItemMove(e);
@@ -11396,6 +11419,7 @@ function dragItemMove(e){
     document.querySelectorAll('#inv-overlay .slot[data-kind="eq"]').forEach(el=>{
       if(el.dataset.key===s && itemFits(invDrag.id,player.opts.gender)) el.classList.add('valid'); });
     if(invDrag.loc.kind==='inv' && itemFits(invDrag.id,player.opts.gender)) dollCanvas.classList.add('valid');
+    if(s==='food') document.querySelectorAll('#belt-grid .bslot').forEach(el=>el.classList.add('valid'));   // food can go on the fight belt
   }
   ghost.style.transform=`translate(${e.clientX-28}px,${e.clientY-28}px)`;
   const t=dropTargetAt(e.clientX,e.clientY);
@@ -11410,6 +11434,7 @@ function onDragUp(e){
     const t=dropTargetAt(e.clientX,e.clientY);
     if(t===dollCanvas){ if(invDrag.loc.kind==='inv') moveItem(invDrag.loc,{kind:'eq',key:ITEMS[invDrag.id].slot}); }
     else if(t && t.id==='inv-trash') askDiscard(invDrag.loc);
+    else if(t && t.classList.contains('bslot')) setBelt(+t.dataset.key,invDrag.id);
     else if(t) moveItem(invDrag.loc,slotLoc(t));
   }
   endDrag();
@@ -11417,7 +11442,7 @@ function onDragUp(e){
 function endDrag(){
   if(!invDrag) return;
   ghost.style.display='none';
-  document.querySelectorAll('#inv-overlay .slot').forEach(el=>el.classList.remove('valid','over','dragging')); const tr=document.getElementById('inv-trash'); if(tr) tr.classList.remove('over');
+  document.querySelectorAll('#inv-overlay .slot,#inv-overlay .bslot').forEach(el=>el.classList.remove('valid','over','dragging')); const tr=document.getElementById('inv-trash'); if(tr) tr.classList.remove('over');
   dollCanvas.classList.remove('valid');
   window.removeEventListener('pointermove',onDragMove);
   window.removeEventListener('pointerup',onDragUp);
@@ -16042,6 +16067,52 @@ Object.assign(ITEM_STATS,{ staff_hex:{...(ITEM_STATS.staff_hex||{}), mreg:2}, st
   grave_salt:{ magic:1, mreg:3 } });
 NECK_LOOKS.grave_salt={cord:'#2e2c34',w:0.5,p:'disc',col:'#8ad0c0'};
 LOOT_TIERS[1].push('mana_potion'); LOOT_TIERS[2].push('grave_salt','mana_potion');
+
+// ════════ The fight belt: which food and draughts sit on the bar in a fight (set in the inventory) ════════
+const BELT_N=5;
+function beltIds(){ if(Array.isArray(CHOICE.belt)) return CHOICE.belt.slice(0,BELT_N).concat(Array(BELT_N).fill(null)).slice(0,BELT_N);
+  return ['apple','bread','cooked_meat','potion',isMagicWeapon()?'mana_potion':null]; }            // until you set it yourself: the old bar
+function setBelt(i,id){ if(id && (!ITEMS[id] || ITEMS[id].slot!=='food')){ invMsg.textContent='Only food and draughts go on the fight belt.'; return; }
+  const B=beltIds(); if(id){ const k=B.indexOf(id); if(k>=0) B[k]=B[i]; } B[i]=id||null; CHOICE.belt=B;   // already on the belt: the two swap places
+  refreshBelt(); refreshFoodBar(); autosaveSoon(400); }
+function beltPick(i,el){ let m=document.getElementById('belt-pick');
+  if(!m){ m=document.createElement('div'); m.id='belt-pick'; document.body.appendChild(m); document.addEventListener('pointerdown',e=>{ if(!m.contains(e.target) && !e.target.closest('.bslot')) m.style.display='none'; }); }
+  const foods=Object.keys(ITEMS).filter(id=>ITEMS[id].slot==='food'), cur=beltIds()[i];
+  m.innerHTML=''; const add=(id,label,note)=>{ const b=document.createElement('button'); b.type='button';
+    if(id){ const cv=document.createElement('canvas'); cv.width=cv.height=40; cv.style.width=cv.style.height='20px'; drawItemIcon(cv.getContext('2d'),id,40); b.appendChild(cv); }
+    b.insertAdjacentHTML('beforeend',label+(note?'<small>'+note+'</small>':'')); b.addEventListener('click',()=>{ m.style.display='none'; setBelt(i,id); }); m.appendChild(b); };
+  foods.forEach(id=>{ const n=player.inv.filter(x=>x===id).length; add(id,ITEMS[id].name+(id===cur?' ✓':''),(ITEMS[id].mana?'+'+ITEMS[id].mana+' mana':'+'+ITEMS[id].heal+' HP')+' · '+n); });
+  if(cur) add(null,'Leave this slot empty','');
+  const r=el.getBoundingClientRect(); m.style.display='flex'; m.style.left=Math.min(innerWidth-m.offsetWidth-8,r.left)+'px'; m.style.top=Math.max(8,Math.min(innerHeight-m.offsetHeight-8,r.bottom+4))+'px'; }
+function buildBeltUI(){ if(document.getElementById('belt-box')) return;
+  const bag=document.querySelector('#inv-overlay .bag'); if(!bag) return;
+  const box=document.createElement('div'); box.id='belt-box'; box.innerHTML='<div class="menu-label" title="What you can eat or drink in a fight. Drag food here, or click a slot to choose.">Fight Belt</div><div id="belt-grid"></div>';
+  const fx=document.createElement('div'); fx.id='fx-box'; fx.innerHTML='<div class="menu-label">Effects</div><div id="fx-list"></div>';
+  const g=document.getElementById('inv-grid'); g.after(box); const sp=document.getElementById('stat-panel'); sp.after(fx);
+  const grid=box.querySelector('#belt-grid');
+  for(let i=0;i<BELT_N;i++){ const el=document.createElement('div'); el.className='bslot'; el.dataset.kind='belt'; el.dataset.key=i;
+    el.addEventListener('click',()=>beltPick(i,el)); grid.appendChild(el); } }
+function refreshBelt(){ buildBeltUI(); const B=beltIds();
+  document.querySelectorAll('#belt-grid .bslot').forEach((el,i)=>{ const id=B[i], n=id?player.inv.filter(x=>x===id).length:0, k=(id||'')+'|'+n;
+    if(el._k===k) return; el._k=k; el.innerHTML=''; el.classList.toggle('none',!!id && !n);
+    if(id){ const cv=document.createElement('canvas'); cv.width=cv.height=96; cv.style.width=cv.style.height='44px'; drawItemIcon(cv.getContext('2d'),id,96); el.appendChild(cv);
+      el.insertAdjacentHTML('beforeend','<span class="bn">'+n+'</span>'); el.title=ITEMS[id].name+' ('+(ITEMS[id].mana?'+'+ITEMS[id].mana+' mana':'+'+ITEMS[id].heal+' HP')+'), you carry '+n+'. Click to change.'; }
+    else { el.innerHTML='<span class="bplus">+</span>'; el.title='Empty. Drag food here, or click to choose.'; }
+    el.insertAdjacentHTML('beforeend','<span class="bk">'+(i+1)+'</span>'); }); }
+
+// ════════ Effects: every blessing, lesson and ailment on you, shown in the inventory ════════
+function activeEffects(){ const L=[], left=t=>{ const h=Math.max(0,(t-dayClock)/DAY_LEN*24); return h>=1?Math.round(h)+' h left':'under an hour left'; };
+  if(CHOICE.bruised) L.push({bad:1,ico:'✚',name:'Bruised',val:'health capped at half',tip:'You took a beating. Your health stays at half until you sleep, bathe, or eat a proper meal (roast meat or a healing draught).'});
+  if(bathBuffOn()) L.push({ico:'≈',name:'Refreshed',val:'+10 max health · '+left(CHOICE.bathBuff),tip:'A hot bath. +10 max health until it wears off.'});
+  if(CHOICE.moonBless) L.push({ico:'☾',name:'Moonlit Blessing',val:'+10 max health',tip:'The moon walked to the altar of the Drowned Shrine. Lasting.'});
+  if(CHOICE.bless) L.push({ico:'✝',name:"Mother Hild's Blessing",val:'rank '+CHOICE.bless+' · +'+CHOICE.bless*5+' max health',tip:'Bought at the chapel. Lasting.'});
+  const rk=renownRank(); if(rk>0) L.push({ico:'★',name:'Renown: '+RENOWN[rk],val:'+'+rk*4+' max health',tip:'What the valley thinks of you. Grows as you finish quests.'});
+  const ag=(CHOICE.brannTaught?1:0)+(CHOICE.brannTrap==='done'?1:0); if(ag) L.push({ico:'➶',name:"Brann's Lessons",val:'+'+ag+' agility',tip:'What the hunter taught you about moving quietly.'});
+  if(CHOICE.temper) L.push({ico:'⚒',name:'Trained at Arms',val:'+'+CHOICE.temper+' attack power',tip:'Lasting.'});
+  if(CHOICE.attune) L.push({ico:'✧',name:'Attuned',val:'+'+CHOICE.attune+' spell power',tip:'Lasting.'});
+  return L; }
+function refreshEffects(){ buildBeltUI(); const box=document.getElementById('fx-list'); if(!box) return; const L=activeEffects();
+  box.innerHTML=L.length ? L.map(e=>`<div class="fx${e.bad?' bad':''}" title="${e.tip.replace(/"/g,'&quot;')}"><span class="fi">${e.ico}</span><b>${e.name}</b><span class="v">${e.val}</span></div>`).join('') : '<span class="fx-none">Nothing on you right now.</span>'; }
 </script>
 </body>
 </html>

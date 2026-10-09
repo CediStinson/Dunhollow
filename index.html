@@ -12182,7 +12182,7 @@ function drawActor(e){
   const s=P(wx,wy), bob=e.moving?-Math.abs(Math.sin(gt*10))*2.5:0, B=s.y+bob;
   const open = !isP && e===combat.foe && (e.state==='recover'||e.state==='stagger') && combat.phase==='fight';
   g.save();
-  if(!isP && e.dead && e.type!=='skeleton' && e.type!=='cryptking'){      // topple over and stay down, instead of fading away
+  if(!isP && e.dead && e.type!=='skeleton'){      // topple over and stay down, instead of fading away
     const fallP=Math.min(1,(e.fallT||0)/0.55), ease=1-(1-fallP)*(1-fallP);
     const dir2=(e.id%2===0)?1:-1;
     g.translate(s.x,B); g.rotate(dir2*ease*(Math.PI/2)*0.94); g.translate(-s.x,-B);
@@ -12194,11 +12194,11 @@ function drawActor(e){
   if(e.type==='dummy') drawDummy(s.x,B,e);
   else if(e.type==='wolf') drawLitSprite(s.x,B,()=>drawWolf(s.x,B,e,e.dir||0,poseFor(e)),1.2);
   else if(e.type==='lurker') drawLurker(s.x,B,e,poseFor(e));
-  else if(e.type==='skeleton'||e.type==='cryptking') drawRisen(s.x,B,e,poseFor(e));
+  else if(e.type==='skeleton') drawRisen(s.x,B,e,poseFor(e));
   else drawLitSprite(s.x,B,()=>drawChar(g,s.x,B,e.opts,e.moving?Math.sin(gt*10)*5:0,e.dir||0,poseFor(e)));
   g.restore();
   if(!isP && e.dead) return;
-  const ty=B-(e.type==='wolf'?66:e.type==='cryptking'?156:114);
+  const ty=B-(e.type==='wolf'?66:114);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const deadly=!isP && e.type!=='dummy' && e.hostile!==false && player.maxHp>0 && ((e.maxHp||0)*(((weaponOf(e)||{}).dmg)||5)*tierDmg(e)) >= 2*player.maxHp*Math.max(8,playerHitDmg());   // far stronger than you: a skull
   const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  '+'◆'.repeat(e.tier) : ''), tw=g.measureText(label).width;
@@ -13491,9 +13491,7 @@ AREAS.barrow=CAVE('The Drowned Barrow',10,9,()=>{ const l=[{type:'teleporter', i
     {type:'rune', i:0, j:4, text:"Old letters cut deep into the wet stone: <i>“Bertil, last king of the hollow, and his household. The water took the land. Let the water keep us.”</i>"}];
   if(CHOICE.barrow==='done' && !destroyedBreakables.has('barrow:5,1')) l.push({type:'crate', i:5, j:1, breakable:true, rich:true});
   return l; }, { entries:{ fromLow:{i:4,j:7} },
-  mobs:()=> CHOICE.barrow==='done' ? [] : [ { name:'The Barrow-King', type:'brute', i:4, j:3, faction:'wight', opts:{gender:'m',skin:0,hair:4,hairColor:13,beard:5,face:0,ghost:true,equip:{head:'helm_full',torso:'tunic_red',armor:'blackmail',hands:'gauntlets',legs:'trousers',feet:'plate_boots',weapon:'longsword',offhand:'shield_iron'}} },
-      { name:'Drowned Housecarl', type:'bandit', i:2, j:4, faction:'wight', opts:{gender:'m',skin:0,hair:1,hairColor:13,beard:3,face:1,ghost:true,equip:{head:'kettle',torso:'shirt',armor:'mail',hands:null,legs:'trousers',feet:null,weapon:'spear',offhand:null}} },
-      { name:'Drowned Shieldmaid', type:'bandit', i:7, j:4, faction:'wight', opts:{gender:'f',skin:0,hair:5,hairColor:13,beard:0,face:2,ghost:true,equip:{head:null,torso:'shirt',armor:'gambeson',hands:null,legs:'trousers',feet:null,weapon:'sword',offhand:'shield'}} } ] });
+  mobs:()=> CHOICE.barrow==='done' ? [] : [ { name:'The Barrow-King', type:'barrowking', i:4, j:3, faction:'wight', opts:{gender:'m',skin:0,hair:4,hairColor:13,beard:5,face:0,ghost:true,equip:{head:'helm_full',torso:'tunic_red',armor:'blackmail',hands:'gauntlets',legs:'trousers',feet:'plate_boots',weapon:'longsword',offhand:'shield_iron'}} } ] });
 wrap('stones','objects',l=>[...l,{type:'teleporter', i:1, j:0, to:'fenpath', entry:'fromStones'}]);
 AREAS.stones.entries.fromFen={i:1,j:1};
 AREA_PATHS.fenpath=[ [[1.5,19.5],[1.8,15],[2.4,10],[2.6,6.5],[3.8,4.6],[5.5,4.5]] ];
@@ -14304,7 +14302,6 @@ const RISEN_ARMS=['dagger','club','hatchet','sword','axe','mace','spear','mornin
 const RISEN=name=>{ const day=Math.floor(dayClock/DAY_LEN), h=[...(name||'')].reduce((a,ch)=>a*31+ch.charCodeAt(0)|0,7);        // whatever they were buried with: a different one each day
   return {gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:RISEN_ARMS[hsh(day+3,h)%RISEN_ARMS.length],offhand:null}}; };
 function drawRisen(x,B,e,pose){
-  if(e.type==='cryptking'){ drawCryptKing(x,B,e,pose); return; }
   if(e.dead){ const t=e.fallT||0; drawSkelFig(x,B,{asm:Math.max(0.25,1-t*1.4), emerge:1, dir:e.dir||0, weapon:e.opts.equip.weapon}); return; }      // it comes apart and lies there in a heap
   const k=pose&&pose.kind==='raise'?-0.45*Math.min(1,pose.t):pose&&pose.kind==='strike'?Math.max(0,1-Math.min(1,pose.t)*0.6):0;
   drawSkelFig(x,B,{asm:1, stand:true, dir:e.dir||0, moving:!!e.moving, walk:gt*9+(e.id||0), k, weapon:e.opts.equip.weapon}); }
@@ -15393,18 +15390,9 @@ LOOT_TIERS[0].push('bone_charm','copper_chain'); LOOT_TIERS[1].push('glass_beads
         {label:'Something else.', fn:oldBr}, bye]); return; }
     if(W!=='done' && fangs>0 && !CHOICE.wolfNeckHint){ CHOICE.wolfNeckHint=true; say('Brann the Hunter',["“Wolf tooth?” He weighs it. “Bring me three and I'll string you a necklace. Hunters wear them for luck. It isn't luck. It's knowing you can.”"],[{label:'Something else.',fn:oldBr},bye]); return; }
     return oldBr(); }; }
-// ════════════════════════════════════════════════════════════════════════════
-//  THE OLD CRYPT under Dunhollow's graveyard, and the Crypt King who will not lie down
-//    CHOICE.crypt : null → 'open' (Tobb gave you the key) → 'done' (the king is dust)
-//  The fight: three phases, and between them the duel breaks off and you have to move.
-//    1 → at two thirds: SOUL STORM. He draws the dead's breath and blasts the hall twice; only a pillar's shadow is safe.
-//    2 → at one third: GRAVE-FIRE. The floor runes flare in waves; step off the marked stones. Then two Crypt Guards rise
-//        and he stands warded until they fall.
-//    3 → enraged: faster, and every blow he lands feeds him.
-// ════════════════════════════════════════════════════════════════════════════
-AREAS.graveyard.entries.fromCrypt={i:1,j:3};
+// ── the old crypt at the back of Dunhollow's graveyard: sealed, for now ──
 wrap('graveyard','objects',l=>[...l,{type:'crypt', i:0, j:0, fp:[3,2]},
-  {type:'teleporter', i:1, j:2, to:'crypt', entry:'fromGraves', locked:()=>!CHOICE.crypt, onLocked:()=>setTimeout(()=>say('The Old Crypt',["An iron gate, rusted shut and chained twice over. Beyond it, steps go down into the dark.","The padlock is newer than the chain. Somebody here keeps the key."],[bye]),200)}]);
+  {type:'teleporter', i:1, j:2, to:'graveyard', entry:'fromVillage', locked:()=>true, onLocked:()=>setTimeout(()=>say('The Old Crypt',["An iron gate, rusted shut and chained twice over. Beyond it, steps go down into the dark.","Cold air breathes up through the bars. Whatever is down there, it is not for today."],[bye]),200)}]);
 function paintCrypt(o){
   const L=P(o.i,o.j+2), F=P(o.i+3,o.j+2), R=P(o.i+3,o.j), H=92, RH=46, up=(p,h)=>({x:p.x,y:p.y-h});
   const q=(t,h)=>({x:L.x+(F.x-L.x)*t,y:L.y+(F.y-L.y)*t-h}), r=(t,h)=>({x:F.x+(R.x-F.x)*t,y:F.y+(R.y-F.y)*t-h});
@@ -15425,97 +15413,48 @@ function paintCrypt(o){
   { const c=r(0.5,H+5+RH*0.36); g.strokeStyle='#4a463e'; g.lineWidth=2; g.beginPath(); g.arc(c.x,c.y,7,0,Math.PI*2); g.stroke();   // a carved wreath and skull
     g.fillStyle='#c8c2b0'; g.beginPath(); g.arc(c.x,c.y-1,3.4,0,Math.PI*2); g.fill(); g.fillRect(c.x-2,c.y+1,4,3); g.fillStyle='#3a3630'; g.fillRect(c.x-2,c.y-2,1.4,1.4); g.fillRect(c.x+0.6,c.y-2,1.4,1.4); }
   g.fillStyle='#e8e2d0'; const ct=up(RR,6); g.fillRect(ct.x-1.2,ct.y-10,2.4,12); g.fillRect(ct.x-4.5,ct.y-6.5,9,2.4);   // a stone cross on the ridge
-  // the door: a deep arch, an iron gate
-  const d0=q(0.39,8), d1=q(0.61,8), d2=q(0.61,62), d3=q(0.39,62), top=q(0.5,74);
+  const d0=q(0.39,8), d1=q(0.61,8), d2=q(0.61,62), d3=q(0.39,62), top=q(0.5,74);                                  // the door: a deep arch, a chained iron gate
   g.beginPath(); g.moveTo(d0.x,d0.y); g.lineTo(d1.x,d1.y); g.lineTo(d2.x,d2.y); g.quadraticCurveTo(top.x+6,top.y-2,d3.x,d3.y); g.closePath(); g.fillStyle='#120e0c'; g.fill(); g.strokeStyle='#4a463e'; g.lineWidth=3; g.stroke();
-  const open=!!CHOICE.crypt;
-  g.strokeStyle=open?'rgba(60,56,52,0.9)':'#2e2a28'; g.lineWidth=1.6;
-  for(let t=0.41;t<0.6;t+=0.035){ const a=q(open?0.39+(t-0.39)*0.25:t,10), b=q(open?0.39+(t-0.39)*0.25:t,60); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); }   // swung open against the jamb, once you have the key
-  if(!open){ const c=q(0.5,32); g.strokeStyle='#6a625a'; g.lineWidth=1.4; g.beginPath(); g.moveTo(c.x-10,c.y-6); g.lineTo(c.x+10,c.y+6); g.moveTo(c.x-10,c.y+6); g.lineTo(c.x+10,c.y-6); g.stroke(); g.fillStyle='#8a7a50'; g.fillRect(c.x-2.5,c.y-1,5,6); }   // chains and a padlock
-  else { const gl=g.createRadialGradient(q(0.5,30).x,q(0.5,30).y,1,q(0.5,30).x,q(0.5,30).y,22); gl.addColorStop(0,'rgba(140,200,150,0.25)'); gl.addColorStop(1,'rgba(140,200,150,0)'); g.fillStyle=gl; g.fillRect(q(0.5,30).x-24,q(0.5,30).y-24,48,48); }
+  g.strokeStyle='#2e2a28'; g.lineWidth=1.6; for(let t=0.41;t<0.6;t+=0.035){ const a=q(t,10), b=q(t,60); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); }
+  { const c=q(0.5,32); g.strokeStyle='#6a625a'; g.lineWidth=1.4; g.beginPath(); g.moveTo(c.x-10,c.y-6); g.lineTo(c.x+10,c.y+6); g.moveTo(c.x-10,c.y+6); g.lineTo(c.x+10,c.y-6); g.stroke(); g.fillStyle='#8a7a50'; g.fillRect(c.x-2.5,c.y-1,5,6); }
   [q(0.33,8),q(0.67,8)].forEach(p=>{ g.fillStyle='#6a665c'; g.fillRect(p.x-4,p.y-14,8,14); g.fillStyle='#8a867c'; g.fillRect(p.x-5,p.y-16,10,3); });   // two stone urns
   g.fillStyle='rgba(70,100,50,0.45)'; [[0.05,12],[0.82,20],[0.93,70]].forEach(([t,h])=>{ const p=q(t,h); g.beginPath(); g.ellipse(p.x,p.y,9,4,0.3,0,Math.PI*2); g.fill(); });   // moss
 }
-function paintSarcophagus(o){
-  const a=P(o.i+0.1,o.j+0.15), b=P(o.i+0.9,o.j+0.15), c=P(o.i+0.9,o.j+0.85), d=P(o.i+0.1,o.j+0.85), h=24;
-  const poly=(pts,fill,stroke)=>{ g.beginPath(); pts.forEach((p,k)=>k?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); g.fillStyle=fill; g.fill(); if(stroke){ g.strokeStyle=stroke; g.lineWidth=1; g.stroke(); } };
-  const U=(p,k)=>({x:p.x,y:p.y-k});
-  g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(c.x,c.y-2,34,12,0,0,Math.PI*2); g.fill();
-  poly([d,c,U(c,h),U(d,h)],'#7a766c','#3a3630'); poly([c,b,U(b,h),U(c,h)],'#5e5a52','#3a3630');
-  poly([U(a,h+4),U(b,h+4),U(c,h+4),U(d,h+4)],'#9a968a','#3a3630'); poly([U(d,h),U(c,h),U(c,h+4),U(d,h+4)],'#8a867c');
-  const m=t=>({x:U(a,h+5).x+(U(c,h+5).x-U(a,h+5).x)*t, y:U(a,h+5).y+(U(c,h+5).y-U(a,h+5).y)*t});   // a stone effigy on the lid, feet toward you
-  g.fillStyle='#b4b0a2'; const hd=m(0.2); g.beginPath(); g.ellipse(hd.x,hd.y,5,3.4,0,0,Math.PI*2); g.fill();
-  const b0=m(0.32), b1=m(0.85); g.strokeStyle='#b4b0a2'; g.lineCap='round'; g.lineWidth=8; g.beginPath(); g.moveTo(b0.x,b0.y); g.lineTo(b1.x,b1.y); g.stroke(); g.lineCap='butt';
-  g.strokeStyle='#6a665c'; g.lineWidth=1; const hn=m(0.5); g.beginPath(); g.moveTo(hn.x-4,hn.y-1); g.lineTo(hn.x+4,hn.y+1); g.stroke();   // hands folded on a sword
-  if(o.open){ poly([U(a,h+4),U(b,h+4),U(c,h+4),U(d,h+4)],'#1a1614'); }
-}
-{ const oDO=drawObject; drawObject=function(o){ if(o.type==='crypt') return paintCrypt(o); if(o.type==='sarcophagus') return paintSarcophagus(o); return oDO(o); }; }
+{ const oDO=drawObject; drawObject=function(o){ if(o.type==='crypt') return paintCrypt(o); return oDO(o); }; }
 
-// the hall: sarcophagi down both walls, the dead who climbed out of them, a stair further down choked with rubble (for another day)
-const CRYPT_BONES=[['Crypt Bones',2,9],['Grinning Bones',4,6],['Hollow-Eyed Bones',2,3]];
-AREAS.crypt=CAVE('The Old Crypt',7,14,()=>{ const l=[{type:'teleporter', i:3, j:13, to:'graveyard', entry:'fromCrypt'}, {type:'teleporter', i:3, j:0, to:'cryptking', entry:'fromCrypt'},
-    ...[2,5,8,11].flatMap(j=>[{type:'sarcophagus', i:0, j, open:j%2===0},{type:'sarcophagus', i:6, j, open:j===5}]),
-    ...[[1,1],[5,1],[1,12],[5,12]].map(([i,j])=>({type:'pillar', i, j})),
-    {type:'lantern', i:1, j:7}, {type:'lantern', i:5, j:4}, {type:'lantern', i:5, j:10},
-    {type:'bones', i:4, j:9, noblock:true}, {type:'bones', i:2, j:5, noblock:true}, {type:'bones', i:3, j:2, noblock:true},
-    {type:'boulder', i:6, j:0, v:1}, {type:'boulder', i:0, j:0, v:2},
-    {type:'rune', i:0, j:6, text:"Cut into the lid, worn almost smooth: <i>“Here lie the lords of Ashdown, who held this valley before it had a name. Wake them not.”</i>"},
-    {type:'rune', i:6, j:6, text:"A side-stair goes down into the dark, choked with fallen stone. Cold air breathes up through the cracks, and far below, water drips. <i>Not today.</i>"}];
-  if(CHOICE.crypt==='done' && !destroyedBreakables.has('crypt:1,8')) l.push({type:'crate', i:1, j:8, breakable:true, rich:true});
-  return l; }, { entries:{ fromGraves:{i:3,j:12}, fromKing:{i:3,j:1} },
-  mobs:()=> CRYPT_BONES.map(([n,i,j],k)=>({ name:n, type:'skeleton', i, j, faction:'cryptbones', opts:RISEN(n) })) });
-// the king's hall: four pillars, his tomb at the head of it
-AREAS.cryptking=CAVE("The Crypt King's Hall",11,11,()=>{ const l=[{type:'teleporter', i:5, j:10, to:'crypt', entry:'fromKing'},
-    ...[[3,3],[7,3],[3,7],[7,7]].map(([i,j])=>({type:'pillar', i, j})),
-    {type:'sarcophagus', i:5, j:0, open:true}, {type:'lantern', i:2, j:0}, {type:'lantern', i:8, j:0}, {type:'lantern', i:0, j:9}, {type:'lantern', i:10, j:9},
-    {type:'bones', i:1, j:4, noblock:true}, {type:'bones', i:9, j:6, noblock:true}, {type:'bones', i:6, j:8, noblock:true}];
-  if(CHOICE.crypt==='done' && !destroyedBreakables.has('cryptking:4,0')) l.push({type:'crate', i:4, j:0, breakable:true, rich:true});
-  return l; }, { entries:{ fromCrypt:{i:5,j:9} },
-  mobs:()=> CHOICE.crypt==='done' ? [] : [{ name:'The Crypt King', type:'cryptking', i:5, j:2, faction:'cryptking',
-    opts:{gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:'longsword',offhand:null}} }] });
-FOES.cryptking={ label:'Crypt King', base:150, stagger:0.9, pattern:[
+// ════════════════════════════════════════════════════════════════════════════
+//  THE BARROW-KING: Bertil, last king of the hollow, and he fights like one
+//  Three phases; between them the duel breaks off and you have to move.
+//    1 → at two thirds: THE DROWNING WAIL. He roars the barrow full of black water, twice, from two places;
+//        only the lee of a standing stone is safe (shown on the floor).
+//    2 → at one third: BOG-FIRE. Marsh-gas kindles under the stones in four quickening waves; step off the marked ones.
+//        Then his housecarl and shieldmaid rise, and he stands warded until they fall.
+//    3 → enraged: faster, and every blow he lands feeds him.
+// ════════════════════════════════════════════════════════════════════════════
+FOES.barrowking={ label:'Barrow-King', base:95, stagger:0.9, pattern:[
   {wait:1.3, wind:1.15, after:0.60, dir:'right'}, {wait:0.5, wind:0.60, after:0.35, dir:'left'}, {wait:0.0, wind:0.55, after:0.65, dir:'up'},
   {wait:1.6, wind:1.40, after:0.80, dir:'left'}, {wait:0.9, wind:0.85, after:0.55, dir:'right'} ]};
-const CK_PAT1=FOES.cryptking.pattern, CK_PAT3=[
+const BK_PAT1=FOES.barrowking.pattern, BK_PAT3=[
   {wait:0.8, wind:0.80, after:0.45, dir:'up'}, {wait:0.3, wind:0.55, after:0.30, dir:'right'}, {wait:0.0, wind:0.50, after:0.30, dir:'left'}, {wait:0.0, wind:0.50, after:0.60, dir:'right'},
   {wait:1.0, wind:1.05, after:0.50, dir:'left'}, {wait:0.6, wind:0.70, after:0.45, dir:'up'} ];
-function drawCryptKing(x,B,e,pose){
-  const k=pose&&pose.kind==='raise'?-0.45*Math.min(1,pose.t):pose&&pose.kind==='strike'?Math.max(0,1-Math.min(1,pose.t)*0.6):0, S=1.38, d=e.dir||0, fr=dirView(d)<=2 || dirView(d)===2;
-  g.save(); g.translate(x,B); g.scale(S,S); g.translate(-x,-B);
-  const cape=(front)=>{ g.fillStyle=front?'rgba(48,20,52,0.95)':'#2a1230'; g.beginPath(); g.moveTo(x-11,B-66); g.quadraticCurveTo(x-17,B-30,x-14,B-4);
-    for(let t=0;t<=1;t+=0.125) g.lineTo(x-14+28*t,B-4+(Math.floor(t*8)%2?-5:0)); g.quadraticCurveTo(x+17,B-30,x+11,B-66); g.closePath(); g.fill(); g.strokeStyle='#120814'; g.lineWidth=0.8; g.stroke(); };
-  const back=dirView(d)>=3;
-  if(!back && !e.dead) cape(false);                                                 // the cape hangs behind him
-  if(e.dead){ const t=e.fallT||0; drawSkelFig(x,B,{asm:Math.max(0.25,1-t*1.4), emerge:1, dir:d, weapon:e.opts.equip.weapon}); }
-  else drawSkelFig(x,B,{asm:1, stand:true, dir:d, moving:!!e.moving, walk:gt*7, k, weapon:e.opts.equip.weapon});
-  if(back && !e.dead) cape(true);
-  if(!e.dead){ const cx=x+(dirView(d)===2?(dirMirrored(d)?-1.5:1.5):0), cy=B-89.5;                          // an iron crown, gold gone green
-    g.fillStyle='#6a7a52'; g.beginPath(); g.moveTo(cx-7,cy+3); for(let n=0;n<=4;n++){ const px=cx-7+n*3.5; g.lineTo(px,cy+(n%2?-1:-5.5)); g.lineTo(px+1.75,cy+1); } g.lineTo(cx+7,cy+3); g.closePath(); g.fill();
-    g.strokeStyle='#2e3626'; g.lineWidth=0.6; g.stroke(); g.fillStyle='#b8a050'; g.fillRect(cx-7,cy+1,14,2); g.fillStyle='#8a2a2a'; g.beginPath(); g.arc(cx,cy+2,0.9,0,Math.PI*2); g.fill();
-    g.fillStyle='rgba(48,20,52,0.95)'; g.beginPath(); g.ellipse(x,B-64,12,4,0,0,Math.PI*2); g.fill();          // the cape's collar over the shoulders
-    g.fillStyle='#b8a050'; g.beginPath(); g.arc(x,B-63,1.4,0,Math.PI*2); g.fill(); }
-  g.restore();
-  if(e.warded){ const s=P(e.x,e.y); g.save(); g.globalCompositeOperation='lighter'; glow(s.x,s.y-70,62,96,'150,110,230',0.45+Math.sin(gt*5)*0.08); g.restore();
-    g.strokeStyle=`rgba(190,160,255,${0.55+Math.sin(gt*5)*0.2})`; g.lineWidth=2; g.beginPath(); g.ellipse(s.x,s.y-66,40,74,0,0,Math.PI*2); g.stroke(); }
-}
-
-// ── the set pieces between duels ──
-let CK=null;                                         // {mode:'storm'|'rings'|'wait', ...}
+const BK_AREA='barrow', BK_HOME=[4,2], BK_SPOTS=[[4,2],[4,6],[2,4],[7,4]];
+const BK_HOUSE=[['Drowned Housecarl',2,4,()=>({gender:'m',skin:0,hair:1,hairColor:13,beard:3,face:1,ghost:true,equip:{head:'kettle',torso:'shirt',armor:'mail',hands:null,legs:'trousers',feet:null,weapon:'spear',offhand:null}})],['Drowned Shieldmaid',7,4,()=>({gender:'f',skin:0,hair:5,hairColor:13,beard:0,face:2,ghost:true,equip:{head:null,torso:'shirt',armor:'gambeson',hands:null,legs:'trousers',feet:null,weapon:'sword',offhand:'shield'}})]];
+let CK=null;                                         // the set piece in progress: {mode:'storm'|'rings'|'adds'|'wait', ...}
 const ckTh=K=>{ const ph=K.cphase||1; return ph>=3 ? 0 : Math.floor(K.maxHp*(ph===1?0.66:0.33)); };   // where each phase ends
-const ckKing=()=>mobs.find(m=>m.type==='cryptking' && !m.dead);
-const ckPillars=()=>OBJECTS.filter(o=>o.type==='pillar' && !o.broken).map(o=>[o.i+0.5,o.j+0.5]);
-function ckSheltered(src,px,py){ const pil=ckPillars(), dx=px-src[0], dy=py-src[1], L=Math.hypot(dx,dy); if(L<0.6) return false;
+const ckKing=()=>mobs.find(m=>m.type==='barrowking' && !m.dead);
+const ckStones=()=>OBJECTS.filter(o=>['pillar','menhir','ruin'].includes(o.type)).map(o=>[o.i+0.5,o.j+0.5]);
+function ckSheltered(src,px,py){ const pil=ckStones(), dx=px-src[0], dy=py-src[1], L=Math.hypot(dx,dy); if(L<0.6) return false;
   for(let t=0.04;t<1;t+=0.02){ const x=src[0]+dx*t, y=src[1]+dy*t; if(pil.some(([a,b])=>Math.hypot(x-a,y-b)<0.46)) return true; } return false; }
 function ckBreakDuel(K){ combat.active=false; combat.phase='idle'; combat.foe=null; duel.st='ready'; duelHud.classList.remove('open'); document.getElementById('hint').style.display='';
   K.hostile=false; K.state='guard'; K.path=[]; K.moving=false; }
-function ckPlace(K,i,j){ for(let n=0;n<10;n++) sparks.push({wx:K.x,wy:K.y,vx:(Math.random()-0.5)*160,vy:-40-Math.random()*90,t:0,col:'#b090e0'});
-  K.i=i; K.j=j; K.x=i+0.5; K.y=j+0.5; K.dir=dirTo([i,j],tileOf(player)); for(let n=0;n<14;n++) sparks.push({wx:K.x,wy:K.y,vx:(Math.random()-0.5)*160,vy:-40-Math.random()*90,t:0,col:'#d0b8ff'}); }
-function ckResume(K,msg){ CK=null; K.hostile=true; K.warded=false; if(msg) banner(msg,'#d8c0ff',1600); setTimeout(()=>{ if(areaId==='cryptking' && !K.dead && player.hp>0) startCombat(); },700); }
-function ckStorm(K){ ckBreakDuel(K); ckPlace(K,5,1);
-  banner('Soul Storm! Hide behind a pillar!','#b8a0ff',2200); logMsg('The Crypt King breathes in, and every grave in the hall breathes out. Get a pillar between you and him!','#b8a0ff');
-  CK={mode:'storm', src:[5.5,1.5], t:5, blasts:0}; }
-function ckRings(K){ ckBreakDuel(K); ckPlace(K,5,1);
-  banner('Grave-fire! Step off the marked stones!','#9ae0a0',2200); logMsg('Runes kindle in the floor, one ring after another. Keep moving!','#9ae0a0');
+function ckPlace(K,i,j){ for(let n=0;n<10;n++) sparks.push({wx:K.x,wy:K.y,vx:(Math.random()-0.5)*160,vy:-40-Math.random()*90,t:0,col:'#8ab8c8'});
+  K.i=i; K.j=j; K.x=i+0.5; K.y=j+0.5; K.dir=dirTo([i,j],tileOf(player)); for(let n=0;n<14;n++) sparks.push({wx:K.x,wy:K.y,vx:(Math.random()-0.5)*160,vy:-40-Math.random()*90,t:0,col:'#b8e0f0'}); }
+function ckResume(K,msg){ CK=null; K.hostile=true; K.warded=false; if(msg) banner(msg,'#c8e0f0',1600); setTimeout(()=>{ if(areaId===BK_AREA && !K.dead && player.hp>0) startCombat(); },700); }
+function ckStorm(K){ ckBreakDuel(K); ckPlace(K,BK_HOME[0],BK_HOME[1]);
+  banner('The Drowning Wail! Hide behind a standing stone!','#9ad0e8',2200); logMsg('The Barrow-King opens his mouth, and the roar of black water fills the barrow. Get a standing stone between you and him!','#9ad0e8');
+  CK={mode:'storm', src:[BK_HOME[0]+0.5,BK_HOME[1]+0.5], t:5, blasts:0}; }
+function ckRings(K){ ckBreakDuel(K); ckPlace(K,BK_HOME[0],BK_HOME[1]);
+  banner('Bog-fire! Step off the marked stones!','#9ae0a0',2200); logMsg('Marsh-gas seeps up between the stones and kindles, one ring after another. Keep moving!','#9ae0a0');
   CK={mode:'rings', wave:0, t:0.8, tiles:null, tele:0}; }
 function ckRingTiles(K){ const A=AREAS[areaId], out=[], pi=Math.floor(player.x), pj=Math.floor(player.y);
   for(let i=0;i<A.w;i++) for(let j=0;j<A.h;j++){ if(blocked.has(i+','+j) || (i===K.i&&j===K.j)) continue; if(Math.random()<0.42) out.push(i+','+j); }
@@ -15526,82 +15465,71 @@ function ckRingTiles(K){ const A=AREAS[areaId], out=[], pi=Math.floor(player.x),
 function ckHurt(n,label){ player.hp-=n; player.flash=0.45; shake=Math.max(shake,9); floatText(tileOf(player),'-'+n,'#ff7a6a',true); if(label) floatText([player.i,player.j-0.001],label,'#f0c0a0'); updateHud();
   if(player.hp<=0){ CK=null; defeat(); } }
 function ckTick(dt){
-  const K=ckKing(); if(!K || areaId!=='cryptking'){ CK=null; return; }
+  const K=ckKing(); if(!K || areaId!==BK_AREA){ CK=null; return; }
   if(!CK){ // phase thresholds, from blows and from bleeding alike
-    if(K.cphase===undefined){ K.cphase=1; FOES.cryptking.pattern=CK_PAT1; }
+    if(K.cphase===undefined){ K.cphase=1; FOES.barrowking.pattern=BK_PAT1; }
     const th=ckTh(K);
     if(th && K.hp<=th && combat.phase!=='down'){ K.hp=th; K.cphase++; if(K.cphase===2) ckStorm(K); else ckRings(K); }
     return; }
   if(combat.phase==='down'){ CK=null; return; }
   if(CK.mode==='storm'){ CK.t-=dt; K.dir=dirTo(tileOf(K),tileOf(player));
     if(CK.t<=0){ const safe=ckSheltered(CK.src,player.x,player.y); CK.flash=0.5; CK.blasts++;
-      if(safe){ floatText(tileOf(player),'Sheltered','#c8d8ff',true); logMsg('The storm howls past the pillar and breaks on the far wall.','#c8d8ff'); }
-      else ckHurt(Math.max(18,Math.round(player.maxHp*0.42)),'Soul Storm!');
+      if(safe){ floatText(tileOf(player),'Sheltered','#c8e8ff',true); logMsg('The wave breaks on the standing stone and pours past you on both sides.','#c8e8ff'); }
+      else ckHurt(Math.max(18,Math.round(player.maxHp*0.42)),'Drowning Wail!');
       if(!CK) return;
-      if(CK.blasts>=2){ const k0=K; setTimeout(()=>ckResume(k0,'The Crypt King comes for you!'),700); CK={mode:'wait'}; return; }
-      const spots=[[5,1],[1,5],[9,5],[5,9]].filter(([a,b])=>!ckSheltered([a+0.5,b+0.5],player.x,player.y) && Math.hypot(a+0.5-player.x,b+0.5-player.y)>2);   // somewhere your pillar does not cover
-      const sp=spots.length?spots[Math.floor(Math.random()*spots.length)]:[1,5];
-      setTimeout(()=>{ if(CK && CK.mode==='storm'){ ckPlace(K,sp[0],sp[1]); CK.src=[sp[0]+0.5,sp[1]+0.5]; CK.t=4.2; banner('Again! Find another pillar!','#b8a0ff',1500); } },600); CK.t=99; }
+      if(CK.blasts>=2){ const k0=K; setTimeout(()=>ckResume(k0,'The Barrow-King comes for you!'),700); CK={mode:'wait'}; return; }
+      const spots=BK_SPOTS.filter(([a,b])=>!ckSheltered([a+0.5,b+0.5],player.x,player.y) && Math.hypot(a+0.5-player.x,b+0.5-player.y)>2);   // somewhere your stone does not cover
+      const sp=spots.length?spots[Math.floor(Math.random()*spots.length)]:BK_SPOTS[1];
+      setTimeout(()=>{ if(CK && CK.mode==='storm'){ ckPlace(K,sp[0],sp[1]); CK.src=[sp[0]+0.5,sp[1]+0.5]; CK.t=4.2; banner('Again! Find another stone!','#9ad0e8',1500); } },600); CK.t=99; }
     if(CK && CK.flash) CK.flash=Math.max(0,CK.flash-dt); return; }
   if(CK.mode==='rings'){ CK.t-=dt; K.dir=dirTo(tileOf(K),tileOf(player));
     if(CK.burst) CK.burst=Math.max(0,CK.burst-dt);
     if(!CK.tiles && CK.t<=0){ if(CK.wave>=4){ ckAdds(K); return; } CK.tiles=ckRingTiles(K); CK.tele=CK.t=[1.7,1.45,1.25,1.1][CK.wave]; return; }
     if(CK.tiles && CK.t<=0){ const here=Math.floor(player.x)+','+Math.floor(player.y), hit=CK.tiles.includes(here);
       CK.burstTiles=CK.tiles; CK.burst=0.45; CK.tiles=null; CK.wave++; CK.t=0.55;
-      if(hit) ckHurt(Math.max(8,Math.round(player.maxHp*0.16)),'Grave-fire!'); }
+      if(hit) ckHurt(Math.max(8,Math.round(player.maxHp*0.16)),'Bog-fire!'); }
     return; }
 }
 function ckAdds(K){ CK={mode:'adds'}; K.warded=true;
-  banner('The Crypt King calls his guard!','#d8c0ff',2000); logMsg('He raises his sword, and two of his old housecarls climb out of the floor. A ward of cold light closes round him: cut them down first.','#d8c0ff');
-  [[2,5],[8,5]].forEach(([i,j],k)=>{ const n=k?'Crypt Guard of the Right':'Crypt Guard of the Left', o=RISEN(n); o.equip.weapon=k?'mace':'sword';
-    const hp=maxHpOf(o.equip,FOES.skeleton.base)+12;
-    mobs.push({ id:200+k, key:n+'@'+dayClock.toFixed(0), name:n, type:'skeleton', opts:o, faction:'cryptguard', spawn:[i,j], i, j, x:i+0.5, y:j+0.5, dir:k?6:1, hp, maxHp:hp, path:[], moving:false, dead:false, gone:false, fade:1, flash:0, lunge:null,
-      state:'guard', t:0, k:0, wind:1, quick:false, guardDir:'up', ox:0, oy:0, hostile:true, fallT:0, emergeT:0 }); });
-  setTimeout(()=>{ if(areaId==='cryptking' && player.hp>0) startCombat(); },1200); }
+  banner('His household rises!','#c8e0f0',2000); logMsg('The Barrow-King lifts his sword, and his housecarl and shieldmaid climb out of the black water. A ward of cold light closes round him: cut them down first.','#c8e0f0');
+  BK_HOUSE.forEach(([n,i,j,o],k)=>{ const op=o(), hp=maxHpOf(op.equip,FOES.bandit.base)+8;
+    mobs.push({ id:200+k, key:n+'@'+dayClock.toFixed(0), name:n, type:'bandit', opts:op, faction:'wightguard', spawn:[i,j], i, j, x:i+0.5, y:j+0.5, dir:k?6:1, hp, maxHp:hp, path:[], moving:false, dead:false, gone:false, fade:1, flash:0, lunge:null,
+      state:'guard', t:0, k:0, wind:1, quick:false, guardDir:'up', ox:0, oy:0, hostile:true, fallT:0 }); });
+  setTimeout(()=>{ if(areaId===BK_AREA && player.hp>0) startCombat(); },1200); }
 { const oV=victory; victory=function(faction,...r){
-    if(faction==='cryptguard'){ combat.active=false; combat.phase='idle'; combat.foe=null; duelHud.classList.remove('open'); document.getElementById('hint').style.display='';
-      const K=ckKing(); if(K){ K.warded=false; FOES.cryptking.pattern=CK_PAT3; logMsg('The ward breaks like ice. The Crypt King howls, and comes for you faster than anything dead should move.','#ff9a80'); ckResume(K,'The Crypt King is enraged!'); }
+    if(faction==='wightguard'){ combat.active=false; combat.phase='idle'; combat.foe=null; duelHud.classList.remove('open'); document.getElementById('hint').style.display='';
+      const K=ckKing(); if(K){ K.warded=false; FOES.barrowking.pattern=BK_PAT3; logMsg('The ward breaks like ice on the fen. The Barrow-King howls, and comes for you faster than anything drowned should move.','#ff9a80'); ckResume(K,'The Barrow-King is enraged!'); }
       return; }
-    const res=oV(faction,...r);
-    if(faction==='cryptking'){ CK=null; CHOICE.crypt='done'; FOES.cryptking.pattern=CK_PAT1; player.purse+=45; updateHud(); giveQuestItem('king_chain',true); giveQuestItem('potion',true);
-      banner('The Crypt King is dust','#e8d8a8',2400); logMsg('The crown rolls across the floor and stops. Whatever held him together lets go all at once. Around his neck: a chain of old gold. In the tomb: 45 copper and a healing draught.','#e8c060');
-      if(typeof saveGame==='function') saveGame(); }
-    return res; }; }
+    if(faction==='wight'){ CK=null; FOES.barrowking.pattern=BK_PAT1; }
+    return oV(faction,...r); }; }
 // in the last phase every blow he lands feeds him
-{ const oI=impact; impact=function(f){ const hp0=player.hp; const r=oI(f); if(f.type==='cryptking' && f.cphase>=3 && player.hp<hp0 && !f.dead){ const h=Math.min(5,f.maxHp-f.hp); if(h>0){ f.hp+=h; floatText(tileOf(f),'+'+h,'#b8a0ff'); } } return r; }; }
-// a warded king cannot be hurt (spells and bleeding included)
-{ const oW=wound; wound=function(f,n,...r){ if(f && f.warded){ floatText(tileOf(f),'Warded','#c8b0ff'); return; }
-    if(f && f.type==='cryptking' && (f.cphase||1)<3){ const th=ckTh(f), pre=f.hp; f.hp+=1000; oW(f,n,...r); const dealt=pre+1000-f.hp; f.hp=Math.max(th,pre-dealt); return; }   // he cannot be killed through a phase
+{ const oI=impact; impact=function(f){ const hp0=player.hp; const r=oI(f); if(f.type==='barrowking' && f.cphase>=3 && player.hp<hp0 && !f.dead){ const h=Math.min(5,f.maxHp-f.hp); if(h>0){ f.hp+=h; floatText(tileOf(f),'+'+h,'#9ad0e8'); } } return r; }; }
+// a warded king cannot be hurt; nor can he be killed through a phase
+{ const oW=wound; wound=function(f,n,...r){ if(f && f.warded){ floatText(tileOf(f),'Warded','#c8e0f0'); return; }
+    if(f && f.type==='barrowking' && (f.cphase||1)<3){ const th=ckTh(f), pre=f.hp; f.hp+=1000; oW(f,n,...r); const dealt=pre+1000-f.hp; f.hp=Math.max(th,pre-dealt); return; }
     return oW(f,n,...r); }; }
 { const oU=update; update=function(dt){ const r=oU(dt); try{ ckTick(dt*slowmo.scale); }catch(e){ console.error(e); } return r; }; }
-{ const oSA=switchArea; switchArea=function(...a){ CK=null; FOES.cryptking.pattern=CK_PAT1; return oSA(...a); }; }
-// what the interludes look like: shadows behind the pillars, the runes about to burn, the storm when it breaks
-{ const oSDI=typeof skelDrawItems==='function'?skelDrawItems:null; skelDrawItems=function(items){ if(oSDI) oSDI(items); if(!CK || areaId!=='cryptking') return;
+{ const oSA=switchArea; switchArea=function(...a){ CK=null; FOES.barrowking.pattern=BK_PAT1; return oSA(...a); }; }
+// what the set pieces look like: the lee of the stones, the gas about to burn, the wave when it breaks, the ward
+{ const oSDI=typeof skelDrawItems==='function'?skelDrawItems:null; skelDrawItems=function(items){ if(oSDI) oSDI(items); if(!CK || areaId!==BK_AREA) return;
     items.push({d:-1e6, fn:()=>{ const A=AREAS[areaId], dia=(i,j,fill,inset=0.06)=>{ const a=P(i+inset,j+inset), b=P(i+1-inset,j+inset), c=P(i+1-inset,j+1-inset), d=P(i+inset,j+1-inset); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c.x,c.y); g.lineTo(d.x,d.y); g.closePath(); g.fillStyle=fill; g.fill(); };
-      if(CK.mode==='storm' && CK.src){ for(let i=0;i<A.w;i++) for(let j=0;j<A.h;j++){ if(blocked.has(i+','+j)) continue; if(ckSheltered(CK.src,i+0.5,j+0.5)) dia(i,j,'rgba(90,140,255,'+(0.28+Math.sin(gt*4)*0.06)+')'); } }
+      if(CK.mode==='storm' && CK.src){ for(let i=0;i<A.w;i++) for(let j=0;j<A.h;j++){ if(blocked.has(i+','+j)) continue; if(ckSheltered(CK.src,i+0.5,j+0.5)) dia(i,j,'rgba(90,150,255,'+(0.28+Math.sin(gt*4)*0.06)+')'); } }
       if(CK.mode==='rings'){
         if(CK.tiles){ const p=1-CK.t/CK.tele; CK.tiles.forEach(k=>{ const [i,j]=k.split(',').map(Number), c=P(i+0.5,j+0.5);
             dia(i,j,`rgba(110,240,130,${0.22+0.4*p})`,0.08);
             g.strokeStyle=`rgba(200,255,200,${0.7+0.3*p})`; g.lineWidth=2.4; g.beginPath(); g.ellipse(c.x,c.y,TW*0.36*(0.35+0.65*p),TH*0.36*(0.35+0.65*p),0,0,Math.PI*2); g.stroke(); }); }
         if(CK.burst && CK.burstTiles){ const a=CK.burst/0.45; g.save(); g.globalCompositeOperation='lighter'; CK.burstTiles.forEach(k=>{ const [i,j]=k.split(',').map(Number), c=P(i+0.5,j+0.5); glow(c.x,c.y-18*(1-a),34,44*(1.2-a),'150,255,170',0.55*a); }); g.restore(); } } } }); }; }
-{ const oDCO=drawCombatOver; drawCombatOver=function(){ oDCO(); if(!CK || areaId!=='cryptking') return; const K=ckKing(); if(!K) return; const s=P(K.x,K.y);
-    if(CK.mode==='storm' && CK.t<20){ const r=18+CK.t*12; g.save(); g.strokeStyle=`rgba(180,150,255,${0.6+Math.sin(gt*10)*0.2})`; g.lineWidth=3; g.beginPath(); g.ellipse(s.x,s.y-70,r,r*0.9,0,0,Math.PI*2); g.stroke();
-      g.font='bold 22px Georgia,serif'; g.textAlign='center'; g.fillStyle='#e8dcff'; g.fillText(Math.ceil(CK.t),s.x,s.y-62); g.textAlign='left'; g.restore();
-      g.save(); g.globalCompositeOperation='lighter'; glow(s.x,s.y-70,70+Math.sin(gt*8)*8,90,'150,110,230',0.35); g.restore(); }
-    if(CK.flash){ g.save(); g.setTransform(1,0,0,1,0,0); g.fillStyle=`rgba(200,180,255,${CK.flash*0.8})`; g.fillRect(0,0,gc.width,gc.height); g.restore(); } }; }
-// Old Tobb has the key, and has been hearing things
-{ const oldDg=TALKERS.digger; TALKERS.digger=()=>{ const day=Math.floor(dayClock/DAY_LEN);
-    if(!CHOICE.crypt && (CHOICE.grave || day>=3)){ say('Old Tobb',["Tobb is staring at the old crypt at the back of the yard. He has not dug anything all day.","“Scratching. Every night, under the Ashdown crypt. Like fingernails on a coffin lid, only from the inside.” He swallows. “Those are the old lords, from before Dunhollow had a name. I've the key to the gate. Sixty years I never once used it.”"],[
-        {label:'“Give me the key. I will go down.”', fn:()=>{ remember('crypt','open','Old Tobb gave you the key to the Ashdown crypt. Something scratches under it at night.'); say('Old Tobb',["He presses a black iron key into your hand and closes your fingers over it.","“Whatever's down there, it was a king once. Kings don't like to be told they're dead. Take a light. Take food. And if you hear me praying, don't stop me.”"],[bye]); }},
-        {label:'“Not yet.”', fn:closeDialog}]); return; }
-    if(CHOICE.crypt==='done' && !CHOICE.cryptTobb){ CHOICE.cryptTobb=true; player.purse+=15; updateHud(); say('Old Tobb',["“Quiet. All night. Not a scratch.” Tobb looks ten years younger. “Here. Fifteen coppers, all I've got put by. And you never have to pay for a grave in Dunhollow.”"],[bye]); return; }
-    if(CHOICE.crypt==='open' && !CHOICE.cryptNag){ CHOICE.cryptNag=true; say('Old Tobb',"“Still scratching. Louder, if anything.” He nods at the crypt. “The gate's open. I didn't go in.”",[{label:'Something else.',fn:oldDg},bye]); return; }
-    return oldDg(); }; }
-{ const oldN=npcHasNews; npcHasNews=function(n){ const r=oldN(n); if(r) return r; if(n.id==='digger'){ if(!CHOICE.crypt && (CHOICE.grave || Math.floor(dayClock/DAY_LEN)>=3)) return '!'; if(CHOICE.crypt==='done' && !CHOICE.cryptTobb) return '?'; } return null; }; }
-JOURNAL.push(['The Crypt King', ()=> !CHOICE.crypt ? null : CHOICE.crypt==='done' ? ['done',"You went down into the Ashdown crypt under Dunhollow's graveyard and laid the Crypt King to rest."+(CHOICE.cryptTobb?'':' Old Tobb will want to hear it.')] : ['active',"Something scratches under the old crypt at the back of Dunhollow's graveyard. Old Tobb gave you the key. Beware the Crypt King: when he breathes in, hide behind a pillar; when the floor runes kindle, keep moving."]]);
-// his chain: what the king wore, and now you do
-Object.assign(ITEMS,{ king_chain:{ name:"The Crypt King's Chain", slot:'neck' } }); Object.assign(ITEM_STATS,{ king_chain:{hp:4, ap:2, agi:1} }); GEAR_HP.king_chain=4; PRICES.king_chain=90;
-NECK_LOOKS.king_chain={cord:'#b89a48',w:0.9,p:'disc',col:'#d8b850'};
+{ const oDCO=drawCombatOver; drawCombatOver=function(){ oDCO(); if(areaId!==BK_AREA) return; const K=ckKing(); if(!K) return; const s=P(K.x,K.y);
+    if(K.warded){ g.save(); g.globalCompositeOperation='lighter'; glow(s.x,s.y-56,58,86,'130,190,230',0.42+Math.sin(gt*5)*0.08); g.restore();
+      g.strokeStyle=`rgba(170,220,255,${0.55+Math.sin(gt*5)*0.2})`; g.lineWidth=2; g.beginPath(); g.ellipse(s.x,s.y-54,36,64,0,0,Math.PI*2); g.stroke(); }
+    if(!CK) return;
+    if(CK.mode==='storm' && CK.t<20){ const rr=18+CK.t*12; g.save(); g.strokeStyle=`rgba(150,210,240,${0.6+Math.sin(gt*10)*0.2})`; g.lineWidth=3; g.beginPath(); g.ellipse(s.x,s.y-60,rr,rr*0.9,0,0,Math.PI*2); g.stroke();
+      g.font='bold 22px Georgia,serif'; g.textAlign='center'; g.fillStyle='#e0f2ff'; g.fillText(Math.ceil(CK.t),s.x,s.y-52); g.textAlign='left'; g.restore();
+      g.save(); g.globalCompositeOperation='lighter'; glow(s.x,s.y-60,70+Math.sin(gt*8)*8,90,'110,170,220',0.35); g.restore(); }
+    if(CK.flash){ g.save(); g.setTransform(1,0,0,1,0,0); g.fillStyle=`rgba(150,200,230,${CK.flash*0.8})`; g.fillRect(0,0,gc.width,gc.height); g.restore(); } }; }
+// ── TESTING ONLY: a way from the farm straight into the Barrow-King's lair. Each trip puts him back on his feet. Remove before release. ──
+wrap('farm','objects',l=>[...l,{type:'teleporter', i:9, j:4, to:'barrow', entry:'fromLow'}]);
+{ const oSA=switchArea; switchArea=function(to,...r){ if(to==='barrow' && areaId==='farm'){ if(!CHOICE.barrow || CHOICE.barrow==='done') CHOICE.barrow='open'; defeatedMobs.delete('barrow:The Barrow-King'); } return oSA(to,...r); }; }
 </script>
 </body>
 </html>

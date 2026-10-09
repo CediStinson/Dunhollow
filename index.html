@@ -5256,6 +5256,7 @@ function bedPrompt(){                                 // somebody else's bed, or
     if(!bed) OBJECTS.filter(o=>o.type==='bed').forEach(o=>{ const d=Math.hypot(o.i+1-player.x,o.j+0.5-player.y); if(d<bd){ bd=d; bed=o; } });
     const sl=bed && NPCS.find(n=>n.sleepBed && n.sleepBed.i===bed.i && n.sleepBed.j===bed.j);
     if(sl){ say(sl.name,[sl.name+" is asleep in that one. The bed by the far wall is free."],[{label:'Leave them be.',fn:closeDialog}]); return; }
+    if(bed && bed.owner==='marta'){ say('A Bed',["Marta's bed. Her money box sleeps under that pillow; she would not thank you for lying on it."],[{label:'Not now.',fn:closeDialog}]); return; }
     if(bed && bed.owner && areaId==='elderhouse'){ say('A Bed',["That is "+({elder:"Hamond's",wenna:"Old Wenna's",ada:"Ada's"}[bed.owner])+" bed. Better not."],[{label:'Not now.',fn:closeDialog}]); return; }
     const r=bedChoice(); if(bed && bed.edric){ const t=document.getElementById('dlg-text'); if(t) t.innerHTML="<p>Edric's bed. Ada keeps it made, the blanket turned down as if he might still come home. Hamond told you to use it.</p>"+t.innerHTML.replace(/<p>The blanket is rough but warm\. /,'<p>'); }
     return r;
@@ -5638,6 +5639,7 @@ function tentOct(){ const w=ROOM.w, h=ROOM.h, c=tentCut();
   if(tentRound()){ const R=Math.min(w,h)/2, N=20; return Array.from({length:N},(_,k)=>{ const a=Math.PI+k*2*Math.PI/N; return [w/2+Math.cos(a)*R, h/2+Math.sin(a)*R]; }); }   // a circle, as a fine polygon, in the same winding as the octagon
   return [[0,h-c],[0,c],[c,0],[w-c,0],[w,c],[w,h-c],[w-c,h],[c,h]]; }
 function paintTentWalls(){
+  const HUT=!!(AREAS[areaId]&&AREAS[areaId].hut), C1=HUT?'#b8a27c':C1, C2=HUT?'#8a7656':C2, BAND=HUT?'#6a5030':BAND, POLE=HUT?'#5a4026':POLE;   // a wattle hut uses the round tent's shape in daub and thatch
   const V=tentOct(), w=ROOM.w, h=ROOM.h, WH=80, apex=up(P(w/2,h/2),190), lerp=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
   function up(q,hh){ return {x:q.x,y:q.y-hh}; }
   // only the walls whose inside faces us: the back half of the octagon (the near half is cut away so you can see in)
@@ -5646,30 +5648,31 @@ function paintTentWalls(){
   edges.forEach(([a,b],k)=>{ const A=P(a[0],a[1]), Bq=P(b[0],b[1]), At=up(A,WH), Bt=up(Bq,WH);
     const lit=0.5+0.5*Math.cos(k*(tentRound()?0.3:0.7)+0.6), F=tentRound()?2:6;
     // the wall: canvas hanging straight, gently scalloped at the top
-    const wg=g.createLinearGradient(0,Math.min(At.y,Bt.y),0,Math.max(A.y,Bq.y)); wg.addColorStop(0,tone('#ece6d6',-0.08+lit*0.08)); wg.addColorStop(1,tone('#d8d0bc',-0.18+lit*0.08));
+    const wg=g.createLinearGradient(0,Math.min(At.y,Bt.y),0,Math.max(A.y,Bq.y)); wg.addColorStop(0,tone(C1,-0.08+lit*0.08)); wg.addColorStop(1,tone(C2,-0.18+lit*0.08));
     g.fillStyle=wg; g.beginPath(); g.moveTo(A.x,A.y); g.lineTo(Bq.x,Bq.y); g.lineTo(Bt.x,Bt.y); g.lineTo(At.x,At.y); g.closePath(); g.fill();
-    g.strokeStyle='rgba(150,130,90,0.3)'; g.lineWidth=1; for(let t=1/F;t<0.99;t+=1/F){ const q=lerp(A,Bq,t); g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(q.x,q.y-WH); g.stroke(); }   // the folds
-    g.strokeStyle='#cdb46e'; g.lineWidth=2; g.beginPath(); g.moveTo(At.x,At.y+10); g.lineTo(Bt.x,Bt.y+10); g.stroke();                    // a gold band
-    g.fillStyle=tone('#ece6d6',-0.04); for(let t=0;t<0.999;t+=1/F){ const q0=lerp(At,Bt,t), q1=lerp(At,Bt,t+1/F), qm=lerp(At,Bt,t+0.5/F);   // scallops
+    g.strokeStyle='rgba(150,130,90,0.3)'; g.lineWidth=1; for(let t=1/F;t<0.99;t+=1/F){ const q=lerp(A,Bq,t); g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(q.x,q.y-WH); g.stroke(); }   // the folds (or the stakes of the wattle)
+    if(HUT){ g.strokeStyle='rgba(70,52,30,0.28)'; g.lineWidth=0.9; for(let hh=8;hh<WH;hh+=8){ g.beginPath(); g.moveTo(A.x,A.y-hh); g.lineTo(Bq.x,Bq.y-hh); g.stroke(); } }   // the woven withies
+    g.strokeStyle=BAND; g.lineWidth=2; g.beginPath(); g.moveTo(At.x,At.y+10); g.lineTo(Bt.x,Bt.y+10); g.stroke();                    // a gold band
+    g.fillStyle=tone(C1,-0.04); for(let t=0;t<0.999;t+=1/F){ const q0=lerp(At,Bt,t), q1=lerp(At,Bt,t+1/F), qm=lerp(At,Bt,t+0.5/F);   // scallops
       g.beginPath(); g.moveTo(q0.x,q0.y); g.quadraticCurveTo(qm.x,qm.y+12,q1.x,q1.y); g.closePath(); g.fill(); }
     // where the roof begins: a short lip of canvas leaning in over the room, the rest is left open like every interior
     const lipA={x:At.x+(apex.x-At.x)*0.12,y:At.y-26}, lipB={x:Bt.x+(apex.x-Bt.x)*0.12,y:Bt.y-26};
-    g.fillStyle=tone('#d8d0bc',-0.12+lit*0.06); g.beginPath(); g.moveTo(At.x,At.y); g.lineTo(Bt.x,Bt.y); g.lineTo(lipB.x,lipB.y); g.lineTo(lipA.x,lipA.y); g.closePath(); g.fill();
+    g.fillStyle=tone(C2,-0.12+lit*0.06); g.beginPath(); g.moveTo(At.x,At.y); g.lineTo(Bt.x,Bt.y); g.lineTo(lipB.x,lipB.y); g.lineTo(lipA.x,lipA.y); g.closePath(); g.fill();
     g.strokeStyle='rgba(120,100,70,0.35)'; g.lineWidth=1; g.beginPath(); g.moveTo(lipA.x,lipA.y); g.lineTo(lipB.x,lipB.y); g.stroke();
-    if(!tentRound() || k%4===0){ g.strokeStyle='#bfa868'; g.lineWidth=3; g.beginPath(); g.moveTo(A.x,A.y); g.lineTo(lipA.x,lipA.y); g.stroke(); } });   // a pole at each corner (every few panels on the round one)
+    if(!tentRound() || k%4===0){ g.strokeStyle=POLE; g.lineWidth=3; g.beginPath(); g.moveTo(A.x,A.y); g.lineTo(lipA.x,lipA.y); g.stroke(); } });   // a pole at each corner (every few panels on the round one)
 }
 // the pavilion's roof, drawn over everything as a pale see-through cone so the room stays readable
-function drawTentRoof(){ if(!AREAS[areaId] || !AREAS[areaId].tent) return;
+function drawTentRoof(){ if(!AREAS[areaId] || !AREAS[areaId].tent) return; const HUT=!!AREAS[areaId].hut, RC=HUT?'#c8a458':RC, RB=HUT?'#7a5e2a':RB;
   const V=tentOct(), w=ROOM.w, h=ROOM.h, WH=80, c0=P(w/2,h/2), apex={x:c0.x,y:c0.y-WH-150}, top=v=>{ const q=P(v[0],v[1]); return {x:q.x,y:q.y-WH}; };
   g.save(); g.globalAlpha=0.22;
   const back=k=>{ const a=V[k], b=V[(k+1)%V.length]; return (b[1]-a[1])-(b[0]-a[0])<=0.01; };            // the panels over the back walls only: the front stays open
   const panels=V.map((v,k)=>[top(v),top(V[(k+1)%V.length]),k]).filter(p=>back(p[2]));
   panels.forEach(([a,b,k])=>{ const lit=0.5+0.5*Math.cos(k*(tentRound()?0.3:0.7)+0.6);
-    g.fillStyle=tone('#ece6d6',-0.12+lit*0.12); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(apex.x,apex.y); g.closePath(); g.fill(); });
-  g.globalAlpha=0.4; g.strokeStyle='#cdb46e'; g.lineWidth=1.2;
+    g.fillStyle=tone(RC,-0.12+lit*0.12); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(apex.x,apex.y); g.closePath(); g.fill(); });
+  g.globalAlpha=0.4; g.strokeStyle=RB; g.lineWidth=1.2;
   panels.forEach(([a,b,k],n)=>{ [a].concat(n===panels.length-1?[b]:[]).forEach(q=>{ g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(apex.x,apex.y); g.stroke(); }); });   // the ribs
   g.beginPath(); panels.forEach(([a,b],n)=>{ if(!n) g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); }); g.stroke();                                        // the eave along the back
-  g.globalAlpha=0.7; g.fillStyle='#cdb46e'; g.beginPath(); g.ellipse(apex.x,apex.y+4,7,2.6,0,0,Math.PI*2); g.fill();                            // the finial
+  g.globalAlpha=0.7; g.fillStyle=RB; g.beginPath(); g.ellipse(apex.x,apex.y+4,7,2.6,0,0,Math.PI*2); g.fill();                            // the finial
   g.restore(); }
 // A canvas A-frame tent on a 2x2 footprint; anchor = its far-front corner
 function paintTent(x,y,burnt){
@@ -8569,7 +8572,7 @@ function pointerUp(px,py){
       if(best){ player.path=best; pendingPickup=pk; }
       return;
     }
-    const hs = OBJECTS.find(o=>(o.type==='house'||o.type==='bldg'||o.type==='chapel'||(o.type==='pavilion'&&o.inside)) && (o.inside||o.door) && ti>=o.i && tj>=o.j && ti<o.i+o.fp[0] && tj<o.j+o.fp[1]);
+    const hs = OBJECTS.find(o=>(o.type==='house'||o.type==='bldg'||o.type==='chapel'||o.type==='roundhut'||(o.type==='pavilion'&&o.inside)) && (o.inside||o.door) && ti>=o.i && tj>=o.j && ti<o.i+o.fp[0] && tj<o.j+o.fp[1]);
     if(hs){ const [di,dj]=doorTile(hs);
       if(player.i===di && player.j===dj){ enterHouse(hs); return; }
       const pth=findPath(player.i,player.j,di,dj); if(pth){ player.path=pth; pendingDoor=hs; } return; }
@@ -15386,7 +15389,18 @@ function drawSleeper(n){                           // asleep in a bed, turned ov
     const z=pt(-0.2,-0.2,48); g.save(); g.font='italic 600 11px Georgia,serif'; g.fillStyle=`rgba(220,226,250,${0.5+0.3*Math.sin(gt*1.4)})`; g.fillText('z',z.x+((gt*6)%8),z.y-((gt*6)%8)); g.font='italic 600 8px Georgia,serif'; g.fillText('z',z.x+8,z.y-12); g.restore(); }
 let CLICKED_BED=null;                                                                    // the bed you actually clicked, not just the nearest one
 // ── a little round hut in Dunhollow's west corner: wattle and daub, a cone of thatch, smoke from the top ──
-wrap('village','objects',l=>[...l,{type:'roundhut', i:0, j:8, fp:[2,2]}]);
+wrap('village','objects',l=>[...l,{type:'roundhut', i:0, j:7, fp:[3,3], door:'r', dt:1, inside:'martahut', back:'fromHut'}]);   // Marta's: she lives and sleeps here
+AREAS.village.entries.fromHut={i:3,j:8};
+// inside Marta's hut: one round room, her bed, her stock, a fire in the middle
+AREAS.martahut={ ...CROOM("Marta's Hut",7,7,'village','fromHut', ()=>[
+    {type:'bed', i:4, j:1, fp:[2,1], owner:'marta'}, {type:'hearth', i:3, j:3}, {type:'crates', i:1, j:2}, {type:'barrels', i:1, j:4},
+    {type:'table', i:5, j:4}, {type:'lantern', i:2, j:1}, {type:'critter', kind:'flowers', i:4, j:5, noblock:true}],
+  ()=>{ if(!NIGHT()) return []; const bed={i:4,j:1};                // at night she is asleep here
+    return [{ id:'sleep_trader', name:'Marta the Trader', i:bed.i, j:bed.j, x:bed.i+1.9, y:bed.j+0.95, dir:0, sleepBed:bed, opts:{gender:'f',skin:2,hair:0,hairColor:3,beard:0,eyesShut:true,equip:{head:null,torso:'shirt',armor:null,hands:null,legs:'trousers',feet:null,weapon:null,offhand:null}} }]; }),
+  tent:true, round:true, hut:true };
+AREAS.martahut.entries={ fromHut:{i:3,j:5} };
+AREAS.martahut.objects=(o=>()=>o().map(x=>x.type==='teleporter'?{...x, i:3, j:6}:x))(AREAS.martahut.objects);
+TALKERS.sleep_trader=()=>say('Marta the Trader',["Marta is asleep, rolled up in two blankets with her boots still on. The money box is under her pillow, and one hand is on it."],[{label:'Let her sleep.', fn:closeDialog}]);
 function paintRoundHut(x,y){ const rx=72, ry=36, H=46, R=1.16;
   g.fillStyle='rgba(8,5,2,0.32)'; g.beginPath(); g.ellipse(x+8,y+6,rx*1.15,ry*1.15,0,0,Math.PI*2); g.fill();
   const wg=g.createLinearGradient(x-rx,0,x+rx,0); wg.addColorStop(0,'#8a7656'); wg.addColorStop(0.45,'#b8a27c'); wg.addColorStop(1,'#6e5c40');
@@ -15402,8 +15416,9 @@ function paintRoundHut(x,y){ const rx=72, ry=36, H=46, R=1.16;
   g.strokeStyle='rgba(90,66,26,0.5)'; g.lineWidth=0.9; for(let k=0;k<=16;k++){ const a=Math.PI*k/16, px=x+Math.cos(a)*rx*R, py=y-H+4+Math.sin(a)*ry*R; g.beginPath(); g.moveTo(x+(px-x)*0.12,top+(py-top)*0.12); g.lineTo(px,py); g.stroke(); }
   g.strokeStyle='rgba(60,42,16,0.5)'; g.lineWidth=1.4; g.beginPath(); g.ellipse(x,y-H+4,rx*R,ry*R,0,0.05,Math.PI-0.05); g.stroke();           // the ragged eave
   g.fillStyle='#4a3a20'; g.beginPath(); g.ellipse(x,top+4,5,2.5,0,0,Math.PI*2); g.fill(); }
-function drawRoundHut(o){ const q=P(o.i+1,o.j+1); drawCached('roundhut',q.x,q.y,190,190,95,150,paintRoundHut);
-    for(let k=0;k<4;k++){ const t=((gt*0.18+k/4)%1); g.fillStyle=`rgba(150,146,140,${0.22*(1-t)})`; g.beginPath(); g.arc(q.x+Math.sin(t*3+k)*6+t*8,q.y-46-62-t*55,3+t*9,0,Math.PI*2); g.fill(); } }
+function drawRoundHut(o){ const S=o.fp[0]/2, q=P(o.i+o.fp[0]/2,o.j+o.fp[1]/2); g.save(); g.translate(q.x,q.y); g.scale(S,S); drawCached('roundhut',0,0,190,190,95,150,paintRoundHut); g.restore();
+    for(let k=0;k<4;k++){ const t=((gt*0.18+k/4)%1); g.fillStyle=`rgba(150,146,140,${0.22*(1-t)})`; g.beginPath(); g.arc(q.x+(Math.sin(t*3+k)*6+t*8)*S,q.y-(46+62)*S-t*55,3+t*9,0,Math.PI*2); g.fill(); }
+    if(o.inside) drawDoorMark(o); }
 // the purple bandana is the Baron's thugs' mark: you take it off one of them, no honest (or dishonest) vendor ever sells it
 // chairs block your way like anything else; only someone going to sit on one may step onto it
 // whoever sits at a table sits on the chair, pulled in to it

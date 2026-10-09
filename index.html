@@ -948,6 +948,26 @@ function withLook(opts,fn){
 // idle and walking frames repeat, so most figures cost one drawImage instead of hundreds of paths.
 const FIG_CACHE=new Map(), FIG_K=1.4, FIG_W=130, FIG_H=160, FIG_AX=65, FIG_AY=138;
 function drawChar(c,x,B,opts,swing=0,dir=0,pose=null){
+  if(opts && opts.bones){                               // the risen dead: a skeleton wearing the gear
+    const k=pose&&pose.kind==='raise'?-0.45*Math.min(1,pose.t):pose&&pose.kind==='strike'?Math.max(0,1-Math.min(1,pose.t)*0.6):0;
+    drawSkelFig(x,B,{asm:1, stand:true, dir, moving:Math.abs(swing)>0.5, walk:gt*9, k, weapon:null});
+    const sh=gearShell(opts,swing,dir,pose); c.drawImage(sh,x-110,B-200,220,230);
+    return; }
+  drawCharSoaked(c,x,B,opts,swing,dir,pose);
+}
+let WET_NPC=0; const WET_NPC_BUF=document.createElement('canvas').getContext('2d');   // set while a rain-soaked townsperson is drawn
+function drawCharSoaked(c,x,B,opts,swing=0,dir=0,pose=null){   // in the rain, townsfolk are drawn a shade darker, with a sheen
+  if(!WET_NPC || c!==g) return drawCharFigure(c,x,B,opts,swing,dir,pose);
+    const T=g.getTransform(), sc=Math.hypot(T.a,T.b), d=T.transformPoint({x,y:B}), W=Math.ceil(130*sc), H=Math.ceil(190*sc), ox=Math.floor(d.x-W/2), oy=Math.floor(d.y-H*0.9);
+    const b=WET_NPC_BUF; if(b.canvas.width<W||b.canvas.height<H){ b.canvas.width=Math.max(W,b.canvas.width); b.canvas.height=Math.max(H,b.canvas.height); }
+    b.setTransform(1,0,0,1,0,0); b.globalCompositeOperation='source-over'; b.clearRect(0,0,b.canvas.width,b.canvas.height);
+    b.setTransform(T.a,T.b,T.c,T.d,T.e-ox,T.f-oy); drawCharFigure(b,x,B,opts,swing,dir,pose);
+    b.setTransform(1,0,0,1,0,0); b.globalCompositeOperation='source-atop'; b.fillStyle='rgba(18,26,44,0.24)'; b.fillRect(0,0,W,H);   // everything soaked a shade darker
+    b.fillStyle='rgba(210,228,245,0.13)'; for(let k=0;k<5;k++){ const xx=W*(0.32+k*0.09); b.fillRect(xx,H*0.25,Math.max(1,sc*0.8),H*0.6); }   // and a wet sheen running down
+    b.globalCompositeOperation='source-over';
+    g.save(); g.setTransform(1,0,0,1,0,0); g.drawImage(b.canvas,0,0,W,H,ox,oy,W,H); g.restore();
+}
+function drawCharFigure(c,x,B,opts,swing=0,dir=0,pose=null){
   if(typeof LOW_FX!=='undefined' && LOW_FX && !pose && c===g){
     const sw=Math.round(swing*0.8)/0.8, key=(opts._ck||(opts._ck=JSON.stringify(opts)))+'|'+dir+'|'+sw;
     let cv=FIG_CACHE.get(key);
@@ -5176,7 +5196,8 @@ function drawTileMarker(i,j,fill,stroke){
 // ── objects (drawn at tile center)
 // A barrel or crate: usually just splinters, occasionally a scrap of gear.
 const FARM_LOOT = ['apple','bread','apple','dagger','boots','jerkin','pitchfork','smock','hatchet','club','hose_grey'];
-function collectPickup(o){
+function collectPickup(o){ const had=hasItem(o.item);
+  if(QUEST_ITEMS.has(o.item) && player.inv.indexOf(null)<0){ for(let k=player.inv.length-1;k>=0;k--){ const it=player.inv[k]; if(it && !QUEST_ITEMS.has(it)){ logMsg('No room: you leave the '+ITEMS[it].name+' behind.','#e0b070'); player.inv[k]=null; break; } } }   // story things always fit
   const idx=OBJECTS.indexOf(o); if(idx<0) return;
   OBJECTS.splice(idx,1); blocked.delete(o.i+','+o.j);
   collectedPickups.add(areaId+':'+o.i+','+o.j);
@@ -5192,6 +5213,7 @@ function collectPickup(o){
     else { OBJECTS.splice(idx,0,o); blocked.add(o.i+','+o.j); collectedPickups.delete(areaId+':'+o.i+','+o.j); floatText([o.i,o.j],'Inventory is full','#e0b070'); logMsg('Inventory is full.','#e0b070'); }
   }
   updateHud();
+  if(o.item==='charter' && !had && hasItem('charter')){ CHOICE.stq='found'; logMsg('Where the tall stone\'s moon-shadow ends, the earth is soft. A lead case: the Stone Charter.','#e8c060'); setTimeout(()=>openNote('charter'),600); }
 }
 function breakObject(o){
   const idx=OBJECTS.indexOf(o); if(idx<0) return;
@@ -5224,7 +5246,16 @@ function sleepUntil(which){
   logMsg({morning:'You sleep through the night and wake rested with the first light.',midday:'You sleep late. The sun is high when you wake, rested.',evening:'You doze the day away and wake rested as the light turns gold.'}[which],'#c8b890');
   if(typeof saveGame==='function') saveGame();
 }
-function bedPrompt(){
+function bedPrompt(){                                 // somebody else's bed, or one already slept in
+  let bed=CLICKED_BED && OBJECTS.includes(CLICKED_BED) ? CLICKED_BED : null, bd=1e9; CLICKED_BED=null;
+    if(!bed) OBJECTS.filter(o=>o.type==='bed').forEach(o=>{ const d=Math.hypot(o.i+1-player.x,o.j+0.5-player.y); if(d<bd){ bd=d; bed=o; } });
+    const sl=bed && NPCS.find(n=>n.sleepBed && n.sleepBed.i===bed.i && n.sleepBed.j===bed.j);
+    if(sl){ say(sl.name,[sl.name+" is asleep in that one. The bed by the far wall is free."],[{label:'Leave them be.',fn:closeDialog}]); return; }
+    if(bed && bed.owner && areaId==='elderhouse'){ say('A Bed',["That is "+({elder:"Hamond's",wenna:"Old Wenna's",ada:"Ada's"}[bed.owner])+" bed. Better not."],[{label:'Not now.',fn:closeDialog}]); return; }
+    const r=bedChoice(); if(bed && bed.edric){ const t=document.getElementById('dlg-text'); if(t) t.innerHTML="<p>Edric's bed. Ada keeps it made, the blanket turned down as if he might still come home. Hamond told you to use it.</p>"+t.innerHTML.replace(/<p>The blanket is rough but warm\. /,'<p>'); }
+    return r;
+}
+function bedChoice(){
   if(combat.active) return;
   say('A Bed',["The blanket is rough but warm. How long do you sleep?"],[
     {label:'Sleep until the next morning.', fn:()=>sleepUntil('morning')},
@@ -7952,7 +7983,12 @@ function drawCharacter(wx,wy,opts,name,moving,dir=0){
 
 // ── pathfinding (BFS, 8 directions, no corner cutting)
 function walkable(i,j){ return i>=0 && j>=0 && i<ROOM.w && j<ROOM.h && !blocked.has(i+','+j) && !mobAt(i,j); }
-function findPath(si,sj,ti,tj){
+function findPath(si,sj,ti,tj){                       // to a chair: its tile counts as free, so you can walk up and sit
+  const ch=OBJECTS.find(o=>o.type==='chair' && o.i===ti && o.j===tj);
+  if(!ch || (si===player.i && sj===player.j)) return findPathRaw(si,sj,ti,tj);
+  const k=ti+','+tj, was=blocked.has(k); blocked.delete(k); try{ return findPathRaw(si,sj,ti,tj); } finally{ if(was) blocked.add(k); }
+}
+function findPathRaw(si,sj,ti,tj){
   if(!walkable(ti,tj)) return null;
   const key=(i,j)=>i+','+j;
   const prev=new Map([[key(si,sj),null]]);
@@ -8101,6 +8137,7 @@ function buildWorldCache(){
 function drawWorldCache(){
   if(!worldCache || worldCache.area!==areaId || (worldCache.sky && worldCache.sky!==windowSky().key)) buildWorldCache();   // windows change with the hour
   g.drawImage(worldCache.cv, gc.width/2+cam.x-worldCache.ox, ORIGIN_Y+cam.y-worldCache.oy);
+  if(AREAS[areaId].theme==='ash') OBJECTS.forEach(o=>{ if(o.type==='lava') drawLava(o); });
 }
 
 // ── the ground: painted per-pixel in grid space, then mapped onto the iso plane
@@ -8399,6 +8436,10 @@ function drawLightFX(){
     if(m.fire) glow(p.x,p.y-zz,7,7,'210,255,140',0.6*tw); else glow(p.x,p.y-zz,4,4,'255,235,190',0.28*tw);
   }
   g.restore();
+  if(AREAS[areaId].theme==='ash'){                    // the ash lands: a red cast and embers drifting up
+    const W=gc.width, H=gc.height; g.save(); g.setTransform(1,0,0,1,0,0); g.globalCompositeOperation='multiply'; g.fillStyle='rgb(255,226,212)'; g.fillRect(0,0,W,H);
+    g.globalCompositeOperation='lighter'; for(let k=0;k<40;k++){ const ph=(gt*(0.05+rnd01(k,1,776)*0.06)+rnd01(k,2,777))%1, x=rnd01(k,3,778)*W+Math.sin(gt*0.7+k)*20, y=H*(1.05-ph*1.2);
+      g.fillStyle=`rgba(255,${120+Math.round(rnd01(k,4,779)*80)},40,${0.7*Math.sin(ph*Math.PI)})`; g.fillRect(x,y,2,2); } g.restore(); }
 }
 
 // ── screen-space finish: light shafts, a warm/cool grade, vignette
@@ -9235,6 +9276,10 @@ function drawItemIcon(g2,id,size){
   g2.save(); g2.globalAlpha=0.85; for(const [dx,dy] of [[-u,0],[u,0],[0,-u],[0,u]]) g2.drawImage(o.canvas,dx,dy); g2.restore();
   g2.drawImage(a.canvas,0,0);
   drawStatTag(g2,id,size);
+  const T=ICON_TINT[unWoven(id)]; if(T){                // some pieces are a tinted copy of another
+    try{ g2.setTransform(1,0,0,1,0,0); const im=g2.getImageData(0,0,size,size), d=im.data;
+      for(let i=0;i<d.length;i+=4){ if(!d[i+3]) continue; d[i]=Math.min(255,d[i]*T[0]); d[i+1]=Math.min(255,d[i+1]*T[1]); d[i+2]=Math.min(255,d[i+2]*T[2]); }
+      g2.putImageData(im,0,0); }catch(e){} }
 }
 // A small engraved tag in the lower-right corner, sized to its text, instead of a big disc.
 function drawStatTag(g2,id,size){
@@ -9290,7 +9335,14 @@ function placeError(id,loc){
   return '';
 }
 // Move the item at `from` to `to`; whatever was at `to` swaps back to `from`.
-function moveItem(from,to){
+function moveItem(from,to){                           // your skeleton's weapon slot has its own rules
+    if((from.kind==='skel'&&to.kind==='eq') || (from.kind==='eq'&&to.kind==='skel')){ flash('Put it in your pack first.'); return false; }
+    const had=skelArmsOn(), ok=moveItemRaw(from,to);
+    if(ok && had && !skelArmsOn() && CHOICE.skelWeapon && !skelWeaponHome()){ moveItemRaw(to,from); flash("Make room in your pack first: your skeleton's weapon has to go somewhere."); return false; }
+    if(ok) refreshInventory();
+    return ok;
+}
+function moveItemRaw(from,to){
   if(from.kind===to.kind && from.key===to.key) return false;
   if(to.kind==='eq' && !SLOTS.includes(to.key)){ const id=getAt(from); if(id && ITEMS[id] && ITEMS[id].read) openNote(id); else flash("That can't be worn."); return false; }   // letters, leaves and flowers stay in the pack
   const a=getAt(from), b=getAt(to);
@@ -9381,6 +9433,8 @@ function buildInventoryUI(){
   document.getElementById('rot-l').addEventListener('click',()=>{ dollDir=(dollDir+1)%8; drawDoll(); });
   document.getElementById('rot-r').addEventListener('click',()=>{ dollDir=(dollDir+7)%8; drawDoll(); });
   document.getElementById('inv-close').addEventListener('click',closeInventory);
+  const w=document.querySelector('#eq-left .slot[data-key="weapon"]'), sl=makeSlot('skel','weapon'); sl.classList.add('skel-slot');
+  const l=document.createElement('div'); l.className='lbl'; l.textContent='Skeleton'; sl.appendChild(l); w.after(sl);   // the skeleton's weapon slot, beside yours
 }
 
 // Showcase figures (paper doll, character creator) get the same treatment as figures in
@@ -9413,6 +9467,7 @@ function drawLitFigure(cv,opts,dir,footPad,scale,store){
 const DOLL={};
 function drawDoll(){ drawLitFigure(dollCanvas,player.opts,dollDir,52,5.1,DOLL); }
 function refreshInventory(){
+  skelWeaponHome();
   document.querySelectorAll('#inv-overlay .slot').forEach(el=>{
     const id=getAt(slotLoc(el));
     const icv=el.querySelector('canvas'); drawItemIcon(icv.getContext('2d'),id,icv.width);
@@ -9423,6 +9478,7 @@ function refreshInventory(){
   refreshStatPanel();
   if(typeof syncHideEyes==='function') syncHideEyes();
   drawDoll();
+  const sl=document.querySelector('#inv-overlay .skel-slot'); if(sl){ sl.style.display=skelArmsOn()?'':'none'; sl.title=CHOICE.skelWeapon?ITEMS[CHOICE.skelWeapon].name+' (carried by the skeleton you raise, for show)':'Your skeleton\'s weapon: drop any weapon here. It is only for show.'; }   // your skeleton's weapon slot
 }
 function refreshStatPanel(){
   const panel=document.getElementById('stat-panel'); if(!panel || !player.opts) return;
@@ -10194,6 +10250,7 @@ function sellTo(who,back,o){                     // o (optional): only these ite
   box.prepend(hint); box.prepend(grid);
 }
 function shopFrom(who,stock,disc,greet,back){
+  if(Array.isArray(stock) && stock.key!=='gratis'){ const key=stock.key; stock=stock.filter(id=>unWoven(id)!=='bandana'); if(key!==undefined) stock.key=key; }   // only Gratis deals in purple bandanas
   const day=Math.floor(dayClock/DAY_LEN), sk=stock.key||who;
   const FREE=disc===0, wares=stock.filter(id=>ITEMS[id]&&(PRICES[id]||FREE)).map(id=>({id, pr:FREE?0:Math.max(1,Math.round(PRICES[id]*disc*PRICE_MUL()))}));
   const buy=({id,pr})=>{ if(player.purse<pr) return; const free=player.inv.indexOf(null);
@@ -10732,7 +10789,7 @@ function moonTalk(){
 }
 Object.assign(TALKERS,{ moon_ithil:moonTalk, moon_nel:moonTalk });
 // ════════ After the Baron: who rules, and who pays the men he paid ════════
-let PRICE_MUL=()=>({orrin:1.1, guild:0.9}[CHOICE.ruler]||1);
+const PRICE_MUL=()=>({orrin:1.1, guild:0.9}[CHOICE.ruler]||1)*(GB_RANK()==='Partner'?0.9:GB_RANK()==='Associate'?0.95:1);   // who rules, and your standing with the Gold Brothers
 function rulerTalk(){
   const nimNote = CHOICE.nim==='free' ? " You think of Nim, and what a curfew would mean for a girl who steals bread." : "";
   say('Magistrate Aldous',["Aldous looks older than he did. “The Baron is in chains. Good. And now nobody is collecting taxes, nobody is paying the guard, and three people have been in my chapel since dawn, each explaining why the town should be theirs.”",
@@ -10970,9 +11027,6 @@ function ruvinTalk(){
 }
 TALKERS.ruvin=ruvinTalk;
 
-{ const oldNote=openNote; openNote=function(id){ if(id!=='package') return oldNote(id);
-  say('A Waxed Package',["Heavy for its size, sealed in black wax stamped with a plain O.","You could break the seal. It would be obvious that you had."],[
-    {label:'Break the seal.', fn:()=>{ closeDialog(); if(packageRead()) oldNote('orrinletters'); }}, {label:'Leave it sealed.', fn:closeDialog}]); }; }
 
 
 // ════════ Dunhollow gets a tavern; Sylvhaven opens its moon-bath ════════
@@ -11058,7 +11112,6 @@ Object.assign(TALKERS,{ ruvinsea:ruvinSeaTalk, isolde:isoldeTalk, priestess:prie
 { const oldRv=TALKERS.ruvin; TALKERS.ruvin=()=>{ if(SAIL_OK() && CHOICE.ruvin==='done'){ say('Ruvin Craban',["Ruvin grins and points at the gangplank. “Your berth's ready. Port Fearn Arianhod, half a day downriver and out past the bar. Coming?”"],[
     {label:'Sail to Port Fearn Arianhod.', fn:()=>sail('portfearn','fromSea','The Golden Fourage slips out past the river bar. By evening, gulls and the smell of spice.')}, {label:'“Not today.”', fn:closeDialog}]); return; } oldRv(); }; }
 // the Company's ranks count for something: family prices, a livery, and the Daughter's favour
-{ const baseMul=PRICE_MUL; PRICE_MUL=()=>baseMul()*(GB_RANK()==='Partner'?0.9:GB_RANK()==='Associate'?0.95:1); }
 { const oldCr=TALKERS.craban; TALKERS.craban=()=>{ if(GB_RANK() && !CHOICE.livery){ CHOICE.livery=true; giveQuestItem('tunic_gold',true);
     say('Alaric Craban',["Craban pushes a folded bundle into your arms: dark red wool, gold trim.","“Company livery. And your name in the ledger means every trader who deals with us gives you a Company price. Don't wear red in a fight you might lose.” <i>You receive the Gold Brothers Livery. Traders now give you a Company discount (5%, 10% as Partner).</i>"],[{label:'“Thank you.”', fn:oldCr}]); return; } oldCr(); }; }
 
@@ -11115,7 +11168,6 @@ wrap('village','npcs',list=> CHOICE.pact==='trade' && !havenBurnt() ? [...list,{
         say('Old Tobb',"The flower keeps glowing on the stone, even in daylight. Tobb takes off his hood. “Well. That's a thing I didn't expect to see before I died.”",[bye]); }},
       {label:'Keep it for now.', fn:closeDialog} ]); return; }
     dt(); }; }
-{ const ss=shopSell; shopSell=function(){ const had=hasItem('moonbloom'); ss(); if(had) setTimeout(()=>{ if(!hasItem('moonbloom') && !CHOICE.maren) remember('maren','sold','You sold Calandor\'s moonbloom to Marta.'); },0); }; }
 
 
 // Hamond looks back on everything, once the camp is dealt with
@@ -11216,9 +11268,12 @@ function elderTalk(){
   showDialog('Elder Hamond',greet,opts);
 }
 function traderTalk(){
-  if(player.opts.race==='elf' && !CHOICE.martaElf){ CHOICE.martaElf=true; showDialog('Marta the Trader',["Marta looks at your ears for a very long time.","“My grandmother said elves pay in moonlight and leaves. You'll pay in copper, same as everyone. …Can I touch them? No? Fair.”"],[{label:'Show me your wares.',fn:shopBuy},{label:'I have things to sell.',fn:shopSell},bye],true); return; }
-  showDialog('Marta the Trader', CHOICE.pups==='marta' ? "Three wolf pups tumble around Marta's boots. “My favourite customer! For you, a friend's price.”" : CHOICE.goat==='sold' ? "Barnabas the goat is eating Marta's awning. She doesn't seem to mind. “For Barnabas's hero, a discount!”" : "“Good day! Steel, leather, a hat for your head. And if you have things to sell, I will look at them.”",
+  if(player.opts.race==='elf' && !CHOICE.martaElf){ CHOICE.martaElf=true; showDialog('Marta the Trader',["Marta looks at your ears for a very long time.","“My grandmother said elves pay in moonlight and leaves. You'll pay in copper, same as everyone. …Can I touch them? No? Fair.”"],[{label:'Show me your wares.',fn:shopBuy},{label:'I have things to sell.',fn:shopSell},bye],true); }
+  else showDialog('Marta the Trader', CHOICE.pups==='marta' ? "Three wolf pups tumble around Marta's boots. “My favourite customer! For you, a friend's price.”" : CHOICE.goat==='sold' ? "Barnabas the goat is eating Marta's awning. She doesn't seem to mind. “For Barnabas's hero, a discount!”" : "“Good day! Steel, leather, a hat for your head. And if you have things to sell, I will look at them.”",
     [{label:'Show me your wares.',fn:shopBuy},{label:'I have things to sell.',fn:shopSell},bye],true);
+  if(CHOICE.pupSt==='adopted' && CHOICE.pupAdopt!=null && dlgIsOpen()){ const box=document.getElementById('dlg-opts'), nm=PUP_NAMES[CHOICE.pupAdopt]||'your wolf';
+    if(box && !box.querySelector('.dlg-opt.foster') && /Marta/i.test(document.getElementById('dlg-name')?.textContent||'Marta')){ const b=document.createElement('button'); b.className='dlg-opt foster';
+      b.innerHTML=`<span>${CHOICE.pupFoster?'“I have come for '+nm+'.”':'“Could you keep '+nm+' for me a while?”'}</span>`; b.addEventListener('click',()=>pupFosterSet(!CHOICE.pupFoster)); box.insertBefore(b,box.lastElementChild); } }   // a wolf you adopted can stay with Marta for a while
 }
 function shopBuy(){
   const disc = CHOICE.pups==='marta' || CHOICE.goat==='sold' ? 0.85 : 1;
@@ -11229,8 +11284,13 @@ function shopBuy(){
   if(CHOICE.pact==='trade' && !havenBurnt() && !SOLD_TODAY.has('marta'+Math.floor(dayClock/DAY_LEN)+'elf_boots')) stock.push('elf_boots');   // only once the elves trade with the valley
   shopFrom('Marta the Trader',stock,disc,"“Take your time. The rest comes on tomorrow's cart.”",traderTalk);
 }
-function shopSell(){ sellTo('Marta the Trader',traderTalk); }
+function shopSell(){ const had=hasItem('moonbloom'); sellTo('Marta the Trader',traderTalk);
+  if(had) setTimeout(()=>{ if(!hasItem('moonbloom') && !CHOICE.maren) remember('maren','sold','You sold Calandor\'s moonbloom to Marta.'); },0); }
 function openNote(id){
+  if(id==='package'){                                  // Orrin's package: break the seal, or not
+  say('A Waxed Package',["Heavy for its size, sealed in black wax stamped with a plain O.","You could break the seal. It would be obvious that you had."],[
+    {label:'Break the seal.', fn:()=>{ closeDialog(); if(packageRead()) openNote('orrinletters'); }}, {label:'Leave it sealed.', fn:closeDialog}]);
+    return; }
   const it=ITEMS[id]; if(!it) return;
   document.getElementById('note-title').textContent=it.title||it.name;
   document.getElementById('note-body').innerHTML=(it.body||[]).map(p=>`<p>${p}</p>`).join('');
@@ -11275,7 +11335,10 @@ function dropTargetAt(px,py){
   if(hit.closest && hit.closest('#inv-trash')) return document.getElementById('inv-trash');
   return hit.closest ? hit.closest('#inv-overlay .slot') : null;
 }
-function onDragMove(e){
+function onDragMove(e){ const was=invDrag&&invDrag.moved; dragItemMove(e);
+    if(invDrag && !was && invDrag.moved && ITEMS[invDrag.id].slot==='weapon' && skelArmsOn() && invDrag.loc.kind==='inv'){ const sl=document.querySelector('#inv-overlay .skel-slot'); if(sl) sl.classList.add('valid'); }   // a weapon can go to your skeleton
+}
+function dragItemMove(e){
   if(!invDrag) return;
   if(!invDrag.moved){
     if(Math.hypot(e.clientX-invDrag.sx,e.clientY-invDrag.sy)<5) return;
@@ -13355,9 +13418,6 @@ wrap('stones','npcs',l=> CHOICE.stones ? l : [...l,
   { id:'stguard2', name:"Baron's Sergeant", i:8, j:7, dir:6, opts:BANDIT({skin:3,hair:2,beard:5,equip:{head:'helm_full',torso:'baron_tabard',armor:'blackmail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'longsword',offhand:null}}) } ]);
 TALKERS.stguard1=TALKERS.stguard2=()=>say("Baron's Sergeant","“Talk to the clerk. We just stand here and look large.”",[bye]);
 wrap('stones','objects',l=> STQ()==='night' && nightAmt()>0.4 && !collectedPickups.has('stones:6,7') ? [...l.filter(o=>!(o.i===6&&o.j===7&&o.type==='critter')),{type:'pickup', i:6, j:7, item:'charter'}] : l);
-{ const oldC=collectPickup; collectPickup=function(o){ const had=hasItem(o.item);
-    if(QUEST_ITEMS.has(o.item) && player.inv.indexOf(null)<0){ for(let k=player.inv.length-1;k>=0;k--){ const it=player.inv[k]; if(it && !QUEST_ITEMS.has(it)){ logMsg('No room: you leave the '+ITEMS[it].name+' behind.','#e0b070'); player.inv[k]=null; break; } } }   // story things always fit
-    oldC(o); if(o.item==='charter' && !had && hasItem('charter')){ CHOICE.stq='found'; logMsg('Where the tall stone\'s moon-shadow ends, the earth is soft. A lead case: the Stone Charter.','#e8c060'); setTimeout(()=>openNote('charter'),600); } }; }
 function stonesHint(id){ if(id==='stones' && STQ()==='night' && nightAmt()<=0.4) setTimeout(()=>logMsg('Wenna said the charter shows itself under the moon. Come back after dark.','#c8a860'),600); }
 { const oldW=TALKERS.wenna; TALKERS.wenna=()=>{ if(STQ()!=='wenna'){ oldW(); return; } CHOICE.stq='night';
   say('Old Wenna',["You show Wenna the surveyor's writ. She reads it with her nose almost on the paper, then laughs until she has to sit down.","“No charter! My grandmother's grandmother put her mark on it. The old king's own grant, sealed in lead and buried under the stones the day they were raised, so no lord could burn it.”",
@@ -14011,7 +14071,10 @@ function csUI(on){ let el=document.getElementById('cs-ui');
     const st=document.createElement('style'); st.textContent='#cs-ui{position:fixed;inset:0;z-index:40;display:none;pointer-events:auto;}#cs-ui .cs-bar{position:absolute;left:0;right:0;height:0;background:#000;transition:height .45s ease;}#cs-ui .cs-bar.t{top:0}#cs-ui .cs-bar.b{bottom:0}#cs-ui.open .cs-bar{height:9vh}#cs-ui .cs-skip{position:absolute;left:50%;transform:translate(-50%,50%);bottom:4.5vh;font:600 13px "Segoe UI",system-ui,sans-serif;letter-spacing:1px;color:#f0dca0;background:rgba(36,24,8,.9);border:1px solid rgba(200,150,60,.75);border-radius:6px;padding:7px 22px;cursor:pointer;opacity:.9}#cs-ui .cs-skip:hover{opacity:1}';
     document.head.appendChild(st); document.body.appendChild(el); el.querySelector('.cs-skip').addEventListener('click',e=>{ e.stopPropagation(); csSkip(); }); }
   if(on){ el.style.display='block'; requestAnimationFrame(()=>el.classList.add('open')); } else { el.classList.remove('open'); setTimeout(()=>{ if(!CS.on) el.style.display='none'; },450); } }
-function cutscene(steps,onEnd){ if(CS.on) return false; try{ closeDialog(); }catch(e){} CS.on=true; CS.steps=steps; CS.k=0; CS.t=0; CS.onEnd=onEnd||null; CS.focus=null; player.path=[]; csUI(true); return true; }
+function cutscene(steps,onEnd){
+  try{ if(invOverlay.classList.contains('open')) closeInventory(); closeNote(); if(typeof closeBigMap==='function') closeBigMap();
+    const so=document.getElementById('sign-overlay'); if(so) so.classList.remove('open'); if(typeof ctrlOverlay!=='undefined') ctrlOverlay.classList.remove('open'); }catch(e){}   // close whatever panel is open
+  if(CS.on) return false; try{ closeDialog(); }catch(e){} CS.on=true; CS.steps=steps; CS.k=0; CS.t=0; CS.onEnd=onEnd||null; CS.focus=null; player.path=[]; csUI(true); return true; }
 // a spoken line: a speech bubble over the speaker for `d` seconds, the speaker turned to face `to`
 const csSay=(m,text,d=2.2,to=null)=>({dur:d, start:()=>{ if(to) csLook(m,to).start(); CS.say=m?{ent:m,text,t:0}:null; }, end:()=>{ CS.say=null; }, skip:()=>{ CS.say=null; }});
 function drawCsSpeech(){ const S=CS.say; if(!CS.on || !S) return;
@@ -14258,7 +14321,7 @@ Object.entries(AP_STATS).forEach(([id,v])=>{ ITEM_STATS[id]={...(ITEM_STATS[id]|
 ITEM_STATS.elf_cloak={...ITEM_STATS.elf_cloak, magic:1};
 const APM=()=>1+gearSum('ap')*0.04;
 var HIT_SRC=null;                       // who caused the wound being dealt right now: 'melee', 'spell' or null (bones, burns)
-let playerHitDmg=()=> isMagicWeapon() ? SPELLS.right.dmg*SPM() : weaponOf(player).dmg*APM();
+const playerHitDmg=()=> (player.opts && player.opts.equip.weapon==='emberbrand') ? emberHit() : isMagicWeapon() ? SPELLS.right.dmg*SPM() : weaponOf(player).dmg*APM();
 const AREA_TIER={ farm:1, road:1, lane:1, millroad:2, wolfwood:2, camp:2, southtrail:2, mistmere:2, clearing:2,
   fellings:3, ruin:3, lowstreets:3, warren:3, kingsroad:3, elfroad:3, cave1:3, cave2:4, cave3:4, cave4:4,
   fen:4, fenlow:4, fenpath:4, barrow:5 };
@@ -14291,7 +14354,6 @@ QUEST_ITEMS.add('ember_core');
 // one rule: +4% per point of Attack Power AND per point of Spell Power, so every point you wear counts
 const emberMult=()=>1+(gearSum('ap')+gearSum('magic'))*0.04;
 const emberHit=()=>WEAPONS.emberbrand.dmg*emberMult();
-{ const oldPHD=playerHitDmg; playerHitDmg=()=> (player.opts && player.opts.equip.weapon==='emberbrand') ? emberHit() : oldPHD(); }
 // foes with fire set you alight
 const FIRE_FOE=f=> f && ((f.opts&&f.opts.equip&&['fire_blade','emberbrand'].includes(f.opts.equip.weapon)) || /^Ash Hound|^The Slag Warden/.test(f.name||''));
 
@@ -14333,12 +14395,7 @@ function drawLava(o){ const [fw,fh]=o.fp, t=(typeof gt!=='undefined'?gt:0);
   for(let k=0;k<3;k++){ const ph=(t*0.6+k*0.33+o.j*0.1)%1, q=P(o.i+0.5+rnd01(k,o.i,774)*(fw-1),o.j+0.5+rnd01(k,o.j,775)*(fh-1));   // a bubble swells and pops
     g.fillStyle=`rgba(255,220,140,${0.6*(1-ph)})`; g.beginPath(); g.ellipse(q.x,q.y,2+ph*6,1+ph*3,0,0,Math.PI*2); g.fill(); }
   g.restore(); }
-{ const oldDWC=drawWorldCache; drawWorldCache=function(){ oldDWC(); if(AREAS[areaId].theme==='ash') OBJECTS.forEach(o=>{ if(o.type==='lava') drawLava(o); }); }; }
 // embers rising everywhere in the valley, and a red cast over it all
-{ const oldLFX=drawLightFX; drawLightFX=function(){ oldLFX(); if(AREAS[areaId].theme!=='ash') return;
-    const W=gc.width, H=gc.height; g.save(); g.setTransform(1,0,0,1,0,0); g.globalCompositeOperation='multiply'; g.fillStyle='rgb(255,226,212)'; g.fillRect(0,0,W,H);
-    g.globalCompositeOperation='lighter'; for(let k=0;k<40;k++){ const ph=(gt*(0.05+rnd01(k,1,776)*0.06)+rnd01(k,2,777))%1, x=rnd01(k,3,778)*W+Math.sin(gt*0.7+k)*20, y=H*(1.05-ph*1.2);
-      g.fillStyle=`rgba(255,${120+Math.round(rnd01(k,4,779)*80)},40,${0.7*Math.sin(ph*Math.PI)})`; g.fillRect(x,y,2,2); } g.restore(); }; }
 // ash hounds glow from inside
 function drawActor(e){                               // you, a foe, a wolf
   const ch=e===player && player.sitChair;
@@ -14543,19 +14600,6 @@ SLOT_NAMES.skel='Skeleton';
 function skelWeaponHome(){ if(!CHOICE.skelWeapon || skelArmsOn()) return true;     // the staff is put away: its skeleton's weapon goes back in your pack
   const free=player.inv.indexOf(null); if(free<0) return false;
   player.inv[free]=CHOICE.skelWeapon; logMsg(ITEMS[CHOICE.skelWeapon].name+' goes back into your pack.','#a89878'); CHOICE.skelWeapon=null; return true; }
-{ const oM=moveItem; moveItem=function(from,to){
-    if((from.kind==='skel'&&to.kind==='eq') || (from.kind==='eq'&&to.kind==='skel')){ flash('Put it in your pack first.'); return false; }
-    const had=skelArmsOn(), ok=oM(from,to);
-    if(ok && had && !skelArmsOn() && CHOICE.skelWeapon && !skelWeaponHome()){ oM(to,from); flash("Make room in your pack first: your skeleton's weapon has to go somewhere."); return false; }
-    if(ok) refreshInventory();
-    return ok; }; }
-{ const oB=buildInventoryUI; buildInventoryUI=function(){ const fresh=!invBuilt; oB(); if(!fresh) return;
-    const w=document.querySelector('#eq-left .slot[data-key="weapon"]'), sl=makeSlot('skel','weapon'); sl.classList.add('skel-slot');
-    const l=document.createElement('div'); l.className='lbl'; l.textContent='Skeleton'; sl.appendChild(l); w.after(sl); }; }
-{ const oR=refreshInventory; refreshInventory=function(){ skelWeaponHome(); oR();
-    const sl=document.querySelector('#inv-overlay .skel-slot'); if(sl){ sl.style.display=skelArmsOn()?'':'none'; sl.title=CHOICE.skelWeapon?ITEMS[CHOICE.skelWeapon].name+' (carried by the skeleton you raise, for show)':'Your skeleton\'s weapon: drop any weapon here. It is only for show.'; } }; }
-{ const oD=onDragMove; onDragMove=function(e){ const was=invDrag&&invDrag.moved; oD(e);
-    if(invDrag && !was && invDrag.moved && ITEMS[invDrag.id].slot==='weapon' && skelArmsOn() && invDrag.loc.kind==='inv'){ const sl=document.querySelector('#inv-overlay .skel-slot'); if(sl) sl.classList.add('valid'); } }; }
 setInterval(()=>{ try{ if(CHOICE.skelWeapon && !skelArmsOn()) skelWeaponHome(); }catch(e){} },1000);   // however the staff left your hand
 // Vesna's last lesson: the bones you raise fight with their fists, until the fen's own dead teach you how to put a weapon back in a dead hand
 const FEN_BONES=['fen:Risen Bones','fen:Rattling Bones','fen:Restless Bones','fenlow:Drowned Bones'];
@@ -14657,7 +14701,11 @@ function pupNearFree(i,j,r=3){ for(let d=0;d<=r;d++) for(let a=-d;a<=d;a++) for(
   return [i,j]; }
 
 // ── who exists where: the pups with you, at Marta's, or the one that walks beside you ──
-function pupSync(){
+function pupSync(){                                   // a wolf left with Marta is placed as if at home
+  if(CHOICE.pupSt==='adopted' && CHOICE.pupFoster){ CHOICE.pupSt='home'; try{ placePups(); } finally{ CHOICE.pupSt='adopted'; } return; }
+  placePups();
+}
+function placePups(){
   const st=CHOICE.pupSt, old=PUPS.splice(0,PUPS.length);
   const take=(v,mode)=>{ let p=old.find(o=>o.v===v); const fresh=!p; if(!p) p=pupNew(v,player.x,player.y,mode); p.mode=mode; p.name=PUP_NAMES[v]; p.fresh=fresh; return p; };
   if(st==='follow') [0,1,2].forEach(v=>PUPS.push(take(v,'follow')));
@@ -15107,9 +15155,6 @@ let TALK_STATE='', TALK_ROOT_REAL=0;
 const RT_HOLD=()=> TALK_NPC && dlgIsOpen() ? TALK_NPC : null;
 // "Back." on every reply that would otherwise only say goodbye, inside a conversation you started
 // a cutscene clears the screen: inventory, notes, the map, a signpost you were reading (never the menu)
-{ const oC=cutscene; cutscene=function(steps,onEnd){ try{ if(invOverlay.classList.contains('open')) closeInventory(); closeNote(); if(typeof closeBigMap==='function') closeBigMap();
-      const so=document.getElementById('sign-overlay'); if(so) so.classList.remove('open'); if(typeof ctrlOverlay!=='undefined') ctrlOverlay.classList.remove('open'); }catch(e){}
-    return oC(steps,onEnd); }; }
 // people on their way somewhere: follow them through a door and they are still walking on the other side
 const TRANSIT={};
 const doorDest=n=>{ const t=n.goto||[n.i,n.j]; const o=OBJECTS.find(o=>o.type==='teleporter' && Math.abs(o.i-t[0])+Math.abs(o.j-t[1])<=1); if(o) return o.to;
@@ -15128,7 +15173,7 @@ function transitArea(prev,id){                 // someone was walking between ar
         const m=rtNPC(k,T.slot,true); m.i=en[0]; m.j=en[1]; m.x=en[0]+0.5; m.y=en[1]+0.5; m.path=[]; m.sit=false; m.chop=false; m.wander=null;
         m.goto=ex; m.vanish=true; m.transit=true; m._gone=R.gone; m.slot=T.slot; NPCS.push(m); } }catch(e){ console.error(e); } }
 // out in the rain, everyone gets wet, not only you: soaked clothes go dark, a sheen on the skin, drips and a damp patch underfoot
-let WET_NPC=0; const WET_NPC_BUF=document.createElement('canvas').getContext('2d');
+
 const rainingHere=()=>{ const A=AREAS[areaId]; return !!A && !A.inside && typeof weatherToday==='function' && weatherToday()==='rain'; };
 function drawNPCState(n){
     if(n.sleepBed) return drawSleeper(n);
@@ -15137,15 +15182,6 @@ function drawNPCState(n){
     const q=P(n.x??n.i+0.5,n.y??n.j+0.5);
     for(let k=0;k<3;k++){ const ph=((gt*(0.9+k*0.17)+k*0.37+n.i*0.13)%1), dx=[-6,5,-1][k], y0=q.y-[58,46,68][k]; g.fillStyle=`rgba(190,220,235,${0.7*(1-ph)})`; g.beginPath(); g.ellipse(q.x+dx,y0+ph*(q.y-y0),1,1.8,0,0,Math.PI*2); g.fill(); }
     g.fillStyle='rgba(40,60,70,0.16)'; g.beginPath(); g.ellipse(q.x,q.y+1,9,2.8,0,0,Math.PI*2); g.fill(); }
-{ const oDC=drawChar; drawChar=function(c,x,B,opts,swing=0,dir=0,pose=null){ if(!WET_NPC || c!==g) return oDC(c,x,B,opts,swing,dir,pose);
-    const T=g.getTransform(), sc=Math.hypot(T.a,T.b), d=T.transformPoint({x,y:B}), W=Math.ceil(130*sc), H=Math.ceil(190*sc), ox=Math.floor(d.x-W/2), oy=Math.floor(d.y-H*0.9);
-    const b=WET_NPC_BUF; if(b.canvas.width<W||b.canvas.height<H){ b.canvas.width=Math.max(W,b.canvas.width); b.canvas.height=Math.max(H,b.canvas.height); }
-    b.setTransform(1,0,0,1,0,0); b.globalCompositeOperation='source-over'; b.clearRect(0,0,b.canvas.width,b.canvas.height);
-    b.setTransform(T.a,T.b,T.c,T.d,T.e-ox,T.f-oy); oDC(b,x,B,opts,swing,dir,pose);
-    b.setTransform(1,0,0,1,0,0); b.globalCompositeOperation='source-atop'; b.fillStyle='rgba(18,26,44,0.24)'; b.fillRect(0,0,W,H);   // everything soaked a shade darker
-    b.fillStyle='rgba(210,228,245,0.13)'; for(let k=0;k<5;k++){ const xx=W*(0.32+k*0.09); b.fillRect(xx,H*0.25,Math.max(1,sc*0.8),H*0.6); }   // and a wet sheen running down
-    b.globalCompositeOperation='source-over';
-    g.save(); g.setTransform(1,0,0,1,0,0); g.drawImage(b.canvas,0,0,W,H,ox,oy,W,H); g.restore(); }; }
 // ── the road toughs who come back are not always the same sort: now and then a hedge-witch or a hedge-mage turns up in their place
 const ROAD_TOUGHS=new Set(['Road Thief','Highwayman','Footpad','Footpad Lookout']);
 const ROAD_CASTERS=[
@@ -15259,18 +15295,12 @@ pupAdopt=function(v,nm){
   if(!cutscene([ csFocus(p,0.3), pupSay(p,'Yip!',0.8), pupMv(p,player.x+0.7,player.y+0.6,2.8), csLook(player,p),
       csBark(ma,"“Off you go, "+nm+".”",2.2), csFocus(player,0.5) ], fin)) fin(); };
 // Marta will keep your wolf as long as you like, and give it back whenever you ask
-{ const oPS=pupSync; pupSync=function(){ if(CHOICE.pupSt==='adopted' && CHOICE.pupFoster){ CHOICE.pupSt='home'; try{ oPS(); } finally{ CHOICE.pupSt='adopted'; } return; } return oPS(); }; }
 function pupFosterSet(on){ const v=CHOICE.pupAdopt, nm=PUP_NAMES[v];
   CHOICE.pupFoster=on?true:null; closeDialog();
   if(on){ const p=PUPS.find(q=>q.mode==='comp'); pupSync(); const h=PUPS.find(q=>q.v===v); if(h && p){ h.x=p.x; h.y=p.y; h.i=p.i; h.j=p.j; h.wait=6; h.rest=true; }
     logMsg(nm+' stays with Marta for now.','#c8a0e0'); say('Marta the Trader',["You crouch and tell "+nm+" to stay. "+(pupHe(v)==='she'?'She':'He')+" looks at you for a long moment, then flops down at Marta's feet with a sigh that could shame a bard.","“I will feed "+pupHim(v)+". Come back for "+pupHim(v)+" whenever you like.”"],[bye]); }
   else { pupSync(); PUPS.forEach(q=>{ if(q.mode==='comp'){ q.x=player.x+0.8; q.y=player.y+0.4; q.i=Math.floor(q.x); q.j=Math.floor(q.y); q.path=[]; q.lie=0; q.alpha=1; } });
     logMsg(nm+' is with you again.','#c8a0e0'); say('Marta the Trader',["You whistle once. "+nm+" is at your side before Marta has finished turning round, tail going like a flail.","“Yes, yes. I fed "+pupHim(v)+" twice a day and "+pupHe(v)+" still looks at you like that. Go on.”"],[bye]); } }
-{ const oT=traderTalk; traderTalk=function(...a){ const r=oT(...a);
-    if(CHOICE.pupSt==='adopted' && CHOICE.pupAdopt!=null && dlgIsOpen()){ const box=document.getElementById('dlg-opts'), nm=PUP_NAMES[CHOICE.pupAdopt]||'your wolf';
-      if(box && !box.querySelector('.dlg-opt.foster') && /Marta/i.test(document.getElementById('dlg-name')?.textContent||'Marta')){ const b=document.createElement('button'); b.className='dlg-opt foster';
-        b.innerHTML=`<span>${CHOICE.pupFoster?'“I have come for '+nm+'.”':'“Could you keep '+nm+' for me a while?”'}</span>`; b.addEventListener('click',()=>pupFosterSet(!CHOICE.pupFoster)); box.insertBefore(b,box.lastElementChild); } }
-    return r; }; }
 // in a fight, your wolf goes for the foe's legs: a bite every few seconds, wherever his guard is
 const WOLF_BITE=()=>5+(pupStage()>=2?2:0);
 let wolfBiteT=2.2;
@@ -15317,13 +15347,6 @@ function drawSleeper(n){                           // asleep in a bed, turned ov
     const pt=(gi,gj,h)=>{ const q=P(bed.i+0.5+gi,bed.j+0.5+gj); return {x:q.x,y:q.y-h}; };
     const z=pt(-0.2,-0.2,48); g.save(); g.font='italic 600 11px Georgia,serif'; g.fillStyle=`rgba(220,226,250,${0.5+0.3*Math.sin(gt*1.4)})`; g.fillText('z',z.x+((gt*6)%8),z.y-((gt*6)%8)); g.font='italic 600 8px Georgia,serif'; g.fillText('z',z.x+8,z.y-12); g.restore(); }
 let CLICKED_BED=null;                                                                    // the bed you actually clicked, not just the nearest one
-{ const oBP=bedPrompt; bedPrompt=function(){ let bed=CLICKED_BED && OBJECTS.includes(CLICKED_BED) ? CLICKED_BED : null, bd=1e9; CLICKED_BED=null;
-    if(!bed) OBJECTS.filter(o=>o.type==='bed').forEach(o=>{ const d=Math.hypot(o.i+1-player.x,o.j+0.5-player.y); if(d<bd){ bd=d; bed=o; } });
-    const sl=bed && NPCS.find(n=>n.sleepBed && n.sleepBed.i===bed.i && n.sleepBed.j===bed.j);
-    if(sl){ say(sl.name,[sl.name+" is asleep in that one. The bed by the far wall is free."],[{label:'Leave them be.',fn:closeDialog}]); return; }
-    if(bed && bed.owner && areaId==='elderhouse'){ say('A Bed',["That is "+({elder:"Hamond's",wenna:"Old Wenna's",ada:"Ada's"}[bed.owner])+" bed. Better not."],[{label:'Not now.',fn:closeDialog}]); return; }
-    const r=oBP(); if(bed && bed.edric){ const t=document.getElementById('dlg-text'); if(t) t.innerHTML="<p>Edric's bed. Ada keeps it made, the blanket turned down as if he might still come home. Hamond told you to use it.</p>"+t.innerHTML.replace(/<p>The blanket is rough but warm\. /,'<p>'); }
-    return r; }; }
 // ── a little round hut in Dunhollow's west corner: wattle and daub, a cone of thatch, smoke from the top ──
 wrap('village','objects',l=>[...l,{type:'roundhut', i:0, j:8, fp:[2,2]}]);
 function paintRoundHut(x,y){ const rx=72, ry=36, H=46, R=1.16;
@@ -15344,11 +15367,7 @@ function paintRoundHut(x,y){ const rx=72, ry=36, H=46, R=1.16;
 function drawRoundHut(o){ const q=P(o.i+1,o.j+1); drawCached('roundhut',q.x,q.y,190,190,95,150,paintRoundHut);
     for(let k=0;k<4;k++){ const t=((gt*0.18+k/4)%1); g.fillStyle=`rgba(150,146,140,${0.22*(1-t)})`; g.beginPath(); g.arc(q.x+Math.sin(t*3+k)*6+t*8,q.y-46-62-t*55,3+t*9,0,Math.PI*2); g.fill(); } }
 // the purple bandana is the Baron's thugs' mark: you take it off one of them, no honest (or dishonest) vendor ever sells it
-{ const oSF=shopFrom; shopFrom=function(who,stock,...r){ if(Array.isArray(stock) && stock.key!=='gratis'){ const key=stock.key; stock=stock.filter(id=>unWoven(id)!=='bandana'); if(key!==undefined) stock.key=key; } return oSF(who,stock,...r); }; }
 // chairs block your way like anything else; only someone going to sit on one may step onto it
-{ const oFP=findPath; findPath=function(si,sj,ti,tj){ const ch=OBJECTS.find(o=>o.type==='chair' && o.i===ti && o.j===tj);
-    if(!ch || (si===player.i && sj===player.j)) return oFP(si,sj,ti,tj);
-    const k=ti+','+tj, was=blocked.has(k); blocked.delete(k); try{ return oFP(si,sj,ti,tj); } finally{ if(was) blocked.add(k); } }; }
 // whoever sits at a table sits on the chair, pulled in to it
 function drawNPC(n){                                 // a townsperson: on a chair, asleep, soaked by rain, in a towel, carrying a log
     const ch=n.sit && !n.moving && OBJECTS.find(o=>o.type==='chair' && o.i===n.i && o.j===n.j);
@@ -15374,10 +15393,6 @@ function drawSoftBlood(b,a){ const q=P(b.x,b.y), r=b.r; g.save(); g.translate(q.
   g.restore(); }
 // icons tuned to the colour each piece actually has when worn (measured from the figure itself, so the pack and the paper doll agree)
 const ICON_TINT={"elf_circlet":[1.27,1.25,1.24],"elf_leggings":[1.73,1.87,1.9],"elf_trousers":[1.81,1.82,1.9],"elf_shirt":[1.34,1.28,1.44],"fen_boots":[1.9,1.75,1.9],"robe_blue":[1.56,1.48,1.32],"elf_tunic_worn":[1.37,1.37,1.57],"emberstep_boots":[1.54,1.79,1.9],"robe_elf":[1.11,1.12,1.16],"elf_bustier":[0.89,0.85,0.85],"coif":[1.23,1.22,1.23],"brightmail":[1.16,1.15,1.14],"elf_leggings_worn":[1.32,1.31,1.35],"cinder_gloves":[1.59,1.5,1.5],"elf_cloak":[1.24,1.2,1.23],"hood":[1.28,1.31,1.35],"kettle":[1.15,1.15,1.14],"straw_hat":[1.15,1.16,1.17],"hood_red":[1.25,1.23,1.23],"bandana":[1.22,1.44,1.1],"tunic_linen":[0.95,0.88,0.88],"tunic_gold":[0.9,0.79,0.73],"necro_leggings":[0.87,0.79,0.75],"helm_full":[1.09,1.09,1.09],"ash_mantle":[1.24,1.19,1.19]};
-{ const oDII=drawItemIcon; drawItemIcon=function(g2,id,size){ const r=oDII(g2,id,size); const T=id && ICON_TINT[unWoven(id)]; if(!T) return r;
-    try{ g2.setTransform(1,0,0,1,0,0); const im=g2.getImageData(0,0,size,size), d=im.data;
-      for(let i=0;i<d.length;i+=4){ if(!d[i+3]) continue; d[i]=Math.min(255,d[i]*T[0]); d[i+1]=Math.min(255,d[i+1]*T[1]); d[i+2]=Math.min(255,d[i+2]*T[2]); }
-      g2.putImageData(im,0,0); }catch(e){} return r; }; }
 // Vesna's lantern: carried in the off hand, it lights the way at night and lends a little of the fen's strength
 const hasLantern=()=> hasItem('morwen_lantern') || !!(player.opts && player.opts.equip && unWoven(player.opts.equip.offhand||'')==='morwen_lantern');
 Object.assign(ITEM_STATS,{ morwen_lantern:{ magic:2, ap:2 } }); PRICES.morwen_lantern=PRICES.morwen_lantern||60;
@@ -15845,16 +15860,11 @@ const SHELL_CACHE=new Map(), SHELL_CV=document.createElement('canvas'); SHELL_CV
 function gearShell(opts,swing,dir,pose){ const pk=pose?pose.kind+':'+Math.round(Math.min(1,pose.t)*8):'-', key=(opts._shellId||(opts._shellId=Math.random().toString(36).slice(2)))+'|'+dir+'|'+pk+'|'+Math.round(swing);
   let cv=SHELL_CACHE.get(key); if(cv) return cv;
   const c=SHELL_CV.getContext('2d',{willReadFrequently:true}); c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,440,460); c.setTransform(2,0,0,2,0,0);
-  const sg=g; try{ oDrawCharForShell(c,110,200,{...opts, bones:false, shell:true, skin:30, beard:0, stubble:false, marks:null},swing,dir,pose); } finally{ g=sg; }
+  const sg=g; try{ drawCharSoaked(c,110,200,{...opts, bones:false, shell:true, skin:30, beard:0, stubble:false, marks:null},swing,dir,pose); } finally{ g=sg; }
   const im=c.getImageData(0,0,440,460), d=im.data;
   for(let k=0;k<d.length;k+=4){ const r=d[k], gg=d[k+1], b=d[k+2]; if(d[k+3] && r-gg>28 && b-gg>28 && Math.abs(r-b)<110) d[k+3]=0; }   // the skin: gone, so the bones show
   cv=document.createElement('canvas'); cv.width=440; cv.height=460; cv.getContext('2d').putImageData(im,0,0);
   if(SHELL_CACHE.size>240) SHELL_CACHE.clear(); SHELL_CACHE.set(key,cv); return cv; }
-let oDrawCharForShell=null;
-{ const oDC=drawChar; oDrawCharForShell=oDC; drawChar=function(c,x,B,opts,swing=0,dir=0,pose=null){ if(!opts || !opts.bones) return oDC(c,x,B,opts,swing,dir,pose);
-    const k=pose&&pose.kind==='raise'?-0.45*Math.min(1,pose.t):pose&&pose.kind==='strike'?Math.max(0,1-Math.min(1,pose.t)*0.6):0;
-    drawSkelFig(x,B,{asm:1, stand:true, dir, moving:Math.abs(swing)>0.5, walk:gt*9, k, weapon:null});
-    const sh=gearShell(opts,swing,dir,pose); c.drawImage(sh,x-110,B-200,220,230); }; }
 // ════════════════════════════════════════════════════════════════════════════
 //  FIRST TIME: the first time something new happens, time slows to a crawl and a card says what to do.
 //  You can still act while it is slow. 'Got it' (or Enter) and the world speeds up again. CHOICE.taught remembers.

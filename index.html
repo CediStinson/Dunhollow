@@ -5265,6 +5265,10 @@ function breakObject(o){
       floatText([o.i,o.j],'Found: '+ITEMS[id].name,'#8ac070',true);
       logMsg('You find '+ITEMS[id].name+' inside.','#8ac070');
     } else floatText([o.i,o.j],'Bag full!','#e0b070');
+  } else if(typeof JUNK_COMMON!=='undefined' && Math.random()<(o.rich?0.6:0.36)){                        // odds and ends: somebody's spoons, buttons, a pipe
+    const pool=o.rich||Math.random()<0.12 ? JUNK_FINE : JUNK_COMMON, id=pool[Math.floor(Math.random()*pool.length)], free=player.inv.indexOf(null);
+    if(free>=0){ player.inv[free]=id; floatText([o.i,o.j],'Found: '+ITEMS[id].name,'#c8b890',true); logMsg('You find '+ITEMS[id].name.replace(/^An? /,'a ').replace(/^Some /,'some ')+' inside.','#c8b890'); updateHud(); }
+    else floatText([o.i,o.j],'Bag full!','#e0b070');
   } else if(Math.random()<(o.rich?0.7:0.08)){
     const cu=o.rich ? 4+Math.floor(Math.random()*6) : 1+Math.floor(Math.random()*3); player.purse+=cu; updateHud();
     floatText([o.i,o.j],'+'+formatCoin(cu),'#e8c060',true); logMsg('A few coppers lay at the bottom: '+formatCoin(cu)+'.','#e8c060');
@@ -16665,6 +16669,49 @@ function drawMule3D(X,Y,phi,ph,moving,pack,harness,seed){
   oa.setTransform(k,0,0,k,-ox*k,-oy*k); g=oa; try{ parts.forEach(p=>{ if(p.sharp && (p.sharp[0]*sf+p.sharp[1]*cf)>0.2) p.fn(1); }); } finally{ g=G; }   // and the fine detail that faces us, crisp again
   g.drawImage(O.a,0,0,pw,ph2,ox,oy,W,H);
   if(CK){ let c=CACHE.get(CK); if(!c){ if(CACHE.size>24) CACHE.delete(CACHE.keys().next().value); c={cv:document.createElement('canvas')}; CACHE.set(CK,c); } if(c.cv.width<pw) c.cv.width=pw; if(c.cv.height<ph2) c.cv.height=ph2; const cc=c.cv.getContext('2d'); cc.clearRect(0,0,c.cv.width,c.cv.height); cc.drawImage(O.a,0,0); c.t=gt; } }
+
+// ════════ Odds and ends: the junk in crates and barrels, worth a few coppers to any trader ════════
+const JUNK_DEF={   // id: [name, price, what it is]
+  bent_spoon:['A Bent Spoon',1,'A pewter spoon somebody used to dig with.'], tin_cup:['A Dented Tin Cup',2,'Dented, but it still holds water. Mostly.'],
+  wooden_bowl:['A Chipped Bowl',1,'A turned wooden bowl with a crack down one side.'], old_fork:['An Iron Fork',2,'Two tines, a little rust, a lot of meals.'],
+  candle_stub:['Candle Stubs',1,'A handful of tallow ends. Some chandler will melt them down.'], brass_buttons:['Brass Buttons',3,'Six brass buttons, cut off somebody\'s good coat.'],
+  clay_pipe:['A Clay Pipe',2,'A long white clay pipe, the stem snapped short.'], thimble:['A Thimble',2,'A brass thimble, worn smooth by somebody\'s finger.'],
+  horn_comb:['A Horn Comb',2,'A comb of polished horn, missing three teeth.'], rusty_key:['A Rusty Key',1,'It opens nothing you know of.'],
+  carved_horse:['A Carved Horse',3,'A child\'s wooden horse, the paint long gone.'], bone_dice:['Bone Dice',3,'A pair of bone dice. One of them rolls sixes rather often.'],
+  iron_nails:['A Fistful of Nails',1,'Bent nails. The smith will take them for scrap.'],
+  pewter_tankard:['A Pewter Tankard',7,'A heavy pewter tankard with a hinged lid.'], silver_spoon:['A Silver Spoon',12,'A real silver spoon with a little crest on the handle. Somebody will miss it.'],
+  brass_candlestick:['A Brass Candlestick',9,'A tall brass candlestick, greened at the base.'], green_bottle:['A Green Glass Bottle',4,'Thick green glass, the stopper still in.'],
+  cameo:['A Little Cameo',18,'A woman\'s profile carved in shell, in a ring of tarnished silver.'] };
+Object.entries(JUNK_DEF).forEach(([id,[name,price,title]])=>{ ITEMS[id]={ name, slot:'misc', junk:true, title }; PRICES[id]=price; SELL_MISC.add(id); });
+const JUNK_COMMON=['bent_spoon','tin_cup','wooden_bowl','old_fork','candle_stub','brass_buttons','clay_pipe','thimble','horn_comb','rusty_key','carved_horse','bone_dice','iron_nails'];
+const JUNK_FINE=['pewter_tankard','silver_spoon','brass_candlestick','green_bottle','cameo','brass_buttons','bone_dice'];
+// their icons, in the 40x40 item box
+paintItemArt=(orig=>function(g2,id,size){ if(!JUNK_DEF[id]) return orig.apply(this,arguments);
+  g2.save(); g2.scale(size/40,size/40); g2.lineCap='round'; g2.lineJoin='round';
+  const E=(x,y,rx,ry,f,st,r=0)=>{ g2.beginPath(); g2.ellipse(x,y,rx,ry,r,0,Math.PI*2); if(f){ g2.fillStyle=f; g2.fill(); } if(st){ g2.strokeStyle=st; g2.lineWidth=1; g2.stroke(); } };
+  const L=(pts,c,w)=>{ g2.strokeStyle=c; g2.lineWidth=w; g2.beginPath(); pts.forEach(([x,y],k)=>k?g2.lineTo(x,y):g2.moveTo(x,y)); g2.stroke(); };
+  const Pg=(pts,f,st)=>{ g2.beginPath(); pts.forEach(([x,y],k)=>k?g2.lineTo(x,y):g2.moveTo(x,y)); g2.closePath(); g2.fillStyle=f; g2.fill(); if(st){ g2.strokeStyle=st; g2.lineWidth=1; g2.stroke(); } };
+  const metal=(c1,c2)=>{ const gr=g2.createLinearGradient(8,8,32,32); gr.addColorStop(0,c1); gr.addColorStop(1,c2); return gr; };
+  switch(id){
+    case 'bent_spoon': L([[9,32],[18,22],[22,19]],'#9a9ca2',2.4); E(26,15,5,3.6,metal('#d8dae0','#7a7c84'),'#4a4c52',-0.7); break;
+    case 'silver_spoon': L([[9,33],[21,20]],'#d8dae2',2.2); E(26,14,5.2,3.8,metal('#f4f6fa','#a0a4ac'),'#5a5e66',-0.75); E(10,32,1.8,1.8,'#c8b060'); break;
+    case 'old_fork': L([[10,33],[22,18]],'#7a6a5a',2.4); L([[22,18],[28,9]],'#6a6a70',1.4); L([[22,18],[31,12]],'#6a6a70',1.4); L([[8,34],[13,29]],'#5a3a20',3.4); break;
+    case 'tin_cup': Pg([[11,12],[27,12],[25,32],[13,32]],metal('#c8ccd2','#7a7e86'),'#4a4e56'); E(19,12,8,2.4,'#5a5e66','#4a4e56'); L([[27,16],[32,18],[31,26],[26,27]],'#8a8e96',2); Pg([[18,23],[22,22],[22,25]],'rgba(60,60,70,0.5)'); break;
+    case 'pewter_tankard': Pg([[10,12],[26,12],[26,33],[10,33]],metal('#b4b8c0','#6a6e76'),'#3e4248'); E(18,12,8,2.2,'#8a8e96','#3e4248'); L([[26,16],[32,17],[32,28],[26,29]],'#7a7e86',2.4); Pg([[9,9],[27,9],[26,12],[10,12]],'#9a9ea6','#3e4248'); L([[10,24],[26,24]],'#5a5e66',1); break;
+    case 'wooden_bowl': Pg([[6,18],[34,18],[30,28],[10,28]],'#8a5a30','#4a2c14'); E(20,18,14,4,'#a8743e','#4a2c14'); E(20,18,10,2.6,'#6a4220'); L([[25,19],[27,26]],'#3a2210',1.2); break;
+    case 'candle_stub': [[12,22,8],[20,18,12],[28,24,6]].forEach(([x,y,h])=>{ Pg([[x-3,y+h],[x+3,y+h],[x+3,y],[x-3,y]],'#efe2b8','#a8946a'); L([[x,y],[x,y-3]],'#2a2018',1); Pg([[x-3,y],[x+3,y],[x+2,y+3],[x-1,y+2]],'#d8c890'); }); break;
+    case 'brass_buttons': [[13,14],[25,13],[19,22],[12,28],[27,27],[20,31]].forEach(([x,y])=>{ E(x,y,4.2,4.2,metal('#f0d080','#9a7020'),'#6a4a10'); E(x,y,1.8,1.8,null,'#7a5a18'); }); break;
+    case 'clay_pipe': E(12,24,5,6,'#ece6d6','#8a8070'); E(12,19.5,3.6,1.6,'#3a3028'); L([[15,27],[33,14]],'#e8e2d2',2.4); L([[15,27],[33,14]],'rgba(120,110,90,0.4)',0.6); break;
+    case 'thimble': Pg([[13,30],[27,30],[25,13],[15,13]],metal('#f0d890','#9a7428'),'#6a4a14'); E(20,13,5,2,'#d8bc68','#6a4a14'); for(let y=17;y<29;y+=3) for(let x=15;x<26;x+=3) E(x+(y%2),y,0.55,0.55,'#7a5a20'); E(20,30,7,1.8,null,'#6a4a14'); break;
+    case 'horn_comb': Pg([[7,15],[33,15],[33,21],[7,21]],'#c8a878','#6a5030'); for(let x=8;x<33;x+=2.2){ if(x>20&&x<27&&Math.floor(x)%3===0) continue; L([[x,21],[x,30]],'#b8986a',1.2); } break;
+    case 'rusty_key': E(11,20,5,5,null,null); g2.lineWidth=2.6; g2.strokeStyle='#8a5a34'; g2.beginPath(); g2.arc(11,20,4.6,0,Math.PI*2); g2.stroke(); L([[16,20],[33,20]],'#8a5a34',2.6); L([[28,20],[28,26]],'#8a5a34',2.4); L([[32,20],[32,25]],'#8a5a34',2.4); E(23,20,1.2,1.2,'#a06a3a'); break;
+    case 'carved_horse': Pg([[10,18],[26,17],[29,13],[33,14],[33,18],[29,21],[28,26],[26,26],[25,22],[14,22],[13,27],[11,27],[11,22],[8,19]],'#b07a48','#5a3a1c'); L([[29,13],[30,10]],'#5a3a1c',1.6); Pg([[7,30],[30,30],[30,33],[7,33]],'#8a5a30','#4a2c14'); L([[12,27],[12,30]],'#5a3a1c',1.6); L([[27,26],[27,30]],'#5a3a1c',1.6); break;
+    case 'bone_dice': [[9,14,0.15],[20,20,-0.2]].forEach(([x,y,r])=>{ g2.save(); g2.translate(x+6,y+6); g2.rotate(r); Pg([[-6,-6],[6,-6],[6,6],[-6,6]],'#ece4cc','#8a8068'); [[-3,-3],[0,0],[3,3]].forEach(([a,b2])=>E(a,b2,1.1,1.1,'#2a2018')); g2.restore(); }); break;
+    case 'iron_nails': [[8,12,0.5],[12,30,-0.3],[20,10,0.9],[24,28,0.2],[16,18,-0.8]].forEach(([x,y,r])=>{ g2.save(); g2.translate(x,y); g2.rotate(r); L([[0,0],[14,0]],'#6a6a72',1.8); L([[0,-2.2],[0,2.2]],'#5a5a62',2.2); g2.restore(); }); break;
+    case 'brass_candlestick': E(20,33,10,2.6,metal('#f0d080','#8a6418'),'#5a4010'); Pg([[17,32],[23,32],[22,12],[18,12]],metal('#f0d080','#8a6418'),'#5a4010'); E(20,22,4.5,2,'#d8b050','#5a4010'); E(20,12,6,2,'#e8c870','#5a4010'); Pg([[17.5,12],[22.5,12],[22,4],[18,4]],'#f2ead0','#a89a70'); E(20,25,3,1,'rgba(80,140,90,0.6)'); break;
+    case 'green_bottle': Pg([[14,34],[26,34],[26,18],[22,13],[22,6],[18,6],[18,13],[14,18]],'rgba(70,130,80,0.85)','#244a2c'); Pg([[17,4],[23,4],[23,8],[17,8]],'#a07a50','#5a3a1c'); L([[16,30],[16,20]],'rgba(220,255,220,0.5)',1.4); break;
+    case 'cameo': E(20,21,11,13,metal('#d8dae2','#7a7e88'),'#4a4e56'); E(20,21,8.4,10.4,'#c87a5a'); g2.fillStyle='#f2e6d8'; g2.beginPath(); g2.moveTo(18,30); g2.quadraticCurveTo(15,24,17,19); g2.quadraticCurveTo(17,13,21,13); g2.quadraticCurveTo(25,14,24,18); g2.lineTo(26,21); g2.lineTo(24,22); g2.quadraticCurveTo(25,27,22,30); g2.closePath(); g2.fill(); break; }
+  g2.restore(); })(paintItemArt);
 </script>
 </body>
 </html>

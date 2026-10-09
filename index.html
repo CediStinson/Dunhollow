@@ -4763,7 +4763,7 @@ function switchArea(id,entryKey){
   updateMinimap();
   banner(A.label,'#e8c878',1300);
   skelFollowArea(); stonesHint(id); fenOpenCheck(id); fenRumour(id); poolsArea(id); introScene(id,entryKey);
-  markElves(); tentBlock(id);
+  markElves(); tentBlock(id); corridorBlock(id);
   try{ pupArea(); }catch(err){ console.error(err); }
   transitArea(prev,id);
   autosaveSoon();
@@ -5021,7 +5021,7 @@ function paintRock(x,y,s){
 // ── trees are real, depth-sorted objects (they block their tile, so nobody walks through a trunk) ──
 const TREE_DENSITY = { farm:0.08, road:0.7, crossroads:0.6, village:0.2, wood:0.9, fen:0.5, elf:0.7, bog:0.2 };
 function genTrees(id){
-  const A=AREAS[id], dens=TREE_DENSITY[A.theme]||0; if(!dens) return [];
+  const A=AREAS[id], dens=A.dens??(TREE_DENSITY[A.theme]||0); if(!dens) return [];
   const saveArea=areaId; areaId=id;                           // groundAt reads the current area's paths
   const keep=[];
   const busy=new Set();
@@ -10550,19 +10550,21 @@ Object.assign(TALKERS,{ apprentice:apprenticeTalk, ellin:ellinTalk, cole:coleTal
 // ════════════════ the long ways between places ════════════════
 const encounter=(key,chance)=>{ const day=Math.floor(dayClock/DAY_LEN); return rnd01(day*17+key.length,key.charCodeAt(0),400)<chance; };   // same answer all day, new roll the next
 Object.assign(AREAS,{
-  lane:{ fence:{r:false,l:false}, w:7, h:24, theme:'road', label:'Dunhollow Lane', mini:{x:0,y:0},
-    // a forest road like the one from the farm, with Dunhollow's small fields and ploughland cut into the verges
-    notches:()=>[ {i0:5,j0:1,w:2,h:7}, {i0:0,j0:2,w:2,h:9,kind:'plough'}, {i0:5,j0:12,w:2,h:7} ], dummy:null,
-    objects:()=>{ const l=[{type:'teleporter', i:3, j:0, to:'village', entry:'fromCrossroads'}, {type:'teleporter', i:0, j:21, to:'road', entry:'fromCrossroads'},
-      {type:'milestone', i:4, j:20, t:'DUN ½'}, {type:'scarecrow', i:6, j:4}, {type:'scarecrow', i:6, j:15}, {type:'shrine', i:1, j:13},
-      {type:'logpile', i:0, j:16}];
-      if(!destroyedBreakables.has('lane:0,18')) l.push({type:'crate', i:0, j:18, breakable:true});
-      [[2,14],[2,17],[4,7],[2,20]].forEach(([i,j])=>l.push({type:'critter', kind:'flowers', i, j, noblock:true}));
-      [[4,1],[1,19]].forEach(([i,j])=>l.push({type:'rocks', i, j, noblock:true}));
+  lane:{ fence:{r:false,l:false}, w:14, h:24, theme:'road', label:'Dunhollow Lane', mini:{x:0,y:0}, corridor:1.8, dens:1.7,
+    // a forest road that winds like a snake between boulders and little fields: east, back west, east again, and up to Dunhollow
+    notches:()=>[ {i0:3,j0:18,w:6,h:3,kind:'plough'}, {i0:5,j0:11,w:5,h:4} ], dummy:null,
+    objects:()=>{ const l=[{type:'teleporter', i:4, j:0, to:'village', entry:'fromCrossroads'}, {type:'teleporter', i:0, j:23, to:'road', entry:'fromCrossroads'},
+      {type:'milestone', i:3, j:22, t:'DUN ½'}, {type:'scarecrow', i:5, j:19}, {type:'scarecrow', i:8, j:12}, {type:'shrine', i:1, j:14},
+      {type:'logpile', i:12, j:23},
+      {type:'rocks', i:13, j:21}, {type:'rockridge', i:10, j:18, fp:[3,1], v:1}, {type:'rocks', i:0, j:12},   // the road bends round the boulders
+      {type:'rockridge', i:6, j:6, fp:[3,1], v:2}, {type:'rocks', i:13, j:6}, {type:'rocks', i:2, j:3}];
+      if(!destroyedBreakables.has('lane:12,22')) l.push({type:'crate', i:12, j:22, breakable:true});
+      [[7,23],[11,16],[3,13],[10,10],[9,4]].forEach(([i,j])=>l.push({type:'critter', kind:'flowers', i, j, noblock:true}));
+      [[8,22],[5,9]].forEach(([i,j])=>l.push({type:'rocks', i, j, noblock:true}));
       return l; },
     npcs:()=>[],
-    mobs:()=> nightAmt()>0.5 && QUEST.wolves<2 ? [{ name:'Hungry Wolf', type:'wolf', i:4, j:9, faction:'lanewolf', coat:'#7a7064', daily:true }] : [],
-    entries:{ fromRoad:{i:1,j:21}, fromCross:{i:1,j:21}, fromVillage:{i:3,j:1} } },
+    mobs:()=> nightAmt()>0.5 && QUEST.wolves<2 ? [{ name:'Hungry Wolf', type:'wolf', i:7, j:10, faction:'lanewolf', coat:'#7a7064', daily:true }] : [],
+    entries:{ fromRoad:{i:1,j:23}, fromCross:{i:1,j:23}, fromVillage:{i:4,j:1} } },
   kingsroad:{ fence:{r:false,l:false}, w:8, h:49, theme:'road', label:"The King's Road", mini:{x:0,y:0}, noTree:['0,0','1,0','2,0','3,0','5,0','6,0','7,0','0,1','1,1','2,1','6,1','7,1','0,2','7,2'],
     notches:()=>[], dummy:null,
     objects:()=>[ {type:'teleporter', i:4, j:48, to:'road', entry:'fromCity'}, {type:'milestone', i:6, j:44, t:'HOL 3'}, {type:'rocks', i:1, j:38, noblock:true}, {type:'rocks', i:6, j:33, noblock:true},
@@ -10592,12 +10594,12 @@ Object.assign(AREAS,{
     mobs:()=> nightAmt()>0.5 ? [{ name:'Night Wolf', type:'wolf', i:3, j:16, faction:'nightwolf', coat:'#4a4e56', daily:true }] : [],
     entries:{ fromMere:{i:3,j:24}, fromGate:{i:3,j:1} } },
 });
-AREA_PATHS.lane=[ [[3.5,-0.5],[3.2,6],[3.8,12],[3.1,18],[2.6,21.2],[-0.5,21.5]] ];   // the forest road comes in from the west, low on the lane
+AREA_PATHS.lane=[ [[-0.5,23.5],[5,23.4],[10.5,22.8],[12.2,20.5],[11,17.6],[7,16.8],[3.2,15.6],[2.4,12.5],[4.5,10.2],[9,9.8],[11.8,8],[11.4,5],[8.5,3.6],[5,3.2],[4,1.2],[4.5,-0.5]] ];   // in from the forest road on the west, a long snake up to Dunhollow
 // Dunhollow Lane: the man in grey comes back for his master's letter
-wrap('lane','npcs',list=> CHOICE.letter==='sold' || ambushReady() ? list : [...list, ...AREAS.crossroads._strangerDef()]);
+wrap('lane','npcs',list=> CHOICE.letter==='sold' || ambushReady() ? list : [...list, ...AREAS.crossroads._strangerDef().map(n=>({...n, i:6, j:16}))]);
 wrap('lane','mobs',list=> ambushReady() ? [...list,
-  { name:'The Man in Grey', type:'brute', i:5, j:9, faction:'grey', opts:{gender:'m',skin:0,hair:1,hairColor:0,beard:0,equip:{head:'hood',torso:'shirt',armor:'mail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'sword',offhand:null}} },
-  { name:'Hired Blade', type:'bandit', i:2, j:10, faction:'grey', opts:BANDIT({skin:3,hair:3,hairColor:2,beard:4}) } ] : list);
+  { name:'The Man in Grey', type:'brute', i:6, j:16, faction:'grey', opts:{gender:'m',skin:0,hair:1,hairColor:0,beard:0,equip:{head:'hood',torso:'shirt',armor:'mail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'sword',offhand:null}} },
+  { name:'Hired Blade', type:'bandit', i:4, j:15, faction:'grey', opts:BANDIT({skin:3,hair:3,hairColor:2,beard:4}) } ] : list);
 // ── The Mill Track: west out of Dunhollow, past the old mill-pond, to the crossroads ──
 Object.assign(AREAS,{ millroad:{ fence:{r:false,l:false}, w:34, h:7, theme:'road', label:'The Mill Track', mini:{x:0,y:0},
     notches:()=>[], dummy:null,
@@ -14574,6 +14576,9 @@ wrap('road','mobs',l=> nightAmt()<0.3 ? [...l,{ name:'Road Thief', type:'bandit'
 AREAS.weavetent={ ...CROOM("Maelis's Weaving Tent",5,5,'sylvhaven','fromTent', ()=>[{type:'loom', i:1, j:0, fp:[2,1]}, {type:'clothtable', i:4, j:2}, {type:'lantern', i:0, j:2}],
   ()=> havenBurnt() ? [] : [{ id:'maelis', name:'Maelis the Weaver', i:3, j:1, dir:0, opts:ELFO({gender:'f',skin:1,hair:3,hairColor:1,face:1,marks:{elfFace:2,earrings:'drop'},equip:{head:'elf_circlet',torso:'elf_tunic',armor:'robe_elf',hands:null,legs:'elf_leggings',feet:'elf_boots',weapon:null,offhand:'moon_amulet'}}) }]), tent:true, round:true };
 AREAS.weavetent.entries.fromCity={i:1,j:4};
+function corridorBlock(id){ const A=AREAS[id]; if(!A || !A.corridor) return;   // a road through deep forest: off the road there is no way through
+  for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++){ if(inNotch(i,j)) continue; const k=i+','+j; if(groundAt(i+0.5,j+0.5).d>A.corridor) blocked.add(k); }
+  OBJECTS.forEach(o=>{ if(o.type==='teleporter') blocked.delete(o.i+','+o.j); }); Object.values(A.entries).forEach(e=>blocked.delete(e.i+','+e.j)); }
 function tentBlock(id){ if(AREAS[id] && AREAS[id].tent){ for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++) if(!inTent(i+0.5,j+0.5)) blocked.add(i+','+j); } }
 wrap('sylvhaven','npcs',l=>l.filter(n=>n.id!=='maelis'));
 wrap('sylvhaven','objects',l=>l.map(o=>o.type==='pavilion'&&o.i===1&&o.j===1&&!o.burnt ? {...o, door:'r', dt:1, inside:'weavetent', back:'fromCity'} : o));
@@ -15884,7 +15889,7 @@ const MOUNDS=[
   ['kingsroad',0,13,{coin:18},"A traveller's purse, slit open and buried empty… no: the thief hid the coin and the purse together, and never came back."],
   ['elfroad',0,5,{item:'potion'},"A flask of something green, stoppered with silver wire. Elvish. It smells of mint, and of healing."],
   ['willowpool',11,4,{item:'copper_chain'},"A copper chain, green with age, in a nest of willow roots."],
-  ['lane',5,19,{coin:9,item:'bread'},"A carter's dinner and his pay, buried against bandits. The bread is a week old. The coin isn't."],
+  ['lane',12,9,{coin:9,item:'bread'},"A carter's dinner and his pay, buried against bandits. The bread is a week old. The coin isn't."],
   ['mistmere',12,1,{item:'grave_ring'},"A ring, black with damp, on a finger bone. You leave the finger. You take the ring."] ];
 const moundKey=m=>m[0]+':'+m[1]+','+m[2];
 const hasSpade=()=> player.opts && player.opts.equip.weapon==='shovel';

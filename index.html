@@ -16543,6 +16543,26 @@ npcHasNews=(orig=>function(n){ if(n && !n.sleepBed){
       say(O,["Oswin lays a sword on the counter that you hardly recognise: grey, clean steel, a fresh bright edge, the old fuller cut deep down the middle.","“Whoever was buried with that knew what they were carrying. Whatever your witch wants with it, I don't want to know.”"],[
         {label:'Take the blade.', fn:()=>{ if(!giveQuestItem('clean_blade')) return; remember('reforge','clean',"Oswin cleaned the grave-blade. Back to Vesna with it, and with bones."); updateHud(); closeDialog(); }}, bye]); return; }
     return oS(...a); }; }
+
+// ════════ Places you have emptied don't stay empty: chests in the quiet Fellings, and now and then new squatters ════════
+const dayRoll=(a,salt)=>{ const v=Math.sin((Math.floor(dayClock/DAY_LEN)+1)*12.9898+salt*78.233+[...a].reduce((h,c)=>h+c.charCodeAt(0),0)*0.37)*43758.5453; return v-Math.floor(v); };
+const LOGGERS_GONE=()=>['seal','paid','colliers','fought'].includes(CHOICE.fell);
+// the Fellings once the loggers have gone: some days the elves leave something in the old crates (they turn up as chests, freshly filled)
+{ const oF=AREAS.fellings.objects; AREAS.fellings.objects=()=>{ const chestDay=LOGGERS_GONE() && dayRoll('fellings',3)<0.4, d=Math.floor(dayClock/DAY_LEN);
+    if(chestDay && CHOICE.fellChestDay!==d){ CHOICE.fellChestDay=d; [[1,7],[2,7]].forEach(([i,j])=>{ const k='fellings:'+i+','+j; destroyedBreakables.delete(k); delete OPENED_KIND[k]; }); }
+    return oF().map(o=> chestDay && o.breakable && (o.type==='crate'||o.type==='chest') ? {...o, rich:true} : o); }; }
+// squatters: a few days in four, a new little band settles where the last one was cleared out
+const SQUAT={ camp:'bandits', southtrail:'goblins', fellings:'mixed' };
+const SQUAT_B=[['Drifter','dagger','jerkin'],['Ragged Cutthroat','club',null],['Squatter','hatchet','gambeson'],['Hedge Robber','spear','jerkin']];
+const SQUAT_G=[['Goblin Scavenger','dagger'],['Goblin Squatter','spear'],['Goblin Rummager','hatchet']];
+Object.entries(SQUAT).forEach(([a,kind])=>{ const base=AREAS[a].mobs; AREAS[a].mobs=()=>{ const l=base(), d=Math.floor(dayClock/DAY_LEN);
+    const own=l.filter(m=>!m.daily), cleared=(a==='fellings') ? LOGGERS_GONE() : own.length>0 && own.every(m=>defeatedMobs.has(a+':'+m.name.trim()) || defeatedMobs.has(a+':'+m.name));   // only where you cut them down, not where they were spared
+    if(!cleared || dayRoll(a,7)>=0.28) return l;                                                 // most days it stays quiet
+    const spots=(l.length?l:[{i:Math.floor(AREAS[a].w/2),j:Math.floor(AREAS[a].h/2)}]).map(m=>[m.i,m.j]), n=2+Math.floor(dayRoll(a,11)*2), gob=kind==='goblins'||(kind==='mixed'&&dayRoll(a,13)<0.5), out=[...l];
+    for(let k=0;k<n;k++){ const [i,j]=spots[k%spots.length], di=k>=spots.length?1:0;
+      if(gob){ const [nm,w]=SQUAT_G[(k+d)%SQUAT_G.length]; out.push({ name:nm+(k?' '.repeat(k):''), type:'goblin', i:i+di, j, faction:'goblins', daily:true, opts:GOBLIN({skin:20+(k%3),equip:{head:k%2?'hood':null,torso:'shirt',armor:null,hands:null,legs:'trousers',feet:null,weapon:w,offhand:null}}) }); }
+      else { const [nm,w,ar]=SQUAT_B[(k+d)%SQUAT_B.length]; out.push({ name:nm+(k?' '.repeat(k):''), type:k===0&&n>2?'brute':'bandit', i:i+di, j, faction:'highway', daily:true, opts:BANDIT({skin:(k+d)%5,hair:(k*2)%5,hairColor:(k+3)%8,beard:k%4,equip:{head:k%2?'hood':null,torso:'tunic_linen',armor:ar,hands:null,legs:'trousers',feet:'boots',weapon:w,offhand:null}}) }); } }
+    return out; }; });
 </script>
 </body>
 </html>

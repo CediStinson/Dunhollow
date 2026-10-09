@@ -16546,7 +16546,7 @@ Object.entries(SQUAT).forEach(([a,kind])=>{ const base=AREAS[a].mobs; AREAS[a].m
 // ════════ The mule in 3D: built from rounded parts in its own space and drawn from the camera's angle, so it can face any way ════════
 // x: forward (towards the head), y: up, z: to its left. phi: the way it faces on the ground (0 = screen right, 45° = down-right along +i, 135° = down-left along +j ...)
 function drawMule3D(X,Y,phi,ph,moving,pack,harness,seed){
-  const K=MULE_COATS[Math.abs(seed|0)%MULE_COATS.length], S=1.72, cf=Math.cos(phi), sf=Math.sin(phi);
+  const K=MULE_COATS[Math.abs(seed|0)%MULE_COATS.length], S=1.5, cf=Math.cos(phi), sf=Math.sin(phi);
   const pr=(x,y,z)=>({ x:X+(x*cf - z*sf)*S, y:Y+((x*sf + z*cf)*0.5 - y)*S, d:(x*sf + z*cf) });         // to the screen, and how near the camera it is
   const bob=moving?Math.abs(Math.cos(ph))*1.1:0, idle=Math.sin(gt*0.9+seed), graze=moving?0:Math.max(0,Math.sin(gt*0.32+seed*3)-0.35)*0.9;
   const parts=[];      // {d, draw(pass)}: pass 0 draws a dark rim, pass 1 the fill
@@ -16556,7 +16556,7 @@ function drawMule3D(X,Y,phi,ph,moving,pack,harness,seed){
       if(!pass){ g.fillStyle='rgba(22,14,8,0.75)'; g.fill(); return; }
       const lit=nx*-0.6+ny*-0.8>0?1:-1, mx=(A.x+B.x)/2, my=(A.y+B.y)/2, rr=(r1+r2)/2;                     // light from the upper left: shade it like a cylinder
       const gr=g.createLinearGradient(mx-nx*rr*lit,my-ny*rr*lit,mx+nx*rr*lit,my+ny*rr*lit); gr.addColorStop(0,light); gr.addColorStop(0.42,col); gr.addColorStop(1,dark);
-      g.fillStyle=opt.flat?col:gr; g.fill(); if(opt.after) opt.after(A,B); } }); };
+      g.fillStyle=opt.flat?col:gr; g.fill(); if(opt.along){ const ga=g.createLinearGradient(A.x,A.y,B.x,B.y); ga.addColorStop(0,'rgba(0,0,0,0)'); ga.addColorStop(0.45,'rgba(0,0,0,0)'); ga.addColorStop(1,opt.along); g.fillStyle=ga; g.fill(); } if(opt.after) opt.after(A,B); } }); };
   const ball=(c,r,col,dark,light,opt={})=>{ const P=pr(...c); parts.push({ d:P.d+(opt.dz||0), fn:pass=>{ const R=r*S+(pass?0:0.9); g.beginPath(); g.arc(P.x,P.y,R,0,Math.PI*2);
       if(!pass){ if(opt.norim) return; g.fillStyle='rgba(22,14,8,0.75)'; g.fill(); return; }
       const gr=g.createRadialGradient(P.x-R*0.35,P.y-R*0.45,R*0.1,P.x,P.y,R); gr.addColorStop(0,light); gr.addColorStop(0.55,col); gr.addColorStop(1,dark); g.fillStyle=opt.flat?col:gr; g.fill(); } }); };
@@ -16572,7 +16572,8 @@ function drawMule3D(X,Y,phi,ph,moving,pack,harness,seed){
     const swing=sw*4.2, knee=l.f?[l.x+swing*0.5+lift*0.5,12+lift,l.z]:[l.x-3+swing*0.5-lift*0.3,12.5+lift,l.z], fet=[l.x+swing+(l.f?lift*0.3:-lift*0.6),2.8+lift,l.z], hoof=[fet[0]+0.4,0.6+lift*0.9,l.z];
     if(!l.f) cap([l.x+2,32+by,l.z*1.08],[l.x-2.5,18+by,l.z],6.4,3.6,C,D,Lc);                             // the big muscle of the haunch
     else cap([l.x-0.5,30+by,l.z*1.05],[l.x+0.6,17+by,l.z],5.2,3.2,C,D,Lc);                               // the forearm under the shoulder
-    cap(top,knee,3.1,2.2,C,D,Lc); cap(knee,fet,1.85,1.45,C,D,Lc); cap(fet,hoof,1.6,1.9,'#2a221a','#120c08','#4a3e32'); });
+    cap(top,knee,3.2,2.3,C,D,Lc); ball(knee,2.35,C,tone(C,-0.2),tone(C,0.05),{dz:0.02}); cap(knee,fet,1.75,1.35,C,D,Lc); ball(fet,1.65,C,tone(C,-0.2),tone(C,0.05),{dz:0.02});   // knee (or hock) and fetlock joints
+    cap([fet[0]+0.1,fet[1]-0.6,fet[2]],hoof,1.5,2.0,'#2a221a','#120c08','#4a3e32'); });
   // tail: a bare dock, then a switch of long hair
   const tw=idle*0.35+(moving?Math.sin(ph)*0.15:0); cap([-26,37+by,0],[-30,30+by,tw*2],2,1.3,C,D,Lc);
   for(let h=0;h<6;h++){ const o=(h-2.5)*0.55; line([[-30,30+by,tw*2],[-32+o*0.5,22+by,tw*4+o],[-32.5+o,13+by,tw*6+o*1.4]],K.stripe,0.7,-0.2); }
@@ -16580,18 +16581,24 @@ function drawMule3D(X,Y,phi,ph,moving,pack,harness,seed){
   const gN=graze, nb=[16,35+by,0], poll=[27-gN*2,50+by-gN*14,0], muz=[39-gN*1,43+by-gN*20,0];
   cap(nb,poll,6.6,4.2,C,D,Lc);
   for(let m=0;m<8;m++){ const t=m/7, x=nb[0]+(poll[0]-nb[0])*t-1.2, y=nb[1]+(poll[1]-nb[1])*t+4.6-t*1.4; line([[x,y,0],[x-1.2,y+2.2,0]],K.stripe,0.9,0.2); }   // a short upright mane
-  cap(poll,[(poll[0]+muz[0])/2,(poll[1]+muz[1])/2-0.5,0],4.6,3.9,C,D,Lc); cap([(poll[0]+muz[0])/2,(poll[1]+muz[1])/2-0.5,0],muz,3.9,3.5,C,D,Lc);
-  ball([poll[0]+2.5,poll[1]-4.6,0],4.2,C,D,Lc,{dz:-0.3});                                                // the round of the jaw
-  ball([muz[0]+0.3,muz[1]-0.2,0],2.9,tone(K.m,-0.12),tone(K.m,-0.45),K.m,{dz:0.4});                                                   // the pale, mealy muzzle
-  [1,-1].forEach(sd=>{ ball([poll[0]+2.6,poll[1]-0.6,3.4*sd],1.45,K.m,K.m,K.m,{flat:true,norim:true,dz:0.6}); ball([poll[0]+2.7,poll[1]-0.6,3.7*sd],0.9,'#140c08','#140c08','#5a4a40',{norim:true,dz:0.8});   // eye rings and eyes
-    ball([muz[0]+1.6,muz[1]+0.4,1.7*sd],0.55,'#2a1a12','#2a1a12','#2a1a12',{flat:true,norim:true,dz:0.9}); });                                                // nostrils
-  const ef=Math.sin(gt*1.7+seed)*0.12; [1,-1].forEach(sd=>{ const base=[poll[0]-0.6,poll[1]+3.4,1.9*sd], tip=[poll[0]-4.5+ef*8*sd,poll[1]+14,3.4*sd+ef*4];
-    cap(base,tip,1.45,0.7,C,D,Lc); line([[base[0],base[1]+1,base[2]],[tip[0]+0.3,tip[1]-1.5,tip[2]]],K.m,0.9,0.15); line([[tip[0]+0.2,tip[1]-0.8,tip[2]],[tip[0],tip[1]+0.4,tip[2]]],K.stripe,1.5,0.2); });   // long ears, pale inside, dark tips
+  const mid=[(poll[0]+muz[0])/2,(poll[1]+muz[1])/2-0.3,0];
+  ball([poll[0]+0.6,poll[1]+0.4,0],4.5,C,D,Lc);                                                            // the broad forehead
+  cap(poll,mid,4.4,3.7,C,D,Lc); cap(mid,muz,3.7,3.3,C,D,Lc,{along:K.m,dz:0.3});                          // the long face, paling to a mealy nose
+  ball([poll[0]+3,poll[1]-4.2,0],4.4,C,D,Lc,{dz:-0.3});                                                   // the round of the cheek and jaw
+  [1,-1].forEach(sd=>{ const ex=poll[0]+3, ey=poll[1]-0.2, ez=3.6*sd;
+    ball([ex,ey,ez],1.55,tone(C,0.18),tone(C,0.18),tone(C,0.18),{flat:true,norim:true,dz:0.6});           // a paler ring of hair round the eye
+    ball([ex+0.15,ey,ez*1.04],1.0,'#120a06','#120a06','#120a06',{flat:true,norim:true,dz:0.8});            // the dark eye
+    ball([ex-0.2,ey+0.35,ez*1.06],0.32,'#f0e8dc','#f0e8dc','#f0e8dc',{flat:true,norim:true,dz:0.9});       // its catchlight
+    ball([muz[0]+1.4,muz[1]+0.2,1.6*sd],0.5,'#3a2618','#3a2618','#3a2618',{flat:true,norim:true,dz:0.9}); }); // nostrils
+  const ef=Math.sin(gt*1.7+seed)*0.12; [1,-1].forEach(sd=>{ const base=[poll[0]-0.8,poll[1]+3.6,2.1*sd], mid=[poll[0]-3+ef*4*sd,poll[1]+9,3.3*sd+ef*2], tip=[poll[0]-4.6+ef*8*sd,poll[1]+14.5,4.1*sd+ef*4];
+    cap(base,mid,1.25,1.75,C,D,Lc); cap(mid,tip,1.75,0.45,C,D,Lc);                                        // long, leaf-shaped ears
+    line([[base[0]+0.2,base[1]+1.2,base[2]*1.05],[mid[0]+0.2,mid[1],mid[2]*1.05],[tip[0]+0.2,tip[1]-1.6,tip[2]*1.05]],K.m,1.1,0.15);   // pale inside
+    line([[tip[0]+0.1,tip[1]-1.1,tip[2]],[tip[0],tip[1]+0.3,tip[2]]],K.stripe,1.4,0.2); });                                         // dark tips
   if(harness||pack){ const hb=[poll[0]+1.6,poll[1]-0.8,0], ns=[muz[0]-1.5,muz[1]+0.3,0];                  // a leather halter
     [1,-1].forEach(sd=>{ line([[hb[0],hb[1]+3.8,4*sd],[hb[0],hb[1]-4,4*sd],[ns[0],ns[1]-2.4,3.4*sd],[ns[0],ns[1]+2.6,3.4*sd]],'#3a2414',0.75,0.7); }); }
   if(harness){                                                                                            // the padded collar on its brass-tipped hames, traces back to the cart, girth and breeching
     [1,-1].forEach(sd=>{ cap([19,45+by,5.2*sd],[15,30+by,6.6*sd],2.4,2.6,'#4a2e18','#2a180c','#7a5434'); line([[19.5,47+by,5.6*sd],[15.5,28+by,7.4*sd]],'#c8a050',0.7,0.5); ball([19.6,47.5+by,5.6*sd],0.95,'#e0c070','#a08030','#fff0b0',{norim:true,dz:0.6});
-      line([[16,33+by,7.2*sd],[-6,32+by,8.6*sd],[-34,31+by,8.6*sd]],'#3a2414',1.2,0.3);
+      line([[16,33+by,7.2*sd],[-6,32+by,8.8*sd],[-27,31+by,8.4*sd]],'#3a2414',1.2,0.3);
       line([[-14,37+by,9.2*sd],[-23,35+by,8*sd],[-26,29+by,6*sd]],'#3a2414',1,0.3); });
     cap([19.5,47+by,-5.2],[19.5,47+by,5.2],2.2,2.2,'#4a2e18','#2a180c','#7a5434');
     [1,-1].forEach(sd=>line([[4,40+by,0],[4,33+by,9.6*sd],[4.5,20.5+by,6*sd]],'#3a2414',1.4,0.4)); }
@@ -16599,7 +16606,7 @@ function drawMule3D(X,Y,phi,ph,moving,pack,harness,seed){
     [1,-1].forEach(sd=>{ const P0=[-3,27+by,11.2*sd]; cap([-10,28+by,11*sd],[5,28+by,11*sd],6.2,6.2,'#a8844c','#5a4020','#d8b878',{dz:0.2,
         after:(A,B)=>{ g.save(); g.strokeStyle='rgba(70,46,20,0.55)'; g.lineWidth=0.7; const dx=B.x-A.x, dy=B.y-A.y; for(let k=-2;k<=2;k++){ g.beginPath(); g.moveTo(A.x,A.y+k*3*S*0.9); g.lineTo(B.x,B.y+k*3*S*0.9); g.stroke(); } for(let k=0;k<=5;k++){ const t=k/5; g.beginPath(); g.moveTo(A.x+dx*t,A.y+dy*t-6*S); g.lineTo(A.x+dx*t,A.y+dy*t+6*S); g.stroke(); } g.restore(); } });
       line([[-7,42+by,7*sd],[-7,33+by,12*sd],[-7,22+by,11*sd]],'#3a2414',1.1,0.6); line([[2,42+by,7*sd],[2,33+by,12*sd],[2,22+by,11*sd]],'#3a2414',1.1,0.6); });
-    cap([-2.5,45.5+by,-6],[-2.5,45.5+by,6],4.2,4.2,'#6a4a8a','#3a2a5a','#9a7aba',{after:(A,B)=>{ g.strokeStyle='#c8a050'; g.lineWidth=1; g.beginPath(); g.moveTo(A.x,A.y-1); g.lineTo(B.x,B.y-1); g.stroke(); }});
+    cap([-12,44.5+by,0],[6,44.5+by,0],3.6,3.6,'#6a4a8a','#3a2a5a','#9a7aba',{after:(A,B)=>{ g.strokeStyle='#c8a050'; g.lineWidth=1; g.beginPath(); g.moveTo(A.x,A.y-1); g.lineTo(B.x,B.y-1); g.stroke(); }});
     ball([9,45+by,2],3.4,'#b8a070','#7a6040','#e8d8a8'); ball([-15,43+by,-3],3,'#5a5a60','#2a2a2e','#8a8a90'); }
   // draw: a soft shadow, then far to near, each part's rim before its fill so the whole beast gets one outline
   const sh=g.createRadialGradient(X,Y+1,2,X,Y+1,34*S/1.5*1.2); sh.addColorStop(0,'rgba(10,6,2,0.4)'); sh.addColorStop(1,'rgba(10,6,2,0)');

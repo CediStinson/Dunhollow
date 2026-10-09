@@ -11716,6 +11716,8 @@ function thugTalk(m){
     {label:"“I'm new. Keep your voice down, someone's watching.”", fn:outcome(0.45,"“New, eh. Then stand over there and look mean.”","“New. Right. And I'm the Baron's mother.” The cudgel comes up.")}, attack ]);
 }
 function startCombat(target){
+  if(CS.on) return;                                     // never during a cutscene
+  player.st=(player.st||[]).filter(s=>s.kind==='bleed');   // only bleeding carries over from the last fight
   setTimeout(()=>{ try{ refreshFoodBar(); }catch(e){} },0);
   const practice = !!target && target.type==='dummy';
   if(combat.active || (!practice && !mobs.some(m=>m.hostile && !m.dead && !calmThug(m)))) return;
@@ -11758,6 +11760,10 @@ function beginFight(){
   if(combat.practice) banner('Practice!','#8ab0d8',1100);
   else if(foeDef(f).unguarded) banner('No guard: strike it, parry the lunge!','#e8c878',1800);
   else { banner(combat.first?'Match his guard, hit the open side!':foeDef(f).label+'!', '#e8c878', combat.first?2200:1100); combat.first=false; }
+  if(foeDef(f).unguarded) teach('wolf','No guard',["This one has <b>no guard</b>: every side is open. Just <b>Attack</b>.","But it lunges fast and with little warning. Watch for the ring and <b>Parry</b> the side it lunges from."]);
+  else teach('duel','Your first fight',["<b>Hold a direction</b> (<b>A</b> / <b>W</b> / <b>D</b>, the arrow keys, or the buttons) to choose a side: left, high, right.",
+    "The shield over your foe shows the side he is <b>guarding</b>. <b>Attack</b> (<b>J</b> or left click) one of the <b>other</b> sides.",
+    "After you land a blow he shifts his guard, so watch the shield and switch sides."]);
 }
 const curStep = f => foeDef(f).pattern[f.k % foeDef(f).pattern.length];
 function beginWind(f,quick){
@@ -11766,14 +11772,29 @@ function beginWind(f,quick){
   f.swingDir = quick ? f.guardDir : s.dir;      // a provoked counter swings from wherever he was guarding
   f.wind=quick?PARRY.counterWind:s.wind; f.t=f.wind;
   if(quick) floatText(tileOf(f),'Counter!','#ffb070');
+  if(hasStatus(f,'chill')){ f.wind*=1.45; f.t=f.wind; }       // frost slows the swing
+  if(f.phase2){ f.wind*=0.8; f.t=f.wind; }                    // an enraged Greymaw is quicker
+  teach('parry','He is about to strike',["A <b>ring</b> closes in around him and an arrow shows the side he swings from.",
+        "Hold <b>that same direction</b> and <b>Parry</b> (<b>K</b>, <b>Space</b> or right click) before the ring closes.",
+        "Parry just as the ring meets the white circle for a <b>perfect parry</b>: he staggers and is wide open. Hit him then!",
+        "Parry the wrong side, or too late, and you take the blow."]);
 }
 function hurtPlayer(n,label){
-  if(combat.practice) n=0;
-  player.hp-=n; player.flash=0.45; shake=Math.max(shake,n?7:3);
-  duel.st='hit'; duel.t=PARRY.hitStun;
-  floatText(tileOf(player),n?'-'+n:'Hit','#ff7a6a',true);
-  if(label) floatText([player.i,player.j-0.001],label,'#f0c0a0');
-  updateHud();
+  const f=combat.foe;
+  if(n>0 && f && f.tier) n=Math.round(n*tierDmg(f));                    // tougher kin of the same foe hit harder
+  const agi=gearSum('agi');
+  if(n>0 && agi>0 && !combat.practice && Math.random()<agi*AGI_DODGE){ floatText(tileOf(player),'Dodge!','#a8e0ff',true); player.flash=0.15; }
+  else {
+    if(n>0 && f && hasStatus(f,'weak')) n=Math.max(1,Math.ceil(n*0.5));  // a withered foe hits soft
+    if(combat.practice) n=0;
+    player.hp-=n; player.flash=0.45; shake=Math.max(shake,n?7:3);
+    duel.st='hit'; duel.t=PARRY.hitStun;
+    floatText(tileOf(player),n?'-'+n:'Hit','#ff7a6a',true);
+    if(label) floatText([player.i,player.j-0.001],label,'#f0c0a0');
+    updateHud();
+  }
+  if(player.hp>0 && player.hp<player.maxHp*0.5 && !combat.practice && player.inv.some(id=>id && ITEMS[id] && ITEMS[id].heal))
+  teach('food','You are hurt',["Food and draughts heal you, even mid-fight: use the <b>food bar</b> beside the Attack and Parry buttons.","Eating takes a moment, so do it while he recovers from a swing, not while he winds up."]);
 }
 function timingNote(since){
   return since<=perfectFor(player)+0.08 ? 'a hair early' : since<=windowFor(player) ? 'early' : null;
@@ -11995,10 +12016,12 @@ function victory(faction){
   grave.forEach(m=>{ if(Math.random()<0.07){ const id=m.type==='skeleton'?'tin_medal':'glass_beads', f=player.inv.indexOf(null); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } } });   // what the dead were buried with; what goblins stole
 }
 function defeat(){
+  QUEST_FIGHT_LOST=!!FIGHT_UNDO;                        // a quest fight that resets itself costs no coin
   setTimeout(()=>{ try{ refreshFoodBar(); }catch(e){} },0);
   combat.active=false; combat.phase='down'; combat.downT=2.6; combat.foe=null;
   duelHud.classList.remove('open');
   banner('Defeated','#c0483a'); logMsg('You collapse. The world goes dark.','#c0483a');
+  if(FIGHT_UNDO){ FIGHT_UNDO(); FIGHT_UNDO=null; logMsg('Whatever you were fighting for is still waiting. Try again when you are ready.','#c8a0e0'); }
 }
 function endCombatSilently(){
   combat.active=false; combat.phase='idle'; combat.foe=null;
@@ -12416,11 +12439,9 @@ function tickStatus(e,dt){ if(!e.st||!e.st.length) return;
   e.st=e.st.filter(s=>s.t>0); }
 { const oldCU=combatUpdate; combatUpdate=function(dt){ tickStatus(player,dt); if(combat.active && combat.phase==='fight' && combat.foe) tickStatus(combat.foe,dt);
     if(player.maxMana){ player.mana=Math.min(player.maxMana,(player.mana??player.maxMana)+dt*(combat.active?7:40)); } return oldCU(dt); }; }
-{ const oldStart=startCombat; startCombat=function(t){ player.st=(player.st||[]).filter(s=>s.kind==='bleed'); return oldStart(t); }; }
 // wolves' bites (and edged weapons) open wounds that keep bleeding; mages' fire keeps burning
 const BLEEDERS=new Set(['dagger','hatchet','axe','elf_blade','spear']);
 // chilled foes wind up slower
-{ const oldWind=beginWind; beginWind=function(f,quick){ oldWind(f,quick); if(hasStatus(f,'chill')){ f.wind*=1.45; f.t=f.wind; } }; }
 
 // ── staves: the guard direction picks the spell ──
 Object.assign(WEAPONS,{ staff_hex:{ wind:0.30, dmg:3, len:30, magic:1.05 }, staff_oak:{ wind:0.30, dmg:3, len:30, magic:1 }, staff_star:{ wind:0.26, dmg:4, len:32, magic:1.35 }, staff_cinder:{ wind:0.30, dmg:4, len:30, magic:1.15 } });
@@ -12445,7 +12466,6 @@ function raiseSkeleton(f){ const m=SPM(), T=Math.round(9*m*10)/10, fx=f?f.x-play
 function crumbleSkel(){ const S=SKEL; if(!S || S.crumble) return; S.crumble=1; S.asm=Math.min(S.asm,1);
   floatText([Math.floor(S.x),Math.floor(S.y)],'The bones fall apart','#a8a490'); }
 // withered foes hit for half
-{ const oldHP=hurtPlayer; hurtPlayer=function(n,label,...r){ if(n>0 && combat.foe && hasStatus(combat.foe,'weak')) n=Math.max(1,Math.ceil(n*0.5)); return oldHP(n,label,...r); }; }
 { const oldCU=combatUpdate; combatUpdate=function(dt){ const r=oldCU(dt);
     SKEL_PILES.forEach(p=>p.age+=dt); SKEL_PILES=SKEL_PILES.filter(p=>p.age<SKEL_PILE_LIFE && p.area===areaId);
     const S=SKEL; if(!S) return r;
@@ -13179,7 +13199,6 @@ PUZ_DRAW.moonaltar=o=>{ const c=P(o.i+0.5,o.j+0.5), lit=PZ().moon||(nightAmt()>0
 
 // ════════ Old Greymaw, a proper boss: bigger, and savage when wounded ════════
 { const oldRM=resetMobs; resetMobs=function(){ oldRM(); mobs.forEach(m=>{ if(m.name==='Old Greymaw' && !m.dead){ m.maxHp=m.hp=78; m.boss=true; } }); }; }
-{ const oldBW=beginWind; beginWind=function(f,quick){ oldBW(f,quick); if(f.phase2){ f.wind*=0.8; f.t=f.wind; } }; }
 
 // ════════ Water that lives: glints of light on every pond ════════
 function drawPoolGlints(o){ if(LOW_FX) return; const [fw,fh]=o.fp;   // sun glints on open water
@@ -13192,7 +13211,6 @@ SPELLS.right.dmg=7; SPELLS.left.dmg=5; SPELLS.up.dmg=4; WEAPONS.staff_crystal.ma
 
 // ════════ A clearer road: one main story, told in order, and the loose ends tied ════════
 let FIGHT_UNDO=null;                      // a scripted fight lost is a fight you can try again
-{ const oldD=defeat; defeat=function(...a){ const r=oldD.apply(this,a); if(FIGHT_UNDO){ FIGHT_UNDO(); FIGHT_UNDO=null; logMsg('Whatever you were fighting for is still waiting. Try again when you are ready.','#c8a0e0'); } return r; }; }
 const QUEST_ITEMS=new Set(['edric_knife','fourage','moonsilver','moonthread','silver_setting','leaf','letter','seal','ledger','journal','trapnote','orrinletters','charter','cartwheel','brooch','strongbox','package','moonbloom','greencrystal']);
 function giveQuestItem(id,keep){                 // story papers always fit: something ordinary is left behind to make room
   const f=player.inv.indexOf(null);
@@ -13283,9 +13301,6 @@ const ITEM_STATS={ moon_amulet:{agi:2,magic:3}, robe:{hp:1,magic:1}, robe_blue:{
 Object.entries(ITEM_STATS).forEach(([id,st])=>{ GEAR_HP[id]=st.hp||0; });
 const gearSum=(k)=>{ const E=(player.opts&&player.opts.equip)||{}; return SLOTS.reduce((a,sl)=>a+((ITEM_STATS[E[sl]]||{})[k]||0),0) + (k==='agi' ? (CHOICE.brannTaught?1:0)+(CHOICE.brannTrap==='done'?1:0) : 0) + (k==='ap' ? (CHOICE.temper||0) : k==='magic' ? (CHOICE.attune||0) : 0); };   // attune: ranks from older saves; woven: Maelis's thread in a piece you wear   // plus what Brann taught you, and what you paid to be trained in
 const AGI_DODGE=0.05;                                     // each point of agility: 5% to dodge a blow outright
-{ const oldH=hurtPlayer; hurtPlayer=function(n,label){ const agi=gearSum('agi');
-    if(n>0 && agi>0 && !combat.practice && Math.random()<agi*AGI_DODGE){ floatText(tileOf(player),'Dodge!','#a8e0ff',true); player.flash=0.15; return; }
-    return oldH(n,label); }; }
 // magic damage from gear adds to every spell
 // (spell power used to be added flat to every hit; it is now a multiplier, see BALANCE at the end)
 // every stat a piece of gear carries, in words
@@ -13897,7 +13912,6 @@ function csTick(dt){ if(!CS.on) return; const s=CS.steps[CS.k]; if(!s){ csEnd();
   if(CS.focus){ const f=CS.focus, fx=f.x??f.i+0.5, fy=f.y??f.j+0.5, tx=-(fx-fy)*TW/2, ty=gc.height/2-ORIGIN_Y-(fx+fy)*TH/2-40, r=Math.min(1,dt*2.6); cam.x+=(tx-cam.x)*r; cam.y+=(ty-cam.y)*r; }
   if(s.until && CS.t>10){ if(s.skip) s.skip(); else if(s.end) s.end(); CS.k++; CS.t=0; return; }     // never get stuck
   if(s.until ? s.until() : CS.t>=(s.dur||0)){ if(s.end) s.end(); CS.k++; CS.t=0; } }
-{ const oldSC=startCombat; startCombat=function(...a){ if(CS.on) return; return oldSC.apply(this,a); }; }
 { const oldSD2=showDialog; showDialog=function(...a){ if(CS.on){ CS.queued.push(a); return; } return oldSD2(...a); }; }
 window.addEventListener('keydown',e=>{ if(!CS.on) return; if(e.key==='Escape'||e.key===' '||e.key==='Enter') csSkip(); e.stopImmediatePropagation(); e.preventDefault(); },true);
 const csWait=d=>({dur:d});
@@ -14143,7 +14157,6 @@ const tierOf=area=>AREA_TIER[area]||(AREAS[area]&&AREAS[area].tier)||2;
 const tierDmg=f=> 1+0.12*(((f&&f.tier)||1)-1);
 { const oldRM=resetMobs; resetMobs=function(){ oldRM(); const t=tierOf(areaId);
     mobs.forEach(m=>{ if(m.type==='dummy') return; m.tier=t; const hp=Math.round(m.maxHp*(1+0.2*(t-1))); m.maxHp=hp; if(!m.dead) m.hp=hp; }); }; }
-{ const oldHP=hurtPlayer; hurtPlayer=function(n,...r){ const f=combat.foe; if(n>0 && f && f.tier) n=Math.round(n*tierDmg(f)); return oldHP(n,...r); }; }
 
 // ════════════════════════════════════════════════════════════
 //  CINDER PASS and THE SUNKEN FORGE: west of the goblin warren, a volcanic valley
@@ -15413,7 +15426,6 @@ function cureBruise(){ if(!CHOICE.bruised) return; CHOICE.bruised=false; logMsg(
     if(CHOICE.bruised && player.hp>=hpCap()){ if(typeof flash==='function') flash('Bread won\'t mend this. Sleep, a bath, or a proper meal.'); return false; }
     const r=oE(k); refreshPlayerHp(false); updateHud(); return r; }; }
 let QUEST_FIGHT_LOST=false;
-{ const oD=defeat; defeat=function(...a){ QUEST_FIGHT_LOST=!!FIGHT_UNDO; return oD.apply(this,a); }; }   // read before the quest fight's own undo clears it
 function wakeAfterDefeat(){
   const lost=QUEST_FIGHT_LOST ? 0 : Math.floor(player.purse*0.25); QUEST_FIGHT_LOST=false;
   player.purse-=lost; dayClock+=DAY_LEN*0.5; CHOICE.bruised=true;
@@ -15806,22 +15818,6 @@ function showTeach(title,lines){ let el=document.getElementById('teach-card');
   el.querySelector('#teach-ok').onclick=e=>{ e.stopPropagation(); close(); }; close.t=setTimeout(close,16000); showTeach.close=close; }
 document.addEventListener('keydown',e=>{ if(TEACH_OPEN && e.key==='Enter' && showTeach.close){ e.preventDefault(); showTeach.close(); } });
 // ── the first fight (on the farm, for most) ──
-{ const oBF=beginFight; beginFight=function(...a){ const r=oBF(...a); const f=combat.foe;
-    if(f && foeDef(f) && foeDef(f).unguarded) teach('wolf','No guard',["This one has <b>no guard</b>: every side is open. Just <b>Attack</b>.","But it lunges fast and with little warning. Watch for the ring and <b>Parry</b> the side it lunges from."]);
-    else teach('duel','Your first fight',["<b>Hold a direction</b> (<b>A</b> / <b>W</b> / <b>D</b>, the arrow keys, or the buttons) to choose a side: left, high, right.",
-      "The shield over your foe shows the side he is <b>guarding</b>. <b>Attack</b> (<b>J</b> or left click) one of the <b>other</b> sides.",
-      "After you land a blow he shifts his guard, so watch the shield and switch sides."]);
-    return r; }; }
-{ const oBW=beginWind; beginWind=function(f,quick){ const r=oBW(f,quick);
-    teach('parry','He is about to strike',["A <b>ring</b> closes in around him and an arrow shows the side he swings from.",
-        "Hold <b>that same direction</b> and <b>Parry</b> (<b>K</b>, <b>Space</b> or right click) before the ring closes.",
-        "Parry just as the ring meets the white circle for a <b>perfect parry</b>: he staggers and is wide open. Hit him then!",
-        "Parry the wrong side, or too late, and you take the blow."]);
-    return r; }; }
-{ const oHP=hurtPlayer; hurtPlayer=function(n,...r){ const res=oHP(n,...r);
-    if(player.hp>0 && player.hp<player.maxHp*0.5 && !combat.practice && player.inv.some(id=>id && ITEMS[id] && ITEMS[id].heal))
-      teach('food','You are hurt',["Food and draughts heal you, even mid-fight: use the <b>food bar</b> beside the Attack and Parry buttons.","Eating takes a moment, so do it while he recovers from a swing, not while he winds up."]);
-    return res; }; }
 // ── the Barrow-King ──
 { const o=ckStorm; ckStorm=function(K){ const r=o(K); teach('wail','The Drowning Wail',["When the count above him reaches zero, black water floods the barrow.",
     "The <b>green tiles</b> are the lee of the standing stones: <b>click one to walk there</b> before the count runs out.","He does it <b>twice</b>, from two different places, so be ready to move to another stone."]); return r; }; }

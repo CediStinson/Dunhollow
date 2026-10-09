@@ -5197,6 +5197,7 @@ function drawTileMarker(i,j,fill,stroke){
 // A barrel or crate: usually just splinters, occasionally a scrap of gear.
 const FARM_LOOT = ['apple','bread','apple','dagger','boots','jerkin','pitchfork','smock','hatchet','club','hose_grey'];
 function collectPickup(o){ const had=hasItem(o.item);
+  if(o.guarded && areaId===BK_AREA && ckKing()){ say('A Spade',["A spade leans against the throne, its blade still bright. The Barrow-King stands between you and it."],[{label:'Not yet.', fn:closeDialog}]); return; }
   if(o.bogmound && !hasSpade()){ CHOICE.moundSeen=true;                 // the fen caches are buried: like any mound, they need a spade in your hands
     say('A Mound of Mud',["The mud here has been heaped up and patted down, and the reeds will not grow on it. Something is buried under there.",
       ownsSpade() ? "<i>You have a spade. Take it in your hands first.</i>" : "<i>You need a spade to dig this up. Maybe find one.</i>"],[{label:'Leave it.', fn:closeDialog}]); return; }
@@ -13852,7 +13853,7 @@ Object.assign(AREAS,{
     mobs:()=>[ { name:'Old Mudmaw', type:'lurker', i:6, j:9, faction:'mudmaw', opts:LURK({big:true,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:'mace',offhand:null}}) } ],
     entries:{ fromFenN:{i:4,j:1}, fromBarrow:{i:12,j:2} } },
 });
-AREAS.barrow=CAVE('The Drowned Barrow',10,9,()=>{ const l=[{type:'teleporter', i:4, j:8, to:'fenlow', entry:'fromBarrow'},
+AREAS.barrow=CAVE('The Drowned Barrow',10,9,()=>{ const l=[{type:'teleporter', i:4, j:8, to:'fenlow', entry:'fromBarrow', locked:bkSealed, onLocked:()=>logMsg('Black water has risen over the way out. It will not let you go while he stands.','#9ad0e8')},
     {type:'ruin', i:4, j:1, v:0}, {type:'menhir', i:1, j:2, v:1}, {type:'menhir', i:8, j:2, v:2}, {type:'menhir', i:1, j:5, v:0}, {type:'menhir', i:8, j:5, v:1}, {type:'pillar', i:6, j:1, broken:true},
     {type:'bones', i:3, j:4, noblock:true}, {type:'bones', i:6, j:6, noblock:true}, {type:'lantern', i:2, j:7}, {type:'lantern', i:7, j:7},
     {type:'rune', i:0, j:4, text:"Old letters cut deep into the wet stone: <i>“Bertil, last king of the hollow, and his household. The water took the land. Let the water keep us.”</i>"}];
@@ -15637,6 +15638,7 @@ const BK_HOUSE=[['Drowned Housecarl',2,4,()=>({gender:'m',skin:0,hair:1,hairColo
 let CK=null;                                         // the set piece in progress: {mode:'storm'|'rings'|'adds'|'wait', ...}
 const ckTh=K=>{ const ph=K.cphase||1; return ph>=3 ? 0 : Math.floor(K.maxHp*(ph===1?0.66:0.33)); };   // where each phase ends
 const ckKing=()=>mobs.find(m=>m.type==='barrowking' && !m.dead);
+function bkSealed(){ const K=areaId===BK_AREA && ckKing(); return !!K && (!!CK || combat.active || K.hp<K.maxHp); }   // once the fight has begun, no way out until he falls (losing still carries you home)
 const ckStones=()=>OBJECTS.filter(o=>['pillar','menhir','ruin'].includes(o.type)).map(o=>[o.i+0.5,o.j+0.5]);
 function ckSheltered(src,px,py){ const pil=ckStones(), dx=px-src[0], dy=py-src[1], L=Math.hypot(dx,dy); if(L<0.6) return false;
   for(let t=0.04;t<1;t+=0.02){ const x=src[0]+dx*t, y=src[1]+dy*t; if(pil.some(([a,b])=>Math.hypot(x-a,y-b)<0.46)) return true; } return false; }
@@ -15866,7 +15868,7 @@ function drawDugPit(o){ const q=P(o.i+0.5,o.j+0.5);
   g.fillStyle='#1a120a'; g.beginPath(); g.ellipse(q.x,q.y+1,14,5.6,0,0,Math.PI*2); g.fill();
   g.fillStyle='#6a4e30'; [[-20,-2],[18,1],[6,-8],[-8,7]].forEach(([a,b])=>{ g.beginPath(); g.ellipse(q.x+a,q.y+b,3.4,1.8,0,0,Math.PI*2); g.fill(); }); }
 // the spade that dug the Barrow-King's barrow lies in his hall still
-wrap('barrow','objects',l=> collectedPickups.has('barrow:9,1') ? l : [...l,{type:'pickup', i:9, j:1, item:'shovel'}]);
+wrap('barrow','objects',l=> (collectedPickups.has('barrow:9,1')||collectedPickups.has('barrow:3,1')) ? l : [...l,{type:'pickup', i:3, j:1, item:'shovel', guarded:true}]);   // behind the king, by his throne: you have to get past him first
 // Old Tobb will not lend his
 { const oldDg=TALKERS.digger; TALKERS.digger=()=>{
     if(CHOICE.moundSeen && !ownsSpade() && !CHOICE.spadeQ){ say('Old Tobb',["Tobb leans on his spade, the way he always does."],[

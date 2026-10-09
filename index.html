@@ -14455,7 +14455,7 @@ const VESNA_N='Vesna the Grave-Speaker';
 function vesnaFen(){
   const hag=defeatedMobs.has('fen:Hesk the Fen Hag'), back=()=>vesnaFen(), necroTalk=VESNA_NECRO;
   if(hasLantern() && CHOICE.morwen!=='done'){                       // her lantern, back from Hesk
-    say(VESNA_N,["Vesna takes the lantern in both hands and holds it up to her face. The little flame inside turns green, then gold.","“Hesk taught me everything I know. Then she tried to use this to talk the drowned kings into getting up again. It works. That's the trouble.”","“Listen. In the Sunken Hollow, south of here, the wisps gather over a bank of reeds at night. Under those reeds is the barrow of the old kings. Gold, and worse than gold.”"],[
+    say(VESNA_N,["Vesna takes the lantern in both hands and holds it up to her face. The little flame inside turns green, then gold.","“Hesk taught me everything I know. Then she tried to use this to talk the drowned kings into getting up again. It works. That's the trouble.”","“Listen. In the Sunken Hollow, south of here, the wisps gather over a bank of reeds at night. Under those reeds is the barrow of the old kings. Gold, and worse than gold.”","“If you go down there: when the king breathes in, put stone between you and him. The old standing stones still remember how to keep the water off.”"],[
       {label:'Take her gift.', fn:()=>{ giveQuestItem('potion',true); giveQuestItem('potion',true); player.purse+=15; updateHud(); remember('morwen','done',"You brought Vesna her lantern. She told you of a barrow under the reeds of the Sunken Hollow.");
         say(VESNA_N,["She breathes on the glass and the flame steadies, warm and gold. She puts the lantern back in your hands.","“Keep it. It burns green near the dead and gold near the living, and it will light your road when the sun is gone. Two of my draughts and a little coin besides. The rest you'll have to dig for.”","<i>You receive 15 copper and two healing draughts. Vesna's Lantern is yours: carry it in your off hand (+2 Spell Power, +2 Attack Power, light at night).</i>"],[{label:'Back.',fn:back},bye]); }}]); return; }
   const opts=[];
@@ -15798,6 +15798,56 @@ let oDrawCharForShell=null;
     const k=pose&&pose.kind==='raise'?-0.45*Math.min(1,pose.t):pose&&pose.kind==='strike'?Math.max(0,1-Math.min(1,pose.t)*0.6):0;
     drawSkelFig(x,B,{asm:1, stand:true, dir, moving:Math.abs(swing)>0.5, walk:gt*9, k, weapon:null});
     const sh=gearShell(opts,swing,dir,pose); c.drawImage(sh,x-110,B-200,220,230); }; }
+// ════════════════════════════════════════════════════════════════════════════
+//  FIRST TIME: the first time something new happens, time slows to a crawl and a card says what to do.
+//  You can still act while it is slow. 'Got it' (or Enter) and the world speeds up again. CHOICE.taught remembers.
+// ════════════════════════════════════════════════════════════════════════════
+let TEACH_OPEN=false; const TEACH_Q=[];
+function teach(key,title,lines){ CHOICE.taught=CHOICE.taught||{}; if(CHOICE.taught[key]) return; CHOICE.taught[key]=true;
+  if(TEACH_OPEN){ TEACH_Q.push([title,lines]); return; } showTeach(title,lines); }
+function showTeach(title,lines){ let el=document.getElementById('teach-card');
+  if(!el){ el=document.createElement('div'); el.id='teach-card'; el.style.cssText='position:fixed;bottom:16px;left:16px;z-index:60;max-width:min(318px,calc(100vw - 32px));padding:14px 18px 12px;background:linear-gradient(#22180c,#140e06);border:1px solid #9a7a32;border-radius:9px;box-shadow:0 10px 36px rgba(0,0,0,0.7);color:#f0e4c8;font:14px/1.45 Georgia,serif;';
+    document.body.appendChild(el); }
+  el.innerHTML=`<div style="font:bold 12px Georgia,serif;letter-spacing:3px;text-transform:uppercase;color:#e8c878;margin-bottom:6px">⏳ ${title}</div>`+lines.map(t=>`<div style="margin:3px 0">${t}</div>`).join('')+
+    `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:9px"><small style="color:#a89878">Time is slowed while you read.</small><button id="teach-ok" style="background:#3a2a12;border:1px solid #9a7a32;color:#f0d890;border-radius:5px;padding:6px 16px;font:bold 13px Georgia,serif;cursor:pointer">Got it</button></div>`;
+  el.style.display='block'; TEACH_OPEN=true;
+  const close=()=>{ if(!TEACH_OPEN) return; TEACH_OPEN=false; el.style.display='none'; clearTimeout(close.t); const n=TEACH_Q.shift(); if(n) setTimeout(()=>showTeach(n[0],n[1]),400); };
+  el.querySelector('#teach-ok').onclick=e=>{ e.stopPropagation(); close(); }; close.t=setTimeout(close,16000); showTeach.close=close; }
+document.addEventListener('keydown',e=>{ if(TEACH_OPEN && e.key==='Enter' && showTeach.close){ e.preventDefault(); showTeach.close(); } });
+{ const oU=update; update=function(dt){ return oU(TEACH_OPEN ? dt*0.12 : dt); }; }
+// ── the first fight (on the farm, for most) ──
+{ const oBF=beginFight; beginFight=function(...a){ const r=oBF(...a); const f=combat.foe;
+    if(f && foeDef(f) && foeDef(f).unguarded) teach('wolf','No guard',["This one has <b>no guard</b>: every side is open. Just <b>Attack</b>.","But it lunges fast and with little warning. Watch for the ring and <b>Parry</b> the side it lunges from."]);
+    else teach('duel','Your first fight',["<b>Hold a direction</b> (<b>A</b> / <b>W</b> / <b>D</b>, the arrow keys, or the buttons) to choose a side: left, high, right.",
+      "The shield over your foe shows the side he is <b>guarding</b>. <b>Attack</b> (<b>J</b> or left click) one of the <b>other</b> sides.",
+      "After you land a blow he shifts his guard, so watch the shield and switch sides."]);
+    return r; }; }
+{ const oBW=beginWind; beginWind=function(f,quick){ const r=oBW(f,quick);
+    teach('parry','He is about to strike',["A <b>ring</b> closes in around him and an arrow shows the side he swings from.",
+        "Hold <b>that same direction</b> and <b>Parry</b> (<b>K</b>, <b>Space</b> or right click) before the ring closes.",
+        "Parry just as the ring meets the white circle for a <b>perfect parry</b>: he staggers and is wide open. Hit him then!",
+        "Parry the wrong side, or too late, and you take the blow."]);
+    return r; }; }
+{ const oHP=hurtPlayer; hurtPlayer=function(n,...r){ const res=oHP(n,...r);
+    if(player.hp>0 && player.hp<player.maxHp*0.5 && !combat.practice && player.inv.some(id=>id && ITEMS[id] && ITEMS[id].heal))
+      teach('food','You are hurt',["Food and draughts heal you, even mid-fight: use the <b>food bar</b> beside the Attack and Parry buttons.","Eating takes a moment, so do it while he recovers from a swing, not while he winds up."]);
+    return res; }; }
+// ── the Barrow-King ──
+{ const o=ckStorm; ckStorm=function(K){ const r=o(K); teach('wail','The Drowning Wail',["When the count above him reaches zero, black water floods the barrow.",
+    "The <b>green tiles</b> are the lee of the standing stones: <b>click one to walk there</b> before the count runs out.","He does it <b>twice</b>, from two different places, so be ready to move to another stone."]); return r; }; }
+{ const o=ckRings; ckRings=function(K){ const r=o(K); teach('thorns','Black thorns',["Patches of stone turn <b>black</b>, and thorns burst up out of them a moment later.",
+    "Step onto a tile that is <b>not</b> dark before they erupt. There is always a free one beside you.","Four waves, each a little quicker than the last."]); return r; }; }
+{ const o=ckAdds; ckAdds=function(K){ const r=o(K); teach('ward','His household rises',["While the <b>ward of cold light</b> surrounds him, the king cannot be hurt.","Defeat the <b>Housecarl</b> and the <b>Shieldmaid</b> first, and the ward breaks."]); return r; }; }
+{ const o=ckResume; ckResume=function(K,msg){ const r=o(K,msg); if(K && K.cphase>=3 && !K.warded) setTimeout(()=>teach('enrage','Enraged',["He swings <b>faster</b> now, and <b>every blow he lands heals him</b>.","Parry, and strike only while he recovers. Every hit you take makes the fight longer."]),900); return r; }; }
+// ── the first time you lose a fight ──
+{ const oW=wakeAfterDefeat; wakeAfterDefeat=function(...a){ const lost0=player.purse; const r=oW(...a); CHOICE.taught=CHOICE.taught||{};
+    if(!CHOICE.taught.death){ CHOICE.taught.death=true; const lost=lost0-player.purse;
+      setTimeout(()=>say('What Losing Costs',["You lost the fight. You are not dead, but it cost you:",
+        "• <b>You wake in the last bed you slept in</b> (the farm, if you have never slept anywhere else). Sleep somewhere new to change it.",
+        "• <b>Half a day has passed.</b> Anything with a deadline kept ticking.",
+        "• <b>A quarter of the coin you carried is gone</b>"+(lost>0?" ("+formatCoin(lost)+" this time)":"")+". Not when a quest fight simply resets itself.",
+        "• <b>You are Bruised:</b> your health stays at <b>half</b> and will not heal past it until you <b>sleep</b> in a bed, take a <b>bath</b>, or eat <b>roast meat</b> or drink a <b>healing draught</b>. Bread and apples will not mend it."],[{label:'Understood.',fn:closeDialog}]),1600); }
+    return r; }; }
 </script>
 </body>
 </html>

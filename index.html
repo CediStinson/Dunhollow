@@ -11876,6 +11876,12 @@ const LOOT_TIERS=[
   ['mail','axe','morningstar','riding_boots','shield_iron','gauntlets','coif','studded','longsword','plate_boots'] ];
 function lootTier(m){ const hp=m.maxHp||0, dmg=(weaponOf(m)||{}).dmg||0; return hp>=80||dmg>=13 ? 2 : hp>=55||dmg>=10 ? 1 : 0; }
 function victory(faction){
+  if(faction==='wightguard'){ combat.active=false; combat.phase='idle'; combat.foe=null; duelHud.classList.remove('open'); document.getElementById('hint').style.display='';   // the king's household is down: his ward breaks
+    const K=ckKing(); if(K){ K.warded=false; FOES.barrowking.pattern=BK_PAT3; logMsg('The ward breaks like ice on the fen. The Barrow-King howls, and comes for you faster than anything drowned should move.','#ff9a80'); ckResume(K,'The Barrow-King is enraged!'); }
+    return; }
+  if(faction==='wight'){ CK=null; FOES.barrowking.pattern=BK_PAT1; }
+  const grave=mobs.filter(m=>m.hostile && (!faction||m.faction===faction) && m.dead && (m.type==='skeleton'||m.type==='goblin'));
+  FIGHT_UNDO=null;
   setTimeout(()=>{ try{ refreshFoodBar(); }catch(e){} },0);
   combat.active=false; combat.phase='idle'; combat.foe=null;
   duelHud.classList.remove('open'); document.getElementById('hint').style.display='';
@@ -11937,6 +11943,24 @@ function victory(faction){
   combat.respawnT=30;
   setTimeout(()=>{ if(!combat.active) clog.classList.remove('open'); },6000);
   updateHud();
+  // bosses and named foes: what they leave behind
+  if(faction==='cavequeen'){ PZ().boss=true; const c=14+Math.floor(Math.random()*10); player.purse+=c; updateHud();
+    logMsg('Mother Mogg\'s hoard: '+formatCoin(c)+'.','#e8c060'); setTimeout(()=>{ if(!combat.active && areaId==='cave4') switchArea('cave4','fromCave3'); },1500); }
+  if(faction==='wight'){ CHOICE.barrow='done'; ['barrow_blade','bog_crown','fen_boots','wight_ring','potion'].forEach(id=>giveQuestItem(id,true)); const c=45+Math.floor(Math.random()*16); player.purse+=c; updateHud();
+    logMsg("The Barrow-King lies still at last. His sword falls from his hand, black water still running off the blade: Bertil's Drowned Blade.",'#b8c8a8');
+    logMsg('From his head, a crown of bog-black wood. On his feet, boots that never rotted; on his finger, a ring of black gold. In his purse, '+formatCoin(c)+' and a healing draught.','#e8c060'); }
+  if(faction==='hag') logMsg("Hesk falls into the reeds. Something glints where she stood: a lantern.",'#e8c060');
+  if(faction==='hag'){ giveQuestItem('staff_bog',true); logMsg("Hesk's staff lies in the reeds, still warm: The Bog-Hag's Staff.",'#b8a8e8'); }
+  if(faction==='cavequeen'){ giveQuestItem('staff_cinder',true); logMsg("Mother Mogg's fire-stick: a Cinder Staff. And on the dais, the cracked heart of the cave.",'#e8c060'); }
+  if(faction==='acolyte' && Math.random()<0.25) { giveQuestItem('staff_cinder',true); logMsg('One of the acolytes dropped a Cinder Staff.','#e8c060'); }
+  if(faction==='guard'){ const r=Math.random(); if(r<0.2){ giveQuestItem('helm_full',true); logMsg("The sergeant's great helm rolls into the grass.",'#e8c060'); } else if(r<0.35){ giveQuestItem('blackmail',true); logMsg("The guard's blackened brigandine is still good.",'#e8c060'); } }
+  if(faction==='flamesworn' && !CHOICE.fireBlade){ CHOICE.fireBlade=true; giveQuestItem('fire_blade',true); logMsg("The captain's sword lies in the ash, its edge still glowing: the Fire Blade.",'#ffb060'); }
+  if(faction==='flamesworn' && Math.random()<0.5){ const pool=['ash_mantle','cinder_gloves','obsidian_helm','scorched_greaves','emberstep_boots']; giveQuestItem(pool[Math.floor(Math.random()*pool.length)]); }
+  if(faction==='ashhound' && Math.random()<0.6) giveQuestItem('ember_core');
+  if(faction==='slagwarden'){ CHOICE.warden=true; logMsg('The Warden crumbles into slag. Behind him, the forge flares up, and a woman made of heat and smoke steps out of it.','#ffb060');
+    setTimeout(()=>{ if(areaId==='emberforge' && !NPCS.some(n=>n.id==='ilka')){ const nn=AREAS.emberforge.npcs(); NPCS.push(...nn); nn.forEach(n=>blocked.add(n.i+','+n.j)); } },1800); }
+  if(faction==='guard' && Math.random()<0.4 && giveQuestItem('baron_tabard')) logMsg("One of them wore the Baron's tabard. You take it: faded, frayed, and still his.",'#e8c060');
+  grave.forEach(m=>{ if(Math.random()<0.07){ const id=m.type==='skeleton'?'tin_medal':'glass_beads', f=player.inv.indexOf(null); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } } });   // what the dead were buried with; what goblins stole
 }
 function defeat(){
   setTimeout(()=>{ try{ refreshFoodBar(); }catch(e){} },0);
@@ -12763,8 +12787,6 @@ Object.assign(AREAS,{
 Object.assign(WEAPONS,{ staff_crystal:{ wind:0.24, dmg:5, len:32, magic:1.6 } });
 Object.assign(ITEMS,{ staff_crystal:{ name:'Heartcrystal Staff', slot:'weapon' } }); PRICES.staff_crystal=220;
 // the queen falls: the cave is yours
-{ const oldV=victory; victory=function(faction){ oldV(faction); if(faction==='cavequeen'){ PZ().boss=true; const c=14+Math.floor(Math.random()*10); player.purse+=c; updateHud();
-    logMsg('Mother Mogg\'s hoard: '+formatCoin(c)+'.','#e8c060'); setTimeout(()=>{ if(!combat.active && areaId==='cave4') switchArea('cave4','fromCave3'); },1500); } }; }
 
 // ── acting on puzzle pieces ──
 function pzRebuild(){ blocked.clear(); [...OBJECTS,...NPCS].forEach(o=>{ if(o.type==='teleporter'||o.type==='debris'||o.noblock||o.wander) return;
@@ -13155,7 +13177,6 @@ SPELLS.right.dmg=7; SPELLS.left.dmg=5; SPELLS.up.dmg=4; WEAPONS.staff_crystal.ma
 
 // ════════ A clearer road: one main story, told in order, and the loose ends tied ════════
 let FIGHT_UNDO=null;                      // a scripted fight lost is a fight you can try again
-{ const oldV=victory; victory=function(...a){ FIGHT_UNDO=null; return oldV.apply(this,a); }; }
 { const oldD=defeat; defeat=function(...a){ const r=oldD.apply(this,a); if(FIGHT_UNDO){ FIGHT_UNDO(); FIGHT_UNDO=null; logMsg('Whatever you were fighting for is still waiting. Try again when you are ready.','#c8a0e0'); } return r; }; }
 const QUEST_ITEMS=new Set(['edric_knife','fourage','moonsilver','moonthread','silver_setting','leaf','letter','seal','ledger','journal','trapnote','orrinletters','charter','cartwheel','brooch','strongbox','package','moonbloom','greencrystal']);
 function giveQuestItem(id,keep){                 // story papers always fit: something ordinary is left behind to make room
@@ -13629,11 +13650,6 @@ PUZ_TYPES.add('reedbank');
 // what you dig up in the fen
 function fenCache(){ CHOICE.fenCaches=(CHOICE.fenCaches||0)+1; const c=8+Math.floor(Math.random()*10); player.purse+=c; updateHud(); logMsg('Something buried in the mud, and '+formatCoin(c)+' with it. ('+CHOICE.fenCaches+'/3 fen caches)','#e8c060'); }
 // the barrow-king falls
-{ const oldV=victory; victory=function(faction){ oldV(faction);
-    if(faction==='wight'){ CHOICE.barrow='done'; ['barrow_blade','bog_crown','fen_boots','wight_ring','potion'].forEach(id=>giveQuestItem(id,true)); const c=45+Math.floor(Math.random()*16); player.purse+=c; updateHud();
-      logMsg("The Barrow-King lies still at last. His sword falls from his hand, black water still running off the blade: Bertil's Drowned Blade.",'#b8c8a8');
-      logMsg('From his head, a crown of bog-black wood. On his feet, boots that never rotted; on his finger, a ring of black gold. In his purse, '+formatCoin(c)+' and a healing draught.','#e8c060'); }
-    if(faction==='hag') logMsg("Hesk falls into the reeds. Something glints where she stood: a lantern.",'#e8c060'); }; }
 // on first walking the clear causeway
 function fenOpenCheck(id){ if(id==='fenpath' && CHOICE.fenSeen==null){ CHOICE.fenSeen=renownDone(); } if(id==='fenpath' && FEN_OPEN() && !CHOICE.fenOpen){ CHOICE.fenOpen=true; setTimeout(()=>{ banner('The causeway is clear','#c8d8a8',1800); logMsg('The fallen oak is gone. The Fen Causeway runs north, into the mist.','#e8c060'); },600); } }
 
@@ -13824,11 +13840,6 @@ Object.assign(ITEMS,{ staff_bone:{ name:'The Ossuary Staff', slot:'weapon' }, st
 Object.assign(PRICES,{ staff_bone:80, staff_barrow:170 });
 Object.assign(ITEMS,{ staff_bog:{ name:"The Bog-Hag's Staff", slot:'weapon' }, heartshard:{ name:'A Cracked Heart-Crystal', slot:'misc' } });
 Object.assign(PRICES,{ staff_bog:120, heartshard:0 }); QUEST_ITEMS.add('heartshard');
-{ const oldV2=victory; victory=function(faction){ const foes=mobs.filter(m=>m.hostile && m.faction===faction); oldV2(faction);
-    if(faction==='hag'){ giveQuestItem('staff_bog',true); logMsg("Hesk's staff lies in the reeds, still warm: The Bog-Hag's Staff.",'#b8a8e8'); }
-    if(faction==='cavequeen'){ giveQuestItem('staff_cinder',true); logMsg("Mother Mogg's fire-stick: a Cinder Staff. And on the dais, the cracked heart of the cave.",'#e8c060'); }
-    if(faction==='acolyte' && Math.random()<0.25) { giveQuestItem('staff_cinder',true); logMsg('One of the acolytes dropped a Cinder Staff.','#e8c060'); }
-    if(faction==='guard'){ const r=Math.random(); if(r<0.2){ giveQuestItem('helm_full',true); logMsg("The sergeant's great helm rolls into the grass.",'#e8c060'); } else if(r<0.35){ giveQuestItem('blackmail',true); logMsg("The guard's blackened brigandine is still good.",'#e8c060'); } } }; }   // one piece at most, and usually nothing
 // Orvell can turn the heart of the crystal cave into a staff
 { const oldO=TALKERS.orvell; TALKERS.orvell=()=>{ if(!hasItem('heartshard')) return oldO();
     say('Magister Orvell',["Orvell takes the cracked crystal in both hands and goes very still. Inside it, green light turns slowly, like a fish in deep water.","“The heart of the Weighing Stones. Goblins sat on this for a hundred years and used it to keep their soup warm.” He sounds personally offended.","“I can set it in a staff. It will take my best ash-wood and an afternoon, and forty copper for the wood.”"],[
@@ -14243,13 +14254,6 @@ AREA_TIER.emberpass=4; AREA_TIER.emberforge=5;
 if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
 
 // ── the story: the captain's blade, three ember cores, and the forge spirit who wakes the steel ──
-{ const oldV=victory; victory=function(faction){ const r=oldV(faction);
-    if(faction==='flamesworn' && !CHOICE.fireBlade){ CHOICE.fireBlade=true; giveQuestItem('fire_blade',true); logMsg("The captain's sword lies in the ash, its edge still glowing: the Fire Blade.",'#ffb060'); }
-    if(faction==='flamesworn' && Math.random()<0.5){ const pool=['ash_mantle','cinder_gloves','obsidian_helm','scorched_greaves','emberstep_boots']; giveQuestItem(pool[Math.floor(Math.random()*pool.length)]); }
-    if(faction==='ashhound' && Math.random()<0.6) giveQuestItem('ember_core');
-    if(faction==='slagwarden'){ CHOICE.warden=true; logMsg('The Warden crumbles into slag. Behind him, the forge flares up, and a woman made of heat and smoke steps out of it.','#ffb060');
-      setTimeout(()=>{ if(areaId==='emberforge' && !NPCS.some(n=>n.id==='ilka')){ const nn=AREAS.emberforge.npcs(); NPCS.push(...nn); nn.forEach(n=>blocked.add(n.i+','+n.j)); } },1800); }
-    return r; }; }
 const coreCount=()=>player.inv.filter(x=>x==='ember_core').length;
 function ilkaTalk(){
   const hasBlade=hasItem('fire_blade')||(player.opts.equip.weapon==='fire_blade');
@@ -15333,9 +15337,6 @@ const tabardOn=()=>!!(player.opts && player.opts.equip && unWoven(player.opts.eq
     g2.strokeStyle='#4a3420'; g2.lineWidth=1.1; g2.beginPath(); g2.moveTo(12,20.5); g2.quadraticCurveTo(20,22,28,20.5); g2.stroke();
     drawBaronSigil(g2,20,13.5,10,'#c8a050','#3a0c0a',1);
     g2.restore(); }; }
-{ const oV=victory; victory=function(faction,...r){ const res=oV(faction,...r);
-    if(faction==='guard' && Math.random()<0.4 && giveQuestItem('baron_tabard')) logMsg("One of them wore the Baron's tabard. You take it: faded, frayed, and still his.",'#e8c060');
-    return res; }; }
 // his soldiers, when you wear his red
 const TABARD_LINES=["“Back to your post, soldier. Sergeant's in a mood.”","“You're new. Keep your head down and your mouth shut, that's the whole job.”","“Heard the Baron's paying late again. Course he is.”","“If anyone asks, you saw nothing. That's an order. Probably.”"];
 ['krgateguard0','krgateguard1','mguard','kguard1','kguard2','stguard1','stguard2','recruit'].forEach(id=>{ const old=TALKERS[id]; TALKERS[id]=(...a)=>{
@@ -15444,10 +15445,6 @@ Object.assign(ITEM_STATS,{ copper_chain:{hp:1}, bone_charm:{agi:1}, glass_beads:
 Object.entries({copper_chain:1,tin_medal:2,wolf_necklace:1}).forEach(([k,v])=>GEAR_HP[k]=v);
 Object.assign(PRICES,{ copper_chain:6, bone_charm:4, glass_beads:8, tin_medal:7, wolf_necklace:40 });
 LOOT_TIERS[0].push('bone_charm','copper_chain'); LOOT_TIERS[1].push('glass_beads','tin_medal'); FARM_LOOT.push('bone_charm','copper_chain');
-{ const oV=victory; victory=function(faction,...r){ const grave=mobs.filter(m=>m.hostile && (!faction||m.faction===faction) && m.dead && (m.type==='skeleton'||m.type==='goblin'));
-    const res=oV(faction,...r);
-    grave.forEach(m=>{ if(Math.random()<0.07){ const id=m.type==='skeleton'?'tin_medal':'glass_beads', f=player.inv.indexOf(null); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } } });   // what the dead were buried with; what goblins stole
-    return res; }; }
 { const oPIA=paintItemArt; paintItemArt=function(g2,id,size){ const L=NECK_LOOKS[unWoven(id)]; if(!L) return oPIA(g2,id,size);
     g2.save(); g2.scale(size/40,size/40);
     g2.fillStyle='rgba(0,0,0,0.25)'; g2.beginPath(); g2.ellipse(20,35,12,2.4,0,0,Math.PI*2); g2.fill();
@@ -15576,12 +15573,6 @@ function ckAdds(K){ CK={mode:'adds'}; K.warded=true;
     mobs.push({ id:200+k, key:n+'@'+dayClock.toFixed(0), name:n, type:'bandit', opts:op, faction:'wightguard', spawn:[i,j], i, j, x:i+0.5, y:j+0.5, dir:k?6:1, hp, maxHp:hp, path:[], moving:false, dead:false, gone:false, fade:1, flash:0, lunge:null,
       state:'guard', t:0, k:0, wind:1, quick:false, guardDir:'up', ox:0, oy:0, hostile:true, fallT:0 }); });
   setTimeout(()=>{ if(areaId===BK_AREA && player.hp>0) startCombat(); },1200); }
-{ const oV=victory; victory=function(faction,...r){
-    if(faction==='wightguard'){ combat.active=false; combat.phase='idle'; combat.foe=null; duelHud.classList.remove('open'); document.getElementById('hint').style.display='';
-      const K=ckKing(); if(K){ K.warded=false; FOES.barrowking.pattern=BK_PAT3; logMsg('The ward breaks like ice on the fen. The Barrow-King howls, and comes for you faster than anything drowned should move.','#ff9a80'); ckResume(K,'The Barrow-King is enraged!'); }
-      return; }
-    if(faction==='wight'){ CK=null; FOES.barrowking.pattern=BK_PAT1; }
-    return oV(faction,...r); }; }
 // in the last phase every blow he lands feeds him
 { const oI=impact; impact=function(f){ const hp0=player.hp; const r=oI(f); if(f.type==='barrowking' && f.cphase>=3 && player.hp<hp0 && !f.dead){ const h=Math.min(5,f.maxHp-f.hp); if(h>0){ f.hp+=h; floatText(tileOf(f),'+'+h,'#9ad0e8'); } } return r; }; }
 // a warded king cannot be hurt; nor can he be killed through a phase

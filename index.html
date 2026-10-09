@@ -9518,7 +9518,7 @@ function refreshStatPanel(){
   ];
   panel.innerHTML = rows.map(([k,v])=>`<div class="stat-row"><b>${k}</b><span>${v}</span></div>`).join('');
   const a=gearSum('agi'), m=gearSum('magic');
-  panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Swing Time</b><span>${W.wind.toFixed(2)}s</span></div><div class="stat-row"><b>Agility</b><span>${a}${a?` (${Math.round(a*AGI_DODGE*100)}% dodge)`:''}</span></div><div class="stat-row"><b>Attack Power</b><span>${gearSum('ap')} (×${APM().toFixed(2)} weapon)</span></div><div class="stat-row"><b>Spell Power</b><span>${m}${isMagicWeapon()?' (×'+SPM().toFixed(2)+' spells)':''}</span></div>`);
+  panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Swing Time</b><span>${W.wind.toFixed(2)}s</span></div><div class="stat-row"><b>Agility</b><span>${a}${a?` (${Math.round(dodgeChance(a)*100)}% dodge)`:''}</span></div><div class="stat-row"><b>Attack Power</b><span>${gearSum('ap')} (×${APM().toFixed(2)} weapon)</span></div><div class="stat-row"><b>Spell Power</b><span>${m}${isMagicWeapon()?' (×'+SPM().toFixed(2)+' spells)':''}</span></div>`);
   const t=[CHOICE.temper&&('Tempered '+CHOICE.temper),CHOICE.attune&&('Attuned '+CHOICE.attune),SLOTS.some(sl=>isWoven(player.opts.equip[sl]))&&('Woven pieces worn '+SLOTS.filter(sl=>isWoven(player.opts.equip[sl])).length),SLOTS.some(sl=>isTempered(player.opts.equip[sl]))&&('Tempered pieces worn '+SLOTS.filter(sl=>isTempered(player.opts.equip[sl])).length),CHOICE.bless&&('Blessed '+CHOICE.bless)].filter(Boolean);
   if(t.length) panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Training</b><span>${t.join(' · ')}</span></div>`);
   if(bathBuffOn()){
@@ -11432,7 +11432,7 @@ const PARRY = { perfect:0.20, window:0.36, parryRecover:0.28, atkWind:0.18, atkW
                 caughtRecover:0.42,              // your blade is caught: long recovery on a mistimed or wrong-side swing
                 chainPenalty:0.08, chainMax:0.3, chainWindow:0.8,
                 interruptStun:0.7, guardRecover:0.35,
-                shieldPerfect:0.08, shieldWindow:0.10 };   // a shield widens both timing windows
+                shieldPerfect:0.04, shieldWindow:0.05 };   // a shield widens both timing windows
 const unWoven = id => (id && id.startsWith && /^[tw]_/.test(id)) ? id.replace(/^(?:[tw]_)+/,'') : id;   // a woven piece behaves like the piece it was made from
 const isShieldId = id0 => { const id=unWoven(id0); return !!id && (id==='shield' || (ITEMS[id] && ITEMS[id].base==='shield')); };
 const hasShield = e => e===player ? isShieldId(player.opts.equip.offhand) : !!(e.opts && e.opts.equip && isShieldId(e.opts.equip.offhand));
@@ -11499,7 +11499,7 @@ const heldKeys=new Set();
 let playerGuard='up', guardOrder=[];   // guardOrder: most-recently-pressed direction wins
 
 // ── GEAR_HP kept from the earlier system ──
-const GEAR_HP = { mail:20, jerkin:10, kettle:10, hood:3, boots:3, gloves:2, gambeson:7, studded:14, blackmail:24, brightmail:28, gauntlets:5, riding_boots:4, hood_red:3, straw_hat:1, elf_cloak:8, tunic_linen:1, tunic_blue:2, tunic_green:2, tunic_red:2, smock:1, hose_grey:1, breeches:1, trews_black:2, elf_leggings:2, shirt:0, elf_scale:22, elf_circlet:3, elf_boots:4, elf_tunic:2, elf_robe:3, elf_leggings_worn:1, elf_boots_worn:2 };
+const GEAR_HP = { mail:16, jerkin:8, kettle:8, hood:3, boots:3, gloves:2, gambeson:7, studded:11, blackmail:19, brightmail:22, gauntlets:5, riding_boots:4, hood_red:3, straw_hat:1, elf_cloak:8, tunic_linen:1, tunic_blue:2, tunic_green:2, tunic_red:2, smock:1, hose_grey:1, breeches:1, trews_black:2, elf_leggings:2, shirt:0, elf_scale:18, elf_circlet:3, elf_boots:4, elf_tunic:2, elf_robe:3, elf_leggings_worn:1, elf_boots_worn:2 };
 Object.keys(ITEMS).forEach(id=>{ if(ITEMS[id].slot==='torso') GEAR_HP[id]=0; });   // clothing under the armour is purely cosmetic
 
 function resetMobs(){
@@ -11523,7 +11523,7 @@ function resetMobs(){
     const s=MOB_SPAWNS[k]; if(s && s.chop){ m.chop=true; m.chopPh=s.chopPh||0; }
     if(m.dead && corpseGone(areaId,m)) m.gone=true; });
   const t=tierOf(areaId);                              // further from home, tougher kin
-  mobs.forEach(m=>{ if(m.type==='dummy') return; m.tier=t; const hp=Math.round(m.maxHp*(1+0.2*(t-1))); m.maxHp=hp; if(!m.dead) m.hp=hp; });
+  mobs.forEach(m=>{ if(m.type==='dummy') return; m.tier=t; const hp=Math.round(m.maxHp*(1+(m.type==='barrowking'?0.2:TIER_HP)*(t-1))); m.maxHp=hp; if(!m.dead) m.hp=hp; });
   if(!(A.mobsGone && A.mobsGone())){                   // some foes come back after a while (an old corpse is marked gone; that is fine)
     const D=CHOICE.deadAt||{};
     mobs.forEach(m=>{ if(!m.dead || !RESPAWNS.has(m.name)) return; const k=areaId+':'+m.key, at=D[k];
@@ -11967,7 +11967,7 @@ function hurtPlayer(n,label){
   const f=combat.foe;
   if(n>0 && f && f.tier) n=Math.round(n*tierDmg(f));                    // tougher kin of the same foe hit harder
   const agi=gearSum('agi');
-  if(n>0 && agi>0 && !combat.practice && Math.random()<agi*AGI_DODGE){ floatText(tileOf(player),'Dodge!','#a8e0ff',true); player.flash=0.15; }
+  if(n>0 && agi>0 && !combat.practice && Math.random()<dodgeChance(agi)){ floatText(tileOf(player),'Dodge!','#a8e0ff',true); player.flash=0.15; }
   else {
     if(n>0 && f && hasStatus(f,'weak')) n=Math.max(1,Math.ceil(n*0.5));  // a withered foe hits soft
     if(combat.practice) n=0;
@@ -12038,6 +12038,7 @@ function wound(f,n,label,col){                       // a blow lands on a foe
 function woundRaw(f,n,label,col){
   const W=WEAPONS[player.opts&&player.opts.equip.weapon]||{};
   if(f!==player && HIT_SRC==='melee' && n>0) n=Math.round(W.ember ? n*emberMult() : n*APM());     // attack power; an ember blade scales with spell power instead
+  if(f.type==='barrowking' && HIT_SRC==='melee' && !isMagicWeapon() && n>0) n=Math.max(1,Math.round(n*BK_STEEL));   // his bog-iron mail turns plain steel
   if(f!==player && hasStatus(player,'weak') && n>0) n=Math.max(1,Math.ceil(n*0.6));
   const crit = Math.random()<PARRY.critChance;
   if(crit) n=Math.round(n*PARRY.critMult);
@@ -13498,7 +13499,8 @@ const ITEM_STATS={ moon_amulet:{agi:2,magic:3}, robe:{hp:1,magic:1}, robe_blue:{
   hose_grey:{hp:1,agi:1}, breeches:{hp:2}, elf_leggings:{agi:2,magic:2}, elf_leggings_worn:{agi:2,magic:1} };
 Object.entries(ITEM_STATS).forEach(([id,st])=>{ GEAR_HP[id]=st.hp||0; });
 const gearSum=(k)=>{ const E=(player.opts&&player.opts.equip)||{}; return SLOTS.reduce((a,sl)=>a+((ITEM_STATS[E[sl]]||{})[k]||0),0) + (k==='agi' ? (CHOICE.brannTaught?1:0)+(CHOICE.brannTrap==='done'?1:0) : 0) + (k==='ap' ? (CHOICE.temper||0) : k==='magic' ? (CHOICE.attune||0) : 0); };   // attune: ranks from older saves; woven: Maelis's thread in a piece you wear   // plus what Brann taught you, and what you paid to be trained in
-const AGI_DODGE=0.05;                                     // each point of agility: 5% to dodge a blow outright
+const AGI_DODGE=0.04, DODGE_CAP=0.3;                      // each point of agility: 4% to dodge a blow outright, never more than 30%
+const dodgeChance=a=>Math.min(DODGE_CAP,a*AGI_DODGE);
 // magic damage from gear adds to every spell
 // (spell power used to be added flat to every hit; it is now a multiplier, see BALANCE at the end)
 // every stat a piece of gear carries, in words
@@ -13510,7 +13512,7 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
   if(WEAPONS[id]){ L.push(['Damage',WEAPONS[id].dmg]); L.push(['Swing time',WEAPONS[id].wind.toFixed(2)+'s <small>('+(WEAPONS[id].wind<=0.17?'fast':WEAPONS[id].wind<=0.22?'steady':'slow')+')</small>']); } if(WEAPONS[id]&&WEAPONS[id].magic) L.push(['Spell power','×'+WEAPONS[id].magic]);
   const hp=GEAR_HP[id]||0; if(hp) L.push(['Health',(hp>0?'+':'')+hp]);
   if(st.agi) L.push(['Agility','+'+st.agi+' <small>('+Math.round(st.agi*AGI_DODGE*100)+'% dodge)</small>']);
-  if(st.ap) L.push(['Attack power','+'+st.ap+' <small>(+'+st.ap*4+'% weapon damage)</small>']);
+  if(st.ap) L.push(['Attack power','+'+st.ap+' <small>(+'+st.ap*3+'% weapon damage)</small>']);
   if(st.magic) L.push(['Spell power','+'+st.magic+' <small>(+'+st.magic*4+'% spell damage)</small>']);
   if(typeof isWoven==='function' && isWoven(id)) L.push(['Woven by Maelis','one of a kind <small>(+1 spell power included)</small>']);
   if(typeof isTempered==='function' && isTempered(id)) L.push(['Tempered by Oswin','one of a kind <small>(+1 attack power included)</small>']);
@@ -14331,7 +14333,7 @@ for(const id in ITEMS){ const it=ITEMS[id]; if(it && it.slot==='torso'){ delete 
 
 // ════════════════════════════════════════════════════════════
 //  BALANCE: two damage stats that work the same way, and one danger level per place
-//   · Attack Power (gear): each point +4% weapon damage.   Spell Power (gear): each point +4% spell damage,
+//   · Attack Power (gear): each point +3% weapon damage.   Spell Power (gear): each point +4% spell damage,
 //     on top of the staff's own multiplier. Nothing is added flat any more.
 //   · Spells cast into a foe's wind-up do half damage, so a mage reads the fight like a swordsman does.
 //   · Every place has a danger level, 1 to 5, shown as ◆ after a foe's name. Each level adds
@@ -14341,14 +14343,16 @@ const AP_STATS={ gloves:1, gauntlets:3, jerkin:1, gambeson:1, studded:2, mail:1,
   kettle:1, coif:1, helm_full:2, bandana:1, riding_boots:1, plate_boots:2, breeches:1, hose_grey:1, shield_red:1 };
 Object.entries(AP_STATS).forEach(([id,v])=>{ ITEM_STATS[id]={...(ITEM_STATS[id]||{}), ap:v}; });
 ITEM_STATS.elf_cloak={...ITEM_STATS.elf_cloak, magic:1};
-const APM=()=>1+gearSum('ap')*0.04;
+const APM=()=>1+gearSum('ap')*0.03;
 var HIT_SRC=null;                       // who caused the wound being dealt right now: 'melee', 'spell' or null (bones, burns)
 const playerHitDmg=()=> (player.opts && player.opts.equip.weapon==='emberbrand') ? emberHit() : isMagicWeapon() ? SPELLS.right.dmg*SPM() : weaponOf(player).dmg*APM();
 const AREA_TIER={ farm:1, road:1, lane:1, millroad:2, wolfwood:2, camp:2, southtrail:2, mistmere:2, clearing:2,
   fellings:3, ruin:3, lowstreets:3, warren:3, kingsroad:3, elfroad:3, cave1:3, cave2:4, cave3:4, cave4:4,
   fen:4, fenlow:4, fenpath:4, barrow:5 };
 const tierOf=area=>AREA_TIER[area]||(AREAS[area]&&AREAS[area].tier)||2;
-const tierDmg=f=> 1+0.12*(((f&&f.tier)||1)-1);
+// further from home, tougher kin: more health and harder blows each tier (the Barrow-King has his own, gentler curve: his fight is built by hand)
+const TIER_HP=0.3, TIER_DMG=0.18;
+const tierDmg=f=> 1+(f&&f.type==='barrowking'?0.12:TIER_DMG)*(((f&&f.tier)||1)-1);
 
 // ════════════════════════════════════════════════════════════
 //  CINDER PASS and THE SUNKEN FORGE: west of the goblin warren, a volcanic valley
@@ -15624,6 +15628,7 @@ function paintCrypt(o){
 FOES.barrowking={ label:'Barrow-King', base:95, stagger:0.9, pattern:[
   {wait:1.3, wind:1.15, after:0.60, dir:'right'}, {wait:0.5, wind:0.60, after:0.35, dir:'left'}, {wait:0.0, wind:0.55, after:0.65, dir:'up'},
   {wait:1.6, wind:1.40, after:0.80, dir:'left'}, {wait:0.9, wind:0.85, after:0.55, dir:'right'} ]};
+const BK_STEEL=0.5;                                  // weapon blows do half against the Barrow-King; spells pass through his mail
 const BK_PAT1=FOES.barrowking.pattern, BK_PAT3=[
   {wait:0.8, wind:0.80, after:0.45, dir:'up'}, {wait:0.3, wind:0.55, after:0.30, dir:'right'}, {wait:0.0, wind:0.50, after:0.30, dir:'left'}, {wait:0.0, wind:0.50, after:0.60, dir:'right'},
   {wait:1.0, wind:1.05, after:0.50, dir:'left'}, {wait:0.6, wind:0.70, after:0.45, dir:'up'} ];

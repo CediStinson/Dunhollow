@@ -8704,6 +8704,7 @@ function snapshot(){
 function loadGame(id){ const list=readSaves(); if(!list) return; const sv=list.find(e=>e.id===id); if(sv) applySave(sv); }
 function deleteSaveByName(n){ const list=readSaves(); if(!list) return; writeSaves(list.filter(e=>nameKey(e.name)!==nameKey(n))); renderSaves(); }
 function applySave(sv){
+  const W=sv&&(sv.world||{}), D=(W.choices&&W.choices.deadAt)||{}, latest=Math.max(0,...Object.values(D).filter(v=>typeof v==='number'));
   // saves from before v3: the women's Freckled and Noble faces became Dreamy and Regal; their freckles and mole are face details now
   if(sv && sv.opts && (sv.v||0)<3 && sv.opts.gender==='f'){ const M=sv.opts.marks=sv.opts.marks||{}; if((sv.opts.face|0)===1) M.freckles=true; if((sv.opts.face|0)===2) M.mole=true; }
   player.name=sv.name||'Wanderer';
@@ -8736,6 +8737,10 @@ function applySave(sv){
   closeMenu();
   enterGame();
   centerCam();
+  if(typeof W.clock==='number') dayClock=W.clock; else if(latest>dayClock) dayClock=latest+DAY_LEN*0.6;   // saves from before the clock was kept
+  try{ if(worldCache) worldCache.area=null; if(!combat.active) resetMobs(); }catch(e){}   // with the right clock: old corpses go, foes due back come back
+  if('wynn' in CHOICE){ if(CHOICE.maren==null) CHOICE.maren=CHOICE.wynn; delete CHOICE.wynn; } if('wynnThanked' in CHOICE){ if(CHOICE.marenThanked==null) CHOICE.marenThanked=CHOICE.wynnThanked; delete CHOICE.wynnThanked; }   // Wynn was renamed Maren
+  try{ pupNamesSync(); pupSync(); }catch(e){}
 }
 
 function deleteSave(id){
@@ -9409,11 +9414,27 @@ function refreshStatPanel(){
     ['Off Hand', E.offhand ? ITEMS[E.offhand].name : 'None'],
   ];
   panel.innerHTML = rows.map(([k,v])=>`<div class="stat-row"><b>${k}</b><span>${v}</span></div>`).join('');
+  const a=gearSum('agi'), m=gearSum('magic');
+  panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Swing Time</b><span>${W.wind.toFixed(2)}s</span></div><div class="stat-row"><b>Agility</b><span>${a}${a?` (${Math.round(a*AGI_DODGE*100)}% dodge)`:''}</span></div><div class="stat-row"><b>Attack Power</b><span>${gearSum('ap')} (×${APM().toFixed(2)} weapon)</span></div><div class="stat-row"><b>Spell Power</b><span>${m}${isMagicWeapon()?' (×'+SPM().toFixed(2)+' spells)':''}</span></div>`);
+  const t=[CHOICE.temper&&('Tempered '+CHOICE.temper),CHOICE.attune&&('Attuned '+CHOICE.attune),SLOTS.some(sl=>isWoven(player.opts.equip[sl]))&&('Woven pieces worn '+SLOTS.filter(sl=>isWoven(player.opts.equip[sl])).length),SLOTS.some(sl=>isTempered(player.opts.equip[sl]))&&('Tempered pieces worn '+SLOTS.filter(sl=>isTempered(player.opts.equip[sl])).length),CHOICE.bless&&('Blessed '+CHOICE.bless)].filter(Boolean);
+  if(t.length) panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Training</b><span>${t.join(' · ')}</span></div>`);
+  if(bathBuffOn()){
+    const h=Math.max(0,(CHOICE.bathBuff-dayClock)/DAY_LEN*24); panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Refreshed</b><span>+10 max health · ${h>=1?Math.round(h)+' h':'under an hour'} left</span></div>`); }
 }
 const noteOverlay=document.getElementById('note-overlay');
 // ── talking to people ──
 const dlgOverlay=document.getElementById('dlg-overlay');
 function showDialog(name,text,opts,purse){
+  if(TALK_NPC && Array.isArray(opts) && TALK_ROOT_REAL<0){ TALK_ROOT_REAL=opts.filter(o=>!(o===bye || o.fn===closeDialog || /^(Farewell|Leave|Not now|Close|Bow and leave|Back)/.test(String(o.label)))).length; }   // what the first screen offered
+  if(TALK_NPC && dlgIsOpen() && Array.isArray(opts)){ TALK_DEPTH++;
+    const onlyBye=opts.length && opts.every(o=>o===bye || o.fn===closeDialog || /^(Farewell|Leave|Not now|Close|Bow and leave)/.test(String(o.label)));
+    const hasBack=opts.some(o=>/^Back\b/.test(String(o.label)));
+    const root=TALKERS[TALK_NPC.id], who=TALK_NPC;
+    let changed=false; try{ changed=TALK_STATE!=='' && JSON.stringify(CHOICE)!==TALK_STATE; }catch(e){}         // something was decided: going 'back' would replay the question
+    if(onlyBye && !hasBack && !changed && TALK_ROOT_REAL>0 && root && name===who.name) opts=[{label:'Back.', fn:()=>{ TALK_NPC=who; TALK_DEPTH=0; root(); }}, ...opts]; }
+  else TALK_DEPTH=0;
+  if(CS.on){ CS.queued.push([name,text,opts,purse]); return; }   // during a cutscene it waits for the end
+  if(BATH_NOTE){ text=[BATH_NOTE,...[].concat(text)]; BATH_NOTE=null; }
   document.getElementById('dlg-name').textContent=name;
   document.getElementById('dlg-text').innerHTML=(Array.isArray(text)?text:[text]).map(p=>`<p>${p}</p>`).join('')+(purse?`<div class="dlg-purse">Your purse: ${formatCoin(player.purse)}</div>`:'');
   const box=document.getElementById('dlg-opts'); box.innerHTML='';
@@ -9487,7 +9508,13 @@ function npcHasNews(n){                                // '!' new business, '?' 
 }
 const TALKERS={};
 function talkTo(n){
+  TALK_NPC=n; TALK_DEPTH=0; TALK_ROOT_REAL=-1; try{ TALK_STATE=JSON.stringify(CHOICE); }catch(e){ TALK_STATE=''; }
   if(combat.active) return;
+  if(n && disguised() && !BARON_FOLK.has(n.id) && !/guard/i.test(n.id||'')){        // in the purple bandana, honest folk will not deal with you
+    if(n.wander){ n.path=[]; n.moving=false; n.wait=4; }
+    n.dir=dirTo([n.i,n.j],tileOf(player)); player.dir=dirTo(tileOf(player),[n.i,n.j]); player.path=[]; player.moving=false;
+    say(n.name,[PURPLE_SNUBS[(hsh((n.id||'').length*7+n.i,n.j)+Math.floor(dayClock/DAY_LEN))%PURPLE_SNUBS.length],"<i>They stare at the purple bandana and will not deal with you while you wear it.</i>"],[bye]);
+    return; }
   if(n.wander){ n.path=[]; n.moving=false; n.wait=6; n.x=n.i+0.5; n.y=n.j+0.5; }
   if(TALK_TURN.n && TALK_TURN.n!==n) TALK_TURN.n.dir=TALK_TURN.dir;
   if(TALK_TURN.n!==n && !n.wander && !n.goto){ TALK_TURN.n=n; TALK_TURN.dir=n.dir; }   // when you are done they turn back to their work: the loggers to the oak, Tobb to his digging
@@ -12897,9 +12924,16 @@ Object.assign(ITEMS,{ staff_crystal:{ name:'Heartcrystal Staff', slot:'weapon' }
 function pzRebuild(){ blocked.clear(); [...OBJECTS,...NPCS].forEach(o=>{ if(o.type==='teleporter'||o.type==='debris'||o.noblock||o.wander) return;
   const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) blocked.add((o.i+a)+','+(o.j+b)); }); }
 function pzSay(t,col){ floatText(tileOf(player),t,col||'#e8d8a8'); logMsg(t,col||'#e8d8a8'); }
-function puzAct(o){
+function puzAct(o){                                 // you use something in the world: a crate, a stone, a mirror, a mound of earth
+  if(o.type==='dirtmound') return digMound(o);
+  if(o.type==='bathchest') return openBathChest(o);
+  if(o.type==='reedbank') return reedBank(o);
+  const P=PZ();
+  if(o.type==='mirror'){ const M=P.mirrors; M[o.k]=M[o.k]==='a'?'b':'a'; shake=1.5; pzSay('The silver mirror turns on its old pivot with a groan.','#dfe6ee'); moonCheck(); return; }
+  if(o.type==='moonsource'){ pzSay(nightAmt()>0.4 ? 'Moonlight pours through a crack in the stone.' : 'A crack in the western stone. By day it holds only dust.','#dfe6ee'); return; }
+  if(o.type==='moonaltar'){ if(P.moon){ pzSay('The altar glows softly, its gift already given.','#dfe6ee'); return; } pzSay(nightAmt()>0.4 ? 'The altar waits in the dark.' : 'An altar of pale stone, cold even in daylight.','#dfe6ee'); return; }
   if(o.type==='stash'){ openStash(); return; }
-  const P=PZ(), di=o.i-player.i, dj=o.j-player.j;
+  const di=o.i-player.i, dj=o.j-player.j;
   if(o.type==='rune'){ say('An Inscription',o.text,[bye]); return; }
   if(o.type==='gate'){ pzSay('The gate is shut fast. Something in this room must open it.'); return; }
   if(o.type==='block'){
@@ -13199,11 +13233,6 @@ function moonBeam(){ // returns list of tiles the beam crosses and whether it re
       if(o.type==='moonaltar') return {path, hit:true};
       break; } }
   return {path, hit:false}; }
-{ const oldAct=puzAct; puzAct=function(o){ const P=PZ();
-    if(o.type==='mirror'){ const M=P.mirrors; M[o.k]=M[o.k]==='a'?'b':'a'; shake=1.5; pzSay('The silver mirror turns on its old pivot with a groan.','#dfe6ee'); moonCheck(); return; }
-    if(o.type==='moonsource'){ pzSay(nightAmt()>0.4 ? 'Moonlight pours through a crack in the stone.' : 'A crack in the western stone. By day it holds only dust.','#dfe6ee'); return; }
-    if(o.type==='moonaltar'){ if(P.moon){ pzSay('The altar glows softly, its gift already given.','#dfe6ee'); return; } pzSay(nightAmt()>0.4 ? 'The altar waits in the dark.' : 'An altar of pale stone, cold even in daylight.','#dfe6ee'); return; }
-    return oldAct(o); }; }
 function moonCheck(){ const P=PZ(); if(P.moon || nightAmt()<=0.4) return; if(!moonBeam().hit) return;
   P.moon=true; CHOICE.moonBless=true; refreshPlayerHp(true); slowmo.scale=0.3; slowmo.t=0.6; banner('The moon walks to the altar','#dfe6ee',2200);
   logMsg('Silver light fills the drowned shrine. You feel it settle in your chest like a second heartbeat. (+10 max HP, permanently)','#dfe6ee');
@@ -13440,8 +13469,6 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
   document.addEventListener('pointerdown',e=>{ const el=e.target.closest&&e.target.closest(SEL); if(el && e.pointerType==='touch'){ show(el,e.clientX,e.clientY); clearTimeout(tt); tt=setTimeout(hide,2600); } else if(!el) hide(); }, true);
   const oc=closeDialog; closeDialog=function(){ hide(); return oc.apply(this,arguments); };
 }
-{ const oldP=refreshStatPanel; refreshStatPanel=function(){ oldP(); const panel=document.getElementById('stat-panel'); if(!panel||!player.opts) return; const a=gearSum('agi'), m=gearSum('magic'), W=weaponOf(player);
-    panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Swing Time</b><span>${W.wind.toFixed(2)}s</span></div><div class="stat-row"><b>Agility</b><span>${a}${a?` (${Math.round(a*AGI_DODGE*100)}% dodge)`:''}</span></div><div class="stat-row"><b>Attack Power</b><span>${gearSum('ap')} (×${APM().toFixed(2)} weapon)</span></div><div class="stat-row"><b>Spell Power</b><span>${m}${isMagicWeapon()?' (×'+SPM().toFixed(2)+' spells)':''}</span></div>`); }; }
 
 // food and draughts: the grocer, the innkeeper and the priestess sell them
 { const oldG=TALKERS.grocer; TALKERS.grocer=()=>{ if(!CHOICE.nim){ oldG(); return; }
@@ -13730,12 +13757,12 @@ AREA_PATHS.fen=[ [[-0.5,8.5],[4,8.8],[8,9.6],[10.2,12],[10.5,17],[10.5,23.5]], [
 AREA_PATHS.fenlow=[ [[4.5,-0.5],[5,3],[7.5,5.6],[11.5,5],[12.5,2.2]], [[7.5,5.6],[7,7.6],[6.5,9.5]], [[6.5,9.5],[10,12.6],[14.5,15.5]], [[11.5,5],[14.6,8.6]] ];
 // the reeds hide a stone door: part them and the barrow opens
 PUZ_TYPES.add('reedbank');
-{ const oldPA=puzAct; puzAct=function(o){ if(o.type!=='reedbank') return oldPA(o);
+function reedBank(o){                               // the reeds that hide the barrow
     if(!(NECRO()>=2 || CHOICE.morwen==='done' || CHOICE.barrow)){   // nobody has told you what lies under them: they are just reeds, thick and wet and cold
       say('A Bank of Reeds',["The reeds here grow thick, taller than you, and the water between them is black. Something croaks and goes quiet.","You have no reason to go wading in there, and every reason not to."],[{label:'Leave it.', fn:closeDialog}]); return; }
     say('A Bank of Reeds',[CHOICE.morwen==='done'?"Where the wisps gathered, the reeds grow thicker than anywhere else. Vesna said: <i>under the reeds</i>.":"The reeds here grow oddly thick and straight, as if planted. Behind them, something hard and grey.","You push your arms in and pull them apart. Cold air breathes out at you, and the smell of very old water."],[
       {label:'Tear the reeds aside.', fn:()=>{ CHOICE.barrow='open'; closeDialog(); logMsg('Behind the reeds: a stone doorway, half sunk in the mud. A barrow.','#e8c060'); banner('A hidden barrow','#c8d8a8',1600); switchArea('fenlow','fromBarrow'); }},
-      {label:'Leave it alone.', fn:closeDialog}]); }; }
+      {label:'Leave it alone.', fn:closeDialog}]); }
 // what you dig up in the fen
 function fenCache(){ CHOICE.fenCaches=(CHOICE.fenCaches||0)+1; const c=8+Math.floor(Math.random()*10); player.purse+=c; updateHud(); logMsg('Something buried in the mud, and '+formatCoin(c)+' with it. ('+CHOICE.fenCaches+'/3 fen caches)','#e8c060'); }
 // the barrow-king falls
@@ -13814,7 +13841,6 @@ function drawPlayerWading(e){                       // out of a fight: you sink 
 // "take a bath": everything you wear goes in a chest on the bank, and you go into the water
 const BATH_NOTES={ 'Maud':"“Leave your things in the chest on the bank. Nobody here's going to steal your boots.”", 'Ithilwen':"“Your things go in the chest by the stones. The water does not like cloth.”", 'Yselde, Bath-mistress':"“Clothes in the chest, not on the floor. I'm not your mother.”", 'Nimuë, Keeper of the Bath':"“Your things will wait in the chest beside the pool. Nobody here wants them.”" };
 let BATH_NOTE=null;
-{ const oldSD=showDialog; showDialog=function(name,text,...r){ if(BATH_NOTE){ text=[BATH_NOTE,...[].concat(text)]; BATH_NOTE=null; } return oldSD(name,text,...r); }; }
 function bathStrip(who){
   const E=player.opts.equip, items={}; SLOTS.forEach(sl=>{ if(E[sl]) items[sl]=E[sl]; });            // they come off at the chest, in the scene
   let pool=null, best=1e9; OBJECTS.filter(o=>o.type==='pool').forEach(o=>{ const d=Math.hypot(o.i+o.fp[0]/2-player.x,o.j+o.fp[1]/2-player.y); if(d<best){ best=d; pool=o; } });
@@ -13841,12 +13867,13 @@ function drawBathChest(o){ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y;
   g.fillStyle='#c8a050'; g.fillRect(x-2,y-12,4,5);
   g.fillStyle='#d8d0c0'; g.beginPath(); g.moveTo(x-6,y-27); g.quadraticCurveTo(x+2,y-34,x+10,y-26); g.lineTo(x+8,y-22); g.closePath(); g.fill(); }   // a sleeve poking out
 PUZ_TYPES.add('bathchest');
-{ const oldPA2=puzAct; puzAct=function(o){ if(o.type!=='bathchest') return oldPA2(o); const c=CHOICE.bathChest; if(!c) return;
+function openBathChest(o){ const c=CHOICE.bathChest; if(!c) return;   // what you left by the bath
+   
     const names=Object.values(c.items).map(id=>ITEMS[id]?ITEMS[id].name:id);
     say('Your Things',["Your clothes and gear, folded in the chest: "+names.join(', ')+"."],[
       {label:'Get dressed.', fn:()=>{ const E=player.opts.equip; Object.entries(c.items).forEach(([sl,id])=>{ if(!E[sl]) E[sl]=id; else giveQuestItem(id,true); });
         CHOICE.bathChest=null; OBJECTS.splice(OBJECTS.indexOf(o),1); blocked.delete(o.i+','+o.j); delete player.opts._ck; const m0=player.maxHp; refreshPlayerHp(); player.hp=Math.min(player.maxHp,player.hp+Math.max(0,player.maxHp-m0)); updateHud(); logMsg('You get dressed again.','#c8d8e8'); closeDialog(); }},
-      {label:'Leave them for now.', fn:closeDialog}]); }; }
+      {label:'Leave them for now.', fn:closeDialog}]); }
 
 // the moon-bathers come back into the water with you; towels stay on the stones
 function moonJoined(){ return CHOICE.moonJoin!=null && dayClock-CHOICE.moonJoin < DAY_LEN*0.12 && dayClock>=CHOICE.moonJoin; }
@@ -13895,12 +13922,6 @@ function drawWetPlayer(e,oldDA,wet,kind,clad){
 // the fallen don't lie there forever: after half a day they are gone (buried, carried off, or eaten)
 const corpseGone=(id,m)=>{ const t=(CHOICE.deadAt||{})[id+':'+(m.key||m.name)]; return t==null || t>dayClock+1 || dayClock-t > DAY_LEN*0.5; };   // a death 'in the future' is from a clock that went back: gone
 // the clock is saved with the game; older saves did not keep it, so their dead stayed dead (and unburied) until the clock caught up
-{ const oldAS=applySave; applySave=function(sv,...r){ const W=sv&&(sv.world||{});
-    const D=(W.choices&&W.choices.deadAt)||{}, latest=Math.max(0,...Object.values(D).filter(v=>typeof v==='number'));
-    const res=oldAS.call(this,sv,...r);
-    if(typeof W.clock==='number') dayClock=W.clock; else if(latest>dayClock) dayClock=latest+DAY_LEN*0.6;
-    try{ if(worldCache) worldCache.area=null; if(!combat.active) resetMobs(); }catch(e){}   // with the right clock: old corpses go, foes due back come back
-    return res; }; }
 setInterval(()=>{ try{ if(!running || combat.active) return; mobs.forEach(m=>{ if(m.dead && !m.gone && corpseGone(areaId,m)) m.gone=true; }); }catch(e){} },2000);
 
 // towels round the hips: painted onto the body itself, so they follow every pose (standing, lounging, kneeling, side-on)
@@ -13972,7 +13993,6 @@ function csTick(dt){ if(!CS.on) return; const s=CS.steps[CS.k]; if(!s){ csEnd();
   if(CS.focus){ const f=CS.focus, fx=f.x??f.i+0.5, fy=f.y??f.j+0.5, tx=-(fx-fy)*TW/2, ty=gc.height/2-ORIGIN_Y-(fx+fy)*TH/2-40, r=Math.min(1,dt*2.6); cam.x+=(tx-cam.x)*r; cam.y+=(ty-cam.y)*r; }
   if(s.until && CS.t>10){ if(s.skip) s.skip(); else if(s.end) s.end(); CS.k++; CS.t=0; return; }     // never get stuck
   if(s.until ? s.until() : CS.t>=(s.dur||0)){ if(s.end) s.end(); CS.k++; CS.t=0; } }
-{ const oldSD2=showDialog; showDialog=function(...a){ if(CS.on){ CS.queued.push(a); return; } return oldSD2(...a); }; }
 window.addEventListener('keydown',e=>{ if(!CS.on) return; if(e.key==='Escape'||e.key===' '||e.key==='Enter') csSkip(); e.stopImmediatePropagation(); e.preventDefault(); },true);
 const csWait=d=>({dur:d});
 const csDo=fn=>({dur:0, start:fn});
@@ -14406,9 +14426,6 @@ function crateTalk(){ const u=CHOICE.stashUp||0, cost=STASH_UPS[u];
     if(dlgOverlay.classList.contains('open') && box && !box.querySelector('.dlg-opt.train')){ const b=document.createElement('button'); b.className='dlg-opt train';
       b.innerHTML=`<span>${label()}</span>`; b.addEventListener('click',fn); box.insertBefore(b,box.lastElementChild); }
     return r; }; });
-{ const oldP=refreshStatPanel; refreshStatPanel=function(){ oldP(); const panel=document.getElementById('stat-panel'); if(!panel||!player.opts) return;
-    const t=[CHOICE.temper&&('Tempered '+CHOICE.temper),CHOICE.attune&&('Attuned '+CHOICE.attune),SLOTS.some(sl=>isWoven(player.opts.equip[sl]))&&('Woven pieces worn '+SLOTS.filter(sl=>isWoven(player.opts.equip[sl])).length),SLOTS.some(sl=>isTempered(player.opts.equip[sl]))&&('Tempered pieces worn '+SLOTS.filter(sl=>isTempered(player.opts.equip[sl])).length),CHOICE.bless&&('Blessed '+CHOICE.bless)].filter(Boolean);
-    if(t.length) panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Training</b><span>${t.join(' · ')}</span></div>`); }; }
 
 // ════════ RESPAWNS: ordinary foes come back a day after you kill them; story foes stay dead ════════
 const RESPAWNS=new Set(['Forest Wolf','Mist Wolf','Pale Mist Wolf','Barrow Wolf','Old Barrow Wolf','Hungry Wolf','Ridge Wolf','Night Wolf','Prowling Wolf','Lean Wolf',
@@ -14468,11 +14485,6 @@ Object.keys(AREAS).forEach(a=>{ if(typeof AREAS[a].mobs!=='function') return;
 // in the Baron's purple, the decent folk of the land want nothing to do with you; only his guards and his own people talk to you as before
 const BARON_FOLK=new Set(['recruit','voss','bram','steward','surveyor','stranger','grane','marapits']);
 const PURPLE_SNUBS=["“Leave, or I'll beat the shit out of you.”","“Your kind has no place here.”","“We don't serve the Baron's thugs. Out.”","“Get out before I call the whole street.”","“I've nothing for you. Go back to your master.”","“Take your purple rag and go.”"];
-{ const oldTalk=talkTo; talkTo=function(n){
-    if(combat.active || !n || !disguised() || BARON_FOLK.has(n.id) || /guard/i.test(n.id||'')) return oldTalk(n);
-    if(n.wander){ n.path=[]; n.moving=false; n.wait=4; }
-    n.dir=dirTo([n.i,n.j],tileOf(player)); player.dir=dirTo(tileOf(player),[n.i,n.j]); player.path=[]; player.moving=false;
-    say(n.name,[PURPLE_SNUBS[(hsh((n.id||'').length*7+n.i,n.j)+Math.floor(dayClock/DAY_LEN))%PURPLE_SNUBS.length],"<i>They stare at the purple bandana and will not deal with you while you wear it.</i>"],[bye]); }; }
 // ── the risen dead of the fen: the same old bones a necromancer calls up, only nobody called these ──
 FOES.skeleton={ label:'Skeleton', base:44, stagger:1.1, pattern:[
   {wait:1.2, wind:0.95, after:0.55, dir:'left'}, {wait:0.5, wind:0.70, after:0.45, dir:'right'}, {wait:1.5, wind:1.15, after:0.70, dir:'up'} ]};
@@ -14947,7 +14959,6 @@ JOURNAL.push(['A Wolf of Your Own', ()=>{
   return ['active', d>=PUP_FEED_NEED ? "The pups are ready. Ask Marta about taking one of them with you."
     : "Marta's pups need meat, raw or roasted, a little each day. Bring it to her stall. Wolves remember who feeds them. ("+d+" of "+PUP_FEED_NEED+" days)"]; }]);
 // saves from before Calandor's weaver was called Maren
-{ const oAS=applySave; applySave=function(sv){ const r=oAS(sv); if('wynn' in CHOICE){ if(CHOICE.maren==null) CHOICE.maren=CHOICE.wynn; delete CHOICE.wynn; } if('wynnThanked' in CHOICE){ if(CHOICE.marenThanked==null) CHOICE.marenThanked=CHOICE.wynnThanked; delete CHOICE.wynnThanked; } return r; }; }
 // skeletons are dead already: Drain finds nothing to drink, and frost means nothing to bones
 const SPELL_IMMUNE=f=>!!f && f.type==='skeleton';
 
@@ -15062,20 +15073,9 @@ function drawBaronBanner(o){ const q=P(o.i,o.j+0.5); drawCached('baronbanner',q.
 let TALK_NPC=null, TALK_DEPTH=0;
 const dlgIsOpen=()=>typeof dlgOverlay!=='undefined' && dlgOverlay.classList.contains('open');
 let TALK_STATE='', TALK_ROOT_REAL=0;
-{ const oT=talkTo; talkTo=function(n){ TALK_NPC=n; TALK_DEPTH=0; TALK_ROOT_REAL=-1; try{ TALK_STATE=JSON.stringify(CHOICE); }catch(e){ TALK_STATE=''; } return oT(n); }; }
 
 const RT_HOLD=()=> TALK_NPC && dlgIsOpen() ? TALK_NPC : null;
 // "Back." on every reply that would otherwise only say goodbye, inside a conversation you started
-{ const oSD=showDialog; showDialog=function(name,text,opts,...r){
-    if(TALK_NPC && Array.isArray(opts) && TALK_ROOT_REAL<0){ TALK_ROOT_REAL=opts.filter(o=>!(o===bye || o.fn===closeDialog || /^(Farewell|Leave|Not now|Close|Bow and leave|Back)/.test(String(o.label)))).length; }   // what the first screen offered
-    if(TALK_NPC && dlgIsOpen() && Array.isArray(opts)){ TALK_DEPTH++;
-      const onlyBye=opts.length && opts.every(o=>o===bye || o.fn===closeDialog || /^(Farewell|Leave|Not now|Close|Bow and leave)/.test(String(o.label)));
-      const hasBack=opts.some(o=>/^Back\b/.test(String(o.label)));
-      const root=TALKERS[TALK_NPC.id], who=TALK_NPC;
-      let changed=false; try{ changed=TALK_STATE!=='' && JSON.stringify(CHOICE)!==TALK_STATE; }catch(e){}         // something was decided: going 'back' would replay the question
-      if(onlyBye && !hasBack && !changed && TALK_ROOT_REAL>0 && root && name===who.name) opts=[{label:'Back.', fn:()=>{ TALK_NPC=who; TALK_DEPTH=0; root(); }}, ...opts]; }
-    else TALK_DEPTH=0;
-    return oSD(name,text,opts,...r); }; }
 // a cutscene clears the screen: inventory, notes, the map, a signpost you were reading (never the menu)
 { const oC=cutscene; cutscene=function(steps,onEnd){ try{ if(invOverlay.classList.contains('open')) closeInventory(); closeNote(); if(typeof closeBigMap==='function') closeBigMap();
       const so=document.getElementById('sign-overlay'); if(so) so.classList.remove('open'); if(typeof ctrlOverlay!=='undefined') ctrlOverlay.classList.remove('open'); }catch(e){}
@@ -15157,8 +15157,6 @@ const BATH_BUFF_LEN=()=>DAY_LEN*0.5, bathBuffOn=()=> CHOICE.bathBuff!=null && da
     logMsg('Refreshed: clean, warm and loose-limbed. +10 max health for half a day.','#a8d8f0'); return r; }; }
 { const oR=refreshPlayerHp; refreshPlayerHp=function(full){ const r=oR(full); if(bathBuffOn()){ player.maxHp+=10; if(full) player.hp=player.maxHp; } player.hp=Math.min(player.hp,player.maxHp); return r; }; }
 let BATH_WAS=false; setInterval(()=>{ try{ const on=bathBuffOn(); if(BATH_WAS && !on && running){ refreshPlayerHp(false); updateHud(); logMsg('The glow of the bath has worn off.','#8aa8b8'); } BATH_WAS=on; }catch(e){} },2000);
-{ const oldP=refreshStatPanel; refreshStatPanel=function(){ oldP(); const panel=document.getElementById('stat-panel'); if(!panel || !bathBuffOn()) return;
-    const h=Math.max(0,(CHOICE.bathBuff-dayClock)/DAY_LEN*24); panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Refreshed</b><span>+10 max health · ${h>=1?Math.round(h)+' h':'under an hour'} left</span></div>`); }; }
 // ── goats are goats: they amble about near home, crop the grass, lie down in the sun and stare at nothing
 function goatTick(o){ const now=gt; if(o.gx==null){ o.hx=o.i+0.5; o.hy=o.j+0.5; o.gx=o.hx; o.gy=o.hy; o.gs='idle'; o.gt=now+1+Math.random()*2; o.face=1; o.lt=now; }
   const dt=Math.min(0.1,now-o.lt); o.lt=now; if(CS.on && o.gs==='walk'){ o.gs='idle'; }
@@ -15202,7 +15200,6 @@ Object.assign(CHOICE,{ pupName:CHOICE.pupName??null, pupFoster:CHOICE.pupFoster?
 const PUP_OLD_NAMES=['Bread','Butter','Hamond'], PUP_LOOK=['the little dark one','the pale she-wolf','the big grey one'];
 const pupNamesSync=()=>{ for(let v=0;v<3;v++) PUP_NAMES[v]=''; if(CHOICE.pupSt==='adopted' && CHOICE.pupAdopt!=null) PUP_NAMES[CHOICE.pupAdopt]=CHOICE.pupName||PUP_OLD_NAMES[CHOICE.pupAdopt]; };
 pupNamesSync();
-{ const oAS=applySave; applySave=function(sv){ const r=oAS(sv); try{ pupNamesSync(); pupSync(); }catch(e){} return r; }; }
 const pupHim=v=>PUP_SEX[v]==='she'?'her':'him', pupHe=v=>PUP_SEX[v]==='she'?'she':'he';
 // no tag over a wolf that has no name; the tag over yours says what you called it
 { const oDP=drawPup; drawPup=function(p){ p.name=PUP_NAMES[p.v]||''; if(p.name) return oDP(p);
@@ -15771,7 +15768,7 @@ const hasSpade=()=> player.opts && player.opts.equip.weapon==='shovel';
 const ownsSpade=()=> hasSpade() || hasItem('shovel');
 MOUNDS.forEach(m=>wrap(m[0],'objects',l=>[...l, (CHOICE.dug||{})[moundKey(m)] ? {type:'dugpit', i:m[1], j:m[2], noblock:true} : {type:'dirtmound', i:m[1], j:m[2], mound:m}]));
 PUZ_TYPES.add('dirtmound');
-{ const oldPA=puzAct; puzAct=function(o){ if(o.type!=='dirtmound') return oldPA(o);
+function digMound(o){                               // a mound of earth: needs a spade in your hands
     if(!hasSpade()){ CHOICE.moundSeen=true;
       say('A Mound of Earth',["Someone has heaped the earth up here and stamped it flat, a while ago. Grass is only just coming through it. Something is buried under there.",
         ownsSpade() ? "<i>You have a spade. Take it in your hands first.</i>" : "<i>You need a spade to dig this up. Maybe find one.</i>"],[{label:'Leave it.', fn:closeDialog}]); return; }
@@ -15783,7 +15780,7 @@ PUZ_TYPES.add('dirtmound');
     if(R.coin){ player.purse+=R.coin; floatText([o.i,o.j],'+'+formatCoin(R.coin),'#e8c060',true); logMsg('Found: '+formatCoin(R.coin)+'.','#e8c060'); }
     if(R.item){ if(giveQuestItem(R.item,true)){ floatText([o.i,o.j-0.01],'Found: '+ITEMS[R.item].name,'#8ac070',true); logMsg('Found: '+ITEMS[R.item].name+'.','#8ac070'); } }
     const n=Object.keys(CHOICE.dug).length; logMsg('('+n+'/'+MOUNDS.length+' buried things dug up)','#a89878');
-    updateHud(); if(typeof saveGame==='function') saveGame(); }; }
+    updateHud(); if(typeof saveGame==='function') saveGame(); }
 function drawDirtMound(o){ const q=P(o.i+0.5,o.j+0.5);
   g.fillStyle='rgba(0,0,0,0.22)'; g.beginPath(); g.ellipse(q.x,q.y+2,26,10,0,0,Math.PI*2); g.fill();
   const gr=g.createRadialGradient(q.x-6,q.y-8,2,q.x,q.y-3,26); gr.addColorStop(0,'#7a5a3a'); gr.addColorStop(1,'#3e2c1a');

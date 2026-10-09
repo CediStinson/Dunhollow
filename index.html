@@ -824,6 +824,11 @@ function dirFromDelta(di,dj){
 // Weapon drawn from the hand (origin) along +x, rotated by `ang` (radians).
 function drawWeapon(c,hx,hy,ang,id,s=1){
   if(!id) return;
+  if(id==='barrow_blade') return drawDrownedBlade(c,hx,hy,ang,s);
+  if(id==='shovel') return drawShovel(c,hx,hy,ang,s);
+  if(id==='fire_blade' || id==='emberbrand') return drawEmberBlade(c,hx,hy,ang,id,s);
+  if(NECRO_STAVES.includes(id)) return drawNecroStaff(c,hx,hy,ang,id,s);
+  if(id.startsWith('staff_')) return drawStaff(c,hx,hy,ang,id,s);
   c.save(); c.translate(hx,hy); c.rotate(ang); c.scale(s,s);
   const steel='#c9ced6', steelD='#8a929c', wood='#6a4520', woodD='#4a2e14', brass='#c09040';
   if(id==='morningstar'){
@@ -7743,7 +7748,7 @@ function speechBubble(x,bottom,text,a=1){ if(a<=0) return;
   g.beginPath(); g.moveTo(x-5,bottom-0.5); g.lineTo(x,bottom+7); g.lineTo(x+4,bottom-0.5); g.fill();
   g.fillStyle='#3a2a18'; g.textAlign='center'; g.textBaseline='middle'; lines.forEach((l,k)=>g.fillText(l,bx,top+4.5+lh*(k+0.5)));
   g.restore(); }
-function drawNPC(n){
+function drawNPCBody(n){
   const P0=P(n.x??n.i+0.5,n.y??n.j+0.5), x=P0.x, y=P0.y-(n.moving?Math.abs(Math.sin(gt*9+n.i))*2:0), sw=n.moving?Math.sin(gt*9+n.i)*5:0;
   if(n.bathe){ const sink=56+Math.sin(gt*1.4+n.i)*0.8;          // shoulder-deep: everything below the waterline is hidden
     g.save(); g.beginPath(); g.rect(x-60,y-200,120,199); g.clip(); drawChar(g,x,y+sink,n.opts,0,n.dir||0); g.restore();
@@ -12734,7 +12739,7 @@ function foeSpell(f){ const w=f && f.opts && f.opts.equip && f.opts.equip.weapon
     g.save(); g.globalCompositeOperation='lighter'; glow(q.x+6,q.y-112,r,r,S.rgb,0.35+0.55*k); g.fillStyle='rgba(255,255,255,'+(0.3+0.6*k)+')'; g.beginPath(); g.arc(q.x+6,q.y-112,1.5+2.5*k,0,Math.PI*2); g.fill(); g.restore(); }; }
 // a withered player hits for half, too
 // how a staff looks in the hand and in the pack
-{ const oldDW=drawWeapon; drawWeapon=function(c,hx,hy,ang,id,s=1){ if(!id || !id.startsWith('staff_')) return oldDW(c,hx,hy,ang,id,s);
+function drawStaff(c,hx,hy,ang,id,s){            // a mage's staff: a shaft, two claws and a glowing stone
     const gem={staff_bog:'#c8d860',staff_hex:'#8ae07a',staff_oak:'#9adcf0',staff_star:'#e8e0ff',staff_cinder:'#ff8a3a',staff_crystal:'#8ae0a8'}[id]||'#9adcf0', wood=id==='staff_bog'?'#2a2618':id==='staff_star'?'#d8d0b8':id==='staff_cinder'?'#3a2418':id==='staff_hex'?'#3e3a2a':'#7a5a30';
     c.save(); c.translate(hx,hy); c.rotate(ang); c.scale(s,s);
     if(STAFF_REST){ c.translate(14,0); }                                    // at rest the shaft runs down to the ground and the stone sits above the head
@@ -12742,7 +12747,7 @@ function foeSpell(f){ const w=f && f.opts && f.opts.equip && f.opts.equip.weapon
     c.fillStyle=wood; c.fillRect(r0,-1.3,rl,2.6); c.fillStyle=tone(wood,0.2); c.fillRect(r0,-1.3,rl,0.9);
     c.strokeStyle=tone(wood,-0.3); c.lineWidth=1.2; c.beginPath(); c.moveTo(29,0); c.quadraticCurveTo(34,-5,31,-7); c.moveTo(29,0); c.quadraticCurveTo(34,5,31,7); c.stroke();   // claws that hold the stone
     const gg=c.createRadialGradient(32,0,0,32,0,6); gg.addColorStop(0,'#fff'); gg.addColorStop(0.35,gem); gg.addColorStop(1,'rgba(0,0,0,0)'); c.fillStyle=gg; c.beginPath(); c.arc(32,0,6,0,Math.PI*2); c.fill();
-    c.fillStyle=gem; c.beginPath(); c.arc(32,0,2.2,0,Math.PI*2); c.fill(); c.restore(); }; }
+    c.fillStyle=gem; c.beginPath(); c.arc(32,0,2.2,0,Math.PI*2); c.fill(); c.restore(); }
 // wizards' staves: each its own head (a crook round an orb, a crescent moon, an iron ember-cage, a crystal crown)
 { const WIZ=['staff_oak','staff_star','staff_cinder','staff_crystal'];
   const oldDW=drawWeapon; drawWeapon=function(c,hx,hy,ang,id,s=1){ if(!WIZ.includes(id)) return oldDW(c,hx,hy,ang,id,s);
@@ -12776,7 +12781,7 @@ function foeSpell(f){ const w=f && f.opts && f.opts.equip && f.opts.equip.weapon
       glowAt(e+7,0,9,0.45); cr(e+2,-1.2,8,1.3,-0.35); cr(e+2,1.2,8,1.3,0.35); cr(e+1.5,0,12,1.9,0); }
     c.lineCap='butt'; c.restore(); }; }
 // necromancers' staves: no tidy claw-and-stone, but skulls, horns, bones and a cold eye-light
-{ const oldDW=drawWeapon; drawWeapon=function(c,hx,hy,ang,id,s=1){ if(!NECRO_STAVES.includes(id)) return oldDW(c,hx,hy,ang,id,s);
+function drawNecroStaff(c,hx,hy,ang,id,s){       // the necromancer's staves: black wood or bone, a skull, a cold light
     const P_={ staff_hex:{wood:'#1e1b18',glow:'#8ae07a'}, staff_bone:{wood:'#cfc4a4',glow:'#b8f0d0'}, staff_bog:{wood:'#2a2618',glow:'#c8d860'}, staff_barrow:{wood:'#1c1a1e',glow:'#a8c8ff'} }[id];
     const BONE='#ddd2b4', BD='#8a7e62';
     c.save(); c.translate(hx,hy); c.rotate(ang); c.scale(s,s); if(STAFF_REST) c.translate(14,0);
@@ -12804,7 +12809,7 @@ function foeSpell(f){ const w=f && f.opts && f.opts.equip && f.opts.equip.weapon
     if(id!=='staff_bog'){ c.save(); c.globalCompositeOperation='lighter'; ey.forEach(([ex,eyy])=>{ const gg=c.createRadialGradient(ex,eyy,0,ex,eyy,3); gg.addColorStop(0,'#fff'); gg.addColorStop(0.3,P_.glow); gg.addColorStop(1,'rgba(0,0,0,0)'); c.fillStyle=gg; c.beginPath(); c.arc(ex,eyy,3,0,Math.PI*2); c.fill(); }); c.restore(); }
     else { const gg=c.createRadialGradient(hx0+1,0,0,hx0+1,0,7); gg.addColorStop(0,'rgba(200,216,96,0.5)'); gg.addColorStop(1,'rgba(0,0,0,0)'); c.fillStyle=gg; c.beginPath(); c.arc(hx0+1,0,7,0,Math.PI*2); c.fill(); }
     if(id==='staff_hex'||id==='staff_barrow'){ c.fillStyle='#0e0e10'; c.save(); c.translate(hx0-6,2.4); c.rotate(0.9); c.beginPath(); c.ellipse(0,3,0.8,3.2,0,0,Math.PI*2); c.fill(); c.restore(); }   // a black feather tied under it
-    c.restore(); }; }
+    c.restore(); }
 
 // ── Magister Orvell and the runaway apprentice ──
 wrap('keepward','npcs',l=>[...l,{ id:'orvell', name:'Magister Orvell', i:10, j:9, dir:1, opts:{gender:'m',skin:0,hair:4,hairColor:13,beard:5,face:0,equip:{head:'hood',torso:'tunic_blue',armor:'robe_blue',hands:null,legs:null,feet:'boots',weapon:'staff_oak',offhand:null}} }]);
@@ -13764,8 +13769,9 @@ JOURNAL.push(
   ['Fen Treasures', ()=> !CHOICE.fenCaches ? null : CHOICE.fenCaches>=3 ? ['done',"You dug up all three caches hidden in the fen."] : ['active',"There are things buried in the fen, under little mounds with a marker stick. Found "+CHOICE.fenCaches+" of 3."]]);
 
 // Young Pim hauls wood to the cart
-{ const oldDN=drawNPC; drawNPC=function(n){ oldDN(n); if(!n.carry || FEN_OPEN()) return; const q=P(n.x??n.i+0.5,n.y??n.j+0.5), y=q.y-(n.moving?Math.abs(Math.sin(gt*9+n.i))*2:0);
-    g.save(); g.translate(q.x+2,y-62); g.rotate(-0.35); g.fillStyle='#6a4c2c'; g.fillRect(-15,-4,30,8); g.fillStyle='#d8b880'; g.beginPath(); g.ellipse(15,0,2.4,4,0,0,Math.PI*2); g.fill(); g.restore(); }; }
+function drawNPCFigure(n){ drawNPCBody(n); if(!n.carry || FEN_OPEN()) return;   // Gerd's men carry logs while the causeway is blocked
+    const q=P(n.x??n.i+0.5,n.y??n.j+0.5), y=q.y-(n.moving?Math.abs(Math.sin(gt*9+n.i))*2:0);
+    g.save(); g.translate(q.x+2,y-62); g.rotate(-0.35); g.fillStyle='#6a4c2c'; g.fillRect(-15,-4,30,8); g.fillStyle='#d8b880'; g.beginPath(); g.ellipse(15,0,2.4,4,0,0,Math.PI*2); g.fill(); g.restore(); }
 
 
 // more fires that will roast your meat: the Crooked Lantern in Hollowmere, and Brann's campfire
@@ -13896,11 +13902,12 @@ setInterval(()=>{ try{ if(!running || combat.active) return; mobs.forEach(m=>{ i
 
 // towels round the hips: painted onto the body itself, so they follow every pose (standing, lounging, kneeling, side-on)
 const TOWEL_BUF=document.createElement('canvas');
-{ const oldDN3=drawNPC; drawNPC=function(n){ if(!n.silk || n.bathe) return oldDN3(n); const c=n.silk; n.silk=null;
+function drawNPCClothed(n){ if(!n.silk || n.bathe) return drawNPCFigure(n);   // a bather in a silk towel: the towel is painted onto the figure offscreen
+    const c=n.silk; n.silk=null;
     try{ const q=P(n.x??n.i+0.5,n.y??n.j+0.5), T=g.getTransform(), sc=Math.hypot(T.a,T.b), d=T.transformPoint({x:q.x,y:q.y});
       const W=Math.ceil(180*sc), H=Math.ceil(270*sc), ox=Math.floor(d.x-W/2), oy=Math.floor(d.y-H*0.82);
       if(TOWEL_BUF.width!==W||TOWEL_BUF.height!==H){ TOWEL_BUF.width=W; TOWEL_BUF.height=H; } const tc=TOWEL_BUF.getContext('2d'); tc.setTransform(1,0,0,1,0,0); tc.globalCompositeOperation='source-over'; tc.clearRect(0,0,W,H); tc.setTransform(T.a,T.b,T.c,T.d,T.e-ox,T.f-oy);
-      const sg=g; g=tc; try{ oldDN3(n); } finally{ g=sg; }
+      const sg=g; g=tc; try{ drawNPCFigure(n); } finally{ g=sg; }
       const es=n.opts.race==='elf'?1.06:1, so=n.sit?sitDrop(n.sit,n.dir,n.opts):0, x=q.x, wy=q.y-45.5*es+so, hy=q.y-(n.sit?35:31.5)*es+so, sd=((n.dir||0)%2)?1:-1;
       tc.globalCompositeOperation='source-atop';
       const gr=tc.createLinearGradient(x-14,0,x+14,0); gr.addColorStop(0,tone(c,0.04)); gr.addColorStop(0.55,c); gr.addColorStop(1,tone(c,-0.24));
@@ -13912,7 +13919,7 @@ const TOWEL_BUF=document.createElement('canvas');
       tc.fillStyle='rgba(255,255,255,0.35)'; tc.fillRect(x-40,wy+0.4,80,0.9);                 // the rolled top edge
       tc.globalCompositeOperation='source-over';
       g.save(); g.setTransform(1,0,0,1,0,0); g.drawImage(TOWEL_BUF,ox,oy); g.restore(); }
-    finally{ n.silk=c; } }; }
+    finally{ n.silk=c; } }
 
 // ════════ staves and heavy gear, where they belong ════════
 Object.assign(WEAPONS,{ staff_bog:{ wind:0.28, dmg:4, len:31, magic:1.25 }, staff_bone:{ wind:0.29, dmg:3, len:30, magic:1.15 }, staff_barrow:{ wind:0.27, dmg:5, len:32, magic:1.45 } });
@@ -14236,14 +14243,14 @@ const emberHit=()=>WEAPONS.emberbrand.dmg*emberMult();
 const FIRE_FOE=f=> f && ((f.opts&&f.opts.equip&&['fire_blade','emberbrand'].includes(f.opts.equip.weapon)) || /^Ash Hound|^The Slag Warden/.test(f.name||''));
 
 // ── the look: a blade with a glowing edge, embers on the Emberbrand ──
-{ const oldDW=drawWeapon; drawWeapon=function(c,hx,hy,ang,id,s=1){ if(id!=='fire_blade' && id!=='emberbrand') return oldDW(c,hx,hy,ang,id,s);
-    oldDW(c,hx,hy,ang,id==='emberbrand'?'longsword':'sword',s);
+function drawEmberBlade(c,hx,hy,ang,id,s){       // a plain sword or longsword with fire running down the edge
+    drawWeapon(c,hx,hy,ang,id==='emberbrand'?'longsword':'sword',s);
     const L=id==='emberbrand'?27:21; c.save(); c.translate(hx,hy); c.rotate(ang); c.scale(s,s); c.globalCompositeOperation='lighter';
     const gr=c.createLinearGradient(5,0,L,0); gr.addColorStop(0,'rgba(255,90,20,0.2)'); gr.addColorStop(1,'rgba(255,190,80,0.85)');
     c.strokeStyle=gr; c.lineCap='round'; c.lineWidth=id==='emberbrand'?2.2:1.4; c.beginPath(); c.moveTo(6,0); c.lineTo(L,0); c.stroke();
     if(id==='emberbrand'){ const t=(typeof gt!=='undefined'?gt:0); for(let k=0;k<4;k++){ const u=((t*0.8+k*0.25)%1); c.fillStyle=`rgba(255,${150+k*20},60,${0.8*(1-u)})`; c.beginPath(); c.arc(8+u*(L-6),-2-u*6+Math.sin(t*5+k)*1.5,0.9,0,Math.PI*2); c.fill(); }
       c.strokeStyle='rgba(255,140,40,0.35)'; c.lineWidth=5; c.beginPath(); c.moveTo(8,0); c.lineTo(L,0); c.stroke(); }
-    c.restore(); }; }
+    c.restore(); }
 function paintEmberArt(g2,id,size){             // true when drawn
     if(id==='fire_blade' || id==='emberbrand'){ g2.save(); g2.scale(size/40,size/40); drawWeapon(g2,7,33,-Math.PI/4,id,1.3); g2.restore(); return true; }
     if(id==='ember_core'){ g2.save(); g2.scale(size/40,size/40);
@@ -14937,7 +14944,7 @@ const SPELL_IMMUNE=f=>!!f && f.type==='skeleton';
 
 // Old Tobb's spade
 Object.assign(ITEMS,{ shovel:{ name:'Spade', slot:'weapon' } }); Object.assign(WEAPONS,{ shovel:{ wind:0.26, dmg:6, len:26 } }); Object.assign(PRICES,{ shovel:8 });
-{ const oDW=drawWeapon; drawWeapon=function(c,hx,hy,ang,id,s=1){ if(id!=='shovel') return oDW(c,hx,hy,ang,id,s);
+function drawShovel(c,hx,hy,ang,s){
     c.save(); c.translate(hx,hy); c.rotate(ang); c.scale(s,s);
     c.fillStyle='#6a4a28'; c.fillRect(-8,-1.3,30,2.6); c.fillStyle='#8a6438'; c.fillRect(-8,-1.3,30,0.9);          // the ash handle
     c.strokeStyle='#5a3c20'; c.lineWidth=1.6; c.beginPath(); c.moveTo(-8,-3.2); c.lineTo(-11,-3.2); c.lineTo(-11,3.2); c.lineTo(-8,3.2); c.stroke();   // the D-grip
@@ -14945,7 +14952,7 @@ Object.assign(ITEMS,{ shovel:{ name:'Spade', slot:'weapon' } }); Object.assign(W
     c.fillStyle='#7a7c80'; c.beginPath(); c.moveTo(24,-4.6); c.lineTo(34,-4.2); c.quadraticCurveTo(37,0,34,4.2); c.lineTo(24,4.6); c.closePath(); c.fill();   // the blade, worn bright at the edge
     c.fillStyle='#a8aaae'; c.beginPath(); c.moveTo(33,-4); c.quadraticCurveTo(36,0,33,4); c.lineTo(34,4.2); c.quadraticCurveTo(37,0,34,-4.2); c.fill();
     c.fillStyle='rgba(70,50,30,0.6)'; c.beginPath(); c.ellipse(28,1.5,3,1.6,0,0,Math.PI*2); c.fill();               // earth on it
-    c.restore(); }; }
+    c.restore(); }
 // ── tables and benches, built in the room's own perspective so they sit square on the floor ──
 const CHAIR={L:0.17,D:0.16,H:17,BH:22}, CHAIR_OVER={...{L:0.17,D:0.16,H:17,BH:22}, part:'over'}, CHAIR_IN=0.3;
 function drawChairOver(ch){ const f=ch.face||[1,0], q=ch._x!=null?{x:ch._x,y:ch._y}:P(ch.i+0.5+f[0]*CHAIR_IN,ch.j+0.5+f[1]*CHAIR_IN);
@@ -15084,11 +15091,13 @@ function transitArea(prev,id){                 // someone was walking between ar
 // out in the rain, everyone gets wet, not only you: soaked clothes go dark, a sheen on the skin, drips and a damp patch underfoot
 let WET_NPC=0; const WET_NPC_BUF=document.createElement('canvas').getContext('2d');
 const rainingHere=()=>{ const A=AREAS[areaId]; return !!A && !A.inside && typeof weatherToday==='function' && weatherToday()==='rain'; };
-{ const oDN=drawNPC; drawNPC=function(n){ if(!rainingHere() || n.bathe || n.sleepBed || (n.opts&&n.opts.ghost)) return oDN(n);
-    WET_NPC=(typeof LOW_FX!=='undefined' && LOW_FX)?0:1; try{ oDN(n); } finally{ WET_NPC=0; }   // the soaked tint is skipped in the light mode: drips only
+function drawNPCState(n){
+    if(n.sleepBed) return drawSleeper(n);
+    if(!rainingHere() || n.bathe || (n.opts&&n.opts.ghost)) return drawNPCClothed(n);
+    WET_NPC=(typeof LOW_FX!=='undefined' && LOW_FX)?0:1; try{ drawNPCClothed(n); } finally{ WET_NPC=0; }   // the soaked tint is skipped in the light mode: drips only
     const q=P(n.x??n.i+0.5,n.y??n.j+0.5);
     for(let k=0;k<3;k++){ const ph=((gt*(0.9+k*0.17)+k*0.37+n.i*0.13)%1), dx=[-6,5,-1][k], y0=q.y-[58,46,68][k]; g.fillStyle=`rgba(190,220,235,${0.7*(1-ph)})`; g.beginPath(); g.ellipse(q.x+dx,y0+ph*(q.y-y0),1,1.8,0,0,Math.PI*2); g.fill(); }
-    g.fillStyle='rgba(40,60,70,0.16)'; g.beginPath(); g.ellipse(q.x,q.y+1,9,2.8,0,0,Math.PI*2); g.fill(); }; }
+    g.fillStyle='rgba(40,60,70,0.16)'; g.beginPath(); g.ellipse(q.x,q.y+1,9,2.8,0,0,Math.PI*2); g.fill(); }
 { const oDC=drawChar; drawChar=function(c,x,B,opts,swing=0,dir=0,pose=null){ if(!WET_NPC || c!==g) return oDC(c,x,B,opts,swing,dir,pose);
     const T=g.getTransform(), sc=Math.hypot(T.a,T.b), d=T.transformPoint({x,y:B}), W=Math.ceil(130*sc), H=Math.ceil(190*sc), ox=Math.floor(d.x-W/2), oy=Math.floor(d.y-H*0.9);
     const b=WET_NPC_BUF; if(b.canvas.width<W||b.canvas.height<H){ b.canvas.width=Math.max(W,b.canvas.width); b.canvas.height=Math.max(H,b.canvas.height); }
@@ -15267,7 +15276,7 @@ wrap('elderhouse','npcs',l=>{ if(!SLEEP_HRS()) return l; const out=[...l];
 SLEEPERS.forEach(([id,name])=>{ TALKERS['sleep_'+id]=()=>{ const real={elder:'elder',wenna:'wenna',ada:'ada'}[id], news=(()=>{ try{ return npcHasNews({id:real,name}); }catch(e){ return null; } })();
   say(name,[{elder:"Hamond is asleep on his back with his hands folded on his chest, snoring like a slow saw.",wenna:"Old Wenna sleeps with her stick beside her, one hand still on it. Now and then she mutters something about a goat.",ada:"Ada is asleep, turned toward the empty bed by the far wall."}[id]],[...(news?[{label:'Wake '+(id==='elder'?'him':'her')+' gently.', fn:()=>{ const n=NPCS.find(q=>q.id==='sleep_'+id); TALK_NPC=null; closeDialog(); const t=TALKERS[real]; if(t) t(); }}]:[]),{label:'Let them sleep.',fn:closeDialog}]); }; });
 function bedBlanket(o){ const k=o.col!=null ? o.col : ([...areaId].reduce((h,ch)=>h*31+ch.charCodeAt(0)|0,7)+o.i*13+o.j*7)>>>0; return BED_BLANKETS[k%BED_BLANKETS.length]; }
-{ const oDN=drawNPC; drawNPC=function(n){ if(!n.sleepBed) return oDN(n);
+function drawSleeper(n){                           // asleep in a bed, turned over like the dead, with a z or two
     const bed=n.sleepBed, br=Math.sin(gt*1.1+bed.i)*0.5;
     const pil=P(bed.i+0.5-0.18,bed.j+0.5), U=Math.hypot(TW/2,TH/2), ux=-(TW/2)/U, uy=-(TH/2)/U;               // u: along the bed, from the foot toward the pillow
     const hx=pil.x, hy=pil.y-21, fx=hx-ux*84, fy=hy-uy*84;                                                   // head on the pillow, feet 84px down the bed
@@ -15275,7 +15284,7 @@ function bedBlanket(o){ const k=o.col!=null ? o.col : ([...areaId].reduce((h,ch)
     drawChar(g,fx,fy+br,n.opts,0,0,null);
     g.restore();
     const pt=(gi,gj,h)=>{ const q=P(bed.i+0.5+gi,bed.j+0.5+gj); return {x:q.x,y:q.y-h}; };
-    const z=pt(-0.2,-0.2,48); g.save(); g.font='italic 600 11px Georgia,serif'; g.fillStyle=`rgba(220,226,250,${0.5+0.3*Math.sin(gt*1.4)})`; g.fillText('z',z.x+((gt*6)%8),z.y-((gt*6)%8)); g.font='italic 600 8px Georgia,serif'; g.fillText('z',z.x+8,z.y-12); g.restore(); }; }
+    const z=pt(-0.2,-0.2,48); g.save(); g.font='italic 600 11px Georgia,serif'; g.fillStyle=`rgba(220,226,250,${0.5+0.3*Math.sin(gt*1.4)})`; g.fillText('z',z.x+((gt*6)%8),z.y-((gt*6)%8)); g.font='italic 600 8px Georgia,serif'; g.fillText('z',z.x+8,z.y-12); g.restore(); }
 let CLICKED_BED=null;                                                                    // the bed you actually clicked, not just the nearest one
 { const oPU=pointerUp; pointerUp=function(px,py){ if(drag.active && drag.moved<6){ const r=gc.getBoundingClientRect(), gp=fromIso(px-r.left,py-r.top), ti=Math.floor(gp.x), tj=Math.floor(gp.y);
       const b=OBJECTS.find(o=>o.type==='bed' && ti>=o.i && ti<o.i+(o.fp?o.fp[0]:1) && tj>=o.j && tj<o.j+(o.fp?o.fp[1]:1)); if(b) CLICKED_BED=b; } return oPU(px,py); }; }
@@ -15312,9 +15321,10 @@ function drawRoundHut(o){ const q=P(o.i+1,o.j+1); drawCached('roundhut',q.x,q.y,
     if(!ch || (si===player.i && sj===player.j)) return oFP(si,sj,ti,tj);
     const k=ti+','+tj, was=blocked.has(k); blocked.delete(k); try{ return oFP(si,sj,ti,tj); } finally{ if(was) blocked.add(k); } }; }
 // whoever sits at a table sits on the chair, pulled in to it
-{ const oDN=drawNPC; drawNPC=function(n){ const ch=n.sit && !n.moving && OBJECTS.find(o=>o.type==='chair' && o.i===n.i && o.j===n.j);
-    if(!ch) return oDN(n); const ox=n.x, oy=n.y, bx=(n.x??n.i+0.5), by=(n.y??n.j+0.5); n.x=bx+ch.face[0]*CHAIR_IN; n.y=by+ch.face[1]*CHAIR_IN; const od=n.dir, os=n.sit; n.dir=dirFromDelta(ch.face[0],ch.face[1]); if(n.sit===true) n.sit='chair';   // faces the table, sitting up on the seat
-    try{ return oDN(n); } finally{ n.x=ox; n.y=oy; n.dir=od; n.sit=os; if((ch.face[0]+ch.face[1])<0) drawChairOver(ch); } }; }   // a chair facing away from us: its back (and legs) in front of the sitter
+function drawNPC(n){                                 // a townsperson: on a chair, asleep, soaked by rain, in a towel, carrying a log
+    const ch=n.sit && !n.moving && OBJECTS.find(o=>o.type==='chair' && o.i===n.i && o.j===n.j);
+    if(!ch) return drawNPCState(n); const ox=n.x, oy=n.y, bx=(n.x??n.i+0.5), by=(n.y??n.j+0.5); n.x=bx+ch.face[0]*CHAIR_IN; n.y=by+ch.face[1]*CHAIR_IN; const od=n.dir, os=n.sit; n.dir=dirFromDelta(ch.face[0],ch.face[1]); if(n.sit===true) n.sit='chair';   // faces the table, sitting up on the seat
+    try{ return drawNPCState(n); } finally{ n.x=ox; n.y=oy; n.dir=od; n.sit=os; if((ch.face[0]+ch.face[1])<0) drawChairOver(ch); } }   // a chair facing away from us: its back (and legs) in front of the sitter
 // you can sit on a chair too: click it, walk up, sit down facing the table; any move gets you up again
 let pendingChair=null;
 const chairFree=ch=> !NPCS.some(n=>n.i===ch.i && n.j===ch.j);
@@ -15648,7 +15658,7 @@ var GEAR_LORE={
 // the blade: a cut that withers, a cut that drinks
 // in his hands it does the same to you
 // the look: a long blade gone green-black, a drowned shine on the edge, a little black water running off it
-{ const oldDW=drawWeapon; drawWeapon=function(c,hx,hy,ang,id,s=1){ if(id!=='barrow_blade') return oldDW(c,hx,hy,ang,id,s);
+function drawDrownedBlade(c,hx,hy,ang,s){
     const t=(typeof gt!=='undefined'?gt:0), L=30;
     c.save(); c.translate(hx,hy); c.rotate(ang); c.scale(s,s);
     // the blade: black as bog-water, its edges rippling like something still under the surface
@@ -15675,7 +15685,7 @@ var GEAR_LORE={
     c.fillStyle='#d8d0b8'; c.beginPath(); c.arc(-8.6,0,1.8,0,Math.PI*2); c.fill(); c.fillRect(-10.2,-0.9,1.2,1.8);
     c.fillStyle='#1a1612'; c.fillRect(-9.4,-0.9,0.6,0.6); c.fillRect(-9.4,0.3,0.6,0.6);
     c.save(); c.globalCompositeOperation='lighter'; c.fillStyle=`rgba(140,255,180,${0.5*pulse})`; c.fillRect(-9.4,-0.9,0.6,0.6); c.fillRect(-9.4,0.3,0.6,0.6); c.restore();   // its eyes, faintly lit
-    c.restore(); }; }
+    c.restore(); }
 // the crown: bog-oak twisted into points, moss in the crooks, one pale light set in the front
 function drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V,part){
   const cy=Y.HAIRLINE-0.4, rx=HW+1.3, ry=2.6, front=V.turn>-0.25, fx=front?(pr>0.8?HW*0.5:faceOff(pr)):0, far=part==='far';

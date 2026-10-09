@@ -419,6 +419,13 @@ html,body{touch-action:none;overscroll-behavior:none;-webkit-tap-highlight-color
 .jq .jt{float:right;cursor:pointer;font:600 10px 'Segoe UI',system-ui,sans-serif;padding:2px 7px;border-radius:4px;border:1px solid rgba(120,80,30,0.45);color:#6a4a1a;background:rgba(200,160,80,0.18);user-select:none;}
 .jq .jt.off{color:#9a8a6a;background:transparent;border-style:dashed;}
 .jh{font-variant:small-caps;letter-spacing:2px;color:#7a5a2a;margin:14px 0 6px;font-size:13px;}
+.bst{margin:8px 0 12px;padding:8px 10px;border-left:3px solid #8a6a3a;background:rgba(120,90,40,0.07);}
+.bst b{display:block;font-size:15px;}
+.bst i.k{display:block;color:#8a6a3a;font-size:11px;margin-bottom:4px;}
+.bst .r{display:flex;gap:8px;font-size:12px;margin:2px 0;}
+.bst .r em{flex:0 0 92px;font-style:normal;color:#7a5a2a;}
+.bst.unk{opacity:.55;border-left-color:#b8a888;}
+.blink{display:inline-block;margin-top:6px;cursor:pointer;color:#6a3a1a;text-decoration:underline;}
 .note-paper{max-height:86vh;overflow:auto;}
 .dlg-opt em.dsub{display:block;font-style:normal;font-size:11px;color:#6a5030;margin-top:2px;} .dlg-opt em.dsub b.up{color:#2a7a34;} .dlg-opt em.dsub b.dn{color:#a8322a;} .dlg-opt em.dsub b.eq{color:#8a7a5a;font-weight:normal;}
 </style>
@@ -10546,6 +10553,7 @@ function openJournal(){
   const st=storyStep(); for(let k=act.length-1;k>=0;k--) if(act[k].t===st[0]) act.splice(k,1);
   document.getElementById('note-body').innerHTML=`<div class="jh">The Road Ahead</div><div class="jq active main"><span class="jt${isTracked(MAIN_Q)?'':' off'}" data-q="${MAIN_Q}">${isTracked(MAIN_Q)?'◉ Followed':'○ Follow'}</span><b>${st[0]}</b><span>${st[1]}</span></div><div class="jh">Open</div>${act.length?act.map(li).join(''):'<i>Nothing pressing. The roads are quiet, for now.</i>'}<div class="jh">Done</div>${done.length?done.map(li).join(''):'<i>Nothing yet.</i>'}${failed.length?`<div class="jh">Failed</div>${failed.map(li).join('')}`:''}`;
   document.querySelectorAll('#note-body .jt').forEach(el=>el.addEventListener('click',e=>{ e.stopPropagation(); const q=el.dataset.q; CHOICE.untrack={...(CHOICE.untrack||{})}; if(CHOICE.untrack[q]) delete CHOICE.untrack[q]; else CHOICE.untrack[q]=true; openJournal(); updateHud(); }));
+  if(typeof bestiaryLink==='function') document.getElementById('note-body').insertAdjacentHTML('beforeend',bestiaryLink());
   noteOverlay.classList.add('open');
 }
 const MAIN_Q='__main';
@@ -16209,6 +16217,49 @@ Object.assign(ITEMS,{ warm_tonic:{ name:'Warming Tonic', slot:'food', heal:4, cu
   rue_water:{ name:'Rue Water', slot:'food', heal:4, cure:'weak' }, linen_wrap:{ name:'Linen Wrap', slot:'food', heal:4, cure:'bleed' } });
 Object.assign(PRICES,{ warm_tonic:9, burn_salve:9, rue_water:11, linen_wrap:6 });
 LOOT_TIERS[0].push('linen_wrap'); LOOT_TIERS[1].push('warm_tonic','burn_salve','linen_wrap'); LOOT_TIERS[2].push('rue_water','burn_salve');
+
+// ════════ The bestiary: a page in the journal for every kind of foe you have faced ════════
+const BEASTS=[
+  { k:'barrowking', is:f=>f.type==='barrowking', name:'The Barrow-King', kind:'Undead lord · the barrow on the fen',
+    how:'Fights in phases: storms of grave-wind, rings of cold earth, his household rising to shield him. Each phase ends at a fixed wound, however hard you hit.',
+    res:'Undead: spells barely touch him, and his ward turns teeth and steel alike while his household stands.', aff:'Bleeding in his second phase; later he drinks the life from every blow that lands.',
+    ans:'Read each phase: shelter from the storm, step out of the rings, cut down the guard to break his ward. Bring wraps and healing draughts.' },
+  { k:'ghost', is:f=>!!(f.opts&&f.opts.ghost), name:'The Drowned Dead', kind:'Undead · the fen',
+    how:'Grey shapes from the water, swinging the rusted blades they drowned with.', res:'Undead: your spells do little to them.', aff:'Nothing worse than the cut.', ans:'Steel. A sword or an axe, and patience.' },
+  { k:'skeleton', is:f=>f.type==='skeleton'||!!(f.opts&&f.opts.bones), name:'Risen Bones', kind:'Undead · the fen and the barrows',
+    how:'Quick and tireless: a fast feint, then the real blow. They carry whatever they died with.', res:'Undead: your spells do little to them, and they do not bleed.', aff:'Bleeding, if the blade they carry is an edged one.', ans:'Steel, and parry the second blow, not the first.' },
+  { k:'necro', is:f=>f.type==='mage'&&NECRO_STAVES.includes(f.opts&&f.opts.equip&&f.opts.equip.weapon), name:'Grave-Speakers', kind:'Necromancers · hedge-witches and hags',
+    how:'Long glowing windups, a spell at the end of each: Drain (up), Raise Dead (left), Wither (right).', res:'Ward your spells with their staff if you cast at the side they guard.',
+    aff:'Withered: your blows land for half. Drain heals them on your life. Raise Dead puts a skeleton at your shoulder.', ans:'Interrupt the windup by casting or striking into it. Rue Water clears a wither. A staff wards their spells, a shield catches half.' },
+  { k:'firemage', is:f=>f.type==='mage'&&!NECRO_STAVES.includes(f.opts&&f.opts.equip&&f.opts.equip.weapon), name:'Magi and Zealots', kind:'Casters · hedge-mages, acolytes, the Flamesworn',
+    how:'Long glowing windups ending in Fire (left), Frost (up) or Arcane (right). Cinder staves speak only fire.', res:'Ward your spells with their staff if you cast at the side they guard.',
+    aff:'Burning, and Chilled: your swing slows and your parries must be quicker.', ans:'Cooling Salve for the burn, Warming Tonic for the chill. A staff wards their spells, a shield catches half; with only a sword you must duck.' },
+  { k:'ashhound', is:f=>f.type==='wolf'&&FIRE_FOE(f), name:'Ash Hounds', kind:'Beasts · the Ember Pass',
+    how:'No guard, fast lunges, smoke in their fur.', res:'Nothing in particular.', aff:'Burning, often; the bite bleeds too.', ans:'Strike any side, parry the lunge. Cooling Salve and wraps on the belt.' },
+  { k:'flamesworn', is:f=>f.type!=='wolf'&&f.type!=='mage'&&FIRE_FOE(f), name:'The Flamesworn', kind:'Fire cultists · the Ember Pass and the forge',
+    how:'Burning blades and forge hammers; the Slag Warden sets you alight with every blow.', res:'Nothing in particular.', aff:'Burning.', ans:'Parry clean and carry Cooling Salve.' },
+  { k:'wolf', is:f=>f.type==='wolf', name:'Wolves', kind:'Beasts · every road and wood',
+    how:'No guard at all: every side is open. They lunge fast and with little warning.', res:'Nothing in particular.', aff:'Bleeding from every bite that lands.', ans:'Just attack; watch for the ring and parry the lunge. A Linen Wrap stops the bleeding.' },
+  { k:'lurker', is:f=>f.type==='lurker', name:'Fen Lurkers', kind:'Bog-things · the Drowning Fen',
+    how:'Heavy and slow to rise, then a quick second swipe. They take a lot of killing.', res:'Nothing in particular.', aff:'Only the bruise of the club.', ans:'Parry the slow blow, hit the open side, and be patient.' },
+  { k:'goblin', is:f=>f.type==='goblin', name:'Goblins', kind:'Warren-folk · the south trail and the Warren',
+    how:'Quick and jittery, fond of the double stab: the second comes from the same side as the first.', res:'Nothing in particular.', aff:'Bleeding, from their knives and spears.', ans:'Parry twice on the same side. They are frail: a few clean blows finish them.' },
+  { k:'brute', is:f=>f.type==='brute', name:'Brutes', kind:'Big men with big weapons',
+    how:'Slow, heavy swings, then a sudden short one right after the long one.', res:'Nothing in particular.', aff:'Bleeding, if they carry an axe.', ans:'A perfect parry staggers them for a long time: make it count.' },
+  { k:'bandit', is:f=>f.type==='bandit', name:'Cutthroats and Guards', kind:'Bandits, loggers, cutpurses, the Baron\'s men',
+    how:'A steady swing, then a combo: the first blow barely leaves an opening, the follow-up comes fast and high.', res:'Nothing in particular.', aff:'Bleeding, from knives, hatchets and spears.', ans:'Match the shield over his head to see his guard; hit another side.' } ];
+const beastOf=f=>f ? BEASTS.find(b=>{ try{ return b.is(f); }catch(e){ return false; } }) : null;
+const BEST=()=>CHOICE.bestiary=CHOICE.bestiary||{};
+setInterval(()=>{ try{ if(running && combat.active && !combat.practice && combat.foe){ const b=beastOf(combat.foe); if(b && !BEST()[b.k]){ BEST()[b.k]={met:1,kills:0}; logMsg('A new page in your bestiary: '+b.name+'.','#c8a060'); } } }catch(e){} },500);
+foeDown=(orig=>function(f){ try{ const b=beastOf(f); if(b && !combat.practice){ const e=BEST()[b.k]=BEST()[b.k]||{met:1,kills:0}; e.kills=(e.kills||0)+1; } }catch(e){} return orig.apply(this,arguments); })(foeDown);
+function bestiaryLink(){ const n=Object.keys(BEST()).length; return `<div class="jh">Bestiary</div><span class="blink" id="open-bestiary">Open the bestiary (${n} of ${BEASTS.length} known)</span>`; }
+function openBestiary(){ const B=BEST();
+  document.getElementById('note-title').innerHTML=player.name+"'s Bestiary<div style='font-size:11px;letter-spacing:1px;margin-top:4px;color:#8a6a3a'>Every kind of foe you have faced, and what you have learned of them</div>";
+  const row=(k,v)=>`<div class="r"><em>${k}</em><span>${v}</span></div>`;
+  document.getElementById('note-body').innerHTML='<span class="blink" id="back-journal">← Back to the journal</span>'+[...BEASTS.filter(b=>B[b.k]),...BEASTS.filter(b=>!B[b.k])].map(b=>B[b.k] ? `<div class="bst"><b>${b.name}</b><i class="k">${b.kind} · slain: ${B[b.k].kills||0}</i>${row('How it fights',b.how)}${row('Resists',b.res)}${row('Afflicts you',b.aff)}${row('The answer',b.ans)}</div>`
+    : `<div class="bst unk"><b>? ? ?</b><i class="k">Not yet met.</i></div>`).join('');
+  document.getElementById('back-journal').addEventListener('click',e=>{ e.stopPropagation(); openJournal(); }); }
+document.addEventListener('click',e=>{ if(e.target && e.target.id==='open-bestiary'){ e.stopPropagation(); openBestiary(); } },true);
 </script>
 </body>
 </html>

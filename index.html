@@ -15611,6 +15611,84 @@ function drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V){
       g2.strokeStyle='#07070a'; g2.lineWidth=0.9; g2.stroke();
       g2.fillStyle='#c8ccd4'; g2.beginPath(); g2.arc(20,13.5,1.6,0,Math.PI*2); g2.fill(); }   // the pewter pin
     g2.restore(); }; }
+// ════════════════════════════════════════════════════════════════════════════
+//  BURIED THINGS: mounds of stamped-down earth in out-of-the-way corners, and a spade to dig them with
+//    CHOICE.moundSeen : you found a mound and had nothing to dig with
+//    CHOICE.spadeQ    : 'tobb' (he will not lend his) → 'vesna' (she told you where one lies)
+//    CHOICE.dug       : {area:i,j → true}
+//  The spade lies in the Barrow-King's hall: the one his household dug his barrow with.
+// ════════════════════════════════════════════════════════════════════════════
+const MOUNDS=[
+  ['farm',8,6,{coin:6},"A clay pot, cracked, with a farmer's coppers in it. Whoever buried it never came back for it."],
+  ['road',15,0,{item:'bone_charm'},"A knucklebone on a thong, wrapped in rotten cloth. Somebody's luck, put away for later."],
+  ['crossroads',1,1,{item:'tin_medal'},"A tin saint's medal in a twist of oilcloth. A pilgrim's, maybe, buried at the crossroads for a blessing."],
+  ['wolfwood',11,0,{item:'potion'},"A stoppered flask, still sealed with wax. A hunter's cache."],
+  ['clearing',0,6,{coin:14},"A poacher's stash: a purse of coin under a flat stone. Brann would be furious."],
+  ['millroad',23,0,{item:'glass_beads'},"A string of glass beads in a little wooden box. A girl's treasure, hidden from her brothers."],
+  ['southtrail',0,2,{item:'rusted_blade'},"A blade, rusted through, wrapped in what was once a cloak. Somebody buried their sword and their war with it."],
+  ['kingsroad',0,13,{coin:18},"A traveller's purse, slit open and buried empty… no: the thief hid the coin and the purse together, and never came back."],
+  ['elfroad',0,5,{item:'potion'},"A flask of something green, stoppered with silver wire. Elvish. It smells of mint, and of healing."],
+  ['willowpool',11,4,{item:'copper_chain'},"A copper chain, green with age, in a nest of willow roots."],
+  ['lane',5,19,{coin:9,item:'bread'},"A carter's dinner and his pay, buried against bandits. The bread is a week old. The coin isn't."],
+  ['mistmere',12,1,{item:'grave_ring'},"A ring, black with damp, on a finger bone. You leave the finger. You take the ring."] ];
+const moundKey=m=>m[0]+':'+m[1]+','+m[2];
+const hasSpade=()=> player.opts && player.opts.equip.weapon==='shovel';
+const ownsSpade=()=> hasSpade() || hasItem('shovel');
+MOUNDS.forEach(m=>wrap(m[0],'objects',l=>[...l, (CHOICE.dug||{})[moundKey(m)] ? {type:'dugpit', i:m[1], j:m[2], noblock:true} : {type:'dirtmound', i:m[1], j:m[2], mound:m}]));
+PUZ_TYPES.add('dirtmound');
+{ const oldPA=puzAct; puzAct=function(o){ if(o.type!=='dirtmound') return oldPA(o);
+    if(!hasSpade()){ CHOICE.moundSeen=true;
+      say('A Mound of Earth',["Someone has heaped the earth up here and stamped it flat, a while ago. Grass is only just coming through it. Something is buried under there.",
+        ownsSpade() ? "<i>You have a spade. Take it in your hands first.</i>" : "<i>You need a spade to dig this up. Maybe find one.</i>"],[{label:'Leave it.', fn:closeDialog}]); return; }
+    const m=o.mound, R=m[3]; closeDialog(); player.dir=dirTo(tileOf(player),[o.i,o.j]); player.lunge={dx:0,dy:0,t:0};
+    (CHOICE.dug=CHOICE.dug||{})[moundKey(m)]=true;
+    const idx=OBJECTS.indexOf(o); if(idx>=0){ OBJECTS.splice(idx,1,{type:'dugpit', i:o.i, j:o.j, noblock:true}); blocked.delete(o.i+','+o.j); }
+    for(let n=0;n<12;n++) sparks.push({wx:o.i+0.5,wy:o.j+0.5,vx:(Math.random()-0.5)*120,vy:-30-Math.random()*70,t:0,col:['#5a4026','#3a2a1a','#7a5a36'][n%3]});
+    logMsg('You dig. '+m[4],'#e8c060');
+    if(R.coin){ player.purse+=R.coin; floatText([o.i,o.j],'+'+formatCoin(R.coin),'#e8c060',true); logMsg('Found: '+formatCoin(R.coin)+'.','#e8c060'); }
+    if(R.item){ if(giveQuestItem(R.item,true)){ floatText([o.i,o.j-0.01],'Found: '+ITEMS[R.item].name,'#8ac070',true); logMsg('Found: '+ITEMS[R.item].name+'.','#8ac070'); } }
+    const n=Object.keys(CHOICE.dug).length; logMsg('('+n+'/'+MOUNDS.length+' buried things dug up)','#a89878');
+    updateHud(); if(typeof saveGame==='function') saveGame(); }; }
+function drawDirtMound(o){ const q=P(o.i+0.5,o.j+0.5);
+  g.fillStyle='rgba(0,0,0,0.22)'; g.beginPath(); g.ellipse(q.x,q.y+2,26,10,0,0,Math.PI*2); g.fill();
+  const gr=g.createRadialGradient(q.x-6,q.y-8,2,q.x,q.y-3,26); gr.addColorStop(0,'#7a5a3a'); gr.addColorStop(1,'#3e2c1a');
+  g.fillStyle=gr; g.beginPath(); g.moveTo(q.x-24,q.y+1); g.quadraticCurveTo(q.x-12,q.y-15,q.x+2,q.y-13); g.quadraticCurveTo(q.x+18,q.y-11,q.x+24,q.y+1); g.quadraticCurveTo(q.x,q.y+9,q.x-24,q.y+1); g.fill();
+  g.fillStyle='rgba(30,20,10,0.35)'; [[-9,-4],[6,-7],[12,-1],[-2,1]].forEach(([a,b])=>{ g.beginPath(); g.ellipse(q.x+a,q.y+b,2.4,1.2,0,0,Math.PI*2); g.fill(); });   // clods
+  g.fillStyle='#8a8478'; [[-14,-1],[15,-3]].forEach(([a,b])=>{ g.beginPath(); g.ellipse(q.x+a,q.y+b,2.6,1.6,0,0,Math.PI*2); g.fill(); });               // pebbles
+  g.strokeStyle='#5a7a3a'; g.lineWidth=1.2; [[-6,-11],[-4,-12],[9,-9],[11,-10],[0,-12]].forEach(([a,b])=>{ g.beginPath(); g.moveTo(q.x+a,q.y+b); g.lineTo(q.x+a+(a>0?1.4:-1.4),q.y+b-4.5); g.stroke(); }); }   // grass just coming through
+function drawDugPit(o){ const q=P(o.i+0.5,o.j+0.5);
+  g.fillStyle='#4a3622'; g.beginPath(); g.ellipse(q.x,q.y,24,10,0,0,Math.PI*2); g.fill();
+  g.fillStyle='#1a120a'; g.beginPath(); g.ellipse(q.x,q.y+1,14,5.6,0,0,Math.PI*2); g.fill();
+  g.fillStyle='#6a4e30'; [[-20,-2],[18,1],[6,-8],[-8,7]].forEach(([a,b])=>{ g.beginPath(); g.ellipse(q.x+a,q.y+b,3.4,1.8,0,0,Math.PI*2); g.fill(); }); }
+{ const oDO=drawObject; drawObject=function(o){ if(o.type==='dirtmound') return drawDirtMound(o); if(o.type==='dugpit') return drawDugPit(o); return oDO(o); }; }
+// the spade that dug the Barrow-King's barrow lies in his hall still
+wrap('barrow','objects',l=> collectedPickups.has('barrow:9,1') ? l : [...l,{type:'pickup', i:9, j:1, item:'shovel'}]);
+// Old Tobb will not lend his
+{ const oldDg=TALKERS.digger; TALKERS.digger=()=>{
+    if(CHOICE.moundSeen && !ownsSpade() && !CHOICE.spadeQ){ say('Old Tobb',["Tobb leans on his spade, the way he always does."],[
+        {label:'“Could you lend me your spade? There is something buried I want to dig up.”', fn:()=>{ remember('spadeQ','tobb','Old Tobb will not lend you his spade. He thinks Vesna might know where to find one.');
+          say('Old Tobb',["He pulls the spade a little closer, like a man who has heard that question before.","“Lend it? This spade and me have dug every grave in Dunhollow for forty years. I need it every day God sends, and some nights besides.”","He squints. “If you want a spade, ask that pale woman who talks to the dead. Vesna. She's dug up more than I've ever buried, I'd wager. She'll know where one's lying about.”"],[bye]); }},
+        {label:'Something else.', fn:oldDg}, bye]); return; }
+    return oldDg(); }; }
+// Vesna knows where one lies
+const barrowKnown=()=> NECRO()>=2 || CHOICE.morwen==='done' || !!CHOICE.barrow;
+{ const oldV=TALKERS.vesna; TALKERS.vesna=(...a)=>{
+    if(CHOICE.spadeQ==='tobb' && !ownsSpade()){ say('Vesna the Grave-Speaker',["“A spade.” Vesna almost smiles. “Tobb sent you. Tobb thinks I dig up the dead.” She does not say that he is wrong."],[
+        {label:'“Do you know where I could find one?”', fn:()=>{
+          if(barrowKnown()){ remember('spadeQ','vesna',"Vesna says the spade that dug the Barrow-King's barrow lies in his hall, under the reeds of the Sunken Hollow.");
+            say('Vesna the Grave-Speaker',["“When the old kings of the hollow went into the ground, their gravediggers went in with them. Tools and all.”","“Bertil's household dug his barrow with their own hands, and he kept them. The spade they dug it with lies in his hall still, under the reeds. If you can get past him, it's yours. He won't need it.”"],[bye]); }
+          else { CHOICE.spadeVesnaWait=true; say('Vesna the Grave-Speaker',["“I know of one. It lies with a king, and you are not ready to meet him.”","“Do something for me first, and then ask me again.”"],[bye]); } }},
+        {label:'Something else.', fn:()=>oldV(...a)}, bye]); return; }
+    return oldV(...a); }; }
+{ const oldN=npcHasNews; npcHasNews=function(n){ const r=oldN(n); if(r) return r;
+    if(n.id==='digger' && CHOICE.moundSeen && !ownsSpade() && !CHOICE.spadeQ) return '?';
+    if(n.id==='vesna' && CHOICE.spadeQ==='tobb' && !ownsSpade() && barrowKnown()) return '?';
+    return null; }; }
+JOURNAL.push(['Buried Things', ()=> !CHOICE.moundSeen && !ownsSpade() ? null : Object.keys(CHOICE.dug||{}).length>=MOUNDS.length ? ['done',"You dug up every buried thing in the valley."] :
+  ownsSpade() ? ['active',"You have a spade. Hold it and dig up the mounds of stamped earth hidden around the valley, behind trees and in quiet corners. ("+Object.keys(CHOICE.dug||{}).length+"/"+MOUNDS.length+")"] :
+  CHOICE.spadeQ==='vesna' ? ['active',"Vesna says the spade that dug the Barrow-King's barrow lies in his hall, under the reeds of the Sunken Hollow."] :
+  CHOICE.spadeQ==='tobb' ? ['active',"Old Tobb will not lend you his spade. He says Vesna, who talks to the dead, might know where one lies."] :
+  ['active',"Somebody buried something under a mound of earth. You need a spade to dig it up. Maybe Old Tobb, the gravedigger, can help."]]);
 </script>
 </body>
 </html>

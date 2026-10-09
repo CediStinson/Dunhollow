@@ -12896,6 +12896,7 @@ function skelDrawItems(items){
     items.push({d:p.x+p.y-0.2, fn:()=>{ const q=P(p.x,p.y); drawSkelFig(q.x,q.y,{pile:true, alpha:a, dir:p.dir, weapon:p.weapon}); }}); });
   if(SKEL) items.push({d:SKEL.x+SKEL.y+0.01, ax:SKEL.x, ay:SKEL.y, fn:()=>drawSkel(SKEL)});
   if(FSKEL) items.push({d:FSKEL.x+FSKEL.y+0.01, ax:FSKEL.x, ay:FSKEL.y, fn:()=>drawSkel(FSKEL)});
+  if(typeof muleItems==='function') muleItems(items);
   try{ pupDrawItems(items); }catch(e){ console.error(e); }
   try{ const G=CHOICE.goatBlood; if(areaId==='village' && G){ const days=(dayClock-G.t)/DAY_LEN, a=days<2?1:Math.max(0,1-(days-2)/3);   // the goat's blood: full for two days, then gone over three more
       if(a>0.01) G.b.forEach(b=>items.push({d:b.x+b.y-0.9, fn:()=>drawSoftBlood(b,a)})); } }catch(e){} }
@@ -14406,7 +14407,8 @@ const slotOf=(R,h=HOUR())=>{ const s=R.slots.find(s=>inSlot(s,h))||null; return 
 const prevArea=(R,s)=>{ if(!s) return null; const k=R.slots.indexOf(s), p=R.slots[(k-1+R.slots.length)%R.slots.length]; return p && Math.abs((p.h[1]%24)-(s.h[0]%24))<0.01 ? p.area : null; };
 const nextArea=(R,s)=>{ const k=R.slots.indexOf(s), n=R.slots[(k+1)%R.slots.length]; return n && Math.abs((s.h[1]%24)-(n.h[0]%24))<0.01 ? n.area : null; };
 function rtNPC(k,s,fromStart){ const R=ROUTINES[k], at=s.walk?(fromStart?s.walk[0]:s.walk[0]):s.at;
-  const n={ id:R.ids[s.area]||k, name:R.name, i:at[0], j:at[1], dir:s.dir??0, route:k, slot:s, opts:{...R.opts, equip:{...R.opts.equip, ...(s.equip||{})}} };
+  const n={ id:R.ids[s.area]||k, name:R.name, i:at[0], j:at[1], dir:s.dir??0, route:k, slot:s, opts:{...R.opts, equip:{...R.opts.equip, ...(s.equip||{})}}, speed:R.speed, mule:R.mule };
+  if(s.walk && R.speed && fromStart){ const h=HOUR(), a=s.h[0]; let el=h-a; if(el<0) el+=24; n.skipSec=el*(DAY_LEN/24); }   // a slow walker: where he would be by now
   if(s.walk){ n.goto=s.walk[1]; n.vanish=true; } else { if(s.sit) n.sit=true; if(s.chop){ n.chop=true; n.chopPh=Math.random(); } if(s.wander) n.wander=s.wander; if(s.bed) rtLieDown(n,s); }
   return n; }
 // a bed slot: in their own bed, turned in for the night (and back on their feet before they go anywhere)
@@ -14442,9 +14444,11 @@ function walkRoutes(dt){                       // townsfolk on their daily round
           const s=n.arrive||n.slot; n.goto=null; n.dir=s.dir??n.dir; if(s.bed){ rtLieDown(n,s); continue; } if(s.sit) n.sit=true; if(s.chop){ n.chop=true; n.chopPh=Math.random(); } if(s.wander){ n.wander=s.wander; n.wait=2; } continue; }
         const was=blocked.has(n.goto[0]+','+n.goto[1]); blocked.delete(n.goto[0]+','+n.goto[1]);
         n.path=(findPath(n.i,n.j,n.goto[0],n.goto[1])||[]).slice(0,60); if(was) blocked.add(n.goto[0]+','+n.goto[1]);
+        if(n.skipSec){ const k=Math.floor(n.skipSec*(n.speed||1.3)); n.skipSec=0; if(k>=n.path.length && n.vanish){ ROUTINES[n.route].gone={slot:n.slot, at:Math.floor(dayClock/(DAY_LEN/48))}; NPCS.splice(q,1); continue; }   // already through and gone
+          if(k>0){ const st=n.path[Math.min(k,n.path.length)-1]; n.i=st[0]; n.j=st[1]; n.x=n.i+0.5; n.y=n.j+0.5; n.path=n.path.slice(k); n.trail=null; } }   // you came in while he was half-way across
         if(!n.path.length){ n.i=n.goto[0]; n.j=n.goto[1]; n.x=n.i+0.5; n.y=n.j+0.5; } continue; }
       const [ni,nj]=n.path[0]; if(player.i===ni && player.j===nj && (n.blockT||0)<0.6){ n.moving=false; n.blockT=(n.blockT||0)+dt; continue; }   // waits a moment, then squeezes past you
-      if(!(player.i===ni && player.j===nj)) n.blockT=0; stepAlong(n,dt,1.3); } }
+      if(!(player.i===ni && player.j===nj)) n.blockT=0; stepAlong(n,dt,n.speed||1.3); } }
 
 // torso garments (shirts, tunics, bodices, robes worn as the torso layer) are cosmetic only: no stats at all
 for(const id in ITEMS){ const it=ITEMS[id]; if(it && it.slot==='torso'){ delete ITEM_STATS[id]; if(GEAR_HP[id]) GEAR_HP[id]=0; } }
@@ -16304,6 +16308,69 @@ Object.assign(TALKERS,{
   sleep_hunter:()=>say('Brann the Hunter',["Brann sleeps on his side with his boots on and the hatchet in reach. One eye opens, sees it is you, and closes again."],[{label:'Let him sleep.', fn:closeDialog}]),
   sleep_smith:()=>say('Oswin the Armourer',["Oswin snores on a cot by the banked forge, his hands black to the wrist. Come back when the hammer is ringing."],[{label:'Let him sleep.', fn:closeDialog}]),
   sleep_tailor:()=>say('Bess the Tailor',["Bess is asleep under a quilt of a hundred offcuts. A pincushion is still strapped to her wrist."],[{label:'Let her sleep.', fn:closeDialog}]) });
+
+// ════════ Mules: a grey-brown mule in harness before every whole cart, and one under a peddler's packs ════════
+function drawMuleFig(x,y,face,ph,moving,pack,harness,seed){            // side-on, facing right (face=-1 flips it); ph: the walk cycle
+  const sw=moving?Math.sin(ph):0, sw2=moving?Math.sin(ph+Math.PI):0, bob=moving?Math.abs(Math.cos(ph))*1.6:0, idle=Math.sin(gt*0.9+seed);
+  g.save(); g.translate(x,y); g.scale(face,1);
+  g.fillStyle='rgba(10,6,2,0.32)'; g.beginPath(); g.ellipse(0,1,30,7,0,0,Math.PI*2); g.fill();      // its shadow
+  const C='#7e6a56', CD='#5e4c3c', CL='#a8957e', HOOF='#2a221a';
+  const leg=(lx,a,far)=>{ g.save(); g.translate(lx,-22-bob); g.rotate(a*0.38); g.fillStyle=far?CD:C; g.beginPath(); g.moveTo(-3,0); g.lineTo(3,0); g.lineTo(2.2,14); g.lineTo(2.6,21); g.lineTo(-2.2,21); g.lineTo(-2,14); g.closePath(); g.fill();
+    g.fillStyle=HOOF; g.fillRect(-2.6,20,5.4,3); g.restore(); };
+  leg(13,sw2,true); leg(-15,sw,true);                                                                          // the far legs first
+  const tail=idle*0.25+(moving?sw*0.1:0); g.strokeStyle=CD; g.lineWidth=3; g.beginPath(); g.moveTo(-24,-33-bob); g.quadraticCurveTo(-30,-26-bob,-27+tail*10,-15-bob); g.stroke();
+  g.fillStyle='#2e241c'; g.beginPath(); g.ellipse(-27+tail*10,-13-bob,2.6,4.5,tail,0,Math.PI*2); g.fill();      // the tuft
+  const bg=g.createLinearGradient(0,-42-bob,0,-20-bob); bg.addColorStop(0,C); bg.addColorStop(0.7,C); bg.addColorStop(1,CL);
+  g.fillStyle=bg; g.beginPath(); g.ellipse(0,-31-bob,25,11.5,0,0,Math.PI*2); g.fill();                         // the barrel of it
+  g.strokeStyle='rgba(30,20,12,0.5)'; g.lineWidth=1; g.stroke();
+  const hd=moving?0:Math.max(0,Math.sin(gt*0.35+seed*3))*0.35;                                               // now and then the head drops to crop the grass
+  g.save(); g.translate(17,-37-bob); g.rotate(hd);
+  g.fillStyle=C; g.beginPath(); g.moveTo(-6,6); g.lineTo(4,-15); g.lineTo(12,-12); g.lineTo(6,8); g.closePath(); g.fill();   // the neck
+  g.fillStyle='#3a2e24'; g.beginPath(); g.moveTo(-3,0); g.lineTo(4,-15); g.lineTo(7,-14); g.lineTo(0,2); g.closePath(); g.fill();   // a short brushy mane
+  g.save(); g.translate(10,-14); g.rotate(0.55);
+  g.fillStyle=C; g.beginPath(); g.ellipse(6,0,10,5.2,0,0,Math.PI*2); g.fill();                                // the long head
+  g.fillStyle=CL; g.beginPath(); g.ellipse(13.5,0.8,4.4,4,0,0,Math.PI*2); g.fill();                            // pale muzzle
+  g.fillStyle='#1a120c'; g.beginPath(); g.arc(15.5,-0.5,0.9,0,Math.PI*2); g.fill(); g.beginPath(); g.arc(3,-2,1.1,0,Math.PI*2); g.fill();   // nostril, eye
+  const ear=Math.sin(gt*1.7+seed)*0.12; [[-2,-4,-0.9+ear],[0,-4.5,-0.6-ear]].forEach(([ex,ey,ea],k)=>{ g.save(); g.translate(ex,ey); g.rotate(ea); g.fillStyle=k?C:CD; g.beginPath(); g.ellipse(0,-7,2.4,7.5,0,0,Math.PI*2); g.fill(); g.fillStyle=k?'#c8a890':'#5a4636'; g.beginPath(); g.ellipse(0,-7,1,5,0,0,Math.PI*2); g.fill(); g.restore(); });   // the long ears
+  if(harness||pack){ g.strokeStyle='#3a2414'; g.lineWidth=1.4; g.beginPath(); g.ellipse(9,0.5,4.5,5.4,0,0,Math.PI*2); g.stroke(); }     // a halter
+  g.restore(); g.restore();
+  if(harness){ g.fillStyle='#4a2e18'; g.beginPath(); g.ellipse(19,-38-bob,5,9,0.4,0,Math.PI*2); g.fill(); g.strokeStyle='#8a6a3a'; g.lineWidth=1.2; g.stroke();   // the collar
+    g.strokeStyle='#3a2414'; g.lineWidth=1.6; g.beginPath(); g.moveTo(16,-34-bob); g.lineTo(-30,-30-bob); g.moveTo(-6,-41-bob); g.lineTo(-6,-21-bob); g.stroke(); }   // traces and the girth
+  if(pack){ g.fillStyle='#8a6a44'; g.beginPath(); g.ellipse(-3,-27-bob,11,10,0,0,Math.PI*2); g.fill(); g.strokeStyle='#4a341c'; g.lineWidth=1; g.stroke();   // the near pannier
+    g.strokeStyle='#5a3e22'; g.beginPath(); g.moveTo(-12,-30-bob); g.lineTo(6,-30-bob); g.stroke();
+    g.fillStyle='#6a4a8a'; g.beginPath(); g.ellipse(-3,-44-bob,13,4.5,0,0,Math.PI*2); g.fill(); g.fillStyle='#8a6aaa'; g.fillRect(-14,-46-bob,22,2);   // a rolled blanket on top
+    g.fillStyle='#b8a070'; g.beginPath(); g.ellipse(9,-46-bob,4,6,0.3,0,Math.PI*2); g.fill(); g.strokeStyle='#6a5030'; g.stroke();                   // a jug lashed on
+    g.strokeStyle='#3a2414'; g.lineWidth=1.3; g.beginPath(); g.moveTo(-8,-41-bob); g.lineTo(-8,-19-bob); g.stroke(); }
+  leg(14,sw,false); leg(-13,sw2,false);                                                                        // the near legs over the body
+  g.restore(); }
+// a harnessed mule before each whole cart, on the tile its shafts point to
+OBJ_DRAW.mule=o=>{ const q=P(o.i+0.5,o.j+0.5); drawMuleFig(q.x-6,q.y+2,1,0,false,false,true,o.i*3+o.j); };
+setTimeout(()=>Object.keys(AREAS).forEach(a=>wrap(a,'objects',l=>{ const out=[...l], A=AREAS[a];
+  l.forEach(o=>{ if(o.type!=='cart' || o.nowheel || o.nomule) return; const i=o.i+1, j=o.j; if(i>=A.w || l.some(x=>x!==o && x.i===i && x.j===j)) return; out.push({type:'mule', i, j}); });
+  return out; })),0);
+// a walker with a mule: it plods a step behind him along the way he came
+function muleItems(items){ NPCS.forEach(n=>{ if(!n.mule) return; const x=n.x??n.i+0.5, y=n.y??n.j+0.5;
+    n.trail=n.trail||[{x:x-0.9,y}]; const L=n.trail[n.trail.length-1]; if(Math.hypot(x-L.x,y-L.y)>0.08) n.trail.push({x,y}); if(n.trail.length>60) n.trail.shift();
+    let d=0, m=n.trail[0]; for(let k=n.trail.length-1;k>0;k--){ d+=Math.hypot(n.trail[k].x-n.trail[k-1].x,n.trail[k].y-n.trail[k-1].y); if(d>=1.05){ m=n.trail[k-1]; break; } }
+    const M=n.muleAt=n.muleAt||{x:m.x,y:m.y,ph:0}; const mv=Math.hypot(m.x-M.x,m.y-M.y); M.moving=mv>0.01; if(M.moving){ M.face=(P(m.x,m.y).x-P(M.x,M.y).x)>=0?1:-1; M.ph+=mv*9; } M.x=m.x; M.y=m.y;
+    if(!M.moving && !n.moving) M.face=M.face||1;
+    items.push({d:M.x+M.y-0.02, ax:M.x, ay:M.y, fn:()=>{ const q=P(M.x,M.y); drawMuleFig(q.x,q.y+2,M.face||1,M.ph,M.moving,true,false,7); }}); }); }
+// ════════ Corwin the peddler: walks the valley road with his mule Thistle, and keeps a stall in Dunhollow at midday ════════
+const PEDDLER_POOL=['potion','mana_potion','warm_tonic','burn_salve','rue_water','linen_wrap','copper_chain','glass_beads','bone_charm','tin_medal','straw_hat','hood_red','riding_boots','breeches','apple','bread'];
+ROUTINES.peddler={ name:'Corwin the Peddler', speed:0.8, mule:true, ids:{road:'peddler', lane:'peddler', village:'peddler', tunnel:'peddler', millroad:'peddler'},
+  opts:{gender:'m',skin:2,hair:2,hairColor:12,beard:4,face:1,equip:{head:'straw_hat',torso:'smock',armor:null,hands:null,legs:'breeches',feet:'boots',weapon:null,offhand:null}}, slots:[
+    { h:[6,8.5],    area:'road', walk:[[13,1],[33,2]] },                     // down off the King's Road and east along the forest road
+    { h:[8.5,11],   area:'lane', walk:[[0,23],[10,1]] },                     // up the lane, slowly
+    { h:[11,15],    area:'village', at:[7,6], dir:1, fromArea:'lane' },     // his stall by the well
+    { h:[15,15.75], area:'village', walk:[[7,6],[0,5]] },                    // off toward the tunnel
+    { h:[15.75,17.5], area:'tunnel', walk:[[23,1],[0,1]] },
+    { h:[17.5,19.5], area:'millroad', walk:[[33,3],[0,3]] } ] };           // and on toward the crossroads, to camp by the King's Road
+RT_IDS.add('peddler'); ['road','lane','tunnel','millroad'].forEach(rtWrap);
+TALKERS.peddler=()=>{ const n=NPCS.find(x=>x.id==='peddler'), walking=n && n.goto;
+  say('Corwin the Peddler',[walking?"A weathered man in a straw hat, a grey mule plodding at his heels. He doesn't break stride, but he doesn't mind talking either.":"Corwin has the mule's panniers open on a blanket: a little of everything, and nothing twice.",
+    "“Corwin, and this is Thistle. She has opinions. Whatever you need, I might have it, and if I haven't, I'll have something better tomorrow.”"],
+    [{label:'“Show me your packs.”', fn:()=>shopFrom('Corwin the Peddler',todaysStock('peddler',PEDDLER_POOL.filter(id=>ITEMS[id]),5),1.05,"“Everything's been somewhere. Some of it twice.”",TALKERS.peddler)},
+     {label:'“Where are you headed?”', fn:()=>say('Corwin the Peddler',"“Down from the King's Road every morning, up the lane to Dunhollow by eleven, stall by the well till mid-afternoon, then through the tunnel and out along the mill track. Same road every day. Thistle won't walk any other.”",[{label:'Something else.',fn:TALKERS.peddler},bye])}, bye]); };
 </script>
 </body>
 </html>

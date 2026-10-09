@@ -11489,7 +11489,7 @@ const hasShield = e => e===player ? isShieldId(player.opts.equip.offhand) : !!(e
 const SHIELD_PROF = { shield:[1.35,0.8], shield_red:[1,1], shield_iron:[0.65,1.4] };
 const shieldOf = e => { const q = e===player ? player.opts.equip.offhand : (e.opts&&e.opts.equip&&e.opts.equip.offhand); return SHIELD_PROF[unWoven(q)] || [1,1]; };
 function perfectFor(e){ return PARRY.perfect + (hasShield(e)?PARRY.shieldPerfect*shieldOf(e)[0]:0) + (e===player && player.opts && player.opts.race==='elf' ? 0.03 : 0); }   // elves read a swing a hair earlier
-function windowFor(e){ return PARRY.window + (hasShield(e)?PARRY.shieldWindow*shieldOf(e)[1]:0); }
+function windowFor(e){ return (PARRY.window + (hasShield(e)?PARRY.shieldWindow*shieldOf(e)[1]:0))*(e===player && typeof hasStatus==='function' && hasStatus(player,'chill')?0.7:1); }   // chilled: stiff hands, a narrower window
 const FOES = {
   bandit:{ label:'Bandit', base:50, stagger:1.2, pattern:[
     {wait:1.4, wind:1.10, after:0.60, dir:'left'},
@@ -11846,7 +11846,7 @@ function doAttack(){
   duel.chain = (clock-duel.lastAtk < PARRY.chainWindow) ? Math.min(duel.chain+1, PARRY.chainMax/PARRY.chainPenalty) : 0;
   duel.lastAtk = clock;
   const W=weaponOf(player);
-  duel.st='attack'; duel.atkWind=Math.max(0.1, W.wind-(['gloves','gauntlets'].includes(player.opts.equip.hands)?0.05:0)); duel.t=duel.atkWind;
+  duel.st='attack'; duel.atkWind=Math.max(0.1, W.wind-(['gloves','gauntlets'].includes(player.opts.equip.hands)?0.05:0))*(hasStatus(player,'chill')?1.4:1); duel.t=duel.atkWind;   // chilled: a slower swing
 }
 function doParry(){
   if(!inFight()) return;
@@ -11989,7 +11989,8 @@ function nextFoe(first,target){
 }
 function beginFight(){
   const f=combat.foe;
-  combat.phase='fight'; f.state='guard'; f.t=curStep(f).wait+0.9;
+  combat.phase='fight'; f.state='guard'; if(f.type==='mage' && !f.kRolled){ f.kRolled=true; f.k=Math.floor(Math.random()*foeDef(f).pattern.length); }   // a caster opens with any of its spells, not always the same one
+  f.t=curStep(f).wait+0.9;
   if(combat.practice) banner('Practice!','#8ab0d8',1100);
   else if(foeDef(f).unguarded) banner('No guard: strike it, parry the lunge!','#e8c878',1800);
   else { banner(combat.first?'Match his guard, hit the open side!':foeDef(f).label+'!', '#e8c878', combat.first?2200:1100); combat.first=false; }
@@ -12067,9 +12068,10 @@ function impact(f){                                   // a foe's swing lands (or
     else if(f.opts && BLEEDERS.has(f.opts.equip&&f.opts.equip.weapon) && Math.random()<0.25) addStatus(player,'bleed',3.2,1); }
   if(S){ f.lunge=null; bolts.push({from:{x:f.x,y:f.y}, to:player, t:0, S}); floatText(tileOf(f),S.name+'!',S.col);   // a caster's swing is a spell
     if(hurt){
-      if(S.name==='Drain'){ const h=Math.min(3,f.maxHp-f.hp); if(h>0){ f.hp+=h; floatText([f.i,f.j-0.003],'+'+h,'#8ad07a'); } }
+      if(S.name==='Drain'){ const h=Math.min(4,f.maxHp-f.hp); floatText([player.i,player.j-0.004],'Life drained','#8ad07a'); if(h>0){ f.hp+=h; floatText([f.i,f.j-0.003],'+'+h,'#8ad07a'); } logMsg(shortName(f)+' drains your life'+(h>0?' and heals '+h+'.':'.'),'#8ad07a'); }
       else if(S.name==='Wither') addStatus(player,'weak',4,0);
-      else if(S.name==='Frost') addStatus(player,'chill',3,0); } }
+      else if(S.name==='Frost' || S===FOE_HEX_LEFT) addStatus(player,'chill',3,0);
+      else if(S.name==='Fire' && !FIRE_STAFF(f.opts&&f.opts.equip&&f.opts.equip.weapon) && Math.random()<0.6) addStatus(player,'burn',3,1); } }
   if(f.phase2 && hurt) addStatus(player,'bleed',5,2);
   if(hurt && FIRE_FOE(f) && Math.random()<(/Slag/.test(f.name)?1:0.35)) addStatus(player,'burn',3,2);
   if(f.type==='barrowking' && f.cphase>=3 && player.hp<hp0 && !f.dead){ const h=Math.min(5,f.maxHp-f.hp); if(h>0){ f.hp+=h; floatText(tileOf(f),'+'+h,'#9ad0e8'); } }
@@ -12691,7 +12693,9 @@ refreshCreator();
 const STATUS_DEF = { weak:{ col:'#a070c0', name:'Withered', tick:0, max:1 }, bleed:{ col:'#d0342c', name:'Bleeding', tick:0.8, max:3 }, burn:{ col:'#f08a30', name:'Burning', tick:0.6, max:1 }, chill:{ col:'#8ac8f0', name:'Chilled', tick:0, max:1 } };
 function addStatus(e,kind,dur,dmg){ e.st=e.st||[]; const D=STATUS_DEF[kind], same=e.st.filter(s=>s.kind===kind);
   if(same.length>=D.max){ same[0].t=Math.max(same[0].t,dur); return; }
-  e.st.push({kind,t:dur,dmg,acc:0}); floatText(tileOf(e),D.name+'!',D.col); }
+  e.st.push({kind,t:dur,dmg,acc:0}); floatText(tileOf(e),D.name+'!',D.col);
+  if(e===player && STATUS_ON_YOU[kind]) logMsg(STATUS_ON_YOU[kind],D.col); }
+const STATUS_ON_YOU={ weak:'You are withered: your blows land weaker for a few seconds.', chill:'You are chilled: your swings come slower and your parries must be quicker.', burn:'You are burning!' };   // (bleeding has its own words)
 const hasStatus=(e,kind)=>!!(e.st&&e.st.some(s=>s.kind===kind));
 function tickStatus(e,dt){ if(!e.st||!e.st.length) return;
   e.st.forEach(s=>{ s.t-=dt; const D=STATUS_DEF[s.kind]; if(!D.tick) return; s.acc+=dt;

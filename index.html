@@ -4701,7 +4701,10 @@ function doorTile(o){ const t=o.dt??1; return o.door==='l' ? [o.i+t, o.j+o.fp[1]
 // quest progress: letter 0 unseen, 2 shown to the elder; wolves 0 none, 1 asked, 2 cleared, 3 rewarded
 const QUEST={ letter:0, wolves:0, camp:0 };
 function switchArea(id,entryKey){
-  const A=AREAS[id]; areaId=id;
+  if(id==='barrow' && areaId==='farm'){ if(!CHOICE.barrow || CHOICE.barrow==='done') CHOICE.barrow='open'; defeatedMobs.delete('barrow:The Barrow-King'); }   // TESTING ONLY: the farm teleporter into the lair
+  CK=null; FOES.barrowking.pattern=BK_PAT1;          // a Barrow-King fight never survives leaving the room
+  player.sitChair=null; pendingChair=null;
+  const prev=areaId, A=AREAS[id]; areaId=id;
   ROOM.w=A.w; ROOM.h=A.h;
   NOTCHES.length=0; NOTCHES.push(...A.notches());
   OBJECTS.length=0; OBJECTS.push(...A.objects());
@@ -4733,6 +4736,10 @@ function switchArea(id,entryKey){
   if(A.onEnter) setTimeout(()=>{ if(areaId===id && !combat.active) A.onEnter(); },900);
   updateMinimap();
   banner(A.label,'#e8c878',1300);
+  skelFollowArea(); stonesHint(id); fenOpenCheck(id); fenRumour(id); poolsArea(id); introScene(id,entryKey);
+  markElves(); tentBlock(id);
+  try{ pupArea(); }catch(err){ console.error(err); }
+  transitArea(prev,id);
   autosaveSoon();
 }
 
@@ -12374,7 +12381,7 @@ function crumbleSkel(){ const S=SKEL; if(!S || S.crumble) return; S.crumble=1; S
     if(f && !f.dead && combat.phase==='fight' && S.asm>=1 && md<0.5){ S.cd-=dt; if(S.cd<=0){ S.cd=1.5; S.anim=0.3; wound(f,S.dmg||3,'Bones!','#e8e4d0'); } }
     return r; }; }
 // it comes along through doors and gates
-{ const oldSA=switchArea; switchArea=function(id,ek,...r){ const res=oldSA(id,ek,...r); if(SKEL){ if(SKEL.crumble) SKEL=null; else { SKEL.x=player.x+0.7; SKEL.y=player.y+0.35; } } return res; }; }
+function skelFollowArea(){ if(SKEL){ if(SKEL.crumble) SKEL=null; else { SKEL.x=player.x+0.7; SKEL.y=player.y+0.35; } } }   // the risen one follows you through doors
 // the skeleton as a little model of bones in 3D (x across, y up the screen, z toward you when it faces south), so it can turn to all eight facings like anyone else
 // and its pieces can lie in a real heap on the ground: each group of bones has a resting place in the heap, and flies up into place (or back down) bone by bone
 const SKEL_HEAP=[   // per group: centre, then how it lies in the heap: tipped over x, tipped over z, turned, and where (in degrees and px)
@@ -13148,7 +13155,7 @@ wrap('stones','objects',l=> STQ()==='night' && nightAmt()>0.4 && !collectedPicku
 { const oldC=collectPickup; collectPickup=function(o){ const had=hasItem(o.item);
     if(QUEST_ITEMS.has(o.item) && player.inv.indexOf(null)<0){ for(let k=player.inv.length-1;k>=0;k--){ const it=player.inv[k]; if(it && !QUEST_ITEMS.has(it)){ logMsg('No room: you leave the '+ITEMS[it].name+' behind.','#e0b070'); player.inv[k]=null; break; } } }   // story things always fit
     oldC(o); if(o.item==='charter' && !had && hasItem('charter')){ CHOICE.stq='found'; logMsg('Where the tall stone\'s moon-shadow ends, the earth is soft. A lead case: the Stone Charter.','#e8c060'); setTimeout(()=>openNote('charter'),600); } }; }
-{ const oldS=switchArea; switchArea=function(id,...a){ const r=oldS(id,...a); if(id==='stones' && STQ()==='night' && nightAmt()<=0.4) setTimeout(()=>logMsg('Wenna said the charter shows itself under the moon. Come back after dark.','#c8a860'),600); return r; }; }
+function stonesHint(id){ if(id==='stones' && STQ()==='night' && nightAmt()<=0.4) setTimeout(()=>logMsg('Wenna said the charter shows itself under the moon. Come back after dark.','#c8a860'),600); }
 { const oldW=TALKERS.wenna; TALKERS.wenna=()=>{ if(STQ()!=='wenna'){ oldW(); return; } CHOICE.stq='night';
   say('Old Wenna',["You show Wenna the surveyor's writ. She reads it with her nose almost on the paper, then laughs until she has to sit down.","“No charter! My grandmother's grandmother put her mark on it. The old king's own grant, sealed in lead and buried under the stones the day they were raised, so no lord could burn it.”",
     "“Where? Ha. 'Where the tall stone's shadow ends when the moon is up.' That's the rhyme. Go at night. Take a spade. And if you find a little goat drawn in the names, that was us.”"],[bye]); }; }
@@ -13596,7 +13603,7 @@ function fenCache(){ CHOICE.fenCaches=(CHOICE.fenCaches||0)+1; const c=8+Math.fl
       logMsg('From his head, a crown of bog-black wood. On his feet, boots that never rotted; on his finger, a ring of black gold. In his purse, '+formatCoin(c)+' and a healing draught.','#e8c060'); }
     if(faction==='hag') logMsg("Hesk falls into the reeds. Something glints where she stood: a lantern.",'#e8c060'); }; }
 // on first walking the clear causeway
-{ const oldSA=switchArea; switchArea=function(id,e){ const r=oldSA(id,e); if(id==='fenpath' && CHOICE.fenSeen==null){ CHOICE.fenSeen=renownDone(); } if(id==='fenpath' && FEN_OPEN() && !CHOICE.fenOpen){ CHOICE.fenOpen=true; setTimeout(()=>{ banner('The causeway is clear','#c8d8a8',1800); logMsg('The fallen oak is gone. The Fen Causeway runs north, into the mist.','#e8c060'); },600); } return r; }; }
+function fenOpenCheck(id){ if(id==='fenpath' && CHOICE.fenSeen==null){ CHOICE.fenSeen=renownDone(); } if(id==='fenpath' && FEN_OPEN() && !CHOICE.fenOpen){ CHOICE.fenOpen=true; setTimeout(()=>{ banner('The causeway is clear','#c8d8a8',1800); logMsg('The fallen oak is gone. The Fen Causeway runs north, into the mist.','#e8c060'); },600); } }
 
 // ════════ the people of the causeway and the fen ════════
 function gerdTalk(){
@@ -13613,12 +13620,12 @@ TALKERS.morwen=()=>TALKERS.vesna();
 // word gets round: once along the way, and a few times once the causeway is clear, someone mentions it in passing
 const FEN_RUMOURS=["“Heard the loggers finally cleared that oak on the fen road. Not that anyone sane goes into the fen.”","“Gerd's lot were in the Wheatsheaf last night, drinking to a dead tree. The causeway north of the stones is open, they say.”","“That grave-speaker woman lives out in the fen, they say. She'll have visitors now, with the road clear. Poor visitors.”"];
 let rumourCd=0;
-{ const oldSA2=switchArea; switchArea=function(id,e){ const r=oldSA2(id,e); try{ rumourCd--; if(id==='fenpath' || AREAS[id].inside && !AREAS[id].under || rumourCd>0) return r;
+function fenRumour(id){ try{ rumourCd--; if(id==='fenpath' || AREAS[id].inside && !AREAS[id].under || rumourCd>0) return;
     const open=FEN_OPEN(), mid=!open && fenLeft()<=2 && visitedAreas.fenpath && !CHOICE.fenMidHeard;
     const want = mid ? "“They say Gerd's crew are halfway through that great oak on the fen road. Took them long enough.”" : (open && !CHOICE.fenOpen && (CHOICE.fenRumours||0)<FEN_RUMOURS.length) ? FEN_RUMOURS[CHOICE.fenRumours||0] : null;
-    if(!want) return r;
+    if(!want) return;
     setTimeout(()=>{ if(areaId!==id) return; const who=NPCS.filter(n=>n.name && !n.shop && !n.sit && n.id!=='shade' && n.id!=='vesna').sort((a,b)=>Math.hypot(a.i-player.i,a.j-player.j)-Math.hypot(b.i-player.i,b.j-player.j))[0]; if(!who) return;
-      who.bark={text:want.replace(/[“”]/g,''),t:0}; logMsg(who.name+': '+want,'#d8c8a0'); if(mid) CHOICE.fenMidHeard=true; else CHOICE.fenRumours=(CHOICE.fenRumours||0)+1; rumourCd=3; },1800); }catch(err){} return r; }; }
+      who.bark={text:want.replace(/[“”]/g,''),t:0}; logMsg(who.name+': '+want,'#d8c8a0'); if(mid) CHOICE.fenMidHeard=true; else CHOICE.fenRumours=(CHOICE.fenRumours||0)+1; rumourCd=3; },1800); }catch(err){} }
 { const oldN=npcHasNews; npcHasNews=function(n){ const r=oldN(n); if(r) return r;
     if(n.id==='gerd' && !CHOICE.gerdMet){ return '!'; }
     return null; }; }
@@ -13645,9 +13652,9 @@ JOURNAL.push(
 function poolAt(x,y){ return OBJECTS.find(o=>o.type==='pool' && (()=>{ const [fw,fh]=o.fp, cx=o.i+fw/2, cy=o.j+fh/2, rx=fw/2+0.1, ry=fh/2+0.1; return ((x-cx)/rx)**2+((y-cy)/ry)**2<1; })()); }
 function poolDepth(x,y){ const o=poolAt(x,y); if(!o) return 0; const [fw,fh]=o.fp, r=Math.sqrt(((x-o.i-fw/2)/(fw/2+0.1))**2+((y-o.j-fh/2)/(fh/2+0.1))**2); return Math.min(1,(1-r)/0.35); }
 // pools no longer block: you can wade in
-{ const oldSA=switchArea; switchArea=function(id,e){ const r=oldSA(id,e); OBJECTS.forEach(o=>{ if(o.type!=='pool') return; for(let a=0;a<o.fp[0];a++) for(let b=0;b<o.fp[1];b++){ const k=(o.i+a)+','+(o.j+b); if(!OBJECTS.some(x=>x!==o && x.type!=='pool' && !x.noblock && x.type!=='teleporter' && a+o.i>=x.i && a+o.i<x.i+((x.fp||[1,1])[0]) && b+o.j>=x.j && b+o.j<x.j+((x.fp||[1,1])[1]))) blocked.delete(k); } });
+function poolsArea(id){ OBJECTS.forEach(o=>{ if(o.type!=='pool') return; for(let a=0;a<o.fp[0];a++) for(let b=0;b<o.fp[1];b++){ const k=(o.i+a)+','+(o.j+b); if(!OBJECTS.some(x=>x!==o && x.type!=='pool' && !x.noblock && x.type!=='teleporter' && a+o.i>=x.i && a+o.i<x.i+((x.fp||[1,1])[0]) && b+o.j>=x.j && b+o.j<x.j+((x.fp||[1,1])[1]))) blocked.delete(k); } });
     if(CHOICE.bathChest && CHOICE.bathChest.area===id){ const c=CHOICE.bathChest; OBJECTS.push({type:'bathchest', i:c.i, j:c.j}); blocked.add(c.i+','+c.j); }
-    player.sink=poolDepth(player.x,player.y)*56; return r; }; }
+    player.sink=poolDepth(player.x,player.y)*56; }
 // the player sinks as deep as the bathers do
 { const oldDA=drawActor; drawActor=function(e){ if(e!==player || combat.active) return oldDA(e);
     const tgt=poolDepth(player.x,player.y)*56; player.sink=(player.sink||0)+(tgt-(player.sink||0))*0.12; const sk=player.sink;
@@ -13873,7 +13880,7 @@ function bathScene(who, note, chestSpot, ti, tj){
   if(!cutscene(steps)){ steps.forEach(s=>{ s.start&&s.start(); s.skip?s.skip():(s.end&&s.end()); }); } }
 
 // ── first visits: Brann fighting off a wolf, Grane spotting you, the loggers at the oak ──
-{ const oldSA3=switchArea; switchArea=function(id,e){ const r=oldSA3(id,e); try{
+function introScene(id,e){ try{
     if(id==='clearing' && !CHOICE.csBrann){ const br=NPCS.find(n=>n.id==='hunter'); if(br){ CHOICE.csBrann=true; setTimeout(()=>{ if(areaId==='clearing') brannScene(br); },350); } }
     else if(id==='farm' && e==='fromHouse' && !CHOICE.csFarm && mobs.some(m=>m.faction==='bandits' && !m.dead)){ CHOICE.csFarm=true; setTimeout(()=>{ if(areaId==='farm') farmScene(); },350); }
     else if(id==='fellings' && !CHOICE.csFell && mobs.some(m=>m.name==='Overseer Grane' && !m.dead)){ CHOICE.csFell=true; setTimeout(()=>{ if(areaId==='fellings') fellScene(); },350); }
@@ -13881,7 +13888,7 @@ function bathScene(who, note, chestSpot, ti, tj){
     else if(id==='camp' && !CHOICE.csCamp && mobs.some(m=>m.name==='Mara Blackthorn' && !m.dead)){ CHOICE.csCamp=true; setTimeout(()=>{ if(areaId==='camp') campScene(); },350); }
     else if(id==='sylvhaven' && !CHOICE.csHaven && !havenBurnt()){ CHOICE.csHaven=true; setTimeout(()=>{ if(areaId==='sylvhaven') havenScene(); },350); }
     else if(id==='fenpath' && !CHOICE.csFen && !FEN_OPEN()){ CHOICE.csFen=true; setTimeout(()=>{ if(areaId==='fenpath') fenScene(); },350); }
-  }catch(err){} return r; }; }
+  }catch(err){} }
 function brannScene(br){
   const wi=Math.max(0,br.i-4), wj=Math.min(ROOM.h-1,br.j+3);
   const wolf={ id:997, key:'cs', name:'Grey Wolf', type:'wolf', coat:'#6e665c', faction:'cs', x:wi+0.5, y:wj+0.5, i:wi, j:wj, dir:1, hp:30, maxHp:30, path:[], moving:false, dead:false, gone:false, fade:1, flash:0, lunge:null, state:'guard', t:0, k:0, wind:1, ox:0, oy:0, hostile:false, fallT:0, cs:true, spawn:[wi,wj] };
@@ -14319,20 +14326,19 @@ const RESPAWN_AFTER=DAY_LEN;               // one full day
         const d=Math.abs(i-m.i)+Math.abs(j-m.j); if(d<bd){ bd=d; best=[i,j]; } }
       if(best){ m.i=best[0]; m.j=best[1]; m.x=m.i+0.5; m.y=m.j+0.5; m.spawn=[m.i,m.j]; } }); }; }
 // elves: most carry face marks, some body marks and earrings too (the same ones every time you meet them)
-{ const oldSA=switchArea; switchArea=function(id,...a){ const r=oldSA(id,...a);
+function markElves(){
     NPCS.forEach(n=>{ const o=n.opts; if(!o || o.race!=='elf' || o._marked) return; o._marked=true; if(o.marks && Object.values(o.marks).some(Boolean)) return;
       const h0=String(n.id||n.name).split('').reduce((a,ch)=>Math.imul(a^ch.charCodeAt(0),16777619)>>>0,2166136261);
       const r=k=>{ let x=Math.imul(h0^Math.imul(k+1,2654435761),2246822507); x^=x>>>13; x=Math.imul(x,3266489909); x^=x>>>16; return (x>>>0)/4294967296; };
       const M={}; if(r(1)<0.85 || n.id==='aerwen') M.elfFace=1+Math.floor(r(2)*3); if(r(3)<0.3 && !o.equip?.torso) M.elfBody=1+Math.floor(r(4)*2); if(r(5)<0.4) M.earrings=['cuff','drop','stud'][Math.floor(r(6)*3)];
-      o.marks=M; delete o._ck; });
-    return r; }; }
+      o.marks=M; delete o._ck; }); }
 // a few more things to hunt
 wrap('road','mobs',l=> nightAmt()<0.3 ? [...l,{ name:'Road Thief', type:'bandit', i:9, j:3, faction:'roadthief', opts:BANDIT({skin:1,hair:1,hairColor:2,beard:1,equip:{head:'hood',torso:'shirt',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:'club',offhand:null}}) }] : l);
 // Maelis weaves in her own tent now: the empty pavilion in Sylvhaven, with a loom that works by moonlight
 AREAS.weavetent={ ...CROOM("Maelis's Weaving Tent",5,5,'sylvhaven','fromTent', ()=>[{type:'loom', i:1, j:0, fp:[2,1]}, {type:'clothtable', i:4, j:2}, {type:'lantern', i:0, j:2}],
   ()=> havenBurnt() ? [] : [{ id:'maelis', name:'Maelis the Weaver', i:3, j:1, dir:0, opts:ELFO({gender:'f',skin:1,hair:3,hairColor:1,face:1,marks:{elfFace:2,earrings:'drop'},equip:{head:'elf_circlet',torso:'elf_tunic',armor:'robe_elf',hands:null,legs:'elf_leggings',feet:'elf_boots',weapon:null,offhand:'moon_amulet'}}) }]), tent:true, round:true };
 AREAS.weavetent.entries.fromCity={i:1,j:4};
-{ const oldSA=switchArea; switchArea=function(id,...a){ const r=oldSA(id,...a); if(AREAS[id] && AREAS[id].tent){ for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++) if(!inTent(i+0.5,j+0.5)) blocked.add(i+','+j); } return r; }; }
+function tentBlock(id){ if(AREAS[id] && AREAS[id].tent){ for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++) if(!inTent(i+0.5,j+0.5)) blocked.add(i+','+j); } }
 wrap('sylvhaven','npcs',l=>l.filter(n=>n.id!=='maelis'));
 wrap('sylvhaven','objects',l=>l.map(o=>o.type==='pavilion'&&o.i===1&&o.j===1&&!o.burnt ? {...o, door:'r', dt:1, inside:'weavetent', back:'fromCity'} : o));
 AREAS.sylvhaven.entries.fromTent={i:3,j:2};
@@ -14548,7 +14554,6 @@ function pupArea(){
   let k=0;
   PUPS.forEach(p=>{ if(p.mode==='follow'||p.mode==='comp'){ p.x=player.x+[-0.6,0.5,-0.2][k%3]; p.y=player.y+[0.5,0.3,-0.6][k%3]; p.i=Math.floor(p.x); p.j=Math.floor(p.y); p.path=[]; p.lie=0; p.alpha=1; k++; } });
 }
-{ const oSA=switchArea; switchArea=function(id,e,...r){ const res=oSA(id,e,...r); try{ pupArea(); }catch(err){ console.error(err); } return res; }; }
 
 // ── walking behind you, along the way you came ──
 function pupTrailPush(){ const L=PUP_TRAIL[PUP_TRAIL.length-1]; if(!L || Math.hypot(player.x-L.x,player.y-L.y)>0.18){ PUP_TRAIL.push({x:player.x,y:player.y}); if(PUP_TRAIL.length>160) PUP_TRAIL.shift(); } }
@@ -15019,7 +15024,7 @@ const doorDest=n=>{ const t=n.goto||[n.i,n.j]; const o=OBJECTS.find(o=>o.type===
     before.forEach(n=>{ if(NPCS.includes(n)) return; const R=ROUTINES[n.route], s=n.walkSlot||slotOf(R)||n.slot, dest=s&&(s.walk?(nextArea(R,s)||doorDest(n)):s.area);
       if(n.transit && n._gone!==undefined) R.gone=n._gone;                                   // passing through does not count as having arrived anywhere
       if(dest && dest!==areaId) TRANSIT[n.route]={from:areaId, dest, t:gt, slot:s}; }); }; }
-{ const oSA=switchArea; switchArea=function(id,...a){ const prev=areaId, r=oSA(id,...a);
+function transitArea(prev,id){                 // someone was walking between areas when you left: they cross your path, or follow you in
     try{ for(const k in TRANSIT){ const T=TRANSIT[k]; delete TRANSIT[k]; if(T.from!==prev || gt-T.t>25 || NPCS.some(n=>n.route===k)) continue;
         const R=ROUTINES[k], en=exitToward(prev);
         if(T.dest===id){ const R2=R, ns=R2.slots[(R2.slots.indexOf(T.slot)+1)%R2.slots.length];      // you followed them home: they come in right behind you and settle
@@ -15027,8 +15032,7 @@ const doorDest=n=>{ const t=n.goto||[n.i,n.j]; const o=OBJECTS.find(o=>o.type===
           m.goto=ns.at; m.arrive=ns; m.sit=false; m.chop=false; m.wander=null; m.early=true; NPCS.push(m); continue; }
         const ex=exitToward(T.dest); if(!en || !ex) continue;
         const m=rtNPC(k,T.slot,true); m.i=en[0]; m.j=en[1]; m.x=en[0]+0.5; m.y=en[1]+0.5; m.path=[]; m.sit=false; m.chop=false; m.wander=null;
-        m.goto=ex; m.vanish=true; m.transit=true; m._gone=R.gone; m.slot=T.slot; NPCS.push(m); } }catch(e){ console.error(e); }
-    return r; }; }
+        m.goto=ex; m.vanish=true; m.transit=true; m._gone=R.gone; m.slot=T.slot; NPCS.push(m); } }catch(e){ console.error(e); } }
 // out in the rain, everyone gets wet, not only you: soaked clothes go dark, a sheen on the skin, drips and a damp patch underfoot
 let WET_NPC=0; const WET_NPC_BUF=document.createElement('canvas').getContext('2d');
 const rainingHere=()=>{ const A=AREAS[areaId]; return !!A && !A.inside && typeof weatherToday==='function' && weatherToday()==='rain'; };
@@ -15288,7 +15292,6 @@ function sitOnChair(ch){ if(!chairFree(ch)) return; player.sitChair=ch; player.p
     oU(dt);
     if(pendingChair){ if(player.path.length){} else { const ch=pendingChair; pendingChair=null; if(OBJECTS.includes(ch) && cheb([ch.i,ch.j],[player.i,player.j])<=1) sitOnChair(ch); } }
     if(player.sitChair && (player.path.length || player.i!==player.sitChair.i || player.j!==player.sitChair.j)) player.sitChair=null; }; }
-{ const oSA=switchArea; switchArea=function(...a){ player.sitChair=null; pendingChair=null; return oSA(...a); }; }
 { const oDA=drawActor; drawActor=function(e){ const ch=e===player && player.sitChair; if(!ch) return oDA(e);
     const q=P(ch.i+0.5+ch.face[0]*CHAIR_IN, ch.j+0.5+ch.face[1]*CHAIR_IN), d=dirFromDelta(ch.face[0],ch.face[1]);
     drawLitSprite(q.x,q.y,()=>drawSitting(g,q.x,q.y,player.opts,d,'chair'));
@@ -15591,7 +15594,6 @@ function ckAdds(K){ CK={mode:'adds'}; K.warded=true;
     if(f && f.type==='barrowking' && (f.cphase||1)<3){ const th=ckTh(f), pre=f.hp; f.hp+=1000; oW(f,n,...r); const dealt=pre+1000-f.hp; f.hp=Math.max(th,pre-dealt); return; }
     return oW(f,n,...r); }; }
 { const oU=update; update=function(dt){ const r=oU(dt); try{ ckTick(dt*slowmo.scale); }catch(e){ console.error(e); } return r; }; }
-{ const oSA=switchArea; switchArea=function(...a){ CK=null; FOES.barrowking.pattern=BK_PAT1; return oSA(...a); }; }
 // what the set pieces look like: the lee of the stones, the gas about to burn, the wave when it breaks, the ward
 { const oSDI=typeof skelDrawItems==='function'?skelDrawItems:null; skelDrawItems=function(items){ if(oSDI) oSDI(items); if(!CK || areaId!==BK_AREA) return;
     items.push({d:-1e6, fn:()=>{ const A=AREAS[areaId], dia=(i,j,fill,inset=0.06)=>{ const a=P(i+inset,j+inset), b=P(i+1-inset,j+inset), c=P(i+1-inset,j+1-inset), d=P(i+inset,j+1-inset); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c.x,c.y); g.lineTo(d.x,d.y); g.closePath(); g.fillStyle=fill; g.fill(); };
@@ -15619,7 +15621,6 @@ function ckAdds(K){ CK={mode:'adds'}; K.warded=true;
     if(CK.flash){ g.save(); g.setTransform(1,0,0,1,0,0); g.fillStyle=`rgba(150,200,230,${CK.flash*0.8})`; g.fillRect(0,0,gc.width,gc.height); g.restore(); } }; }
 // ── TESTING ONLY: a way from the farm straight into the Barrow-King's lair. Each trip puts him back on his feet. Remove before release. ──
 wrap('farm','objects',l=>[...l,{type:'teleporter', i:9, j:4, to:'barrow', entry:'fromLow'}]);
-{ const oSA=switchArea; switchArea=function(to,...r){ if(to==='barrow' && areaId==='farm'){ if(!CHOICE.barrow || CHOICE.barrow==='done') CHOICE.barrow='open'; defeatedMobs.delete('barrow:The Barrow-King'); } return oSA(to,...r); }; }
 // ════════ the Barrow-King's things: Bertil's sword, and the crown the bog grew round his head ════════
 Object.assign(ITEMS,{ barrow_blade:{ name:"Bertil's Drowned Blade", slot:'weapon' }, bog_crown:{ name:'Crown of the Drowned King', slot:'head' } });
 Object.assign(WEAPONS,{ barrow_blade:{ wind:0.21, dmg:15, len:27, wither:0.25, drain:0.22 } });

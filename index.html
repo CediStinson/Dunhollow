@@ -3306,6 +3306,7 @@ function drawHead(c, x, B, opts, view=0){
   const kettled=EQ.head==='kettle', HKIND=opts.vari&&opts.vari.head, closed=kettled&&(HKIND==='coif'||HKIND==='helm_full'), underHat=fn=>{ if(closed) return; if(!kettled){ fn(); return; }
     c.save(); c.beginPath(); c.rect(x-200,B+(closed?Y.SHOULDER+2:Y.HAIRLINE+1.2),400,300); c.clip(); fn(); c.restore(); };
   if(!hooded) underHat(()=>drawHair(c,x,B,opts.hair,hair,hairDark,F,P,view,LN,'back'));   // anything hanging behind the skull
+  if(EQ.head==='bog_crown' && typeof drawBogCrown==='function') drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V,'far');   // the far side of a crown sits behind the head
   if(!closed && !LATE_EARS) ears.filter(e=>Math.abs(e.x)>=HW-1).forEach(e=>drawEar(e,false));   // outside the silhouette: behind the head
   if(!showFace && !F && !ELFISH && !GOB && !hooded && !closed){                 // from behind a beard shows past the jaw, beside the neck
     const bs=opts.beard ?? (opts.hair===1 ? 5 : 0);
@@ -3603,7 +3604,7 @@ function drawHead(c, x, B, opts, view=0){
       [-1,1].forEach(sd=>{ c.beginPath(); c.moveTo(x+LN,B+top+2); c.quadraticCurveTo(x+LN+sd*2.5,B+top+5,x+LN+sd*1.5,B+top+8); c.lineTo(x+LN+sd*0.4,B+top+7); c.closePath(); c.fill(); });
     }
   }
-  if(EQ.head==='bog_crown') drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V);
+  if(EQ.head==='bog_crown') drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V,'near');
   if(EQ.head==='elf_circlet'){                          // a fine silver band across the brow
     const cy=Y.HAIRLINE+0.6, rx=HW+0.4, ry=2.3;
     c.strokeStyle=tone(ELFC.silver,-0.45); c.lineWidth=1.7; c.beginPath(); c.ellipse(x+LN,B+cy,rx,ry,0,0.08,Math.PI-0.08); c.stroke();
@@ -15552,24 +15553,43 @@ var GEAR_LORE={
 { const oldImp=impact; impact=function(f){ const hp0=player.hp; oldImp(f); if(player.hp<hp0 && player.hp>0 && f.opts && f.opts.equip && f.opts.equip.weapon==='barrow_blade' && Math.random()<0.3) addStatus(player,'weak',3,0); }; }
 // the look: a long blade gone green-black, a drowned shine on the edge, a little black water running off it
 { const oldDW=drawWeapon; drawWeapon=function(c,hx,hy,ang,id,s=1){ if(id!=='barrow_blade') return oldDW(c,hx,hy,ang,id,s);
-    oldDW(c,hx,hy,ang,'longsword',s);
+    const t=(typeof gt!=='undefined'?gt:0), L=30;
     c.save(); c.translate(hx,hy); c.rotate(ang); c.scale(s,s);
-    c.fillStyle='rgba(16,34,24,0.72)'; c.beginPath(); c.moveTo(5,-1.9); c.lineTo(24.5,-1.5); c.lineTo(28,0); c.lineTo(24.5,1.5); c.lineTo(5,1.9); c.closePath(); c.fill();   // the steel gone green-black
-    c.strokeStyle='rgba(20,36,26,0.9)'; c.lineWidth=0.7; c.beginPath(); c.moveTo(7,0); c.lineTo(25,0); c.stroke();                                 // the fuller, with old letters
-    c.fillStyle='rgba(140,210,170,0.6)'; for(let k=0;k<5;k++){ c.fillRect(9+k*3.3,-0.3,1.1,0.6); }
-    c.globalCompositeOperation='lighter'; c.strokeStyle='rgba(120,220,170,0.35)'; c.lineWidth=1; c.beginPath(); c.moveTo(6,-1.6); c.lineTo(26,-0.4); c.stroke();   // a drowned shine on the edge
-    const t=(typeof gt!=='undefined'?gt:0); c.globalCompositeOperation='source-over';
-    for(let k=0;k<2;k++){ const u=((t*0.6+k*0.5)%1); c.fillStyle=`rgba(40,60,50,${0.8*(1-u)})`; c.beginPath(); c.ellipse(12+k*8,1.5+u*7,0.7,1.1,0,0,Math.PI*2); c.fill(); }   // black water dripping off it
-    c.fillStyle='#d8d0b8'; c.beginPath(); c.arc(-3.2,0,1.5,0,Math.PI*2); c.fill(); c.fillStyle='#2a2620'; c.fillRect(-3.8,-0.5,0.5,0.5); c.fillRect(-3,-0.5,0.5,0.5);   // a little skull on the pommel
+    // the blade: black as bog-water, its edges rippling like something still under the surface
+    const edge=(sd)=>{ const pts=[]; for(let k=0;k<=12;k++){ const u=k/12, xx=2+u*(L-2), w=(2.6-u*1.4)*(1-Math.pow(u,6)) + Math.sin(u*Math.PI*5)*0.35*(1-u); pts.push([xx,sd*w]); } return pts; };
+    const top=edge(-1), bot=edge(1).reverse();
+    c.beginPath(); c.moveTo(top[0][0],top[0][1]); top.forEach(p=>c.lineTo(p[0],p[1])); c.lineTo(L+1.5,0); bot.forEach(p=>c.lineTo(p[0],p[1])); c.closePath();
+    const bg=c.createLinearGradient(0,-3,0,3); bg.addColorStop(0,'#2a3430'); bg.addColorStop(0.45,'#0a0c0c'); bg.addColorStop(1,'#050606'); c.fillStyle=bg; c.fill();
+    c.strokeStyle='rgba(90,150,120,0.35)'; c.lineWidth=0.4; c.stroke();                                          // a cold drowned sheen along the edge
+    const pulse=0.55+0.45*Math.sin(t*2.4);
+    c.save(); c.globalCompositeOperation='lighter';
+    c.strokeStyle=`rgba(70,200,130,${0.10+0.16*pulse})`; c.lineWidth=0.9; c.beginPath(); c.moveTo(4,0); c.lineTo(L-4,0); c.stroke();   // the rune-line glowing down the fuller
+    c.fillStyle=`rgba(150,240,190,${0.22+0.3*pulse})`; for(let k=0;k<5;k++){ const xx=6+k*4.4; c.fillRect(xx,-0.35,0.5,0.7); c.fillRect(xx+0.8,-0.6,0.4,0.4); }   // the old letters
+    for(let k=0;k<3;k++){ const u=((t*0.35+k/3)%1), xx=8+k*7; c.fillStyle=`rgba(60,110,90,${0.28*(1-u)})`; c.beginPath(); c.ellipse(xx+Math.sin(t*2+k)*1.5,-2-u*9,1.6+u*2,1+u*1.2,0,0,Math.PI*2); c.fill(); }   // wisps rising off it
+    c.restore();
+    for(let k=0;k<2;k++){ const u=((t*0.6+k*0.5)%1); c.fillStyle=`rgba(10,14,12,${0.85*(1-u)})`; c.beginPath(); c.ellipse(13+k*8,1.8+u*7,0.7,1.1,0,0,Math.PI*2); c.fill(); }   // black water dripping off it
+    // the guard: two black roots twisting out from a green stone
+    c.strokeStyle='#0e0c0a'; c.lineWidth=1.9; c.lineCap='round';
+    [-1,1].forEach(sd=>{ c.beginPath(); c.moveTo(1.2,0); c.bezierCurveTo(1.6,sd*2.5,-0.6,sd*4.2,1.8,sd*6.2); c.stroke(); });
+    c.strokeStyle='#2e3428'; c.lineWidth=0.6; [-1,1].forEach(sd=>{ c.beginPath(); c.moveTo(1.2,0); c.bezierCurveTo(1.6,sd*2.5,-0.6,sd*4.2,1.8,sd*6.2); c.stroke(); });
+    c.save(); c.globalCompositeOperation='lighter'; const gg=c.createRadialGradient(1,0,0,1,0,3.5); gg.addColorStop(0,`rgba(160,255,190,${0.6+0.3*pulse})`); gg.addColorStop(1,'rgba(80,200,120,0)'); c.fillStyle=gg; c.fillRect(-3,-4,8,8); c.restore();
+    c.fillStyle='#9af0b8'; c.beginPath(); c.arc(1,0,1.1,0,Math.PI*2); c.fill();
+    // the grip, bound in black leather, and a little bone skull for a pommel
+    c.fillStyle='#14100c'; c.fillRect(-7,-1.1,7.4,2.2); c.strokeStyle='#3a2e22'; c.lineWidth=0.4; for(let k=-6.4;k<0;k+=1.4){ c.beginPath(); c.moveTo(k,-1.1); c.lineTo(k+0.9,1.1); c.stroke(); }
+    c.fillStyle='#d8d0b8'; c.beginPath(); c.arc(-8.6,0,1.8,0,Math.PI*2); c.fill(); c.fillRect(-10.2,-0.9,1.2,1.8);
+    c.fillStyle='#1a1612'; c.fillRect(-9.4,-0.9,0.6,0.6); c.fillRect(-9.4,0.3,0.6,0.6);
+    c.save(); c.globalCompositeOperation='lighter'; c.fillStyle=`rgba(140,255,180,${0.5*pulse})`; c.fillRect(-9.4,-0.9,0.6,0.6); c.fillRect(-9.4,0.3,0.6,0.6); c.restore();   // its eyes, faintly lit
     c.restore(); }; }
 // the crown: bog-oak twisted into points, moss in the crooks, one pale light set in the front
-function drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V){
-  const cy=Y.HAIRLINE-0.4, rx=HW+1.3, ry=2.6, front=V.turn>-0.25, fx=front?(pr>0.8?HW*0.5:faceOff(pr)):0;
+function drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V,part){
+  const cy=Y.HAIRLINE-0.4, rx=HW+1.3, ry=2.6, front=V.turn>-0.25, fx=front?(pr>0.8?HW*0.5:faceOff(pr)):0, far=part==='far';
+  // points all round the band: the ones on the upper half of the ellipse are the far side, whichever way the head is turned
   const spikes=[0.08,0.22,0.36,0.5,0.64,0.78,0.92].map((t,k)=>({a:Math.PI*(1+t), L:[5.5,7.5,6,9,6.5,7.8,5.2][k]})).concat([0.15,0.5,0.85].map((t,k)=>({a:Math.PI*t, L:[4.5,6,4.8][k], fr:true})));
   const spike=(sp,col)=>{ const bx=x+LN+Math.cos(sp.a)*rx, by=B+cy+Math.sin(sp.a)*ry, lean=Math.cos(sp.a)*1.6;
     c.fillStyle=col; c.beginPath(); c.moveTo(bx-1.3,by); c.quadraticCurveTo(bx+lean*0.3-0.8,by-sp.L*0.6,bx+lean,by-sp.L); c.quadraticCurveTo(bx+lean*0.2+0.7,by-sp.L*0.45,bx+1.3,by); c.closePath(); c.fill(); };
-  spikes.filter(sp=>!sp.fr).forEach(sp=>spike(sp,'#1a1610'));                                                  // the far points, behind the band
-  c.strokeStyle='#14100c'; c.lineWidth=3.4; c.beginPath(); c.ellipse(x+LN,B+cy,rx,ry,0,0,Math.PI*2); c.stroke();   // the band of black bog-oak
+  if(far){ spikes.filter(sp=>!sp.fr).forEach(sp=>spike(sp,'#16120c'));
+    c.strokeStyle='#100c08'; c.lineWidth=3.4; c.beginPath(); c.ellipse(x+LN,B+cy,rx,ry,0,Math.PI,Math.PI*2); c.stroke(); return; }
+  c.strokeStyle='#14100c'; c.lineWidth=3.4; c.beginPath(); c.ellipse(x+LN,B+cy,rx,ry,0,0,Math.PI); c.stroke();          // the near side of the band of black bog-oak
   c.strokeStyle='#3a3020'; c.lineWidth=1.2; c.beginPath(); c.ellipse(x+LN,B+cy-0.4,rx,ry,0,0.1,Math.PI-0.1); c.stroke();
   spikes.filter(sp=>sp.fr).forEach(sp=>spike(sp,'#2a2216'));                                                   // the near points
   c.fillStyle='rgba(90,120,60,0.85)'; [[-0.6,0.6],[0.45,0.8],[0.9,0.2]].forEach(([u,v])=>{ c.beginPath(); c.ellipse(x+LN+u*rx,B+cy+v*ry,1.4,0.8,0,0,Math.PI*2); c.fill(); });   // moss

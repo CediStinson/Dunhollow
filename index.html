@@ -5247,7 +5247,7 @@ function sleepUntil(which){
   closeDialog(); dayClock=tgt; player.hp=player.maxHp; updateHud();
   banner({morning:'You wake at dawn',midday:'You wake at midday',evening:'You wake as evening falls'}[which],'#e8d8a8',1600);
   logMsg({morning:'You sleep through the night and wake rested with the first light.',midday:'You sleep late. The sun is high when you wake, rested.',evening:'You doze the day away and wake rested as the light turns gold.'}[which],'#c8b890');
-  if(typeof saveGame==='function') saveGame();
+  autosaveSoon(200);
 }
 function bedPrompt(){                                 // somebody else's bed, or one already slept in
   let bed=CLICKED_BED && OBJECTS.includes(CLICKED_BED) ? CLICKED_BED : null, bd=1e9; CLICKED_BED=null;
@@ -8059,6 +8059,7 @@ function update(dt){
   if(pendingChair && !player.path.length){ const ch=pendingChair; pendingChair=null; if(OBJECTS.includes(ch) && cheb([ch.i,ch.j],[player.i,player.j])<=1) sitOnChair(ch); }
   if(player.sitChair && (player.path.length || player.i!==player.sitChair.i || player.j!==player.sitChair.j)) player.sitChair=null;
   try{ ckTick(dt*slowmo.scale); }catch(e){ console.error(e); }
+  questWatch(dt);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -8700,42 +8701,55 @@ function wakeUp(){
 // ════════════════════════════════════════════════════════════
 //  SAVE / LOAD
 // ════════════════════════════════════════════════════════════
-const SAVE_KEY='dunhollow.saves', MAX_SAVES=12;
+const SAVE_KEY='dunhollow.saves', MAX_SAVES=24;      // two per character: the one you made, and the autosave
 const overlay=document.getElementById('menu-overlay');
 const saveList=document.getElementById('save-list');
 
 // localStorage throws on a file:// page in some browsers, so every access is guarded
 const nameKey=n=>String(n||'Wanderer').trim().toLowerCase();
+const slotOfSave=sv=>sv && sv.slot==='auto' ? 'auto' : 'manual';
+const saveKey=sv=>nameKey(sv.name)+'|'+slotOfSave(sv);
 function readSaves(){
   try{ const raw=localStorage.getItem(SAVE_KEY); let a=raw?JSON.parse(raw):[]; if(!Array.isArray(a)) a=[];
-    const seen=new Set(), out=[]; a.sort((x,y)=>(y.ts||0)-(x.ts||0)).forEach(sv=>{ const k=nameKey(sv.name); if(seen.has(k)) return; seen.add(k); out.push(sv); });   // one save per character: the newest wins
+    const seen=new Set(), out=[]; a.sort((x,y)=>(y.ts||0)-(x.ts||0)).forEach(sv=>{ const k=saveKey(sv); if(seen.has(k)) return; seen.add(k); out.push(sv); });   // one manual save and one autosave per character: the newest of each wins
     if(out.length!==a.length) try{ localStorage.setItem(SAVE_KEY,JSON.stringify(out)); }catch(e){}
     return out; }
   catch(e){ return null; }
 }
 const SRV={ on:false, list:[], loading:false };          // server saves, fetched each time the menu opens
 function saveExists(name){ const l=readSaves(); return !!(l && l.some(sv=>nameKey(sv.name)===nameKey(name))) || SRV.list.some(e=>nameKey(e.name)===nameKey(name)); }
-function allSaves(){ const loc=(readSaves()||[]).map(sv=>({name:sv.name, ts:sv.ts, area:sv.world&&sv.world.area, local:sv})), m=new Map();
-  [...SRV.list.map(e=>({...e,srv:true})), ...loc].forEach(e=>{ const k=nameKey(e.name), o=m.get(k); if(!o) m.set(k,e); else m.set(k,{...o, ...(e.ts>o.ts?e:{}), srv:o.srv||e.srv, local:o.local||e.local}); });
-  return [...m.values()].sort((a,b)=>(b.ts||0)-(a.ts||0)); }
+function allSaves(){ const loc=(readSaves()||[]).map(sv=>({name:sv.name, ts:sv.ts, area:sv.world&&sv.world.area, slot:slotOfSave(sv), local:sv})), m=new Map();
+  [...SRV.list.map(e=>({...e,srv:true,slot:'manual'})), ...loc].forEach(e=>{ const k=saveKey(e), o=m.get(k); if(!o) m.set(k,e); else m.set(k,{...o, ...(e.ts>o.ts?e:{}), srv:o.srv||e.srv, local:o.local||e.local}); });
+  const ent=[...m.values()], last=n=>Math.max(...ent.filter(x=>nameKey(x.name)===n).map(x=>x.ts||0));
+  return ent.sort((a,b)=>(last(nameKey(b.name))-last(nameKey(a.name))) || nameKey(a.name).localeCompare(nameKey(b.name)) || (a.slot==='manual'?-1:1)); }   // characters by when they were last played; the manual save first
 async function refreshServer(){ if(location.protocol==='file:') return; SRV.loading=true; renderSaves();
   try{ const j=await cloud({action:'list'}); if(j&&j.ok){ SRV.on=true; SRV.list=j.saves||[]; } }catch(e){}
   SRV.loading=false; renderSaves(); }
-async function loadEntry(e){ if(e.srv && (!e.local || e.ts>(e.local.ts||0))){ try{ const j=await cloud({action:'load',code:'char:'+nameKey(e.name)}); if(j&&j.ok&&j.saves&&j.saves[0]){ const sv=j.saves[0]; sv.id='char:'+nameKey(sv.name); const l=readSaves(); if(l) writeSaves([sv,...l.filter(x=>nameKey(x.name)!==nameKey(sv.name))].slice(0,MAX_SAVES)); applySave(sv); return; } }catch(err){} }
+async function loadEntry(e){ if(e.slot==='auto'){ if(e.local) applySave(e.local); return; }
+  if(e.srv && (!e.local || e.ts>(e.local.ts||0))){ try{ const j=await cloud({action:'load',code:'char:'+nameKey(e.name)}); if(j&&j.ok&&j.saves&&j.saves[0]){ const sv=j.saves[0]; sv.id='char:'+nameKey(sv.name); const l=readSaves(); if(l) writeSaves([sv,...l.filter(x=>nameKey(x.name)!==nameKey(sv.name))].slice(0,MAX_SAVES)); applySave(sv); return; } }catch(err){} }
   if(e.local) applySave(e.local); }
-function deleteEntry(e){ const l=readSaves(); if(l) writeSaves(l.filter(x=>nameKey(x.name)!==nameKey(e.name))); SRV.list=SRV.list.filter(x=>nameKey(x.name)!==nameKey(e.name));
+function deleteEntry(e){ const l=readSaves(); if(l) writeSaves(l.filter(x=>saveKey(x)!==saveKey(e)));
+  if(e.slot==='auto'){ renderSaves(); return; }
+  SRV.list=SRV.list.filter(x=>nameKey(x.name)!==nameKey(e.name));
   if(SRV.on) cloud({action:'delete',code:'char:'+nameKey(e.name)}).catch(()=>{}); renderSaves(); }
 function writeSaves(list){
   try{ localStorage.setItem(SAVE_KEY,JSON.stringify(list)); return true; }
   catch(e){ return false; }
 }
 
-// autosave: on every area change, once the move has settled (not mid-fight or mid-cutscene: then retry shortly)
-let AUTOSAVE_T=null, CLOUD_AUTO_TS=0;
+// autosave: on every area change and after anything that settles your story (a quest done, a night slept, a lost fight),
+// once things have settled (not mid-fight or mid-cutscene: then retry shortly). It has its own slot and never touches the save you made.
+let AUTOSAVE_T=null;
 function autosaveSoon(delay=700){ clearTimeout(AUTOSAVE_T); AUTOSAVE_T=setTimeout(()=>{
   if(!player.opts || !running || document.getElementById('screen-game').style.display==='none') return;
   if(combat.active || (typeof CS!=='undefined' && CS.on) || player.hp<=0) return autosaveSoon(2500);
   saveGame(true); },delay); }
+let QUESTS_DONE=-1, QUEST_WATCH_T=0;
+function questWatch(dt){                               // a quest just finished: autosave
+  if((QUEST_WATCH_T-=dt)>0 || !running || !player.opts) return; QUEST_WATCH_T=2;
+  let n=0; try{ JOURNAL.forEach(([t,fn])=>{ try{ const r=fn(); if(r && r[0]==='done') n++; }catch(e){} }); }catch(e){ return; }
+  if(QUESTS_DONE>=0 && n>QUESTS_DONE) autosaveSoon(400);
+  QUESTS_DONE=n; }
 function savedBlip(){ let el=document.getElementById('save-blip');
   if(!el){ el=document.createElement('div'); el.id='save-blip'; el.textContent='Saved';
     el.style.cssText='position:fixed;right:22px;bottom:198px;z-index:40;font:italic 12px Georgia,serif;color:#c8b078;letter-spacing:1px;opacity:0;transition:opacity .5s;pointer-events:none;text-shadow:0 1px 3px #000';
@@ -8745,16 +8759,15 @@ function saveGame(auto){
   if(!player.opts){ return; }                       // nothing to save before a character exists
   const list=readSaves();
   if(list===null){ renderSaves(); return; }
-  const sv=snapshot(), k=nameKey(sv.name);
-  writeSaves([sv, ...list.filter(e=>nameKey(e.name)!==k)].slice(0,MAX_SAVES));   // overwrite this character's save
-  const toCloud=!auto || Date.now()-CLOUD_AUTO_TS>120000; if(toCloud) CLOUD_AUTO_TS=Date.now();
-  if(auto) savedBlip();
-  if(SRV.on && toCloud){ const nm=sv.name; cloud({action:'save',code:'char:'+nameKey(nm),data:sv}).then(j=>{ if(j&&j.ok){ SRV.list=[{name:nm,ts:sv.ts,area:sv.world.area},...SRV.list.filter(e=>nameKey(e.name)!==nameKey(nm))]; if(overlay.classList.contains('open')) renderSaves(); } }).catch(()=>{}); }
+  const sv=snapshot(auto?'auto':'manual'), k=saveKey(sv);
+  writeSaves([sv, ...list.filter(e=>saveKey(e)!==k)].slice(0,MAX_SAVES));   // overwrite this character's save in that slot
+  if(auto){ savedBlip(); return; }                  // the autosave stays on this device; the server keeps the save you made
+  if(SRV.on){ const nm=sv.name; cloud({action:'save',code:'char:'+nameKey(nm),data:sv}).then(j=>{ if(j&&j.ok){ SRV.list=[{name:nm,ts:sv.ts,area:sv.world.area},...SRV.list.filter(e=>nameKey(e.name)!==nameKey(nm))]; if(overlay.classList.contains('open')) renderSaves(); } }).catch(()=>{}); }
   renderSaves(); try{ if(typeof logMsg==='function' && overlay.classList.contains('open')) logMsg('Saved: '+sv.name+'.','#a8c890'); }catch(e){}
 }
-function snapshot(){
+function snapshot(slot){
   return {
-    id: 'char:'+nameKey(player.name),
+    id: (slot==='auto'?'auto:':'char:')+nameKey(player.name), slot: slot==='auto'?'auto':'manual',
     name: player.name,
     opts: {...player.opts, equip:{...player.opts.equip}},
     inv:  [...player.inv],
@@ -8769,6 +8782,7 @@ function snapshot(){
 function loadGame(id){ const list=readSaves(); if(!list) return; const sv=list.find(e=>e.id===id); if(sv) applySave(sv); }
 function deleteSaveByName(n){ const list=readSaves(); if(!list) return; writeSaves(list.filter(e=>nameKey(e.name)!==nameKey(n))); renderSaves(); }
 function applySave(sv){
+  QUESTS_DONE=-1;
   const W=sv&&(sv.world||{}), D=(W.choices&&W.choices.deadAt)||{}, latest=Math.max(0,...Object.values(D).filter(v=>typeof v==='number'));
   // saves from before v3: the women's Freckled and Noble faces became Dreamy and Regal; their freckles and mole are face details now
   if(sv && sv.opts && (sv.v||0)<3 && sv.opts.gender==='f'){ const M=sv.opts.marks=sv.opts.marks||{}; if((sv.opts.face|0)===1) M.freckles=true; if((sv.opts.face|0)===2) M.mole=true; }
@@ -8826,7 +8840,7 @@ function renderSaves(){
     const nm=document.createElement('div'); nm.className='save-name'; nm.textContent=e.name||'Wanderer';
     const meta=document.createElement('div'); meta.className='save-meta';
     const where=(AREAS[e.area]||{}).label;
-    meta.textContent=(where?where+' · ':'')+new Date(e.ts).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})+(SRV.on&&!e.srv?' · this device only':'');
+    meta.textContent=(e.slot==='auto'?'Autosave · ':'Your save · ')+(where?where+' · ':'')+new Date(e.ts).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})+(SRV.on&&!e.srv?' · this device only':'');
     info.appendChild(nm); info.appendChild(meta);
     const loadB=document.createElement('button'); loadB.className='save-act'; loadB.textContent='Load'; loadB.addEventListener('click',()=>loadEntry(e));
     const delB=document.createElement('button'); delB.className='save-act danger'; delB.textContent='Delete';     // two clicks instead of a modal confirm
@@ -8857,7 +8871,7 @@ function closeMenu(){
 
 document.getElementById('menu-btn').addEventListener('click',openMenu);
 document.getElementById('menu-close-btn').addEventListener('click',closeMenu);
-document.getElementById('save-btn').addEventListener('click',saveGame);
+document.getElementById('save-btn').addEventListener('click',()=>saveGame(false));
 // ── saves as real files: download one, or load one back ──
 function importSave(sv){ if(!sv || !sv.opts || !sv.world){ alert('That file is not a Dunhollow save.'); return; }
   sv.id='char:'+nameKey(sv.name); const list=readSaves(); if(list){ writeSaves([sv,...list.filter(e=>nameKey(e.name)!==nameKey(sv.name))].slice(0,MAX_SAVES)); }
@@ -9367,7 +9381,7 @@ function askDiscard(loc){
   const id=getAt(loc); if(!id) return;
   if(typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(id) || ITEMS[id].slot==='misc' && ITEMS[id].read){ flash(`You can't throw away ${ITEMS[id].name}. You'll need it.`); return; }
   clearTimeout(msgTimer); invMsg.innerHTML=`Throw away <b>${ITEMS[id].name}</b> for good?<button class="danger" id="dis-yes">Throw away</button><button id="dis-no">Keep</button>`;
-  document.getElementById('dis-yes').onclick=()=>{ if(getAt(loc)===id){ setAt(loc,null); logMsg('You throw away '+ITEMS[id].name+'.','#a89878'); refreshInventory(); updateHud(); if(typeof saveGame==='function') saveGame(); } invMsg.textContent=''; };
+  document.getElementById('dis-yes').onclick=()=>{ if(getAt(loc)===id){ setAt(loc,null); logMsg('You throw away '+ITEMS[id].name+'.','#a89878'); refreshInventory(); updateHud(); autosaveSoon(200); } invMsg.textContent=''; };
   document.getElementById('dis-no').onclick=()=>{ invMsg.textContent=''; };
 }
 // provisions: eat or drink to win back health, in or out of a fight
@@ -9413,7 +9427,7 @@ function makeSlot(kind,key){
       eye.addEventListener('pointerdown',e=>{ e.stopPropagation(); }); eye.addEventListener('dblclick',e=>e.stopPropagation());
       eye.addEventListener('click',e=>{ e.stopPropagation(); if(!player.opts) return; const H=player.opts.hide=player.opts.hide||{};
         if(key==='head'){ player.opts.hideHelm=!isHidden('head'); H.head=player.opts.hideHelm; } else H[key]=!H[key];
-        delete player.opts._ck; syncHideEyes(); drawDoll(); if(typeof saveGame==='function') saveGame(); });
+        delete player.opts._ck; syncHideEyes(); drawDoll(); autosaveSoon(200); });
       el.appendChild(eye); } }
   el.addEventListener('pointerdown',onSlotDown);
   el.addEventListener('dblclick',()=>quickMove(slotLoc(el)));
@@ -11318,7 +11332,7 @@ function openInventory(){
   dollDir=player.dir||0;
   invOverlay.classList.add('open'); refreshInventory();
 }
-function closeInventory(){ invOverlay.classList.remove('open'); invMsg.textContent=''; if(STASH_OPEN){ STASH_OPEN=false; invOverlay.classList.remove('stashing'); if(typeof saveGame==='function') saveGame(); } }
+function closeInventory(){ invOverlay.classList.remove('open'); invMsg.textContent=''; if(STASH_OPEN){ STASH_OPEN=false; invOverlay.classList.remove('stashing'); autosaveSoon(200); } }
 function openStash(){ STASH_OPEN=true; stashArr(); openInventory(); if(!invOverlay.classList.contains('open')){ STASH_OPEN=false; return; } invOverlay.classList.add('stashing');
   const cap=stashCap(); document.querySelectorAll('#stash-grid .slot').forEach(el=>{ el.style.display = +el.dataset.key<cap ? '' : 'none'; });
   const lb=document.querySelector('#stash-box .menu-label'); if(lb) lb.textContent='The Wheatsheaf Crate ('+stashArr().slice(0,cap).filter(Boolean).length+'/'+cap+')'; refreshInventory(); }
@@ -14498,7 +14512,7 @@ function weaveTalk(){ const E=player.opts.equip, back=()=>TALKERS.maelis();
   const pieces=WEAVE_SLOTS.map(sl=>E[sl]).filter(id=>id && ITEMS[id]);
   const opts=pieces.map(id=> isWoven(id) ? {label:`${ITEMS[id].name}: already woven`, off:true, fn:()=>{}}
     : {label:`Weave the ${ITEMS[id].name}. (+1 Spell Power)`, off:player.purse<weaveCost(id), note:'-'+formatCoin(weaveCost(id)), fn:()=>{ const c=weaveCost(id); const sl=WEAVE_SLOTS.find(k=>E[k]===id); if(!sl||!ITEMS[wovenOf(id)]) return; player.purse-=c; E[sl]=wovenOf(id); delete player.opts._ck; refreshPlayerHp(false); updateHud();   // this piece, and only this one, becomes woven
-        logMsg(`Maelis weaves moonlight into your ${ITEMS[id].name}. It is one of a kind now: +1 Spell Power.`,'#c8d8ff'); if(typeof saveGame==='function') saveGame(); weaveTalk(); }});
+        logMsg(`Maelis weaves moonlight into your ${ITEMS[id].name}. It is one of a kind now: +1 Spell Power.`,'#c8d8ff'); autosaveSoon(200); weaveTalk(); }});
   say('Maelis the Weaver',["Maelis lets the loom run on by itself and looks you over, piece by piece, the way a tailor would.",
     pieces.length ? "“Each thing you wear can hold one thread of moonlight, no more. Choose well. The thread is not cheap, and finer cloth takes a finer thread.”" : "“Come back wearing something. I cannot weave into skin.”"],
     [...opts,{label:'Back.',fn:back},bye],true); }
@@ -14506,7 +14520,7 @@ function trainTalk(id){ const T=TRAINING[id], r=CHOICE[T.key]||0, cost=trainCost
   if(r>=TRAIN_MAX){ say(T.who,[...T.lines(r),"“There's nothing more I can do for you. You are as good as my craft can make you.”"],[{label:'Back.',fn:back},bye]); return; }
   say(T.who,[...T.lines(r),`<i>Rank ${r} of ${TRAIN_MAX}. The next rank gives ${T.stat} for ${formatCoin(cost)}.</i>`],[
     {label:`Pay ${formatCoin(cost)}. (${T.stat})`, off:player.purse<cost, note:'-'+formatCoin(cost), fn:()=>{ player.purse-=cost; CHOICE[T.key]=r+1; refreshPlayerHp(false); updateHud();
-      logMsg(`${T.who}: rank ${r+1}. ${T.stat}.`,'#e8c060'); if(typeof saveGame==='function') saveGame(); trainTalk(id); }},
+      logMsg(`${T.who}: rank ${r+1}. ${T.stat}.`,'#e8c060'); autosaveSoon(200); trainTalk(id); }},
     {label:'Back.',fn:back}, bye],true); }
 const STASH_UPS=[60,150,300];
 function crateTalk(){ const u=CHOICE.stashUp||0, cost=STASH_UPS[u];
@@ -15217,7 +15231,7 @@ function temperTalk(){ const E=player.opts.equip, back=()=>TALKERS.smith();
     : !ITEMS['t_'+id] ? {label:`${ITEMS[id].name}: nothing to temper`, off:true, fn:()=>{}}
     : {label:`Temper the ${ITEMS[id].name}. (+1 Attack Power)`, off:player.purse<temperCost(id), note:'-'+formatCoin(temperCost(id)), fn:()=>{ const c=temperCost(id), sl=TEMPER_SLOTS.find(k=>E[k]===id); if(!sl) return;
         player.purse-=c; E[sl]='t_'+id; delete player.opts._ck; refreshPlayerHp(false); updateHud();
-        logMsg(`Oswin works your ${ITEMS[id].name} over at the anvil: rivets tight, edges true, the weight where it should be. +1 Attack Power.`,'#e8c060'); if(typeof saveGame==='function') saveGame(); temperTalk(); }});
+        logMsg(`Oswin works your ${ITEMS[id].name} over at the anvil: rivets tight, edges true, the weight where it should be. +1 Attack Power.`,'#e8c060'); autosaveSoon(200); temperTalk(); }});
   say('Oswin the Armourer',["Oswin turns your gear over in his black hands, tutting at every nick.",
     pieces.length ? "“One piece at a time. Each one I can true up once: rivets, straps, balance. After that it's as good as steel and leather get. Better kit costs more to do properly.”" : "“Come back wearing some steel or leather. I don't temper shirts.”",
     ...(CHOICE.temper ? [`<i>Your earlier training with him still counts: +${CHOICE.temper} Attack Power.</i>`] : [])],
@@ -15512,7 +15526,7 @@ function wakeAfterDefeat(){
   logMsg('Someone found you before the crows did and carried you back to your bed. Half a day is gone.','#c8a080');
   if(lost>0) logMsg('Your purse is lighter: '+formatCoin(lost)+' missing.','#c0483a');
   logMsg('Bruised: your health stays at half until you sleep, bathe, or eat a proper meal.','#c8a080');
-  if(typeof saveGame==='function') saveGame();
+  autosaveSoon(200);
   CHOICE.taught=CHOICE.taught||{};
   if(!CHOICE.taught.death){ CHOICE.taught.death=true;           // the first time: what losing costs, in full
       setTimeout(()=>say('What Losing Costs',["You lost the fight. You are not dead, but it cost you:",
@@ -15834,7 +15848,7 @@ function digMound(o){                               // a mound of earth: needs a
     if(R.coin){ player.purse+=R.coin; floatText([o.i,o.j],'+'+formatCoin(R.coin),'#e8c060',true); logMsg('Found: '+formatCoin(R.coin)+'.','#e8c060'); }
     if(R.item){ if(giveQuestItem(R.item,true)){ floatText([o.i,o.j-0.01],'Found: '+ITEMS[R.item].name,'#8ac070',true); logMsg('Found: '+ITEMS[R.item].name+'.','#8ac070'); } }
     const n=Object.keys(CHOICE.dug).length; logMsg('('+n+'/'+MOUNDS.length+' buried things dug up)','#a89878');
-    updateHud(); if(typeof saveGame==='function') saveGame(); }
+    updateHud(); autosaveSoon(200); }
 function drawDirtMound(o){ const q=P(o.i+0.5,o.j+0.5);
   g.fillStyle='rgba(0,0,0,0.22)'; g.beginPath(); g.ellipse(q.x,q.y+2,26,10,0,0,Math.PI*2); g.fill();
   const gr=g.createRadialGradient(q.x-6,q.y-8,2,q.x,q.y-3,26); gr.addColorStop(0,'#7a5a3a'); gr.addColorStop(1,'#3e2c1a');

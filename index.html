@@ -5288,7 +5288,7 @@ function bedPrompt(){                                 // somebody else's bed, or
     const sl=bed && NPCS.find(n=>n.sleepBed && n.sleepBed.i===bed.i && n.sleepBed.j===bed.j);
     if(sl){ say(sl.name,[sl.name+" is asleep in that one. The bed by the far wall is free."],[{label:'Leave them be.',fn:closeDialog}]); return; }
     if(bed && bed.owner==='marta'){ say('A Bed',["Marta's bed. Her money box sleeps under that pillow; she would not thank you for lying on it."],[{label:'Not now.',fn:closeDialog}]); return; }
-    if(bed && bed.owner && areaId==='elderhouse'){ say('A Bed',["That is "+({elder:"Hamond's",wenna:"Old Wenna's",ada:"Ada's"}[bed.owner])+" bed. Better not."],[{label:'Not now.',fn:closeDialog}]); return; }
+    if(bed && bed.owner && (areaId==='elderhouse'||areaId==='farmhouse')){ say('A Bed',["That is "+({elder:"Hamond's",wenna:"Old Wenna's",ada:"Ada's"}[bed.owner])+" bed. Better not."],[{label:'Not now.',fn:closeDialog}]); return; }
     const r=bedChoice(); if(bed && bed.edric){ const t=document.getElementById('dlg-text'); if(t) t.innerHTML="<p>Edric's bed. Ada keeps it made, the blanket turned down as if he might still come home. Hamond told you to use it.</p>"+t.innerHTML.replace(/<p>The blanket is rough but warm\. /,'<p>'); }
     return r;
 }
@@ -15489,9 +15489,8 @@ function drawPup(p){ const dep=(typeof poolDepth==='function')?poolDepth(p.x,p.y
 // ── Hamond's house at night: Hamond, Old Wenna and Ada asleep in their beds; Edric's bed is yours if you want it ──
 const SLEEP_HRS=()=>{ const h=HOUR(); return h>=22 || h<6; };
 const SLEEPERS=[ ['elder','Elder Hamond',{gender:'m',skin:1,hair:4,hairColor:13,beard:5}], ['wenna','Old Wenna',{gender:'f',skin:0,hair:4,hairColor:13,beard:0}], ['ada','Ada',{gender:'f',skin:1,hair:3,hairColor:8,beard:0,face:1}] ];
-wrap('village','npcs',l=> SLEEP_HRS() ? l.filter(n=>!(n.id==='ada' && !adaHome())) : l);   // Hamond and Wenna keep their own hours now (ROUTINES)
 wrap('elderhouse','npcs',l=>{ if(!SLEEP_HRS()) return l; const out=[...l];
-  SLEEPERS.forEach(([id,name,o])=>{ if(id!=='ada' || adaHome()) return; const bed=AREAS.elderhouse.objects().find(b=>b.owner===id); if(!bed) return;
+  SLEEPERS.forEach(([id,name,o])=>{ return;   // all of them walk to bed themselves now (ROUTINES) const bed=AREAS.elderhouse.objects().find(b=>b.owner===id); if(!bed) return;
     out.push({ id:'sleep_'+id, name, i:bed.i, j:bed.j, x:bed.i+1.9, y:bed.j+0.95, dir:0, sleepBed:bed, opts:{...o, eyesShut:true, equip:{head:null,torso:'shirt',armor:null,hands:null,legs:'trousers',feet:null,weapon:null,offhand:null}} }); });
   return out; });
 SLEEPERS.forEach(([id,name])=>{ TALKERS['sleep_'+id]=()=>{ const real={elder:'elder',wenna:'wenna',ada:'ada'}[id], news=(()=>{ try{ return npcHasNews({id:real,name}); }catch(e){ return null; } })();
@@ -16260,6 +16259,51 @@ function openBestiary(){ const B=BEST();
     : `<div class="bst unk"><b>? ? ?</b><i class="k">Not yet met.</i></div>`).join('');
   document.getElementById('back-journal').addEventListener('click',e=>{ e.stopPropagation(); openJournal(); }); }
 document.addEventListener('click',e=>{ if(e.target && e.target.id==='open-bestiary'){ e.stopPropagation(); openBestiary(); } },true);
+
+// ════════ Ada keeps hours too: in Dunhollow or out at the farm, with or without the Well Sisters, she walks to bed and back ════════
+wrap('farmhouse','objects',l=> adaHome() ? [...l,{type:'bed', i:3, j:0, fp:[2,1], owner:'ada'}] : l);   // once she lives with you, her own bed
+const adaPoolMember=()=>CHOICE.sisters==='done' && CHOICE.pool!=='stared';
+const ADA_SL={};
+ROUTINES.ada={ name:'Ada', sleepId:'sleep_ada',
+  get ids(){ return adaHome() ? {farm:'adafarm', farmhouse:'adafarm'} : {village:'ada', elderhouse:'ada'}; },
+  get opts(){ return adaHome() ? {gender:'f',skin:1,hair:5,hairColor:8,beard:0,face:1,equip:{head:null,torso:'tunic_linen',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}}
+                               : {gender:'f',skin:1,hair:3,hairColor:8,beard:0,face:1,equip:{head:null,torso:'tunic_linen',armor:null,hands:null,legs:'hose_grey',feet:null,weapon:null,offhand:null}}; },
+  get slots(){ const key=(adaHome()?'f':'v')+(adaPoolMember()?'p':''); if(ADA_SL[key]) return ADA_SL[key];
+    const farmDoor=()=>{ const h=AREAS.farm.objects().find(o=>o.inside==='farmhouse'); return h?doorTile(h):[1,3]; };
+    return ADA_SL[key]={
+      v: [ { h:[6.5,22], area:'village', at:[5,3], dir:0 }, { h:[22,30.5], area:'elderhouse', at:[2,5], bed:[0,5] } ],
+      vp:[ { h:[6.3,6.7], area:'village', walk:[[10,4],[0,5]] },                                    // out of Hamond's house and off to the Willow Pool
+           { h:[18.2,22], area:'village', at:[5,3], dir:0, fromArea:'tunnel' },                    // back from the sisters in the evening
+           { h:[22,30.3], area:'elderhouse', at:[2,5], bed:[0,5] } ],
+      f: [ { h:[6.5,21.5], area:'farm', at:[7,2], dir:1 }, { h:[21.5,30.5], area:'farmhouse', at:[3,1], bed:[3,0] } ],
+      fp:[ { h:[6.3,6.7], area:'farm', walk:[farmDoor(),[12,3]] },
+           { h:[18.2,21.5], area:'farm', at:[7,2], dir:1, fromArea:'road' },
+           { h:[21.5,30.3], area:'farmhouse', at:[3,1], bed:[3,0] } ] }[key]; } };
+['ada','adafarm','sleep_ada'].forEach(i=>RT_IDS.add(i));
+rtWrap('farm'); rtWrap('farmhouse');
+
+// ════════ More folk keep hours: Brann goes home to his lodge, Oswin and Bess shut their market stalls and go home to bed ════════
+wrap('smithy','objects',l=>[...l,{type:'bed', i:0, j:0, fp:[2,1], owner:'oswin'}]);   // a cot in the corner of the smithy, warm from the forge
+Object.assign(ROUTINES,{
+  brann:{ name:'Brann the Hunter', ids:{clearing:'hunter', lodge:'hunter'}, sleepId:'sleep_hunter',
+    opts:{gender:'m',skin:3,hair:3,hairColor:5,beard:4,face:1,equip:{head:'hood',torso:'shirt',armor:'studded',hands:'gloves',legs:'breeches',feet:'boots',weapon:'hatchet',offhand:null}}, slots:[
+    { h:[6,21],  area:'clearing', at:[6,5], dir:1 },                                     // out by his fire all day
+    { h:[21,30], area:'lodge', at:[2,1], bed:[2,0] } ] },                                // and to bed in the lodge
+  oswin:{ name:'Oswin the Armourer', ids:{market:'smith', smithy:'smith'}, sleepId:'sleep_smith',
+    opts:{gender:'m',skin:3,hair:2,hairColor:1,beard:5,face:1,equip:{head:null,torso:'shirt',armor:'studded',hands:'gauntlets',legs:'hose_grey',feet:'boots',weapon:null,offhand:null}}, slots:[
+    { h:[7,19],  area:'market', at:[17,6], dir:0 },                                      // at his stall by the smithy door
+    { h:[19,22], area:'smithy', at:[3,1], dir:1 },                                       // the forge after hours
+    { h:[22,31], area:'smithy', at:[2,0], bed:[0,0] } ] },
+  bess:{ name:'Bess the Tailor', ids:{market:'tailor', tailorshop:'tailor'}, sleepId:'sleep_tailor',
+    opts:{gender:'f',skin:1,hair:4,hairColor:8,face:2,equip:{head:null,torso:'tunic_red',armor:null,hands:null,legs:'hose_grey',feet:'riding_boots',weapon:null,offhand:null}}, slots:[
+    { h:[8,19],  area:'market', at:[10,6], dir:0 },
+    { h:[19,32], area:'tailorshop', at:[2,0], bed:[0,0] } ] } });
+['hunter','sleep_hunter','smith','sleep_smith','tailor','sleep_tailor'].forEach(i=>RT_IDS.add(i));
+['clearing','lodge','market','smithy','tailorshop'].forEach(rtWrap);
+Object.assign(TALKERS,{
+  sleep_hunter:()=>say('Brann the Hunter',["Brann sleeps on his side with his boots on and the hatchet in reach. One eye opens, sees it is you, and closes again."],[{label:'Let him sleep.', fn:closeDialog}]),
+  sleep_smith:()=>say('Oswin the Armourer',["Oswin snores on a cot by the banked forge, his hands black to the wrist. Come back when the hammer is ringing."],[{label:'Let him sleep.', fn:closeDialog}]),
+  sleep_tailor:()=>say('Bess the Tailor',["Bess is asleep under a quilt of a hundred offcuts. A pincushion is still strapped to her wrist."],[{label:'Let her sleep.', fn:closeDialog}]) });
 </script>
 </body>
 </html>

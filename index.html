@@ -4733,6 +4733,7 @@ function switchArea(id,entryKey){
   if(A.onEnter) setTimeout(()=>{ if(areaId===id && !combat.active) A.onEnter(); },900);
   updateMinimap();
   banner(A.label,'#e8c878',1300);
+  autosaveSoon();
 }
 
 const player={ i:6, j:1, x:6.5, y:1.5, path:[], moving:false, dir:0, name:'Wanderer', opts:null, inv:[], purse:0 };   // purse is in copper (1 silver=10, 1 gold=100)
@@ -8634,13 +8635,26 @@ function writeSaves(list){
   catch(e){ return false; }
 }
 
-function saveGame(){
+// autosave: on every area change, once the move has settled (not mid-fight or mid-cutscene: then retry shortly)
+let AUTOSAVE_T=null, CLOUD_AUTO_TS=0;
+function autosaveSoon(delay=700){ clearTimeout(AUTOSAVE_T); AUTOSAVE_T=setTimeout(()=>{
+  if(!player.opts || !running || document.getElementById('screen-game').style.display==='none') return;
+  if(combat.active || (typeof CS!=='undefined' && CS.on) || player.hp<=0) return autosaveSoon(2500);
+  saveGame(true); },delay); }
+function savedBlip(){ let el=document.getElementById('save-blip');
+  if(!el){ el=document.createElement('div'); el.id='save-blip'; el.textContent='Saved';
+    el.style.cssText='position:fixed;right:22px;bottom:198px;z-index:40;font:italic 12px Georgia,serif;color:#c8b078;letter-spacing:1px;opacity:0;transition:opacity .5s;pointer-events:none;text-shadow:0 1px 3px #000';
+    document.body.appendChild(el); }
+  el.style.opacity='0.85'; clearTimeout(savedBlip.t); savedBlip.t=setTimeout(()=>el.style.opacity='0',1400); }
+function saveGame(auto){
   if(!player.opts){ return; }                       // nothing to save before a character exists
   const list=readSaves();
   if(list===null){ renderSaves(); return; }
   const sv=snapshot(), k=nameKey(sv.name);
   writeSaves([sv, ...list.filter(e=>nameKey(e.name)!==k)].slice(0,MAX_SAVES));   // overwrite this character's save
-  if(SRV.on){ const nm=sv.name; cloud({action:'save',code:'char:'+nameKey(nm),data:sv}).then(j=>{ if(j&&j.ok){ SRV.list=[{name:nm,ts:sv.ts,area:sv.world.area},...SRV.list.filter(e=>nameKey(e.name)!==nameKey(nm))]; if(overlay.classList.contains('open')) renderSaves(); } }).catch(()=>{}); }
+  const toCloud=!auto || Date.now()-CLOUD_AUTO_TS>120000; if(toCloud) CLOUD_AUTO_TS=Date.now();
+  if(auto) savedBlip();
+  if(SRV.on && toCloud){ const nm=sv.name; cloud({action:'save',code:'char:'+nameKey(nm),data:sv}).then(j=>{ if(j&&j.ok){ SRV.list=[{name:nm,ts:sv.ts,area:sv.world.area},...SRV.list.filter(e=>nameKey(e.name)!==nameKey(nm))]; if(overlay.classList.contains('open')) renderSaves(); } }).catch(()=>{}); }
   renderSaves(); try{ if(typeof logMsg==='function' && overlay.classList.contains('open')) logMsg('Saved: '+sv.name+'.','#a8c890'); }catch(e){}
 }
 function snapshot(){

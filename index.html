@@ -16490,6 +16490,59 @@ window.addEventListener('keyup',e=>{ if(FISH && (e.key==='f'||e.key==='F'||e.key
 window.addEventListener('pointerdown',e=>{ if(!FISH) return; if(e.target.closest && (e.target.closest('#fish-panel')||e.target===gc)){ e.preventDefault(); e.stopPropagation(); if(FISH.st==='reel') FISH.hold=true; else fishPress(); } },true);
 window.addEventListener('pointerup',e=>{ if(FISH){ FISH.hold=false; if(e.target.closest && (e.target.closest('#fish-panel')||e.target===gc)){ e.preventDefault(); e.stopPropagation(); } } },true);
 window.addEventListener('click',e=>{ if(FISH && e.target===gc){ e.preventDefault(); e.stopPropagation(); } },true);
+
+// ════════ The Grave-Blade Reforged: Vesna wakes a rusted grave-blade, but only once Oswin has made the steel sound again ════════
+Object.assign(ITEMS,{ clean_blade:{ name:'The Cleaned Grave-Blade', slot:'misc' }, grave_blade:{ name:'The Bone-Bound Blade', slot:'weapon' } });
+Object.assign(WEAPONS,{ grave_blade:{ wind:0.19, dmg:10, len:24, wither:0.14, drain:0.12 } });
+Object.assign(PRICES,{ clean_blade:0, grave_blade:150 }); QUEST_ITEMS.add('clean_blade');
+Object.assign(GEAR_LORE,{ grave_blade:"A grave-blade cleaned by Oswin's wheel and bound by Vesna with the bones of the dead it was buried among. The edge is grey as ash, and when it bites something cold goes in with it. <i>Sometimes withers what it cuts, and sometimes drinks a little of it back for you.</i>" });
+function drawGraveBlade(c,hx,hy,ang,s){ c.save(); c.translate(hx,hy); c.rotate(ang); c.scale(s,s);
+  c.fillStyle='#d8ccaa'; c.fillRect(-5,-1.6,7,3.2); c.fillStyle='#a8987a'; [-4,-1.5,1].forEach(x=>c.fillRect(x,-1.8,0.8,3.6));          // a grip of knuckle-bones
+  c.fillStyle='#e0d6b8'; c.beginPath(); c.arc(-6.5,0,2.6,0,Math.PI*2); c.fill(); c.fillStyle='#3a3020'; c.fillRect(-7.6,-1,0.9,0.9); c.fillRect(-6.4,-1,0.9,0.9);   // a little skull pommel
+  c.fillStyle='#d0c4a2'; c.beginPath(); c.ellipse(2.6,0,1.6,5.4,0,0,Math.PI*2); c.fill(); c.fillStyle='#b8aa88'; c.fillRect(1.8,-5,1.6,1.2); c.fillRect(1.8,3.8,1.6,1.2);   // a crossguard of vertebrae
+  const gr=c.createLinearGradient(0,-2,0,2); gr.addColorStop(0,'#c8d0d8'); gr.addColorStop(0.5,'#5a6068'); gr.addColorStop(1,'#3a4048');
+  c.fillStyle=gr; c.beginPath(); c.moveTo(4,-1.9); c.lineTo(23,-1.3); c.lineTo(27,0); c.lineTo(23,1.3); c.lineTo(4,1.9); c.closePath(); c.fill();   // grave-grey steel
+  c.strokeStyle='rgba(200,230,220,0.55)'; c.lineWidth=0.6; c.beginPath(); c.moveTo(5,-1.6); c.lineTo(23,-1.1); c.lineTo(26.5,0); c.stroke();          // a pale, cold edge
+  c.fillStyle='rgba(30,36,40,0.7)'; c.fillRect(6,-0.3,14,0.6); c.restore(); }
+drawWeapon=(orig=>function(c,hx,hy,ang,id,s=1){ if(id==='grave_blade') return drawGraveBlade(c,hx,hy,ang,s); return orig.apply(this,arguments); })(drawWeapon);
+paintItemArt=(orig=>function(g2,id,size){ if(id==='grave_blade'||id==='clean_blade'){ g2.save(); g2.scale(size/40,size/40); if(id==='grave_blade') drawGraveBlade(g2,8,32,-Math.PI/4,1.25); else drawWeapon(g2,8,32,-Math.PI/4,'sword',1.25); g2.restore(); return; } return orig.apply(this,arguments); })(paintItemArt);
+const REFORGE_BONES=5, REFORGE_SKULLS=1;
+const rfDay=()=>Math.floor(dayClock/DAY_LEN);
+const rfHave=()=>player.inv.filter(x=>x==='old_bone').length>=REFORGE_BONES && player.inv.filter(x=>x==='old_skull').length>=REFORGE_SKULLS;
+JOURNAL.push(['The Grave-Blade Reforged', ()=> !CHOICE.reforge ? null
+  : CHOICE.reforge==='done' ? ['done',"Vesna bound the dead into the grave-blade Oswin cleaned for you: the Bone-Bound Blade."]
+  : CHOICE.reforge==='asked' ? ['active',"Vesna will wake the rusted grave-blade, but the steel is rotten. Take it to Oswin the Armourer in Hollowmere's market to have it cleaned and given a new edge."]
+  : CHOICE.reforge==='smith' ? ['active',"Oswin is grinding the rust off the grave-blade. Come back to him "+(rfDay()>CHOICE.reforgeDay?'now: it should be ready.':'tomorrow.')]
+  : ['active',"Bring the cleaned blade back to Vesna, with "+REFORGE_BONES+" old bones and "+REFORGE_SKULLS+" skull for her to bind into it. (You have "+player.inv.filter(x=>x==='old_bone').length+" bones and "+player.inv.filter(x=>x==='old_skull').length+" skull.)"]]);
+npcHasNews=(orig=>function(n){ if(n && !n.sleepBed){
+    if(n.id==='vesna' && hasItem('rusted_blade') && !CHOICE.reforge && (CHOICE.necro||CHOICE.morwen)) return '!';
+    if(n.id==='vesna' && CHOICE.reforge==='clean' && hasItem('clean_blade') && rfHave()) return '?';
+    if(n.id==='smith' && CHOICE.reforge==='asked' && hasItem('rusted_blade')) return '?';
+    if(n.id==='smith' && CHOICE.reforge==='smith' && rfDay()>CHOICE.reforgeDay) return '?'; }
+  return orig.apply(this,arguments); })(npcHasNews);
+{ const oV=TALKERS.vesna; TALKERS.vesna=(...a)=>{ const V='Vesna the Grave-Speaker';
+    if(!CHOICE.reforge && hasItem('rusted_blade')){ say(V,["Vesna's eyes go to the rusted blade at your belt before they go to you.","“Someone was buried with that, and they have not finished with it. I can wake what is left in it.” She runs a nail along the pitted edge and red flakes fall. “But not in this. The steel is rotten through: wake it like this and it will snap in your first fight.”"],[
+        {label:'“Then what do I do?”', fn:()=>{ remember('reforge','asked',"Vesna will wake the rusted grave-blade once a smith has made the steel sound. Oswin the Armourer, in Hollowmere's market."); updateHud();
+          say(V,["“Take it to a smith who knows old iron. Oswin, in Hollowmere's market, if his temper allows. Have him grind it to clean steel and draw a new edge.”","“Then bring it back to me with bones to bind into it. Five old bones and a skull. The fen gives them up easily enough, and so do the dead who walk in it.”"],[bye]); }},
+        {label:'Something else.', fn:()=>oV(...a)}, bye]); return; }
+    if(CHOICE.reforge==='clean' && hasItem('clean_blade')){
+      if(!rfHave()){ say(V,["Vesna weighs the cleaned blade and nods. “Oswin does good work, for a man who hits things.”","“Now the bones. Five old bones and a skull. Bring them and I will bind it.”"],[{label:'Something else.', fn:()=>oV(...a)},bye]); return; }
+      say(V,["You lay the cleaned blade on Vesna's table, and the bones beside it.","“Good.” She arranges them along the steel like a spine, sets the skull at the hilt, and begins to speak in the language with no vowels."],[
+        {label:'Watch.', fn:()=>{ let b=REFORGE_BONES, sk=REFORGE_SKULLS; player.inv=player.inv.map(x=>{ if(x==='old_bone'&&b>0){ b--; return null; } if(x==='old_skull'&&sk>0){ sk--; return null; } if(x==='clean_blade') return 'grave_blade'; return x; });
+          remember('reforge','done',"Vesna bound the dead into the grave-blade: the Bone-Bound Blade."); updateHud(); refreshFoodBar(); banner('The Bone-Bound Blade','#d8ccaa',2200); slowmo.scale=0.4; slowmo.t=0.6;
+          logMsg('The bones crumble to grey dust and the dust runs into the steel. You receive the Bone-Bound Blade: it sometimes withers what it cuts, and drinks a little life back for you.','#d8ccaa');
+          say(V,["The bones go grey and crumble, and the grey runs into the steel like water into sand. The blade is warm for a moment, then cold, and stays cold.","“There. It remembers how to kill now. Try not to let it teach you.”"],[bye]); }},
+        {label:'Not yet.', fn:closeDialog}]); return; }
+    return oV(...a); }; }
+{ const oS=TALKERS.smith; TALKERS.smith=(...a)=>{ const O='Oswin the Armourer';
+    if(CHOICE.reforge==='asked' && hasItem('rusted_blade')){ say(O,["You hand Oswin the rusted blade. He turns it under the light, frowning, then licks a thumb and rubs the flat.","“Grave-iron. Older than this city. Someone took good steel into the ground with them.” He taps it with a fingernail and listens. “The heart's still sound. I can grind it clean and draw a new edge. Twenty-five copper, and come back tomorrow.”"],[
+        {label:'Pay him. (-25c)', off:player.purse<25, note:'-25c', fn:()=>{ player.purse-=25; const k=player.inv.indexOf('rusted_blade'); if(k>=0) player.inv[k]=null; CHOICE.reforgeDay=rfDay(); remember('reforge','smith',"Oswin is grinding the rust off the grave-blade. Back to him tomorrow."); updateHud();
+          say(O,"“Tomorrow. Don't hover.”",[bye]); }},
+        {label:'Something else.', fn:()=>oS(...a)}, bye]); return; }
+    if(CHOICE.reforge==='smith'){ if(rfDay()<=CHOICE.reforgeDay){ say(O,["Somewhere behind the stall a grindstone is singing. “Tomorrow, I said.”"],[{label:'Something else.', fn:()=>oS(...a)},bye]); return; }
+      say(O,["Oswin lays a sword on the counter that you hardly recognise: grey, clean steel, a fresh bright edge, the old fuller cut deep down the middle.","“Whoever was buried with that knew what they were carrying. Whatever your witch wants with it, I don't want to know.”"],[
+        {label:'Take the blade.', fn:()=>{ if(!giveQuestItem('clean_blade')) return; remember('reforge','clean',"Oswin cleaned the grave-blade. Back to Vesna with it, and with bones."); updateHud(); closeDialog(); }}, bye]); return; }
+    return oS(...a); }; }
 </script>
 </body>
 </html>

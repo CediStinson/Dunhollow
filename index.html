@@ -14773,7 +14773,7 @@ function crateTalk(){ const u=CHOICE.stashUp||0, cost=STASH_UPS[u];
 
 // ════════ RESPAWNS: ordinary foes come back a day after you kill them; story foes stay dead ════════
 const RESPAWNS=new Set(['Forest Wolf','Mist Wolf','Pale Mist Wolf','Barrow Wolf','Old Barrow Wolf','Hungry Wolf','Ridge Wolf','Night Wolf','Prowling Wolf','Lean Wolf',
-  'Goblin Sneak','Goblin Stabber','Bog Lurker','Mire Lurker','Ash Hound','Ash Hound Alpha','Road Thief','Timber Wolf','Timber Wolf Bitch']);
+  'Goblin Sneak','Goblin Stabber','Bog Lurker','Mire Lurker','Ash Hound','Ash Hound Alpha','Road Thief','Timber Wolf','Timber She-wolf']);
 const RESPAWN_AFTER=DAY_LEN;               // one full day
 // ── no foe stands right beside a friendly face or on a doorstep: anyone spawning within 3 tiles of an
 //    NPC (or 2 of an entrance) is moved to the nearest open spot that is clear of both
@@ -14810,7 +14810,7 @@ function drawLoom(o){
     const sx=(Math.sin(t*1.6)+1)/2, sp={x:a.x+(b.x-a.x)*sx, y:a.y+(b.y-a.y)*sx-H*woven};                                    // the shuttle flying by itself
     glow(sp.x,sp.y,16,10,'200,230,255',0.7); g.fillStyle='#f4f8ff'; g.beginPath(); g.ellipse(sp.x,sp.y,4,1.6,0,0,Math.PI*2); g.fill();
     g.restore(); }
-wrap('wolfwood','mobs',l=> nightAmt()>0.5 && (QUEST.wolves||0)>=2 ? [...l,{ name:'Timber Wolf', type:'wolf', i:3, j:3, faction:'timber', coat:'#5a524a' },{ name:'Timber Wolf Bitch', type:'wolf', i:4, j:5, faction:'timber', coat:'#6e665a' }] : l);
+wrap('wolfwood','mobs',l=> nightAmt()>0.5 && (QUEST.wolves||0)>=2 ? [...l,{ name:'Timber Wolf', type:'wolf', i:3, j:3, faction:'timber', coat:'#5a524a' },{ name:'Timber She-wolf', type:'wolf', i:4, j:5, faction:'timber', coat:'#6e665a' }] : l);
 
 // ════════ woven pieces: a one-of-a-kind twin of each wearable item, made only by Maelis ════════
 for(const id of Object.keys(ITEMS)){ const it=ITEMS[id]; if(id.startsWith('w_') || !WEAVE_TWIN_SLOTS.includes(it.slot)) continue;
@@ -15036,7 +15036,9 @@ function drawPupFigure(p){
   if(p.alpha<=0.01) return;
   const q=P(p.x,p.y), sc=pupSize(p), lying=p.lie>0.5;
   const bob=lying?0:p.moving?-Math.abs(Math.sin(gt*12+p.v*2))*1.6*sc:p.munch?-Math.abs(Math.sin(gt*11+p.v))*2.2*sc:0, B=q.y+bob;
-  const e={coat:PUP_COATS[p.v], moving:p.moving}, pose=lying?{kind:'lie',sleep:!!p.sleep}:null;
+  const F=p.fight, pose=lying?{kind:'lie',sleep:!!p.sleep}                                                       // in a fight: the same crouch and lunge an enemy wolf shows
+    : F&&F.wind>0 ? {kind:'raise', t:1-F.wind/WOLF_WIND} : F&&F.bite>0 ? {kind:'strike', t:Math.min(1,(1-F.bite)*4+0.4)} : null;
+  const e={coat:PUP_COATS[p.v], moving:p.moving&&!pose};
   g.save(); g.globalAlpha*=p.alpha;
   drawLitSprite(q.x,B,()=>{ g.save(); g.translate(q.x,B); g.scale(sc,sc); g.translate(-q.x,-B); drawWolf(q.x,B,e,p.dir||0,pose); g.restore(); },0.5+sc*0.5);
   g.restore();
@@ -15569,7 +15571,7 @@ function pupKeepClear(p){ if(!SKEL || SKEL.crumble) return;                // ne
   const sx=p.x-SKEL.x, sy=p.y-SKEL.y, sd=Math.hypot(sx,sy); if(sd>=0.75) return;
   const ux=sd>0.01?sx/sd:0.7, uy=sd>0.01?sy/sd:0.7; p.x+=ux*(0.75-sd); p.y+=uy*(0.75-sd); }
 const pupFighting=()=>{ const f=combat.foe; return !!(combat.active && f && !f.dead && f.type!=='dummy' && !combat.practice); };
-let wolfBiteT=2.2;
+let wolfBiteT=2.2; const WOLF_WIND=0.32;
 function pupCompanion(dt){ try{                // your grown wolf fights at your side
     const p=PUPS.find(q=>q.mode==='comp'), f=combat.foe;
     if(!p || !pupFighting()){ wolfBiteT=2.2; if(p) p.fight=null; return; }
@@ -15579,10 +15581,12 @@ function pupCompanion(dt){ try{                // your grown wolf fights at your
     const dx=tx-p.x, dy=ty-p.y, d=Math.hypot(dx,dy); if(d>0.05){ const st=Math.min(d,4.5*dt); p.x+=dx/d*st; p.y+=dy/d*st; p.moving=d>0.15; } else p.moving=false;
     pupKeepClear(p);
     p.i=Math.floor(p.x); p.j=Math.floor(p.y); p.lie=0; p.sleep=false; if(!p.moving) p.dir=dirFromDelta((f.x??f.i+0.5)-p.x,(f.y??f.j+0.5)-p.y);
-    p.fight=p.fight||{bite:0}; if(p.fight.bite>0) p.fight.bite=Math.max(0,p.fight.bite-dt*3.5);
-    if(combat.phase!=='fight' || Math.hypot(tx-p.x,ty-p.y)>0.6) return;
-    wolfBiteT-=dt; if(wolfBiteT>0) return; wolfBiteT=2.6+Math.random()*1.4;
-    if(f.warded){ floatText(tileOf(f),'Warded','#c8e0f0'); return; }   // the king's ward turns teeth too
+    p.fight=p.fight||{bite:0,wind:0}; if(p.fight.bite>0) p.fight.bite=Math.max(0,p.fight.bite-dt*2.4);
+    if(p.fight.wind>0){ p.fight.wind-=dt; if(p.fight.wind>0) return; p.fight.wind=0; }        // crouched to spring: the bite lands as it ends
+    else { if(combat.phase!=='fight' || Math.hypot(tx-p.x,ty-p.y)>0.6) return;
+      wolfBiteT-=dt; if(wolfBiteT>0) return; wolfBiteT=2.6+Math.random()*1.4; p.fight.wind=WOLF_WIND; return; }   // first the crouch, like any wolf before it lunges
+    if(!pupFighting()) return;
+    if(f.warded){ p.fight.bite=1; floatText(tileOf(f),'Warded','#c8e0f0'); return; }   // the king's ward turns teeth too
     const n=WOLF_BITE(); p.fight.bite=1; f.hp-=n; f.flash=0.3; floatText([f.i+0.3,f.j+0.3],'-'+n,'#c8d8a0',true);
     if(Math.random()<0.3) p.bark={text:'Grrr!',t:0,d:0.8};
     if(f.hp<=0) foeDown(f); }catch(e){ console.error(e); } }

@@ -15201,7 +15201,7 @@ traderTalk=function(){
   const opts=[{label:'Show me your wares.',fn:shopBuy},{label:'I have things to sell.',fn:shopSell},{label:'How are the pups?',fn:pupStatus}];
   if(CHOICE.pupSt==='home'){
     if((CHOICE.pupDays||0)>=PUP_FEED_NEED) opts.push({label:'“One of them is ready to leave with me.”', fn:pupAdoptTalk});
-    else { const meat=player.inv.some(x=>x==='raw_meat'||x==='cooked_meat'); opts.push({label:'Feed the pups.', off:!meat, note:meat?'':'needs meat', fn:pupFeedMenu}); } }
+    else { const meat=player.inv.some(x=>PUP_FOODS.includes(x)); opts.push({label:'Feed the pups.', off:!meat, note:meat?'':'needs meat or fish', fn:pupFeedMenu}); } }
   opts.push(bye);
   showDialog('Marta the Trader',pupHomeGreeting(),opts,true);
 };
@@ -15210,16 +15210,19 @@ function pupStatus(){
   const look=["They are tiny: round bellies, huge paws, eyes only just open to the world.","They have shot up. All legs and ears, and they trip over both.","Nearly grown now: long legs, deep chests, and the first real wolf-stare."][st];
   const fed=ad ? "“Those two? Fat, happy and a menace to the neighbours. "+PUP_NAMES[CHOICE.pupAdopt]+" is a good deal quieter without them, I imagine.”"
     : d>=PUP_FEED_NEED ? "“They are ready, you know. You know what I mean.” She nods toward the three of them, all looking at you."
-    : d===0 ? "“They need feeding, Wanderer. Meat, raw or roasted, I do not mind which. Little and often. Wolves remember who keeps coming back.”"
+    : d===0 ? "“They need feeding, Wanderer. Meat or fish, raw or roasted, I do not mind which. Little and often. Wolves remember who keeps coming back.”"
     : "“They know your step already. Keep coming.”";
   say('Marta the Trader',[look,fed],[{label:'Back.',fn:traderTalk},bye]);
 }
+const PUP_RAW_FISH=['fish_perch','fish_trout','fish_carp','fish_eel','fish_herring'], PUP_FOODS=['cooked_meat','raw_meat','grilled_fish',...PUP_RAW_FISH];   // wolves eat fish too, raw or off the fire
 function pupFeedMenu(){
   if(CHOICE.pupLast===pupDayNo()){ say('Marta the Trader',["Marta shakes her head and points: three bellies like drums, three wolves flat on their sides.","“They have had theirs today. Any more and they will burst. Come back tomorrow.”"],[{label:'Back.',fn:traderTalk},bye]); return; }
-  const nc=player.inv.filter(x=>x==='cooked_meat').length, nr=player.inv.filter(x=>x==='raw_meat').length;
-  say('Marta the Trader',"“Meat, then. Roasted or raw, they will not care. They will care very much about how much of it there is.”",[
+  const nc=player.inv.filter(x=>x==='cooked_meat').length, nr=player.inv.filter(x=>x==='raw_meat').length, ng=player.inv.filter(x=>x==='grilled_fish').length, rf=player.inv.find(x=>PUP_RAW_FISH.includes(x)), nf=player.inv.filter(x=>PUP_RAW_FISH.includes(x)).length;
+  say('Marta the Trader',"“Meat or fish, roasted or raw, they will not care. They will care very much about how much of it there is.”",[
     {label:'Give a piece of roast meat.', off:!nc, note:'×'+nc, fn:()=>pupFeed('cooked_meat')},
     {label:'Give a piece of raw meat.', off:!nr, note:'×'+nr, fn:()=>pupFeed('raw_meat')},
+    {label:'Give a grilled fish.', off:!ng, note:'×'+ng, fn:()=>pupFeed('grilled_fish')},
+    {label:rf?'Give a raw '+ITEMS[rf].name.toLowerCase()+'.':'Give a raw fish.', off:!nf, note:'×'+nf, fn:()=>pupFeed(rf)},
     {label:'Back.',fn:traderTalk}],true);
 }
 function pupFeed(id){
@@ -15229,7 +15232,9 @@ function pupFeed(id){
   if(CHOICE.pupLast!=null && day-CHOICE.pupLast>2){ streak=Math.floor(streak/2); lapsed=true; }      // one missed day is forgiven; a long gap sets them back
   streak++; CHOICE.pupDays=streak; CHOICE.pupLast=day;
   const eat=id==='cooked_meat' ? "Marta tears the roast into strips and the pups fall on it, snapping and squeaking. The smell alone has the big grey one circling like a shark."
-                               : "The pups hit the raw meat like it owes them money. There is growling, tugging, and a great deal of blood on a great many noses.";
+          : id==='grilled_fish' ? "Marta picks out the bones first, muttering about choking. It makes no difference: the fish is gone before she has finished, and so is the skin."
+          : PUP_RAW_FISH.includes(id) ? "You drop the "+ITEMS[id].name.toLowerCase()+" in front of them and it flips once. That is a mistake. Three pups pounce, there is a great deal of splashing in the water bowl, and Marta laughs until she has to sit down."
+          : "The pups hit the raw meat like it owes them money. There is growling, tugging, and a great deal of blood on a great many noses.";
   const prog=["The smallest one cleans your fingers afterwards. The other two keep their distance, still chewing, watching you.",
     "They remember you from yesterday. The grey one growls at the meat, then at you, then eats.","The pale little she-wolf lets you scratch her ears for the first time. The grey one pretends not to notice.",
     "They hear you coming now: three tails thump the ground behind the stall.","The grey one stops growling when you reach for the bowl. Marta raises an eyebrow.",

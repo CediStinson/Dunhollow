@@ -16493,16 +16493,16 @@ Object.assign(GEAR_LORE||{},{ one_ring:'A plain band of gold on a fine chain, wa
 PEDDLER_POOL.push('fishing_rod');
 const _todays=todaysStock; todaysStock=function(who,pool,n){ const r=_todays(who,pool,n); if(who==='peddler' && !r.includes('fishing_rod') && !hasItem('fishing_rod')) r.unshift('fishing_rod'); return r; };   // he always has a rod for you
 // ── cooking: walk up to any campfire with raw meat or fish ──
-PUZ_TYPES.add('campfire');
+PUZ_TYPES.add('campfire'); PUZ_TYPES.add('hearth');   // any fire you can crouch by, outdoors or in a house
 const COOKS={ raw_meat:'cooked_meat', fish_perch:'grilled_fish', fish_trout:'grilled_fish', fish_carp:'grilled_fish', fish_eel:'grilled_fish', fish_herring:'grilled_fish' };
-function campfireCook(o){ const raw=player.inv.map((id,k)=>({id,k})).filter(x=>x.id && COOKS[x.id]);
-  if(!raw.length){ say('A Campfire',"The fire crackles. Bring raw meat or a fish and you can cook it here.",[bye]); return; }
+function campfireCook(o){ const T=o&&o.type==='hearth'?'The Hearth':'A Campfire', raw=player.inv.map((id,k)=>({id,k})).filter(x=>x.id && COOKS[x.id]);
+  if(!raw.length){ say(T,"The fire crackles. Bring raw meat or a fish and you can cook it here.",[bye]); return; }
   const names={}; raw.forEach(x=>names[x.id]=(names[x.id]||0)+1);
-  say('A Campfire',["You crouch by the fire. "+Object.entries(names).map(([id,n])=>n+'× '+ITEMS[id].name).join(', ')+"."],[
+  say(T,["You crouch by the fire. "+Object.entries(names).map(([id,n])=>n+'× '+ITEMS[id].name).join(', ')+"."],[
     {label:'Cook it all.', fn:()=>{ raw.forEach(x=>{ player.inv[x.k]=COOKS[x.id]; }); updateHud(); refreshFoodBar(); if(invOverlay.classList.contains('open')) refreshInventory();
       const out={}; raw.forEach(x=>{ const c=COOKS[x.id]; out[c]=(out[c]||0)+1; }); logMsg('You cook over the fire: '+Object.entries(out).map(([id,n])=>n+'× '+ITEMS[id].name).join(', ')+'.','#8ad07a');
-      say('A Campfire',"Fat spits in the flames. The smell alone is worth it.",[bye]); }}, bye]); }
-puzAct=(orig=>function(o){ if(o && o.type==='campfire') return campfireCook(o); return orig.apply(this,arguments); })(puzAct);
+      say(T,"Fat spits in the flames. The smell alone is worth it.",[bye]); }}, bye]); }
+puzAct=(orig=>function(o){ if(o && (o.type==='campfire'||o.type==='hearth')) return campfireCook(o); return orig.apply(this,arguments); })(puzAct);
 // ── where you can fish ──
 const fishKind=o=>!o||o.type!=='pool'||o.kind==='moon'||o.kind==='bath' ? null : (areaId==='docks'||areaId==='portfearn') ? 'sea' : o.kind==='fen' ? 'fen' : 'fresh';
 function fishSpot(){ if(!running || combat.active || (typeof CS!=='undefined'&&CS.on) || player.path.length) return null;

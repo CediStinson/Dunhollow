@@ -10919,7 +10919,7 @@ function harlSpawn(){ closeDialog(); FIGHT_UNDO=()=>{ CHOICE.unpaid=null; }; CHO
 function harlTalk(){
   const opts=[
     {label:'Pay them a month\'s wage. (40 copper)', off:player.purse<40, note:'-40c', fn:()=>{ player.purse-=40; updateHud(); remember('unpaid','paid','You paid the Baron\'s deserters a month\'s wage out of your own purse.');
-      say('Sergeant Harl',"He weighs the purse. “From you. Not the Crown, not the town. You.” He shakes his head. “We'll go home. Some of us have homes.”",[bye]); }},
+      say('Sergeant Harl',"He weighs the purse. “From you. Not the Crown, not the town. You.” He shakes his head. “The lads will go home. Me, I've none. Does your village need a watchman?”",[bye]); }},
     {label:'Draw steel. Robbers are robbers.', fn:harlSpawn},
     {label:'Walk on. Not your war.', fn:()=>{ remember('unpaid','ignored','You walked past the deserters on the King\'s Road. Other travellers were not so lucky.'); say('Sergeant Harl',"“Wise.” He steps aside. Behind you, later, you hear a cart stop, and a woman shouting.",[bye]); }} ];
   if(CHOICE.camp==='spared') opts.unshift({label:'“Mara Blackthorn\'s colliers need hands. Honest work.”', fn:()=>{ remember('unpaid','mara','You sent the Baron\'s deserters to work with Mara\'s colliers, the people they once hunted.');
@@ -10928,6 +10928,13 @@ function harlTalk(){
     "“Toll,” he says, and then, more tiredly: “No. It's not a toll. The Baron's gone, the Crown doesn't pay us, and we've got wives. So it's a robbery. I'm sorry. Purse, please.”"],[...opts,bye]);
 }
 Object.assign(TALKERS,{ harl:harlTalk });
+// what became of them: paid men keep Dunhollow's peace; ignored men keep robbing the road
+wrap('village','npcs',l=> CHOICE.unpaid==='paid' ? [...l,{ id:'harl_v', name:'Harl the Watchman', i:9, j:8, dir:1, opts:{gender:'m',skin:1,hair:2,hairColor:3,beard:3,face:1,equip:{head:'kettle',torso:'tunic_linen',armor:'gambeson',hands:'gloves',legs:'breeches',feet:'boots',weapon:'spear',offhand:null}} }] : l);
+TALKERS.harl_v=()=>say('Harl the Watchman',["The sergeant from the King's Road leans on a spear by the well, in plain wool now instead of the Baron's red.","“Hamond needed a watch. Turns out I needed a village. Nobody's robbed on the forest road while I'm awake, and I sleep very little.”"],[bye]);
+wrap('road','mobs',l=> CHOICE.unpaid==='paid' ? l.filter(m=>m.faction!=='roadthief') : l);
+wrap('kingsroad','mobs',l=> CHOICE.unpaid==='ignored' && nightAmt()>0.5 ? [...l,
+  { name:'Red Deserter', type:'bandit', i:4, j:9, faction:'deserters', daily:true, opts:BANDIT({skin:1,hair:2,beard:3,equip:{head:'kettle',torso:'tunic_red',armor:'gambeson',hands:null,legs:'breeches',feet:'boots',weapon:'sword',offhand:null}}) },
+  { name:'Hungry Deserter', type:'bandit', i:6, j:11, faction:'deserters', daily:true, opts:BANDIT({skin:2,hair:1,beard:1,equip:{head:null,torso:'tunic_red',armor:null,hands:null,legs:'breeches',feet:'boots',weapon:'spear',offhand:null}}) }] : l);
 // ════════ Hollowmere comes alive: doors you can use, rooms behind them, and people talking ════════
 const CROOM=(label,w,h,back,backEntry,objs,npcs)=>({ ...INSIDE_BASE, w, h, theme:'interior', label, mini:{x:0,y:0},
   objects:()=>[{type:'teleporter', i:Math.floor(w/2), j:h-1, to:back, entry:backEntry}, ...objs()], npcs, entries:{ fromCity:{i:Math.floor(w/2), j:h-2} } });
@@ -13054,14 +13061,15 @@ FOES.mage={ label:'Magus', base:48, stagger:1.3, pattern:[        // long, glowi
 const ACOLYTE=(name,i,j,o)=>({ name, type:'mage', i, j, faction:'acolyte', opts:{gender:'m',skin:1,hair:2,hairColor:1,beard:1,face:0,...o,equip:{head:'hood',torso:'smock',armor:null,hands:null,legs:'hose_grey',feet:'boots',weapon:'staff_cinder',offhand:null,...(o.equip||{})}} });
 wrap('ruin','mobs',l=> CHOICE.appr==='asked' ? [...l, ACOLYTE('Cinder Acolyte',2,3,{}), ACOLYTE('Cinder Acolyte ',6,4,{gender:'f',hair:1,hairColor:6,beard:0})] : l);
 // Tessaly is at the altar from the start, behind her friends (she used to appear only on re-entry, after they fell)
-wrap('ruin','npcs',l=> CHOICE.appr==='asked' ? [...l,{ id:'tessaly', name:'Tessaly', i:4, j:2, dir:0, opts:{gender:'f',skin:1,hair:1,hairColor:6,face:3,equip:{head:null,torso:'elf_robe',armor:null,hands:null,legs:null,feet:null,weapon:'staff_star',offhand:null}} }] : l);
+wrap('ruin','npcs',l=> CHOICE.appr==='asked' && !CHOICE.apprFight ? [...l,{ id:'tessaly', name:'Tessaly', i:4, j:2, dir:0, opts:{gender:'f',skin:1,hair:1,hairColor:6,face:3,equip:{head:null,torso:'elf_robe',armor:null,hands:null,legs:null,feet:null,weapon:'staff_star',offhand:null}} }] : l);
 function orvellTalk(){
   const shop=()=>shopFrom('Magister Orvell',['staff_oak'],1,["“One staff at a time, and only the oak. The starwood ones must be earned. Or stolen, apparently.”"]);
   const teach=()=>say('Magister Orvell',["“Hold the staff as you would hold a guard. Then let it speak.”","“Lean <b>left</b> and it burns: fire that keeps eating. Lean <b>up</b> and it bites cold: your foe grows slow. Lean <b>right</b> and it strikes pure: the hardest blow, the cheapest call.”","“Magic passes any guard. It does not pass your own exhaustion. Mind the blue.”"],[{label:'Back.', fn:orvellTalk}]);
-  const opts=[{label:'Ask about magic.', fn:teach},{label:'Buy a staff.', fn:shop}];
+  const opts=CHOICE.appr==='taken' ? [{label:'Buy a staff.', fn:shop}] : [{label:'Ask about magic.', fn:teach},{label:'Buy a staff.', fn:shop}];
   if(!CHOICE.appr) opts.unshift({label:'“You look troubled.”', fn:()=>say('Magister Orvell',["“My apprentice, Tessaly, took my starwood staff and ran. She has found others who think fire is an argument. They are in the Drowned Shrine, past the Mistmere.”","“Bring her back. Or bring the staff back. I will not pretend I know which matters more to me.”"],[
     {label:'“I will find her.”', fn:()=>{ remember('appr','asked','Magister Orvell\'s apprentice Tessaly fled to the Drowned Shrine with his starwood staff and a band of fire-cultists.'); say('Magister Orvell',"“Her friends burn. Frost will slow them. Or simply hit them very hard.”",[bye]); }}, bye])});
   if(CHOICE.appr==='returned') opts.unshift({label:'Ask after Tessaly.', fn:()=>say('Magister Orvell',"“She is in the tower. She hates me. She is studying again. Both of those are progress.”",[bye])});
+  if(CHOICE.appr==='taken') opts.unshift({label:'Tell him how you got the staff.', fn:()=>say('Magister Orvell',["You tell him how you got it. He listens to all of it.","“You beat a frightened girl in a swamp for a stick.” He turns back to his books. “Keep it. I find I do not want it any more. And do not ask me to teach you anything again.”"],[bye])});
   if(CHOICE.appr==='freed') opts.unshift({label:'Tell him Tessaly is gone.', fn:()=>say('Magister Orvell',"He looks at you a long time. “Then she chose. I suppose I should have let her choose sooner.”",[bye])});
   say('Magister Orvell',["An old man in a pale robe leans on a staff topped with a stone that glows faintly blue.", CHOICE.appr==='returned'?"“Ah. The one who brought her home.”":"“A wanderer. You have the look of someone who hits things. Have you ever considered hitting them from further away?”"],[...opts,bye]);
 }
@@ -13071,8 +13079,15 @@ function tessalyTalk(){
       say('Tessaly',"She lets the staff drop. “Fine. But I'm telling him to his face.” Later, Orvell pays you twenty-five copper and does not look at you. <i>You receive 25 copper.</i>",[bye]); NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='tessaly')); }},
     {label:'“Go. I will tell him I did not find you.”', fn:()=>{ remember('appr','freed','You let Tessaly go. She gave you her master\'s starwood staff.'); giveQuestItem('staff_star',true);
       say('Tessaly',"She stares at you. Then she presses the staff into your hands. “Take it. It was always his. I'll make my own.” She is gone into the mist before you can answer. <i>You receive the Starwood Staff.</i>",[bye]); NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='tessaly')); }},
-    {label:'“Give me the staff. Now.”', fn:()=>{ remember('appr','taken','You took the starwood staff from Tessaly by force of words and steel.'); giveQuestItem('staff_star',true);
-      say('Tessaly',"For a moment the stone in the staff flares. Then she throws it at your feet and walks into the reeds without a word. <i>You take the Starwood Staff.</i>",[bye]); NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='tessaly')); }} ]); }
+    {label:'“Give me the staff. Now.”', fn:()=>say('Tessaly',["The stone in the staff flares white. Her knuckles go white with it.","“Take it, then. If you can.”"],[{label:'Fight her for it.', fn:apprFight},{label:'“…Never mind.”', fn:tessalyTalk}])} ]); }
+// taking the staff by force is a fight now, and a mage who has nothing left to lose fights hard
+const TESSALY_FOE={ name:'Tessaly', type:'mage', i:4, j:2, faction:'tessaly', opts:{gender:'f',skin:1,hair:1,hairColor:6,face:3,equip:{head:null,torso:'elf_robe',armor:null,hands:null,legs:null,feet:null,weapon:'staff_star',offhand:null}} };
+function apprFight(){ closeDialog(); CHOICE.apprFight=true; NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='tessaly'));
+  MOB_SPAWNS.push(TESSALY_FOE); resetMobs(); mobs.forEach(m=>{ if(m.name==='Tessaly'){ m.hostile=true; FOOLED[areaId+':'+m.name]=false; } }); startCombat(); }
+wrap('ruin','mobs',l=> CHOICE.appr==='asked' && CHOICE.apprFight ? [...l,TESSALY_FOE] : l);
+setInterval(()=>{ try{ if(CHOICE.appr==='asked' && CHOICE.apprFight && defeatedMobs.has('ruin:Tessaly') && !combat.active){
+    remember('appr','taken','You beat Tessaly and took the starwood staff from her.'); giveQuestItem('staff_star',true); updateHud();
+    logMsg("Tessaly lies in the reeds, alive and furious. The starwood staff is yours.",'#e8c060'); } }catch(e){} },400);
 const acolytesUp=()=> !(defeatedMobs.has('ruin:Cinder Acolyte') && defeatedMobs.has('ruin:Cinder Acolyte ')) && mobs.some(m=>m.faction==='acolyte' && !m.dead);
 Object.assign(TALKERS,{ orvell:orvellTalk, tessaly:()=>{ if(areaId==='ruin' && acolytesUp()){ say('Tessaly',["The young woman at the altar grips her master's starwood staff and steps back behind her friends.","“Orvell's dog. Talk to them first.”"],[bye]); return; } tessalyTalk(); } });
 // (no staff banner at the start of a fight: the mage's craft gets its own teacher later)

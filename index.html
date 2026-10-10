@@ -9915,7 +9915,9 @@ Object.assign(AREAS,{
     npcs:()=> CHOICE.camp==='spared' ? [
       { id:'marapits', name:'Mara Blackthorn', i:5, j:4, dir:1, opts:{gender:'f',skin:1,hair:2,hairColor:0,equip:{head:null,torso:'shirt',armor:'mail',hands:'gloves',legs:'trousers',feet:'boots',weapon:null,offhand:null}} },
       { id:'coll', name:'Old Coll', i:8, j:5, dir:6, opts:{gender:'m',skin:2,hair:2,hairColor:12,beard:5,face:1,equip:{head:null,torso:'smock',armor:null,hands:null,legs:'trousers',feet:null,weapon:null,offhand:null}} } ] : [],
-    mobs:()=>[], entries:{ fromCamp:{i:6,j:1} } },
+    mobs:()=> CHOICE.camp==='bribed' ? [                        // she paid you to look away, not to come back and help yourself
+      { name:"Mara's Man", type:'bandit', i:4, j:5, faction:'mara', opts:BANDIT({skin:2,hair:1,hairColor:3,beard:2,equip:{head:'hood',torso:'smock',armor:'gambeson',hands:'gloves',legs:'trousers',feet:'boots',weapon:'axe',offhand:null}}) },
+      { name:"Mara's Woman", type:'bandit', i:8, j:5, faction:'mara', opts:{gender:'f',skin:1,hair:3,hairColor:1,face:2,equip:{head:'hood',torso:'tunic_green',armor:'jerkin',hands:'gloves',legs:'hose_grey',feet:'boots',weapon:'spear',offhand:null}} } ] : [], entries:{ fromCamp:{i:6,j:1} } },
 });
 AREA_PATHS.stones=[ [[4.5,9.5],[4.8,7],[6.5,4.5]], [[2.5,0],[2.5,9]], [[1.5,-0.5],[1.7,1.2],[2.5,2.4]] ];
 AREA_PATHS.pits=[ [[6.5,-0.5],[6.5,5]] ];
@@ -10663,6 +10665,14 @@ wrap('lane','npcs',list=> CHOICE.letter==='sold' || ambushReady() ? list : [...l
 wrap('lane','mobs',list=> ambushReady() ? [...list,
   { name:'The Man in Grey', type:'brute', i:9, j:14, faction:'grey', opts:{gender:'m',skin:0,hair:1,hairColor:0,beard:0,equip:{head:'hood',torso:'shirt',armor:'mail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'sword',offhand:null}} },
   { name:'Hired Blade', type:'bandit', i:6, j:13, faction:'grey', opts:BANDIT({skin:3,hair:3,hairColor:2,beard:4}) } ] : list);
+// the letter you sold: once the camp is broken, the man who bought it comes back to tie off the one thread left, which is you
+const looseEnds=()=> CHOICE.letter==='sold' && QUEST.camp>=3 && !CHOICE.greyDead;
+wrap('lane','mobs',list=> looseEnds() ? [...list,
+  { name:'The Man in Grey', type:'brute', i:9, j:14, faction:'grey', opts:{gender:'m',skin:0,hair:1,hairColor:0,beard:0,equip:{head:'hood',torso:'shirt',armor:'mail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'sword',offhand:null}} },
+  { name:'Hired Blade', type:'bandit', i:6, j:13, faction:'grey', opts:BANDIT({skin:3,hair:3,hairColor:2,beard:4}) },
+  { name:'Second Blade', type:'bandit', i:11, j:12, faction:'grey', opts:BANDIT({skin:1,hair:2,hairColor:6,beard:1,equip:{head:'hood',torso:'shirt',armor:'jerkin',hands:null,legs:'trousers',feet:'boots',weapon:'spear',offhand:null}}) } ] : list);
+setInterval(()=>{ try{ if(running && areaId==='lane' && looseEnds() && !CHOICE.greyBack && mobs.some(m=>m.faction==='grey' && !m.dead)){ CHOICE.greyBack=true;
+    logMsg("The man in grey who bought your letter is waiting on the lane, with friends. The Baron does not like loose ends.",'#e0a060'); banner('Loose ends','#e0a060',1500); } }catch(e){} },500);
 // ── The Mill Track: west out of Dunhollow, past the old mill-pond, to the crossroads ──
 Object.assign(AREAS,{ millroad:{ fence:{r:false,l:false}, w:29, h:7, theme:'road', label:'The Mill Track', mini:{x:0,y:0},
     notches:()=>[], dummy:null,

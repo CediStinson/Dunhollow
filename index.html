@@ -4758,7 +4758,6 @@ function doorTile(o){ const t=o.dt??1; return o.door==='l' ? [o.i+t, o.j+o.fp[1]
 // quest progress: letter 0 unseen, 2 shown to the elder; wolves 0 none, 1 asked, 2 cleared, 3 rewarded
 const QUEST={ letter:0, wolves:0, camp:0 };
 function switchArea(id,entryKey){
-  if(id==='barrow' && areaId==='farm'){ if(!CHOICE.barrow || CHOICE.barrow==='done') CHOICE.barrow='open'; defeatedMobs.delete('barrow:The Barrow-King'); }   // TESTING ONLY: the farm teleporter into the lair
   CK=null; FOES.barrowking.pattern=BK_PAT1;          // a Barrow-King fight never survives leaving the room
   player.sitChair=null; pendingChair=null;
   const prev=areaId, A=AREAS[id]; areaId=id;
@@ -10706,22 +10705,24 @@ function tollTalk(){ say("Toll-keeper Brisk",["A guard in a kettle hat sits in f
 function pilgrimTalk(){ say('A Pilgrim',"“I walk to the Chapel of the Dawn in Hollowmere every spring. Forty years. My knees have become a prayer of their own.”",[bye]); }
 function singerTalk(){ say('A Singing Elf',["An elf in white walks slowly along the old paving, singing in a language like water over stones. She nods to you without stopping.",gateOpen()?"“The lanterns know you now. Walk in their light.”":"The lanterns along the road stay dark as you pass."],[bye]); }
 // the carter: once you know a road, he will drive you along it for a few coppers
-const CARTER_STOPS=[ ['crossroads','fromRoad','The Crossroads'], ['village','fromCrossroads','Dunhollow'], ['citygate','fromRoad','the Hollowmere Gate Ward'] ];
+const CARTER_STOPS=[ ['crossroads','fromRoad','The Crossroads'], ['village','fromCrossroads','Dunhollow'], ['citygate','fromRoad','the Hollowmere Gate Ward'], ['fenpath','fromCart','the top of the Fen Causeway'] ];
 function carterTalk(){
   if(CHOICE.hobb!=='done'){ hobbQuest(); return; }
-  const here=areaId, opts=CARTER_STOPS.filter(([a])=>a!==here && visitedAreas[a]).map(([a,e,label])=>{ const locked=a==='citygate' && !wildDone();
+  const here=areaId, opts=CARTER_STOPS.filter(([a])=>a!==here && visitedAreas[a] && (a!=='fenpath' || FEN_OPEN())).map(([a,e,label])=>{ const locked=a==='citygate' && !wildDone();
     return {label:'Ride to '+label+(locked?' (not today)':''), note:locked?'':'-3c', off:locked||player.purse<3, fn:()=>{ player.purse-=3; updateHud(); dayClock+=40; closeDialog(); switchArea(a,e); logMsg('The cart rattles along the road. The day moves on.','#c8b890'); }}; });
   const who=(NPCS.find(n=>n.id===(TALK_NPC&&TALK_NPC.id))||{}).name||'Hobb the Carter';
   say(who, who==='Hobb the Carter' ? ["A man with a patient ox and an impatient mule.","“Three coppers takes you anywhere I've been. Which is anywhere you've been, funnily enough.”"]
-    : ["A cart with Hobb's mark burnt into the tailboard, and a driver leaning on the wheel.","“Hobb's cart. Three coppers, the crossroads, Dunhollow or the Hollowmere gate.”"],[...opts,bye]);
+    : ["A cart with Hobb's mark burnt into the tailboard, and a driver leaning on the wheel.","“Hobb's cart. Three coppers, the crossroads, Dunhollow, the Hollowmere gate"+(FEN_OPEN()?", or the top of the fen causeway, where Gerd's lot cleared the oak":"")+".”"],[...opts,bye]);
 }
-Object.assign(TALKERS,{ tollman:tollTalk, pilgrim:pilgrimTalk, singer:singerTalk, carter:carterTalk, carter_v:()=>carterTalk(), carter_c:()=>carterTalk() });
+Object.assign(TALKERS,{ tollman:tollTalk, pilgrim:pilgrimTalk, singer:singerTalk, carter:carterTalk, carter_v:()=>carterTalk(), carter_c:()=>carterTalk(), carter_f:()=>carterTalk() });
 const CARTER=(i,j)=>({ id:'carter', name:'Hobb the Carter', i, j, dir:1, opts:{gender:'m',skin:2,hair:2,hairColor:3,beard:5,face:1,equip:{head:'straw_hat',torso:'smock',armor:null,hands:'gloves',legs:'breeches',feet:'boots',weapon:null,offhand:null}} });
 const HOBB_AT=()=>'crossroads';   // one Hobb, one place: stuck at the crossroads till his wheel comes back, then carting between Dunhollow and the city
 wrap('crossroads','npcs',l=>HOBB_AT()==='crossroads'?[...l,CARTER(8,7)]:l); wrap('crossroads','objects',l=>HOBB_AT()==='crossroads'?[...l,{type:'cart', i:9, j:8, nowheel:CHOICE.hobb!=='done'}]:l);
 // once Hobb drives again his lads keep a cart at Dunhollow and at the Hollowmere gate too: ride from any of the three
 const CART_LAD=(id,name,i,j,o)=>({ id, name, i, j, dir:1, opts:{gender:'m',skin:1,hair:1,hairColor:2,beard:0,face:0,...o,equip:{head:'hood',torso:'tunic_linen',armor:null,hands:'gloves',legs:'breeches',feet:'boots',weapon:null,offhand:null,...((o||{}).equip||{})}} });
 wrap('village','npcs',l=>CHOICE.hobb==='done'?[...l,CART_LAD('carter_v','Kit, the Carter\'s Lad',9,8,{})]:l); wrap('village','objects',l=>CHOICE.hobb==='done'?[...l,{type:'cart', i:10, j:9}]:l);
+setTimeout(()=>{ wrap('fenpath','npcs',l=>CHOICE.hobb==='done' && FEN_OPEN()?[...l,CART_LAD('carter_f','Wil, the Carter\'s Boy',2,7,{skin:2,hair:3,hairColor:5})]:l); wrap('fenpath','objects',l=>CHOICE.hobb==='done' && FEN_OPEN()?[...l,{type:'cart', i:0, j:5}]:l);
+  AREAS.fenpath.entries.fromCart={i:3,j:6}; },0);   // the causeway is defined further down
 wrap('citygate','npcs',l=>CHOICE.hobb==='done'?[...l,CART_LAD('carter_c','Bryn the Carter',9,17,{skin:3,hair:2,hairColor:1,beard:3,equip:{head:'straw_hat',torso:'smock'}})]:l);
 
 
@@ -15986,8 +15987,6 @@ function drawBarrowKingFX(){ if(areaId!==BK_AREA) return; const K=ckKing(); if(!
       g.font='bold 22px Georgia,serif'; g.textAlign='center'; g.fillStyle='#e0f2ff'; g.fillText(Math.ceil(CK.t),s.x,s.y-52); g.textAlign='left'; g.restore();
       g.save(); g.globalCompositeOperation='lighter'; glow(s.x,s.y-60,70+Math.sin(gt*8)*8,90,'110,170,220',0.35); g.restore(); }
     if(CK.flash){ g.save(); g.setTransform(1,0,0,1,0,0); g.fillStyle=`rgba(150,200,230,${CK.flash*0.8})`; g.fillRect(0,0,gc.width,gc.height); g.restore(); } }
-// ── TESTING ONLY: a way from the farm straight into the Barrow-King's lair. Each trip puts him back on his feet. Remove before release. ──
-wrap('farm','objects',l=>[...l,{type:'teleporter', i:9, j:4, to:'barrow', entry:'fromLow'}]);
 // ════════ the Barrow-King's things: Bertil's sword, and the crown the bog grew round his head ════════
 Object.assign(ITEMS,{ barrow_blade:{ name:"Bertil's Drowned Blade", slot:'weapon' }, bog_crown:{ name:'Crown of the Drowned King', slot:'head' } });
 Object.assign(WEAPONS,{ barrow_blade:{ wind:0.21, dmg:15, len:27, wither:0.25, drain:0.22 } });

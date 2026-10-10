@@ -10125,8 +10125,8 @@ function tirnelTalk(){
 }
 function calandorTalk(){
   if(havenBurnt()){ say('Calandor',["An old elf sits alone by the dead pool. The pavilions are black. The lanterns are glass and ash.","“They came in the night, with torches and the Baron's banner. They knew the paths. Someone showed them the paths.” He does not look at you. He does not need to."],[bye]); return; }
-  if(CHOICE.maren==='laid' && !CHOICE.marenThanked){ CHOICE.marenThanked='gone'; giveQuestItem('elf_circlet',true); updateHud();
-    say('Calandor',["“I felt it. The pool was bright for a moment, as bright as the evening she first came here, soaked to the knees, looking for her goat.”","“Thank you. I think I will go and sit with her awhile. Take this; she always said it suited humans better.” <i>You receive a Silver Circlet.</i>"],[bye]); return; }
+  if(CHOICE.maren==='laid' && !CHOICE.marenThanked){ CHOICE.marenThanked='gone'; giveQuestItem('elf_cloak',true); updateHud();
+    say('Calandor',["“I felt it. The pool was bright for a moment, as bright as the evening she first came here, soaked to the knees, looking for her goat.”","“Thank you. I think I will go and sit with her awhile. Take my cloak; she always said it suited humans better.” <i>You receive Calandor's elven cloak.</i>"],[bye]); return; }
   if(CHOICE.maren==='sold'){ say('Calandor',"“The moonbloom is not in your pack, and it is not in the ground. It is in a market somewhere.” He turns back to the water. "+(ELFP()?"“You have lived among the humans too long. You needed the coin more than the dead do.”":"“Humans. You always need the coin more than the dead do.”")+"",[bye]); return; }
   if(hasItem('moonbloom')){ say('Calandor',"“The graveyard of Dunhollow, north of the well. Her name was Maren. Please.”",[bye]); return; }
   say('Calandor',["An old elf sits by the moon pool, very still. Lily flowers glow on the water.",
@@ -10696,7 +10696,10 @@ function gislaTalk(){
   if(CHOICE.gisla==='asked'){ say('Gisla the Herb-Wife',"“The wolf, love. West end of the pond.”",[bye]); return; }
   say('Gisla the Herb-Wife',["Gisla hums over her basket."],[{label:'Buy draughts and herbs.', fn:()=>shopFrom('Gisla the Herb-Wife',['potion','mana_potion','warm_tonic','burn_salve','linen_wrap','apple'],0.85,"“Friend's price.”",gislaTalk)},bye]);
 }
-TALKERS.gisla=gislaTalk;
+TALKERS.gisla=()=>{ if(CHOICE.pim==='fever' && !hasItem('warm_tonic')){
+    if(CHOICE.gisla!=='done'){ say('Gisla the Herb-Wife',["“Fen-fever? Poor lamb. I'd brew it today, but I can't get to my mint with that wolf at the pond.”","“Drive it off and I'll have a tonic ready before you're back.”"],[bye]); return; }
+    say('Gisla the Herb-Wife',["“Fen-fever. Gerd's boy, is it? Went chasing lights.” She is already uncorking something that smells of mint and pepper.","“Warm tonic. Make him drink all of it, however he complains. No charge: the pond is mine again thanks to you.”"],[{label:'Take the tonic.', fn:()=>{ if(giveQuestItem('warm_tonic')) logMsg('Gisla gives you a warm tonic for Pim.','#8ac070'); closeDialog(); }}]); return; }
+  gislaTalk(); };
 AREA_PATHS.kingsroad=[ [[4.5,-0.5],[4.2,8],[4.8,16],[4.1,24],[4.4,31],[3.8,38],[4.6,44],[4.5,49.5]] ];
 AREA_PATHS.elfroad=[ [[3.5,-0.5],[3.4,7],[2.8,13],[3.3,19],[3.5,26.5]] ];
 function tollTalk(){ say("Toll-keeper Brisk",["A guard in a kettle hat sits in front of a tiny stone tollhouse, eating an onion like an apple.",wildDone()?"“You again. Go on through, the gate knows your face.” He does not ask for coin. He does not explain why.":"“Road's the Baron's. Gate's the Baron's. Onion's mine.” He takes another bite. He does not say anything else useful."],[bye]); }
@@ -14277,15 +14280,18 @@ JOURNAL.push(['The Heart of the Cave', ()=> !(hasItem('heartshard')||CHOICE.shar
 { const oldG2=TALKERS.gerd; TALKERS.gerd=()=>{ if(!FEN_OPEN()) return oldG2();
     if(!CHOICE.pim){ say('Foreman Gerd',["Gerd is pacing by the cart, axe forgotten in his hand.","“We cleared the oak, and that idiot boy Pim went straight into the fen. Said he saw lights. Pretty lights, he said, going south.”","“Nobody follows lights in the Drowning Fen. Nobody comes back from following them, mostly. Find him? I'll pay what the crew can scrape.”"],[
         {label:'“I will find Pim.”', fn:()=>{ remember('pim','asked',"Young Pim ran into the Drowning Fen after the lights. Gerd wants him back."); say('Foreman Gerd',"“South, he said. Past the old woman's hut. Bring him back by the ear if you have to.”",[bye]); }}, bye]); return; }
-    if(CHOICE.pim==='found'){ CHOICE.pim='done'; player.purse+=15; updateHud(); giveQuestItem('axe',true);
-      say('Foreman Gerd',["Pim is sitting on the cart, wrapped in a blanket, being shouted at by Ulla.","Gerd grips your hand. “Fifteen copper from the crew, and my old felling axe. It's taken down bigger things than that oak.” <i>You receive 15 copper and a Felling Axe.</i>"],[bye]); return; }
+    if(CHOICE.pim==='found'){ remember('pim','fever',"Pim caught fen-fever in the hollow. Gisla the herb-wife on the Mill Track brews a warm tonic that breaks it.");
+      say('Foreman Gerd',["Pim is on the cart under three blankets, shivering and sweating at once. Ulla has stopped shouting at him.","“Fen-fever. The bog gets into you.” Gerd looks older. “Gisla, the herb-wife on the Mill Track, brews a warm tonic for it. If anyone has one, she does.”"],[bye]); return; }
+    if(CHOICE.pim==='fever' && !hasItem('warm_tonic')){ say('Foreman Gerd',"“Gisla's warm tonic. Mill Track, west of Dunhollow. He's getting worse.”",[bye]); return; }
+    if(CHOICE.pim==='fever'){ player.inv[player.inv.indexOf('warm_tonic')]=null; CHOICE.pim='done'; player.purse+=15; updateHud(); giveQuestItem('axe',true);
+      say('Foreman Gerd',["You tip Gisla's tonic into Pim. He makes a face like a drowned cat, sweats it out, and by evening is sitting up and being shouted at by Ulla again.","Gerd grips your hand. “Fifteen copper from the crew, and my old felling axe. It's taken down bigger things than that oak.” <i>You receive 15 copper and a Felling Axe.</i>"],[bye]); return; }
     if(CHOICE.pim==='asked'){ say('Foreman Gerd',"“No sign of him? South. The Sunken Hollow, probably. The lights go there.”",[bye]); return; }
     oldG2(); }; }
 wrap('fen','npcs',l=> CHOICE.pim==='asked' ? [...l,{ id:'pim_lost', name:'Young Pim', i:33, j:4, dir:1, opts:LOGGER({skin:2,hair:1,hairColor:8,beard:0,face:2,equip:{weapon:null}}) }] : l);
 TALKERS.pim_lost=()=>say('Young Pim',["Pim is standing knee-deep in the mud, staring at the reeds by the old stones with his mouth open.","“They go in there! The lights! Into the reeds, and then they're gone. There's a door, I swear there's a door behind them.”","He finally looks at you. “…Is Gerd angry?”"],[
   {label:'“Furious. Come on, back to the cart.”', fn:()=>{ remember('pim','found',"You found Young Pim in the Sunken Hollow. He swears there is a door behind the reeds."); NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='pim_lost')); say('Young Pim',"He wades out after you, still looking back over his shoulder at the reeds.",[bye]); }}]);
 wrap('fenpath','npcs',l=> FEN_OPEN() && CHOICE.pim==='done' ? [...l,{ id:'logger4', name:'Young Pim', i:4, j:15, dir:1, sit:'knees', opts:LOGGER({skin:2,hair:1,hairColor:8,beard:0,face:2,equip:{weapon:null}}) }] : l);
-JOURNAL.push(['Lights in the Fen', ()=> !CHOICE.pim ? null : CHOICE.pim==='done' ? ['done',"You brought Young Pim back from the fen. Gerd gave you his felling axe."] : CHOICE.pim==='found' ? ['active',"Pim is safe. Tell Foreman Gerd on the Fen Causeway."] : ['active',"Young Pim ran into the Drowning Fen after the lights. Gerd thinks he went south, to the Sunken Hollow."]]);
+JOURNAL.push(['Lights in the Fen', ()=> !CHOICE.pim ? null : CHOICE.pim==='done' ? ['done',"You brought Young Pim back from the fen. Gerd gave you his felling axe."] : CHOICE.pim==='found' ? ['active',"Pim is safe. Tell Foreman Gerd on the Fen Causeway."] : CHOICE.pim==='fever' ? ['active',hasItem('warm_tonic')?"Bring the warm tonic to Pim at Gerd's cart on the Fen Causeway.":"Pim has fen-fever. Gisla the herb-wife on the Mill Track brews a warm tonic that breaks it."] : ['active',"Young Pim ran into the Drowning Fen after the lights. Gerd thinks he went south, to the Sunken Hollow."]]);
 
 // ════════ CUTSCENES: short scripted moments with letterbox bars and a skip button ════════
 const CS={on:false, steps:[], k:0, t:0, onEnd:null, queued:[], focus:null, say:null};
@@ -14401,15 +14407,16 @@ setInterval(()=>{ try{ if(!running || areaId!=='graveyard') return;
 }catch(e){} },1000);
 Object.assign(ITEMS,{ grave_mote:{ name:'A Grave-Mote', slot:'misc' } }); QUEST_ITEMS.add('grave_mote');
 wrap('graveyard','objects',l=> CHOICE.necroQ==='motes' && nightAmt()>0.4 ? [...l, ...GRAVE_MOTES.filter(([i,j])=>!collectedPickups.has('graveyard:'+i+','+j)).map(([i,j])=>({type:'pickup', i, j, item:'grave_mote'})), ...GRAVE_MOTES.map(([i,j])=>({type:'wisp', i, j, noblock:true}))] : l);
-const VESNA_HOW=()=>{ const h=defeatedMobs.has("graveyard:Edric's Shade") ? 'fought' : (CHOICE.shadeHow||'avenged');
+const VESNA_HOW=()=>{ const h=defeatedMobs.has("graveyard:Edric's Shade") ? 'fought' : CHOICE.shade!=='rest' ? 'stones' : (CHOICE.shadeHow||'avenged');
   return ({ fought:{ bark:"You cut him down. Shades do not die. They tear.", open:"Her mouth is a thin line. “You put a blade through Edric's shade. It is gone, yes. Torn, the way you tear a letter you will not read. Pieces of him are still in this earth, cold and confused. I will be picking them out for a month.”", cold:true },
     words:{ bark:"You talked him down. With words. Hm.", open:"“I felt him go. Edric. You did not fight him and you did not bribe him. You talked. Most people shout at the dead, or run. You listened.”" },
     truth:{ bark:"Ada knows. That is why he could go.", open:"“I felt him go. Edric. You told his widow the truth, and the truth cut the thread. Lies keep the dead here longer than any curse.”" },
     ring:{ bark:"A thief who gives back. The dead like that.", open:"“I felt him go. Edric. And I saw the ring on his grave this morning. Grave-robbing, then confessing. Few people walk both halves of that road.”" },
+    stones:{ bark:"The old stones stand again. The dead noticed.", open:"“You settled the boundary. Those stones are graves too, older than this yard, and the dead under them felt the stakes come out. So did I.”"+(CHOICE.shade?" She glances at Edric's grave. “That one still weeps. Listen to him, when you can.”":"") },
     avenged:{ bark:"Blood for blood, and now he sleeps.", open:"“I felt him go. Edric. His killers are dead and so he lets go. Old, simple magic, revenge. It works. It always costs something.”" } })[h]; };
 // she arrives: the shade is at rest, or destroyed, and a woman walks down from the stones
 setInterval(()=>{ try{ if(!running || CS.on || combat.active || areaId!=='graveyard' || CHOICE.necro) return;
-    if(!(CHOICE.shade==='rest' || defeatedMobs.has("graveyard:Edric's Shade"))) return;
+    if(!(CHOICE.shade==='rest' || defeatedMobs.has("graveyard:Edric's Shade") || (STQ() && nightAmt()>0.5))) return;   // or, after dark, once the boundary stones are settled
     if(typeof dlgOverlay!=='undefined' && dlgOverlay.classList.contains('open')) return;
     CHOICE.necro='met'; const v=VESNA(4,0,1); v.x=4.5; v.y=0.5; v.path=[]; NPCS.push(v);
     const ti=Math.max(0,Math.min(ROOM.w-1,player.i-1)), tj=player.j;
@@ -14688,7 +14695,12 @@ if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
 
 // ── the story: the captain's blade, three ember cores, and the forge spirit who wakes the steel ──
 const coreCount=()=>player.inv.filter(x=>x==='ember_core').length;
+let ILKA_SKIP=false;
 function ilkaTalk(){
+  if(!ILKA_SKIP && CHOICE.reforge==='asked' && hasItem('rusted_blade') && CHOICE.warden){ say('Ilka, Spirit of the Forge',["Ilka's eyes go to the rusted blade before they go to you. “Grave-iron. Someone buried that in water and expected it to stay there.”","“Give it here. Fire does in a breath what a grindstone does in a day.”"],[
+      {label:'Hand her the blade.', fn:()=>{ const k=player.inv.indexOf('rusted_blade'); if(k>=0) player.inv[k]=null; giveQuestItem('clean_blade',true); remember('reforge','clean',"Ilka burned the rust off the grave-blade in the Sunken Forge. Back to Vesna with it, and with bones."); updateHud();
+        say('Ilka, Spirit of the Forge',"She holds it in the heart of the forge with her bare hand until the rust runs off it like water. What she gives back is grey and clean and still warm. “Your witch can have it now.”",[bye]); }},
+      {label:'Something else.', fn:()=>{ ILKA_SKIP=true; try{ ilkaTalk(); } finally{ ILKA_SKIP=false; } }}]); return; }
   const hasBlade=hasItem('fire_blade')||(player.opts.equip.weapon==='fire_blade');
   if(CHOICE.emberbrand){ say('Ilka, Spirit of the Forge',["Ilka watches the Emberbrand at your side the way a mother watches a child cross a river.","“It drinks from both wells, that one: the strength of your arm and the fire you carry. Feed both and it will never fail you.”"],
       [{label:'Look at her wares.', fn:()=>shopFrom('Ilka, Spirit of the Forge',['ash_mantle','cinder_gloves','obsidian_helm','scorched_greaves','emberstep_boots'],1,"“Cinderweave and black glass. Made for those who fight with both hands.”",ilkaTalk)}, bye]); return; }
@@ -16570,7 +16582,7 @@ const rfDay=()=>Math.floor(dayClock/DAY_LEN);
 const rfHave=()=>player.inv.filter(x=>x==='old_bone').length>=REFORGE_BONES && player.inv.filter(x=>x==='old_skull').length>=REFORGE_SKULLS;
 JOURNAL.push(['The Grave-Blade Reforged', ()=> !CHOICE.reforge ? null
   : CHOICE.reforge==='done' ? ['done',"Vesna bound the dead into the grave-blade Oswin cleaned for you: the Bone-Bound Blade."]
-  : CHOICE.reforge==='asked' ? ['active',"Vesna will wake the rusted grave-blade, but the steel is rotten. Take it to Oswin the Armourer in Hollowmere's market to have it cleaned and given a new edge."]
+  : CHOICE.reforge==='asked' ? ['active',"Vesna will wake the rusted grave-blade, but the steel is rotten. Take it to Oswin the Armourer in Hollowmere's market to have it cleaned and given a new edge"+(CHOICE.warden?", or to Ilka in the Sunken Forge, whose fire does it at once.":".")]
   : CHOICE.reforge==='smith' ? ['active',"Oswin is grinding the rust off the grave-blade. Come back to him "+(rfDay()>CHOICE.reforgeDay?'now: it should be ready.':'tomorrow.')]
   : ['active',"Bring the cleaned blade back to Vesna, with "+REFORGE_BONES+" old bones and "+REFORGE_SKULLS+" skull for her to bind into it. (You have "+player.inv.filter(x=>x==='old_bone').length+" bones and "+player.inv.filter(x=>x==='old_skull').length+" skull.)"]]);
 npcHasNews=(orig=>function(n){ if(n && !n.sleepBed){

@@ -10400,7 +10400,7 @@ function sellaTalk(){
   if(!CHOICE.baron && !hasItem('ledger') && !CHOICE.ledger) opts.push({label:'“Have you got anything on the Baron?”', fn:()=>say('Sella the Fence',["She glances at the door, then pulls a folded bundle from inside her coat.","“Pages cut out of the Steward's own ledger. What the Baron paid, and to whom. A clerk owed me money. Forty copper, and you never saw me.”"],[
     {label:'Buy the pages. (-40c)', off:player.purse<40, note:'-40c', fn:()=>{ player.purse-=40; CHOICE.ledger=true; giveQuestItem('ledger',true); updateHud(); say('Sella the Fence',"“Pleasure. Don't read them in public.” <i>You receive the Steward's Ledger.</i>",[bye]); }},
     {label:'Not now.', fn:closeDialog}])});
-  if(!CHOICE.thieves) opts.push({label:'“Your friends in the east alley jumped me.”', fn:()=>say('Sella the Fence',"“Jory's crew? They jump everybody. It's a hobby.” She thinks. “Give me 15 copper and they'll leave you be. Or break their heads. Either way, keep it out of my shop.”",[
+  if(!CHOICE.thieves && CHOICE.lure==='sprung') opts.push({label:'“Your friends in the east alley jumped me.”', fn:()=>say('Sella the Fence',"“Jory's crew? They jump everybody. It's a hobby.” She thinks. “Give me 15 copper and they'll leave you be. Or break their heads. Either way, keep it out of my shop.”",[
     {label:'Pay 15 copper.', off:player.purse<15, note:'-15c', fn:()=>{ player.purse-=15; updateHud(); remember('thieves','deal','You bought peace with the Lowstreets\' cutpurses.'); defeatedMobs.add('lowstreets:Cutpurse Jory'); defeatedMobs.add('lowstreets:Cutpurse Mags'); defeatedMobs.add('lowstreets:Big Rolf'); say('Sella the Fence',"“Pleasure doing business.”",[bye]); }},
     {label:'“I will break heads.”', fn:closeDialog}])});
   opts.push(bye);
@@ -16762,6 +16762,54 @@ paintItemArt=(orig=>function(g2,id,size){ if(!JUNK_DEF[id]) return orig.apply(th
     case 'green_bottle': Pg([[14,34],[26,34],[26,18],[22,13],[22,6],[18,6],[18,13],[14,18]],'rgba(70,130,80,0.85)','#244a2c'); Pg([[17,4],[23,4],[23,8],[17,8]],'#a07a50','#5a3a1c'); L([[16,30],[16,20]],'rgba(220,255,220,0.5)',1.4); break;
     case 'cameo': E(20,21,11,13,metal('#d8dae2','#7a7e88'),'#4a4e56'); E(20,21,8.4,10.4,'#c87a5a'); g2.fillStyle='#f2e6d8'; g2.beginPath(); g2.moveTo(18,30); g2.quadraticCurveTo(15,24,17,19); g2.quadraticCurveTo(17,13,21,13); g2.quadraticCurveTo(25,14,24,18); g2.lineTo(26,21); g2.lineTo(24,22); g2.quadraticCurveTo(25,27,22,30); g2.closePath(); g2.fill(); break; }
   g2.restore(); })(paintItemArt);
+
+// ════════ Bait in the Lowstreets: Jory's crew no longer jump you on sight. They loiter in the back alleys, and Dalla brings the marks to them ════════
+//   CHOICE.lure : null → 'sprung' (they turned on you) → 'fought' (all down)  |  'watch' (you warned the watch first)
+//   CHOICE.lureWarned : Nim told you whose bait Dalla is (only if you were kind to Nim; handed to the guard, she is one of them)
+const LURE_SPOT=[19,20], LURE_GANG=['Cutpurse Jory','Cutpurse Mags','Big Rolf'];
+const lureOpen=()=> !CHOICE.lure && !CHOICE.thieves && !(AREAS.lowstreets.mobsGone && AREAS.lowstreets.mobsGone());
+const lureGangDown=()=> LURE_GANG.every(n=>defeatedMobs.has('lowstreets:'+n)) && (CHOICE.nim!=='guard' || defeatedMobs.has('lowstreets:Nim'));
+AREAS.lowstreets.mobsCalm=()=> CHOICE.lure!=='sprung';                  // until the trap is sprung they are just three people in an alley
+const DALLA_OPTS={gender:'f',skin:1,hair:3,hairColor:4,face:2,equip:{head:'hood',torso:'tunic_linen',armor:null,hands:null,legs:'hose_grey',feet:null,weapon:null,offhand:null}};
+wrap('lowstreets','npcs',l=>{ const r=[...l];
+  if(lureOpen()) r.push({ id:'dalla', name:'Dalla', i:5, j:11, dir:1, opts:DALLA_OPTS });
+  if(lureOpen() && (CHOICE.nim==='free' || CHOICE.nim==='paid') && !CHOICE.lureWarned) r.push({ id:'nim_low', name:'Nim', i:4, j:9, dir:1, opts:{gender:'f',skin:2,hair:1,hairColor:5,face:1,equip:{head:'hood',torso:'tunic_linen',armor:null,hands:null,legs:'hose_grey',feet:null,weapon:null,offhand:null}} });
+  return r; });
+wrap('lowstreets','mobs',l=> CHOICE.nim==='guard' && !CHOICE.thieves && CHOICE.lure!=='watch' ? [...l,{ name:'Nim', type:'bandit', i:21, j:22, faction:'thieves', opts:{gender:'f',skin:2,hair:1,hairColor:5,face:1,equip:{head:'hood',torso:'tunic_linen',armor:'jerkin',hands:null,legs:'hose_grey',feet:'boots',weapon:'dagger',offhand:null}} }] : l);   // the guard let her go; she remembers who called him
+wrap('lowstreets','objects',l=> CHOICE.lure==='fought' && !collectedPickups.has('lowstreets:24,20') ? [...l,{type:'pickup', i:24, j:20, item:'pewter_tankard', onTake:()=>{ player.purse+=22; updateHud(); logMsg("Jory's stash, under a loose board: a pewter tankard and 22 copper that used to be other people's.",'#e8c060'); }}] : l);
+function lureSpring(firstStrike){
+  if(areaId!=='lowstreets' || CHOICE.lure==='sprung') return;
+  const d=NPCS.find(n=>n.id==='dalla'); const at=d?[d.i,d.j]:[LURE_SPOT[0]-1,LURE_SPOT[1]];
+  NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='dalla')); CHOICE.lure='sprung';
+  MOB_SPAWNS.push({ name:'Dalla', type:'bandit', i:at[0], j:at[1], faction:'thieves', opts:{...DALLA_OPTS, equip:{...DALLA_OPTS.equip, weapon:'dagger'}} });
+  resetMobs(); mobs.forEach(m=>{ if(m.dead) return; m.hostile=true; FOOLED[areaId+':'+m.name]=false; if(firstStrike) m.hp=Math.round(m.hp*0.7); });
+  say('Dalla',[ firstStrike ? "Dalla stops, turns, and finds you already reaching for your weapon. Her smile slips. “Oh, hells. Somebody talked.”" : "Dalla stops at the mouth of the alley and turns round. She isn't crying any more.","“Sorry, love. Nothing personal. Purse on the ground, and nobody needs to bleed.” Behind her, three loiterers push themselves off the wall."+(CHOICE.nim==='guard'?" One of them is Nim. She smiles at you without any warmth at all.":"")],
+    [{label:'Fight.', fn:()=>{ closeDialog(); startCombat(); }}]); }
+function dallaTalk(){
+  const D='Dalla', lead=()=>{ closeDialog(); const d=NPCS.find(n=>n.id==='dalla'); if(!d) return; if(d.x==null){ d.x=d.i+0.5; d.y=d.j+0.5; } d.wander=[LURE_SPOT]; d.path=[]; d.wait=0; d.speed=1.1; d.leading=true; logMsg('Dalla hurries ahead into the alleys. Follow her.','#c8b090'); };
+  const opts=[];
+  if(CHOICE.lureWarned) opts.push(
+    {label:'“Lead on. I will be ready for your friends.”', fn:()=>{ CHOICE.lureReady=true; lead(); }},
+    {label:'Call the watch on her and her friends.', fn:()=>{ remember('lure','watch',"You set the watch on Dalla and Jory's crew before they could spring their trap."); LURE_GANG.forEach(n=>defeatedMobs.add('lowstreets:'+n)); player.purse+=10; updateHud();
+      NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='dalla')); resetMobs();
+      say(D,["You shout for the watch. Dalla's face goes very still, and then she runs, straight into two helmets coming round the corner.","Down the alley there is a scuffle, a crash of crates, and a lot of swearing. A sergeant comes back with three bloody noses in tow. “Jory's lot. We've been after them since spring.” <i>He presses 10 copper on you.</i>"],[bye]); }});
+  else opts.push({label:'“Show me where he is.”', fn:lead});
+  opts.push({label:'“Not my trouble.”', fn:()=>say(D,"Her face crumples, quite convincingly. “Then I'll find somebody kinder.”",[bye])});
+  say(D,["A young woman in a patched hood grabs your sleeve, eyes red from crying.","“Please. My brother. Some men beat him for his wages and left him in the alley behind the dyers' vats. He can't stand. I can't lift him on my own.”"],opts); }
+function nimLowTalk(){ CHOICE.lureWarned=true; NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='nim_low'));
+  say('Nim',["Nim drops off a washline post beside you as if she grew there.","“Psst. The crying woman with the hurt brother? That's Dalla. Her brother is Big Rolf, and he's fine. Jory's crew wait in the east alley for whoever she brings.”","“I owe you one. Now I don't.” She is gone before you can answer."],[bye]); }
+Object.assign(TALKERS,{ dalla:dallaTalk, nim_low:nimLowTalk });
+setInterval(()=>{ try{ if(!running || areaId!=='lowstreets' || combat.active || CS.on) return;
+    const d=NPCS.find(n=>n.id==='dalla' && n.leading);
+    if(d){ const far=Math.hypot(player.x-d.x,player.y-d.y)>4.5; d.speed=far?0.02:1.1;                         // she waits for you to keep up
+      if(!dlgIsOpen() && Math.hypot(d.x-LURE_SPOT[0]-0.5,d.y-LURE_SPOT[1]-0.5)<1.6 && Math.hypot(player.x-d.x,player.y-d.y)<3.5) lureSpring(!!CHOICE.lureReady); }
+    if(CHOICE.lure==='sprung' && lureGangDown() && mobs.every(m=>m.faction!=='thieves' || m.dead)){ remember('lure','fought',"You beat Dalla and Jory's crew at their own game."); logMsg("Jory's crew lie in the alley. Someone has left a board loose by the far wall.",'#e8c060'); }
+  }catch(e){} },300);
+JOURNAL.push(['Bait in the Lowstreets', ()=> !CHOICE.lure && !CHOICE.lureWarned ? null
+  : CHOICE.lure==='fought' ? ['done',"Dalla led you into Jory's alley, and Jory's crew learned what you are."]
+  : CHOICE.lure==='watch' ? ['done',"Nim warned you about Dalla. The watch took her and Jory's crew."]
+  : CHOICE.lure==='sprung' ? ['active',"Dalla led you into an ambush in the Lowstreets' east alley. Jory's crew are still there."]
+  : ['active',"Nim says the crying woman in the Lowstreets, Dalla, is bait for Jory's crew in the east alley."]]);
 </script>
 </body>
 </html>

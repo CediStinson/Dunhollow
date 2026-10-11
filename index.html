@@ -17248,8 +17248,8 @@ wrap('keepward','npcs',l=> CHOICE.appr==='returned' ? [...l,{ id:'tessaly_k', na
 TALKERS.tessaly_k=()=>{ const T='Tessaly', K=CHOICE.mageKnown||[];
   if(CHOICE.tessLesson){ say(T,"“Whisper. The staff is not deaf.”",[bye]); return; }
   if(K.length<3){ say(T,["Tessaly is copying out a book with ink-black fingers. She does not look up.","“Has he had you jarring wisps yet? He did that to me. Finish his lessons. Then come and find me: there is one thing he will never teach you, because he does not know he does it.”"],[bye]); return; }
-  say(T,["“So. All three.” She puts the pen down. “Cast something. Anything. At that candle.”","You do. The candle goes over, and the shelf behind it, and some of the wall.","“You cast like him. You throw the whole breath at it, every time, as if the staff were deaf. It isn't. Whisper.” She makes you light the candle again, and again, softer each time, until it takes with barely a word."],[
-    {label:'Learn to whisper.', fn:()=>{ CHOICE.tessLesson=true; updateHud(); logMsg("Tessaly's lesson: your magister's spells cost a quarter less mana.",'#e8e0ff'); say(T,"“There. Now go and tell him I taught you something. Watch his face. That is my fee.”",[bye]); }}, bye]); };
+  say(T,["“So. All three.” She puts the pen down. “Cast something. Anything. At that candle.”","You do. The candle goes over, and the shelf behind it, and some of the wall.","“You cast like him. You throw the whole breath at it, every time, as if the staff were deaf. It isn't. Whisper.” She sets three new candles on the table."],[
+    {label:'Try to whisper.', fn:()=>whisperStart(()=>{ CHOICE.tessLesson=true; updateHud(); try{ autosaveSoon(300); }catch(e){} logMsg("Tessaly's lesson: your magister's spells cost a quarter less mana.",'#e8e0ff'); say(T,"“There. Now go and tell him I taught you something. Watch his face. That is my fee.”",[bye]); })}, bye]); };
 // fire-sprites and bottled light shine through the night instead of being darkened by it
 drawMoonlight=(orig=>function(){ orig.apply(this,arguments); if(AREAS[areaId].inside) return; const n=nightAmt(); if(n<0.02) return;
   g.save(); g.globalCompositeOperation='lighter';
@@ -17278,7 +17278,8 @@ const listenOpen=k=>CHOICE.necroQ==='listen' && !(CHOICE.listened||[]).includes(
 OBJ_DRAW.kneelslab=o=>{ const a=P(o.i+0.1,o.j+0.15), b=P(o.i+0.9,o.j+0.15), c=P(o.i+0.9,o.j+0.85), d=P(o.i+0.1,o.j+0.85), m=P(o.i+0.5,o.j+0.5), lit=!CHOICE.cryptKnelt && CHOICE.necroQ==='crypt';
   g.fillStyle='#5a5650'; g.beginPath(); [a,b,c,d].forEach((p,k)=>k?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); g.fill(); g.strokeStyle='#2e2a26'; g.lineWidth=1.2; g.stroke();
   g.strokeStyle=lit?'rgba(220,230,200,'+(0.55+Math.sin(gt*2)*0.25)+')':'#3e3a34'; g.lineWidth=1.6; g.lineCap='round';      // a kneeling man, cut into the stone
-  g.beginPath(); g.arc(m.x-2,m.y-6,2.4,0,Math.PI*2); g.moveTo(m.x-2,m.y-3.5); g.lineTo(m.x,m.y+2); g.lineTo(m.x+6,m.y+2); g.lineTo(m.x+7,m.y+6); g.moveTo(m.x-1,m.y-1); g.lineTo(m.x-6,m.y+1); g.stroke(); };
+  g.save(); g.translate(m.x,m.y); g.scale(2,1.6); g.translate(-m.x,-m.y); g.lineWidth=1.3;
+  g.beginPath(); g.arc(m.x-2,m.y-6,2.4,0,Math.PI*2); g.moveTo(m.x-2,m.y-3.5); g.lineTo(m.x,m.y+2); g.lineTo(m.x+6,m.y+2); g.lineTo(m.x+7,m.y+6); g.moveTo(m.x-1,m.y-1); g.lineTo(m.x-6,m.y+1); g.stroke(); g.restore(); };
 wrap('crypt','objects',l=>[...l,{type:'kneelslab', i:7, j:5, noblock:true}]);
 PUZ_TYPES.add('kneelslab');
 puzAct=(orig=>function(o){ if(o && o.type==='kneelslab'){ say('A Carved Slab',CHOICE.cryptKnelt?"The carving of the kneeling man is worn smooth where Corran knelt.":"A slab set into the floor, carved with a kneeling man. Under it, cut small: <i>“The first of us kneel here before they go down. The gates remember who has knelt.”</i>",[bye]); return; } return orig.apply(this,arguments); })(puzAct);
@@ -17293,6 +17294,46 @@ const CRYPT_RISE=(name,i,j)=>{ const opts=RISEN(name), hp=maxHpOf(opts.equip,FOE
         setTimeout(()=>{ try{ startCombat(); }catch(e){} },500); }
       if(!CHOICE.cryptKnelt && !warned && Math.hypot(c.x-10.5,c.y-4.5)<3.2){ warned=true; logMsg("The skull on the second gate turns away from Corran. Behind you, in the middle of the chamber, a slab in the floor glows faintly.",'#e8e4d0'); }
     }catch(e){} },100); }
+// ════════ Tessaly's lesson: whisper a spark at a candle. Hold to gather breath, let go inside the narrow band ════════
+const WHISPER_ROUNDS=[[0.10,0.26],[0.07,0.18],[0.05,0.13]];
+let WH=null;
+const whPanel=document.createElement('div'); whPanel.id='whisper-panel';
+whPanel.style.cssText='position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;display:none;width:300px;padding:12px 14px;border-radius:10px;border:1px solid #8a6a3a;background:rgba(20,14,7,0.96);color:#f0dca0;font:13px Georgia,serif;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,0.6);user-select:none;';
+whPanel.innerHTML='<div style="font-size:11px;letter-spacing:2px;color:#a08050;margin-bottom:4px">TESSALY\'S CANDLE</div><div id="wh-msg" style="min-height:36px"></div><canvas id="wh-cv" width="260" height="170" style="display:block;margin:6px auto;width:260px;height:170px;cursor:pointer;touch-action:none"></canvas><div style="font-size:11px;color:#a08050">Hold Space, J or the mouse to gather breath. Let go inside the gold band.</div><button id="wh-quit" style="margin-top:8px;padding:4px 12px;border-radius:6px;border:1px solid #6a5030;background:#2a1e10;color:#d8c090;font:12px Georgia,serif;cursor:pointer">Not now</button>';
+document.body.appendChild(whPanel);
+const whMsg=t=>{ document.getElementById('wh-msg').innerHTML=t; };
+function whisperStart(done){ closeDialog(); WH={ r:0, p:0, hold:false, st:'ready', t:0, lit:0, over:0, done, last:performance.now() }; whPanel.style.display='block';
+  whMsg("“The candle. Not the shelf, not the wall. <i>Whisper.</i>”"); requestAnimationFrame(whLoop); }
+function whisperEnd(){ WH=null; whPanel.style.display='none'; }
+function whDown(){ if(!WH || WH.st!=='ready') return; WH.hold=true; WH.st='hold'; WH.p=0; }
+function whUp(){ if(!WH || WH.st!=='hold') return; WH.hold=false; const [a,b]=WHISPER_ROUNDS[WH.r], p=WH.p;
+  if(p<a){ WH.st='res'; WH.t=1.1; whMsg(["“Nothing. Not even a smell of smoke. Breathe, at least.”","“That was a sigh. Try a word.”","“The candle is asleep. So, nearly, am I.”"][Math.floor(Math.random()*3)]); }
+  else if(p>b){ WH.st='res'; WH.t=1.4; WH.over=1; whMsg(p>0.7?"The candle goes over, and the shelf behind it, and some of the wall. “<b>Whisper</b>, I said.”":"The flame leaps up the wick and gutters out with a bang. “Too loud. The staff is not deaf.”"); }
+  else { WH.st='res'; WH.t=1.3; WH.lit=1; WH.r++; whMsg(WH.r<3?["“There. Again, softer.”","“Good. Now the hardest one: as if you did not want anyone to hear.”"][WH.r-1]:"The wick takes with barely a word, and stays lit. Tessaly blows it out and smiles for the first time."); } }
+function whLoop(now){ const W=WH; if(!W) return; const dt=Math.min(0.05,(now-W.last)/1000); W.last=now;
+  if(W.st==='hold'){ W.p=Math.min(1,W.p+dt*(0.35+W.p*1.6)); if(W.p>=1) whUp(); }                // breath gathers slowly at first, then all at once
+  if(W.st==='res'){ W.t-=dt; if(W.t<=0){ if(W.r>=3){ const d=W.done; whisperEnd(); d&&d(); return; } W.st='ready'; W.p=0; W.lit=0; W.over=0; } }
+  whDraw(); requestAnimationFrame(whLoop); }
+function whDraw(){ const W=WH, c=document.getElementById('wh-cv').getContext('2d'), w=260, h=170, t=performance.now()/1000;
+  c.clearRect(0,0,w,h); const bg=c.createLinearGradient(0,0,0,h); bg.addColorStop(0,'#1a1410'); bg.addColorStop(1,'#2a1e14'); c.fillStyle=bg; c.fillRect(0,0,w,h);
+  c.fillStyle='#4a3420'; c.fillRect(20,128,170,10); c.fillStyle='#3a2818'; c.fillRect(20,138,170,26);                                  // the table
+  for(let k=0;k<3;k++){ const x=60+k*45, lit=k<W.r || (k===W.r && W.lit), over=k===W.r && W.over;                                // three candles, one a round
+    c.save(); if(over){ c.translate(x,128); c.rotate(1.2); c.translate(-x,-128); }
+    c.fillStyle='#e8e0c8'; c.fillRect(x-5,98,10,30); c.fillStyle='#c8c0a8'; c.fillRect(x+2,98,3,30); c.strokeStyle='#2a2018'; c.lineWidth=1.2; c.beginPath(); c.moveTo(x,98); c.lineTo(x,92); c.stroke();
+    if(lit){ const f=1+Math.sin(t*14+k)*0.08; const gl=c.createRadialGradient(x,84,0,x,84,26); gl.addColorStop(0,'rgba(255,220,140,0.55)'); gl.addColorStop(1,'rgba(255,180,80,0)'); c.fillStyle=gl; c.beginPath(); c.arc(x,84,26,0,Math.PI*2); c.fill();
+      c.fillStyle='#ffb040'; c.beginPath(); c.ellipse(x,86,3.4*f,8*f,0,0,Math.PI*2); c.fill(); c.fillStyle='#fff3c0'; c.beginPath(); c.ellipse(x,88,1.6,4,0,0,Math.PI*2); c.fill(); }
+    if(k===W.r && W.st==='hold'){ for(let s=0;s<4;s++){ const u=(t*1.5+s/4)%1; c.fillStyle=`rgba(200,190,255,${(0.6*W.p)*(1-u)})`; c.beginPath(); c.arc(x-30+u*30,90+Math.sin(u*6+s)*4,1.6,0,Math.PI*2); c.fill(); } }   // breath drifting at the wick
+    if(over){ c.fillStyle='rgba(255,140,40,0.8)'; c.beginPath(); c.arc(x,90,6+Math.random()*3,0,Math.PI*2); c.fill(); }
+    c.restore(); }
+  const bx=222, by=14, bh=142, [a,b]=WHISPER_ROUNDS[Math.min(W.r,2)];                                                                 // the breath bar
+  c.fillStyle='#120c06'; c.fillRect(bx,by,22,bh); c.fillStyle='rgba(232,192,96,0.55)'; c.fillRect(bx,by+bh*(1-b),22,bh*(b-a));
+  c.fillStyle=W.p>b?'#d86040':'#a8a0ff'; c.fillRect(bx+5,by+bh*(1-W.p),12,bh*W.p); c.strokeStyle='#8a6a3a'; c.lineWidth=1; c.strokeRect(bx+0.5,by+0.5,21,bh-1);
+  c.fillStyle='#a08050'; c.font='10px Georgia'; c.textAlign='center'; c.fillText(W.r+'/3',bx+11,h-2); }
+{ const cv=document.getElementById('wh-cv'); cv.addEventListener('pointerdown',e=>{ e.preventDefault(); whDown(); }); window.addEventListener('pointerup',()=>whUp());
+  document.getElementById('wh-quit').addEventListener('click',()=>{ whisperEnd(); say('Tessaly',"“Fine. Come back when you can bear to be quiet.”",[bye]); });
+  const isK=e=>e.key===' '||e.key==='j'||e.key==='J';
+  window.addEventListener('keydown',e=>{ if(!WH) return; if(isK(e)){ if(!e.repeat) whDown(); } e.stopPropagation(); e.preventDefault(); },true);
+  window.addEventListener('keyup',e=>{ if(!WH) return; if(isK(e)) whUp(); e.stopPropagation(); e.preventDefault(); },true); }
 </script>
 </body>
 </html>

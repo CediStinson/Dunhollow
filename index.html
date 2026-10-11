@@ -16968,9 +16968,11 @@ const necroPuz=(orig=>function(o){ if(o && o.type==='grave') return graveAct(o);
 const LISTEN_GRAVES={ '8,5':{ who:'Maren the weaver', lines:["“My blue. Oh, my blue. I wove the wedding cloth for half this village, and never my own.”","“He came every evening from the forest, with mud on his boots and nothing to say. I waited fifty years for him to say it.”","“If you ever meet a quiet elf with mud on his boots: tell him I was not angry. Only tired. The blue was for him.”"] },
   '6,1':{ who:'Gerrit the miller', lines:["“Bread? For me?” A dry, floury laugh. “Forty years I fed this valley, and they buried me under a yew. A yew! I hate the smell.”","“The wheel still turns, does it? Someone's turning it wrong. I can hear it from here.”","“Thank you, you said. Nobody ever said it. Bread just happens, they think. Well. Now you know.”"] },
   '1,4':{ who:'the grave with no name', lines:["“…Ilse. Someone said Ilse.”","“I came over the hills with nothing and died of the fever the first winter. They did not know my name. I had stopped using it.”","“Say it again sometimes, when you pass. That is all I wanted.”"] } };
-let LST=null, GSAY=null;
+let LST=null, GSAY=null, PSAY=null;
 drawCsSpeech=(orig=>function(){ orig.apply(this,arguments); const S=GSAY; if(!S) return; if(areaId!=='graveyard'){ GSAY=null; return; }
   const t=gt-S.t0; if(t>S.dur){ GSAY=null; return; } const q=P(S.i+0.5,S.j+0.5); speechBubble(q.x,q.y-100-t*1.5,S.text,Math.min(1,t*4,(S.dur-t)*3)); })(drawCsSpeech);
+drawCsSpeech=(orig=>function(){ orig.apply(this,arguments); const S=PSAY; if(!S) return; const t=gt-S.t0; if(t>S.dur || areaId!=='graveyard'){ PSAY=null; return; }   // what you say to them
+  const q=P(player.x,player.y); speechBubble(q.x,q.y-128,S.text,Math.min(1,t*4,(S.dur-t)*3)); })(drawCsSpeech);
 function graveAct(o){ const k=o.i+','+o.j, G=LISTEN_GRAVES[k], day=Math.floor(dayClock/DAY_LEN);
   if(!G || CHOICE.necroQ!=='listen'){ say('A Grave',o.name?`A plain stone: <i>${o.name}</i>.`:(G?`A worn stone. You can just make out: <i>${G.who}</i>.`:"A worn stone, the name long gone under lichen."),[bye]); return; }
   if((CHOICE.listened||[]).includes(k)){ say('A Grave',`${G.who[0].toUpperCase()+G.who.slice(1)} has nothing more to say. The grass on the grave is warm.`,[bye]); return; }
@@ -16980,18 +16982,18 @@ function graveAct(o){ const k=o.i+','+o.j, G=LISTEN_GRAVES[k], day=Math.floor(da
     '1,4':CHOICE.ilseName?null:"The nameless stone is silent. You cannot call to someone without a name. Old Wenna was alive the fever winter." }[k];
   if(want){ say('A Grave',want,[bye]); return; }
   if(LST) return;
-  logMsg(k==='8,5'?'You lay the blue spool on the stone.':k==='6,1'?'You set the loaf on the grave. “Thank you for the bread,” you say, feeling foolish.':'“Ilse,” you say. The grass on the grave stirs.','#c8b8f0');
+  if(k==='6,1') PSAY={text:'“Thank you for the bread.”', t0:gt, dur:2.2}; else if(k==='1,4') PSAY={text:'“Ilse.”', t0:gt, dur:2}; else floatText([o.i,o.j-0.4],'the blue spool, on the stone','#c8d0f0');
   const L={key:k, G, t:0, said:0, px:player.x, py:player.y, w:{type:'wisp', i:o.i, j:o.j, noblock:true}}; OBJECTS.push(L.w); LST=L;
-  logMsg('A pale light rises off the grave. Sit still, and listen.','#c8b8f0'); floatText([o.i,o.j],'…','#d8d0f0'); }
+  floatText([player.i,player.j-0.3],'Keep still…','#d8d0f0'); }
 setInterval(()=>{ if(!LST) return; try{ const L=LST, o=L.w, day=Math.floor(dayClock/DAY_LEN);
-    const fail=why=>{ const q=OBJECTS.indexOf(o); if(q>=0) OBJECTS.splice(q,1); LST=null; GSAY=null; logMsg(why,'#a898c8'); };
+    const fail=why=>{ const q=OBJECTS.indexOf(o); if(q>=0) OBJECTS.splice(q,1); LST=null; GSAY=null; floatText(tileOf(player),why,'#a898c8'); };
     if(areaId!=='graveyard'){ LST=null; return; }
-    if(Math.hypot(player.x-L.px,player.y-L.py)>0.2 || combat.active){ fail('You moved, and the light went out. Sit down again, and this time keep still.'); return; }
+    if(Math.hypot(player.x-L.px,player.y-L.py)>0.2 || combat.active){ fail('The light went out'); return; }
     L.t+=0.1;
-    if(L.said<3 && L.t>=L.said*3.2){ const line=L.G.lines[L.said++]; GSAY={i:o.i, j:o.j, text:line, t0:gt, dur:L.said<3?3.2:4.6}; }      // the dead speak over their own grave
-    if(L.t>=10){ const q=OBJECTS.indexOf(o); if(q>=0) OBJECTS.splice(q,1); LST=null; CHOICE.listened=[...(CHOICE.listened||[]),L.key];
+    if(L.said<3 && L.t>=1.8+L.said*3.2){ const line=L.G.lines[L.said++]; GSAY={i:o.i, j:o.j, text:line, t0:gt, dur:L.said<3?3.2:4.6}; }      // the dead speak over their own grave
+    if(L.t>=11.8){ const q=OBJECTS.indexOf(o); if(q>=0) OBJECTS.splice(q,1); LST=null; CHOICE.listened=[...(CHOICE.listened||[]),L.key];
       const used={'8,5':'blue_spool','6,1':'bread'}[L.key]; if(used){ const q2=player.inv.indexOf(used); if(q2>=0) player.inv[q2]=null; }
-      const n=CHOICE.listened.length; banner('The dead have spoken ('+n+'/3)','#c8b8f0',1600); logMsg(n<3?'The light sinks back into the grass, and leaves a little warmth behind in you.':'The last light goes out. Go back to Vesna.','#c8b8f0'); } }catch(e){ LST=null; } },100);
+      const n=CHOICE.listened.length; banner('The dead have spoken ('+n+'/3)','#c8b8f0',1600); floatText(tileOf(player),n<3?'a little warmth stays with you':'Go back to Vesna','#c8b8f0'); } }catch(e){ LST=null; } },100);
 
 // ── Wither: "The Hanged Man". He hangs from the King's Road gallows and talks at night ──
 OBJ_DRAW.hangedman=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x+26, top=q.y-176, sw=Math.sin(gt*0.8)*0.035, B='#d8d0b8', D='#4a4436';   // a man's height of bones in rags, turning slowly on the rope

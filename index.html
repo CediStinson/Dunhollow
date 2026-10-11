@@ -4769,7 +4769,8 @@ function switchArea(id,entryKey){
   NPCS.length=0; if(A.npcs) NPCS.push(...A.npcs());
   OBJECTS.push(...genTrees(id));
   // broken crates and barrels leave their boards behind, even after you come back
-  OBJECTS.forEach(o=>{ if(o.type!=='crate' && o.type!=='barrel') return; o.breakable=true;           // every container can be opened
+  OBJECTS.forEach(o=>{ if(o.type==='crates' || o.type==='barrels'){ o.breakable=true; return; }        // stacks placed by hand (Marta's stock) open too, and keep their look
+    if(o.type!=='crate' && o.type!=='barrel') return; o.breakable=true;           // every container can be opened
     const h=hsh(o.i*7+3,o.j*13+id.length)%10;
     if(o.type==='crate') o.type = o.rich ? 'chest' : h<3 ? 'crates' : 'crate';
     else o.type = h<3 ? 'barrels' : 'barrel'; });
@@ -12272,7 +12273,7 @@ function victory(faction){
     if(!hasItem('seal')) giveQuestItem('seal');
     logMsg('On the man in grey: a folded paper under the Baron\'s own seal.','#e8c060'); CHOICE.greyDead=true;
   }
-  if(faction==='guard'){ remember('stones','saved_blood','The Baron\'s guards lie in the grass. The stakes come up easily now.'); stonesAfter(); setTimeout(()=>stonesLeave(['surveyor'],3.4,true),900); logMsg('In the sergeant\'s satchel, the surveyor\'s writ: Dunhollow “holds no charter”. Old Wenna may know better.','#e8c060'); setTimeout(()=>{ if(!combat.active) switchArea('stones','fromGraves'); },1600); }
+  if(faction==='guard'){ remember('stones','saved_blood','The Baron\'s guards lie in the grass. The stakes come up easily now.'); stonesAfter(); setTimeout(()=>stonesLeave(['surveyor'],3.4,true),900); logMsg('In the sergeant\'s satchel, the surveyor\'s writ: Dunhollow “holds no charter”. Old Wenna may know better.','#e8c060'); stonesRefreshAfter(1600); }
   if(faction==='mist'){ logMsg('The wolves of the mere slink off into the mist, or do not.','#d8b24a'); if(!CHOICE.faelan) setTimeout(()=>{ if(!combat.active && areaId==='mistmere') faelanTalk(); },1400); }
   if(faction==='ruin'){ const coin=12+Math.floor(Math.random()*10); player.purse+=coin; logMsg('Among the old offerings in the shrine: '+formatCoin(coin)+'.','#e8c060'); }
   if(faction==='loggers'){ remember('fell','fought','The Fellings are quiet. The Baron\'s loggers will not come back.'); const coin=10+Math.floor(Math.random()*10); player.purse+=coin; logMsg('In Grane\'s ledger box: '+formatCoin(coin)+'.','#e8c060'); }
@@ -13605,6 +13606,12 @@ function stonesLeave(ids,speed,flee){ if(areaId==='stones'){ STONES_WHO.length=0
     steps.push(csPar(who.map((n,k)=>csWalk(n,ex[0]+(k===1?1:k===2?-1:0),ex[1]-(k?1:0),speed))), csDo(()=>{ NPCS.splice(0,NPCS.length,...NPCS.filter(n=>!ids.includes(n.id))); }), csFocus(player,0.4));
     if(!cutscene(steps)) NPCS.splice(0,NPCS.length,...NPCS.filter(n=>!ids.includes(n.id))); };
   setTimeout(go,200); }
+// the stakes come out once the surveyor has run: refresh the place quietly, after his flight, with you standing where you stood
+function stonesRefreshAfter(ms){ setTimeout(function go(){ if(areaId!=='stones') return;
+    if(CS.on || combat.active || (typeof dlgIsOpen==='function' && dlgIsOpen()) || NPCS.some(n=>n.id==='surveyor') || STONES_WHO.length){ setTimeout(go,400); return; }
+    const pos={i:player.i,j:player.j,x:player.x,y:player.y,dir:player.dir}, b0=banner; banner=()=>{};
+    try{ switchArea('stones','fromGraves'); } finally{ banner=b0; }
+    Object.assign(player,pos); player.path=[]; player.moving=false; centerCam(); },ms); }
 function stonesAfter(){ if(!CHOICE.stq || CHOICE.stq==='asked') CHOICE.stq='wenna'; }
 Object.assign(ITEMS,{ charter:{ name:"Dunhollow's Stone Charter", slot:'misc', read:true, title:'A lead case, green with age',
   body:["Inside, a parchment gone brown as a leaf, under the old king's seal.","<i>“Be it known that we grant to the free folk of the hollow the land below the stones, the pasture and the wood, for them and their children, for as long as the stones stand.”</i>","Below it, forty names and marks. One of them is a small drawn goat."] } });

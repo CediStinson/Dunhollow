@@ -12250,6 +12250,7 @@ function victory(faction){
       if(R()<0.08) give('rusted_blade'); if(R()<0.04) give('grave_ring'); return; }                                                                 // and now and then something it was buried with
     if(m.type==='lurker'){ if(R()<0.4) coin(2,5); if(R()<0.2){ const pool=LOOT_TIERS[0]; give(pool[Math.floor(R()*pool.length)]); logMsg('…something it swallowed, a while ago.','#a8a080'); } return; }
     if(m.opts && (m.opts.ghost||m.opts.bones)){ if(R()<0.5) coin(4,12); return; }                // the dead carry nothing but old coin
+    if(m.type!=='ember' && m.type!=='barrowking' && m.type!=='goblin'){ if(R()<0.3) give('old_bone'); if(R()<0.07) give('old_skull'); }   // men who died badly: Vesna has a use for what is left
     if(m.type==='goblin'){ if(R()<0.35) coin(1,3); if(R()<0.15) give(['apple','apple','bread','raw_meat'][Math.floor(R()*4)]); if(R()<0.2) give(['dagger','hood','shirt','club'][Math.floor(R()*4)]); return; }
     const gearP=[0.3,0.2,0.12][tier]*(m.daily?0.4:1)*(m.faction==='guard'||m.type==='mage'?0:1);    // rarer the better it is; road toughs who come back every day carry less; guards and mages are handled on their own
     if(R()<gearP){ const pool=LOOT_TIERS[tier]; give(pool[Math.floor(R()*pool.length)]); }
@@ -14394,7 +14395,7 @@ const NECRO=()=> typeof CHOICE.necro==='number' ? CHOICE.necro : 0;
 function HEX_KNOWN(dir){ const n=NECRO(); return dir==='up' ? n>=1 : dir==='right' ? n>=2 : dir==='left' ? n>=3 : false; }
 const VESNA=(i,j,dir)=>({ id:'vesna', name:'Vesna the Grave-Speaker', i, j, dir, opts:{gender:'f',skin:0,hair:5,hairColor:0,beard:0,face:2,equip:{head:null,torso:'necro_bustier',armor:'necro_robe',hands:null,legs:'hose_grey',feet:'boots',weapon:'staff_hex',offhand:null}} });
 const vesnaInFen=()=> NECRO()>=1 && FEN_OPEN();
-wrap('graveyard','npcs',l=> CHOICE.necro && !FEN_OPEN() ? [...l, VESNA(5,3,1)] : l);    // once the fen road is open she goes home to her stilt-hut, and you find her there
+wrap('graveyard','npcs',l=> CHOICE.necro && (!FEN_OPEN() || nightAmt()>0.5) ? [...l, VESNA(5,3,1)] : l);   // the graveyard by night, always; by day too until the fen road opens    // once the fen road is open she goes home to her stilt-hut, and you find her there
 wrap('fen','npcs',l=> FEN_OPEN() ? [...l, VESNA(18,6,1)] : l);
 // the grave-motes: little lights over the old graves, only at night, only once she has asked
 const GRAVE_MOTES=[[2,3],[6,4],[4,8]];
@@ -14408,16 +14409,17 @@ setInterval(()=>{ try{ if(!running || areaId!=='graveyard') return;
 }catch(e){} },1000);
 Object.assign(ITEMS,{ grave_mote:{ name:'A Grave-Mote', slot:'misc' } }); QUEST_ITEMS.add('grave_mote');
 wrap('graveyard','objects',l=> CHOICE.necroQ==='motes' && nightAmt()>0.4 ? [...l, ...GRAVE_MOTES.filter(([i,j])=>!collectedPickups.has('graveyard:'+i+','+j)).map(([i,j])=>({type:'pickup', i, j, item:'grave_mote'})), ...GRAVE_MOTES.map(([i,j])=>({type:'wisp', i, j, noblock:true}))] : l);
-const VESNA_HOW=()=>{ const h=defeatedMobs.has("graveyard:Edric's Shade") ? 'fought' : CHOICE.shade!=='rest' ? 'stones' : (CHOICE.shadeHow||'avenged');
+const VESNA_HOW=()=>{ const h=defeatedMobs.has("graveyard:Edric's Shade") ? 'fought' : CHOICE.shade==='rest' ? (CHOICE.shadeHow||'avenged') : STQ() ? 'stones' : 'night';
   return ({ fought:{ bark:"You cut him down. Shades do not die. They tear.", open:"Her mouth is a thin line. “You put a blade through Edric's shade. It is gone, yes. Torn, the way you tear a letter you will not read. Pieces of him are still in this earth, cold and confused. I will be picking them out for a month.”", cold:true },
     words:{ bark:"You talked him down. With words. Hm.", open:"“I felt him go. Edric. You did not fight him and you did not bribe him. You talked. Most people shout at the dead, or run. You listened.”" },
     truth:{ bark:"Ada knows. That is why he could go.", open:"“I felt him go. Edric. You told his widow the truth, and the truth cut the thread. Lies keep the dead here longer than any curse.”" },
     ring:{ bark:"A thief who gives back. The dead like that.", open:"“I felt him go. Edric. And I saw the ring on his grave this morning. Grave-robbing, then confessing. Few people walk both halves of that road.”" },
+    night:{ bark:"A living one, in the graveyard, at night. How rare.", open:"“You walk among graves after dark, and you are not drunk, and you are not digging. That makes you interesting.”"+(CHOICE.shade?" She glances at Edric's grave. “That one weeps. Listen to him, when you can.”":"") },
     stones:{ bark:"The old stones stand again. The dead noticed.", open:"“You settled the boundary. Those stones are graves too, older than this yard, and the dead under them felt the stakes come out. So did I.”"+(CHOICE.shade?" She glances at Edric's grave. “That one still weeps. Listen to him, when you can.”":"") },
     avenged:{ bark:"Blood for blood, and now he sleeps.", open:"“I felt him go. Edric. His killers are dead and so he lets go. Old, simple magic, revenge. It works. It always costs something.”" } })[h]; };
 // she arrives: the shade is at rest, or destroyed, and a woman walks down from the stones
 setInterval(()=>{ try{ if(!running || CS.on || combat.active || areaId!=='graveyard' || CHOICE.necro) return;
-    if(!(CHOICE.shade==='rest' || defeatedMobs.has("graveyard:Edric's Shade") || (STQ() && nightAmt()>0.5))) return;   // or, after dark, once the boundary stones are settled
+    if(!(CHOICE.shade==='rest' || defeatedMobs.has("graveyard:Edric's Shade") || nightAmt()>0.5)) return;   // any night in the graveyard
     if(typeof dlgOverlay!=='undefined' && dlgOverlay.classList.contains('open')) return;
     CHOICE.necro='met'; const v=VESNA(4,0,1); v.x=4.5; v.y=0.5; v.path=[]; NPCS.push(v);
     const ti=Math.max(0,Math.min(ROOM.w-1,player.i-1)), tj=player.j;
@@ -14425,38 +14427,46 @@ setInterval(()=>{ try{ if(!running || CS.on || combat.active || areaId!=='gravey
       csBark(v,VESNA_HOW().bark,2.2), csFocus(player,0.4) ], ()=>{ v.x=null; v.y=null; v.i=ti; v.j=tj; vesnaTalk(); });
   }catch(e){} },1000);
 const VESNA_RENOWN=[8,14,20];                                     // deeds done in the valley before each word: the dead do not listen to strangers
-const vesnaWait=k=>renownDone()<VESNA_RENOWN[k];
+const vesnaWait=k=>false;   // no more renown gates: the dead teach whoever listens
 const VESNA_NOTYET=["“Not yet. The dead listen to people the living already trust. Go and be useful to someone. Come back when the valley knows your name.”","“You are still too new. I can smell the road on you. Do some good, or some harm, but let it be <i>seen</i>. Then come back.”","“The last word is heavy. Heavier than you are, yet. Go and live a little more of this valley's story first.”"];
-function vesnaTalk(){ const n=NECRO(), st=NECRO_STAVES.some(w=>player.opts.equip.weapon===w||hasItem(w));
-  const lurkers=['fen:Bog Lurker','fen:Mire Lurker','fen:Old Mudmaw'].filter(k=>defeatedMobs.has(k)).length;
+function vesnaTalk(){ const n=NECRO(), V='Vesna the Grave-Speaker';
+  if(CHOICE.necroQ==='motes') CHOICE.necroQ='listen';                        // older saves: the motes were the first lesson
+  if(CHOICE.necroQ==='lurkers') CHOICE.necroQ=null;                          // the second word is taught at the gallows now
+  const giveStaff=()=>{ if(!NECRO_STAVES.some(w=>player.opts.equip.weapon===w||hasItem(w))){ if(giveQuestItem('staff_hex',true)) logMsg("Vesna hands you a spare necromancer's staff: black wood, a green stone.",'#b8a8e8'); } };
   if(CHOICE.necro==='met' && !CHOICE.necroQ){
-    say('Vesna the Grave-Speaker',["A pale woman in a black robe leans on a staff very like the hedge-witch's. Up close, she smells of rain and turned earth.",""+VESNA_HOW().open+" “A shade is not a ghost, you know. It is a shape, pressed into the world by grief, his and hers, until something lets it go.”","“The dead leave copies of themselves everywhere: in the earth, in the water, in the people who loved them. Most folk are afraid of that. I listen to it. There is a craft in it, if you have the stomach.”", st?"She looks at the staff you carry. “And you have been beating wolves with a necromancer's staff like a shepherd with a crook. It has words in it. I can teach you them.”":"“If you ever find a staff like mine, the hedge-witches carry them, come and see me. It has words in it, and I can teach them.”"],[
-      {label:'“Teach me.”', fn:()=>{ remember('necroQ','motes',"Vesna the Grave-Speaker wants three grave-motes from the Dunhollow graveyard. They only rise at night."); say('Vesna the Grave-Speaker',["“First lesson: what the dead leave behind. At night, little lights rise over the oldest graves here. Grave-motes. Gather three for me, gently. They bruise.”","“Then I will give you the first word. The one that takes.”"],[bye]); }},
+    say(V,["A pale woman in a black robe leans on a staff very like the hedge-witch's. Up close, she smells of rain and turned earth.",VESNA_HOW().open,"“The dead talk all the time. Nobody listens. That is the whole craft, really: listening, and then asking very politely for something back.”"],[
+      {label:'“Teach me.”', fn:()=>{ giveStaff(); remember('necroQ','listen',"Vesna wants you to sit by three graves in the Dunhollow graveyard at night and listen until the dead have finished."); say(V,["“First lesson: listen. Three graves here have something left to say: old Maren the weaver by the east wall, the miller Gerrit up by the yew, and the one by the west wall with no name on it.”","“Go at night. Sit by one, and keep still until the light has finished speaking. Move, and it goes out, and you try another night. One grave a night: they are slow, and so am I.”"],[bye]); }},
       {label:'“Not now.”', fn:closeDialog}]); return; }
-  if(CHOICE.necroQ==='motes'){ const k=player.inv.filter(x=>x==='grave_mote').length;
-    if(k<3){ say('Vesna the Grave-Speaker',k?`“${k} of three. The others rise after dark, over the old graves.”`:"“After dark, over the old graves. They look like fireflies that forgot how to leave.”",[bye]); return; }
-    if(vesnaWait(0)){ say('Vesna the Grave-Speaker',["She looks at the motes in your hand, and then, for a long moment, at you.",VESNA_NOTYET[0],"“Keep them. They will not go out.”"],[bye]); return; }
-    say('Vesna the Grave-Speaker',["She cups the motes in her hands. They go out one by one, like breath on glass.","“Feel that? That is what <b>Drain</b> is: you take a little of what keeps them going, and you keep it.” She taps your staff. “Lean <b>up</b> when you strike, and the staff will drink.”"],[
-      {label:'Learn Drain.', fn:()=>{ for(let q=0;q<3;q++) player.inv[player.inv.indexOf('grave_mote')]=null; CHOICE.necro=1; CHOICE.necroQ=null; updateHud(); logMsg('You learned Drain: lean up with a necromancer\'s staff.','#b8a8e8');
-        say('Vesna the Grave-Speaker', FEN_OPEN() ? "“Next, the fen. I live there, in the stilt-hut in the Drowning Fen. Come and find me. The dead there are older and less polite.”" : "“The next words are not taught in a churchyard. They are taught where the old kings drowned, in the fen. And the fen road is still shut. Have patience. When the way opens, look for me there.”",[bye]); }}]); return; }
-  if(n===1){ if(!FEN_OPEN()){ say('Vesna the Grave-Speaker',"“Patience. The fen road is still shut, and I will not teach the second word over Tobb's turnips.”",[bye]); return; }
-    if(!CHOICE.necroQ && vesnaWait(1)){ say('Vesna the Grave-Speaker',["Vesna stands among the reeds, watching the water.",VESNA_NOTYET[1]],[bye]); return; }
-    if(!CHOICE.necroQ){ say('Vesna the Grave-Speaker',["Vesna stands among the reeds as if she has always been there.","“The mud that walks, out here. The lurkers. They are not alive, not dead: the fen remembering what it swallowed. Put down all three of them, the Bog Lurker, the Mire Lurker and old Mudmaw in the Hollow, and you will understand the second word.”"],[
-        {label:'“I will.”', fn:()=>{ remember('necroQ','lurkers',"Vesna wants the three bog lurkers of the fen put down: the Bog Lurker, the Mire Lurker and Old Mudmaw."); closeDialog(); }}, bye]); return; }
-    if(lurkers<3){ say('Vesna the Grave-Speaker',`“${lurkers} of three. The fen still remembers too much.”`,[bye]); return; }
-    say('Vesna the Grave-Speaker',["“You felt it, didn't you, each time one fell? The fen letting go. That is <b>Wither</b>: you teach the living a little of how it feels to be forgotten.”","“Lean <b>right</b>, and whatever strikes you will strike like an old man.”"],[
-      {label:'Learn Wither.', fn:()=>{ CHOICE.necro=2; CHOICE.necroQ=null; giveQuestItem('necro_leggings',true); logMsg('You learned Wither: lean right with a necromancer\'s staff. Vesna gives you a pair of frayed fen stockings.','#b8a8e8'); say('Vesna the Grave-Speaker',"“One word left. The one everyone wants and nobody should have. Under the reeds in the Sunken Hollow there is a king who will not lie down. Lay him down, and come back.”",[bye]); }}]); return; }
-  if(n===2){ if(CHOICE.barrow!=='done'){ say('Vesna the Grave-Speaker',"“The Barrow-King. Under the reeds, where the lights gather. Lay him down.”",[bye]); return; }
-    if(vesnaWait(2)){ say('Vesna the Grave-Speaker',["Vesna looks at the boots on your feet and nods, slowly.",VESNA_NOTYET[2]],[bye]); return; }
-    say('Vesna the Grave-Speaker',["Vesna looks at the boots on your feet and laughs, once. “Bertil's. He'd have hated that.”","“The last word is <b>Raise</b>. You have seen what the dead leave behind; now you borrow it. Bones remember how to stand. Ask them, and for a little while they will stand for you.”","“Lean <b>left</b>. One at a time. Never more than one. The dead are patient, but they are not servants.”"],[
-      {label:'Learn Raise Dead.', fn:()=>{ CHOICE.necro=3; giveQuestItem('necro_robe',true); logMsg('You learned Raise Dead: lean left with a necromancer\'s staff. Vesna gives you her old robe.','#b8a8e8'); say('Vesna the Grave-Speaker',"“That is all I have. Use it kindly. Or at least use it on people who deserve it.”",[bye]); }}]); return; }
-  say('Vesna the Grave-Speaker',["“The fen is quieter since you came. I don't know if that is good.”"],[bye]); }
+  if(CHOICE.necroQ==='listen'){ const k=(CHOICE.listened||[]).length;
+    if(k<3){ say(V,k?`“${k} of three have spoken to you. The others are waiting, after dark.”`:"“Maren by the east wall, Gerrit by the yew, the nameless one by the west wall. At night. Sit, and keep still.”",[bye]); return; }
+    say(V,["Vesna looks at you for a long moment. “You stayed. Most people get up and leave when the dead start talking about themselves.”","“Feel that, still in your chest? The little warmth they left you? That is <b>Drain</b>: they give, you keep. Lean <b>up</b> when you strike, and the staff will drink.”"],[
+      {label:'Learn Drain.', fn:()=>{ CHOICE.necro=1; CHOICE.necroQ=null; updateHud(); logMsg('You learned Drain: lean up with a necromancer\'s staff.','#b8a8e8'); vesnaTalk(); }}]); return; }
+  if(n===1){
+    if(!CHOICE.necroQ){ say(V,["“The second word is ugly, so it is taught by an ugly teacher. There is a gallows on the King's Road. The man on it has been dead nine years and is still complaining about it.”","“Go at night and cut him down. Bring me his bones, and five more from men who died badly: there are plenty of those on the roads, and they do not need them. We will put him somewhere better.”"],[
+        {label:'“I will cut him down.”', fn:()=>{ remember('necroQ','hanged',"Vesna wants the hanged man cut down from the King's Road gallows at night, and his bones brought to her with five old bones from men who died badly."); closeDialog(); }}, bye]); return; }
+    const nb=player.inv.filter(x=>x==='old_bone').length;
+    if(!hasItem('hanged_bones')){ say(V,"“The gallows on the King's Road. At night, when he is talkative. Cut him down.”"+(nb<5?` And bones: ${nb} of five.`:''),[bye]); return; }
+    if(nb<5){ say(V,`“His bones, good. And five more from men who died badly. You have ${nb}. Bandits, cutthroats, the Baron's hired knives: they all carry bones, whether they like it or not.”`,[bye]); return; }
+    const done=kept=>{ player.inv[player.inv.indexOf('hanged_bones')]=null; for(let q=0;q<5;q++) player.inv[player.inv.indexOf('old_bone')]=null;
+      CHOICE.necro=2; CHOICE.necroQ=null; CHOICE.hanged=kept?'kept':'buried'; if(kept) giveQuestItem('hanged_skull',true); giveQuestItem('necro_leggings',true); updateHud();
+      logMsg('You learned Wither: lean right with a necromancer\'s staff. Vesna gives you a pair of frayed fen stockings.','#b8a8e8'); };
+    say(V,["Vesna lays the bones out on the grass, the hanged man's in the middle, the five others round him like a fence.","“Now watch. This is how nine years of rope and rain undo a man.” She touches the oldest bone, and it greys and crumbles as you look. “That is <b>Wither</b>: you lend the living a little of that. Lean <b>right</b>, and whatever strikes you will strike like an old man.”","“Now. Tobb has a hole ready. Or you can keep his skull. Some of us like a keepsake.”"],[
+      {label:'Bury him. Let Tobb say the words.', fn:()=>{ done(false); say(V,"Tobb fills the hole himself, and mutters something that might be a prayer. On the King's Road that night, the rope stops creaking.",[bye]); }},
+      {label:'Keep his skull.', fn:()=>{ done(true); say(V,["Vesna hands you the skull without comment. It is surprisingly light.","“He will not like that. You may hear about it, on the road, at night.”"],[bye]); }}]); return; }
+  if(n===2){
+    if(!CHOICE.necroQ){ say(V,["“The last word is <b>Raise</b>. You do not learn it from a book. You learn it from someone who has done it: the dead themselves.”","“Under this yard is the old crypt. I have the key; Tobb thinks it is lost. Below, there is a man called Corran who has wanted to lie down properly for two hundred years, but the bone-gates will not open for the living.”","“So you will wake him, and he will follow you, and every gate you bring him to will know its own. Get him to the bottom. Keep the restless ones off him.”"],[
+        {label:'“Open the crypt.”', fn:()=>{ remember('necroQ','crypt',"Vesna has opened the old crypt under the graveyard. Lead Corran's bones down through the bone-gates to his rest."); logMsg('The crypt gate stands open. Go down.','#b8a8e8'); closeDialog(); }}, bye]); return; }
+    if(!CHOICE.cryptDone){ say(V,"“The crypt, at the back of the yard. Corran is waiting for you just inside. Walk slowly: he is old.”",[bye]); return; }
+    say(V,["Vesna puts her hand on your arm. Her fingers are cold. “You felt him stand, didn't you, when you came near him? And lie down again when you brought him home.”","“That is <b>Raise</b>. Bones remember how to stand. Ask, and for a little while they will stand for you. Lean <b>left</b>. One at a time. Never more than one.”"],[
+      {label:'Learn Raise Dead.', fn:()=>{ CHOICE.necro=3; CHOICE.necroQ=null; giveQuestItem('necro_robe',true); updateHud(); logMsg('You learned Raise Dead: lean left with a necromancer\'s staff. Vesna gives you her old robe.','#b8a8e8');
+        say(V,"“That is all I have. The fen has older dead than these, if you want to see what the words can do: a hag who stole my lantern, and a drowned king under the reeds. Use it kindly. Or at least on people who deserve it.”",[bye]); }}]); return; }
+  say(V,[FEN_OPEN()?"“The fen is quieter since you came. I don't know if that is good.”":"“The dead are quieter since you came. They have someone to talk to.”"],[bye]); }
 TALKERS.vesna=vesnaTalk;
 JOURNAL.push(["The Grave-Speaker", ()=> !CHOICE.necro ? null : NECRO()>=3 ? ['done',"Vesna taught you all three words of the necromancer's staff: Drain, Wither and Raise Dead."]
-  : CHOICE.necroQ==='motes' ? ['active', player.inv.filter(x=>x==='grave_mote').length>=3 && vesnaWait(0) ? "You have the grave-motes, but Vesna will not teach a stranger. Make a name for yourself in the valley first." : "Gather three grave-motes for Vesna. They rise over the old graves of the Dunhollow graveyard at night. ("+player.inv.filter(x=>x==='grave_mote').length+"/3)"]
-  : NECRO()===0 ? ['active',"A necromancer named Vesna came to the graveyard after Edric's shade was gone. She offered to teach you the words in a necromancer's staff."]
-  : NECRO()===1 ? ['active', !FEN_OPEN() ? "You know Drain. Vesna will teach the next word in the fen, once the road is open. Be patient." : CHOICE.necroQ==='lurkers' ? "Put down the three bog lurkers for Vesna: the Bog Lurker, the Mire Lurker and Old Mudmaw in the Sunken Hollow." : "You know Drain. Find Vesna in the Drowning Fen for the next word."]
-  : ['active', CHOICE.barrow==='done' ? "The Barrow-King lies down. Tell Vesna in the fen." : "You know Drain and Wither. Vesna wants the Barrow-King under the reeds of the Sunken Hollow laid to rest."]]);
+  : (CHOICE.necroQ==='listen'||CHOICE.necroQ==='motes') ? ['active',"Sit by three graves in the Dunhollow graveyard at night and keep still until each has spoken: Maren by the east wall, Gerrit the miller, and the nameless one by the west wall. ("+(CHOICE.listened||[]).length+"/3)"]
+  : NECRO()===0 ? ['active',"Vesna the Grave-Speaker walks the Dunhollow graveyard at night. She offered to teach you the words in a necromancer's staff."]
+  : NECRO()===1 ? ['active', CHOICE.necroQ==='hanged' ? (hasItem('hanged_bones')?"Bring the hanged man's bones to Vesna, with five old bones from men who died badly. ("+player.inv.filter(x=>x==='old_bone').length+"/5)":"Cut the hanged man down from the gallows on the King's Road at night, for Vesna.") : "You know Drain. Vesna has the next word for you in the graveyard."]
+  : ['active', CHOICE.necroQ==='crypt' ? (CHOICE.cryptDone?"Corran lies at rest. Tell Vesna.":"Lead Corran's bones down through the bone-gates of the old crypt under the graveyard.") : "You know Drain and Wither. Vesna has the last word for you in the graveyard."]]);
 
 // the grave-speaker's clothes: dark, worn, laced with bone
 Object.assign(ITEM_STATS,{ necro_robe:{hp:2,agi:1,magic:4}, necro_bustier:{agi:1,magic:2}, necro_leggings:{agi:2,magic:2} });
@@ -15863,7 +15873,7 @@ function paintNecklaceIcon(g2,L,size){
     return oldBr(); }; }
 // ── the old crypt at the back of Dunhollow's graveyard: sealed, for now ──
 wrap('graveyard','objects',l=>[...l,{type:'crypt', i:0, j:0, fp:[3,2]},
-  {type:'teleporter', i:1, j:2, to:'graveyard', entry:'fromVillage', locked:()=>true, onLocked:()=>setTimeout(()=>say('The Old Crypt',["An iron gate, rusted shut and chained twice over. Beyond it, steps go down into the dark.","Cold air breathes up through the bars. Whatever is down there, it is not for today."],[bye]),200)}]);
+  {type:'teleporter', i:1, j:2, to:'crypt', entry:'fromYard', locked:()=>!(CHOICE.necroQ==='crypt'||CHOICE.cryptDone), onLocked:()=>setTimeout(()=>say('The Old Crypt',["An iron gate, rusted shut and chained twice over. Beyond it, steps go down into the dark.","Cold air breathes up through the bars. Whatever is down there, it is not for today."],[bye]),200)}]);
 function paintCrypt(o){
   const L=P(o.i,o.j+2), F=P(o.i+3,o.j+2), R=P(o.i+3,o.j), H=92, RH=46, up=(p,h)=>({x:p.x,y:p.y-h});
   const q=(t,h)=>({x:L.x+(F.x-L.x)*t,y:L.y+(F.y-L.y)*t-h}), r=(t,h)=>({x:F.x+(R.x-F.x)*t,y:F.y+(R.y-F.y)*t-h});
@@ -16925,6 +16935,102 @@ JOURNAL.push(['The Drowned Bell', ()=> !CHOICE.bell ? null
           if(o.item==='morwen_lantern') logMsg('Where Hesk fell, a lantern lies in the mud, still burning.','#e8c060'); });
         if(want.length){ try{ if(worldCache) worldCache.area=null; }catch(e){} } }
       wasFight=f; }catch(e){} },300); }
+
+// ════════ The grave-speaker's three lessons, taught by the dead themselves ════════
+// ── items: the hanged man's bones, and his skull if you keep it ──
+Object.assign(ITEMS,{ hanged_bones:{ name:"The Hanged Man's Bones", slot:'misc', title:'Nine years of rope and rain. Light as kindling.' }, hanged_skull:{ name:"The Hanged Man's Skull", slot:'misc', junk:true, title:'It is surprisingly light, and it seems to be listening.' } });
+QUEST_ITEMS.add('hanged_bones'); PRICES.hanged_skull=20; SELL_MISC.add('hanged_skull');
+paintItemArt=(orig=>function(g2,id,size){ if(id==='hanged_bones'){ orig.call(this,g2,'old_bone',size); g2.save(); g2.scale(size/40,size/40); g2.strokeStyle='#8a7a5a'; g2.lineWidth=1.6; g2.beginPath(); g2.moveTo(8,8); g2.quadraticCurveTo(20,20,14,34); g2.stroke(); g2.restore(); return; }
+  if(id==='hanged_skull') return orig.call(this,g2,'old_skull',size); return orig.apply(this,arguments); })(paintItemArt);
+const necroPuz=(orig=>function(o){ if(o && o.type==='grave') return graveAct(o); if(o && o.type==='gallows') return gallowsAct(o); if(o && (o.type==='bonegate'||o.type==='bonebier')) return cryptAct(o); return orig.apply(this,arguments); });
+['grave','gallows','bonegate','bonebier'].forEach(t=>PUZ_TYPES.add(t)); puzAct=necroPuz(puzAct);
+
+// ── Drain: "The Listening". Three graves, one a night. Sit by it and keep still until the light has finished ──
+const LISTEN_GRAVES={ '8,5':{ who:'Maren the weaver', lines:["“I wove the wedding cloth for half this village. Never my own.”","“He came every evening from the forest, with mud on his boots and nothing to say. I waited fifty years for him to say it.”","“Tell the elf I was not angry. Only tired. Tell him the blue thread was for him.”"] },
+  '6,1':{ who:'Gerrit the miller', lines:["“Flour in my lungs for forty years, and they buried me under a yew. A yew! I hate the smell.”","“The wheel still turns, does it? Someone's turning it wrong. I can hear it from here.”","“Nobody ever thanked the miller. Bread just happens, they think. Well. Now you know.”"] },
+  '1,4':{ who:'the grave with no name', lines:["“…”","“I came over the hills with nothing and died of the fever the first winter. They did not know my name. I had stopped using it.”","“It was Ilse. Remember it for me. That is all I wanted.”"] } };
+let LST=null;
+function graveAct(o){ const k=o.i+','+o.j, G=LISTEN_GRAVES[k], day=Math.floor(dayClock/DAY_LEN);
+  if(!G || CHOICE.necroQ!=='listen'){ say('A Grave',o.name?`A plain stone: <i>${o.name}</i>.`:(G?`A worn stone. You can just make out: <i>${G.who}</i>.`:"A worn stone, the name long gone under lichen."),[bye]); return; }
+  if((CHOICE.listened||[]).includes(k)){ say('A Grave',`${G.who[0].toUpperCase()+G.who.slice(1)} has nothing more to say. The grass on the grave is warm.`,[bye]); return; }
+  if(nightAmt()<0.5){ say('A Grave',"In daylight it is only a grave. Vesna said: at night.",[bye]); return; }
+  if(CHOICE.listenNight===day){ say('A Grave',"The dead have spoken enough for one night. Come back tomorrow.",[bye]); return; }
+  if(LST) return;
+  const L={key:k, G, t:0, said:0, px:player.x, py:player.y, w:{type:'wisp', i:o.i, j:o.j, noblock:true}}; OBJECTS.push(L.w); LST=L;
+  logMsg('A pale light rises off the grave. Sit still, and listen.','#c8b8f0'); floatText([o.i,o.j],'…','#d8d0f0'); }
+setInterval(()=>{ if(!LST) return; try{ const L=LST, o=L.w, day=Math.floor(dayClock/DAY_LEN);
+    const fail=why=>{ const q=OBJECTS.indexOf(o); if(q>=0) OBJECTS.splice(q,1); LST=null; CHOICE.listenNight=day; logMsg(why,'#a898c8'); };
+    if(areaId!=='graveyard'){ LST=null; return; }
+    if(Math.hypot(player.x-L.px,player.y-L.py)>0.2 || combat.active){ fail('You moved, and the light went out. The dead do not repeat themselves. Try again another night.'); return; }
+    L.t+=0.1;
+    if(L.said<3 && L.t>=L.said*3.2){ const line=L.G.lines[L.said++]; floatText([o.i,o.j-0.6],'✦','#d8d0f0'); logMsg(L.G.who[0].toUpperCase()+L.G.who.slice(1)+': '+line,'#c8b8f0'); }
+    if(L.t>=10){ const q=OBJECTS.indexOf(o); if(q>=0) OBJECTS.splice(q,1); LST=null; CHOICE.listened=[...(CHOICE.listened||[]),L.key]; CHOICE.listenNight=day;
+      const n=CHOICE.listened.length; banner('The dead have spoken ('+n+'/3)','#c8b8f0',1600); logMsg(n<3?'The light sinks back into the grass. Another grave, another night.':'The last light goes out. Go back to Vesna.','#c8b8f0'); } }catch(e){ LST=null; } },100);
+
+// ── Wither: "The Hanged Man". He hangs from the King's Road gallows and talks at night ──
+OBJ_DRAW.hangedman=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x+14, top=q.y-96, sw=Math.sin(gt*0.8)*0.05;
+  g.save(); g.translate(x,top); g.rotate(sw); g.translate(-x,-top);
+  g.strokeStyle='#8a7a5a'; g.lineWidth=1.2; g.beginPath(); g.moveTo(x,top); g.lineTo(x,q.y-62); g.stroke();
+  g.fillStyle='#d8d0b8'; g.strokeStyle='#4a4436'; g.lineWidth=1; g.beginPath(); g.ellipse(x+1,q.y-57,4.2,5,0.25,0,Math.PI*2); g.fill(); g.stroke();      // the skull, lolling
+  g.fillStyle='#2a2620'; g.fillRect(x-0.5,q.y-58,1.5,1.5); g.fillRect(x+2,q.y-57,1.5,1.5);
+  g.fillStyle='rgba(60,52,40,0.9)'; g.beginPath(); g.moveTo(x-5,q.y-51); g.lineTo(x+5,q.y-51); g.lineTo(x+4,q.y-30); g.lineTo(x-4,q.y-30); g.closePath(); g.fill();   // what is left of his shirt
+  g.strokeStyle='#d8d0b8'; g.lineWidth=1.8; g.lineCap='round'; [[-4,-49,-6,-34],[4,-49,6,-34],[-2,-30,-3,-12],[2,-30,3,-11]].forEach(([a,b,c,d])=>{ g.beginPath(); g.moveTo(x+a,q.y+b); g.lineTo(x+c,q.y+d); g.stroke(); });
+  g.restore(); };
+wrap('kingsroad','objects',l=> !CHOICE.hangedDown && !CHOICE.hanged ? [...l,{type:'hangedman', i:6, j:7, noblock:true}] : l);
+function gallowsAct(o){ const H='The Hanged Man';
+  if(CHOICE.hangedDown || CHOICE.hanged){ say('The Gallows',CHOICE.hanged==='kept'?"An empty noose. The rope creaks, though there is no wind.":"An empty noose. The rope hangs still.",[bye]); return; }
+  if(nightAmt()<0.5){ say('The Gallows',["An old gallows. Something has hung from it for a long time and is mostly bones now.","On the road they say that at night, it talks."],[bye]); return; }
+  if(CHOICE.necroQ!=='hanged'){ say(H,["The bones on the rope turn slowly to look at you, which bones should not do.","“Nine years. Nine years, and not one of you has the decency to cut me down. Go on, then. Walk past like the rest.”"],[bye]); return; }
+  say(H,["The bones on the rope turn slowly to look at you.","“Oh. A grave-speaker's errand boy. She sent you? Took her long enough.”","“I stole a sheep. One sheep! The Baron's sheep, but still. Nine years of crows. Cut me down, and take me somewhere with walls.”"],[
+    {label:'Cut him down.', fn:()=>{ if(!giveQuestItem('hanged_bones')) return; CHOICE.hangedDown=true; const q=OBJECTS.findIndex(x=>x.type==='hangedman'); if(q>=0) OBJECTS.splice(q,1);
+      say(H,"The rope parts and he comes down in a clatter of bones into your arms. “Careful! I'm all I've got.” <i>You take the Hanged Man's Bones.</i>",[bye]); }}, bye]); }
+wrap('kingsroad','mobs',l=> CHOICE.hanged==='kept' && nightAmt()>0.5 ? [...l,{ name:'The Hanged Man', type:'bandit', i:6, j:9, faction:'hanged', daily:true, opts:{gender:'m',skin:0,hair:1,hairColor:13,beard:3,face:1,ghost:true,equip:{head:null,torso:'shirt',armor:null,hands:null,legs:'trousers',feet:null,weapon:'club',offhand:null}} }] : l);   // he wants his head back
+
+// ── Raise Dead: "The Crypt Below". Corran's bones follow you; the bone-gates open only for the dead ──
+OBJ_DRAW.bonegate=o=>{ const q=P(o.i+0.5,o.j+0.5); g.lineCap='round';
+  for(let k=-2;k<=2;k++){ const x=q.x+k*7, h=46-Math.abs(k)*5; g.strokeStyle='#4a4436'; g.lineWidth=4.6; g.beginPath(); g.moveTo(x,q.y); g.lineTo(x,q.y-h); g.stroke(); g.strokeStyle='#d8d0b8'; g.lineWidth=3; g.beginPath(); g.moveTo(x,q.y); g.lineTo(x,q.y-h); g.stroke();
+    g.fillStyle='#e2dac4'; g.beginPath(); g.arc(x,q.y-h,2.4,0,Math.PI*2); g.fill(); }
+  g.strokeStyle='#d8d0b8'; g.lineWidth=2.6; [18,32].forEach(h=>{ g.beginPath(); g.moveTo(q.x-16,q.y-h); g.lineTo(q.x+16,q.y-h); g.stroke(); });
+  g.fillStyle='#e8e0cc'; g.strokeStyle='#4a4436'; g.lineWidth=1; g.beginPath(); g.ellipse(q.x,q.y-50,6,6.6,0,0,Math.PI*2); g.fill(); g.stroke(); g.fillStyle='#2a2620'; g.fillRect(q.x-3,q.y-51,2,2); g.fillRect(q.x+1,q.y-51,2,2); };   // a skull on top, watching
+OBJ_DRAW.bonebier=o=>{ const a=P(o.i+0.1,o.j+0.2), b=P(o.i+0.9,o.j+0.2), c=P(o.i+0.9,o.j+0.8), d=P(o.i+0.1,o.j+0.8), up=10;
+  g.fillStyle='#4e4a44'; g.beginPath(); g.moveTo(d.x,d.y); g.lineTo(c.x,c.y); g.lineTo(c.x,c.y-up); g.lineTo(d.x,d.y-up); g.closePath(); g.fill();
+  g.fillStyle='#6a665e'; g.beginPath(); [a,b,c,d].forEach((p,k)=>k?g.lineTo(p.x,p.y-up):g.moveTo(p.x,p.y-up)); g.closePath(); g.fill(); g.strokeStyle='#2e2a26'; g.lineWidth=1.2; g.stroke();
+  if(CHOICE.cryptDone){ const m=P(o.i+0.5,o.j+0.5); g.strokeStyle='#d8d0b8'; g.lineWidth=2.4; g.lineCap='round'; [[-12,-1,12,1],[-9,3,-2,-3],[3,3,9,-3]].forEach(([x1,y1,x2,y2])=>{ g.beginPath(); g.moveTo(m.x+x1,m.y-up+y1); g.lineTo(m.x+x2,m.y-up+y2); g.stroke(); });
+    g.fillStyle='#e2dac4'; g.beginPath(); g.ellipse(m.x-15,m.y-up-1,4,3.4,0,0,Math.PI*2); g.fill(); } };
+const CRYPT_GATES=[[5,4],[10,4],[12,3]];
+AREAS.crypt=CAVE('The Old Crypt',14,9,()=>{ const l=[{type:'teleporter', i:1, j:8, to:'graveyard', entry:'fromCrypt'}];
+    for(let j=0;j<9;j++){ if(j!==4){ l.push({type:'boulder', i:5, j, v:(j*7)%3}, {type:'boulder', i:10, j, v:(j*5+1)%3}); } }
+    l.push({type:'boulder', i:11, j:3, v:2}, {type:'boulder', i:13, j:3, v:0});
+    CRYPT_GATES.forEach(([i,j])=>{ if(!(CHOICE.cryptGates||[]).includes(i+','+j)) l.push({type:'bonegate', i, j}); });
+    l.push({type:'bonebier', i:12, j:1}, {type:'lantern', i:0, j:5}, {type:'lantern', i:9, j:0}, {type:'lantern', i:13, j:7},
+      {type:'bones', i:3, j:2, noblock:true}, {type:'bones', i:7, j:7, noblock:true}, {type:'bones', i:12, j:6, noblock:true}, {type:'pillar', i:8, j:2, broken:true},
+      {type:'ruin', i:2, j:0, v:0}, {type:'ruin', i:8, j:0, v:1}, {type:'ruin', i:11, j:8, v:2},
+      {type:'rune', i:0, j:2, text:"Cut deep, and filled with old soot: <i>“Here lie the first of Dunhollow, who cleared the wood and drained the field. We sleep below so that you may sleep above. Do not wake us for nothing.”</i>"});
+    return l; },
+  { entries:{ fromYard:{i:1,j:7} },
+    npcs:()=> CHOICE.necroQ==='crypt' && !CHOICE.cryptDone ? [{ id:'corran', name:'Corran', i:2, j:7, dir:1, opts:{gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,bones:true,equip:{head:null,torso:'smock',armor:null,hands:null,legs:'trousers',feet:null,weapon:null,offhand:null}} }] : [],
+    mobs:()=> CHOICE.necroQ==='crypt' && !CHOICE.cryptDone ? [ { name:'Restless Bones', type:'skeleton', i:7, j:2, faction:'crypt', opts:RISEN('Restless Bones') }, { name:'Grasping Bones', type:'skeleton', i:8, j:6, faction:'crypt2', opts:RISEN('Grasping Bones') },
+      { name:'The Crypt Warden', type:'skeleton', i:12, j:6, faction:'crypt3', opts:RISEN('The Crypt Warden') } ] : [] });
+AREAS.graveyard.entries.fromCrypt={i:1,j:3};
+TALKERS.corran=()=>say('Corran',["A skeleton in the rags of a farmer's smock. It turns its skull to you, slowly, as if listening to something far away.","“…the bottom… the slab… I cleared the first field in this valley, you know. Two hundred years I have been lying in a corridor.” A dry click that might be a laugh. “Lead on. I'll follow.”"],[bye]);
+function cryptAct(o){ if(o.type==='bonegate') say('A Bone-Gate',["A lattice of old bones, set into the wall like a gate, with a skull on top. It does not move for you.","Vesna said: it knows its own."],[bye]);
+  else say('The Bier',CHOICE.cryptDone?"Corran's bones lie on the slab, neatly, as if he arranged them himself.":"A stone slab at the bottom of the crypt, with room for one.",[bye]); }
+{ let last=performance.now()/1000;
+  setInterval(()=>{ try{ const now=performance.now()/1000, dt=Math.min(0.1,now-last); last=now;
+      if(!running || areaId!=='crypt' || CHOICE.necroQ!=='crypt' || CHOICE.cryptDone) return;
+      const c=NPCS.find(n=>n.id==='corran'); if(!c) return; if(c.x==null){ c.x=c.i+0.5; c.y=c.j+0.5; }
+      const T=c.trail=c.trail||[{x:c.x,y:c.y}], L=T[T.length-1]; if(Math.hypot(player.x-L.x,player.y-L.y)>0.05) T.push({x:player.x,y:player.y}); if(T.length>200) T.splice(0,T.length-200);
+      if(combat.active || dlgIsOpen()){ c.moving=false; return; }                                          // he waits while you fight
+      let need=1.3, tx=T[0].x, ty=T[0].y; for(let k=T.length-1;k>0;k--){ const a=T[k], b=T[k-1], s=Math.hypot(a.x-b.x,a.y-b.y); if(s>=need){ const f=need/(s||1); tx=a.x+(b.x-a.x)*f; ty=a.y+(b.y-a.y)*f; need=0; break; } need-=s; }
+      const home=(CHOICE.cryptGates||[]).length>=3 && Math.hypot(c.x-12.5,c.y-1.5)<3.2; if(home){ tx=12.5; ty=1.5; }                                 // the last gate is open: he knows the way from here
+      const dx=tx-c.x, dy=ty-c.y, d=Math.hypot(dx,dy), st=Math.min(d,(home?1.4:2.6)*dt); if(d>0.03){ c.x+=dx/d*st; c.y+=dy/d*st; c.moving=d>0.08; c.dir=dirFromDelta(dx,dy); } else c.moving=false;
+      c.i=Math.floor(c.x); c.j=Math.floor(c.y);
+      CRYPT_GATES.forEach(([i,j])=>{ const k=i+','+j; if((CHOICE.cryptGates||[]).includes(k) || Math.hypot(c.x-i-0.5,c.y-j-0.5)>2.6) return;
+        CHOICE.cryptGates=[...(CHOICE.cryptGates||[]),k]; const q=OBJECTS.findIndex(o=>o.type==='bonegate'&&o.i===i&&o.j===j); if(q>=0) OBJECTS.splice(q,1); blocked.delete(k);
+        shake=Math.max(shake,2); floatText([i,j],'✦','#e8e4d0'); logMsg('The bone-gate turns its skull toward Corran, and folds itself open.','#e8e4d0'); try{ if(worldCache) worldCache.area=null; }catch(e){} });
+      if((CHOICE.cryptGates||[]).length>=3 && Math.hypot(c.x-12.5,c.y-1.5)<0.35){ CHOICE.cryptDone=true; NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='corran'));
+        banner('Corran lies down','#e8e4d0',2000); logMsg("Corran climbs onto the slab, folds his arms the way his mother taught him, and goes still. Something in your staff hand remembers how he stood. Tell Vesna.",'#e8e4d0'); try{ if(worldCache) worldCache.area=null; }catch(e){} }
+    }catch(e){} },33); }
 </script>
 </body>
 </html>

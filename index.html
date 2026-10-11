@@ -12124,7 +12124,7 @@ function impact(f){                                   // a foe's swing lands (or
     if(f.type==='wolf'){ addStatus(player,'bleed',4.2,1); logMsg('The bite tears. You are bleeding.','#d0342c'); }
     else if(f.opts && BLEEDERS.has(f.opts.equip&&f.opts.equip.weapon) && Math.random()<0.25) addStatus(player,'bleed',3.2,1); }
   if(f.phase2 && hurt) addStatus(player,'bleed',5,2);
-  if(hurt && FIRE_FOE(f) && Math.random()<(/Slag/.test(f.name)?1:0.35)) addStatus(player,'burn',3,2);
+  if(hurt && FIRE_FOE(f) && Math.random()<(/Slag|Kindled/.test(f.name)?1:/^Ember/.test(f.name)?0.6:0.35)) addStatus(player,'burn',3,2);
   if(f.type==='barrowking' && f.cphase>=3 && player.hp<hp0 && !f.dead){ const h=Math.min(5,f.maxHp-f.hp); if(h>0){ f.hp+=h; floatText(tileOf(f),'+'+h,'#9ad0e8'); } }
   if(hurt && f.opts && f.opts.equip && f.opts.equip.weapon==='barrow_blade' && Math.random()<0.3) addStatus(player,'weak',3,0);
 }
@@ -12159,7 +12159,7 @@ function woundRaw(f,n,label,col){
 function playerHit(){                                // your attack lands: a spell if you hold a staff, else steel
   const f=combat.foe, W=WEAPONS[player.opts.equip.weapon]||{};
   if(W.magic && f && SPELL_IMMUNE(f)){ const SP=spellsFor(), S=SP[playerGuard]||SP.right;    // the undead shrug off drain and frost
-    if((S.name==='Drain'||S.name==='Frost') && player.mana>=S.cost){ const hp0=f.hp, m0=player.hp, t0=f.t, w0=f.wind;
+    if((S.name==='Drain'||S.name==='Frost') && SPELL_KNOWN() && player.mana>=spellCost(S)){ const hp0=f.hp, m0=player.hp, t0=f.t, w0=f.wind;
       strike(); const lost=hp0-f.hp; if(lost>0 && !f.dead){ f.hp=Math.min(f.maxHp,f.hp+Math.ceil(lost*0.7)); }       // it barely feels it
       f.st=(f.st||[]).filter(x=>x.kind!=='chill'); if(S.name==='Drain'){ player.hp=Math.min(player.hp,m0); updateHud(); } if(S.name==='Frost'){ f.t=Math.min(f.t,t0+0.01); f.wind=w0; }
       floatText(tileOf(f),'Resisted','#c8c0b0'); return; } }
@@ -12250,7 +12250,8 @@ function victory(faction){
       if(R()<0.08) give('rusted_blade'); if(R()<0.04) give('grave_ring'); return; }                                                                 // and now and then something it was buried with
     if(m.type==='lurker'){ if(R()<0.4) coin(2,5); if(R()<0.2){ const pool=LOOT_TIERS[0]; give(pool[Math.floor(R()*pool.length)]); logMsg('…something it swallowed, a while ago.','#a8a080'); } return; }
     if(m.opts && (m.opts.ghost||m.opts.bones)){ if(R()<0.5) coin(4,12); return; }                // the dead carry nothing but old coin
-    if(m.type!=='ember' && m.type!=='barrowking' && m.type!=='goblin'){ if(R()<0.3) give('old_bone'); if(R()<0.07) give('old_skull'); }   // men who died badly: Vesna has a use for what is left
+    if(m.type==='ember'){ if(R()<0.6) coin(2,6); if(m.opts.big) give('ember_heart'); return; }                 // a fire-sprite leaves warm coins in the ashes, and the big one its heart
+    if(m.type!=='barrowking' && m.type!=='goblin'){ if(R()<0.3) give('old_bone'); if(R()<0.07) give('old_skull'); }   // men who died badly: Vesna has a use for what is left
     if(m.type==='goblin'){ if(R()<0.35) coin(1,3); if(R()<0.15) give(['apple','apple','bread','raw_meat'][Math.floor(R()*4)]); if(R()<0.2) give(['dagger','hood','shirt','club'][Math.floor(R()*4)]); return; }
     const gearP=[0.3,0.2,0.12][tier]*(m.daily?0.4:1)*(m.faction==='guard'||m.type==='mage'?0:1);    // rarer the better it is; road toughs who come back every day carry less; guards and mages are handled on their own
     if(R()<gearP){ const pool=LOOT_TIERS[tier]; give(pool[Math.floor(R()*pool.length)]); }
@@ -12652,6 +12653,7 @@ function drawActorBase(e){
   if(e.type==='dummy') drawDummy(s.x,B,e);
   else if(e.type==='wolf') drawLitSprite(s.x,B,()=>drawWolf(s.x,B,e,e.dir||0,poseFor(e)),1.2);
   else if(e.type==='lurker') drawLurker(s.x,B,e,poseFor(e));
+  else if(e.type==='ember') drawEmber(s.x,B,e,poseFor(e));
   else if(e.type==='skeleton') drawRisen(s.x,B,e,poseFor(e));
   else drawLitSprite(s.x,B,()=>drawChar(g,s.x,B,e.opts,e.moving?Math.sin(gt*10)*5:0,e.dir||0,poseFor(e)));
   g.restore();
@@ -12953,11 +12955,13 @@ function castSpell(){                            // a staff casts the spell for 
     player.maxMana=100; if(player.mana==null) player.mana=100;
     const SP=spellsFor(), S=SP[playerGuard]||SP.right;
     if(SP===HEX_SPELLS && !HEX_KNOWN(playerGuard)) return false;          // a necromancer's staff is just a stick until someone teaches you its words
+    if(SP===SPELLS && !MAGE_KNOWN(playerGuard)) return false;             // so is a magister's, until he has taught you what to say to it
     if(S===HEX_SPELLS.left && SKEL && !SKEL.crumble){ floatText(tileOf(player),'Already risen','#e8e4d0'); return true; }   // one skeleton at a time
-    if(player.mana<S.cost){ floatText(tileOf(player),'Out of mana','#a8a0c8'); return false; }      // a plain whack with the staff
-    player.mana-=S.cost; lunge(player,f); duel.caught=false;
+    if(player.mana<spellCost(S)){ floatText(tileOf(player),'Out of mana','#a8a0c8'); return false; }      // a plain whack with the staff
+    player.mana-=spellCost(S); lunge(player,f); duel.caught=false;
     bolts.push({from:{x:player.x,y:player.y}, to:f, t:0, S});
     let dmg=Math.round(S.dmg*SPM()), lbl=S.name+'!', col=S.col, fx=true; HIT_SRC='spell';
+    if(f.type==='ember'){ if(S.name==='Frost'){ dmg*=2; lbl='Quenched!'; col='#bfe6ff'; } else if(S.name==='Fire'){ dmg=Math.max(1,Math.round(dmg*0.25)); lbl='It drinks the fire'; col='#ffb070'; fx=false; } }   // a fire-sprite hisses at frost and eats fire
     if(f.state==='windup' && !(playerGuard===f.swingDir && (f.wind-f.t)<=PARRY.punish)){ dmg=Math.round(dmg*0.5); lbl='Hurried'; col='#d8b0a0'; }   // cast into his swing: half
     const DEF=foeDef(f)||{}, guarding=!DEF.unguarded && !['recover','stagger','windup','down'].includes(f.state) && playerGuard===f.guardDir;
     if(guarding){                                  // aim at the side he covers and he can still answer it: a ward, a shield, or a quick step aside
@@ -12981,7 +12985,7 @@ function drawActorFigure(e){ drawActorBase(e);         // then status pips over 
       g.fill(); }); }
     if(e===player && combat.active && isMagicWeapon()){ const mw=40, y=ty+32, r=Math.max(0,(player.mana??100)/100);          // the mana bar, under the health bar
       g.fillStyle='rgba(10,8,20,0.85)'; g.fillRect(s.x-mw/2,y,mw,4); g.fillStyle='#6a78e8'; g.fillRect(s.x-mw/2,y,mw*r,4); g.strokeStyle='rgba(0,0,0,0.6)'; g.strokeRect(s.x-mw/2+0.5,y+0.5,mw-1,3);
-      const S=(spellsFor()===HEX_SPELLS && !HEX_KNOWN(playerGuard)) ? {name:'Staff strike', cost:0} : spellsFor()[playerGuard]; if(S && combat.phase==='fight'){ g.font='600 9px "Segoe UI", system-ui, sans-serif'; g.textAlign='center'; g.textAlign='left'; g.fillStyle='rgba(12,8,3,0.8)'; const lbl=S.name+(player.mana<S.cost?' (no mana)':''), lw=g.measureText(lbl).width; g.fillRect(s.x+mw/2+3,y-3,lw+6,11); g.fillStyle=S.col; g.fillText(lbl,s.x+mw/2+6,y+5); } }
+      const S=!SPELL_KNOWN() ? {name:'Staff strike', cost:0} : {...spellsFor()[playerGuard], cost:spellCost(spellsFor()[playerGuard]||{cost:0})}; if(S && combat.phase==='fight'){ g.font='600 9px "Segoe UI", system-ui, sans-serif'; g.textAlign='center'; g.textAlign='left'; g.fillStyle='rgba(12,8,3,0.8)'; const lbl=S.name+(player.mana<S.cost?' (no mana)':''), lw=g.measureText(lbl).width; g.fillRect(s.x+mw/2+3,y-3,lw+6,11); g.fillStyle=S.col; g.fillText(lbl,s.x+mw/2+6,y+5); } }
   }
 function drawBolts(){                               // spells in flight
     bolts=bolts.filter(b=>b.t<0.28); bolts.forEach(b=>{ b.t+=1/60; const k=Math.min(1,b.t/0.18), a=P(b.from.x,b.from.y), z=P(b.to.x,b.to.y), x=a.x+(z.x-a.x)*k, y=a.y-70+(z.y-a.y)*k+20*k;
@@ -13070,7 +13074,7 @@ function drawNecroStaff(c,hx,hy,ang,id,s){       // the necromancer's staves: bl
     c.restore(); }
 
 // ── Magister Orvell and the runaway apprentice ──
-wrap('keepward','npcs',l=>[...l,{ id:'orvell', name:'Magister Orvell', i:10, j:9, dir:1, opts:{gender:'m',skin:0,hair:4,hairColor:13,beard:5,face:0,equip:{head:'hood',torso:'tunic_blue',armor:'robe_blue',hands:null,legs:null,feet:'boots',weapon:'staff_oak',offhand:null}} }]);
+wrap('keepward','npcs',l=> ORVELL_AT_INN() ? l : [...l,{ id:'orvell', name:'Magister Orvell', i:10, j:9, dir:1, opts:{gender:'m',skin:0,hair:4,hairColor:13,beard:5,face:0,equip:{head:'hood',torso:'tunic_blue',armor:'robe_blue',hands:null,legs:null,feet:'boots',weapon:'staff_oak',offhand:null}} }]);
 FOES.mage={ label:'Magus', base:48, stagger:1.3, pattern:[        // long, glowing windups: easy to read, painful to miss
   {wait:1.6, wind:1.35, after:0.8, dir:'up'}, {wait:1.2, wind:1.2, after:0.7, dir:'left'}, {wait:1.5, wind:1.4, after:0.9, dir:'right'} ]};
 const ACOLYTE=(name,i,j,o)=>({ name, type:'mage', i, j, faction:'acolyte', opts:{gender:'m',skin:1,hair:2,hairColor:1,beard:1,face:0,...o,equip:{head:'hood',torso:'smock',armor:null,hands:null,legs:'hose_grey',feet:'boots',weapon:'staff_cinder',offhand:null,...(o.equip||{})}} });
@@ -13079,14 +13083,13 @@ wrap('ruin','mobs',l=> CHOICE.appr==='asked' ? [...l, ACOLYTE('Cinder Acolyte',2
 wrap('ruin','npcs',l=> CHOICE.appr==='asked' && !CHOICE.apprFight ? [...l,{ id:'tessaly', name:'Tessaly', i:4, j:2, dir:0, opts:{gender:'f',skin:1,hair:1,hairColor:6,face:3,equip:{head:null,torso:'elf_robe',armor:null,hands:null,legs:null,feet:null,weapon:'staff_star',offhand:null}} }] : l);
 function orvellTalk(){
   const shop=()=>shopFrom('Magister Orvell',['staff_oak'],1,["“One staff at a time, and only the oak. The starwood ones must be earned. Or stolen, apparently.”"]);
-  const teach=()=>say('Magister Orvell',["“Hold the staff as you would hold a guard. Then let it speak.”","“Lean <b>left</b> and it burns: fire that keeps eating. Lean <b>up</b> and it bites cold: your foe grows slow. Lean <b>right</b> and it strikes pure: the hardest blow, the cheapest call.”","“Magic passes any guard. It does not pass your own exhaustion. Mind the blue.”"],[{label:'Back.', fn:orvellTalk}]);
-  const opts=CHOICE.appr==='taken' ? [{label:'Buy a staff.', fn:shop}] : [{label:'Ask about magic.', fn:teach},{label:'Buy a staff.', fn:shop}];
-  if(!CHOICE.appr) opts.unshift({label:'“You look troubled.”', fn:()=>say('Magister Orvell',["“My apprentice, Tessaly, took my starwood staff and ran. She has found others who think fire is an argument. They are in the Drowned Shrine, past the Mistmere.”","“Bring her back. Or bring the staff back. I will not pretend I know which matters more to me.”"],[
+  const opts=CHOICE.appr==='taken' ? [{label:'Buy a staff.', fn:shop}] : [{label:mageAskLabel(), fn:mageTalk},{label:'Buy a staff.', fn:shop}];
+  if(!CHOICE.appr) opts.unshift({label:'“You look troubled.”', fn:()=>say('Magister Orvell',["“My apprentice, Tessaly, took my starwood staff and ran. She has found others who think fire is an argument. They are in the Drowned Shrine, past the Mistmere.”","“I came down from Hollowmere after her. I am too old to wade through a fen and too proud to ask the Baron's men.”","“Bring her back. Or bring the staff back. I will not pretend I know which matters more to me.”"],[
     {label:'“I will find her.”', fn:()=>{ remember('appr','asked','Magister Orvell\'s apprentice Tessaly fled to the Drowned Shrine with his starwood staff and a band of fire-cultists.'); say('Magister Orvell',"“Her friends burn. Frost will slow them. Or simply hit them very hard.”",[bye]); }}, bye])});
   if(CHOICE.appr==='returned') opts.unshift({label:'Ask after Tessaly.', fn:()=>say('Magister Orvell',"“She is in the tower. She hates me. She is studying again. Both of those are progress.”",[bye])});
   if(CHOICE.appr==='taken') opts.unshift({label:'Tell him how you got the staff.', fn:()=>say('Magister Orvell',["You tell him how you got it. He listens to all of it.","“You beat a frightened girl in a swamp for a stick.” He turns back to his books. “Keep it. I find I do not want it any more. And do not ask me to teach you anything again.”"],[bye])});
   if(CHOICE.appr==='freed') opts.unshift({label:'Tell him Tessaly is gone.', fn:()=>say('Magister Orvell',"He looks at you a long time. “Then she chose. I suppose I should have let her choose sooner.”",[bye])});
-  say('Magister Orvell',["An old man in a pale robe leans on a staff topped with a stone that glows faintly blue.", CHOICE.appr==='returned'?"“Ah. The one who brought her home.”":"“A wanderer. You have the look of someone who hits things. Have you ever considered hitting them from further away?”"],[...opts,bye]);
+  say('Magister Orvell',[areaId==='wheatsheaf'?"An old man in a travel-stained blue robe sits over a cup of Bertha's cider he has not touched. A staff with a faintly glowing blue stone leans on the bench beside him.":"An old man in a pale robe leans on a staff topped with a stone that glows faintly blue.", CHOICE.appr==='returned'?"“Ah. The one who brought her home.”":"“A wanderer. You have the look of someone who hits things. Have you ever considered hitting them from further away?”"],[...opts,bye]);
 }
 function tessalyTalk(){
   say('Tessaly',["A young woman in a scorched robe stands in the ruined shrine, her master's starwood staff in her hands. Her friends lie in the reeds.","“He sent you. Of course he did. Did he tell you he burned my notes? That he said I would never be more than his servant with a stick?”"],[
@@ -14617,7 +14620,7 @@ QUEST_ITEMS.add('ember_core');
 const emberMult=()=>1+(gearSum('ap')+gearSum('magic'))*0.04;
 const emberHit=()=>WEAPONS.emberbrand.dmg*emberMult();
 // foes with fire set you alight
-const FIRE_FOE=f=> f && ((f.opts&&f.opts.equip&&['fire_blade','emberbrand'].includes(f.opts.equip.weapon)) || /^Ash Hound|^The Slag Warden/.test(f.name||''));
+const FIRE_FOE=f=> f && ((f.opts&&f.opts.equip&&['fire_blade','emberbrand'].includes(f.opts.equip.weapon)) || /^Ash Hound|^The Slag Warden|^Ember Sprite|^The Kindled One/.test(f.name||''));
 
 // ── the look: a blade with a glowing edge, embers on the Emberbrand ──
 function drawEmberBlade(c,hx,hy,ang,id,s){       // a plain sword or longsword with fire running down the edge
@@ -17031,6 +17034,201 @@ function cryptAct(o){ if(o.type==='bonegate') say('A Bone-Gate',["A lattice of o
       if((CHOICE.cryptGates||[]).length>=3 && Math.hypot(c.x-12.5,c.y-1.5)<0.35){ CHOICE.cryptDone=true; NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='corran'));
         banner('Corran lies down','#e8e4d0',2000); logMsg("Corran climbs onto the slab, folds his arms the way his mother taught him, and goes still. Something in your staff hand remembers how he stood. Tell Vesna.",'#e8e4d0'); try{ if(worldCache) worldCache.area=null; }catch(e){} }
     }catch(e){} },33); }
+// ════════ The magister's three lessons: light caught in a jar, cold carried home, fire put out ════════
+// ── which words of a magister's staff you know: old saves that already carried one keep all three ──
+function MAGE_KNOWN(dir){ return Array.isArray(CHOICE.mageKnown) && CHOICE.mageKnown.includes(dir); }
+function SPELL_KNOWN(){ return spellsFor()===HEX_SPELLS ? HEX_KNOWN(playerGuard) : MAGE_KNOWN(playerGuard); }
+function spellCost(S){ return Math.round((S&&S.cost||0)*(CHOICE.tessLesson && spellsFor()===SPELLS ? 0.75 : 1)); }   // Tessaly's whisper: a quarter less breath
+const WIZ_STAVES=['staff_oak','staff_star','staff_cinder','staff_crystal'];
+applySave=(orig=>function(sv){ const r=orig.apply(this,arguments);
+  try{ if(!Array.isArray(CHOICE.mageKnown)){ const own=[...player.inv, player.opts.equip.weapon, ...(Array.isArray(CHOICE.stash)?CHOICE.stash:[])].some(id=>WIZ_STAVES.includes(id));
+      CHOICE.mageKnown= own ? ['right','up','left'] : []; } }catch(e){}
+  return r; })(applySave);
+setInterval(()=>{ if(running && !Array.isArray(CHOICE.mageKnown)) CHOICE.mageKnown=[]; },500);      // a new game starts knowing nothing
+
+// ── Orvell sits in the Wheatsheaf while he is still hunting his apprentice; after that he goes home to the Castle Ward ──
+function ORVELL_AT_INN(){ return !CHOICE.appr || CHOICE.appr==='asked'; }
+wrap('wheatsheaf','npcs',l=> ORVELL_AT_INN() ? [...l,{ id:'orvell', name:'Magister Orvell', i:4, j:3, dir:3, opts:{gender:'m',skin:0,hair:4,hairColor:13,beard:5,face:0,equip:{head:'hood',torso:'tunic_blue',armor:'robe_blue',hands:null,legs:null,feet:'boots',weapon:'staff_oak',offhand:null}} }] : l);
+
+Object.assign(ITEMS,{ glass_jar:{ name:"Orvell's Glass Jar", slot:'misc', title:'Thick green glass and a cork. It smells faintly of pickles.' },
+  bottled_wisp:{ name:'A Bottled Wisp', slot:'misc', title:'A cold little light, bumping against the glass. It seems curious about you.' },
+  ember_heart:{ name:'An Ember-Heart', slot:'misc', junk:true, title:'A coal that will not go out. Warm as a hand.' } });
+QUEST_ITEMS.add('glass_jar'); QUEST_ITEMS.add('bottled_wisp'); PRICES.ember_heart=45; SELL_MISC.add('ember_heart');
+paintItemArt=(orig=>function(g2,id,size){ if(id!=='glass_jar' && id!=='bottled_wisp' && id!=='ember_heart') return orig.apply(this,arguments);
+  g2.save(); g2.scale(size/40,size/40);
+  if(id==='ember_heart'){ const gl=g2.createRadialGradient(20,22,0,20,22,15); gl.addColorStop(0,'rgba(255,240,170,1)'); gl.addColorStop(0.35,'rgba(255,150,50,0.95)'); gl.addColorStop(1,'rgba(200,50,10,0)');
+    g2.fillStyle=gl; g2.beginPath(); g2.arc(20,22,15,0,Math.PI*2); g2.fill(); g2.fillStyle='#3a1608'; g2.beginPath(); g2.moveTo(13,24); g2.lineTo(18,15); g2.lineTo(27,17); g2.lineTo(28,26); g2.lineTo(20,31); g2.closePath(); g2.fill();
+    g2.strokeStyle='#ffb040'; g2.lineWidth=1.3; g2.beginPath(); g2.moveTo(16,23); g2.lineTo(20,19); g2.lineTo(25,21); g2.moveTo(20,19); g2.lineTo(21,28); g2.stroke(); g2.restore(); return; }
+  if(id==='bottled_wisp'){ const gl=g2.createRadialGradient(20,24,0,20,24,11); gl.addColorStop(0,'rgba(240,250,255,1)'); gl.addColorStop(0.4,'rgba(160,220,255,0.8)'); gl.addColorStop(1,'rgba(120,180,255,0)'); g2.fillStyle=gl; g2.beginPath(); g2.arc(20,24,11,0,Math.PI*2); g2.fill(); }
+  g2.fillStyle='rgba(150,190,160,0.28)'; g2.strokeStyle='rgba(60,90,70,0.95)'; g2.lineWidth=1.4; g2.beginPath(); g2.roundRect(11,12,18,23,5); g2.fill(); g2.stroke();     // the jar
+  g2.fillStyle='rgba(230,250,240,0.45)'; g2.fillRect(14,15,2.2,15);
+  g2.fillStyle='#a07848'; g2.strokeStyle='#5a3e20'; g2.beginPath(); g2.roundRect(14,7,12,6,1.5); g2.fill(); g2.stroke();                                         // the cork
+  g2.restore(); })(paintItemArt);
+
+// ── what he says ──
+function mageAskLabel(){ const n=(CHOICE.mageKnown||[]).length; return CHOICE.mageQ ? 'About the lesson.' : (n && n<3) ? 'Ask for the next lesson.' : 'Ask about magic.'; }
+function mageTalk(){ const O='Magister Orvell', K=CHOICE.mageKnown=Array.isArray(CHOICE.mageKnown)?CHOICE.mageKnown:[], back={label:'Back.', fn:()=>TALKERS.orvell()};
+  const cnt=id=>player.inv.filter(x=>x===id).length, take=(id,n)=>{ for(let q=0;q<n;q++){ const k=player.inv.indexOf(id); if(k>=0) player.inv[k]=null; } };
+  const learn=(dir,name)=>{ if(!K.includes(dir)) K.push(dir); CHOICE.mageQ=null; updateHud(); logMsg('You learned '+name+': lean '+dir+' with a magister\'s staff.','#9adcf0'); try{ autosaveSoon(300); }catch(e){} };
+  const giveStaff=()=>{ if(!WIZ_STAVES.some(w=>player.opts.equip.weapon===w||hasItem(w))){ if(giveQuestItem('staff_oak',true)) logMsg("Orvell gives you a plain oak staff with a blue stone in the crook.",'#9adcf0'); } };
+  const jars=()=>{ for(let q=cnt('glass_jar')+cnt('bottled_wisp');q<3;q++) giveQuestItem('glass_jar',true); };
+  if(!CHOICE.mageQ){
+    if(K.length>=3){ say(O,["“Fire to the <b>left</b>, frost <b>up</b>, the pure strike to the <b>right</b>. Magic passes any guard. It does not pass your own exhaustion. Mind the blue.”"],[back]); return; }
+    if(!K.includes('right')){ say(O,["“Magic is not in the staff. The staff is a cup. What goes in it, you have to go and fetch yourself.”","“First, the pure strike. It is the oldest and the plainest: light, with nothing added. So you will go and catch some. In the Mistmere at night there are wisps: cold little lights that live on fog and curiosity.”","“Walk at them and they run. Stand still, and they come to see what you are. Three of them. Take these jars, and do not let Bertha see them; she thinks they are for pickling.”"],[
+        {label:'“I will catch your lights.”', fn:()=>{ giveStaff(); jars(); remember('mageQ','light',"Magister Orvell wants three wisps caught in jars, in the Mistmere at night. They run if you walk at them; stand still and they come close."); closeDialog(); }}, back]); return; }
+    if(!K.includes('up')){ say(O,["“Frost next. Frost is patience, and patience is learned by being uncomfortable on purpose for a long time.”","“There is a pool in the willows past Hunter's Clearing. At midnight a cold spring wakes under it, from deep under the hill. Bathe in it at midnight, then walk home to Dunhollow. Do not warm yourself on the way: no fire, no hearth, no bed. Let the cold sit in you until it knows its way around.”","“Three nights. You will hate me. That is part of it.”"],[
+        {label:'“Three cold nights.”', fn:()=>{ remember('mageQ','cold',"Orvell wants you to bathe in the Willow Pool at midnight and walk home to Dunhollow without warming yourself at any fire, hearth or bed. Three nights."); closeDialog(); }}, back]); return; }
+    say(O,["“Fire last, because it is the easiest and the most dangerous. Fire wants to be called. That is the whole trouble with it.”","He leans close and says a word under his breath. The candle on the table leans towards him. “That is the kindling word. Say it over a fire that has burned a long time, and something climbs out to see who called. Ember-sprites: small, hot, and rude. Put them out. Frost works wonderfully.”","“Three old fires: the bandits' camp in the south, the hunters' fire in Hunter's Clearing, the loggers' fire at the Fellings. Ashes will do if the fire is out. Ashes remember.”"],[
+      {label:'“I will put them out.”', fn:()=>{ remember('mageQ','ember',"Orvell taught you the kindling word. Speak it over three old fires (the Bandit Camp, Hunter's Clearing, the Fellings) and put out the ember-sprites that climb out."); closeDialog(); }}, back]); return; }
+  if(CHOICE.mageQ==='light'){ const b=cnt('bottled_wisp');
+    if(b<3){ jars(); say(O,b?`“${b} of three. They bump about in there, don't they? The Mistmere, at night. Stand still.”`:"“The Mistmere, at night. Walk at them and they run. Stand still and let them come to you.”",[back]); return; }
+    say(O,["Orvell holds the three jars up to the lamp, one after the other, and smiles like a boy. Then he unstoppers one against the crook of your staff. The light pours in like water and does not come out.","“Feel that? Light with nothing added. Lean <b>right</b>, and let it go: the hardest blow, the cheapest call.”"],[
+      {label:'Learn the pure strike.', fn:()=>{ take('bottled_wisp',3); learn('right','Arcane'); say(O,"He uncorks the other two at the window and watches them drift off over the roofs. “They go home. Nobody keeps a wisp for long.”",[back]); }}]); return; }
+  if(CHOICE.mageQ==='cold'){ const n=CHOICE.baths||0;
+    if(n<3){ say(O,n?`“${n} of three nights. The cold is still a guest in you. It should be a lodger.”`:"“The Willow Pool at midnight, then home to Dunhollow. No fire, no hearth, no bed on the way.”",[back]); return; }
+    say(O,["He takes your hand. His is warm. Yours, you notice, is not, though it is a warm evening.","“There. It stays now. Lean <b>up</b>, and give some of it away: your foe grows slow, his swing grows long.”"],[
+      {label:'Learn Frost.', fn:()=>{ learn('up','Frost'); TALKERS.orvell(); }}]); return; }
+  if(CHOICE.mageQ==='ember'){ const n=(CHOICE.embers||[]).length;
+    if(n<3){ say(O,`“${n} of three fires. The camp in the south, Hunter's Clearing, the Fellings. Say the word, and have your frost ready.”`,[back]); return; }
+    say(O,["“Three fires that wanted to be people, and you put them out. Now you know how fire thinks: it is hungry, and it is never sorry.”","“Lean <b>left</b> and it burns, and keeps eating. Never call more than you can put out.”"],[
+      {label:'Learn Fire.', fn:()=>{ learn('left','Fire');
+        say(O,CHOICE.appr==='returned'?"“That is everything I know how to teach. Tessaly says there is something I do not know I know. Ask her. She will enjoy that far too much.”":"“That is everything I know how to teach. Go and be careful with it.”",[back]); }}]); return; }
+  say(O,"“Mind the blue.”",[back]); }
+JOURNAL.push(["The Magister's Lessons", ()=>{ const K=CHOICE.mageKnown||[]; if(!K.length && !CHOICE.mageQ) return null;
+  if(K.length>=3) return ['done',"Magister Orvell taught you the three words of a magister's staff: the pure strike, Frost and Fire."+(CHOICE.tessLesson?" Tessaly taught you to whisper them.":"")];
+  if(CHOICE.appr==='taken') return ['failed',"Orvell will not teach you any more, after what you did to Tessaly."];
+  if(CHOICE.mageQ==='light') return ['active',"Catch three wisps in Orvell's jars in the Mistmere at night. Walk at them and they run; stand still and they come close. ("+player.inv.filter(x=>x==='bottled_wisp').length+"/3)"];
+  if(CHOICE.mageQ==='cold') return ['active',"Bathe in the Willow Pool at midnight, then walk home to Dunhollow without warming yourself at a fire, a hearth or a bed. ("+(CHOICE.baths||0)+"/3 nights)"+(CHOICE.coldWalk?" You are cold to the bone: walk.":"")];
+  if(CHOICE.mageQ==='ember') return ['active',"Speak the kindling word over three old fires (the Bandit Camp, Hunter's Clearing, the Fellings) and put out the ember-sprites. ("+(CHOICE.embers||[]).length+"/3)"];
+  return ['active',"Magister Orvell has another lesson for you, "+(ORVELL_AT_INN()?"in the Wheatsheaf in Dunhollow.":"in the Castle Ward of Hollowmere.")]; }]);
+
+// ── Bottled Light: wisps in the Mistmere that run if you walk at them and come close if you keep still ──
+OBJ_DRAW.mwisp=o=>{ const n=Math.max(0.5,nightAmt()), q=P(o.x,o.y), t=gt*1.3+o.seed, x=q.x+Math.sin(t)*4, y=q.y-40+Math.sin(t*1.7)*6, hot=o.flee>0?1.4:1;
+  g.save(); g.globalCompositeOperation='lighter'; glow(x,y,30*hot,30*hot,'170,215,255',0.6*n); glow(x,y,10,10,'235,245,255',0.7*n);
+  g.fillStyle='rgba(245,252,255,'+(0.9*n)+')'; g.beginPath(); g.arc(x,y,2.8,0,Math.PI*2); g.fill();
+  for(let k=0;k<3;k++){ const u=((gt*0.8+k/3+o.seed)%1); g.fillStyle=`rgba(190,225,255,${0.5*(1-u)*n})`; g.beginPath(); g.arc(x-Math.sin(t+k)*3-o.vx*u*14,y+u*10-o.vy*u*8,1.3,0,Math.PI*2); g.fill(); }   // a little trail
+  g.restore(); };
+{ let MW=[], still=0, last=null, noJar=0; const HOMES=[[2,2],[11,2],[12,8],[8,4]];
+  setInterval(()=>{ try{ const dt=0.05, want=running && areaId==='mistmere' && CHOICE.mageQ==='light' && nightAmt()>0.5 && !combat.active;
+      if(!want || MW.some(o=>!OBJECTS.includes(o))){ MW.forEach(o=>{ const q=OBJECTS.indexOf(o); if(q>=0) OBJECTS.splice(q,1); }); MW=[]; if(!want) return; }
+      const left=3-player.inv.filter(x=>x==='bottled_wisp').length;
+      if(!MW.length && left>0){ for(let k=0;k<Math.min(left+1,4);k++){ const [hi,hj]=HOMES[k]; const o={type:'mwisp', i:hi, j:hj, x:hi+0.5, y:hj+0.5, hx:hi+0.5, hy:hj+0.5, vx:0, vy:0, flee:0, seed:k*1.7, noblock:true}; MW.push(o); OBJECTS.push(o); } }
+      const mv=last?Math.hypot(player.x-last.x,player.y-last.y):0; last={x:player.x,y:player.y}; still= (mv<0.002 && !dlgIsOpen()) ? still+dt : 0;
+      MW.slice().forEach(o=>{ const dx=o.x-player.x, dy=o.y-player.y, d=Math.hypot(dx,dy)||0.01; let tx=0, ty=0, sp=0;
+        if(still<0.25 && d<3.4){ tx=dx/d; ty=dy/d; sp=2.7; o.flee=0.6; }                                                  // you came at it: it bolts
+        else if(still>2.5 && d<3.9){ tx=-dx/d; ty=-dy/d; sp=0.55; o.flee=Math.max(0,o.flee-dt); }                        // you are keeping still: it comes to look
+        else { o.flee=Math.max(0,o.flee-dt); const a=gt*0.4+o.seed, gx=o.hx+Math.cos(a)*1.4-o.x, gy=o.hy+Math.sin(a*1.3)*1.1-o.y, gd=Math.hypot(gx,gy)||1; tx=gx/gd; ty=gy/gd; sp=Math.min(0.7,gd); }
+        let nx=o.x+tx*sp*dt, ny=o.y+ty*sp*dt;
+        if(nx<0.6||nx>ROOM.w-0.6){ nx=Math.max(0.6,Math.min(ROOM.w-0.6,nx)); ny+=(ty>=0?1:-1)*sp*dt*0.9; }                // cornered: it slips along the edge
+        if(ny<0.6||ny>ROOM.h-0.6){ ny=Math.max(0.6,Math.min(ROOM.h-0.6,ny)); nx+=(tx>=0?1:-1)*sp*dt*0.9; }
+        o.vx=nx-o.x; o.vy=ny-o.y; o.x=Math.max(0.6,Math.min(ROOM.w-0.6,nx)); o.y=Math.max(0.6,Math.min(ROOM.h-0.6,ny)); o.i=Math.floor(o.x); o.j=Math.floor(o.y);
+        if(d<0.6 && still>2.5){ const k=player.inv.indexOf('glass_jar');
+          if(k<0){ if(gt-noJar>6){ noJar=gt; logMsg('The wisp hangs in front of your face. You have no jar to put it in.','#a8c8e8'); } return; }
+          player.inv[k]='bottled_wisp'; const q=OBJECTS.indexOf(o); if(q>=0) OBJECTS.splice(q,1); MW.splice(MW.indexOf(o),1);
+          const n=player.inv.filter(x=>x==='bottled_wisp').length; banner('A wisp in a jar ('+n+'/3)','#bfe0ff',1500); floatText(tileOf(player),'✦','#d8ecff');
+          logMsg(n<3?'It drifts right into the jar, as if it wanted to see inside. You cork it.':'The third light bumps against the glass. Take them to Orvell.','#bfe0ff'); } });
+    }catch(e){} },50); }
+
+// ── The Cold Water: the Willow Pool at midnight, then home to Dunhollow without warming yourself ──
+OBJ_DRAW.bathstones=o=>{ [[0.35,0.75,10,4.4],[0.6,0.45,9,4],[0.85,0.2,8,3.6]].forEach(([a,b,rx,ry],k)=>{ const q=P(o.i+a,o.j+b);
+    g.fillStyle='#4e5254'; g.beginPath(); g.ellipse(q.x,q.y+1.5,rx,ry,0,0,Math.PI*2); g.fill(); g.fillStyle=k===2?'#7a8a88':'#8a9090'; g.beginPath(); g.ellipse(q.x,q.y,rx,ry,0,0,Math.PI*2); g.fill();
+    if(nightAmt()>0.5 && CHOICE.mageQ==='cold'){ g.fillStyle='rgba(210,235,255,0.35)'; g.beginPath(); g.ellipse(q.x-2,q.y-1,rx*0.5,ry*0.4,0,0,Math.PI*2); g.fill(); } }); };   // rime on the stones, at night
+wrap('willowpool','objects',l=>[...l,{type:'bathstones', i:2, j:3}]);
+PUZ_TYPES.add('bathstones');
+const WILLOW_VOICE=["Under the water something turns over, slow as a sleeper, and the cold closes over your heart like a fist. A voice that is not quite a voice: <i>“Walk, then. Walk, and do not run to the fire like a child.”</i>",
+  "The cold comes up from far below, older than the willows. <i>“Again? Good. The fire-callers never come back a second night.”</i>",
+  "This time the cold does not hurt. It only waits. <i>“There. Now it knows the way. Carry it home.”</i>"];
+function bathAct(){ const day=Math.floor(dayClock/DAY_LEN), h=HOUR(), n=CHOICE.baths||0;
+  if(CHOICE.mageQ!=='cold'){ say('Bathing Stones',"Flat stones go down into the green water. The women of Dunhollow bathe here by day.",[bye]); return; }
+  if(CHOICE.coldWalk){ say('Bathing Stones',"You are already cold to the bone. Walk, before it leaves you.",[bye]); return; }
+  if(!(h>=23 || h<1)){ say('Bathing Stones',h>=18||h<5?"The water is cold, but only cold. Orvell said midnight.":"In daylight it is only a pool. Orvell said midnight.",[bye]); return; }
+  if(CHOICE.bathNight===day){ say('Bathing Stones',"Once a night is enough. More than enough.",[bye]); return; }
+  say('Bathing Stones',["The pool is black and still. Mist sits on it like a lid. You strip to the skin, and go in."],[
+    {label:'Wade in to the neck.', fn:()=>{ CHOICE.bathNight=day; CHOICE.coldWalk={day, n:n+1};
+      say('The Willow Pool',[WILLOW_VOICE[Math.min(n,2)],"You climb out blue, shaking, and dress with fingers that will not work. Dunhollow is a long way off."],[{label:'Walk.', fn:closeDialog}]);
+      logMsg('You are cold to the marrow. Walk home to Dunhollow before dawn, and do not warm yourself: no fire, no hearth, no bed.','#bfe0ff'); }}, bye]); }
+function coldFail(why){ if(!CHOICE.coldWalk) return; CHOICE.coldWalk=null; logMsg(why,'#a8b8c8'); banner('The cold is gone','#a8c0d8',1400); }
+{ let tick=0;
+  setInterval(()=>{ try{ const C=CHOICE.coldWalk; if(!C || !running) return; tick++;
+      if(areaId==='village'){ CHOICE.coldWalk=null; CHOICE.baths=(CHOICE.baths||0)+1; const n=CHOICE.baths;
+        banner('The cold stays in you ('+n+'/3)','#bfe0ff',1800); logMsg(n<3?'You reach Dunhollow with the cold still in you, and it does not leave when you stop. Another night, another bath.':'The cold has made itself at home. Go back to Orvell.','#bfe0ff'); try{ autosaveSoon(300); }catch(e){} return; }
+      const h=HOUR(); if(h>=6 && h<12){ coldFail('The sun comes up, and the cold goes out of you with the night. Try again another midnight.'); return; }
+      if(tick%6===0 && !combat.active) floatText(tileOf(player),'❄','#cfe8ff'); }catch(e){} },500); }
+bedPrompt=(orig=>function(){ if(CHOICE.coldWalk) coldFail('You crawl under a blanket, and the warmth takes the cold out of you all at once. Orvell would not be impressed.'); return orig.apply(this,arguments); })(bedPrompt);
+// the women at the pool notice the frost on their stones
+{ let lastArea=null;
+  setInterval(()=>{ try{ if(!running) return; const a=areaId; if(a===lastArea) return; lastArea=a;
+      if(a!=='willowpool' || CHOICE.pool==='stared' || !((CHOICE.baths||0)>(CHOICE.bathSeen||0)) || nightAmt()>0.3) return;
+      setTimeout(()=>{ const m=NPCS.find(n=>n.id==='pool_maud')||NPCS.find(n=>/^pool_/.test(n.id)); if(!m || areaId!=='willowpool') return; const n=CHOICE.baths; CHOICE.bathSeen=n;
+        const L=[["Maud","“Somebody's been in our pool at midnight. There was frost on the stones this morning. Frost! In this weather.”"],["Brenna","“It's you, isn't it? Lise saw you on the Dunhollow road at one in the morning, blue as a duck egg and walking like a heron.”"],["Maud","“My grandmother used to do that. She said the cold at midnight comes up from under the hill, and it teaches you things. She never said what. You'll tell us, won't you?”"]][Math.min(n,3)-1];
+        floatText([m.i,m.j-0.6],'!','#e8d8a0'); logMsg(L[0]+': '+L[1],'#d8c8a8'); },900); }catch(e){} },400); }
+
+// ── The Ember Sprites: speak the kindling word over three old fires, and put out what climbs out ──
+FOES.ember={ label:'Ember Sprite', base:38, stagger:1.0, pattern:[
+  {wait:1.0, wind:0.85, after:0.6, dir:'left'}, {wait:0.5, wind:0.6, after:0.5, dir:'up'}, {wait:1.3, wind:1.05, after:0.75, dir:'right'} ]};
+Object.assign(WEAPONS,{ ember_touch:{ wind:0.3, dmg:6, len:20 }, ember_maw:{ wind:0.35, dmg:9, len:24 } });
+BEASTS.unshift({ k:'ember', is:f=>f.type==='ember', name:'Ember Sprites', kind:'Fire called up · old campfires',
+  how:'A flicker, a lunge, a long slow swing of flame. The one that climbs from the third fire is bigger and hotter.', res:'Fire feeds them: your own fire barely scorches.', aff:'Burning, often; the big one sets you alight with every blow.', ans:'Frost: it hisses and takes double. Cooling Salve on the belt.' });
+function drawEmber(x,B,e,pose){ const big=e.opts&&e.opts.big?1.45:1, k=pose&&pose.kind==='raise'?Math.min(1,pose.t):0, lun=pose&&pose.kind==='strike'?Math.min(1,pose.t):0;
+  const fade=e.dead?Math.max(0,1-(e.fallT||0)/0.7):1; if(fade<=0) return;
+  const s0=(e.id||0)*1.3, t=gt*7+s0, H=(54+k*10)*big, W=15*big, y=B-7*big-Math.sin(gt*2.3+s0)*3;            // it floats a hand above the ground
+  g.save(); g.globalAlpha*=fade;
+  g.fillStyle='rgba(30,12,4,0.5)'; g.beginPath(); g.ellipse(x,B+2,W*1.3,5.5*big,0,0,Math.PI*2); g.fill();     // scorched ground
+  g.globalCompositeOperation='lighter'; glow(x,y-H*0.45,W*3.2,H*0.95,'255,130,40',0.5); g.globalCompositeOperation='source-over';
+  const flame=(col,sc,ph,lean)=>{ const w=W*sc, h=H*sc, tip=x+Math.sin(t*0.6+ph)*5*sc+lean+lun*6;
+    g.fillStyle=col; g.beginPath(); g.moveTo(x-w,y-h*0.12);
+    g.bezierCurveTo(x-w*1.05,y-h*0.55,tip-w*0.5,y-h*0.7+Math.sin(t+ph)*3,tip,y-h);
+    g.bezierCurveTo(tip+w*0.5,y-h*0.72+Math.cos(t*1.1+ph)*3,x+w*1.05,y-h*0.55,x+w,y-h*0.12);
+    g.quadraticCurveTo(x,y+h*0.12,x-w,y-h*0.12); g.closePath(); g.fill(); };
+  const arm=sd=>{ const sx=x+sd*W*0.8, sy=y-H*0.48, ex=x+sd*(W*1.9+lun*9), ey=y-H*(0.32+k*0.45)-Math.sin(t*0.8+sd)*3;
+    g.strokeStyle='#d8501a'; g.lineWidth=6*big; g.lineCap='round'; g.beginPath(); g.moveTo(sx,sy); g.quadraticCurveTo((sx+ex)/2,ey+8,ex,ey); g.stroke();
+    g.strokeStyle='#ffc050'; g.lineWidth=2.4*big; g.beginPath(); g.moveTo(sx,sy); g.quadraticCurveTo((sx+ex)/2,ey+8,ex,ey); g.stroke(); };
+  arm(-1); flame('#a8300c',1,0,0); flame('#e8661a',0.78,1.3,-1); flame('#ffb43a',0.52,2.1,1); flame('#fff0b0',0.26,3,0); arm(1);
+  const ey=y-H*0.6; g.fillStyle='#3a0c02'; g.beginPath(); g.ellipse(x-5*big,ey,3.2*big,1.8*big,0.25,0,Math.PI*2); g.ellipse(x+5*big,ey,3.2*big,1.8*big,-0.25,0,Math.PI*2); g.fill();   // two dark slits
+  g.fillStyle='#fffbe0'; g.beginPath(); g.arc(x-5*big,ey,1*big,0,Math.PI*2); g.arc(x+5*big,ey,1*big,0,Math.PI*2); g.fill();
+  for(let d=0;d<5;d++){ const u=((gt*0.9+d*0.2+s0)%1); g.fillStyle=`rgba(255,${180+Math.round(60*(1-u))},80,${0.9*(1-u)})`; g.beginPath(); g.arc(x+Math.sin(d*2.1+gt*2)*W*0.8,y-H*(0.6+u*0.75),1.4*big,0,Math.PI*2); g.fill(); }   // sparks
+  g.restore(); }
+const EMBER_SITES={ camp:[6,5], clearing:[5,6], fellings:[6,5] };
+PUZ_TYPES.add('ashes');
+puzAct=(orig=>function(o){
+  if(o && o.type==='bathstones') return bathAct();
+  if(o && (o.type==='campfire'||o.type==='hearth') && CHOICE.coldWalk) coldFail('You crouch by the '+(o.type==='hearth'?'hearth':'fire')+', and the cold leaves you all at once. Orvell said: no fire. Another midnight, then.');
+  if(o && (o.type==='campfire'||o.type==='ashes')){ const st=EMBER_SITES[areaId];
+    if(CHOICE.mageQ==='ember' && st && st[0]===o.i && st[1]===o.j && !(CHOICE.embers||[]).includes(areaId) && !combat.active){ emberAsk(o); return; }
+    if(o.type==='ashes'){ say('Old Ashes',(CHOICE.embers||[]).includes(areaId)?"The ashes are stone cold now, and stay that way.":"A ring of blackened stones and old ashes, long cold.",[bye]); return; } }
+  return orig.apply(this,arguments); })(puzAct);
+function emberAsk(o){ const T=o.type==='ashes'?'Old Ashes':'A Campfire';
+  say(T,[o.type==='ashes'?"A ring of blackened stones and old ashes. Orvell said: ashes remember.":"The fire has burned here a long time; the stones round it are black to the core.","The kindling word sits on your tongue like a hot coal."],[
+    {label:'Speak the kindling word.', fn:()=>emberSummon(o)}, ...(o.type==='campfire'?[{label:'Just warm yourself.', fn:()=>campfireCook(o)}]:[]), bye]); }
+function emberSummon(o){ closeDialog(); const n=(CHOICE.embers||[]).length, big=n>=2, name=big?'The Kindled One':'Ember Sprite';
+  let spot=null; for(const [di,dj] of [[1,0],[0,1],[-1,0],[0,-1],[1,1],[-1,1],[1,-1]]){ const i=o.i+di, j=o.j+dj; if(i<0||j<0||i>=ROOM.w||j>=ROOM.h||blocked.has(i+','+j)||(i===player.i&&j===player.j)||mobAt(i,j)) continue; spot=[i,j]; break; }
+  if(!spot) spot=[o.i,o.j];
+  const opts={ ember:true, big, equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:big?'ember_maw':'ember_touch',offhand:null} }, hp=Math.round(FOES.ember.base*(big?1.9:1));
+  const m={ id:mobs.length+40, key:name, name, type:'ember', opts, faction:'ember', spawn:spot, i:spot[0], j:spot[1], x:spot[0]+0.5, y:spot[1]+0.5, dir:1, hp, maxHp:hp, path:[], moving:false, dead:false, gone:false, fade:1, flash:0, lunge:null,
+    state:'guard', t:0, k:0, wind:1, quick:false, guardDir:'up', ox:0, oy:0, hostile:true, fallT:0, tier:big?2:1, emberSite:areaId };
+  mobs.push(m); try{ FOOLED[areaId+':'+name]=false; }catch(e){}
+  shake=Math.max(shake,4); floatText([o.i,o.j],'✹','#ffb040'); try{ if(worldCache) worldCache.area=null; }catch(e){}
+  logMsg(big?"The fire roars up twice your height, and something in it opens its eyes. It is not small, and it is not pleased.":"The flames stand up on their own, grow arms, and turn round to look at you.",'#ffb070');
+  setTimeout(()=>{ try{ startCombat(); }catch(e){} },350); }
+setInterval(()=>{ try{ if(combat.active) return; mobs.forEach(m=>{ if(m.type!=='ember' || !m.dead || m.counted) return; m.counted=true;
+      const E=CHOICE.embers=CHOICE.embers||[]; if(!E.includes(m.emberSite)) E.push(m.emberSite);
+      banner('The fire is out ('+E.length+'/3)','#ffc080',1600); logMsg(E.length<3?'The sprite gutters out into a wisp of smoke and a few warm coins.':'The Kindled One collapses into a heap of glowing coals. Tell Orvell.','#ffc080'); try{ autosaveSoon(300); }catch(e){} }); }catch(e){} },400);
+
+// ── Tessaly, home again, has one lesson her master does not know he could give ──
+wrap('keepward','npcs',l=> CHOICE.appr==='returned' ? [...l,{ id:'tessaly_k', name:'Tessaly', i:12, j:9, dir:1, opts:{gender:'f',skin:1,hair:1,hairColor:6,face:3,equip:{head:null,torso:'elf_robe',armor:null,hands:null,legs:null,feet:null,weapon:'staff_star',offhand:null}} }] : l);
+TALKERS.tessaly_k=()=>{ const T='Tessaly', K=CHOICE.mageKnown||[];
+  if(CHOICE.tessLesson){ say(T,"“Whisper. The staff is not deaf.”",[bye]); return; }
+  if(K.length<3){ say(T,["Tessaly is copying out a book with ink-black fingers. She does not look up.","“Has he had you jarring wisps yet? He did that to me. Finish his lessons. Then come and find me: there is one thing he will never teach you, because he does not know he does it.”"],[bye]); return; }
+  say(T,["“So. All three.” She puts the pen down. “Cast something. Anything. At that candle.”","You do. The candle goes over, and the shelf behind it, and some of the wall.","“You cast like him. You throw the whole breath at it, every time, as if the staff were deaf. It isn't. Whisper.” She makes you light the candle again, and again, softer each time, until it takes with barely a word."],[
+    {label:'Learn to whisper.', fn:()=>{ CHOICE.tessLesson=true; updateHud(); logMsg("Tessaly's lesson: your magister's spells cost a quarter less mana.",'#e8e0ff'); say(T,"“There. Now go and tell him I taught you something. Watch his face. That is my fee.”",[bye]); }}, bye]); };
+// fire-sprites and bottled light shine through the night instead of being darkened by it
+drawMoonlight=(orig=>function(){ orig.apply(this,arguments); if(AREAS[areaId].inside) return; const n=nightAmt(); if(n<0.02) return;
+  g.save(); g.globalCompositeOperation='lighter';
+  mobs.forEach(m=>{ if(m.type!=='ember' || (m.dead && (m.fallT||0)>0.7)) return; const q=P(m.x+(m.ox||0),m.y+(m.oy||0)), big=m.opts&&m.opts.big?1.45:1, fl=0.9+Math.sin(gt*9+m.id)*0.08;
+    glow(q.x,q.y-34*big,46*big*fl,56*big*fl,'255,140,50',0.42*n); glow(q.x,q.y-30*big,16*big,24*big,'255,220,140',0.35*n); glow(q.x,q.y+2,70*big*fl,30*big*fl,'255,120,40',0.25*n); });
+  OBJECTS.forEach(o=>{ if(o.type!=='mwisp') return; const q=P(o.x,o.y), t=gt*1.3+o.seed, x=q.x+Math.sin(t)*4, y=q.y-40+Math.sin(t*1.7)*6;
+    glow(x,y,24,24,'170,215,255',0.45*n); glow(x,y,6,6,'245,250,255',0.6*n); glow(q.x,q.y,30,12,'150,200,255',0.12*n); });
+  g.restore(); })(drawMoonlight);
 </script>
 </body>
 </html>

@@ -10348,7 +10348,7 @@ function todaysStock(who,pool,n){
 }
 // selling: any trader buys what is in your pack (not story items), at forty percent of its price
 function sellTo(who,back,o){                     // o (optional): only these items, at this buyer's own price, with his own words
-  const goods=player.inv.map((id,k)=>({id,k})).filter(({id})=>id && PRICES[id] && !(typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(id)) && (ITEMS[id].slot!=='misc' || SELL_MISC.has(id) || (o && o.only && o.only.has(id))) && (!o || !o.only || o.only.has(id)));
+  const goods=player.inv.map((id,k)=>({id,k})).filter(({id,k})=>id && PRICES[id] && !(id==='fishing_rod' && player.inv.indexOf(id)===k) && !(typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(id)) && (ITEMS[id].slot!=='misc' || SELL_MISC.has(id) || (o && o.only && o.only.has(id))) && (!o || !o.only || o.only.has(id)));
   say(who,[goods.length?(o&&o.greet||"“Let us see what you have.” (Only what is in your pack, not what you wear.)"):(o&&o.none||"“Nothing in your pack I'd buy.”")],[{label:'Back.',fn:back},bye],true);
   if(!goods.length) return;
   const box=document.getElementById('dlg-opts'), grid=document.createElement('div'); grid.className='shop-grid';
@@ -16518,14 +16518,14 @@ Object.assign(ITEMS,{ fishing_rod:{ name:'Fishing Rod', slot:'misc', tool:true }
   old_boot:{ name:'An Old Boot', slot:'misc', junk:true }, one_ring:{ name:'The One Ring', slot:'neck' } });
 ITEMS.old_bone.junk=true; ITEMS.old_skull.junk=true;
 Object.assign(PRICES,{ fishing_rod:18, fish_perch:3, fish_trout:5, fish_carp:4, fish_eel:6, fish_herring:3, grilled_fish:7, old_boot:1, one_ring:400 });
-['old_bone','old_skull','old_boot','fish_perch'].forEach(id=>SELL_MISC.add(id));
+['old_bone','old_skull','old_boot','fish_perch','fishing_rod'].forEach(id=>SELL_MISC.add(id));   // a spare rod sells; the one you fish with stays
 ITEM_STATS.one_ring={ hp:2, agi:2, ap:2, magic:2, mreg:2 }; GEAR_HP.one_ring=2;
 NECK_LOOKS.one_ring={cord:'#d8b048',w:0.3,p:'ring',col:'#f2c84a'};
 Object.assign(GEAR_LORE||{},{ one_ring:'A plain band of gold on a fine chain, warm as if someone had just taken it off. It fits any finger, but you keep it round your neck. You do not want to lend it to anybody. Ever.' });
 PEDDLER_POOL.push('fishing_rod');
 // Corwin's packs: filled at Hollowmere market and again in Sylvhaven; what you buy is gone until he next reaches an end of the road
 function peddlerStock(pool,n){ const T=(CHOICE.pedd&&CHOICE.pedd.trip)||0, h=[...'peddler'].reduce((a,ch)=>a*31+ch.charCodeAt(0)|0,7), sold=CHOICE.peddSold||[];
-  const out=pool.map((id,k)=>[id,rnd01(T*13+k,h,410)]).sort((a,b)=>a[1]-b[1]).slice(0,n).map(x=>x[0]).filter(id=>!sold.includes(id));
+  const out=pool.map((id,k)=>[id,rnd01(T*13+k,h,410)]).sort((a,b)=>a[1]-b[1]).slice(0,n).map(x=>x[0]).filter(id=>!sold.includes(id) && !(id==='fishing_rod' && hasItem(id)));   // no second rod
   if(!out.includes('fishing_rod') && !hasItem('fishing_rod') && !sold.includes('fishing_rod')) out.unshift('fishing_rod');   // he always has a rod for you
   out.key='peddler'; return out; }
 // ── cooking: walk up to any campfire with raw meat or fish ──

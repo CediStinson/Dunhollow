@@ -853,8 +853,10 @@ function dirFromDelta(di,dj){
 
 // Single entry point: mirrors the canvas for the three flipped facings.
 // Weapon drawn from the hand (origin) along +x, rotated by `ang` (radians).
+const WEAPON_ART={};                                   // id → its own drawing (the wizards' staves, the grave-blade): looked at first
 function drawWeapon(c,hx,hy,ang,id,s=1){
   if(!id) return;
+  if(WEAPON_ART[id]) return WEAPON_ART[id](c,hx,hy,ang,id,s);
   if(id==='barrow_blade') return drawDrownedBlade(c,hx,hy,ang,s);
   if(id==='shovel') return drawShovel(c,hx,hy,ang,s);
   if(id==='fire_blade' || id==='emberbrand') return drawEmberBlade(c,hx,hy,ang,id,s);
@@ -5287,6 +5289,7 @@ function sleepUntil(which){
   autosaveSoon(200);
 }
 function bedPrompt(){                                 // somebody else's bed, or one already slept in
+  if(CHOICE.coldWalk && typeof coldFail==='function') coldFail('You crawl under a blanket, and the warmth takes the cold out of you all at once. Orvell would not be impressed.');   // a blanket ends Orvell's cold walk
   let bed=CLICKED_BED && OBJECTS.includes(CLICKED_BED) ? CLICKED_BED : null, bd=1e9; CLICKED_BED=null;
     if(!bed) OBJECTS.filter(o=>o.type==='bed').forEach(o=>{ const d=Math.hypot(o.i+1-player.x,o.j+0.5-player.y); if(d<bd){ bd=d; bed=o; } });
     const sl=bed && NPCS.find(n=>n.sleepBed && n.sleepBed.i===bed.i && n.sleepBed.j===bed.j);
@@ -8467,6 +8470,7 @@ function drawMoonlight(){
     if((o.i*3+o.j)%3===0) glow(q.x-20,q.y-30,40,26,'255,200,120',0.12*n); });
   const pp=P(player.x,player.y); glow(pp.x,pp.y-40,90,70,'200,210,255',0.06*n);   // eyes adjust around you
   g.restore();
+  if(typeof nightGlows==='function') nightGlows();   // fire-sprites and wisps shine through
 }
 function drawLightFX(){
   drawNight();
@@ -8962,7 +8966,9 @@ window.addEventListener('keydown',e=>{
 // ════════════════════════════════════════════════════════════
 // Item icons are drawn in a 40x40 box, same palette as the sprites.
 const OWN_ART=new Set(['fish_perch','fish_trout','fish_carp','fish_eel','fish_herring','grilled_fish','fishing_rod','old_boot','raw_meat','cooked_meat','wolf_fang','apple','bread','potion','mana_potion','warm_tonic','burn_salve','rue_water','linen_wrap','robe_elf','moonthread','silver_setting','moon_amulet','elf_bustier','plate_boots','bandana','coif','helm_full','tunic_linen','tunic_blue','tunic_green','tunic_red','smock','hose_grey','breeches','riding_boots','hood_red','straw_hat','gambeson','studded','blackmail','brightmail','gauntlets','shield_red','shield_iron']);
+const ITEM_ICON={};                                   // id → its own icon painter (quest items, junk, keepsakes): looked at first
 function paintItemArt(g2,id,size){                   // an item's inventory icon: special pieces first, then the common art
+  if(ITEM_ICON[id]) return ITEM_ICON[id](g2,id,size);
   const u=unWoven(id), L=NECK_LOOKS && NECK_LOOKS[u];
   if(u==='beret' || u==='vest_black' || u==='cowl_black') return paintBlackwearIcon(g2,u,size);
   if(paintBarrowIcon(g2,id,size)) return;
@@ -9625,6 +9631,11 @@ const hasItem=id=>player.inv.includes(id);
 const bye={label:'Farewell.', fn:closeDialog};
 function npcHasNews(n){                                // '!' new business, '?' something to hand in, null nothing
   if(n.sleepBed) return null;
+  // the grave-blade reforged: Vesna and Oswin
+  if(n.id==='vesna' && hasItem('rusted_blade') && !CHOICE.reforge && (CHOICE.necro||CHOICE.morwen)) return '!';
+  if(n.id==='vesna' && CHOICE.reforge==='clean' && hasItem('clean_blade') && rfHave()) return '?';
+  if(n.id==='smith' && CHOICE.reforge==='asked' && hasItem('rusted_blade')) return '?';
+  if(n.id==='smith' && CHOICE.reforge==='smith' && rfDay()>CHOICE.reforgeDay) return '?';
   if(n.id==='vesna' && !n._lesson && areaId==='fen'){ if(!CHOICE.morwen) return '!'; if(CHOICE.morwen==='asked' && hasLantern()) return '?'; }
   if(n.id==='vesna' && NECRO()>=3 && !CHOICE.skelArms) return CHOICE.necroQ==='bones' ? (bonesDown()>=4?'?':null) : '!';
   if((n.id==='digger' && !CHOICE.grave && EDRIC_FOUND()) || (n.id==='hunter' && (!CHOICE.brannMet && !CHOICE.hunter))) return '!';
@@ -9671,12 +9682,16 @@ function npcHasNews(n){                                // '!' new business, '?' 
   if(n.id==='gerd' && FEN_OPEN() && (!CHOICE.pim || CHOICE.pim==='found')) return CHOICE.pim==='found'?'?':'!';
   if(n.id==='pim_lost') return '!';
   if(n.id==='vesna'){ const N=NECRO(), r=(()=>{
-      if(CHOICE.necro==='met' && !CHOICE.necroQ) return '!';
-      if(CHOICE.necroQ==='motes') return player.inv.filter(x=>x==='grave_mote').length>=3 && !vesnaWait(0)?'?':null;
-      if(N===1 && FEN_OPEN() && !CHOICE.necroQ && !vesnaWait(1)) return '!';
-      if(N===1 && CHOICE.necroQ==='lurkers' && ['fen:Bog Lurker','fen:Mire Lurker','fen:Old Mudmaw'].every(k=>defeatedMobs.has(k))) return '?';
-      if(N===2 && CHOICE.barrow==='done' && !vesnaWait(2)) return '?'; })();
+      const Q=CHOICE.necroQ;
+      if(Q==='listen') return (CHOICE.listened||[]).length>=3 ? '?' : null;
+      if(Q==='hanged') return hasItem('hanged_bones') && player.inv.filter(x=>x==='old_bone').length>=3 ? '?' : null;
+      if(Q==='crypt') return CHOICE.cryptDone ? '?' : null;
+      if(!Q && (CHOICE.necro==='met' || N===1 || N===2)) return '!'; })();
     if(r) return r; }
+  if(n.id==='orvell' && CHOICE.appr!=='taken'){ const K=(CHOICE.mageKnown||[]).length, Q=CHOICE.mageQ;     // the magister's lessons
+    if(Q==='light' && player.inv.filter(x=>x==='bottled_wisp').length>=3) return '?'; if(Q==='cold' && (CHOICE.baths||0)>=2) return '?'; if(Q==='ember' && (CHOICE.embers||[]).length>=3) return '?';
+    if(!Q && K>0 && K<3) return '!'; }
+  if(n.id==='tessaly_k' && (CHOICE.mageKnown||[]).length>=3 && !CHOICE.tessLesson) return '!';
   if(n.id==='ilka' && !CHOICE.emberbrand) return (hasItem('fire_blade')||player.opts.equip.weapon==='fire_blade') && coreCount()>=3 ? '?' : '!';
   if(n.id==='trader'){ if(CHOICE.pupSt==='follow') return '!'; if(CHOICE.goatEaten && !CHOICE.goatTold) return '!'; }   // (a fed pup at home is told in conversation, not by a mark)
   if(n.id==='digger' && CHOICE.moundSeen && !ownsSpade() && !CHOICE.spadeQ) return '?';
@@ -12080,6 +12095,7 @@ function beginWind(f,quick){
         "Parry the wrong side, or too late, and you take the blow."]);
 }
 function hurtPlayer(n,label){
+  if(typeof wardTakes==='function' && wardTakes(n)) return;          // Ice Ward or Bone Shield takes it whole
   const f=combat.foe;
   if(n>0 && f && f.tier) n=Math.round(n*tierDmg(f));                    // tougher kin of the same foe hit harder
   const agi=gearSum('agi');
@@ -12175,7 +12191,7 @@ function playerHit(){                                // your attack lands: a spe
       floatText(tileOf(f),'Resisted','#c8c0b0'); return; } }
   strike();
 }
-function strike(){ HIT_SRC='melee'; try{ if(!castSpell()) meleeHit(); } finally{ HIT_SRC=null; } }
+function strike(){ HIT_SRC='melee'; try{ if(!castSpell()){ const f=combat.foe, h0=f?f.hp:0; meleeHit(); if(f && isMagicWeapon() && f.hp<h0 && typeof manaGain==='function') manaGain(5); } } finally{ HIT_SRC=null; } }   // a staff blow gives a little breath back
 function meleeHit(){
   const f=combat.foe; lunge(player,f); duel.caught=false;
   const dmg=weaponOf(player).dmg;
@@ -12201,6 +12217,7 @@ function meleeHit(){
   }
 }
 function foeDown(f){
+  try{ const b=typeof beastOf==='function' && beastOf(f); if(b && !combat.practice){ const e=BEST()[b.k]=BEST()[b.k]||{met:1,kills:0}; e.kills=(e.kills||0)+1; } }catch(e){}   // one more for the bestiary
   if(f.type==='dummy'){
     f.hp=f.maxHp; f.state='guard'; banner('Well fought!','#8ab0d8',1200);
     logMsg('Practice done. The dummy is patched up again.','#8ab0d8');
@@ -12797,6 +12814,7 @@ function crumbleSkel(){ const S=SKEL; if(!S || S.crumble) return; S.crumble=1; S
   floatText([Math.floor(S.x),Math.floor(S.y)],'The bones fall apart','#a8a490'); }
 // withered foes hit for half
 function skelTick(dt){                              // your risen skeleton: climbs out, follows, fights, falls apart
+    if(typeof bookTick==='function') bookTick(dt);
     SKEL_PILES.forEach(p=>p.age+=dt); SKEL_PILES=SKEL_PILES.filter(p=>p.age<SKEL_PILE_LIFE && p.area===areaId);
     const S=SKEL; if(!S) return;
     S.anim=Math.max(0,S.anim-dt);
@@ -12954,6 +12972,7 @@ function skelDrawItems(items){
   if(SKEL) items.push({d:SKEL.x+SKEL.y+0.01, ax:SKEL.x, ay:SKEL.y, fn:()=>drawSkel(SKEL)});
   if(FSKEL) items.push({d:FSKEL.x+FSKEL.y+0.01, ax:FSKEL.x, ay:FSKEL.y, fn:()=>drawSkel(FSKEL)});
   if(typeof muleItems==='function') muleItems(items);
+  if(typeof bookItems==='function') bookItems(items);
   if(typeof fishItems==='function') fishItems(items);
   try{ pupDrawItems(items); }catch(e){ console.error(e); }
   try{ const G=CHOICE.goatBlood; if(areaId==='village' && G){ const days=(dayClock-G.t)/DAY_LEN, a=days<2?1:Math.max(0,1-(days-2)/3);   // the goat's blood: full for two days, then gone over three more
@@ -13023,7 +13042,7 @@ function drawStaff(c,hx,hy,ang,id,s){            // a mage's staff: a shaft, two
     c.fillStyle=gem; c.beginPath(); c.arc(32,0,2.2,0,Math.PI*2); c.fill(); c.restore(); }
 // wizards' staves: each its own head (a crook round an orb, a crescent moon, an iron ember-cage, a crystal crown)
 { const WIZ=['staff_oak','staff_star','staff_cinder','staff_crystal'];
-  const oldDW=drawWeapon; drawWeapon=function(c,hx,hy,ang,id,s=1){ if(!WIZ.includes(id)) return oldDW(c,hx,hy,ang,id,s);
+  const wizStaff=function(c,hx,hy,ang,id,s=1){
     const P_={ staff_oak:{wood:'#6a4a26',gem:'#9adcf0',rgb:'154,220,240'}, staff_star:{wood:'#e2dac2',gem:'#f0ecff',rgb:'230,225,255'}, staff_cinder:{wood:'#2e2016',gem:'#ff8a3a',rgb:'255,138,58'}, staff_crystal:{wood:'#3a4a44',gem:'#8ae0a8',rgb:'138,224,168'} }[id];
     c.save(); c.translate(hx,hy); c.rotate(ang); c.scale(s,s); if(STAFF_REST) c.translate(14,0);
     const r0=STAFF_REST?-46:-8, rl=STAFF_REST?72:34, e=r0+rl, W=P_.wood;
@@ -13052,7 +13071,8 @@ function drawStaff(c,hx,hy,ang,id,s){            // a mage's staff: a shaft, two
       c.strokeStyle='#8a6a30'; c.lineWidth=1; c.beginPath(); [-1,0,1].forEach(k=>{ c.moveTo(e-1,k*0.8); c.quadraticCurveTo(e+3,k*4.6,e+5.5,k*3.2); }); c.stroke();
       const cr=(x,y,l,w,a)=>{ c.save(); c.translate(x,y); c.rotate(a); c.beginPath(); c.moveTo(0,-w); c.lineTo(l*0.75,-w); c.lineTo(l,0); c.lineTo(l*0.75,w); c.lineTo(0,w); c.closePath(); const gg=c.createLinearGradient(0,-w,0,w); gg.addColorStop(0,'#e8fff0'); gg.addColorStop(0.5,P_.gem); gg.addColorStop(1,tone(P_.gem,-0.4)); c.fillStyle=gg; c.fill(); c.strokeStyle='rgba(30,70,50,0.6)'; c.lineWidth=0.3; c.stroke(); c.restore(); };
       glowAt(e+7,0,9,0.45); cr(e+2,-1.2,8,1.3,-0.35); cr(e+2,1.2,8,1.3,0.35); cr(e+1.5,0,12,1.9,0); }
-    c.lineCap='butt'; c.restore(); }; }
+    c.lineCap='butt'; c.restore(); };
+  WIZ.forEach(w=>{ WEAPON_ART[w]=wizStaff; }); }
 // necromancers' staves: no tidy claw-and-stone, but skulls, horns, bones and a cold eye-light
 function drawNecroStaff(c,hx,hy,ang,id,s){       // the necromancer's staves: black wood or bone, a skull, a cold light
     const P_={ staff_hex:{wood:'#1e1b18',glow:'#8ae07a'}, staff_bone:{wood:'#cfc4a4',glow:'#b8f0d0'}, staff_bog:{wood:'#2a2618',glow:'#c8d860'}, staff_barrow:{wood:'#1c1a1e',glow:'#a8c8ff'} }[id];
@@ -13125,6 +13145,9 @@ Object.assign(TALKERS,{ orvell:orvellTalk, tessaly:()=>{ if(areaId==='ruin' && a
 // ════════ The Crystal Cave: a small dungeon of puzzles beneath the goblin warren ════════
 const PZ=()=> (CHOICE.puz=CHOICE.puz||{});
 const PUZ_TYPES=new Set(['block','water','thorns','crystal','rune','gate','stash']);
+// things you can use: each kind of object registers one handler (later modules may replace one deliberately)
+const PUZ_ON={};
+function onUse(types,fn){ types.forEach(t=>{ PUZ_TYPES.add(t); PUZ_ON[t]=fn; }); }
 let pendingPuz=null;
 wrap('warren','objects',l=>[...l.filter(o=>!(o.type==='bones'&&o.i===5&&o.j===2)),{type:'teleporter', i:6, j:1, to:'cave1', entry:'fromWarren'},{type:'bones', i:8, j:3, noblock:true}]);   // the way in is the cave mouth itself
 AREAS.warren.entries.fromCave={i:6,j:2};
@@ -13178,6 +13201,7 @@ function pzRebuild(){ blocked.clear(); [...OBJECTS,...NPCS].forEach(o=>{ if(o.ty
   const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) blocked.add((o.i+a)+','+(o.j+b)); }); }
 function pzSay(t,col){ floatText(tileOf(player),t,col||'#e8d8a8'); logMsg(t,col||'#e8d8a8'); }
 function puzAct(o){                                 // you use something in the world: a crate, a stone, a mirror, a mound of earth
+  if(o && PUZ_ON[o.type]) return PUZ_ON[o.type](o);
   if(o.type==='dirtmound') return digMound(o);
   if(o.type==='bathchest') return openBathChest(o);
   if(o.type==='reedbank') return reedBank(o);
@@ -13714,19 +13738,6 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
   const extraTip=id=>{ const it=ITEMS[id];
     if(typeof bookTip==='function'){ const t=bookTip(id); if(t!==null) return t; }   // staves: your three spells and what can still be learned
     if(it.slot==='food') return (it.cure?`<div class="r">Cures<span>${STATUS_DEF[it.cure].name}</span></div>`:'')+`<div class="r">Restores<span>${it.mana?'+'+it.mana+' Mana':'+'+it.heal+' Health'}</span></div><div class="fl">${FOOD_TIP[id]||''}</div><small>Double-click to ${(id==='potion'||it.mana)?'drink':'eat'} it. In a fight, use the food bar beside the attack buttons.</small>`;
-    if(typeof NECRO_STAVES!=='undefined' && NECRO_STAVES.includes(id)){ const n=NECRO();
-      if(n===0) return `<div class="fl" style="color:#b8a8e8">You don't know how to use this staff properly. In your hands it is just a heavy stick. Maybe look for someone who hangs around graveyards...?</div>`;
-      if(n<3) return `<div class="fl" style="color:#b8a8e8">You know ${n===1?'one word':'two words'} of this staff (${['Drain: lean up','Wither: lean right'].slice(0,n).join(', ')}). Vesna can teach you the rest.</div>`;
-      const m=WEAPONS[id].magic*(1+(typeof gearSum==='function'?gearSum('magic'):0)*0.04), d=k=>Math.round(HEX_SPELLS[k].dmg*m);
-      return `<div class="fl" style="color:#b8a8e8">Drain (up): ${d('up')} damage, heals ${Math.round(3*m)}<br>Wither (right): ${d('right')} damage, foe hits for half<br>Raise Dead (left): a skeleton for ${Math.round(9*m)}s, ${Math.max(2,Math.round(3*m))} per blow</div>`; }
-    if(['staff_oak','staff_star','staff_cinder','staff_crystal'].includes(id) && typeof MAGE_KNOWN==='function'){        // a magister's staff: only the words you have learned
-      const K=['right','up','left'].filter(d=>MAGE_KNOWN(d)), lore=(typeof GEAR_LORE!=='undefined' && GEAR_LORE && GEAR_LORE[id])?`<div class="fl" style="color:#b8c8a8">${GEAR_LORE[id]}</div>`:'', C='#9adcf0';
-      const where=CHOICE.appr==='taken'?"Orvell will not teach you any more.":(typeof ORVELL_AT_INN==='function' && ORVELL_AT_INN())?"Magister Orvell, drinking at the Wheatsheaf in Dunhollow, can teach you the rest.":"Magister Orvell in the Castle Ward of Hollowmere can teach you the rest.";
-      if(!K.length) return lore+`<div class="fl" style="color:${C}">You don't know how to use this staff properly. In your hands it is just a heavy stick. Maybe look for someone who has spent his life in books...? An old magister was seen at the Wheatsheaf.</div>`;
-      const NM={right:'Arcane: lean right', up:'Frost: lean up', left:'Fire: lean left'};
-      if(K.length<3) return lore+`<div class="fl" style="color:${C}">You know ${K.length===1?'one word':'two words'} of this staff (${K.map(d=>NM[d]).join(', ')}). ${where}</div>`;
-      const m=WEAPONS[id].magic*(1+(typeof gearSum==='function'?gearSum('magic'):0)*0.04), d=k=>Math.round(SPELLS[k].dmg*m), c=k=>Math.round(SPELLS[k].cost*(CHOICE.tessLesson?0.75:1));
-      return lore+`<div class="fl" style="color:${C}">Arcane (right): ${d('right')} damage, ${c('right')} mana<br>Frost (up): ${d('up')} damage, slows his swing, ${c('up')} mana<br>Fire (left): ${d('left')} damage, then burns, ${c('left')} mana</div>`; }
     if(typeof GEAR_LORE!=='undefined' && GEAR_LORE && GEAR_LORE[id]) return `<div class="fl" style="color:#b8c8a8">${GEAR_LORE[id]}</div>`;
     return ''; };
   const FLAVOR={ necro_robe:'Vesna\'s old robe: black wool worn thin and grey, the hem gone to long rags, fen mud soaked into it, a sprig of dried bog-myrtle in the cord at the throat.', necro_bustier:'A black bodice, frayed at every edge and laced with a leather cord. It smells of peat smoke.', necro_leggings:'Black knitted stockings, laddered and worn through at the knee, muddy to the shin. A fen-witch does not care.', grave_mote:'A little cold light that sits in your palm like a moth. It came up out of an old grave.', heartshard:'A cracked crystal the size of a fist, from the heart of the goblin cave. Green light turns inside it. Someone who knows staves could use it.', raw_meat:'A bloody cut. Better roasted: an inn, or a hunter\'s fire, will cook it.', cooked_meat:'Spit-roasted, salted, still warm. Keeps you going.', wolf_fang:'A long yellow fang. Traders buy them for charms.', morwen_lantern:'A little iron lantern with a green flame that never goes out. Old Morwen wants it back.', bog_coins:'Coins so old the faces on them have no names. Still silver, though.', silver_torc:'A twisted silver neck-ring, black with bog water. A trader would pay well.', amber_brooch:'A lump of amber in a bronze setting, with a fly caught inside it forever.', wight_ring:'Black gold, cold as the barrow. The Barrow-King wore it for a thousand years.', pelt:'A grey wolf hide, still smelling of the wood. Someone will pay for it.',
@@ -14338,7 +14349,8 @@ function cutscene(steps,onEnd){
   if(CS.on) return false; try{ closeDialog(); }catch(e){} CS.on=true; CS.steps=steps; CS.k=0; CS.t=0; CS.onEnd=onEnd||null; CS.focus=null; player.path=[]; csUI(true); return true; }
 // a spoken line: a speech bubble over the speaker for `d` seconds, the speaker turned to face `to`
 const csSay=(m,text,d=2.2,to=null)=>({dur:d, start:()=>{ if(to) csLook(m,to).start(); CS.say=m?{ent:m,text,t:0}:null; }, end:()=>{ CS.say=null; }, skip:()=>{ CS.say=null; }});
-function drawCsSpeech(){ const S=CS.say; if(!CS.on || !S) return;
+function drawCsSpeech(){ if(typeof drawGraveSpeech==='function'){ drawGraveSpeech(); drawPlayerSpeech(); }   // the dead and you, at the graves
+  const S=CS.say; if(!CS.on || !S) return;
   const e=S.ent, q=P(e.x??e.i+0.5, e.y??e.j+0.5); speechBubble(q.x,q.y-124,S.text,Math.min(1,S.t*5)); }
 function csEnd(){ CS.say=null; CS.on=false; CS.focus=null; csUI(false); const f=CS.onEnd; CS.onEnd=null; if(f) try{ f(); }catch(e){} const q=CS.queued; CS.queued=[]; q.forEach(a=>showDialog(...a)); }
 function csSkip(){ if(!CS.on) return; for(let k=CS.k;k<CS.steps.length;k++){ const s=CS.steps[k]; if(!s._s && s.start) s.start(); s._s=1; if(s.skip) s.skip(); else if(s.end) s.end(); } CS.k=CS.steps.length; csEnd(); }
@@ -14421,23 +14433,13 @@ function fenScene(){ const gd=NPCS.find(n=>n.id==='gerd'); if(!gd) return;
 // ════════ THE GRAVE-SPEAKER: Vesna teaches the necromancer's staff one word at a time ════════
 // necro: null → 'met' (graveyard) → 1 Drain (up) → 2 Wither (right) → 3 Raise Dead (left)
 const NECRO=()=> typeof CHOICE.necro==='number' ? CHOICE.necro : 0;
-function HEX_KNOWN(dir){ const n=NECRO(); return dir==='up' ? n>=1 : dir==='right' ? n>=2 : dir==='left' ? n>=3 : false; }
 const VESNA=(i,j,dir)=>({ id:'vesna', name:'Vesna the Grave-Speaker', i, j, dir, opts:{gender:'f',skin:0,hair:5,hairColor:0,beard:0,face:2,equip:{head:null,torso:'necro_bustier',armor:'necro_robe',hands:null,legs:'hose_grey',feet:'boots',weapon:'staff_hex',offhand:null}} });
 const vesnaInFen=()=> NECRO()>=1 && FEN_OPEN();
 wrap('graveyard','npcs',l=> CHOICE.necro && (!FEN_OPEN() || nightAmt()>0.5) ? [...l, VESNA(5,3,1)] : l);   // the graveyard by night, always; by day too until the fen road opens    // once the fen road is open she goes home to her stilt-hut, and you find her there
 wrap('fen','npcs',l=> FEN_OPEN() ? [...l, VESNA(18,6,1)] : l);
 // the grave-motes: little lights over the old graves, only at night, only once she has asked
-const GRAVE_MOTES=[[2,3],[6,4],[4,8]];
-// the motes rise and fade with the night while you stand there, not only when you walk in
-setInterval(()=>{ try{ if(!running || areaId!=='graveyard') return;
-  const want=CHOICE.necroQ==='motes' && nightAmt()>0.4, isM=o=>(o.type==='pickup'&&o.item==='grave_mote')||(o.type==='wisp'&&GRAVE_MOTES.some(([i,j])=>i===o.i&&j===o.j)), has=OBJECTS.some(isM);
-  if(want){ if(!has) floatText([4,4],'Little lights rise over the old graves…','#c8f0d8');
-    GRAVE_MOTES.forEach(([i,j])=>{ if(!OBJECTS.some(o=>o.type==='wisp'&&o.i===i&&o.j===j)) OBJECTS.push({type:'wisp', i, j, noblock:true});
-      if(!collectedPickups.has('graveyard:'+i+','+j) && !OBJECTS.some(o=>o.item==='grave_mote'&&o.i===i&&o.j===j) && !mobAt(i,j) && !(player.i===i&&player.j===j) && !NPCS.some(n=>n.i===i&&n.j===j)){ OBJECTS.push({type:'pickup', i, j, item:'grave_mote'}); blocked.add(i+','+j); } }); }
-  else if(!want && has){ for(let k=OBJECTS.length-1;k>=0;k--){ const o=OBJECTS[k]; if(isM(o)){ OBJECTS.splice(k,1); if(o.type==='pickup') blocked.delete(o.i+','+o.j); } } }
-}catch(e){} },1000);
+// (a grave-mote may still sit in an old pack: Vesna buys them)
 Object.assign(ITEMS,{ grave_mote:{ name:'A Grave-Mote', slot:'misc' } }); QUEST_ITEMS.add('grave_mote');
-wrap('graveyard','objects',l=> CHOICE.necroQ==='motes' && nightAmt()>0.4 ? [...l, ...GRAVE_MOTES.filter(([i,j])=>!collectedPickups.has('graveyard:'+i+','+j)).map(([i,j])=>({type:'pickup', i, j, item:'grave_mote'})), ...GRAVE_MOTES.map(([i,j])=>({type:'wisp', i, j, noblock:true}))] : l);
 const VESNA_HOW=()=>{ const h=defeatedMobs.has("graveyard:Edric's Shade") ? 'fought' : CHOICE.shade==='rest' ? (CHOICE.shadeHow||'avenged') : STQ() ? 'stones' : 'night';
   return ({ fought:{ bark:"You cut him down. Shades do not die. They tear.", open:"Her mouth is a thin line. “You put a blade through Edric's shade. It is gone, yes. Torn, the way you tear a letter you will not read. Pieces of him are still in this earth, cold and confused. I will be picking them out for a month.”", cold:true },
     words:{ bark:"You talked him down. With words. Hm.", open:"“I felt him go. Edric. You did not fight him and you did not bribe him. You talked. Most people shout at the dead, or run. You listened.”" },
@@ -14455,9 +14457,6 @@ setInterval(()=>{ try{ if(!running || CS.on || combat.active || areaId!=='gravey
     cutscene([ csFocus(v,0.9), csDo(()=>floatText([4,1],'…','#c8b8f0')), csWalk(v,ti,tj,1.8), csLook(v,player), csLook(player,v), csWait(0.4),
       csBark(v,VESNA_HOW().bark,2.2), csFocus(player,0.4) ], ()=>{ v.x=null; v.y=null; v.i=ti; v.j=tj; vesnaTalk(); });
   }catch(e){} },1000);
-const VESNA_RENOWN=[8,14,20];                                     // deeds done in the valley before each word: the dead do not listen to strangers
-const vesnaWait=k=>false;   // no more renown gates: the dead teach whoever listens
-const VESNA_NOTYET=["“Not yet. The dead listen to people the living already trust. Go and be useful to someone. Come back when the valley knows your name.”","“You are still too new. I can smell the road on you. Do some good, or some harm, but let it be <i>seen</i>. Then come back.”","“The last word is heavy. Heavier than you are, yet. Go and live a little more of this valley's story first.”"];
 function vesnaTalk(){ const n=NECRO(), V='Vesna the Grave-Speaker';
   if(CHOICE.necroQ==='motes') CHOICE.necroQ='listen';                        // older saves: the motes were the first lesson
   if(CHOICE.necroQ==='lurkers') CHOICE.necroQ=null;                          // the second word is taught at the gallows now
@@ -16406,7 +16405,6 @@ const BEASTS=[
 const beastOf=f=>f ? BEASTS.find(b=>{ try{ return b.is(f); }catch(e){ return false; } }) : null;
 const BEST=()=>CHOICE.bestiary=CHOICE.bestiary||{};
 setInterval(()=>{ try{ if(running && combat.active && !combat.practice && combat.foe){ const b=beastOf(combat.foe); if(b && !BEST()[b.k]){ BEST()[b.k]={met:1,kills:0}; logMsg('A new page in your bestiary: '+b.name+'.','#c8a060'); } } }catch(e){} },500);
-foeDown=(orig=>function(f){ try{ const b=beastOf(f); if(b && !combat.practice){ const e=BEST()[b.k]=BEST()[b.k]||{met:1,kills:0}; e.kills=(e.kills||0)+1; } }catch(e){} return orig.apply(this,arguments); })(foeDown);
 function bestiaryLink(){ const n=Object.keys(BEST()).length; return `<div class="jh">Bestiary</div><span class="blink" id="open-bestiary">Open the bestiary (${n} of ${BEASTS.length} known)</span>`; }
 function openBestiary(){ const B=BEST();
   document.getElementById('note-title').innerHTML=player.name+"'s Bestiary<div style='font-size:11px;letter-spacing:1px;margin-top:4px;color:#8a6a3a'>Every kind of foe you have faced, and what you have learned of them</div>";
@@ -16502,15 +16500,7 @@ function muleItems(items){ const now=performance.now()/1000;
     items.push({d:M.x+M.y-0.02, ax:M.x, ay:M.y, fn:()=>{ const q=P(M.x,M.y); drawMule3D(q.x,q.y+2,M.phi,M.ph,M.moving,true,false,5); }}); }); }
 // ════════ Corwin the peddler: walks the valley road with his mule Thistle, and keeps a stall in Dunhollow at midday ════════
 const PEDDLER_POOL=['potion','mana_potion','warm_tonic','burn_salve','rue_water','linen_wrap','copper_chain','glass_beads','bone_charm','tin_medal','straw_hat','hood_red','riding_boots','breeches','apple','bread'];
-ROUTINES.peddler={ name:'Corwin the Peddler', speed:0.8, mule:true, ids:{road:'peddler', lane:'peddler', village:'peddler', tunnel:'peddler', millroad:'peddler'},
-  opts:{gender:'m',skin:2,hair:2,hairColor:12,beard:4,face:1,equip:{head:'straw_hat',torso:'smock',armor:null,hands:null,legs:'breeches',feet:'boots',weapon:null,offhand:null}}, slots:[
-    { h:[6,8.5],    area:'road', walk:[[16,1],[33,2]] },                     // down off the King's Road and east along the forest road
-    { h:[8.5,11],   area:'lane', walk:[[0,23],[10,1]] },                     // up the lane, slowly
-    { h:[11,15],    area:'village', at:[7,6], dir:1, fromArea:'lane' },     // his stall by the well
-    { h:[15,15.75], area:'village', walk:[[7,6],[0,5]] },                    // off toward the tunnel
-    { h:[15.75,17.5], area:'tunnel', walk:[[28,1],[0,1]] },
-    { h:[17.5,19.5], area:'millroad', walk:[[28,3],[0,3]] } ] };           // and on toward the crossroads, to camp by the King's Road
-RT_IDS.add('peddler'); ['road','lane','tunnel','millroad'].forEach(rtWrap);
+RT_IDS.add('peddler');   // (his NPC is placed by the walking road below, not by a timetable)
 TALKERS.peddler=()=>{ const n=NPCS.find(x=>x.id==='peddler'), walking=n && n.goto;
   say('Corwin the Peddler',[walking?"A weathered man in a straw hat, a grey mule plodding at his heels. He doesn't break stride, but he doesn't mind talking either.":"Corwin has the mule's panniers open on a blanket: a little of everything, and nothing twice.",
     "“Corwin, and this is Thistle. She has opinions. Whatever you need, I might have it, and if I haven't, I'll have something better tomorrow.”"],
@@ -16532,7 +16522,7 @@ Object.assign(GEAR_LORE||{},{ one_ring:'A plain band of gold on a fine chain, wa
 PEDDLER_POOL.push('fishing_rod');
 const _todays=todaysStock; todaysStock=function(who,pool,n){ const r=_todays(who,pool,n); if(who==='peddler' && !r.includes('fishing_rod') && !hasItem('fishing_rod')) r.unshift('fishing_rod'); return r; };   // he always has a rod for you
 // ── cooking: walk up to any campfire with raw meat or fish ──
-PUZ_TYPES.add('campfire'); PUZ_TYPES.add('hearth');   // any fire you can crouch by, outdoors or in a house
+// any fire you can crouch by, outdoors or in a house: see onUse(['campfire','hearth'],...) below
 const COOKS={ raw_meat:'cooked_meat', fish_perch:'grilled_fish', fish_trout:'grilled_fish', fish_carp:'grilled_fish', fish_eel:'grilled_fish', fish_herring:'grilled_fish' };
 function campfireCook(o){ const T=o&&o.type==='hearth'?'The Hearth':'A Campfire', raw=player.inv.map((id,k)=>({id,k})).filter(x=>x.id && COOKS[x.id]);
   if(!raw.length){ say(T,"The fire crackles. Bring raw meat or a fish and you can cook it here.",[bye]); return; }
@@ -16541,7 +16531,7 @@ function campfireCook(o){ const T=o&&o.type==='hearth'?'The Hearth':'A Campfire'
     {label:'Cook it all.', fn:()=>{ raw.forEach(x=>{ player.inv[x.k]=COOKS[x.id]; }); updateHud(); refreshFoodBar(); if(invOverlay.classList.contains('open')) refreshInventory();
       const out={}; raw.forEach(x=>{ const c=COOKS[x.id]; out[c]=(out[c]||0)+1; }); logMsg('You cook over the fire: '+Object.entries(out).map(([id,n])=>n+'× '+ITEMS[id].name).join(', ')+'.','#8ad07a');
       say(T,"Fat spits in the flames. The smell alone is worth it.",[bye]); }}, bye]); }
-puzAct=(orig=>function(o){ if(o && (o.type==='campfire'||o.type==='hearth')) return campfireCook(o); return orig.apply(this,arguments); })(puzAct);
+onUse(['campfire','hearth'],campfireCook);
 // ── where you can fish ──
 const fishKind=o=>!o||o.type!=='pool'||o.kind==='moon'||o.kind==='bath' ? null : (areaId==='docks'||areaId==='portfearn') ? 'sea' : o.kind==='fen' ? 'fen' : 'fresh';
 function fishSpot(){ if(!running || combat.active || (typeof CS!=='undefined'&&CS.on) || player.path.length) return null;
@@ -16635,8 +16625,8 @@ function drawGraveBlade(c,hx,hy,ang,s){ c.save(); c.translate(hx,hy); c.rotate(a
   c.fillStyle=gr; c.beginPath(); c.moveTo(4,-1.9); c.lineTo(23,-1.3); c.lineTo(27,0); c.lineTo(23,1.3); c.lineTo(4,1.9); c.closePath(); c.fill();   // grave-grey steel
   c.strokeStyle='rgba(200,230,220,0.55)'; c.lineWidth=0.6; c.beginPath(); c.moveTo(5,-1.6); c.lineTo(23,-1.1); c.lineTo(26.5,0); c.stroke();          // a pale, cold edge
   c.fillStyle='rgba(30,36,40,0.7)'; c.fillRect(6,-0.3,14,0.6); c.restore(); }
-drawWeapon=(orig=>function(c,hx,hy,ang,id,s=1){ if(id==='grave_blade') return drawGraveBlade(c,hx,hy,ang,s); return orig.apply(this,arguments); })(drawWeapon);
-paintItemArt=(orig=>function(g2,id,size){ if(id==='grave_blade'||id==='clean_blade'){ g2.save(); g2.scale(size/40,size/40); if(id==='grave_blade') drawGraveBlade(g2,8,32,-Math.PI/4,1.25); else drawWeapon(g2,8,32,-Math.PI/4,'sword',1.25); g2.restore(); return; } return orig.apply(this,arguments); })(paintItemArt);
+WEAPON_ART.grave_blade=(c,hx,hy,ang,id,s)=>drawGraveBlade(c,hx,hy,ang,s);
+ITEM_ICON.grave_blade=ITEM_ICON.clean_blade=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); if(id==='grave_blade') drawGraveBlade(g2,8,32,-Math.PI/4,1.25); else drawWeapon(g2,8,32,-Math.PI/4,'sword',1.25); g2.restore(); };
 const REFORGE_BONES=5, REFORGE_SKULLS=1;
 const rfDay=()=>Math.floor(dayClock/DAY_LEN);
 const rfHave=()=>player.inv.filter(x=>x==='old_bone').length>=REFORGE_BONES && player.inv.filter(x=>x==='old_skull').length>=REFORGE_SKULLS;
@@ -16645,12 +16635,6 @@ JOURNAL.push(['The Grave-Blade Reforged', ()=> !CHOICE.reforge ? null
   : CHOICE.reforge==='asked' ? ['active',"Vesna will wake the rusted grave-blade, but the steel is rotten. Take it to Oswin the Armourer in Hollowmere's market to have it cleaned and given a new edge"+(CHOICE.warden?", or to Ilka in the Sunken Forge, whose fire does it at once.":".")]
   : CHOICE.reforge==='smith' ? ['active',"Oswin is grinding the rust off the grave-blade. Come back to him "+(rfDay()>CHOICE.reforgeDay?'now: it should be ready.':'tomorrow.')]
   : ['active',"Bring the cleaned blade back to Vesna, with "+REFORGE_BONES+" old bones and "+REFORGE_SKULLS+" skull for her to bind into it. (You have "+player.inv.filter(x=>x==='old_bone').length+" bones and "+player.inv.filter(x=>x==='old_skull').length+" skull.)"]]);
-npcHasNews=(orig=>function(n){ if(n && !n.sleepBed){
-    if(n.id==='vesna' && hasItem('rusted_blade') && !CHOICE.reforge && (CHOICE.necro||CHOICE.morwen)) return '!';
-    if(n.id==='vesna' && CHOICE.reforge==='clean' && hasItem('clean_blade') && rfHave()) return '?';
-    if(n.id==='smith' && CHOICE.reforge==='asked' && hasItem('rusted_blade')) return '?';
-    if(n.id==='smith' && CHOICE.reforge==='smith' && rfDay()>CHOICE.reforgeDay) return '?'; }
-  return orig.apply(this,arguments); })(npcHasNews);
 { const oV=TALKERS.vesna; TALKERS.vesna=(...a)=>{ const V='Vesna the Grave-Speaker';
     if(!CHOICE.reforge && hasItem('rusted_blade')){ say(V,["Vesna's eyes go to the rusted blade at your belt before they go to you.","“Someone was buried with that, and they have not finished with it. I can wake what is left in it.” She runs a nail along the pitted edge and red flakes fall. “But not in this. The steel is rotten through: wake it like this and it will snap in your first fight.”"],[
         {label:'“Then what do I do?”', fn:()=>{ remember('reforge','asked',"Vesna will wake the rusted grave-blade once a smith has made the steel sound. Oswin the Armourer, in Hollowmere's market."); updateHud();
@@ -16833,7 +16817,7 @@ Object.entries(JUNK_DEF).forEach(([id,[name,price,title]])=>{ ITEMS[id]={ name, 
 const JUNK_COMMON=['bent_spoon','tin_cup','wooden_bowl','old_fork','candle_stub','brass_buttons','clay_pipe','thimble','horn_comb','rusty_key','carved_horse','bone_dice','iron_nails'];
 const JUNK_FINE=['pewter_tankard','silver_spoon','brass_candlestick','green_bottle','cameo','brass_buttons','bone_dice'];
 // their icons, in the 40x40 item box
-paintItemArt=(orig=>function(g2,id,size){ if(!JUNK_DEF[id]) return orig.apply(this,arguments);
+function junkIcon(g2,id,size){
   g2.save(); g2.scale(size/40,size/40); g2.lineCap='round'; g2.lineJoin='round';
   const E=(x,y,rx,ry,f,st,r=0)=>{ g2.beginPath(); g2.ellipse(x,y,rx,ry,r,0,Math.PI*2); if(f){ g2.fillStyle=f; g2.fill(); } if(st){ g2.strokeStyle=st; g2.lineWidth=1; g2.stroke(); } };
   const L=(pts,c,w)=>{ g2.strokeStyle=c; g2.lineWidth=w; g2.beginPath(); pts.forEach(([x,y],k)=>k?g2.lineTo(x,y):g2.moveTo(x,y)); g2.stroke(); };
@@ -16858,7 +16842,8 @@ paintItemArt=(orig=>function(g2,id,size){ if(!JUNK_DEF[id]) return orig.apply(th
     case 'brass_candlestick': E(20,33,10,2.6,metal('#f0d080','#8a6418'),'#5a4010'); Pg([[17,32],[23,32],[22,12],[18,12]],metal('#f0d080','#8a6418'),'#5a4010'); E(20,22,4.5,2,'#d8b050','#5a4010'); E(20,12,6,2,'#e8c870','#5a4010'); Pg([[17.5,12],[22.5,12],[22,4],[18,4]],'#f2ead0','#a89a70'); E(20,25,3,1,'rgba(80,140,90,0.6)'); break;
     case 'green_bottle': Pg([[14,34],[26,34],[26,18],[22,13],[22,6],[18,6],[18,13],[14,18]],'rgba(70,130,80,0.85)','#244a2c'); Pg([[17,4],[23,4],[23,8],[17,8]],'#a07a50','#5a3a1c'); L([[16,30],[16,20]],'rgba(220,255,220,0.5)',1.4); break;
     case 'cameo': E(20,21,11,13,metal('#d8dae2','#7a7e88'),'#4a4e56'); E(20,21,8.4,10.4,'#c87a5a'); g2.fillStyle='#f2e6d8'; g2.beginPath(); g2.moveTo(18,30); g2.quadraticCurveTo(15,24,17,19); g2.quadraticCurveTo(17,13,21,13); g2.quadraticCurveTo(25,14,24,18); g2.lineTo(26,21); g2.lineTo(24,22); g2.quadraticCurveTo(25,27,22,30); g2.closePath(); g2.fill(); break; }
-  g2.restore(); })(paintItemArt);
+  g2.restore(); }
+Object.keys(JUNK_DEF).forEach(k=>{ ITEM_ICON[k]=ITEM_ICON[k]||junkIcon; });
 
 // ════════ Bait in the Lowstreets: Jory's crew no longer jump you on sight. They loiter in the back alleys, and Dalla brings the marks to them ════════
 //   CHOICE.lure : null → 'sprung' (they turned on you) → 'fought' (all down)  |  'watch' (you warned the watch first)
@@ -16912,11 +16897,11 @@ JOURNAL.push(['Bait in the Lowstreets', ()=> !CHOICE.lure && !CHOICE.lureWarned 
 //   CHOICE.bell : null → 'asked' (the Bellringer asked you) → 'rung' (they rest; the chapel's blessing)  |  'sold' (you cut it down for the bronze; they come every night)
 //   CHOICE.bellCameo : you gave the Bellringer his wife's cameo from the mud
 ITEMS.bronze_bell={ name:'A Drowned Bronze Bell', slot:'misc', junk:true, title:"Saint Elm's bell, green with the fen. A tinker or a smith will pay for the metal." }; PRICES.bronze_bell=60; SELL_MISC.add('bronze_bell');
-paintItemArt=(orig=>function(g2,id,size){ if(id!=='bronze_bell') return orig.apply(this,arguments);
+ITEM_ICON.bronze_bell=(g2,id,size)=>{
   g2.save(); g2.scale(size/40,size/40); const gr=g2.createLinearGradient(10,8,30,32); gr.addColorStop(0,'#b8a060'); gr.addColorStop(0.5,'#8a7038'); gr.addColorStop(1,'#4e6a4a');
   g2.fillStyle=gr; g2.strokeStyle='#2a2010'; g2.lineWidth=1.4; g2.beginPath(); g2.moveTo(15,12); g2.quadraticCurveTo(14,26,8,31); g2.lineTo(32,31); g2.quadraticCurveTo(26,26,25,12); g2.quadraticCurveTo(20,7,15,12); g2.closePath(); g2.fill(); g2.stroke();
   g2.fillStyle='rgba(90,150,110,0.5)'; g2.beginPath(); g2.ellipse(13,27,3,2,0.3,0,Math.PI*2); g2.ellipse(26,22,2.4,1.6,0,0,Math.PI*2); g2.fill();          // verdigris
-  g2.strokeStyle='#5a4a20'; g2.lineWidth=2.2; g2.beginPath(); g2.arc(20,9,3,Math.PI,0); g2.stroke(); g2.fillStyle='#3a2a10'; g2.beginPath(); g2.arc(20,32,2.2,0,Math.PI*2); g2.fill(); g2.restore(); })(paintItemArt);
+  g2.strokeStyle='#5a4a20'; g2.lineWidth=2.2; g2.beginPath(); g2.arc(20,9,3,Math.PI,0); g2.stroke(); g2.fillStyle='#3a2a10'; g2.beginPath(); g2.arc(20,32,2.2,0,Math.PI*2); g2.fill(); g2.restore(); };
 // the frame by the chapel ruins: two leaning posts, a beam, the bell (or the empty hook)
 OBJ_DRAW.bellframe=o=>{ const q=P(o.i+0.5,o.j+0.55), H=44, lean=3;
   g.lineCap='round'; [[-13,-lean],[13,lean]].forEach(([dx,l2])=>{ g.strokeStyle='#2a1c10'; g.lineWidth=6; g.beginPath(); g.moveTo(q.x+dx,q.y); g.lineTo(q.x+dx*0.8+l2,q.y-H); g.stroke(); g.strokeStyle='#5a4228'; g.lineWidth=3.6; g.beginPath(); g.moveTo(q.x+dx,q.y); g.lineTo(q.x+dx*0.8+l2,q.y-H); g.stroke(); });
@@ -16949,7 +16934,7 @@ function bellAct(o){ const T='The Bell of Saint Elm';
     {label:'Cut it down. Bronze is bronze.', fn:()=>{ if(!giveQuestItem('bronze_bell')) return; remember('bell','sold',"You cut down the bell of Saint Elm to sell the bronze. The drowned of the fen will not forgive it.");
       say(T,["It takes a long time and a lot of swearing. The beam groans, the bell drops into your arms, and the fen goes silent around you.","Out on the water, every pale shape has turned to look at you."],[bye]); }},
     bye]); }
-{ const oPA=puzAct; puzAct=function(o){ if(o && o.type==='bellframe') return bellAct(o); return oPA.apply(this,arguments); }; }
+onUse(['bellframe'],bellAct);
 JOURNAL.push(['The Drowned Bell', ()=> !CHOICE.bell ? null
   : CHOICE.bell==='rung' ? ['done',"You rang the bell of Saint Elm at night. The drowned of the fen went to their rest."+(CHOICE.bellCameo?" The Bellringer got his wife's cameo back first.":"")]
   : CHOICE.bell==='sold' ? ['done',"You cut down the bell of Saint Elm for the bronze. The drowned walk the fen every night, looking for it."]
@@ -16969,20 +16954,19 @@ JOURNAL.push(['The Drowned Bell', ()=> !CHOICE.bell ? null
 // ── items: the hanged man's bones, and his skull if you keep it ──
 Object.assign(ITEMS,{ hanged_bones:{ name:"The Hanged Man's Bones", slot:'misc', title:'Nine years of rope and rain. Light as kindling.' }, hanged_skull:{ name:"The Hanged Man's Skull", slot:'misc', junk:true, title:'It is surprisingly light, and it seems to be listening.' } });
 QUEST_ITEMS.add('hanged_bones'); PRICES.hanged_skull=20; SELL_MISC.add('hanged_skull');
-paintItemArt=(orig=>function(g2,id,size){ if(id==='hanged_bones'){ orig.call(this,g2,'old_bone',size); g2.save(); g2.scale(size/40,size/40); g2.strokeStyle='#8a7a5a'; g2.lineWidth=1.6; g2.beginPath(); g2.moveTo(8,8); g2.quadraticCurveTo(20,20,14,34); g2.stroke(); g2.restore(); return; }
-  if(id==='hanged_skull') return orig.call(this,g2,'old_skull',size); return orig.apply(this,arguments); })(paintItemArt);
-const necroPuz=(orig=>function(o){ if(o && o.type==='grave') return graveAct(o); if(o && o.type==='gallows') return gallowsAct(o); if(o && (o.type==='bonegate'||o.type==='bonebier')) return cryptAct(o); return orig.apply(this,arguments); });
-['grave','gallows','bonegate','bonebier'].forEach(t=>PUZ_TYPES.add(t)); puzAct=necroPuz(puzAct);
+ITEM_ICON.hanged_bones=(g2,id,size)=>{ paintItemArt(g2,'old_bone',size); g2.save(); g2.scale(size/40,size/40); g2.strokeStyle='#8a7a5a'; g2.lineWidth=1.6; g2.beginPath(); g2.moveTo(8,8); g2.quadraticCurveTo(20,20,14,34); g2.stroke(); g2.restore(); };   // an old bone with a bit of rope
+ITEM_ICON.hanged_skull=(g2,id,size)=>paintItemArt(g2,'old_skull',size);
+onUse(['grave'],o=>graveAct(o)); onUse(['gallows'],o=>gallowsAct(o)); onUse(['bonegate','bonebier'],o=>cryptAct(o));
 
 // ── Drain: "The Listening". Three graves, one a night. Sit by it and keep still until the light has finished ──
 const LISTEN_GRAVES={ '8,5':{ who:'Maren the weaver', lines:["“My blue. Oh, my blue. I wove the wedding cloth for half this village, and never my own.”","“He came every evening from the forest, with mud on his boots and nothing to say. I waited fifty years for him to say it.”","“If you ever meet a quiet elf with mud on his boots: tell him I was not angry. Only tired. The blue was for him.”"] },
   '6,1':{ who:'Gerrit the miller', lines:["“Bread? For me?” A dry, floury laugh. “Forty years I fed this valley, and they buried me under a yew. A yew! I hate the smell.”","“The wheel still turns, does it? Someone's turning it wrong. I can hear it from here.”","“Thank you, you said. Nobody ever said it. Bread just happens, they think. Well. Now you know.”"] },
   '1,4':{ who:'the grave with no name', lines:["“…Ilse. Someone said Ilse.”","“I came over the hills with nothing and died of the fever the first winter. They did not know my name. I had stopped using it.”","“Say it again sometimes, when you pass. That is all I wanted.”"] } };
 let LST=null, GSAY=null, PSAY=null;
-drawCsSpeech=(orig=>function(){ orig.apply(this,arguments); const S=GSAY; if(!S) return; if(areaId!=='graveyard'){ GSAY=null; return; }
-  const t=gt-S.t0; if(t>S.dur){ GSAY=null; return; } const q=P(S.i+0.5,S.j+0.5); speechBubble(q.x,q.y-100-t*1.5,S.text,Math.min(1,t*4,(S.dur-t)*3)); })(drawCsSpeech);
-drawCsSpeech=(orig=>function(){ orig.apply(this,arguments); const S=PSAY; if(!S) return; const t=gt-S.t0; if(t>S.dur || areaId!=='graveyard'){ PSAY=null; return; }   // what you say to them
-  const q=P(player.x,player.y); speechBubble(q.x,q.y-128,S.text,Math.min(1,t*4,(S.dur-t)*3)); })(drawCsSpeech);
+function drawGraveSpeech(){ const S=GSAY; if(!S) return; if(areaId!=='graveyard'){ GSAY=null; return; }
+  const t=gt-S.t0; if(t>S.dur){ GSAY=null; return; } const q=P(S.i+0.5,S.j+0.5); speechBubble(q.x,q.y-100-t*1.5,S.text,Math.min(1,t*4,(S.dur-t)*3));  }
+function drawPlayerSpeech(){ const S=PSAY; if(!S) return; const t=gt-S.t0; if(t>S.dur || areaId!=='graveyard'){ PSAY=null; return; }   // what you say to them
+  const q=P(player.x,player.y); speechBubble(q.x,q.y-128,S.text,Math.min(1,t*4,(S.dur-t)*3));  }
 function graveAct(o){ const k=o.i+','+o.j, G=LISTEN_GRAVES[k], day=Math.floor(dayClock/DAY_LEN);
   if(!G || CHOICE.necroQ!=='listen'){ say('A Grave',o.name?`A plain stone: <i>${o.name}</i>.`:(G?`A worn stone. You can just make out: <i>${G.who}</i>.`:"A worn stone, the name long gone under lichen."),[bye]); return; }
   if((CHOICE.listened||[]).includes(k)){ say('A Grave',`${G.who[0].toUpperCase()+G.who.slice(1)} has nothing more to say. The grass on the grave is warm.`,[bye]); return; }
@@ -17101,7 +17085,7 @@ Object.assign(ITEMS,{ glass_jar:{ name:"Orvell's Glass Jar", slot:'misc', title:
   bottled_wisp:{ name:'A Bottled Wisp', slot:'misc', title:'A cold little light, bumping against the glass. It seems curious about you.' },
   ember_heart:{ name:'An Ember-Heart', slot:'misc', junk:true, title:'A coal that will not go out. Warm as a hand.' } });
 QUEST_ITEMS.add('glass_jar'); QUEST_ITEMS.add('bottled_wisp'); PRICES.ember_heart=45; SELL_MISC.add('ember_heart');
-paintItemArt=(orig=>function(g2,id,size){ if(id!=='glass_jar' && id!=='bottled_wisp' && id!=='ember_heart') return orig.apply(this,arguments);
+ITEM_ICON.glass_jar=ITEM_ICON.bottled_wisp=ITEM_ICON.ember_heart=(g2,id,size)=>{
   g2.save(); g2.scale(size/40,size/40);
   if(id==='ember_heart'){ const gl=g2.createRadialGradient(20,22,0,20,22,15); gl.addColorStop(0,'rgba(255,240,170,1)'); gl.addColorStop(0.35,'rgba(255,150,50,0.95)'); gl.addColorStop(1,'rgba(200,50,10,0)');
     g2.fillStyle=gl; g2.beginPath(); g2.arc(20,22,15,0,Math.PI*2); g2.fill(); g2.fillStyle='#3a1608'; g2.beginPath(); g2.moveTo(13,24); g2.lineTo(18,15); g2.lineTo(27,17); g2.lineTo(28,26); g2.lineTo(20,31); g2.closePath(); g2.fill();
@@ -17110,7 +17094,7 @@ paintItemArt=(orig=>function(g2,id,size){ if(id!=='glass_jar' && id!=='bottled_w
   g2.fillStyle='rgba(150,190,160,0.28)'; g2.strokeStyle='rgba(60,90,70,0.95)'; g2.lineWidth=1.4; g2.beginPath(); g2.roundRect(11,12,18,23,5); g2.fill(); g2.stroke();     // the jar
   g2.fillStyle='rgba(230,250,240,0.45)'; g2.fillRect(14,15,2.2,15);
   g2.fillStyle='#a07848'; g2.strokeStyle='#5a3e20'; g2.beginPath(); g2.roundRect(14,7,12,6,1.5); g2.fill(); g2.stroke();                                         // the cork
-  g2.restore(); })(paintItemArt);
+  g2.restore(); };
 
 // ── what he says ──
 function mageAskLabel(){ const n=(CHOICE.mageKnown||[]).length; return CHOICE.mageQ ? 'About the lesson.' : (n && n<3) ? 'Ask for the next lesson.' : 'Ask about magic.'; }
@@ -17182,7 +17166,6 @@ OBJ_DRAW.bathstones=o=>{ [[0.35,0.75,10,4.4],[0.6,0.45,9,4],[0.85,0.2,8,3.6]].fo
     if(nightAmt()>0.5 && CHOICE.mageQ==='cold'){ g.fillStyle='rgba(210,235,255,0.35)'; g.beginPath(); g.ellipse(q.x-2,q.y-1,rx*0.5,ry*0.4,0,0,Math.PI*2); g.fill(); } }); };   // rime on the stones, at night
 wrap('willowpool','objects',l=>[...l,{type:'bathstones', i:2, j:3}]);
 wrap('mistmere','mobs',l=> CHOICE.mageQ==='light' && nightAmt()>0.4 ? l.filter(m=>m.type!=='wolf') : l);   // the wolves keep clear of the wisps while you hunt them: they do not like being looked at
-PUZ_TYPES.add('bathstones');
 const WILLOW_VOICE=["Under the water something turns over, slow as a sleeper, and the cold closes over your heart like a fist. A voice that is not quite a voice: <i>“Walk, then. Walk, and do not run to the fire like a child.”</i>",
   "The cold comes up from far below, older than the willows. <i>“Again? Good. The fire-callers never come back a second night.”</i>",
   "This time the cold does not hurt. It only waits. <i>“There. Now it knows the way. Carry it home.”</i>"];
@@ -17207,7 +17190,6 @@ function coldFail(why){ if(!CHOICE.coldWalk) return; CHOICE.coldWalk=null; logMs
         banner('The cold stays in you ('+n+'/2)','#bfe0ff',1800); logMsg(n<2?'You reach Dunhollow with the cold still in you, and it does not leave when you stop. Another night, another bath.':'The cold has made itself at home. Go back to Orvell.','#bfe0ff'); try{ autosaveSoon(300); }catch(e){} return; }
       const h=HOUR(); if(h>=6 && h<12){ coldFail('The sun comes up, and the cold goes out of you with the night. Try again another midnight.'); return; }
       if(tick%6===0 && !combat.active) floatText(tileOf(player),'❄','#cfe8ff'); }catch(e){} },500); }
-bedPrompt=(orig=>function(){ if(CHOICE.coldWalk) coldFail('You crawl under a blanket, and the warmth takes the cold out of you all at once. Orvell would not be impressed.'); return orig.apply(this,arguments); })(bedPrompt);
 // the women at the pool notice the frost on their stones
 { let lastArea=null;
   setInterval(()=>{ try{ if(!running) return; const a=areaId; if(a===lastArea) return; lastArea=a;
@@ -17242,14 +17224,14 @@ function drawEmber(x,B,e,pose){ const big=e.opts&&e.opts.big?1.45:1, k=pose&&pos
   for(let d=0;d<5;d++){ const u=((gt*0.9+d*0.2+s0)%1); g.fillStyle=`rgba(255,${180+Math.round(60*(1-u))},80,${0.9*(1-u)})`; g.beginPath(); g.arc(x+Math.sin(d*2.1+gt*2)*W*0.8,y-H*(0.6+u*0.75),1.4*big,0,Math.PI*2); g.fill(); }   // sparks
   g.restore(); }
 const EMBER_SITES={ camp:[6,5], clearing:[5,6], fellings:[6,5] };
-PUZ_TYPES.add('ashes');
-puzAct=(orig=>function(o){
-  if(o && o.type==='bathstones') return bathAct();
-  if(o && (o.type==='campfire'||o.type==='hearth') && CHOICE.coldWalk) coldFail('You crouch by the '+(o.type==='hearth'?'hearth':'fire')+', and the cold leaves you all at once. Orvell said: no fire. Another midnight, then.');
-  if(o && (o.type==='campfire'||o.type==='ashes')){ const st=EMBER_SITES[areaId];
+onUse(['bathstones'],()=>bathAct());
+// fires: the cold walk and the kindling word come before cooking (this replaces the plain cooking handler)
+onUse(['campfire','hearth','ashes'],o=>{
+  if((o.type==='campfire'||o.type==='hearth') && CHOICE.coldWalk) coldFail('You crouch by the '+(o.type==='hearth'?'hearth':'fire')+', and the cold leaves you all at once. Orvell said: no fire. Another midnight, then.');
+  if(o.type==='campfire'||o.type==='ashes'){ const st=EMBER_SITES[areaId];
     if(CHOICE.mageQ==='ember' && st && st[0]===o.i && st[1]===o.j && !(CHOICE.embers||[]).includes(areaId) && !combat.active){ emberAsk(o); return; }
     if(o.type==='ashes'){ say('Old Ashes',(CHOICE.embers||[]).includes(areaId)?"The ashes are stone cold now, and stay that way.":"A ring of blackened stones and old ashes, long cold.",[bye]); return; } }
-  return orig.apply(this,arguments); })(puzAct);
+  return campfireCook(o); });
 function emberAsk(o){ const T=o.type==='ashes'?'Old Ashes':'A Campfire';
   say(T,[o.type==='ashes'?"A ring of blackened stones and old ashes. Orvell said: ashes remember.":"The fire has burned here a long time; the stones round it are black to the core.","The kindling word sits on your tongue like a hot coal."],[
     {label:'Speak the kindling word.', fn:()=>emberSummon(o)}, ...(o.type==='campfire'?[{label:'Just warm yourself.', fn:()=>campfireCook(o)}]:[]), bye]); }
@@ -17276,19 +17258,19 @@ TALKERS.tessaly_k=()=>{ const T='Tessaly', K=CHOICE.mageKnown||[];
   say(T,["“So. All three.” She puts the pen down. “Cast something. Anything. At that candle.”","You do. The candle goes over, and the shelf behind it, and some of the wall.","“You cast like him. You throw the whole breath at it, every time, as if the staff were deaf. It isn't. Whisper.” She sets three new candles on the table."],[
     {label:'Try to whisper.', fn:()=>whisperStart(()=>{ CHOICE.tessLesson=true; updateHud(); try{ autosaveSoon(300); }catch(e){} logMsg("Tessaly's lesson: your magister's spells cost a quarter less mana.",'#e8e0ff'); say(T,"“There. Now go and tell him I taught you something. Watch his face. That is my fee.”",[bye]); })}, bye]); };
 // fire-sprites and bottled light shine through the night instead of being darkened by it
-drawMoonlight=(orig=>function(){ orig.apply(this,arguments); if(AREAS[areaId].inside) return; const n=nightAmt(); if(n<0.02) return;
+function nightGlows(){ if(AREAS[areaId].inside) return; const n=nightAmt(); if(n<0.02) return;
   g.save(); g.globalCompositeOperation='lighter';
   mobs.forEach(m=>{ if(m.type!=='ember' || (m.dead && (m.fallT||0)>0.7)) return; const q=P(m.x+(m.ox||0),m.y+(m.oy||0)), big=m.opts&&m.opts.big?1.45:1, fl=0.9+Math.sin(gt*9+m.id)*0.08;
     glow(q.x,q.y-34*big,46*big*fl,56*big*fl,'255,140,50',0.42*n); glow(q.x,q.y-30*big,16*big,24*big,'255,220,140',0.35*n); glow(q.x,q.y+2,70*big*fl,30*big*fl,'255,120,40',0.25*n); });
   OBJECTS.forEach(o=>{ if(o.type!=='mwisp') return; const q=P(o.x,o.y), t=gt*1.3+o.seed, x=q.x+Math.sin(t)*4, y=q.y-40+Math.sin(t*1.7)*6;
     glow(x,y,24,24,'170,215,255',0.45*n); glow(x,y,6,6,'245,250,255',0.6*n); glow(q.x,q.y,30,12,'150,200,255',0.12*n); });
-  g.restore(); })(drawMoonlight);
+  g.restore();  }
 // ════════ the graves' three wishes, and the kneeling-slab in the crypt ════════
 Object.assign(ITEMS,{ blue_spool:{ name:"Maren's Blue Spool", slot:'misc', title:'Fine wool, dyed the blue of a June evening. Maren never finished the cloth.' } }); QUEST_ITEMS.add('blue_spool');
-paintItemArt=(orig=>function(g2,id,size){ if(id!=='blue_spool') return orig.apply(this,arguments); g2.save(); g2.scale(size/40,size/40);
+ITEM_ICON.blue_spool=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40);
   g2.fillStyle='#8a6a40'; g2.fillRect(11,9,18,4); g2.fillRect(11,28,18,4); g2.fillStyle='#3a5aa8'; g2.beginPath(); g2.roundRect(13,13,14,15,3); g2.fill();
   g2.strokeStyle='#6a8ad8'; g2.lineWidth=1; for(let y=15;y<27;y+=2.2){ g2.beginPath(); g2.moveTo(13.5,y); g2.lineTo(26.5,y+1); g2.stroke(); }
-  g2.strokeStyle='#3a5aa8'; g2.lineWidth=1.4; g2.beginPath(); g2.moveTo(27,22); g2.quadraticCurveTo(34,26,31,34); g2.stroke(); g2.restore(); })(paintItemArt);
+  g2.strokeStyle='#3a5aa8'; g2.lineWidth=1.4; g2.beginPath(); g2.moveTo(27,22); g2.quadraticCurveTo(34,26,31,34); g2.stroke(); g2.restore(); };
 const listenOpen=k=>CHOICE.necroQ==='listen' && !(CHOICE.listened||[]).includes(k);
 { const oldB=TALKERS.bertha; TALKERS.bertha=(...a)=>{ if(!listenOpen('8,5') || hasItem('blue_spool')) return oldB(...a);
     say('Bertha of the Wheatsheaf',["“Maren's spool? Who's been telling you about Maren?” Bertha puts the cup down, which she never does.","“She wove our curtains, and half the wedding cloths in this valley. When she died there was a spool of her blue left on the loom, and nobody had the heart to use it. It's been in the crate fifty years.”"],[
@@ -17306,8 +17288,7 @@ OBJ_DRAW.kneelslab=o=>{ const a=P(o.i+0.1,o.j+0.15), b=P(o.i+0.9,o.j+0.15), c=P(
   g.save(); g.translate(m.x,m.y); g.scale(2,1.6); g.translate(-m.x,-m.y); g.lineWidth=1.3;
   g.beginPath(); g.arc(m.x-2,m.y-6,2.4,0,Math.PI*2); g.moveTo(m.x-2,m.y-3.5); g.lineTo(m.x,m.y+2); g.lineTo(m.x+6,m.y+2); g.lineTo(m.x+7,m.y+6); g.moveTo(m.x-1,m.y-1); g.lineTo(m.x-6,m.y+1); g.stroke(); g.restore(); };
 wrap('crypt','objects',l=>[...l,{type:'kneelslab', i:7, j:5, noblock:true}]);
-PUZ_TYPES.add('kneelslab');
-puzAct=(orig=>function(o){ if(o && o.type==='kneelslab'){ say('A Carved Slab',CHOICE.cryptKnelt?"The carving of the kneeling man is worn smooth where Corran knelt.":"A slab set into the floor, carved with a kneeling man. Under it, cut small: <i>“The first of us kneel here before they go down. The gates remember who has knelt.”</i>",[bye]); return; } return orig.apply(this,arguments); })(puzAct);
+onUse(['kneelslab'],()=>say('A Carved Slab',CHOICE.cryptKnelt?"The carving of the kneeling man is worn smooth where Corran knelt.":"A slab set into the floor, carved with a kneeling man. Under it, cut small: <i>“The first of us kneel here before they go down. The gates remember who has knelt.”</i>",[bye]));
 const CRYPT_RISE=(name,i,j)=>{ const opts=RISEN(name), hp=maxHpOf(opts.equip,FOES.skeleton.base);
   return { id:mobs.length+60, key:name, name, type:'skeleton', opts, faction:'cryptrise', spawn:[i,j], i, j, x:i+0.5, y:j+0.5, dir:1, hp, maxHp:hp, path:[], moving:false, dead:false, gone:false, fade:1, flash:0, lunge:null,
     state:'guard', t:0, k:0, wind:1, quick:false, guardDir:'up', ox:0, oy:0, hostile:true, fallT:0, tier:1 }; };
@@ -17362,7 +17343,6 @@ function whDraw(){ const W=WH, c=document.getElementById('wh-cv').getContext('2d
 // ════════ Corwin walks a real road: Hollowmere market to Sylvhaven and back, through Dunhollow, at a walking pace ════════
 // One position for him in the whole world, advanced by the clock whether you are watching or not: he is only ever in one place,
 // comes and goes through the gates like anyone else, and if you outpace him he is still behind you on the road.
-delete ROUTINES.peddler;
 const PED_ROUTE=['market','citygate','kingsroad','road','lane','village','tunnel','millroad','crossroads','wolfwood','clearing','mistmere','elfroad','silvergate','sylvhaven'];
 const PED_STALL={ market:{wait:70}, village:{at:[7,6], wait:45, dir:1}, sylvhaven:{wait:70} }, PED_SPEED=0.9;
 const PED_LEGS=(()=>{ const R=PED_ROUTE, L=[]; for(let k=0;k<R.length;k++) L.push({ area:R[k], from:R[k-1]||R[1], to:R[k+1]||R[k-1] });
@@ -17430,13 +17410,12 @@ function manaGain(n){ player.maxMana=100; const m0=player.mana??100; player.mana
 
 // a self-spell (a ward, a double) flies at nobody and wounds nobody
 // staff blows give a little breath back: a caster who fights with the stick between spells is not wasting time
-meleeHit=(o=>function(){ const f=combat.foe, h0=f?f.hp:0; const r=o.apply(this,arguments); if(f && isMagicWeapon() && f.hp<h0) manaGain(5); return r; })(meleeHit);
 // wards: Ice Ward and Bone Shield take the next blow whole
-hurtPlayer=(o=>function(n,label){ const W=player.ward; if(W && W.t>0 && n>0 && combat.active && !combat.practice){ player.ward=null;
+function wardTakes(n){ const W=player.ward; if(W && W.t>0 && n>0 && combat.active && !combat.practice){ player.ward=null;
     floatText(tileOf(player),W.kind==='ice'?'Ice Ward!':'Bone Shield!',W.kind==='ice'?'#bfe6ff':'#e8e4d0',true); burst(player,combat.foe||player,W.kind==='ice'?'#d8f0ff':'#e8e4d0',12); shake=Math.max(shake,4);
     if(W.kind==='ice' && combat.foe && !combat.foe.dead){ addStatus(combat.foe,'chill',5,0); floatText(tileOf(combat.foe),'Numbed','#bfe6ff'); }
-    return; }
-  return o.apply(this,arguments); })(hurtPlayer);
+    return true; }
+  return false; }
 function boneShield(f){ const c=12; if((player.mana??0)<c){ floatText(tileOf(player),'Out of mana','#a8a0c8'); return false; }
   player.mana-=c; lunge(player,f); const w=f && f.state==='windup';
   if(w){ f.state='stagger'; f.t=1.8; floatText(tileOf(f),'Bone Shield!','#e8e4d0'); logMsg('Your skeleton throws itself into the blow, and comes apart in a shower of bones. The blow goes nowhere.','#e8e4d0'); }
@@ -17446,7 +17425,7 @@ function boneShield(f){ const c=12; if((player.mana??0)<c){ floatText(tileOf(pla
 function summonDopp(f){ const m=SPM(), T=Math.round(8*m*10)/10, fx=f?f.x-player.x:1, fy=f?f.y-player.y:0, fl=Math.hypot(fx,fy)||1;
   DOPP={ x:player.x, y:player.y, t:T, max:T, dmg:Math.max(3,Math.round(4*m)), cd:0.9, anim:0, a:0, fade:0, dir:player.dir||0, ox:fy/fl*0.95+fx/fl*0.25, oy:-fx/fl*0.95+fy/fl*0.25 };
   floatText(tileOf(player),'Doppelganger!','#bfe0ff'); logMsg('Cold light steps out of you, takes your shape, and turns on your foe.','#bfe0ff'); }
-skelTick=(o=>function(dt){ o.apply(this,arguments);
+function bookTick(dt){                                // wards wear off; the doppelganger fights and fades
   if(player.ward){ player.ward.t-=dt; if(player.ward.t<=0 || !combat.active) player.ward=null; }
   const D=DOPP; if(!D) return; D.anim=Math.max(0,D.anim-dt);
   if(D.fade){ D.a-=dt*1.6; if(D.a<=0) DOPP=null; return; }
@@ -17454,8 +17433,8 @@ skelTick=(o=>function(dt){ o.apply(this,arguments);
   const f=combat.foe; let tx=player.x+D.ox, ty=player.y+D.oy;
   if(f && !f.dead){ const fx=f.x-player.x, fy=f.y-player.y, fl=Math.hypot(fx,fy)||1; tx=player.x+fy/fl*0.95+fx/fl*0.25; ty=player.y-fx/fl*0.95+fy/fl*0.25; D.dir=dirFromDelta(f.x-D.x,f.y-D.y); }   // your other shoulder: the skeleton has the first
   const mx=tx-D.x, my=ty-D.y, md=Math.hypot(mx,my), sp=Math.min(md,dt*4); if(md>0.001){ D.x+=mx/md*sp; D.y+=my/md*sp; } D.moving=md>0.05;
-  if(f && !f.dead && combat.phase==='fight' && D.a>=1 && md<0.4){ D.cd-=dt; if(D.cd<=0){ D.cd=1.4; D.anim=0.3; wound(f,D.dmg,'Mirror!','#bfe0ff'); } } })(skelTick);
-muleItems=(o=>function(items){ o.apply(this,arguments);
+  if(f && !f.dead && combat.phase==='fight' && D.a>=1 && md<0.4){ D.cd-=dt; if(D.cd<=0){ D.cd=1.4; D.anim=0.3; wound(f,D.dmg,'Mirror!','#bfe0ff'); } }  }
+function bookItems(items){                            // the doppelganger and your ward, sorted in with everyone else
   const D=DOPP; if(D) items.push({d:D.x+D.y+0.01, ax:D.x, ay:D.y, fn:()=>{ const q=P(D.x,D.y), B=q.y-(D.moving?Math.abs(Math.sin(gt*10))*2:0);
     g.save(); g.globalAlpha=0.6*Math.max(0,D.a); g.globalCompositeOperation='source-over';
     const pose=D.anim>0 ? {kind:'strike', t:1-D.anim/0.3, dir:'right'} : {kind:'guard', dir:'up'};
@@ -17465,7 +17444,7 @@ muleItems=(o=>function(items){ o.apply(this,arguments);
     g.save(); g.strokeStyle=ice?`rgba(200,235,255,${a})`:`rgba(232,228,208,${a})`; g.lineWidth=ice?2:2.6; g.globalCompositeOperation='lighter';
     if(ice){ glow(q.x,q.y-48,30,58,'170,220,255',0.35*a); for(let k=0;k<6;k++){ const an=k/6*Math.PI*2+gt*0.6, rx=Math.cos(an)*24, ry=Math.sin(an)*9; g.beginPath(); g.moveTo(q.x+rx,q.y-6+ry); g.lineTo(q.x+rx*0.8,q.y-70+ry*0.6); g.stroke(); } }
     else { for(let k=0;k<7;k++){ const an=k/7*Math.PI*2, rx=Math.cos(an)*22, ry=Math.sin(an)*8; g.beginPath(); g.moveTo(q.x+rx,q.y+ry); g.quadraticCurveTo(q.x+rx*0.6,q.y-46+ry,q.x+rx*0.2,q.y-62); g.stroke(); } }
-    g.restore(); }}); })(muleItems);
+    g.restore(); }});  }
 
 // ── what the staff tooltips say: your three spells, and what a teacher can still add ──
 const SPELL_TIP=(id,m)=>{ const S=SPELL_DEF[id], d=Math.round((S.dmg||0)*m), c=Math.round(S.cost*(CHOICE.tessLesson && ['fire','frost','arcane','kindle','iceward','doppel'].includes(id)?0.75:1));

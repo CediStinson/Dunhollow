@@ -12112,6 +12112,7 @@ function impact(f){                                   // a foe's swing lands (or
     f.state='stagger'; f.t=foeDef(f).stagger;
     slowmo.scale=0.25; slowmo.t=0.22; shake=Math.max(shake,5);
     floatText(tileOf(player),'PERFECT!','#ffffff',true);
+    if(typeof manaGain==='function' && isMagicWeapon()) manaGain(15);
     burst(player,f,'#fff4c0',16);
     logMsg(`Perfect parry! ${shortName(f)} staggers.`,'#f0c060');
     if(!f.quick) f.k++;
@@ -12753,7 +12754,7 @@ refreshCreator();
 
 // ════════ Combat, deeper: bleeding, burning, chill — and magic from a staff ════════
 // status effects on anyone in a fight: {kind, t (seconds left), dmg per tick, tick, acc}
-const STATUS_DEF = { weak:{ col:'#a070c0', name:'Withered', tick:0, max:1 }, bleed:{ col:'#d0342c', name:'Bleeding', tick:0.8, max:3 }, burn:{ col:'#f08a30', name:'Burning', tick:0.6, max:1 }, chill:{ col:'#8ac8f0', name:'Chilled', tick:0, max:1 } };
+const STATUS_DEF = { kindle:{ col:'#ffa040', name:'Kindled', tick:1.0, max:1 }, weak:{ col:'#a070c0', name:'Withered', tick:0, max:1 }, bleed:{ col:'#d0342c', name:'Bleeding', tick:0.8, max:3 }, burn:{ col:'#f08a30', name:'Burning', tick:0.6, max:1 }, chill:{ col:'#8ac8f0', name:'Chilled', tick:0, max:1 } };
 function addStatus(e,kind,dur,dmg){ e.st=e.st||[]; const D=STATUS_DEF[kind], same=e.st.filter(s=>s.kind===kind);
   if(same.length>=D.max){ same[0].t=Math.max(same[0].t,dur); return; }
   e.st.push({kind,t:dur,dmg,acc:0}); floatText(tileOf(e),D.name+'!',D.col);
@@ -12765,7 +12766,8 @@ function tickStatus(e,dt){ if(!e.st||!e.st.length) return;
     while(s.acc>=D.tick && s.t>-0.01){ s.acc-=D.tick;
       if(e===player){ if(combat.practice) continue; player.hp-=s.dmg; floatText(tileOf(player),'-'+s.dmg,D.col); updateHud();
         if(player.hp<=0){ if(combat.active) { player.hp=0; defeat(); } else player.hp=1; } }
-      else if(!e.dead){ e.hp-=s.dmg; floatText(tileOf(e),'-'+s.dmg,D.col); if(e.hp<=0 && e===combat.foe) foeDown(e); } } });
+      else if(!e.dead){ e.hp-=s.dmg; floatText(tileOf(e),'-'+s.dmg,D.col); if(e.hp<=0 && e===combat.foe) foeDown(e); }
+      if(s.grow) s.dmg=Math.min(s.grow,s.dmg+1); } });   // a kindled fire grows while it lasts
   e.st=e.st.filter(s=>s.t>0); }
 // wolves' bites (and edged weapons) open wounds that keep bleeding; mages' fire keeps burning
 const BLEEDERS=new Set(['dagger','hatchet','axe','elf_blade','spear']);
@@ -12784,7 +12786,7 @@ const HEX_SPELLS = { up:  { name:'Drain', col:'#8ae07a', rgb:'140,230,120', cost
                      left:{ name:'Raise Dead', col:'#e8e4d0', rgb:'230,225,200', cost:45, dmg:2, fx:f=>raiseSkeleton(f) },
                      right:{ name:'Wither', col:'#b07ad0', rgb:'170,110,200', cost:20, dmg:3, fx:f=>addStatus(f,'weak',5,0) } };
 const NECRO_STAVES=['staff_hex','staff_bone','staff_bog','staff_barrow'];
-const spellsFor=()=> NECRO_STAVES.includes(player.opts&&player.opts.equip.weapon) ? HEX_SPELLS : SPELLS;
+const spellsFor=()=> (typeof PLAYER_BOOK==='function') ? PLAYER_BOOK() : NECRO_STAVES.includes(player.opts&&player.opts.equip.weapon) ? HEX_SPELLS : SPELLS;   // your three slotted spells
 let SKEL=null, SKEL_PILES=[];                    // the risen skeleton: fights beside you, follows you a while after, then falls into a heap of bones
 const SKEL_PILE_LIFE=60;                         // seconds a fallen heap lies there before it sinks away
 const SPM=()=>((WEAPONS[player.opts&&player.opts.equip.weapon]||{}).magic||1)*(1+(typeof gearSum==='function'?gearSum('magic'):0)*0.04);   // staff × gear: each point of spell power on your gear adds 6%   // spell power, as a multiplier
@@ -12963,17 +12965,17 @@ function castSpell(){                            // a staff casts the spell for 
     if(!W.magic || !f) return false;
     player.maxMana=100; if(player.mana==null) player.mana=100;
     const SP=spellsFor(), S=SP[playerGuard]||SP.right;
-    if(SP===HEX_SPELLS && !HEX_KNOWN(playerGuard)) return false;          // a necromancer's staff is just a stick until someone teaches you its words
-    if(SP===SPELLS && !MAGE_KNOWN(playerGuard)) return false;             // so is a magister's, until he has taught you what to say to it
-    if(S===HEX_SPELLS.left && SKEL && !SKEL.crumble){ floatText(tileOf(player),'Already risen','#e8e4d0'); return true; }   // one skeleton at a time
+    if(S===HEX_SPELLS.left && SKEL && !SKEL.crumble){ if(typeof boneShield==='function' && NECRO_EXTRA('boneshield')) return boneShield(f); floatText(tileOf(player),'Already risen','#e8e4d0'); return true; }   // one skeleton at a time; with Bone Shield, calling again throws it in the way
+    if(S.summon && S.summon()){ floatText(tileOf(player),'Already here','#bfe0ff'); return true; }
     if(player.mana<spellCost(S)){ floatText(tileOf(player),'Out of mana','#a8a0c8'); return false; }      // a plain whack with the staff
     player.mana-=spellCost(S); lunge(player,f); duel.caught=false;
+    if(S.self){ S.fx(f); updateHud(); return true; }                    // a ward or a double: cast on yourself, not at him
     bolts.push({from:{x:player.x,y:player.y}, to:f, t:0, S});
     let dmg=Math.round(S.dmg*SPM()), lbl=S.name+'!', col=S.col, fx=true; HIT_SRC='spell';
     if(f.type==='ember'){ if(S.name==='Frost'){ dmg*=2; lbl='Quenched!'; col='#bfe6ff'; } else if(S.name==='Fire'){ dmg=Math.max(1,Math.round(dmg*0.25)); lbl='It drinks the fire'; col='#ffb070'; fx=false; } }   // a fire-sprite hisses at frost and eats fire
     if(f.state==='windup' && !(playerGuard===f.swingDir && (f.wind-f.t)<=PARRY.punish)){ dmg=Math.round(dmg*0.5); lbl='Hurried'; col='#d8b0a0'; }   // cast into his swing: half
     const DEF=foeDef(f)||{}, guarding=!DEF.unguarded && !['recover','stagger','windup','down'].includes(f.state) && playerGuard===f.guardDir;
-    if(guarding){                                  // aim at the side he covers and he can still answer it: a ward, a shield, or a quick step aside
+    if(guarding && !S.pierce){                     // aim at the side he covers (a bone spear goes through anyway) and he can still answer it: a ward, a shield, or a quick step aside
       const sh=((f.opts&&f.opts.equip&&f.opts.equip.offhand)||'').includes('shield');
       if(foeSpell(f)){ dmg=Math.round(dmg*0.3); lbl='Warded'; col='#b8b0e8'; fx=false; }
       else if(sh){ dmg=Math.round(dmg*0.45); lbl='Shield!'; col='#b8c8d8'; fx=false; burst(f,player,'#b8c8d8',6); }
@@ -13421,7 +13423,7 @@ function testGobTalk(slot){
       ...Object.keys(SL).map(k=>({label:SL[k]+' ('+Object.keys(ITEMS).filter(id=>ITEMS[id].slot===k && !/^[tw]_/.test(id)).length+')', fn:()=>testGobTalk(k)})),
       {label:'Give me 500 copper too.', fn:()=>{ player.purse+=500; updateHud(); testGobTalk(); }},
       {label:NECRO()>=3&&CHOICE.skelArms?'Necromancer words (all known)':'Teach me all the necromancer\'s words.', off:NECRO()>=3&&CHOICE.skelArms, fn:()=>{ CHOICE.necro=3; CHOICE.necroQ=null; CHOICE.skelArms=true; updateHud();   // for testing: everything Vesna teaches, at once
-        logMsg('Gratis whispers three ugly words in your ear. You know Drain (lean up), Wither (lean right) and Raise Dead (lean left), and how to arm your skeleton. Hold a necromancer\'s staff to use them.','#b8a8e8'); testGobTalk(); }}, bye]); return; }
+        logMsg('Gratis whispers three ugly words in your ear. You know Grave Grasp, Bone Spear and Bone Shield, and how to arm your skeleton. Hold a necromancer\'s staff to use them.','#b8a8e8'); testGobTalk(); }}, bye]); return; }
   const ids=Object.keys(ITEMS).filter(id=>ITEMS[id].slot===slot && !/^[tw]_/.test(id)); ids.key='gratis';
   shopFrom('Gratis the Goblin',ids,0,"“"+SL[slot]+"! Take, take. 0g 0s 0c.”",()=>testGobTalk()); }
 TALKERS.testgob=()=>testGobTalk();
@@ -13710,6 +13712,7 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
       return `<div class="r">${k}<span>${v}${d}</span></div>`; }).join(''):ITEMS[id].slot==='food'?'':'<small>No bonuses. Looks good, though.</small>')+extraTip(id)+(eq?'<div class="eqfoot"><span class="eqh">equipped</span></div>':''); };
   const FOOD_TIP={ fish_perch:'A striped perch, still flapping. Better grilled over a campfire.', fish_trout:'A speckled trout. Grill it over a campfire.', fish_carp:'A fat fen carp. It tastes of mud raw; grilled, it is a meal.', fish_eel:'A slippery eel. Nobody eats these raw. Cook it.', fish_herring:'A silver herring from the salt water. Grill it.', grilled_fish:'Crisp skin, flaky and hot from the fire. A proper meal.', warm_tonic:'Ginger, pepper and strong spirit. It burns going down, and the cold goes out of your hands.', burn_salve:'A cold green salve of comfrey and fen-moss. Smear it on and the burning stops.', rue_water:'Bitter rue steeped in well water. It drives the withering out of your blood.', linen_wrap:'A roll of clean linen. Bind a bleeding wound and it closes.', apple:'A crisp apple. A small bite between fights.', bread:'A dense brown loaf. Fills the belly.', potion:'Red, bitter, and it works fast. The best thing to have in a bad fight.', raw_meat:'Edible, barely. Cook it over any campfire and it heals far more.', cooked_meat:'Spit-roasted and salted. A proper meal.', mana_potion:'Cold, blue, and it tastes of tin and thunder. The power comes back into your fingers.' };
   const extraTip=id=>{ const it=ITEMS[id];
+    if(typeof bookTip==='function'){ const t=bookTip(id); if(t!==null) return t; }   // staves: your three spells and what can still be learned
     if(it.slot==='food') return (it.cure?`<div class="r">Cures<span>${STATUS_DEF[it.cure].name}</span></div>`:'')+`<div class="r">Restores<span>${it.mana?'+'+it.mana+' Mana':'+'+it.heal+' Health'}</span></div><div class="fl">${FOOD_TIP[id]||''}</div><small>Double-click to ${(id==='potion'||it.mana)?'drink':'eat'} it. In a fight, use the food bar beside the attack buttons.</small>`;
     if(typeof NECRO_STAVES!=='undefined' && NECRO_STAVES.includes(id)){ const n=NECRO();
       if(n===0) return `<div class="fl" style="color:#b8a8e8">You don't know how to use this staff properly. In your hands it is just a heavy stick. Maybe look for someone who hangs around graveyards...?</div>`;
@@ -14460,13 +14463,13 @@ function vesnaTalk(){ const n=NECRO(), V='Vesna the Grave-Speaker';
   if(CHOICE.necroQ==='lurkers') CHOICE.necroQ=null;                          // the second word is taught at the gallows now
   const giveStaff=()=>{ if(!NECRO_STAVES.some(w=>player.opts.equip.weapon===w||hasItem(w))){ if(giveQuestItem('staff_hex',true)) logMsg("Vesna hands you a spare necromancer's staff: black wood, a green stone.",'#b8a8e8'); } };
   if(CHOICE.necro==='met' && !CHOICE.necroQ){
-    say(V,["A pale woman in a black robe leans on a staff very like the hedge-witch's. Up close, she smells of rain and turned earth.",VESNA_HOW().open,"“The dead talk all the time. Nobody listens. That is the whole craft, really: listening, and then asking very politely for something back.”"],[
+    say(V,["A pale woman in a black robe leans on a staff very like the hedge-witch's. Up close, she smells of rain and turned earth.",VESNA_HOW().open,"“The dead talk all the time. Nobody listens. That is the whole craft, really: listening, and then asking very politely for something back.”","“Any fool with a black staff can Drain, Wither and Raise: the staff knows those words by itself. The dead can teach you better ones. If you are willing to listen.”"],[
       {label:'“Teach me.”', fn:()=>{ giveStaff(); remember('necroQ','listen',"Vesna wants you to sit by three graves in the Dunhollow graveyard at night: Maren's (bring her blue spool from Bertha), Gerrit's (bring a loaf) and the nameless one's (ask Old Wenna her name)."); say(V,["“First lesson: listen. Three graves here have something left undone, and the dead do not talk to strangers with empty hands.”","“Maren the weaver, by the east wall, never finished her blue cloth. Bertha at the Wheatsheaf still has her last spool. Gerrit the miller, under the yew, fed this village forty years and nobody ever thanked him: take him a loaf. And the one by the west wall has no name at all. Old Wenna was alive the fever winter. Ask her.”","“Then come at night, sit with each of them, and keep still until the light has finished speaking. One night will do, if you have done the asking.”"],[bye]); }},
       {label:'“Not now.”', fn:closeDialog}]); return; }
   if(CHOICE.necroQ==='listen'){ const k=(CHOICE.listened||[]).length;
     if(k<3){ say(V,(k?`“${k} of three have spoken to you.` :'“')+" Maren wants her blue spool: Bertha has it. Gerrit wants a loaf, and a thank-you. The nameless one wants her name: Old Wenna knows it. Then sit with them at night, and keep still.”",[bye]); return; }
-    say(V,["Vesna looks at you for a long moment. “You stayed. Most people get up and leave when the dead start talking about themselves.”","“Feel that, still in your chest? The little warmth they left you? That is <b>Drain</b>: they give, you keep. Lean <b>up</b> when you strike, and the staff will drink.”"],[
-      {label:'Learn Drain.', fn:()=>{ CHOICE.necro=1; CHOICE.necroQ=null; updateHud(); logMsg('You learned Drain: lean up with a necromancer\'s staff.','#b8a8e8'); vesnaTalk(); }}]); return; }
+    say(V,["Vesna looks at you for a long moment. “You stayed. Most people get up and leave when the dead start talking about themselves.”","“Feel that, round your ankles? They held on to you while you sat. The dead do that, when they like you. That is <b>Grave Grasp</b>: hands from the earth that hold your foe fast, mid-swing or not. Put it in your spellbook.”"],[
+      {label:'Learn Grave Grasp.', fn:()=>{ CHOICE.necro=1; CHOICE.necroQ=null; updateHud(); logMsg('You learned Grave Grasp. Open your spellbook (B) to give it a direction.','#b8a8e8'); vesnaTalk(); }}]); return; }
   if(n===1){
     if(!CHOICE.necroQ){ say(V,["“The second word is ugly, so it is taught by an ugly teacher. There is a gallows on the King's Road. The man on it has been dead nine years and is still complaining about it.”","“Go at night and cut him down. Bring me his bones, and three more from men who died badly: there are plenty of those on the roads, and they do not need them. We will put him somewhere better.”"],[
         {label:'“I will cut him down.”', fn:()=>{ remember('necroQ','hanged',"Vesna wants the hanged man cut down from the King's Road gallows at night, and his bones brought to her with three old bones from men who died badly."); closeDialog(); }}, bye]); return; }
@@ -14475,24 +14478,24 @@ function vesnaTalk(){ const n=NECRO(), V='Vesna the Grave-Speaker';
     if(nb<3){ say(V,`“His bones, good. And three more from men who died badly. You have ${nb}. Bandits, cutthroats, the Baron's hired knives: they all carry bones, whether they like it or not.”`,[bye]); return; }
     const done=kept=>{ player.inv[player.inv.indexOf('hanged_bones')]=null; for(let q=0;q<3;q++) player.inv[player.inv.indexOf('old_bone')]=null;
       CHOICE.necro=2; CHOICE.necroQ=null; CHOICE.hanged=kept?'kept':'buried'; if(kept) giveQuestItem('hanged_skull',true); giveQuestItem('necro_leggings',true); updateHud();
-      logMsg('You learned Wither: lean right with a necromancer\'s staff. Vesna gives you a pair of frayed fen stockings.','#b8a8e8'); };
-    say(V,["Vesna lays the bones out on the grass, the hanged man's in the middle, the three others round him like a fence.","“Now watch. This is how nine years of rope and rain undo a man.” She touches the oldest bone, and it greys and crumbles as you look. “That is <b>Wither</b>: you lend the living a little of that. Lean <b>right</b>, and whatever strikes you will strike like an old man.”","“Now. Tobb has a hole ready. Or you can keep his skull. Some of us like a keepsake.”"],[
+      logMsg('You learned Bone Spear. Open your spellbook (B) to give it a direction. Vesna gives you a pair of frayed fen stockings.','#b8a8e8'); };
+    say(V,["Vesna lays the bones out on the grass, the hanged man's in the middle, the three others round him like a fence.","“Now watch.” She snaps the hanged man's thigh-bone across her knee, and the splinter flies from her hand straight through the fence post behind you. “<b>Bone Spear</b>. Old bone is the hardest thing there is: shields and wards do not stop it. Put it in your spellbook.”","“Now. Tobb has a hole ready. Or you can keep his skull. Some of us like a keepsake.”"],[
       {label:'Bury him. Let Tobb say the words.', fn:()=>{ done(false); say(V,"Tobb fills the hole himself, and mutters something that might be a prayer. On the King's Road that night, the rope stops creaking.",[bye]); }},
       {label:'Keep his skull.', fn:()=>{ done(true); say(V,["Vesna hands you the skull without comment. It is surprisingly light.","“He will not like that. You may hear about it, on the road, at night.”"],[bye]); }}]); return; }
   if(n===2){
-    if(!CHOICE.necroQ){ say(V,["“The last word is <b>Raise</b>. You do not learn it from a book. You learn it from someone who has done it: the dead themselves.”","“Under this yard is the old crypt. I have the key; Tobb thinks it is lost. Below, there is a man called Corran who has wanted to lie down properly for two hundred years, but the bone-gates will not open for the living.”","“So you will wake him, and he will follow you, and every gate you bring him to will know its own. Get him to the bottom. Keep the restless ones off him.”"],[
+    if(!CHOICE.necroQ){ say(V,["“The last lesson is about the risen. You can raise them; any staff can. But they will not <i>die</i> for you until one of the dead has shown you how.”","“Under this yard is the old crypt. I have the key; Tobb thinks it is lost. Below, there is a man called Corran who has wanted to lie down properly for two hundred years, but the bone-gates will not open for the living.”","“So you will wake him, and he will follow you, and every gate you bring him to will know its own. Get him to the bottom. Keep the restless ones off him.”"],[
         {label:'“Open the crypt.”', fn:()=>{ remember('necroQ','crypt',"Vesna has opened the old crypt under the graveyard. Lead Corran's bones down through the bone-gates to his rest."); logMsg('The crypt gate stands open. Go down.','#b8a8e8'); closeDialog(); }}, bye]); return; }
     if(!CHOICE.cryptDone){ say(V,"“The crypt, at the back of the yard. Corran is waiting for you just inside. Walk slowly: he is old.”",[bye]); return; }
-    say(V,["Vesna puts her hand on your arm. Her fingers are cold. “You felt him stand, didn't you, when you came near him? And lie down again when you brought him home.”","“That is <b>Raise</b>. Bones remember how to stand. Ask, and for a little while they will stand for you. Lean <b>left</b>. One at a time. Never more than one.”"],[
-      {label:'Learn Raise Dead.', fn:()=>{ CHOICE.necro=3; CHOICE.necroQ=null; giveQuestItem('necro_robe',true); updateHud(); logMsg('You learned Raise Dead: lean left with a necromancer\'s staff. Vesna gives you her old robe.','#b8a8e8');
+    say(V,["Vesna puts her hand on your arm. Her fingers are cold. “You felt him stand, didn't you, when you came near him? And lie down again when you brought him home.”","“He knelt for you. Bones remember who they stood for. Now, when your risen one stands beside you, call it again, and it will throw itself between you and the blow. <b>Bone Shield</b>. It costs you the skeleton. It is worth it.”"],[
+      {label:'Learn Bone Shield.', fn:()=>{ CHOICE.necro=3; CHOICE.necroQ=null; giveQuestItem('necro_robe',true); updateHud(); logMsg('You learned Bone Shield: while your skeleton stands, cast Raise Dead again. Vesna gives you her old robe.','#b8a8e8');
         say(V,"“That is all I have. The fen has older dead than these, if you want to see what the words can do: a hag who stole my lantern, and a drowned king under the reeds. Use it kindly. Or at least on people who deserve it.”",[bye]); }}]); return; }
   say(V,[FEN_OPEN()?"“The fen is quieter since you came. I don't know if that is good.”":"“The dead are quieter since you came. They have someone to talk to.”"],[bye]); }
 TALKERS.vesna=vesnaTalk;
-JOURNAL.push(["The Grave-Speaker", ()=> !CHOICE.necro ? null : NECRO()>=3 ? ['done',"Vesna taught you all three words of the necromancer's staff: Drain, Wither and Raise Dead."]
+JOURNAL.push(["The Grave-Speaker", ()=> !CHOICE.necro ? null : NECRO()>=3 ? ['done',"Vesna taught you the dead's own words: Grave Grasp, Bone Spear and Bone Shield."]
   : (CHOICE.necroQ==='listen'||CHOICE.necroQ==='motes') ? ['active',"Sit by three graves in the Dunhollow graveyard at night and keep still until each has spoken. Maren by the east wall wants her blue spool (Bertha at the Wheatsheaf)"+(hasItem('blue_spool')?' ✓':'')+"; Gerrit the miller wants a loaf"+(hasItem('bread')?' ✓':'')+"; the nameless one by the west wall wants her name (Old Wenna)"+(CHOICE.ilseName?' ✓':'')+". ("+(CHOICE.listened||[]).length+"/3)"]
-  : NECRO()===0 ? ['active',"Vesna the Grave-Speaker walks the Dunhollow graveyard at night. She offered to teach you the words in a necromancer's staff."]
-  : NECRO()===1 ? ['active', CHOICE.necroQ==='hanged' ? (hasItem('hanged_bones')?"Bring the hanged man's bones to Vesna, with three old bones from men who died badly. ("+player.inv.filter(x=>x==='old_bone').length+"/3)":"Cut the hanged man down from the gallows on the King's Road at night, for Vesna.") : "You know Drain. Vesna has the next word for you in the graveyard."]
-  : ['active', CHOICE.necroQ==='crypt' ? (CHOICE.cryptDone?"Corran lies at rest. Tell Vesna.":"Lead Corran's bones down through the bone-gates of the old crypt under the graveyard.") : "You know Drain and Wither. Vesna has the last word for you in the graveyard."]]);
+  : NECRO()===0 ? ['active',"Vesna the Grave-Speaker walks the Dunhollow graveyard at night. She offered to teach you words no staff knows by itself."]
+  : NECRO()===1 ? ['active', CHOICE.necroQ==='hanged' ? (hasItem('hanged_bones')?"Bring the hanged man's bones to Vesna, with three old bones from men who died badly. ("+player.inv.filter(x=>x==='old_bone').length+"/3)":"Cut the hanged man down from the gallows on the King's Road at night, for Vesna.") : "You know Grave Grasp. Vesna has the next lesson for you in the graveyard."]
+  : ['active', CHOICE.necroQ==='crypt' ? (CHOICE.cryptDone?"Corran lies at rest. Tell Vesna.":"Lead Corran's bones down through the bone-gates of the old crypt under the graveyard.") : "You know Grave Grasp and Bone Spear. Vesna has the last lesson for you in the graveyard."]]);
 
 // the grave-speaker's clothes: dark, worn, laced with bone
 Object.assign(ITEM_STATS,{ necro_robe:{hp:2,agi:1,magic:4}, necro_bustier:{agi:1,magic:2}, necro_leggings:{agi:2,magic:2} });
@@ -17079,8 +17082,8 @@ function cryptAct(o){ if(o.type==='bonegate') say('A Bone-Gate',["A lattice of o
 // ════════ The magister's three lessons: light caught in a jar, cold carried home, fire put out ════════
 // ── which words of a magister's staff you know: old saves that already carried one keep all three ──
 function MAGE_KNOWN(dir){ return Array.isArray(CHOICE.mageKnown) && CHOICE.mageKnown.includes(dir); }
-function SPELL_KNOWN(){ return spellsFor()===HEX_SPELLS ? HEX_KNOWN(playerGuard) : MAGE_KNOWN(playerGuard); }
-function spellCost(S){ return Math.round((S&&S.cost||0)*(CHOICE.tessLesson && spellsFor()===SPELLS ? 0.75 : 1)); }   // Tessaly's whisper: a quarter less breath
+function SPELL_KNOWN(){ return true; }   // every staff knows its three common words
+function spellCost(S){ return Math.round((S&&S.cost||0)*(CHOICE.tessLesson && SCHOOL()==='mage' ? 0.75 : 1)); }   // Tessaly's whisper: a quarter less breath
 const WIZ_STAVES=['staff_oak','staff_star','staff_cinder','staff_crystal'];
 applySave=(orig=>function(sv){ const r=orig.apply(this,arguments);
   try{ if(!Array.isArray(CHOICE.mageKnown)){ const own=[...player.inv, player.opts.equip.weapon, ...(Array.isArray(CHOICE.stash)?CHOICE.stash:[])].some(id=>WIZ_STAVES.includes(id));
@@ -17113,33 +17116,33 @@ paintItemArt=(orig=>function(g2,id,size){ if(id!=='glass_jar' && id!=='bottled_w
 function mageAskLabel(){ const n=(CHOICE.mageKnown||[]).length; return CHOICE.mageQ ? 'About the lesson.' : (n && n<3) ? 'Ask for the next lesson.' : 'Ask about magic.'; }
 function mageTalk(){ const O='Magister Orvell', K=CHOICE.mageKnown=Array.isArray(CHOICE.mageKnown)?CHOICE.mageKnown:[], back={label:'Back.', fn:()=>TALKERS.orvell()};
   const cnt=id=>player.inv.filter(x=>x===id).length, take=(id,n)=>{ for(let q=0;q<n;q++){ const k=player.inv.indexOf(id); if(k>=0) player.inv[k]=null; } };
-  const learn=(dir,name)=>{ if(!K.includes(dir)) K.push(dir); CHOICE.mageQ=null; updateHud(); logMsg('You learned '+name+': lean '+dir+' with a magister\'s staff.','#9adcf0'); try{ autosaveSoon(300); }catch(e){} };
+  const learn=(dir,name)=>{ if(!K.includes(dir)) K.push(dir); CHOICE.mageQ=null; updateHud(); logMsg('You learned '+name+'. Open your spellbook (B) to give it a direction.','#9adcf0'); try{ autosaveSoon(300); }catch(e){} };
   const giveStaff=()=>{ if(!WIZ_STAVES.some(w=>player.opts.equip.weapon===w||hasItem(w))){ if(giveQuestItem('staff_oak',true)) logMsg("Orvell gives you a plain oak staff with a blue stone in the crook.",'#9adcf0'); } };
   const jars=()=>{ for(let q=cnt('glass_jar')+cnt('bottled_wisp');q<3;q++) giveQuestItem('glass_jar',true); };
   if(!CHOICE.mageQ){
-    if(K.length>=3){ say(O,["“Fire to the <b>left</b>, frost <b>up</b>, the pure strike to the <b>right</b>. Magic passes any guard. It does not pass your own exhaustion. Mind the blue.”"],[back]); return; }
-    if(!K.includes('right')){ say(O,["“Magic is not in the staff. The staff is a cup. What goes in it, you have to go and fetch yourself.”","“First, the pure strike. It is the oldest and the plainest: light, with nothing added. So you will go and catch some. In the Mistmere at night there are wisps: cold little lights that live on fog and curiosity.”","“Walk at them and they run. Stand still, and they come to see what you are. Three of them. Take these jars, and do not let Bertha see them; she thinks they are for pickling.”"],[
+    if(K.length>=3){ say(O,["“Doppelganger, Ice Ward, Kindle: you have them all now. Keep three in your spellbook, swap them when the road changes. Magic passes any guard. It does not pass your own exhaustion. Mind the blue.”"],[back]); return; }
+    if(!K.includes('right')){ say(O,["“Any staff knows Fire, Frost and the pure strike: the words are cut into the wood. What I teach is not in any staff. You have to go and fetch it yourself.”","“First, light that remembers your shape. In the Mistmere at night there are wisps: cold little lights that live on fog and curiosity. Hold one long enough and it learns you.”","“Walk at them and they run. Stand still, and they come to see what you are. Three of them. Take these jars, and do not let Bertha see them; she thinks they are for pickling.”"],[
         {label:'“I will catch your lights.”', fn:()=>{ giveStaff(); jars(); remember('mageQ','light',"Magister Orvell wants three wisps caught in jars, in the Mistmere at night. They run if you walk at them; stand still and they come close."); closeDialog(); }}, back]); return; }
-    if(!K.includes('up')){ say(O,["“Frost next. Frost is patience, and patience is learned by being uncomfortable on purpose for a long time.”","“There is a pool in the willows past Hunter's Clearing. At midnight a cold spring wakes under it, from deep under the hill. Bathe in it at midnight, then walk home to Dunhollow. Do not warm yourself on the way: no fire, no hearth, no bed. Let the cold sit in you until it knows its way around.”","“Two nights. You will hate me. That is part of it.”"],[
+    if(!K.includes('up')){ say(O,["“Next, a ward of ice. Not the frost you throw: the frost you keep. Patience, learned by being uncomfortable on purpose for a long time.”","“There is a pool in the willows past Hunter's Clearing. At midnight a cold spring wakes under it, from deep under the hill. Bathe in it at midnight, then walk home to Dunhollow. Do not warm yourself on the way: no fire, no hearth, no bed. Let the cold sit in you until it knows its way around.”","“Two nights. You will hate me. That is part of it.”"],[
         {label:'“Two cold nights.”', fn:()=>{ remember('mageQ','cold',"Orvell wants you to bathe in the Willow Pool at midnight and walk home to Dunhollow without warming yourself at any fire, hearth or bed. Two nights."); closeDialog(); }}, back]); return; }
-    say(O,["“Fire last, because it is the easiest and the most dangerous. Fire wants to be called. That is the whole trouble with it.”","He leans close and says a word under his breath. The candle on the table leans towards him. “That is the kindling word. Say it over a fire that has burned a long time, and something climbs out to see who called. Ember-sprites: small, hot, and rude. Put them out. Frost works wonderfully.”","“Three old fires: the bandits' camp in the south, the hunters' fire in Hunter's Clearing, the loggers' fire at the Fellings. Ashes will do if the fire is out. Ashes remember.”"],[
+    say(O,["“Last, kindling: a fire that grows the longer it lives. Fire wants to be called. That is the whole trouble with it.”","He leans close and says a word under his breath. The candle on the table leans towards him. “That is the kindling word. Say it over a fire that has burned a long time, and something climbs out to see who called. Ember-sprites: small, hot, and rude. Put them out. Frost works wonderfully.”","“Three old fires: the bandits' camp in the south, the hunters' fire in Hunter's Clearing, the loggers' fire at the Fellings. Ashes will do if the fire is out. Ashes remember.”"],[
       {label:'“I will put them out.”', fn:()=>{ remember('mageQ','ember',"Orvell taught you the kindling word. Speak it over three old fires (the Bandit Camp, Hunter's Clearing, the Fellings) and put out the ember-sprites that climb out."); closeDialog(); }}, back]); return; }
   if(CHOICE.mageQ==='light'){ const b=cnt('bottled_wisp');
     if(b<3){ jars(); say(O,b?`“${b} of three. They bump about in there, don't they? The Mistmere, at night. Stand still.”`:"“The Mistmere, at night. Walk at them and they run. Stand still and let them come to you.”",[back]); return; }
-    say(O,["Orvell holds the three jars up to the lamp, one after the other, and smiles like a boy. Then he unstoppers one against the crook of your staff. The light pours in like water and does not come out.","“Feel that? Light with nothing added. Lean <b>right</b>, and let it go: the hardest blow, the cheapest call.”"],[
-      {label:'Learn the pure strike.', fn:()=>{ take('bottled_wisp',3); learn('right','Arcane'); say(O,"He uncorks the other two at the window and watches them drift off over the roofs. “They go home. Nobody keeps a wisp for long.”",[back]); }}]); return; }
+    say(O,["Orvell holds the three jars up to the lamp, one after the other, and smiles like a boy. Then he unstoppers one against the crook of your staff. The light pours in like water and does not come out.","“Look.” Beside you the light stands up, takes your height, your stance, your scowl. “<b>Doppelganger</b>. For a little while it fights beside you, as you would. Then it remembers it is light, and goes.”"],[
+      {label:'Learn Doppelganger.', fn:()=>{ take('bottled_wisp',3); learn('right','Doppelganger'); say(O,"He uncorks the other two at the window and watches them drift off over the roofs. “They go home. Nobody keeps a wisp for long.”",[back]); }}]); return; }
   if(CHOICE.mageQ==='cold'){ const n=CHOICE.baths||0;
     if(n<2){ say(O,n?`“One night of two. The cold is still a guest in you. It should be a lodger.”`:"“The Willow Pool at midnight, then home to Dunhollow. No fire, no hearth, no bed on the way.”",[back]); return; }
-    say(O,["He takes your hand. His is warm. Yours, you notice, is not, though it is a warm evening.","“There. It stays now. Lean <b>up</b>, and give some of it away: your foe grows slow, his swing grows long.”"],[
-      {label:'Learn Frost.', fn:()=>{ learn('up','Frost'); TALKERS.orvell(); }}]); return; }
+    say(O,["He takes your hand. His is warm. Yours, you notice, is not, though it is a warm evening.","“There. It stays now. Wrap it round you and the next blow breaks on it, and the hand that struck goes numb. <b>Ice Ward</b>.”"],[
+      {label:'Learn Ice Ward.', fn:()=>{ learn('up','Ice Ward'); TALKERS.orvell(); }}]); return; }
   if(CHOICE.mageQ==='ember'){ const n=(CHOICE.embers||[]).length;
     if(n<3){ say(O,`“${n} of three fires. The camp in the south, Hunter's Clearing, the Fellings. Say the word, and have your frost ready.”`,[back]); return; }
-    say(O,["“Three fires that wanted to be people, and you put them out. Now you know how fire thinks: it is hungry, and it is never sorry.”","“Lean <b>left</b> and it burns, and keeps eating. Never call more than you can put out.”"],[
-      {label:'Learn Fire.', fn:()=>{ learn('left','Fire');
+    say(O,["“Three fires that wanted to be people, and you put them out. Now you know how fire thinks: it is hungry, and it is never sorry.”","“A spark, and then it grows: each moment it burns, it burns harder. <b>Kindle</b>. Never call more than you can put out.”"],[
+      {label:'Learn Kindle.', fn:()=>{ learn('left','Kindle');
         say(O,CHOICE.appr==='returned'?"“That is everything I know how to teach. Tessaly says there is something I do not know I know. Ask her. She will enjoy that far too much.”":"“That is everything I know how to teach. Go and be careful with it.”",[back]); }}]); return; }
   say(O,"“Mind the blue.”",[back]); }
 JOURNAL.push(["The Magister's Lessons", ()=>{ const K=CHOICE.mageKnown||[]; if(!K.length && !CHOICE.mageQ) return null;
-  if(K.length>=3) return ['done',"Magister Orvell taught you the three words of a magister's staff: the pure strike, Frost and Fire."+(CHOICE.tessLesson?" Tessaly taught you to whisper them.":"")];
+  if(K.length>=3) return ['done',"Magister Orvell taught you what no staff knows by itself: Doppelganger, Ice Ward and Kindle."+(CHOICE.tessLesson?" Tessaly taught you to whisper them.":"")];
   if(CHOICE.appr==='taken') return ['failed',"Orvell will not teach you any more, after what you did to Tessaly."];
   if(CHOICE.mageQ==='light') return ['active',"Catch three wisps in Orvell's jars in the Mistmere at night. Walk at them and they run; stand still and they come close. ("+player.inv.filter(x=>x==='bottled_wisp').length+"/3)"];
   if(CHOICE.mageQ==='cold') return ['active',"Bathe in the Willow Pool at midnight, then walk home to Dunhollow without warming yourself at a fire, a hearth or a bed. ("+(CHOICE.baths||0)+"/2 nights)"+(CHOICE.coldWalk?" You are cold to the bone: walk.":"")];
@@ -17406,6 +17409,102 @@ const PED=()=>{ if(!CHOICE.pedd || typeof CHOICE.pedd!=='object') CHOICE.pedd={k
     }catch(e){} };
   walkRoutes=(orig=>function(dt){ orig.apply(this,arguments); pedTick(); })(walkRoutes);      // every frame, like everyone else who walks
   setInterval(()=>{ if(!running) pedTick(); },500); }
+// ════════ The spellbook: every staff knows its three common words; teachers add rarer ones, and you choose which three you carry ════════
+const SCHOOL=()=> NECRO_STAVES.includes(player.opts&&player.opts.equip.weapon) ? 'necro' : 'mage';
+let DOPP=null;
+const SPELL_DEF={ fire:SPELLS.left, frost:SPELLS.up, arcane:SPELLS.right, raise:HEX_SPELLS.left, drain:HEX_SPELLS.up, wither:HEX_SPELLS.right,
+  iceward:{ name:'Ice Ward', col:'#bfe6ff', rgb:'190,230,255', cost:26, dmg:0, self:true, fx:()=>{ player.ward={kind:'ice', t:8}; floatText(tileOf(player),'Ice Ward','#bfe6ff'); } },
+  kindle:{ name:'Kindle', col:'#ffa040', rgb:'255,160,64', cost:22, dmg:2, fx:f=>{ addStatus(f,'kindle',6.5,1); const s=(f.st||[]).find(x=>x.kind==='kindle'); if(s){ s.grow=Math.max(3,Math.round(3*SPM())); s.t=Math.max(s.t,6.5); } } },
+  doppel:{ name:'Doppelganger', col:'#bfe0ff', rgb:'190,225,255', cost:40, dmg:0, self:true, summon:()=>!!(DOPP && !DOPP.fade), fx:f=>summonDopp(f) },
+  spear:{ name:'Bone Spear', col:'#efe6cc', rgb:'235,225,200', cost:30, dmg:10, pierce:true, fx:null },
+  grasp:{ name:'Grave Grasp', col:'#b8a478', rgb:'170,150,110', cost:24, dmg:2, fx:f=>{ const w=f.state==='windup'; f.state='stagger'; f.t=w?1.6:1.0; floatText(tileOf(f),'Held!','#d8c8a0'); } } };
+Object.entries(SPELL_DEF).forEach(([k,v])=>{ v.id=k; });
+const BOOK_BASE={ mage:{left:'fire', up:'frost', right:'arcane'}, necro:{left:'raise', up:'drain', right:'wither'} };
+function MAGE_EXTRA(id){ return ({ doppel:'right', iceward:'up', kindle:'left' })[id] ? MAGE_KNOWN(({ doppel:'right', iceward:'up', kindle:'left' })[id]) : false; }   // Orvell's three lessons
+function NECRO_EXTRA(id){ const n=NECRO(); return id==='grasp' ? n>=1 : id==='spear' ? n>=2 : id==='boneshield' ? n>=3 : false; }            // Vesna's three lessons
+function bookSpells(sc){ return sc==='necro' ? ['raise','drain','wither',...['grasp','spear'].filter(NECRO_EXTRA)] : ['fire','frost','arcane',...['kindle','iceward','doppel'].filter(MAGE_EXTRA)]; }
+function BOOK(sc){ const B=CHOICE.book=(CHOICE.book && typeof CHOICE.book==='object')?CHOICE.book:{}; const ok=bookSpells(sc), b=Object.assign({},BOOK_BASE[sc],B[sc]||{});
+  ['left','up','right'].forEach(d=>{ if(!ok.includes(b[d])) b[d]=BOOK_BASE[sc][d]; }); B[sc]=b; return b; }
+function PLAYER_BOOK(){ const b=BOOK(SCHOOL()); return { left:SPELL_DEF[b.left], up:SPELL_DEF[b.up], right:SPELL_DEF[b.right] }; }
+function manaGain(n){ player.maxMana=100; const m0=player.mana??100; player.mana=Math.min(100,m0+n); if(player.mana>m0) floatText([player.i,player.j-0.002],'+'+Math.round(player.mana-m0)+' mana','#9aa8ff'); }
+
+// a self-spell (a ward, a double) flies at nobody and wounds nobody
+// staff blows give a little breath back: a caster who fights with the stick between spells is not wasting time
+meleeHit=(o=>function(){ const f=combat.foe, h0=f?f.hp:0; const r=o.apply(this,arguments); if(f && isMagicWeapon() && f.hp<h0) manaGain(5); return r; })(meleeHit);
+// wards: Ice Ward and Bone Shield take the next blow whole
+hurtPlayer=(o=>function(n,label){ const W=player.ward; if(W && W.t>0 && n>0 && combat.active && !combat.practice){ player.ward=null;
+    floatText(tileOf(player),W.kind==='ice'?'Ice Ward!':'Bone Shield!',W.kind==='ice'?'#bfe6ff':'#e8e4d0',true); burst(player,combat.foe||player,W.kind==='ice'?'#d8f0ff':'#e8e4d0',12); shake=Math.max(shake,4);
+    if(W.kind==='ice' && combat.foe && !combat.foe.dead){ addStatus(combat.foe,'chill',5,0); floatText(tileOf(combat.foe),'Numbed','#bfe6ff'); }
+    return; }
+  return o.apply(this,arguments); })(hurtPlayer);
+function boneShield(f){ const c=12; if((player.mana??0)<c){ floatText(tileOf(player),'Out of mana','#a8a0c8'); return false; }
+  player.mana-=c; lunge(player,f); const w=f && f.state==='windup';
+  if(w){ f.state='stagger'; f.t=1.8; floatText(tileOf(f),'Bone Shield!','#e8e4d0'); logMsg('Your skeleton throws itself into the blow, and comes apart in a shower of bones. The blow goes nowhere.','#e8e4d0'); }
+  else { player.ward={kind:'bone', t:4}; floatText(tileOf(player),'Bone Shield','#e8e4d0'); logMsg('Your skeleton falls apart around you into a cage of bones: the next blow breaks on it.','#e8e4d0'); }
+  shake=Math.max(shake,4); crumbleSkel(); updateHud(); return true; }
+// the double: your own shape in cold light, fighting at your other shoulder until it remembers it is light
+function summonDopp(f){ const m=SPM(), T=Math.round(8*m*10)/10, fx=f?f.x-player.x:1, fy=f?f.y-player.y:0, fl=Math.hypot(fx,fy)||1;
+  DOPP={ x:player.x, y:player.y, t:T, max:T, dmg:Math.max(3,Math.round(4*m)), cd:0.9, anim:0, a:0, fade:0, dir:player.dir||0, ox:fy/fl*0.95+fx/fl*0.25, oy:-fx/fl*0.95+fy/fl*0.25 };
+  floatText(tileOf(player),'Doppelganger!','#bfe0ff'); logMsg('Cold light steps out of you, takes your shape, and turns on your foe.','#bfe0ff'); }
+skelTick=(o=>function(dt){ o.apply(this,arguments);
+  if(player.ward){ player.ward.t-=dt; if(player.ward.t<=0 || !combat.active) player.ward=null; }
+  const D=DOPP; if(!D) return; D.anim=Math.max(0,D.anim-dt);
+  if(D.fade){ D.a-=dt*1.6; if(D.a<=0) DOPP=null; return; }
+  D.a=Math.min(1,D.a+dt*2.5); if(!combat.active){ D.fade=1; return; } D.t-=dt; if(D.t<=0){ D.fade=1; floatText([Math.floor(D.x),Math.floor(D.y)],'it fades','#bfe0ff'); return; }
+  const f=combat.foe; let tx=player.x+D.ox, ty=player.y+D.oy;
+  if(f && !f.dead){ const fx=f.x-player.x, fy=f.y-player.y, fl=Math.hypot(fx,fy)||1; tx=player.x+fy/fl*0.95+fx/fl*0.25; ty=player.y-fx/fl*0.95+fy/fl*0.25; D.dir=dirFromDelta(f.x-D.x,f.y-D.y); }   // your other shoulder: the skeleton has the first
+  const mx=tx-D.x, my=ty-D.y, md=Math.hypot(mx,my), sp=Math.min(md,dt*4); if(md>0.001){ D.x+=mx/md*sp; D.y+=my/md*sp; } D.moving=md>0.05;
+  if(f && !f.dead && combat.phase==='fight' && D.a>=1 && md<0.4){ D.cd-=dt; if(D.cd<=0){ D.cd=1.4; D.anim=0.3; wound(f,D.dmg,'Mirror!','#bfe0ff'); } } })(skelTick);
+muleItems=(o=>function(items){ o.apply(this,arguments);
+  const D=DOPP; if(D) items.push({d:D.x+D.y+0.01, ax:D.x, ay:D.y, fn:()=>{ const q=P(D.x,D.y), B=q.y-(D.moving?Math.abs(Math.sin(gt*10))*2:0);
+    g.save(); g.globalAlpha=0.6*Math.max(0,D.a); g.globalCompositeOperation='source-over';
+    const pose=D.anim>0 ? {kind:'strike', t:1-D.anim/0.3, dir:'right'} : {kind:'guard', dir:'up'};
+    try{ drawChar(g,q.x,B,player.opts,D.moving?Math.sin(gt*10)*5:0,D.dir||0,pose); }catch(e){}
+    g.globalCompositeOperation='lighter'; glow(q.x,B-50,34,64,'170,210,255',0.45*D.a); g.restore(); }});
+  const W=player.ward; if(W && combat.active) items.push({d:player.x+player.y+0.02, ax:player.x, ay:player.y, fn:()=>{ const q=P(player.x,player.y), ice=W.kind==='ice', a=Math.min(1,W.t)*(0.75+Math.sin(gt*5)*0.15);
+    g.save(); g.strokeStyle=ice?`rgba(200,235,255,${a})`:`rgba(232,228,208,${a})`; g.lineWidth=ice?2:2.6; g.globalCompositeOperation='lighter';
+    if(ice){ glow(q.x,q.y-48,30,58,'170,220,255',0.35*a); for(let k=0;k<6;k++){ const an=k/6*Math.PI*2+gt*0.6, rx=Math.cos(an)*24, ry=Math.sin(an)*9; g.beginPath(); g.moveTo(q.x+rx,q.y-6+ry); g.lineTo(q.x+rx*0.8,q.y-70+ry*0.6); g.stroke(); } }
+    else { for(let k=0;k<7;k++){ const an=k/7*Math.PI*2, rx=Math.cos(an)*22, ry=Math.sin(an)*8; g.beginPath(); g.moveTo(q.x+rx,q.y+ry); g.quadraticCurveTo(q.x+rx*0.6,q.y-46+ry,q.x+rx*0.2,q.y-62); g.stroke(); } }
+    g.restore(); }}); })(muleItems);
+
+// ── what the staff tooltips say: your three spells, and what a teacher can still add ──
+const SPELL_TIP=(id,m)=>{ const S=SPELL_DEF[id], d=Math.round((S.dmg||0)*m), c=Math.round(S.cost*(CHOICE.tessLesson && ['fire','frost','arcane','kindle','iceward','doppel'].includes(id)?0.75:1));
+  return S.name+': '+({ fire:d+' damage, then burns', frost:d+' damage, slows his swing', arcane:d+' damage', raise:'a skeleton fights beside you'+(NECRO_EXTRA('boneshield')?' (cast again: Bone Shield)':''), drain:d+' damage, heals you', wither:d+' damage, he hits for half',
+    iceward:'the next blow breaks on it and numbs him', kindle:'a fire that grows each second', doppel:'your double fights beside you', spear:d+' damage, through any guard', grasp:d+' damage, holds him: interrupts his swing' })[id]+' · '+c+' mana'; };
+function bookTip(id){ const sc=NECRO_STAVES.includes(id)?'necro':['staff_oak','staff_star','staff_cinder','staff_crystal'].includes(id)?'mage':null; if(!sc) return null;
+  const m=WEAPONS[id].magic*(1+(typeof gearSum==='function'?gearSum('magic'):0)*0.04), b=BOOK(sc), C=sc==='necro'?'#b8a8e8':'#9adcf0', arrow={left:'◀',up:'▲',right:'▶'};
+  const lore=(sc==='mage' && typeof GEAR_LORE!=='undefined' && GEAR_LORE && GEAR_LORE[id])?`<div class="fl" style="color:#b8c8a8">${GEAR_LORE[id]}</div>`:'';
+  const rows=['left','up','right'].map(d=>arrow[d]+' '+SPELL_TIP(b[d],m)).join('<br>');
+  const extra=sc==='necro' ? ['grasp','spear','boneshield'] : ['doppel','iceward','kindle'], miss=extra.filter(x=>!(sc==='necro'?NECRO_EXTRA(x):MAGE_EXTRA(x))).length;
+  const who=sc==='necro' ? "Vesna the Grave-Speaker, in the Dunhollow graveyard at night," : (CHOICE.appr==='taken' ? null : (typeof ORVELL_AT_INN==='function' && ORVELL_AT_INN()) ? "Magister Orvell, at the Wheatsheaf in Dunhollow," : "Magister Orvell, in the Castle Ward of Hollowmere,");
+  return lore+`<div class="fl" style="color:${C}">${rows}</div><small>Spellbook (B) to change them.${miss&&who?` ${who} can teach you ${miss===3?'three more':miss===2?'two more':'one more'}.`:''}</small>`; }
+
+// ── the spellbook page: pick three, one for each side ──
+const bookPanel=document.createElement('div'); bookPanel.id='book-panel';
+bookPanel.style.cssText='position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;display:none;width:340px;max-width:calc(100vw - 32px);padding:14px 16px;border-radius:10px;border:1px solid #8a6a3a;background:rgba(20,14,7,0.97);color:#f0dca0;font:13px Georgia,serif;box-shadow:0 8px 30px rgba(0,0,0,0.6);';
+document.body.appendChild(bookPanel);
+let BOOK_TAB=null;
+function bookSchools(){ const has=ids=>[player.opts&&player.opts.equip.weapon,...player.inv,...(Array.isArray(CHOICE.stash)?CHOICE.stash:[])].some(x=>ids.includes(x));
+  const L=[]; if(has(['staff_oak','staff_star','staff_cinder','staff_crystal']) || ['doppel','iceward','kindle'].some(MAGE_EXTRA)) L.push('mage');
+  if(has(NECRO_STAVES) || ['grasp','spear'].some(NECRO_EXTRA)) L.push('necro'); return L; }
+function openBook(){ if(combat.active){ flash('Not in the middle of a fight.'); return; } const L=bookSchools(); if(!L.length){ flash('You carry no staff: there is nothing to write in a spellbook.'); return; }
+  if(!BOOK_TAB || !L.includes(BOOK_TAB)) BOOK_TAB=L.includes(SCHOOL())?SCHOOL():L[0]; renderBook(); bookPanel.style.display='block'; }
+function closeBook(){ bookPanel.style.display='none'; }
+function renderBook(){ const L=bookSchools(), sc=BOOK_TAB, b=BOOK(sc), all=bookSpells(sc), arrow={left:'◀ Left',up:'▲ Up',right:'▶ Right'}, m=SPM();
+  const tabs=L.length>1?`<div style="display:flex;gap:6px;margin-bottom:10px">${L.map(x=>`<button data-tab="${x}" style="flex:1;padding:5px;border-radius:6px;border:1px solid ${x===sc?'#c09040':'#5a4020'};background:${x===sc?'#3a2810':'#1a120a'};color:#f0dca0;font:12px Georgia,serif;cursor:pointer">${x==='necro'?'Necromancer':'Magister'}</button>`).join('')}</div>`:'';
+  const row=d=>`<div style="margin:6px 0"><div style="font-size:11px;color:#a08050;letter-spacing:1px">${arrow[d]}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px">${all.map(id=>`<button data-slot="${d}" data-spell="${id}" style="padding:4px 8px;border-radius:6px;border:1px solid ${b[d]===id?SPELL_DEF[id].col:'#4a3820'};background:${b[d]===id?'rgba(255,255,255,0.08)':'transparent'};color:${b[d]===id?SPELL_DEF[id].col:'#c8b088'};font:12px Georgia,serif;cursor:pointer">${SPELL_DEF[id].name}</button>`).join('')}</div></div>`;
+  const pas=sc==='necro' && NECRO_EXTRA('boneshield') ? '<div style="margin-top:8px;font-size:12px;color:#e8e4d0">Bone Shield: cast Raise Dead again while your skeleton stands.</div>' : '';
+  const sel=['left','up','right'].map(d=>SPELL_TIP(b[d],m)).map(t=>`<div style="font-size:11px;color:#c8b898;margin-top:2px">${t}</div>`).join('');
+  bookPanel.innerHTML=`<div style="font-size:11px;letter-spacing:2px;color:#a08050;margin-bottom:8px">SPELLBOOK</div>${tabs}${['left','up','right'].map(row).join('')}${pas}<div style="margin-top:10px;border-top:1px solid #3a2a14;padding-top:6px">${sel}</div><div style="text-align:right;margin-top:10px"><button data-close="1" style="padding:4px 12px;border-radius:6px;border:1px solid #6a5030;background:#2a1e10;color:#d8c090;font:12px Georgia,serif;cursor:pointer">Close</button></div>`; }
+bookPanel.addEventListener('click',e=>{ const t=e.target.closest('button'); if(!t) return; e.stopPropagation();
+  if(t.dataset.close){ closeBook(); return; } if(t.dataset.tab){ BOOK_TAB=t.dataset.tab; renderBook(); return; }
+  if(t.dataset.slot){ const sc=BOOK_TAB, b=BOOK(sc), d=t.dataset.slot, id=t.dataset.spell, other=['left','up','right'].find(x=>x!==d && b[x]===id);
+    if(other) b[other]=b[d]; b[d]=id; CHOICE.book[sc]=b; renderBook(); try{ autosaveSoon(400); }catch(err){} } });
+window.addEventListener('keydown',e=>{ if(!(e.key==='b'||e.key==='B') || !running || (e.target&&e.target.tagName==='INPUT')) return; bookPanel.style.display==='block' ? closeBook() : openBook(); });
+{ const jb=document.getElementById('jrn-btn'), sb=document.createElement('button'); sb.id='book-btn'; sb.textContent='Spells'; sb.className=jb.className; document.getElementById('screen-game').appendChild(sb);
+  const place=()=>{ try{ const cs=getComputedStyle(jb), r=jb.getBoundingClientRect(); ['background','backgroundImage','border','borderRadius','color','fontSize','fontFamily','padding','boxShadow','cursor'].forEach(k=>sb.style[k]=cs[k]);
+      sb.style.position='absolute'; sb.style.top=cs.top; sb.style.right=(innerWidth-r.left+8)+'px'; sb.style.zIndex=cs.zIndex; sb.style.display=(running && bookSchools().length)?'block':'none'; }catch(e){} };
+  setInterval(place,1000); addEventListener('resize',place); sb.addEventListener('click',e=>{ e.stopPropagation(); bookPanel.style.display==='block'?closeBook():openBook(); }); }
 </script>
 </body>
 </html>

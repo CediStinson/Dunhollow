@@ -10342,6 +10342,7 @@ const itemLabel = id => `${ITEMS[id].name}<em class="dsub">${itemCompare(id)}</e
 // traders carry a few things at a time; the stock turns over each day, and what you buy is gone until tomorrow
 const SOLD_TODAY=new Set();
 function todaysStock(who,pool,n){
+  if(who==='peddler' && typeof peddlerStock==='function') return peddlerStock(pool,n);   // Corwin restocks at the ends of his road, not at midnight
   const day=Math.floor(dayClock/DAY_LEN), h=[...who].reduce((a,ch)=>a*31+ch.charCodeAt(0)|0,7);
   const out=pool.map((id,k)=>[id,rnd01(day*13+k,h,410)]).sort((a,b)=>a[1]-b[1]).slice(0,n).map(x=>x[0]).filter(id=>!SOLD_TODAY.has(who+day+id)); out.key=who; return out;
 }
@@ -10368,7 +10369,7 @@ function shopFrom(who,stock,disc,greet,back){
   const FREE=disc===0, wares=stock.filter(id=>ITEMS[id]&&(PRICES[id]||FREE)).map(id=>({id, pr:FREE?0:Math.max(1,Math.round(PRICES[id]*disc*PRICE_MUL()))}));
   const buy=({id,pr})=>{ if(player.purse<pr) return; const free=player.inv.indexOf(null);
     if(free<0){ say(who,"“Your pack is full.”",[{label:'Back.',fn:()=>shopFrom(who,stock,disc,greet,back)},bye],true); return; }
-    player.purse-=pr; player.inv[free]=id; const STAPLE=ITEMS[id].slot==='food'; if(!FREE&&!STAPLE) SOLD_TODAY.add(sk+day+id); updateHud(); logMsg(FREE?'Got '+ITEMS[id].name+' for free.':'Bought '+ITEMS[id].name+' for '+formatCoin(pr)+'.','#e8c060');
+    player.purse-=pr; player.inv[free]=id; const STAPLE=ITEMS[id].slot==='food'; if(!FREE&&!STAPLE){ if(sk==='peddler') (CHOICE.peddSold=CHOICE.peddSold||[]).push(id); else SOLD_TODAY.add(sk+day+id); } updateHud(); logMsg(FREE?'Got '+ITEMS[id].name+' for free.':'Bought '+ITEMS[id].name+' for '+formatCoin(pr)+'.','#e8c060');
     const rest=(FREE||STAPLE)?stock.slice():stock.filter(x=>x!==id); rest.key=sk; shopFrom(who,rest,disc,greet,back); };
   const again=()=>shopFrom(who,stock,disc,greet,back);
   say(who,[...(Array.isArray(greet)?greet:[greet]), ...(wares.length?[]:["“That's all I had today. Come back tomorrow.”"])],[...(FREE?[]:[{label:'Sell something.',fn:()=>sellTo(who,again)}]), ...(back?[{label:'Back.',fn:back}]:[]), bye],true);
@@ -16503,7 +16504,7 @@ const PEDDLER_POOL=['potion','mana_potion','warm_tonic','burn_salve','rue_water'
 RT_IDS.add('peddler');   // (his NPC is placed by the walking road below, not by a timetable)
 TALKERS.peddler=()=>{ const n=NPCS.find(x=>x.id==='peddler'), walking=n && n.goto;
   say('Corwin the Peddler',[walking?"A weathered man in a straw hat, a grey mule plodding at his heels. He doesn't break stride, but he doesn't mind talking either.":"Corwin has the mule's panniers open on a blanket: a little of everything, and nothing twice.",
-    "“Corwin, and this is Thistle. She has opinions. Whatever you need, I might have it, and if I haven't, I'll have something better tomorrow.”"],
+    "“Corwin, and this is Thistle. She has opinions. Whatever you need, I might have it, and if I haven't, I'll have something better once I've been to the end of the road and back.”"],
     [{label:'“Show me your packs.”', fn:()=>shopFrom('Corwin the Peddler',todaysStock('peddler',PEDDLER_POOL.filter(id=>ITEMS[id]),5),1.05,"“Everything's been somewhere. Some of it twice.”",TALKERS.peddler)},
      {label:'“Where are you headed?”', fn:()=>say('Corwin the Peddler',"“Hollowmere market to the elves at Sylvhaven, and back again: down the King's Road, through Dunhollow, out past the mill and the Wolfwood, over the Mistmere and up the old elven road. A while at every end, and an hour by your well. Thistle won't walk any other road.”",[{label:'Something else.',fn:TALKERS.peddler},bye])}, bye]); };
 
@@ -16520,7 +16521,11 @@ ITEM_STATS.one_ring={ hp:2, agi:2, ap:2, magic:2, mreg:2 }; GEAR_HP.one_ring=2;
 NECK_LOOKS.one_ring={cord:'#d8b048',w:0.3,p:'ring',col:'#f2c84a'};
 Object.assign(GEAR_LORE||{},{ one_ring:'A plain band of gold on a fine chain, warm as if someone had just taken it off. It fits any finger, but you keep it round your neck. You do not want to lend it to anybody. Ever.' });
 PEDDLER_POOL.push('fishing_rod');
-const _todays=todaysStock; todaysStock=function(who,pool,n){ const r=_todays(who,pool,n); if(who==='peddler' && !r.includes('fishing_rod') && !hasItem('fishing_rod')) r.unshift('fishing_rod'); return r; };   // he always has a rod for you
+// Corwin's packs: filled at Hollowmere market and again in Sylvhaven; what you buy is gone until he next reaches an end of the road
+function peddlerStock(pool,n){ const T=(CHOICE.pedd&&CHOICE.pedd.trip)||0, h=[...'peddler'].reduce((a,ch)=>a*31+ch.charCodeAt(0)|0,7), sold=CHOICE.peddSold||[];
+  const out=pool.map((id,k)=>[id,rnd01(T*13+k,h,410)]).sort((a,b)=>a[1]-b[1]).slice(0,n).map(x=>x[0]).filter(id=>!sold.includes(id));
+  if(!out.includes('fishing_rod') && !hasItem('fishing_rod') && !sold.includes('fishing_rod')) out.unshift('fishing_rod');   // he always has a rod for you
+  out.key='peddler'; return out; }
 // ── cooking: walk up to any campfire with raw meat or fish ──
 // any fire you can crouch by, outdoors or in a house: see onUse(['campfire','hearth'],...) below
 const COOKS={ raw_meat:'cooked_meat', fish_perch:'grilled_fish', fish_trout:'grilled_fish', fish_carp:'grilled_fish', fish_eel:'grilled_fish', fish_herring:'grilled_fish' };
@@ -17373,7 +17378,8 @@ const PED=()=>{ if(!CHOICE.pedd || typeof CHOICE.pedd!=='object') CHOICE.pedd={k
   const pedTick=()=>{ try{ if(!running) { lastClock=dayClock; return; } const S=PED(), n=NPCS.find(x=>x.id==='peddler'), talking=n && typeof RT_HOLD==='function' && RT_HOLD()===n;
       let dc=lastClock==null?0:dayClock-lastClock; lastClock=dayClock; if(dc<0 || dc>DAY_LEN*4) dc=0;
       if(!talking && !CS.on) S.t+=dc;
-      for(let guard=0; guard<200 && S.t>=pedLegInfo(S.k).dur; guard++){ S.t-=pedLegInfo(S.k).dur; S.k=(S.k+1)%PED_LEGS.length; }
+      for(let guard=0; guard<200 && S.t>=pedLegInfo(S.k).dur; guard++){ S.t-=pedLegInfo(S.k).dur; S.k=(S.k+1)%PED_LEGS.length;
+        if(S.k===0 || S.k===PED_ROUTE.length-1){ S.trip=(S.trip||0)+1; CHOICE.peddSold=[]; } }   // at the end of the road he fills his packs again
       const L=PED_LEGS[S.k];
       if(L.area!==areaId || AREAS[areaId].inside){ if(n) NPCS.splice(NPCS.indexOf(n),1); return; }                        // somewhere else on the road
       const G=pedSee(S.k); if(S.t>=G.dur){ return; }

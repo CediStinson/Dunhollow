@@ -11653,7 +11653,7 @@ function resetMobs(){
     const s=MOB_SPAWNS[k]; if(s && s.chop){ m.chop=true; m.chopPh=s.chopPh||0; }
     if(m.dead && corpseGone(areaId,m)) m.gone=true; });
   const t=tierOf(areaId);                              // further from home, tougher kin
-  mobs.forEach(m=>{ if(m.type==='dummy') return; m.tier=t; const hp=Math.round(m.maxHp*(1+(m.type==='barrowking'?0.2:TIER_HP)*(t-1))); m.maxHp=hp; if(!m.dead) m.hp=hp; });
+  mobs.forEach(m=>{ if(m.type==='dummy') return; m.tier=t; const hp=Math.round(m.maxHp*(1+(m.type==='barrowking'?0.2:TIER_HP)*(t-1)+(m.type==='barrowking'?0:LATE_HP*lateStep(t)))); m.maxHp=hp; if(!m.dead) m.hp=hp; });
   if(!(A.mobsGone && A.mobsGone())){                   // some foes come back after a while (an old corpse is marked gone; that is fine)
     const D=CHOICE.deadAt||{};
     mobs.forEach(m=>{ if(!m.dead || !RESPAWNS.has(m.name)) return; const k=areaId+':'+m.key, at=D[k];
@@ -14617,7 +14617,9 @@ const AREA_TIER={ farm:1, road:1, lane:1, millroad:2, wolfwood:2, camp:2, southt
 const tierOf=area=>AREA_TIER[area]||(AREAS[area]&&AREAS[area].tier)||2;
 // further from home, tougher kin: more health and harder blows each tier (the Barrow-King has his own, gentler curve: his fight is built by hand)
 const TIER_HP=0.3, TIER_DMG=0.18;
-const tierDmg=f=> 1+(f&&f.type==='barrowking'?0.12:TIER_DMG)*(((f&&f.tier)||1)-1);
+var LATE_HP=1.2, LATE_DMG=0.6, LATE_FROM=3;   // beyond danger level LATE_FROM, each level adds this much more again: the far places should frighten a geared hero too
+const lateStep=t=>((t||1)>LATE_FROM && areaId!=='barrow') ? 1 : 0;   // one step for the far places (the barrow's fight is built by hand)
+const tierDmg=f=> 1+(f&&f.type==='barrowking'?0.12:TIER_DMG)*(((f&&f.tier)||1)-1)+(f&&f.type==='barrowking'?0:LATE_DMG*lateStep(f&&f.tier));
 
 // ════════════════════════════════════════════════════════════
 //  CINDER PASS and THE SUNKEN FORGE: west of the goblin warren, a volcanic valley

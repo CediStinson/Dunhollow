@@ -9691,7 +9691,7 @@ function npcHasNews(n){                                // '!' new business, '?' 
   if(n.id==='orvell' && CHOICE.appr!=='taken'){ const K=(CHOICE.mageKnown||[]).length, Q=CHOICE.mageQ;     // the magister's lessons
     if(Q==='light' && player.inv.filter(x=>x==='bottled_wisp').length>=3) return '?'; if(Q==='cold' && (CHOICE.baths||0)>=2) return '?'; if(Q==='ember' && (CHOICE.embers||[]).length>=3) return '?';
     if(!Q && K>0 && K<3) return '!'; }
-  if(n.id==='tessaly_k' && (CHOICE.mageKnown||[]).length>=3 && !CHOICE.tessLesson) return '!';
+  if((n.id==='tessaly_k'||n.id==='tessaly_s') && (CHOICE.mageKnown||[]).length>=3 && !CHOICE.tessLesson) return '!';
   if(n.id==='ilka' && !CHOICE.emberbrand) return (hasItem('fire_blade')||player.opts.equip.weapon==='fire_blade') && coreCount()>=3 ? '?' : '!';
   if(n.id==='trader'){ if(CHOICE.pupSt==='follow') return '!'; if(CHOICE.goatEaten && !CHOICE.goatTold) return '!'; }   // (a fed pup at home is told in conversation, not by a mark)
   if(n.id==='digger' && CHOICE.moundSeen && !ownsSpade() && !CHOICE.spadeQ) return '?';
@@ -17130,7 +17130,7 @@ function mageTalk(){ const O='Magister Orvell', K=CHOICE.mageKnown=Array.isArray
     if(n<3){ say(O,`“${n} of three fires. The camp in the south, Hunter's Clearing, the Fellings. Say the word, and have your frost ready.”`,[back]); return; }
     say(O,["“Three fires that wanted to be people, and you put them out. Now you know how fire thinks: it is hungry, and it is never sorry.”","“A spark, and then it grows: each moment it burns, it burns harder. <b>Kindle</b>. Never call more than you can put out.”"],[
       {label:'Learn Kindle.', fn:()=>{ learn('left','Kindle');
-        say(O,CHOICE.appr==='returned'?"“That is everything I know how to teach. Tessaly says there is something I do not know I know. Ask her. She will enjoy that far too much.”":"“That is everything I know how to teach. Go and be careful with it.”",[back]); }}]); return; }
+        say(O,CHOICE.appr==='returned'?"“That is everything I know how to teach. Tessaly says there is something I do not know I know. Ask her. She will enjoy that far too much.”":CHOICE.appr==='freed'?"“That is everything I know how to teach. Tessaly always said there was something I did not know I knew. They say she went east, to the elves. If you find her… do not tell her I asked.”":"“That is everything I know how to teach. Go and be careful with it.”",[back]); }}]); return; }
   say(O,"“Mind the blue.”",[back]); }
 JOURNAL.push(["The Magister's Lessons", ()=>{ const K=CHOICE.mageKnown||[]; if(!K.length && !CHOICE.mageQ) return null;
   if(K.length>=3) return ['done',"Magister Orvell taught you what no staff knows by itself: Doppelganger, Ice Ward and Kindle."+(CHOICE.tessLesson?" Tessaly taught you to whisper them.":"")];
@@ -17259,6 +17259,14 @@ setInterval(()=>{ try{ if(combat.active) return; mobs.forEach(m=>{ if(m.type!=='
 // ── Tessaly, home again, has one lesson her master does not know he could give ──
 wrap('keepward','npcs',l=> CHOICE.appr==='returned' && !ORVELL_AT_INN() ? [...l,{ id:'tessaly_k', name:'Tessaly', i:12, j:9, dir:1, opts:{gender:'f',skin:1,hair:1,hairColor:6,face:3,equip:{head:null,torso:'elf_robe',armor:null,hands:null,legs:null,feet:null,weapon:'staff_star',offhand:null}} }] : l);
 wrap('wheatsheaf','npcs',l=> CHOICE.appr==='returned' && ORVELL_AT_INN() ? [...l,{ id:'tessaly_k', name:'Tessaly', i:0, j:1, dir:1, opts:{gender:'f',skin:1,hair:1,hairColor:6,face:3,equip:{head:null,torso:'elf_robe',armor:null,hands:null,legs:null,feet:null,weapon:'staff_star',offhand:null}} }] : l);   // by the hearth with her master, until you are taught
+wrap('sylvhaven','npcs',l=> CHOICE.appr==='freed' ? [...l,{ id:'tessaly_s', name:'Tessaly', i:12, j:4, dir:1, opts:{gender:'f',skin:1,hair:1,hairColor:6,face:3,equip:{head:null,torso:'elf_robe',armor:null,hands:null,legs:null,feet:null,weapon:'staff_oak',offhand:null}} }] : l);   // the one you let go: studying alone among the elves
+TALKERS.tessaly_s=()=>{ const T='Tessaly', K=CHOICE.mageKnown||[];
+  if(CHOICE.tessLesson){ say(T,"“Whisper. And do not tell him where I am.”",[bye]); return; }
+  const lesson=()=>whisperStart(()=>{ CHOICE.tessLesson=true; updateHud(); try{ autosaveSoon(300); }catch(e){} logMsg("Tessaly's lesson: your magister's spells cost a quarter less mana.",'#e8e0ff'); say(T,"“There. Now we are even. If you see him, tell him… no. Tell him nothing.”",[bye]); });
+  if(K.length<3){ say(T,["A young woman in a borrowed elven robe sits cross-legged under the pavilion, an apprentice's oak staff across her knees and books all around her. It takes her a moment to place you.","“You. The one who let me walk.” She almost smiles. “The elves let me read here if I sweep the floors. Has the old man finished teaching you yet? Come back when he has. There is something he will never teach you, because he does not know he does it.”"],[bye]); return; }
+  say(T,["“So he taught you all three.” She closes her book. “And you cast like him, I'd bet. The whole breath, every time, as if the staff were deaf.”","“I owe you. But the elves charge for candles, and I have swept every floor in Sylvhaven twice. Thirty copper for the candles, and I'll teach you to <b>whisper</b>.”"],[
+    {label:'Pay 30c and try to whisper.', fn:()=>{ if(player.purse<30){ say(T,"“Thirty. I am grateful, not rich.”",[bye]); return; } player.purse-=30; updateHud(); lesson(); }},
+    {label:'“Later.”', fn:closeDialog}]); };
 TALKERS.tessaly_k=()=>{ const T='Tessaly', K=CHOICE.mageKnown||[];
   if(CHOICE.tessLesson){ say(T,"“Whisper. The staff is not deaf.”",[bye]); return; }
   if(K.length<3){ say(T,["Tessaly is copying out a book with ink-black fingers. She does not look up.","“Has he had you jarring wisps yet? He did that to me. Finish his lessons. Then come and find me: there is one thing he will never teach you, because he does not know he does it.”"],[bye]); return; }

@@ -7851,6 +7851,7 @@ function drawNPCBody(n){
     g.save(); g.beginPath(); g.rect(x-60,y-200,120,199); g.clip(); drawChar(g,x,y+sink,n.opts,0,n.dir||0); g.restore();
     const t=(gt*0.5+n.i*0.3)%1; g.strokeStyle=`rgba(220,240,245,${0.5*(1-t)})`; g.lineWidth=1; g.beginPath(); g.ellipse(x,y,10+t*10,3.5+t*3.5,0,0,Math.PI*2); g.stroke();
     g.fillStyle='rgba(60,100,110,0.35)'; g.beginPath(); g.ellipse(x,y,11,3.6,0,0,Math.PI*2); g.fill();
+    if(romHush()) return;                                       // a close moment: no name tags
     g.font='500 11px "Segoe UI", system-ui, sans-serif'; const tw=g.measureText(n.name).width, ty=y-66;
     g.fillStyle='rgba(12,8,3,0.78)'; g.beginPath(); g.roundRect(x-tw/2-7,ty,tw+14,16,4); g.fill(); g.fillStyle='#f0dca0'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(n.name,x,ty+8);
     const q=npcHasNews(n); if(q){ const by=ty-12+Math.sin(gt*3)*2; g.fillStyle='#1a1006'; g.font='bold 15px Georgia, serif'; g.fillText(q,x+1,by+1); g.fillStyle='#f0c040'; g.fillText(q,x,by); }
@@ -7867,6 +7868,7 @@ function drawNPCBody(n){
     g.restore(); }
   if(n.bark) speechBubble(x,y-118-n.bark.t*2,n.bark.text,Math.min(1,n.bark.t*4,(4-n.bark.t)*2));
   if(n.wander && !n.named && !n.route) return;              // passers-by go unlabelled (people with a day of their own keep their names)
+  if(romHush()) return;
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const tw=g.measureText(n.name).width, ty=y-(n.sit?92:114);
   g.fillStyle='rgba(12,8,3,0.78)'; g.beginPath(); g.roundRect(x-tw/2-7,ty,tw+14,16,4); g.fill();
@@ -8026,6 +8028,7 @@ function drawCharacter(wx,wy,opts,name,moving,dir=0){
   const swing = moving ? Math.sin(gt*10)*5 : 0;
   const B=y+bob;
   drawChar(g,x,B,opts,swing,dir);
+  if(romHush()) return;
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const tw=g.measureText(name).width, ty=B-114;
   g.fillStyle='rgba(12,8,3,0.78)';
@@ -8564,6 +8567,7 @@ function draw(){
   if(typeof drawCsSpeech==='function') drawCsSpeech();
   g.setTransform(1,0,0,1,0,0);
   if(!LOW_FX) drawPostFX(W,H);
+  drawRomFX(W,H);
   applyDuelZoom();
   drawCombatOver();
   g.setTransform(1,0,0,1,0,0);
@@ -11220,28 +11224,65 @@ function nimueTalk(){ const day=Math.floor(dayClock/DAY_LEN), friend=gateOpen()|
       say('Nimuë, Keeper of the Bath',["You step in. The water is cold as starlight, then it is not cold at all. The elves around you take no more notice of you than of the lilies.","Soon you feel as though you have slept for a week. <i>You are fully healed.</i>"],[bye]); }}] : []), bye]); }
 const mbLine=()=>say('An Elf',["“The humans hide themselves even from the water. It must be exhausting.”","“Nimuë says the moon forgets nothing. I say it forgives everything. We argue.”", CHOICE.gb2==='elvesDone'?"“Your merchant sent Ilmarë's bracelets home. We sang for her again.”":"“Stay as long as you like, stranger. The water does not mind.”"][Math.floor(Math.random()*3)],[bye]);
 // ── after dark: three people who like you more than is strictly wise. Everything past the first kiss happens off the page. ──
+// the camera for a close moment: eases in on the two of you, the world darkens to a pool of light round your faces, then black
+const romHush=()=> ROM.dark>0.08 || ROM.black>0.05;
+const ROM={on:false, x:0, y:0, z:1.9, lift:70, dark:0, darkT:0, black:0, blackT:0, tint:'moon', who:null, was:null, motes:[]};
+function romStart(n,tint){ const W=poolDepth(player.x,player.y)>0.4 || (player.sink||0)>18;
+  ROM.who=n||null; ROM.tint=tint||'moon'; ROM.was=n?{x:n.x, y:n.y, dir:n.dir, bathe:n.bathe, sit:n.sit, silk:n.silk}:null;
+  if(n){ const off=[[0.55,-0.1],[-0.55,0.1],[0.1,0.55],[-0.1,-0.55]].sort((p,q)=>W ? poolDepth(player.x+q[0],player.y+q[1])-poolDepth(player.x+p[0],player.y+p[1]) : 0)[0];
+    n.x=player.x+off[0]; n.y=player.y+off[1]; n.sit=false; if(W){ n.bathe=true; n.silk=null; }      // close enough to touch; in the water, so are they
+    n.dir=dirFromDelta(player.x-n.x,player.y-n.y); }
+  player.dir=n?dirFromDelta(n.x-player.x,n.y-player.y):player.dir; player.path=[];
+  ROM.x=n?(player.x+n.x)/2:player.x; ROM.y=n?(player.y+n.y)/2:player.y; ROM.lift=W?18:62; ROM.z=TOUCH?1.6:2.1;
+  ROM.on=true; ROM.area=areaId; ROM.idle=0; ROM.darkT=0.82; ROM.blackT=0; ROM.motes=[]; }
+function romBlack(cb){ ROM.blackT=1; setTimeout(()=>{ try{ cb&&cb(); }catch(e){ console.error(e); } },1300); }
+function romEnd(){ ROM.blackT=0; ROM.darkT=0; ROM.on=false; const n=ROM.who, w=ROM.was;
+  if(n && w){ Object.assign(n,w); if(w.x===undefined){ delete n.x; delete n.y; } } ROM.who=null; ROM.was=null; }
+function romTick(dt){ if(ROM.on && ROM.blackT===0 && (ROM.area!==areaId || !dlgOverlay.classList.contains('open'))){ ROM.idle=(ROM.idle||0)+dt; if(ROM.idle>0.6){ romEnd(); if(NPCS.some(n=>n.id==='saelle')) saelleGone(); } } else ROM.idle=0;   // walked off, or closed the dialog: let go
+  ROM.dark+=(ROM.darkT-ROM.dark)*Math.min(1,dt*1.2); ROM.black+=(ROM.blackT-ROM.black)*Math.min(1,dt*(ROM.blackT>ROM.black?2.2:0.9));
+  if(ROM.on && ROM.motes.length<26 && Math.random()<dt*9) ROM.motes.push({x:Math.random(), y:ROM.tint==='steam'?1.05:0.4+Math.random()*0.6, t:0, r:Math.random()});
+  ROM.motes.forEach(m=>{ m.t+=dt; m.y-=dt*(ROM.tint==='steam'?0.05:0.025); m.x+=Math.sin(m.t*0.8+m.r*6)*dt*0.01; }); ROM.motes=ROM.motes.filter(m=>m.t<(ROM.tint==='steam'?9:6)); }
+function drawRomFX(W,H){ if(ROM.dark<0.01 && ROM.black<0.01) return;
+  const cx=W/2, cy=H*((TOUCH?0.42:0.52)-0.17)-(ROM.lift<40?10:40)*(zoom||1), R=Math.min(W,H)*0.36;
+  const col={moon:'8,12,30', steam:'30,18,14', hearth:'24,10,4'}[ROM.tint]||'0,0,0';
+  const v=g.createRadialGradient(cx,cy,R*0.18,cx,cy,R*1.25); v.addColorStop(0,`rgba(${col},0)`); v.addColorStop(0.55,`rgba(${col},${0.55*ROM.dark})`); v.addColorStop(1,`rgba(${col},${0.97*ROM.dark})`);
+  g.fillStyle=v; g.fillRect(0,0,W,H);
+  g.save(); g.globalCompositeOperation='lighter';
+  ROM.motes.forEach(m=>{ const life=ROM.tint==='steam'?9:6, a=Math.sin(Math.PI*Math.min(1,m.t/life))*ROM.dark;
+    if(ROM.tint==='steam'){ const gr=g.createRadialGradient(m.x*W,m.y*H,0,m.x*W,m.y*H,90+m.r*80); gr.addColorStop(0,`rgba(255,240,230,${0.09*a})`); gr.addColorStop(1,'rgba(255,240,230,0)'); g.fillStyle=gr; g.fillRect(m.x*W-180,m.y*H-180,360,360); }
+    else { g.fillStyle=ROM.tint==='hearth'?`rgba(255,170,80,${0.7*a})`:`rgba(220,230,255,${0.7*a})`; g.beginPath(); g.arc(m.x*W,m.y*H,1.2+m.r*1.6,0,Math.PI*2); g.fill(); } });
+  g.restore();
+  if(ROM.black>0.005){ g.fillStyle=`rgba(0,0,0,${Math.min(1,ROM.black)})`; g.fillRect(0,0,W,H); } }
 function nightPasses(f){ dayClock+=DAY_LEN*(f||0.25); cureBruise(); refreshPlayerHp(true); updateHud(); try{ autosaveSoon(300); }catch(e){} }
-function ithilScene(){ const I='Ithilwen';
+function ithilScene(){ const I='Ithilwen', N=()=>NPCS.find(n=>n.id==='moon_ithil');
   if(CHOICE.ithil){ say(I,["She swims over without a word and floats on her back beside you, her hair spread silver on the water.","“The moon is jealous tonight,” she says. “Let her be.”"],[
-    {label:'Let her be.', fn:()=>{ nightPasses(0.2); say(I,"Much later the moon sets behind the trees, and neither of you notices.",[bye]); }}, bye]); return; }
+    {label:'Let her be.', fn:()=>{ NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='moon_nel')); romStart(N(),'moon'); say(I,"She finds your hand under the water. Overhead the moon goes slowly down behind the trees, and neither of you notices.",[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.2); romEnd(); }); }}]); }}, bye]); return; }
   say(I,["Nelloth climbs out, wrings out her hair, gives Ithilwen a look you are not meant to understand, and goes off up the road singing.","Ithilwen does not follow. She drifts closer through the silver water until you can see the moon twice, once in the sky and once in her eyes.","“Humans always look away,” she says. “You have stopped looking away. I noticed.”"],[
-    {label:'Kiss her.', fn:()=>{ remember('ithil','lover','Ithilwen of the moon pool kept you company until the moon went down.');
-      say(I,["Her mouth tastes of cold water and something like honey. She laughs against your lips, pulls you down under the surface, and the world goes silver, and then it goes dark.","…","You wake on the warm stones at first light with her cloak over the two of you and a strand of silver ribbon wound round your wrist. Ithilwen is already dressed, watching the road.","“Keep it,” she says. “So the moon knows you are mine when you come back.”"],[{label:'Keep the ribbon.', fn:()=>{ nightPasses(0.3); giveQuestItem('moon_ribbon',true); logMsg('You receive Ithilwen\'s silver ribbon.','#dfe6ee'); closeDialog(); }}]); }},
+    {label:'Kiss her.', fn:()=>{ remember('ithil','lover','Ithilwen of the moon pool kept you company until the moon went down.'); NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='moon_nel')); romStart(N(),'moon');
+      say(I,["Her mouth tastes of cold water and something like honey. She laughs against your lips, and her arms come round your neck, and the pool goes very still around the two of you."],[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{
+        say(I,["You wake on the warm stones at first light with her cloak over the two of you and a strand of silver ribbon wound round your wrist. Ithilwen is already dressed, watching the road.","“Keep it,” she says. “So the moon knows you are mine when you come back.”"],[{label:'Keep the ribbon.', fn:()=>{ nightPasses(0.3); romEnd(); giveQuestItem('moon_ribbon',true); logMsg('You receive Ithilwen\'s silver ribbon.','#dfe6ee'); closeDialog(); }}]); }); }}]); }},
     {label:'“I should go.”', fn:()=>say(I,"“Then go.” She smiles and sinks back into the water, unbothered. “The moon is patient. I am a little less so.”",[bye])}]); }
-function gunnarScene(){ const G='Gunnar the Ploughman';
+function gunnarScene(){ const G='Gunnar the Ploughman', N=()=>NPCS.find(n=>n.id==='gunnar');
   if(CHOICE.gunnarNight){ say(G,["“Rematch,” he says, very seriously, and loses on purpose so fast that Bertha snorts into her cups."],[
-    {label:'Go upstairs.', fn:()=>{ nightPasses(0.3); CHOICE.innDay=Math.floor(dayClock/DAY_LEN); say(G,"The second time, nobody wrestles very hard at all. <i>You are fully healed.</i>",[bye]); }}, bye]); return; }
+    {label:'Go upstairs.', fn:()=>{ romStart(N(),'hearth'); say(G,"He takes your hand off the table and does not let go of it, all the way up the stairs.",[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.3); CHOICE.innDay=Math.floor(dayClock/DAY_LEN); romEnd(); say(G,"The second time, nobody wrestles very hard at all. <i>You are fully healed.</i>",[bye]); }); }}]); }}, bye]); return; }
   say(G,["“Different stakes?” He leans in until his beard nearly brushes your knuckles. He smells of hay and woodsmoke and ale. “And what are you putting up?”"],[
-    {label:'“Loser pays for the room upstairs.”', fn:()=>{ remember('gunnarNight',true,'You and Gunnar wrestled for the room upstairs. Nobody remembers who won.');
-      say(G,["For a moment Gunnar the Ploughman, who has never lost, looks like a man who has just been hit with his own plough.","Then he laughs, loud enough to stop the tavern, takes your hand off the table, and does not let go of it.","The stairs creak under the two of you. Bertha does not look up from her cup. “Mind the bed,” she calls after you. “It's older than he is.”","…","In the morning the bed is in one piece, mostly, and Gunnar is singing badly downstairs. He has paid for the room, and for your breakfast. <i>You are fully healed.</i>"],[{label:'Go down to breakfast.', fn:()=>{ nightPasses(0.3); CHOICE.innDay=Math.floor(dayClock/DAY_LEN); CHOICE.lastBed={a:areaId,i:player.i,j:player.j}; closeDialog(); }}]); }},
+    {label:'“Loser pays for the room upstairs.”', fn:()=>{ remember('gunnarNight',true,'You and Gunnar wrestled for the room upstairs. Nobody remembers who won.'); romStart(N(),'hearth');
+      say(G,["For a moment Gunnar the Ploughman, who has never lost, looks like a man who has just been hit with his own plough.","Then he laughs, loud enough to stop the tavern, takes your hand off the table, and does not let go of it. The stairs creak under the two of you.","Bertha does not look up from her cup. “Mind the bed,” she calls after you. “It's older than he is.”"],[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{
+        say(G,"In the morning the bed is in one piece, mostly, and Gunnar is singing badly downstairs. He has paid for the room, and for your breakfast. <i>You are fully healed.</i>",[{label:'Go down to breakfast.', fn:()=>{ nightPasses(0.3); CHOICE.innDay=Math.floor(dayClock/DAY_LEN); CHOICE.lastBed={a:areaId,i:player.i,j:player.j}; romEnd(); closeDialog(); }}]); }); }}]); }},
     {label:'“Just the five coppers.”', fn:()=>say(G,"“Shame,” he says, and means it. He rolls his shoulder. “Ask again when you're braver.”",[bye])}]); }
+function saelleNpc(){ let n=NPCS.find(x=>x.id==='saelle'); if(n) return n;
+  n={ id:'saelle', name:'Saelle', i:player.i, j:player.j, dir:0, opts:{gender:'f',skin:1,hair:3,hairColor:0,face:2,equip:{head:null,torso:'smock',armor:null,hands:null,legs:null,feet:null,weapon:null,offhand:null}} };   // wrapped in a bath sheet when she is out of the water
+  NPCS.push(n); return n; }
+function saelleGone(){ NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='saelle')); }
 function saelleScene(){ const S='Saelle';
+  const night=(after,item)=>{ romStart(saelleNpc(),'steam'); return [{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ romEnd(); saelleGone(); after(); }); }}]; };
   say(S,["Through the steam: a woman with dark wet hair piled on her head and a gold ring in one ear, up to her collarbones in the far pool. She has been watching you since you came in, and she does not stop now that you have noticed.","“Yselde rents a private room behind the boiler,” she says. “Hotter water. A door that locks. I have the key and nobody to share it with.”"],[
     {label:'Follow her, and keep your chest key on your wrist.', fn:()=>{ remember('saelle','wary','Saelle of the bathhouse took you to the room behind the boiler. Your chest key stayed on your wrist the whole time.');
-      say(S,["The room behind the boiler is all copper and steam. She kisses you before the door is even shut, then reaches for your wrist, finds the key cord there, and laughs into your neck.","“Clever,” she murmurs. “I like clever.” And then for a long while neither of you says anything at all.","…","You come out pink and boneless. She is gone, but your purse is untouched and there is a folded note under it, smelling of rosewater."],[{label:'Read the note.', fn:()=>{ nightPasses(0.15); giveQuestItem('saelle_note',true); say(S,"<i>“The only one who ever kept the key. Hollowmere is a small city. — S.”</i>",[bye]); }}]); }},
-    {label:'Follow her.', fn:()=>{ const took=Math.min(player.purse,20); remember('saelle','robbed','Saelle of the bathhouse took you to the room behind the boiler, and your purse paid for it.');
-      say(S,["The room behind the boiler is all copper and steam. She kisses you before the door is even shut, and you forget about the door, and the steam, and most other things.","…","Afterwards you doze. When you wake, the water has gone lukewarm and you are alone. Out at your chest, your clothes are folded more neatly than you left them, and your purse is lighter.","Tucked into it, a note that smells of rosewater."],[{label:'Read the note.', fn:()=>{ player.purse-=took; nightPasses(0.15); giveQuestItem('saelle_note',true); if(took) logMsg('Saelle took '+formatCoin(took)+' from your purse.','#e8a060');
-        say(S,"<i>“For the room. And for the lesson: always keep the key on your wrist. It was worth it, wasn't it? — S.”</i>",[bye]); }}]); }},
+      say(S,["The room behind the boiler is all copper and steam. She kisses you before the door is even shut, then reaches for your wrist, finds the key cord there, and laughs against your neck.","“Clever,” she murmurs. “I like clever.”"],night(()=>{ nightPasses(0.15); giveQuestItem('saelle_note',true);
+        say(S,["You come out pink and boneless. She is gone, but your purse is untouched and there is a folded note under it, smelling of rosewater.","<i>“The only one who ever kept the key. Hollowmere is a small city. — S.”</i>"],[bye]); })); }},
+    {label:'Follow her.', fn:()=>{ remember('saelle','robbed','Saelle of the bathhouse took you to the room behind the boiler, and your purse paid for it.');
+      say(S,["The room behind the boiler is all copper and steam. She kisses you before the door is even shut, and you forget about the door, and the steam, and most other things."],night(()=>{ const took=Math.min(player.purse,20); player.purse-=took; nightPasses(0.15); giveQuestItem('saelle_note',true); if(took) logMsg('Saelle took '+formatCoin(took)+' from your purse.','#e8a060');
+        say(S,["Afterwards you doze. When you wake, the water has gone lukewarm and you are alone. Out at your chest, your clothes are folded more neatly than you left them, and your purse is lighter.","Tucked into it, a note that smells of rosewater: <i>“For the room. And for the lesson: always keep the key on your wrist. It was worth it, wasn't it? — S.”</i>"],[bye]); })); }},
     {label:'Smile, and stay where you are.', fn:()=>say(S,"She shrugs, one wet shoulder out of the water. “Your loss, sweet.” She sinks lower, and keeps watching.",[bye])}]); }
 Object.assign(ITEMS,{ moon_ribbon:{ name:"Ithilwen's Silver Ribbon", slot:'misc', title:"A strand of elven ribbon that holds a little moonlight even in daylight. It was wound round your wrist when you woke." },
   saelle_note:{ name:'A Rosewater Note', slot:'misc', title:"Folded twice, sealed with nothing but a lip-print. It still smells of rosewater and the bathhouse." } });
@@ -12428,9 +12469,10 @@ function combatStep(dt){
   sparks.forEach(s=>{ s.t+=dt; }); sparks=sparks.filter(s=>s.t<0.45);
   shake=Math.max(0,shake-dt*30);
   duel.parryFx=Math.max(0,duel.parryFx-dt);
-  const zt = combat.active && combat.foe ? (TOUCH ? 1.2 : ZOOM_T) : 1;   // phones already show less world: zoom in only a little
-  zoom += (zt-zoom)*Math.min(1,dt*4);
-  if(combat.foe){ zoomC.x=(player.x+combat.foe.x)/2; zoomC.y=(player.y+combat.foe.y)/2; }
+  const zt = ROM.on ? ROM.z : combat.active && combat.foe ? (TOUCH ? 1.2 : ZOOM_T) : 1;   // phones already show less world: zoom in only a little
+  zoom += (zt-zoom)*Math.min(1,dt*(ROM.on?1.1:4));                                            // a romance pushes in slowly
+  if(ROM.on){ zoomC.x=ROM.x; zoomC.y=ROM.y; } else if(combat.foe){ zoomC.x=(player.x+combat.foe.x)/2; zoomC.y=(player.y+combat.foe.y)/2; }
+  romTick(dt);
 
   if(!combat.active){
     if(combat.phase==='down'){
@@ -12540,7 +12582,7 @@ function poseForDuel(e){
 // ── drawing ──
 function applyDuelZoom(){
   if(zoom<=1.001) return;
-  const W=gc.width, H=gc.height, c=P(zoomC.x,zoomC.y), cx=c.x, cy=c.y-70;
+  const W=gc.width, H=gc.height, c=P(zoomC.x,zoomC.y), cx=c.x, cy=c.y-(ROM.on||ROM.dark>0.02?ROM.lift:70)+(ROM.on||ROM.dark>0.02?H*0.17/zoom:0);
   const k=Math.min(1,(zoom-1)/((TOUCH?1.2:ZOOM_T)-1));
   const sx=(Math.random()-0.5)*shake, sy=(Math.random()-0.5)*shake;
   g.setTransform(zoom,0,0,zoom, k*(W/2-cx*zoom)+sx, k*(H*(TOUCH?0.42:0.52)-cy*zoom)+sy);
@@ -12716,6 +12758,7 @@ function drawActorBase(e){
   else drawLitSprite(s.x,B,()=>drawChar(g,s.x,B,e.opts,e.moving?Math.sin(gt*10)*5:0,e.dir||0,poseFor(e)));
   g.restore();
   if(!isP && e.dead) return;
+  if(isP && romHush()) return;
   const ty=B-(e.type==='wolf'?66:114);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const deadly=!isP && e.type!=='dummy' && e.hostile!==false && player.maxHp>0 && ((e.maxHp||0)*(((weaponOf(e)||{}).dmg)||5)*tierDmg(e)) >= 2*player.maxHp*Math.max(8,playerHitDmg());   // far stronger than you: a skull

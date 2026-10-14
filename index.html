@@ -551,6 +551,8 @@ html,body{touch-action:none;overscroll-behavior:none;-webkit-tap-highlight-color
     </div>
     <button class="menu-btn" id="ctrl-btn">Controls</button>
     <button class="menu-btn" id="fs-toggle">Fullscreen</button>
+    <button class="menu-btn" id="snd-toggle">Sound: Off</button>
+    <div class="file-row" style="align-items:center;gap:10px;display:none"><span class="menu-label">Volume</span><input id="snd-vol" type="range" min="0" max="100" value="70" style="flex:1;accent-color:#c09040"></div>
     <div class="menu-label">Promoter's Key</div>
     <div class="file-row"><input id="promo-code" type="text" placeholder="Enter a key" autocomplete="off" maxlength="12" inputmode="numeric"><button class="menu-btn" id="promo-btn" style="flex:0 0 auto;width:auto;padding:8px 14px">Use</button></div>
     <div id="promo-msg"></div>
@@ -12103,6 +12105,7 @@ function thugTalk(m){
 }
 function startCombat(target){
   if(CS.on) return;                                     // never during a cutscene
+  SND.engage();
   player.st=(player.st||[]).filter(s=>s.kind==='bleed');   // only bleeding carries over from the last fight
   setTimeout(()=>{ try{ refreshFoodBar(); }catch(e){} },0);
   const practice = !!target && target.type==='dummy';
@@ -12171,11 +12174,11 @@ function hurtPlayer(n,label){
   const f=combat.foe;
   if(n>0 && f && f.tier) n=Math.round(n*tierDmg(f));                    // tougher kin of the same foe hit harder
   const agi=gearSum('agi');
-  if(n>0 && agi>0 && !combat.practice && Math.random()<dodgeChance(agi)){ floatText(tileOf(player),'Dodge!','#a8e0ff',true); player.flash=0.15; }
+  if(n>0 && agi>0 && !combat.practice && Math.random()<dodgeChance(agi)){ floatText(tileOf(player),'Dodge!','#a8e0ff',true); player.flash=0.15; SND.dodge(); }
   else {
     if(n>0 && f && hasStatus(f,'weak')) n=Math.max(1,Math.ceil(n*0.5));  // a withered foe hits soft
     if(combat.practice) n=0;
-    player.hp-=n; player.flash=0.45; shake=Math.max(shake,n?7:3);
+    player.hp-=n; player.flash=0.45; shake=Math.max(shake,n?7:3); SND.hurt(f&&f.type==='wolf');
     duel.st='hit'; duel.t=PARRY.hitStun;
     floatText(tileOf(player),n?'-'+n:'Hit','#ff7a6a',true);
     if(label) floatText([player.i,player.j-0.001],label,'#f0c0a0');
@@ -12190,16 +12193,16 @@ function timingNote(since){
 function impact(f){                                   // a foe's swing lands (or meets your parry)
   const hp0=player.hp, S=foeSpell(f);
   const s=curStep(f);
-  lunge(f,player); f.strikeAt=clock;
+  lunge(f,player); f.strikeAt=clock; if(!S){ if(f.type==='wolf') SND.bite(); else SND.swing(f.opts&&f.opts.equip&&f.opts.equip.weapon); }
   if(f.type==='wolf') f.guardDir=null;   // never guards, even briefly between lunges
   const sideOk = duel.st==='parry' && duel.parryDir===f.swingDir;
   const since=clock-duel.parryAt;
   duel.lastImpact=clock;
-  if(S){ spellImpact(f,S,s,sideOk,since,hp0); return; }   // a spell is not a sword: it lands by the same rules as yours do on him
+  if(S){ SND.spell(S.name); spellImpact(f,S,s,sideOk,since,hp0); return; }   // a spell is not a sword: it lands by the same rules as yours do on him
   if(sideOk && since<=perfectFor(player)){
     f.state='stagger'; f.t=foeDef(f).stagger;
     slowmo.scale=0.25; slowmo.t=0.22; shake=Math.max(shake,5);
-    floatText(tileOf(player),'PERFECT!','#ffffff',true);
+    floatText(tileOf(player),'PERFECT!','#ffffff',true); SND.perfect();
     if(typeof manaGain==='function' && isMagicWeapon()) manaGain(15);
     burst(player,f,'#fff4c0',16);
     logMsg(`Perfect parry! ${shortName(f)} staggers.`,'#f0c060');
@@ -12207,7 +12210,7 @@ function impact(f){                                   // a foe's swing lands (or
   } else {
     const fdmg=weaponOf(f).dmg;
     if(sideOk && since<=windowFor(player)){
-      const note=timingNote(since); floatText(tileOf(player),'Blocked'+(note?' · '+note:''),'#a8c8f0'); burst(player,f,'#c8d8f0',7);
+      const note=timingNote(since); floatText(tileOf(player),'Blocked'+(note?' · '+note:''),'#a8c8f0'); burst(player,f,'#c8d8f0',7); SND.clang(1);
     } else if(duel.st==='parry'){
       hurtPlayer(fdmg, 'Wrong side!');
     } else {
@@ -12228,9 +12231,10 @@ function impact(f){                                   // a foe's swing lands (or
 }
 function wound(f,n,label,col){                       // a blow lands on a foe
   const W=WEAPONS[player.opts&&player.opts.equip.weapon]||{};
-  if(f && f.warded) floatText(tileOf(f),'Warded','#c8e0f0');
+  if(f && f.warded){ floatText(tileOf(f),'Warded','#c8e0f0'); SND.clang(0.6); }
   else if(f && f.type==='barrowking' && (f.cphase||1)<3){ const th=ckTh(f), pre=f.hp; f.hp+=1000; woundRaw(f,n,label,col); const dealt=pre+1000-f.hp; f.hp=Math.max(th,pre-dealt); }   // his phases end at fixed thresholds, however hard the blow
   else woundRaw(f,n,label,col);
+  if(f && !f.warded && HIT_SRC==='melee') SND.hit(n);
   if(f!==player && HIT_SRC==='melee' && W.wither && n>0 && !f.dead && f.hp>0){ const sp=1+gearSum('magic')*0.04;     // the Drowned Blade: wither and drain, stronger with spell power
     if(Math.random()<W.wither*sp) addStatus(f,'weak',Math.round(3*sp*10)/10,0);
     if(Math.random()<W.drain*sp){ const h=Math.min(Math.round(3*sp),player.maxHp-player.hp); if(h>0){ player.hp+=h; floatText(tileOf(player),'+'+h,'#8ae07a'); updateHud(); } } }
@@ -12265,7 +12269,7 @@ function playerHit(){                                // your attack lands: a spe
 }
 function strike(){ HIT_SRC='melee'; try{ if(!castSpell()){ const f=combat.foe, h0=f?f.hp:0; meleeHit(); if(f && isMagicWeapon() && f.hp<h0 && typeof manaGain==='function') manaGain(5); } } finally{ HIT_SRC=null; } }   // a staff blow gives a little breath back
 function meleeHit(){
-  const f=combat.foe; lunge(player,f); duel.caught=false;
+  const f=combat.foe; lunge(player,f); duel.caught=false; SND.swing(player.opts.equip.weapon);
   const dmg=weaponOf(player).dmg;
   if(f.state==='recover' || f.state==='stagger'){ wound(f,dmg); return; }
   if(f.state==='windup'){
@@ -12282,13 +12286,13 @@ function meleeHit(){
   }
   // he stands guard: hit the side he is not covering
   if(playerGuard===f.guardDir){
-    floatText(tileOf(f),'Clang','#b8c8d8'); burst(f,player,'#b8c8d8',6); duel.caught=true;
+    floatText(tileOf(f),'Clang','#b8c8d8'); burst(f,player,'#b8c8d8',6); duel.caught=true; SND.clang(0.8);
   } else {
     wound(f,dmg,'Open side!','#ffe0a0');
     if(f.hp>0){ f.guardDir=GUARD_AFTER[f.guardDir]; }   // he shifts his guard after being tagged
   }
 }
-function foeDown(f){
+function foeDown(f){ SND.fall();
   try{ const b=typeof beastOf==='function' && beastOf(f); if(b && !combat.practice){ const e=BEST()[b.k]=BEST()[b.k]||{met:1,kills:0}; e.kills=(e.kills||0)+1; } }catch(e){}   // one more for the bestiary
   if(f.type==='dummy'){
     f.hp=f.maxHp; f.state='guard'; banner('Well fought!','#8ab0d8',1200);
@@ -13061,7 +13065,7 @@ function castSpell(){                            // a staff casts the spell for 
     if(S===HEX_SPELLS.left && SKEL && !SKEL.crumble){ if(typeof boneShield==='function' && NECRO_EXTRA('boneshield')) return boneShield(f); floatText(tileOf(player),'Already risen','#e8e4d0'); return true; }   // one skeleton at a time; with Bone Shield, calling again throws it in the way
     if(S.summon && S.summon()){ floatText(tileOf(player),'Already here','#bfe0ff'); return true; }
     if(player.mana<spellCost(S)){ floatText(tileOf(player),'Out of mana','#a8a0c8'); return false; }      // a plain whack with the staff
-    player.mana-=spellCost(S); lunge(player,f); duel.caught=false;
+    player.mana-=spellCost(S); lunge(player,f); duel.caught=false; SND.spell(S.name);
     if(S.self){ S.fx(f); updateHud(); return true; }                    // a ward or a double: cast on yourself, not at him
     bolts.push({from:{x:player.x,y:player.y}, to:f, t:0, S});
     let dmg=Math.round(S.dmg*SPM()), lbl=S.name+'!', col=S.col, fx=true; HIT_SRC='spell';
@@ -17573,6 +17577,109 @@ window.addEventListener('keydown',e=>{ if(!(e.key==='b'||e.key==='B') || !runnin
   const place=()=>{ try{ const cs=getComputedStyle(jb), r=jb.getBoundingClientRect(); ['background','backgroundImage','border','borderRadius','color','fontSize','fontFamily','padding','boxShadow','cursor'].forEach(k=>sb.style[k]=cs[k]);
       sb.style.position='absolute'; sb.style.top=cs.top; sb.style.right=(innerWidth-r.left+8)+'px'; sb.style.zIndex=cs.zIndex; sb.style.display=(running && bookSchools().length)?'block':'none'; }catch(e){} };
   setInterval(place,1000); addEventListener('resize',place); sb.addEventListener('click',e=>{ e.stopPropagation(); bookPanel.style.display==='block'?closeBook():openBook(); }); }
+// ════════ SOUND: all of it made on the spot with Web Audio, nothing to download. Silent until switched on in the Menu ════════
+const SND=(()=>{
+  const KEY='dunhollow.sound', VKEY='dunhollow.volume';
+  let on=false, vol=0.7, ctx=null, master=null, amb=null, sfx=null, white=null, brown=null, L={}, timer=null, lastArea=null;
+  try{ on=localStorage.getItem(KEY)==='1'; const v=parseFloat(localStorage.getItem(VKEY)); if(v>=0 && v<=1) vol=v; }catch(e){}
+  const R=(a,b)=>a+Math.random()*(b-a);
+  function boot(){ if(ctx) return true;
+    const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return false;
+    ctx=new AC(); const comp=ctx.createDynamicsCompressor(); comp.threshold.value=-18; comp.ratio.value=4; comp.connect(ctx.destination);
+    master=ctx.createGain(); master.gain.value=0; master.connect(comp);
+    amb=ctx.createGain(); amb.gain.value=0.85; amb.connect(master); sfx=ctx.createGain(); sfx.gain.value=0.9; sfx.connect(master);
+    const len=ctx.sampleRate*3; white=ctx.createBuffer(1,len,ctx.sampleRate); brown=ctx.createBuffer(1,len,ctx.sampleRate);
+    const w=white.getChannelData(0), b=brown.getChannelData(0); let last=0;
+    for(let k=0;k<len;k++){ w[k]=Math.random()*2-1; last=(last+0.02*w[k])/1.02; b[k]=last*3.5; }
+    // the beds that are always there, faded up and down to suit the place
+    const bed=(buf,chain)=>{ const s=ctx.createBufferSource(); s.buffer=buf; s.loop=true; s.loopStart=0; let n=s; chain.forEach(x=>{ n.connect(x); n=x; }); const gn=ctx.createGain(); gn.gain.value=0; n.connect(gn); gn.connect(amb); s.start(0,Math.random()*2); return {g:gn, f:chain[0]}; };
+    const F=(type,f,q)=>{ const x=ctx.createBiquadFilter(); x.type=type; x.frequency.value=f; if(q) x.Q.value=q; return x; };
+    L.wind=bed(white,[F('bandpass',420,0.7)]); L.leaves=bed(white,[F('highpass',2600),F('lowpass',7000)]);
+    L.rain=bed(white,[F('highpass',1100),F('lowpass',6500)]); L.room=bed(brown,[F('lowpass',260)]);
+    L.cave=bed(brown,[F('lowpass',110)]); L.roar=bed(brown,[F('lowpass',420)]); L.crowd=bed(white,[F('bandpass',650,2.2)]); L.water=bed(white,[F('bandpass',900,0.9)]);
+    timer=setInterval(tick,250); document.addEventListener('visibilitychange',()=>{ if(!ctx) return; if(document.hidden) ctx.suspend(); else if(on) ctx.resume(); });
+    return true; }
+  function setOn(v){ on=!!v; try{ localStorage.setItem(KEY,on?'1':'0'); }catch(e){}
+    if(on){ if(!boot()) return; ctx.resume(); master.gain.setTargetAtTime(vol,ctx.currentTime,0.4); }
+    else if(ctx){ master.gain.setTargetAtTime(0,ctx.currentTime,0.15); }
+    syncUi(); }
+  function setVol(v){ vol=Math.max(0,Math.min(1,v)); try{ localStorage.setItem(VKEY,String(vol)); }catch(e){} if(ctx && on) master.gain.setTargetAtTime(vol,ctx.currentTime,0.1); }
+  const live=()=> on && ctx && ctx.state==='running';
+  // ── small building blocks ──
+  function env(gn,t,a,peak,d){ gn.gain.setValueAtTime(0.0001,t); gn.gain.exponentialRampToValueAtTime(peak,t+a); gn.gain.exponentialRampToValueAtTime(0.0001,t+a+d); }
+  function tone(type,f0,f1,dur,peak,bus,opt){ opt=opt||{}; const t=ctx.currentTime+(opt.at||0), o=ctx.createOscillator(), gn=ctx.createGain(); o.type=type; o.frequency.setValueAtTime(f0,t); if(f1!==f0) o.frequency.exponentialRampToValueAtTime(Math.max(20,f1),t+dur);
+    let n=o; if(opt.lp){ const f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=opt.lp; n.connect(f); n=f; } n.connect(gn); gn.connect(bus||sfx); env(gn,t,opt.a||0.005,peak,dur); o.start(t); o.stop(t+dur+0.1); return o; }
+  function noise(dur,peak,type,f0,f1,q,bus,opt){ opt=opt||{}; const t=ctx.currentTime+(opt.at||0), s=ctx.createBufferSource(), f=ctx.createBiquadFilter(), gn=ctx.createGain(); s.buffer=opt.brown?brown:white; f.type=type; f.frequency.setValueAtTime(f0,t); if(f1!==f0) f.frequency.exponentialRampToValueAtTime(f1,t+dur); if(q) f.Q.value=q;
+    s.connect(f); f.connect(gn); gn.connect(bus||sfx); env(gn,t,opt.a||0.004,peak,dur); s.start(t,Math.random()*2); s.stop(t+dur+0.1); }
+  // ── the world: what a place sounds like ──
+  function place(){ const A=AREAS[areaId]||{}, id=areaId||'', night=typeof nightAmt==='function'?nightAmt():0, rain=!A.inside && typeof weatherToday==='function' && weatherToday()==='rain';
+    const cave=/cave|crypt|barrow|warren|tunnel|cellar|vault|mine|pit/.test(id) && !/steamcellar/.test(id), inside=!!A.inside || cave, th=A.theme;
+    const fire=OBJECTS.some(o=>/hearth|fireplace|campfire|forge|oven/.test(o.type)), pool=OBJECTS.some(o=>o.type==='pool');
+    return {night, rain, cave, inside, th, fire, pool, city:th==='city', wet:th==='bog'||th==='fen', wood:th==='wood'||th==='elf', ash:th==='ash'}; }
+  const T=(layer,v,tc)=>{ L[layer].g.gain.setTargetAtTime(v,ctx.currentTime,tc||1.2); };
+  let gust=0.5, gustT=0;
+  function tick(){ if(!live() || typeof areaId==='undefined' || !AREAS[areaId]) return;
+    const P=place(), out=!P.inside, fight=typeof combat!=='undefined' && combat.active, k=fight?0.55:1;
+    gustT-=0.25; if(gustT<=0){ gust=R(0.25,1); gustT=R(2,6); }
+    T('wind', out ? (0.05+0.07*gust)*(P.wood?0.7:1)*(P.night?1.1:1)*k : 0, 1.6); L.wind.f.frequency.setTargetAtTime(280+gust*380,ctx.currentTime,2);
+    T('leaves', out && P.wood ? 0.012+0.02*gust : 0, 1.5);
+    T('rain', P.rain ? 0.09*k : 0, 2);
+    T('room', P.inside && !P.cave ? 0.05 : 0); T('cave', P.cave ? 0.22 : 0);
+    T('roar', (P.ash ? 0.1 : P.inside && P.fire ? 0.035 : 0)*k);
+    T('crowd', P.city && out && !P.night ? 0.016+Math.random()*0.012 : P.city && !P.inside && P.night ? 0.004 : 0, 0.5);
+    T('water', P.pool ? 0.008 : 0, 2);
+    if(fight) return;                                    // in a fight the birds keep quiet
+    const r=Math.random();
+    if(out && !P.night && !P.rain && !P.ash && r<(P.wood?0.12:P.city?0.03:0.07)) bird();
+    if(out && P.night && !P.rain && !P.ash && r<0.35) cricket();
+    if(out && P.wet && r<(P.night?0.16:0.06)) frog();
+    if(out && P.night && P.wood && Math.random()<0.006) howl();
+    if(out && P.night && !P.city && Math.random()<0.012) owl();
+    if(P.cave && Math.random()<0.1) drip();
+    if((P.ash || (P.inside && P.fire)) && Math.random()<0.6) crackle(P.ash?1.4:1);
+    if(P.pool && Math.random()<0.05) lap(); }
+  function bird(){ const base=R(2400,4200), n=Math.floor(R(2,6)), sp=R(0.07,0.13); for(let q=0;q<n;q++){ const f=base*R(0.85,1.25); tone('sine',f,f*R(0.7,1.4),R(0.05,0.11),R(0.008,0.02),amb,{at:q*sp,a:0.01}); } }
+  function cricket(){ const f=R(4100,4700), at0=R(0,0.2); for(let q=0;q<3;q++) tone('sine',f,f,0.025,0.006,amb,{at:at0+q*0.045,a:0.004}); }
+  function frog(){ const f=R(95,170), at0=R(0,0.1); [0,0.13].forEach((d,q)=>tone('sawtooth',f*(q?0.85:1),f*0.9,0.09,0.02,amb,{at:at0+d,lp:650})); }
+  function owl(){ [0,0.45,0.75].forEach((d,q)=>tone('sine',q?360:390,q?340:370,q?0.35:0.22,0.012,amb,{at:d,a:0.06})); }
+  function howl(){ const t=ctx.currentTime, o=ctx.createOscillator(), v=ctx.createOscillator(), vg=ctx.createGain(), gn=ctx.createGain(), f=ctx.createBiquadFilter();
+    o.type='sawtooth'; f.type='lowpass'; f.frequency.value=900; v.frequency.value=5.5; vg.gain.value=9; v.connect(vg); vg.connect(o.frequency);
+    o.frequency.setValueAtTime(380,t); o.frequency.exponentialRampToValueAtTime(640,t+0.9); o.frequency.setValueAtTime(640,t+1.8); o.frequency.exponentialRampToValueAtTime(470,t+3);
+    gn.gain.setValueAtTime(0.0001,t); gn.gain.exponentialRampToValueAtTime(0.014,t+0.6); gn.gain.setValueAtTime(0.014,t+2.2); gn.gain.exponentialRampToValueAtTime(0.0001,t+3.2);
+    o.connect(f); f.connect(gn); gn.connect(amb); o.start(t); v.start(t); o.stop(t+3.3); v.stop(t+3.3); }
+  function drip(){ const f=R(1100,1900); tone('sine',f,f*1.9,0.07,0.04,amb,{a:0.002}); tone('sine',f*1.5,f*2.4,0.05,0.012,amb,{at:0.32,a:0.002}); }
+  function crackle(s){ const n=Math.floor(R(1,4)); for(let q=0;q<n;q++) noise(R(0.006,0.02),R(0.03,0.09)*s,'highpass',R(1500,3500),R(1500,3500),0,amb,{at:R(0,0.25),a:0.001}); }
+  function lap(){ noise(R(0.25,0.5),0.025,'bandpass',R(500,800),R(300,500),1.2,amb,{a:0.08}); }
+  // ── the fight ──
+  const heavy=w=>/axe|mace|morningstar|club|hammer|longsword|spade|shovel/.test(w||'');
+  return {
+    get on(){ return on; }, get vol(){ return vol; }, setOn, setVol, toggle(){ setOn(!on); },
+    level(){ if(!ctx) return 0; if(!L.an){ L.an=ctx.createAnalyser(); L.an.fftSize=2048; master.connect(L.an); } const d=new Float32Array(2048); L.an.getFloatTimeDomainData(d); let pk=0; d.forEach(x=>{ pk=Math.max(pk,Math.abs(x)); }); return pk; },   // the loudest sample right now, for checking
+    swing(w){ if(!live()) return; const h=heavy(w); noise(h?0.24:0.16,h?0.55:0.45,'bandpass',h?500:900,h?1500:2800,1.1,sfx,{a:0.03}); },
+    hit(n){ if(!live()) return; const s=Math.min(1,0.45+(n||5)/20); tone('sine',140,48,0.16,0.35*s); noise(0.08,0.25*s,'lowpass',1400,500,0,sfx,{a:0.002}); },
+    clang(s){ if(!live()) return; s=s||1; const b=R(470,560); [[1,0.5],[2.76,0.35],[5.4,0.22],[8.93,0.12]].forEach(([m,d])=>tone('sine',b*m,b*m*0.995,d*s+0.15,0.06*s)); noise(0.03,0.3*s,'highpass',3000,3000,0,sfx,{a:0.001}); },
+    perfect(){ if(!live()) return; const b=R(600,640); [[1,1],[2.76,0.8],[5.4,0.6],[8.93,0.4],[12.3,0.3]].forEach(([m,d])=>tone('sine',b*m,b*m,d+0.4,0.07)); noise(0.04,0.35,'highpass',3500,3500,0,sfx,{a:0.001}); tone('sine',90,40,0.5,0.4); },
+    hurt(wolf){ if(!live()) return; tone('sine',110,40,0.22,0.45); noise(0.12,0.3,'lowpass',900,300,0,sfx,{a:0.002});
+      if(wolf){ noise(0.12,0.3,'bandpass',1400,700,2,sfx,{a:0.003}); tone('sawtooth',95,80,0.35,0.08,sfx,{lp:500,a:0.02}); } },
+    bite(){ if(!live()) return; tone('sawtooth',85,120,0.28,0.16,sfx,{lp:420,a:0.03}); noise(0.18,0.22,'bandpass',600,1200,1.5,sfx,{a:0.05}); },
+    dodge(){ if(!live()) return; noise(0.2,0.32,'bandpass',1800,700,1.2,sfx,{a:0.02}); },
+    fall(){ if(!live()) return; tone('sine',75,32,0.5,0.45); noise(0.3,0.2,'lowpass',600,150,0,sfx,{a:0.01,brown:true}); },
+    engage(){ if(!live()) return; tone('sine',70,45,0.6,0.5); tone('sine',105,60,0.4,0.2,sfx,{at:0.18}); },
+    spell(name){ if(!live()) return; const n=(name||'').toLowerCase();
+      if(/fire|kindle|ember|flame/.test(n)){ noise(0.55,0.6,'lowpass',300,2600,0,sfx,{a:0.08}); crackle(3); }
+      else if(/frost|ice|ward/.test(n)){ noise(0.4,0.1,'highpass',4000,6000,0,sfx,{a:0.03}); for(let q=0;q<5;q++){ const f=R(1800,3600); tone('sine',f,f,0.35,0.05,sfx,{at:q*0.05}); } }
+      else if(/drain/.test(n)){ tone('sine',220,90,0.6,0.22,sfx,{a:0.05}); tone('triangle',330,140,0.6,0.08,sfx,{a:0.08}); }
+      else if(/wither|grasp/.test(n)){ noise(0.6,0.2,'bandpass',500,180,2,sfx,{a:0.08,brown:true}); tone('sine',60,40,0.6,0.25,sfx,{a:0.1}); }
+      else if(/raise|bone|spear|shield/.test(n)){ for(let q=0;q<6;q++) noise(0.02,0.25,'bandpass',R(1500,2600),R(1500,2600),3,sfx,{at:q*R(0.04,0.08),a:0.001}); tone('sine',80,45,0.5,0.25); }
+      else { tone('sawtooth',900,180,0.35,0.08,sfx,{lp:3000,a:0.01}); tone('sine',1200,300,0.3,0.12); } },
+  };
+  function syncUi(){ const b=document.getElementById('snd-toggle'); if(b) b.textContent='Sound: '+(on?'On':'Off'); const s=document.getElementById('snd-vol'); if(s){ s.value=Math.round(vol*100); s.parentNode.style.display=on?'flex':'none'; } }
+})();
+{ const b=document.getElementById('snd-toggle'), s=document.getElementById('snd-vol');
+  if(b){ b.textContent='Sound: '+(SND.on?'On':'Off'); b.addEventListener('click',()=>{ SND.toggle(); b.textContent='Sound: '+(SND.on?'On':'Off'); s.parentNode.style.display=SND.on?'flex':'none'; }); }
+  if(s){ s.value=Math.round(SND.vol*100); s.parentNode.style.display=SND.on?'flex':'none'; s.addEventListener('input',()=>SND.setVol(s.value/100)); }
+  if(SND.on){ const wake=()=>{ SND.setOn(true); window.removeEventListener('pointerdown',wake,true); window.removeEventListener('keydown',wake,true); };   // browsers only let sound start after a click or a key
+    window.addEventListener('pointerdown',wake,true); window.addEventListener('keydown',wake,true); } }
 </script>
 </body>
 </html>

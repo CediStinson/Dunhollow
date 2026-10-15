@@ -17820,7 +17820,7 @@ const VOICE=(()=>{
     if(!any && mode==='speech'){ const p=parts(text); if(p.length===1 && !/^(You|Your|The|A |An |She|He|They|It|Through|Across|Somewhere|For a)/.test(p[0][1])) utter(p[0][1],v); } }
   function stop(){ held=null; try{ if(S) S.cancel(); }catch(e){} }
   // speech bubbles: a cutscene line cuts in (it is timed); anything else waits its turn, and chatter far away is not heard
-  let seen=new WeakSet(), lastG=null, lastP=null, lastCs=null, chatT=0;
+  let seen=new WeakSet(), lastG=null, lastP=null, lastCs=null;
   let held=null;                                            // the bubble being spoken: it stays up, and a cutscene waits for it
   const say1=(text,v,cut,obj)=>{ const t=clean(text).replace(/[“”"]/g,'').trim(); if(!t || !/[a-z]/i.test(t) || /^(Grr+|Hm+|\.+)!?$/i.test(t)) return; if(cut) S.cancel(); else if(S.speaking || S.pending) return; const u=utter(t,v); if(u && obj){ held=obj; u.onend=u.onerror=()=>{ if(held===obj) held=null; }; } };
   const youV=()=>who(player.name||'you', player.opts||{});
@@ -17829,10 +17829,9 @@ const VOICE=(()=>{
       const cs=CS.say; if(cs && cs!==lastCs){ lastCs=cs; const e=cs.ent; say1(cs.text, e===player ? youV() : who(e&&e.name||'', e&&e.opts), true, cs); } else if(!cs) lastCs=null;
       if(typeof GSAY!=='undefined' && GSAY && GSAY!==lastG){ lastG=GSAY; say1(GSAY.text,{voice:pick(null,5), pitch:0.55, rate:0.95}, true, GSAY); }       // the dead speak low and slow
       if(typeof PSAY!=='undefined' && PSAY && PSAY!==lastP){ lastP=PSAY; say1(PSAY.text,youV(),false); }
-      chatT=Math.max(0,chatT-0.1);
       NPCS.forEach(n=>{ const b=n.bark; if(!b || seen.has(b)) return; seen.add(b);
         const d=Math.hypot((n.x??n.i+0.5)-player.x,(n.y??n.j+0.5)-player.y);
-        if(CS.on ? d<14 : (d<5 && chatT<=0 && !dlgOverlay.classList.contains('open'))){ say1(b.text,who(n.name,n.opts),CS.on,b); if(!CS.on) chatT=5; } });
+        if(CS.on && d<14) say1(b.text,who(n.name,n.opts),true,b); });          // only lines in a scene: the passers-by's chatter stays on the page
     }catch(e){} },100);
   function setMode(m){ mode=MODES.includes(m)?m:'off'; try{ localStorage.setItem(KEY,mode); }catch(e){} if(mode==='off') stop(); const b=document.getElementById('voice-toggle'); if(b) b.textContent=LABEL[mode]; }
   return { holds(o){ return !!o && held===o && mode!=='off' && S && S.speaking; }, busy(){ return !!held && mode!=='off' && S && S.speaking; }, get mode(){ return mode; }, read, stop, setMode, cycle(){ setMode(MODES[(MODES.indexOf(mode)+1)%MODES.length]); if(mode!=='off'){ S && S.cancel(); read('Old Tobb','“Can you hear me? Good. Now go and do something useful.”'); } }, supported:!!S, _parts:parts, _who:who };

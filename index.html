@@ -9716,6 +9716,8 @@ function npcHasNews(n){                                // '!' new business, '?' 
     if(Q==='light' && player.inv.filter(x=>x==='bottled_wisp').length>=3) return '?'; if(Q==='cold' && (CHOICE.baths||0)>=2) return '?'; if(Q==='ember' && (CHOICE.embers||[]).length>=3) return '?';
     if(!Q && K>0 && K<3) return '!'; }
   if((n.id==='tessaly_k'||n.id==='tessaly_s') && (CHOICE.mageKnown||[]).length>=3 && !CHOICE.tessLesson) return '!';
+  if(n.id==='saelle_l' && !CHOICE.saelle2) return '!';
+  if(typeof techKnown==='function'){ if(n.id==='hunter' && QUEST.wolves>=2 && !techKnown('lunge')) return '!'; if(n.id==='harl_v' && !techKnown('riposte')) return '!'; }   // a lesson waiting
   if(n.id==='ilka' && !CHOICE.emberbrand) return (hasItem('fire_blade')||player.opts.equip.weapon==='fire_blade') && coreCount()>=3 ? '?' : '!';
   if(n.id==='trader'){ if(CHOICE.pupSt==='follow') return '!'; if(CHOICE.goatEaten && !CHOICE.goatTold) return '!'; }   // (a fed pup at home is told in conversation, not by a mark)
   if(n.id==='digger' && CHOICE.moundSeen && !ownsSpade() && !CHOICE.spadeQ) return '?';
@@ -17575,6 +17577,32 @@ window.addEventListener('keydown',e=>{ if(!(e.key==='b'||e.key==='B') || !runnin
   const place=()=>{ try{ const cs=getComputedStyle(jb), r=jb.getBoundingClientRect(); ['background','backgroundImage','border','borderRadius','color','fontSize','fontFamily','padding','boxShadow','cursor'].forEach(k=>sb.style[k]=cs[k]);
       sb.style.position='absolute'; sb.style.top=cs.top; sb.style.right=(innerWidth-r.left+8)+'px'; sb.style.zIndex=cs.zIndex; sb.style.display=(running && bookSchools().length)?'block':'none'; }catch(e){} };
   setInterval(place,1000); addEventListener('resize',place); sb.addEventListener('click',e=>{ e.stopPropagation(); bookPanel.style.display==='block'?closeBook():openBook(); }); }
+// ── Saelle again: the woman from the bathhouse, in the Lowstreets at night, with a job only a stranger can do ──
+const SAELLE_OPTS={gender:'f',skin:1,hair:3,hairColor:0,face:2,marks:{earrings:'hoop'},equip:{head:'hood',torso:'tunic_green',armor:null,hands:'gloves',legs:'hose_grey',feet:'riding_boots',weapon:null,offhand:null}};
+wrap('lowstreets','npcs',l=> CHOICE.saelle && CHOICE.saelle2!=='betrayed' && nightAmt()>0.5 ? [...l,{ id:'saelle_l', name:'Saelle', i:17, j:12, dir:1, opts:SAELLE_OPTS }] : l);
+TALKERS.saelle_l=()=>{ const S='Saelle', robbed=CHOICE.saelle==='robbed';
+  if(CHOICE.saelle2==='helped'){ say(S,["Saelle leans in a doorway with her hood down, a tin cup of something hot in both hands.",CHOICE.saelleNight?"“Back again? Good. The kettle's on, and the door still locks.”":"“My rooms are just up there. The door locks. I find that I'm in no hurry to be alone.”"],[
+      {label:'Go up with her.', fn:()=>{ const n=NPCS.find(x=>x.id==='saelle_l'); romStart(n,'hearth'); CHOICE.saelleNight=true;
+        say(S,"Her rooms are one room, small and warm and full of books she has clearly stolen. She shuts the shutters, and then she shuts your mouth with hers.",[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.3); romEnd(); say(S,"You wake to rain on the shutters and the smell of her rosewater on the pillow. She is sitting on the sill, already dressed, eating an apple. “Your purse is where you left it,” she says. “I checked.” <i>You are fully healed.</i>",[bye]); }); }}]); }},
+      bye]); return; }
+  if(CHOICE.saelle2==='refused'){ say(S,"“Changed your mind? No. I didn't think so.” She smiles anyway.",[{label:'“Tell me about the letters again.”', fn:()=>{ CHOICE.saelle2=null; TALKERS.saelle_l(); }}, bye]); return; }
+  say(S,[robbed?"A hooded woman steps out of the alley mouth. Dark hair, a gold ring in one ear, and a smile you last saw over the rim of a bathhouse pool, shortly before your purse got lighter.":"A hooded woman steps out of the alley mouth. Dark hair, a gold ring in one ear: the woman from the bathhouse, the one who wrote the rosewater note.",
+    robbed?"“Before you shout: I'll pay you back. With interest. If you'll do something for me.”":"“The one who kept the key. I hoped you'd come. I need someone clever, and someone nobody here knows.”",
+    "She nods at the narrow house with the key over its door. “Master Grell lends money. He also keeps letters: mine, in his strongbox, and he's been using them to own me for two years. Tonight his door-man, Bruno, is on his own.”",
+    "“Keep Bruno busy for the time it takes to count to two hundred. That's all.”"],[
+    {label:'“I’ll keep him busy.”', fn:saelleJob},
+    {label:'Tell Bruno what she is planning.', fn:()=>{ remember('saelle2','betrayed','You told Master Grell\'s door-man about Saelle. The watch took her away.'); player.purse+=40; updateHud();
+      say('Bruno',["The big door-man listens, then whistles through his fingers. Two of the watch come at a run.","Saelle doesn't fight. As they take her past you she says, quite quietly, “I'd have paid you back.” Bruno presses forty copper into your hand. <i>You receive 40 copper.</i>"],[bye]); NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='saelle_l')); }},
+    {label:'“Not my business.”', fn:()=>{ CHOICE.saelle2='refused'; say(S,"“Fair.” She pulls her hood up. “It never is, until it is.”",[bye]); }}]); };
+function saelleJob(){ const B='Bruno';
+  const done=how=>{ remember('saelle2','helped','You kept Grell\'s door-man busy while Saelle took back her letters.'); const back=CHOICE.saelle==='robbed'?50:30; player.purse+=back; updateHud();
+    say('Saelle',[how,"A shadow drops from Grell's back window and is gone. A while later Saelle finds you at the corner, breathless, a bundle of letters inside her coat.","“All of them. He'll never know it was you.” She folds coins into your hand"+(CHOICE.saelle==='robbed'?": your twenty back, and thirty more.":": thirty copper.")+" Then she kisses you, quick and hard, in the lamplight. <i>You receive "+back+" copper.</i>","“My rooms are just up there,” she says. “If you're ever in the Lowstreets at night.”"],[bye]); };
+  say(B,["Bruno is the size of a door himself, and he is very bored.","“What d'you want?”"],[
+    {label:'Ask him about the Baron.', fn:()=>done("“The Baron?” Bruno has opinions about the Baron. He has opinions about the Baron's horse, the Baron's cousins and the Baron's tax on beer, and he shares all of them, at length.")},
+    {label:'Challenge him to dice. (5 copper)', off:player.purse<5, note:'-5c', fn:()=>{ player.purse-=5; updateHud(); done("Bruno can't resist dice. He can't win at them either, but he takes a long time trying. You lose five copper on purpose and he is delighted."); }},
+    {label:'Pick a fight with him.', fn:()=>say(B,"Bruno grins and cracks his knuckles, and every shutter in the street opens. So much for quiet. Saelle shakes her head at you from the alley. Better try something else.",[{label:'Back.', fn:saelleJob}])}]); }
+JOURNAL.push(["The Rosewater Note", ()=> !CHOICE.saelle ? null : !CHOICE.saelle2 ? ['active',"Saelle from the bathhouse left a note: “Hollowmere is a small city.” She might be found in the Lowstreets at night."] : CHOICE.saelle2==='refused' ? ['active',"Saelle asked you to distract Master Grell's door-man so she could take back her letters. You said no. She is still in the Lowstreets at night."]
+  : ['done',{helped:"You kept Master Grell's door-man busy while Saelle took back her letters. Her rooms are above the Lowstreets, if you're there at night.", betrayed:"You told Master Grell's door-man about Saelle. The watch took her away."}[CHOICE.saelle2]]]);
 // ════════ SWORD TECHNIQUES: momentum from good fighting, spent on three moves taught by three people ════════
 // left: Lunge (Brann) · up: Shield Bash (Oswin) · right: Riposte (Harl). Like spells, the guard you hold picks the move. Q or the Technique button.
 const TECHS={ left:{id:'lunge', name:'Lunge', cost:40, who:'Brann the Hunter', how:'A long thrust that goes through a guard and cuts a swing short.'},

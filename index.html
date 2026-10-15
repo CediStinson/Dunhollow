@@ -18001,12 +18001,20 @@ const VOICE=(()=>{
     return out.filter(([k,t])=>t && /[a-z0-9]/i.test(t)); }
   // ── the AI engine: Kokoro, run in the player's own browser; fetched only when it is switched on ──
   const KOKORO_JS='https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js', KOKORO_MODEL='onnx-community/Kokoro-82M-v1.0-ONNX';
+  const KOKORO_LOCAL='kokoro/';                           // upload the kokoro folder next to index.html to serve the voices yourself (see kokoro/README.txt)
   const ai={state:'off', tts:null, pct:0, ctx:null, src:null, err:''};
   function status(t){ const el=document.getElementById('voice-status'); if(el) el.textContent=t||''; syncUi(); }
-  async function loadAI(){ if(ai.state==='ready'||ai.state==='loading') return; ai.state='loading'; ai.pct=0; status('Downloading AI voices… (about 90 MB, once)');
-    try{ const M=window.KOKORO_MOCK || await import(KOKORO_JS);
+  async function loadAI(){ if(ai.state==='ready'||ai.state==='loading') return; ai.state='loading'; ai.pct=0; status('Downloading AI voices… (about 115 MB, once)');
+    try{ let M=window.KOKORO_MOCK;
+      if(!M){ try{                                                     // your own web space first: the kokoro/ folder next to this file
+          const base=new URL(KOKORO_LOCAL,location.href).href; M=await import(base+'kokoro.web.js');
+          globalThis.KOKORO_VOICES=base+'voices/'; M.env.wasmPaths=base;
+          const has=await fetch(base+'models/'+KOKORO_MODEL+'/onnx/model_quantized.onnx',{method:'HEAD'}).then(r=>r.ok).catch(()=>false);
+          const T=M.env.transformers; if(has && T){ T.localModelPath=base+'models/'; T.allowLocalModels=true; T.allowRemoteModels=false; }
+        }catch(e){ M=null; console.info('No kokoro/ folder on this server, using the public one.'); } }
+      if(!M) M=await import(KOKORO_JS);
       const files={};
-      ai.tts=await M.KokoroTTS.from_pretrained(KOKORO_MODEL,{ dtype:'q8', device:'wasm', progress_callback:p=>{ if(p && p.status==='progress' && p.file){ files[p.file]=[p.loaded||0,p.total||0]; const L=Object.values(files), a=L.reduce((s,x)=>s+x[0],0), b=L.reduce((s,x)=>s+x[1],0); if(b){ ai.pct=Math.round(100*a/b); status('Downloading AI voices… '+ai.pct+'%'); } } } });
+      ai.tts=await M.KokoroTTS.from_pretrained(KOKORO_MODEL,{ dtype:'q8', device:'wasm', progress_callback:p=>{ if(ai.state==='loading' && p && p.status==='progress' && p.file){ files[p.file]=[p.loaded||0,p.total||0]; const L=Object.values(files), a=L.reduce((s,x)=>s+x[0],0), b=L.reduce((s,x)=>s+x[1],0); if(b){ ai.pct=Math.round(100*a/b); status('Downloading AI voices… '+ai.pct+'%'); } } } });
       ai.state='ready'; status('AI voices ready.'); setTimeout(()=>{ if(ai.state==='ready') status(''); },3000);
     }catch(e){ ai.state='failed'; ai.err=String(e&&e.message||e); status('AI voices could not load here, so the browser’s voices are used.'); console.warn('Kokoro failed',e); } }
   // one queue for both engines: a line is a list of [text, voice] pieces, spoken one after another; stop() drops it all

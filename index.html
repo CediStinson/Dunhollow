@@ -4968,7 +4968,21 @@ function drawFloor(){
 }
 
 // the forest floor filling the carved-out corner, with undergrowth and a rock for closure
-function drawForestNotch(n){
+// a field is thousands of strokes: draw it into its own canvas ten times a second (the sway is slow) and stamp that
+const NOTCH_CACHE=new WeakMap();
+function drawForestNotch(n){ if(LOW_FX && n.kind!=='plough') return drawForestNotchRaw(n);
+  const {i0,j0}=n, i1=i0+(n.w||3), j1=j0+(n.h||3), A=P(i0,j0);
+  let E=NOTCH_CACHE.get(n);
+  if(!E || gt-E.at>0.1 || gt<E.at || E.area!==areaId || (n.kind==='plough' && E.at!==-1 && false)){
+    const pts=[P(i0,j0),P(i1,j0),P(i1,j1),P(i0,j1)], minX=Math.min(...pts.map(q=>q.x))-8, maxX=Math.max(...pts.map(q=>q.x))+8, minY=Math.min(...pts.map(q=>q.y))-30, maxY=Math.max(...pts.map(q=>q.y))+6;
+    if(!E){ E={c:document.createElement('canvas')}; NOTCH_CACHE.set(n,E); }
+    const W=Math.ceil(maxX-minX), H=Math.ceil(maxY-minY); if(E.c.width!==W||E.c.height!==H){ E.c.width=W; E.c.height=H; }
+    const cx=E.c.getContext('2d'); cx.setTransform(1,0,0,1,0,0); cx.clearRect(0,0,W,H);
+    const sg=g, scx=cam.x, scy=cam.y; g=cx; cam.x-=minX; cam.y-=minY;
+    try{ drawForestNotchRaw(n); } finally{ g=sg; cam.x=scx; cam.y=scy; }
+    E.rx=minX-A.x; E.ry=minY-A.y; E.at=gt; E.area=areaId; }
+  g.drawImage(E.c,A.x+E.rx,A.y+E.ry); }
+function drawForestNotchRaw(n){
   const {i0,j0}=n, i1=i0+(n.w||3), j1=j0+(n.h||3);
   if(n.kind==='plough'){                           // a ploughed field: furrows with young sprouts
     for(let r=0;r<Math.floor((j1-j0)/0.24);r++){ const jj=j0+0.12+r*0.24;
@@ -7876,10 +7890,11 @@ function drawNPCBody(n){
     g.fillStyle='rgba(12,8,3,0.78)'; g.beginPath(); g.roundRect(x-tw/2-7,ty,tw+14,16,4); g.fill(); g.fillStyle='#f0dca0'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(n.name,x,ty+8);
     const q=npcHasNews(n); if(q){ const by=ty-12+Math.sin(gt*3)*2; g.fillStyle='#1a1006'; g.font='bold 15px Georgia, serif'; g.fillText(q,x+1,by+1); g.fillStyle='#f0c040'; g.fillText(q,x,by); }
     return; }
-  if(n.sit) drawSitting(g,x,y,n.opts,n.dir||0,n.sit);
+  if(n.sit) drawCachedFigure(x,y,()=>drawSitting(g,x,y,n.opts,n.dir||0,n.sit),'s:'+n.id,(n.dir||0)+'|'+n.sit+'|'+litSig(n.opts));
   else if(n.opts.ghost){ g.save(); g.globalAlpha=0.5+Math.sin(gt*2.2)*0.08; glow(x,y-50,40,70,'170,210,255',0.25); drawChar(g,x,y-2+Math.sin(gt*1.5)*2,n.opts,0,n.dir||0); g.restore(); }
-  else if(!LOW_FX && !n.wander && typeof drawLitSprite==='function') drawLitSprite(x,y,()=>drawChar(g,x,y,n.opts,sw,n.dir||0,NPC_POSE(n)));
-  else drawChar(g,x,y,n.opts,sw,n.dir||0,NPC_POSE(n));
+  else if(!LOW_FX && !n.wander && typeof drawLitSprite==='function'){ const ps=n.moving?NPC_POSE(n):litPose(NPC_POSE(n)); drawLitSprite(x,y,()=>drawChar(g,x,y,n.opts,sw,n.dir||0,ps),1,n.moving?null:'n:'+n.id,(n.dir||0)+'|'+Math.round(sw*4)+'|'+litSig(ps)+'|'+litSig(n.opts)); }
+  else if(n.moving) drawChar(g,x,y,n.opts,sw,n.dir||0,NPC_POSE(n));                // walking: a new frame every time anyway
+  else { const ps=litPose(NPC_POSE(n)); drawCachedFigure(x,y,()=>drawChar(g,x,y,n.opts,sw,n.dir||0,ps),'r:'+n.id,(n.dir||0)+'|'+Math.round(sw*4)+'|'+litSig(ps)+'|'+litSig(n.opts)); }
   if(n.silk){ const sc=n.opts.race==='elf'?1.06:1, so=n.sit?sitDrop(n.sit,n.dir,n.opts):0, wy=y-46*sc+so, hy=y-33*sc+so;            // a thin silk cloth knotted at the hip
     g.save(); g.globalAlpha=0.82; const sg=g.createLinearGradient(x-9,0,x+9,0); sg.addColorStop(0,n.silk); sg.addColorStop(0.6,tone(n.silk,-0.08)); sg.addColorStop(1,tone(n.silk,-0.28));
     g.fillStyle=sg; g.beginPath(); g.moveTo(x-9.5,wy+1); g.quadraticCurveTo(x,wy+3,x+9.5,wy+1); g.lineTo(x+10.5,hy); g.quadraticCurveTo(x+4,hy+5,x-1,hy+2.5); g.quadraticCurveTo(x-6,hy+4,x-10.5,hy-0.5); g.closePath(); g.fill();
@@ -12704,7 +12719,28 @@ function spriteBuffers(){
   }
   return SPR;
 }
-function drawLitSprite(x,B,paint,tall=1){
+// lit figures are cached per figure: the lighting pass (three offscreen canvases) is the costliest thing on screen,
+// so a figure standing still is lit four times a second and stamped in between; anyone moving or fighting changes key every frame
+const LIT_CACHE=new Map(), litSig=o=>{ try{ return JSON.stringify(o); }catch(e){ return ''; } };
+const litPose=ps=>ps && typeof ps.t==='number' ? {...ps, t:Math.round(ps.t*6)/6} : ps;   // background work (chopping, hauling) steps at 12 frames a second
+let litArea=null;
+function drawLitSprite(x,B,paint,tall=1,id,key){
+  if(id && !LOW_FX){ if(litArea!==areaId){ LIT_CACHE.clear(); litArea=areaId; }
+    const e=LIT_CACHE.get(id), S=2, dx=x-130/S, dy=B-292/S;
+    if(e && e.key===key && gt-e.at<0.25 && gt>=e.at){ g.save(); g.shadowBlur=0; g.shadowColor='transparent'; glow(x+6,B+2,28*tall,10,'10,6,2',0.62); g.restore(); g.drawImage(e.c,dx,dy,130,165); return; }
+    drawLitSpriteRaw(x,B,paint,tall,true);
+    const E=e||{c:document.createElement('canvas')}; if(!e){ E.c.width=260; E.c.height=330; if(LIT_CACHE.size>60) LIT_CACHE.clear(); LIT_CACHE.set(id,E); }
+    const cx=E.c.getContext('2d'); cx.clearRect(0,0,260,330); cx.drawImage(SPR.oc,0,0); cx.drawImage(SPR.bc,0,0); E.key=key; E.at=gt;
+    g.drawImage(E.c,dx,dy,130,165); return; }
+  drawLitSpriteRaw(x,B,paint,tall,false); }
+// the same for figures drawn without the lighting pass (folk walking about, sitting, or everyone in reduced-effects mode)
+function drawCachedFigure(x,B,paint,id,key){ if(litArea!==areaId){ LIT_CACHE.clear(); litArea=areaId; }
+  const S=2, dx=x-130/S, dy=B-292/S; let E=LIT_CACHE.get(id);
+  if(!(E && E.key===key && gt-E.at<0.25 && gt>=E.at)){ if(!E){ E={c:document.createElement('canvas')}; E.c.width=260; E.c.height=330; if(LIT_CACHE.size>60) LIT_CACHE.clear(); LIT_CACHE.set(id,E); }
+    const cx=E.c.getContext('2d'); cx.setTransform(1,0,0,1,0,0); cx.clearRect(0,0,260,330); cx.setTransform(S,0,0,S,130-x*S,292-B*S);
+    const sg=g; g=cx; try{ paint(); } finally{ g=sg; } E.key=key; E.at=gt; }
+  g.drawImage(E.c,dx,dy,130,165); }
+function drawLitSpriteRaw(x,B,paint,tall=1,keep){
   if(LOW_FX){ g.save(); g.shadowBlur=0; g.shadowColor='transparent'; glow(x+6,B+2,28*tall,10,'10,6,2',0.62); g.restore(); SPRITE_PASS=true; try{ paint(); } finally{ SPRITE_PASS=false; } return; }
   const {b,o}=spriteBuffers(), S=2, bw=260, bh=330, ax=130, ay=292;   // covers ±65 wide, 146 up, 19 down
   // soft cast shadow, thrown to the lower right, away from the key light
@@ -12732,6 +12768,7 @@ function drawLitSprite(x,B,paint,tall=1){
   o.fillStyle='rgba(14,9,4,0.75)'; o.fillRect(0,0,bw,bh); o.globalCompositeOperation='source-over';
   const dx=x-ax/S, dy=B-ay/S, W2=bw/S, H2=bh/S, sb=g.shadowBlur, sc=g.shadowColor;
   g.shadowBlur=0; g.shadowColor='transparent';
+  if(keep) return;                                     // the cache takes it from the buffers
   g.drawImage(SPR.oc,dx,dy,W2,H2);
   g.shadowBlur=sb; g.shadowColor=sc;
   g.drawImage(SPR.bc,dx,dy,W2,H2);
@@ -12754,11 +12791,11 @@ function drawActorBase(e){
   if(open){ const gs2=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(s.x,B-50,46+Math.sin(gt*14)*6,72,'255,200,70',0.55); g.globalCompositeOperation=gs2; }   // a cheap halo instead of a blurred shadow on every stroke
   if(e.opts && e.opts.ghost){ g.globalAlpha*=0.5+Math.sin(gt*2.2)*0.08; glow(s.x,B-50,40,70,'170,210,255',0.25); }
   if(e.type==='dummy') drawDummy(s.x,B,e);
-  else if(e.type==='wolf') drawLitSprite(s.x,B,()=>drawWolf(s.x,B,e,e.dir||0,poseFor(e)),1.2);
+  else if(e.type==='wolf'){ const live=(combat.active && (e===combat.foe||isP)) || e.moving, ps=live?poseFor(e):litPose(poseFor(e)); drawLitSprite(s.x,B,()=>drawWolf(s.x,B,e,e.dir||0,ps),1.2,live?null:'w:'+(e.id??e.name),(e.dir||0)+'|'+(e.moving?gt.toFixed(2):'')+'|'+litSig(ps)+'|'+e.coat+'|'+(e.dead?1:0)); }
   else if(e.type==='lurker') drawLurker(s.x,B,e,poseFor(e));
   else if(e.type==='ember') drawEmber(s.x,B,e,poseFor(e));
   else if(e.type==='skeleton') drawRisen(s.x,B,e,poseFor(e));
-  else drawLitSprite(s.x,B,()=>drawChar(g,s.x,B,e.opts,e.moving?Math.sin(gt*10)*5:0,e.dir||0,poseFor(e)));
+  else { const live=(combat.active && (e===combat.foe||isP)) || e.moving, ps=live?poseFor(e):litPose(poseFor(e)), sw=e.moving?Math.sin(gt*10)*5:0; drawLitSprite(s.x,B,()=>drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps),1,live?null:isP?'p':'a:'+(e.id??e.name),(e.dir||0)+'|'+Math.round(sw*4)+'|'+litSig(ps)+'|'+litSig(e.opts)+'|'+(isP?Math.round((player.wet||0)*10):'')); }
   g.restore();
   if(!isP && e.dead) return;
   if(isP && romHush()) return;

@@ -554,7 +554,8 @@ html,body{touch-action:none;overscroll-behavior:none;-webkit-tap-highlight-color
     <button class="menu-btn" id="fs-toggle">Fullscreen</button>
     <button class="menu-btn" id="snd-toggle">Sound: Off</button>
     <button class="menu-btn" id="voice-toggle">Voices: Off</button>
-    <div class="file-row" style="align-items:center;gap:10px;display:none"><span class="menu-label">Volume</span><input id="snd-vol" type="range" min="0" max="100" value="70" style="flex:1;accent-color:#c09040"></div>
+    <div class="file-row snd-row" style="align-items:center;gap:10px;display:none"><span class="menu-label" style="width:52px">Volume</span><input id="snd-vol" type="range" min="0" max="100" value="70" style="flex:1;accent-color:#c09040"></div>
+    <div class="file-row snd-row" style="align-items:center;gap:10px;display:none"><span class="menu-label" style="width:52px">Music</span><input id="mus-vol" type="range" min="0" max="100" value="45" style="flex:1;accent-color:#c09040"></div>
     <div class="menu-label">Promoter's Key</div>
     <div class="file-row"><input id="promo-code" type="text" placeholder="Enter a key" autocomplete="off" maxlength="12" inputmode="numeric"><button class="menu-btn" id="promo-btn" style="flex:0 0 auto;width:auto;padding:8px 14px">Use</button></div>
     <div id="promo-msg"></div>
@@ -9491,7 +9492,7 @@ function eatItem(k){ const id=player.inv[k];
   if(id==='cooked_meat'||id==='potion'){ const was=CHOICE.bruised; cureBruise(); const r=eatItemRaw(k); if(!r && was){ refreshPlayerHp(false); updateHud(); } return r; }
   if(CHOICE.bruised && player.hp>=hpCap()){ if(typeof flash==='function') flash('Bread won\'t mend this. Sleep, a bath, or a proper meal.'); return false; }
   const r=eatItemRaw(k); refreshPlayerHp(false); updateHud(); return r; }
-function eatItemRaw(k){ const id=player.inv[k]; if(!id||!ITEMS[id]||!ITEMS[id].heal) return false;
+function eatItemRaw(k){ const id=player.inv[k]; if(!id||!ITEMS[id]||!ITEMS[id].heal) return false; SND.fx(/potion|draught|tonic|water|ale|wine|cider|milk|flask/.test(id)?'gulp':'chew');
   if(player.hp>=player.maxHp){ if(typeof flash==='function') flash('You are not hurt.'); return false; }
   const h=Math.min(ITEMS[id].heal, player.maxHp-player.hp); player.hp+=h; player.inv[k]=null;
   floatText(tileOf(player),'+'+h+' HP','#8ad07a'); if(id==='raw_meat') logMsg('You chew the raw meat. It is not a good idea, but it is something. Better cooked over a campfire.','#c8a070'); else logMsg((id==='potion'?'You drink the ':'You eat the ')+ITEMS[id].name.toLowerCase().replace(/^loaf of /,'bread')+'. (+'+h+' HP)','#8ad07a');
@@ -9740,7 +9741,7 @@ setInterval(()=>{ const t=TALK_TURN.n; if(!t) return; const open=typeof dlgOverl
   if(!open && !(typeof CS!=='undefined' && CS.on)){ if(!t.moving && !(t.path&&t.path.length)) t.dir=TALK_TURN.dir; TALK_TURN.n=null; } },250);   // when the talk ends, they turn back to what they were doing
 // ── choices: what the Wanderer decided, and what Dunhollow will remember ──
 const CHOICE = { csFarm:null, gob:null, toll:null, baron:null, nim:null, thieves:null, morra:null, hal:null, rest:null, letter:null, camp:null, pups:null, ada:null, adaHow:null, edric:null, untrack:null, morwen:null, barrow:null, fenCaches:null, fenOpen:null, gerdMet:null, fenUnlocked:null, fenSeen:null, deadAt:null, pim:null, shardMade:null, csBrann:null, csFell:null, csFen:null, csGate:null, tobbStaff:null, shadeHow:null, csCamp:null, csHaven:null, necro:null, necroQ:null, fenRumours:null, fenMidHeard:null, bathChest:null, moonJoin:null, moonTowels:null, hobb:null, pool:null, poolq:null, sisters:null, poolDay:null, shade:null, shadePaid:null, strip:null, aldoPaid:null, moon:null, moonDay:null, baronDay:null, ruler:null, unpaid:null, orrinOut:null, tallyBurnt:null, moonAtoned:null, bathDay:null, vennStreak:null, vennSus:null, vennCaught:null, gb1:null, gb2:null, gb3:null, gbDay:null, tomas:null, innDay:null, gunnarBeat:null, mbDay:null, ruvin:null, livery:null, oath:null, appr:null, puz:null, moonBless:null, wear:null, bard:null, goat:null, grave:null, hunter:null, faelan:null, fell:null, fellAsked:null, pact:null, maren:null, marenThanked:null, tirnel:null, gift:null, warden:null, stones:null, greyDead:null, maraSeal:null, ledger:null, adafarm:null, martaElf:null, stq:null, charterGiven:null, epiDone:null, crier:null };
-function remember(k,v,msg){ CHOICE[k]=v; if(msg) logMsg(msg,'#c8a0e0'); }
+function remember(k,v,msg){ CHOICE[k]=v; if(msg){ logMsg(msg,'#c8a0e0'); try{ SND.fx('page'); }catch(e){} } }   // a line goes in the journal
 const say=(who,text,opts,purse)=>showDialog(who,text,opts,purse);
 const ELFP=()=>!!(player.opts && player.opts.race==='elf');   // is the Wanderer an elf? many people notice
 
@@ -10611,7 +10612,7 @@ const JOURNAL=[
   ["The Baron's Reckoning", ()=> !(visitedAreas.keepward||STQ()==='done') ? null : BARON_DOWN() ? ['done',"You gave the Crown's magistrate proof of the Baron's crimes. Bertram is arrested."]
     : ['active',(CHOICE.baron==='sold_seal'?"You sold the Baron's orders back to his steward. The magistrate still wants proof. ":"")+((hasItem('charter')&&!CHOICE.charterGiven)?"Bring the Stone Charter to Magistrate Aldous in the Castle Ward chapel.":(hasItem('seal')||hasItem('ledger')||hasItem('journal')||hasItem('orrinletters')||hasItem('trapnote'))?"You carry something the magistrate in the Castle Ward will want to see.":"The Crown's magistrate in the Castle Ward needs proof: the Baron's orders, his steward's accounts, or the books of the people he paid. Someone in the Lowstreets deals in secrets.")]],
 ];
-function openJournal(){
+function openJournal(){ try{ SND.fx('page'); }catch(e){}
   if(!running) return;
   const rows=JOURNAL.map(([t,f])=>{ const r=f(); return r && {t,s:r[0],x:r[1]}; }).filter(Boolean);
   const act=rows.filter(r=>r.s==='active'), done=rows.filter(r=>r.s==='done'), failed=rows.filter(r=>r.s==='failed');
@@ -11507,7 +11508,7 @@ function rescueStrayItems(){                     // items that ended up in a non
   if(!player.opts) return; const e=player.opts.equip;
   Object.keys(e).forEach(k=>{ if(!SLOTS.includes(k) && e[k]){ const f=player.inv.indexOf(null); if(f>=0) player.inv[f]=e[k]; delete e[k]; } else if(!SLOTS.includes(k)) delete e[k]; });
 }
-function openInventory(){
+function openInventory(){ try{ SND.fx('bag'); }catch(e){}
   if(!running || !player.opts) return;
   rescueStrayItems();
   if(combat.active){ logMsg("No time to change gear mid-fight!"); return; }
@@ -16597,7 +16598,7 @@ function campfireCook(o){ const T=o&&o.type==='hearth'?'The Hearth':'A Campfire'
   if(!raw.length){ say(T,"The fire crackles. Bring raw meat or a fish and you can cook it here.",[bye]); return; }
   const names={}; raw.forEach(x=>names[x.id]=(names[x.id]||0)+1);
   say(T,["You crouch by the fire. "+Object.entries(names).map(([id,n])=>n+'× '+ITEMS[id].name).join(', ')+"."],[
-    {label:'Cook it all.', fn:()=>{ raw.forEach(x=>{ player.inv[x.k]=COOKS[x.id]; }); updateHud(); refreshFoodBar(); if(invOverlay.classList.contains('open')) refreshInventory();
+    {label:'Cook it all.', fn:()=>{ SND.fx('sizzle'); raw.forEach(x=>{ player.inv[x.k]=COOKS[x.id]; }); updateHud(); refreshFoodBar(); if(invOverlay.classList.contains('open')) refreshInventory();
       const out={}; raw.forEach(x=>{ const c=COOKS[x.id]; out[c]=(out[c]||0)+1; }); logMsg('You cook over the fire: '+Object.entries(out).map(([id,n])=>n+'× '+ITEMS[id].name).join(', ')+'.','#8ad07a');
       say(T,"Fat spits in the flames. The smell alone is worth it.",[bye]); }}, bye]); }
 onUse(['campfire','hearth'],campfireCook);
@@ -16650,7 +16651,7 @@ function fishTick(dt){ const F=FISH; if(!F) return;
     fishDraw(); } }
 function fishLand(){ const id=FISH.catch, k=player.inv.indexOf(null);
   if(k<0){ fishMsg('You land it, but your pack is full. You let it go.'); FISH.st='done'; FISH.t=1.6; return; }
-  player.inv[k]=id; CHOICE.fishCaught=(CHOICE.fishCaught||0)+1; updateHud(); if(invOverlay.classList.contains('open')) refreshInventory(); refreshFoodBar();
+  player.inv[k]=id; SND.fx('catch'); CHOICE.fishCaught=(CHOICE.fishCaught||0)+1; updateHud(); if(invOverlay.classList.contains('open')) refreshInventory(); refreshFoodBar();
   if(id==='one_ring'){ CHOICE.oneRing=true; banner('The One Ring','#f2c84a',2600); slowmo.scale=0.3; slowmo.t=0.8; logMsg('Something glints in the weed on the hook: a plain gold ring. It is warm. You put it away very quickly, and you do not tell anyone.','#f2c84a'); }
   else logMsg((ITEMS[id].junk?'You reel in… ':'You land ')+(ITEMS[id].junk?ITEMS[id].name.toLowerCase()+'. Well.':'a '+ITEMS[id].name.toLowerCase()+'.'),ITEMS[id].junk?'#a89a80':'#8ad0c8');
   fishMsg(ITEMS[id].junk?'… '+ITEMS[id].name+'. Well, it counts.':'<b>'+ITEMS[id].name+'!</b>'); FISH.st='done'; FISH.t=1.6; document.getElementById('fish-cv').style.display='none'; autosaveSoon(800); }
@@ -17707,10 +17708,90 @@ const SND=(()=>{
       W.eq=eq;
       const iv=(player.inv||[]).filter(Boolean).length; if(W.inv!=null && iv>W.inv && !geared) pickup(); W.inv=iv;
     }catch(e){} },50);
+  // ── little moments: cooking, fishing, eating, the journal, quests, clicks ──
+  function fx(k,a){ if(!live()) return;
+    if(k==='sizzle'){ noise(1.6,0.12,'highpass',2500,3500,0,sfx,{a:0.05}); for(let q=0;q<14;q++) noise(R(0.005,0.015),R(0.05,0.12),'highpass',R(3000,6000),R(3000,6000),0,sfx,{a:0.001,at:R(0,1.4)}); }
+    else if(k==='cast'){ noise(0.25,0.18,'bandpass',900,2600,1.2,sfx,{a:0.03}); tone('sine',900,380,0.12,0.12,sfx,{at:0.55}); noise(0.12,0.06,'bandpass',800,500,1,sfx,{at:0.55,a:0.005}); }   // the swish, the plop of the float
+    else if(k==='bite'){ noise(0.35,0.2,'bandpass',1200,400,1,sfx,{a:0.005}); tone('sine',600,250,0.15,0.1); }
+    else if(k==='reel'){ noise(0.012,0.06,'bandpass',3200,3200,4,sfx,{a:0.001}); }
+    else if(k==='catch'){ noise(0.4,0.22,'bandpass',1000,400,1,sfx,{a:0.005}); [0,0.12,0.24].forEach((d,q)=>tone('triangle',[523,659,784][q],[523,659,784][q],0.3,0.07,sfx,{at:0.25+d})); }
+    else if(k==='gulp'){ [0,0.22].forEach(d=>{ tone('sine',260,140,0.12,0.18,sfx,{at:d}); noise(0.08,0.06,'lowpass',600,300,0,sfx,{at:d,a:0.01}); }); tone('sine',900,1400,0.06,0.04,sfx,{at:0.5}); }
+    else if(k==='chew'){ for(let q=0;q<4;q++) noise(R(0.05,0.08),0.1,'bandpass',R(500,900),R(300,600),1.5,sfx,{at:q*R(0.17,0.22),a:0.01}); }
+    else if(k==='page'){ noise(0.22,0.07,'bandpass',3500,1800,0.8,sfx,{a:0.03}); noise(0.1,0.04,'highpass',5000,5000,0,sfx,{at:0.12,a:0.01}); }
+    else if(k==='quest'){ [[392,0],[523,0.14],[659,0.28],[784,0.42]].forEach(([f,d])=>{ tone('triangle',f,f,0.5,0.08,sfx,{at:d}); tone('sine',f*2,f*2,0.35,0.02,sfx,{at:d}); }); tone('sine',196,196,1.1,0.08,sfx,{at:0.42,a:0.05}); }
+    else if(k==='renown'){ [[392,0],[494,0.16],[587,0.32],[784,0.5],[988,0.66]].forEach(([f,d])=>{ tone('triangle',f,f,0.7,0.09,sfx,{at:d}); tone('sine',f*1.5,f*1.5,0.5,0.025,sfx,{at:d}); }); tone('sine',98,98,1.6,0.14,sfx,{at:0.5,a:0.08}); }
+    else if(k==='click'){ tone('sine',1800,1400,0.03,0.03,sfx,{a:0.001}); }
+    else if(k==='bag'){ noise(0.18,0.08,'bandpass',900,600,1.2,sfx,{a:0.02}); tone('sawtooth',200,160,0.12,0.02,sfx,{lp:700,a:0.02}); } }
+  // ── music: a small composer that never repeats itself; each place has its mood ──
+  let mus=null, musVol=0.45; try{ const v=parseFloat(localStorage.getItem('dunhollow.music')); if(v>=0 && v<=1) musVol=v; }catch(e){}
+  const MOODS={
+    day:   {root:293.66, sc:[0,2,3,5,7,9,10], beat:0.5,  inst:'lute',  dens:0.55, bass:true},
+    night: {root:220,    sc:[0,2,3,5,7,8,10], beat:0.8,  inst:'flute', dens:0.32, bass:true},
+    elf:   {root:329.63, sc:[0,2,4,6,7,9,11], beat:0.34, inst:'harp',  dens:0.7,  bass:false, arp:true},
+    city:  {root:392,    sc:[0,2,4,5,7,9,10], beat:0.42, inst:'lute',  dens:0.6,  bass:true},
+    tavern:{root:293.66, sc:[0,2,4,5,7,9,11], beat:0.28, inst:'lute',  dens:0.8,  bass:true, jig:true},
+    cave:  {root:146.83, sc:[0,1,3,5,7,8,10], beat:1.3,  inst:'bell',  dens:0.22, drone:73.42},
+    fen:   {root:220,    sc:[0,1,3,5,6,8,10], beat:1.0,  inst:'flute', dens:0.25, drone:55},
+    fight: {root:146.83, sc:[0,1,3,5,7,8,10], beat:0.33, inst:'drum',  dens:1,    drone:73.42} };
+  function moodNow(){ const P=place(), A=AREAS[areaId]||{};
+    if(typeof combat!=='undefined' && combat.active) return 'fight';
+    if(P.cave) return 'cave'; if(/wheatsheaf|inn|lantern|dicenden|tavern/.test(areaId)) return 'tavern';
+    if(P.wet && !P.inside) return 'fen'; if(P.th==='elf') return 'elf'; if(P.city && !P.night) return 'city';
+    if(!P.inside && P.night>0.5) return 'night'; return 'day'; }
+  function musBoot(){ if(mus) return; const bus=ctx.createGain(); bus.gain.value=0; bus.connect(master);
+    const dl=ctx.createDelay(1); dl.delayTime.value=0.31; const fb=ctx.createGain(); fb.gain.value=0.32; const wet=ctx.createGain(); wet.gain.value=0.3;   // a little room around it
+    const inp=ctx.createGain(); inp.connect(bus); inp.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(bus);
+    mus={bus, inp, mood:null, next:0, step:0, deg:0, drone:null}; setInterval(musTick,100); }
+  function note(inst,f,t,len,v){ const g0=ctx.createGain(); g0.connect(mus.inp);
+    if(inst==='lute'||inst==='harp'){ const o=ctx.createOscillator(), o2=ctx.createOscillator(), lp=ctx.createBiquadFilter(); o.type='triangle'; o2.type='sine'; o.frequency.value=f; o2.frequency.value=f*2.005; lp.type='lowpass'; lp.frequency.setValueAtTime(inst==='harp'?5000:3200,t); lp.frequency.exponentialRampToValueAtTime(600,t+len);
+      const g2=ctx.createGain(); g2.gain.value=0.35; o.connect(lp); o2.connect(g2); g2.connect(lp); lp.connect(g0); g0.gain.setValueAtTime(0.0001,t); g0.gain.exponentialRampToValueAtTime(v,t+0.008); g0.gain.exponentialRampToValueAtTime(0.0001,t+len*(inst==='harp'?1.8:1.2)); o.start(t); o2.start(t); o.stop(t+len*2); o2.stop(t+len*2); }
+    else if(inst==='flute'){ const o=ctx.createOscillator(), vb=ctx.createOscillator(), vg=ctx.createGain(); o.type='sine'; o.frequency.value=f; vb.frequency.value=5; vg.gain.value=f*0.008; vb.connect(vg); vg.connect(o.frequency); o.connect(g0);
+      g0.gain.setValueAtTime(0.0001,t); g0.gain.exponentialRampToValueAtTime(v,t+0.12); g0.gain.setValueAtTime(v,t+len*0.7); g0.gain.exponentialRampToValueAtTime(0.0001,t+len*1.1); o.start(t); vb.start(t); o.stop(t+len*1.2); vb.stop(t+len*1.2);
+      const s=ctx.createBufferSource(), bp=ctx.createBiquadFilter(), bg=ctx.createGain(); s.buffer=white; bp.type='bandpass'; bp.frequency.value=f*2; bp.Q.value=8; bg.gain.value=v*0.15; s.connect(bp); bp.connect(bg); bg.connect(mus.inp); s.start(t,Math.random()); s.stop(t+len); }   // a little breath in it
+    else if(inst==='bell'){ [1,2.76,5.4].forEach((m,q)=>{ const o=ctx.createOscillator(), g=ctx.createGain(); o.frequency.value=f*m; o.connect(g); g.connect(g0); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(v*[1,0.4,0.15][q],t+0.005); g.gain.exponentialRampToValueAtTime(0.0001,t+len*[3,1.6,0.8][q]); o.start(t); o.stop(t+len*3.2); }); g0.gain.value=1; }
+    else if(inst==='bass'){ const o=ctx.createOscillator(); o.type='triangle'; o.frequency.value=f; o.connect(g0); g0.gain.setValueAtTime(0.0001,t); g0.gain.exponentialRampToValueAtTime(v,t+0.02); g0.gain.exponentialRampToValueAtTime(0.0001,t+len); o.start(t); o.stop(t+len+0.05); }
+    else if(inst==='tom'){ const o=ctx.createOscillator(); o.frequency.setValueAtTime(f,t); o.frequency.exponentialRampToValueAtTime(f*0.5,t+0.25); o.connect(g0); g0.gain.setValueAtTime(0.0001,t); g0.gain.exponentialRampToValueAtTime(v,t+0.004); g0.gain.exponentialRampToValueAtTime(0.0001,t+0.35); o.start(t); o.stop(t+0.4); }
+    else if(inst==='tick'){ const s=ctx.createBufferSource(), hp=ctx.createBiquadFilter(); s.buffer=white; hp.type='highpass'; hp.frequency.value=6000; s.connect(hp); hp.connect(g0); g0.gain.setValueAtTime(v,t); g0.gain.exponentialRampToValueAtTime(0.0001,t+0.05); s.start(t,Math.random()); s.stop(t+0.06); } }
+  function droneTo(f){ if(mus.drone){ const d=mus.drone; d.g.gain.setTargetAtTime(0,ctx.currentTime,0.8); setTimeout(()=>{ try{ d.o.stop(); d.o2.stop(); }catch(e){} },4000); mus.drone=null; }
+    if(!f) return; const o=ctx.createOscillator(), o2=ctx.createOscillator(), lp=ctx.createBiquadFilter(), g=ctx.createGain(); o.type='sawtooth'; o2.type='sawtooth'; o.frequency.value=f; o2.frequency.value=f*1.5*1.003; lp.type='lowpass'; lp.frequency.value=320;
+    o.connect(lp); o2.connect(lp); lp.connect(g); g.connect(mus.inp); g.gain.value=0; g.gain.setTargetAtTime(0.05,ctx.currentTime,1.5); o.start(); o2.start(); mus.drone={o,o2,g}; }
+  const fq=(M,deg,oct)=>{ const n=M.sc.length, d=((deg%n)+n)%n, o=Math.floor(deg/n)+(oct||0); return M.root*Math.pow(2,(M.sc[d]+12*o)/12); };
+  function musTick(){ if(!live() || musVol<=0.001){ if(mus) mus.bus.gain.setTargetAtTime(0,ctx.currentTime,0.3); return; }
+    if(typeof areaId==='undefined' || !AREAS[areaId]) return;
+    const m=moodNow(); if(m!==mus.mood){ mus.bus.gain.setTargetAtTime(0,ctx.currentTime,0.25); const was=mus.mood; mus.mood=m; mus.next=ctx.currentTime+(was?0.9:0.2); mus.step=0; mus.deg=0;
+      setTimeout(()=>{ if(mus.mood===m){ droneTo(MOODS[m].drone||0); mus.bus.gain.setTargetAtTime(musVol*(m==='fight'?1:0.8),ctx.currentTime,0.8); } },(was?800:100)); }
+    else mus.bus.gain.setTargetAtTime(musVol*(m==='fight'?1:0.8),ctx.currentTime,0.5);
+    const M=MOODS[m];
+    while(mus.next<ctx.currentTime+0.4){ const t=mus.next, st=mus.step, bar=M.jig?6:8;
+      if(M.inst==='drum'){ const b=st%8; if(b===0||b===4) note('tom',110,t,0.3,0.5); if(b===6||(b===3&&Math.random()<0.5)) note('tom',165,t,0.2,0.3); if(b%2===1) note('tick',0,t,0.05,0.06);
+        if(st%16===0) note('bell',fq(M,[0,3,4,0][(st/16|0)%4],0),t,1.2,0.05); }
+      else {
+        if(M.bass && st%bar===0) note('bass',fq(M,[0,4,3,0][(st/bar|0)%4],-2),t,M.beat*bar*0.9,0.09);
+        if(M.jig && st%3===0) note('tick',0,t,0.05,0.03);
+        if(st%bar===bar-1 && Math.random()<0.6){ /* a breath at the end of a phrase */ }
+        else if(Math.random()<M.dens){ let d;
+          if(M.arp){ d=[0,2,4,7,4,2][st%6]+[0,3,4,5][(st/12|0)%4]; }
+          else { const r=Math.random(); mus.deg+= r<0.35?1:r<0.7?-1:r<0.82?2:r<0.94?-2:0; mus.deg=Math.max(-2,Math.min(9,mus.deg)); if(st%bar===bar-2) mus.deg=Math.round(mus.deg/7)*7; d=mus.deg; }   // stepwise, home at the end of each phrase
+          const len=M.inst==='flute'?M.beat*(Math.random()<0.4?2:1):M.beat*1.6, v=M.inst==='flute'?0.06:M.inst==='bell'?0.05:0.08;
+          note(M.inst,fq(M,d,M.inst==='harp'||m==='city'?0:0),t,len,v); } }
+      mus.step++; mus.next+=M.beat*(M.jig && st%3===2 ? 1.15 : 1); } }
+  function setMusic(v){ musVol=Math.max(0,Math.min(1,v)); try{ localStorage.setItem('dunhollow.music',String(musVol)); }catch(e){} }
+  let lastDone=null, lastRank=null, fishSt=null, reelT=0;
+  setInterval(()=>{ if(!live()) return; try{
+      if(mus===null) musBoot();
+      const st=typeof FISH!=='undefined' && FISH ? FISH.st : null;
+      if(st!==fishSt){ if(st==='cast') fx('cast'); else if(st==='bite') fx('bite'); fishSt=st; }
+      if(st==='reel' && FISH.hold){ reelT-=0.1; if(reelT<=0){ fx('reel'); reelT=0.12; } }
+      if(typeof renownDone==='function'){ const n=renownDone(), rk=typeof renownRank==='function'?renownRank():0;
+        if(lastRank!=null && rk>lastRank) fx('renown'); else if(lastDone!=null && n>lastDone) fx('quest'); lastDone=n; lastRank=rk; }
+    }catch(e){} },100);
+  // clicks: dialog choices and menu buttons
+  document.addEventListener('click',e=>{ const b=e.target.closest && e.target.closest('.dlg-opt,.menu-btn,.chip,.gender-btn,.ctrl-close,.bm-tools button'); if(b) fx('click'); },true);
   // ── the fight ──
   const heavy=w=>/axe|mace|morningstar|club|hammer|longsword|spade|shovel/.test(w||'');
   return {
     get on(){ return on; }, get vol(){ return vol; }, setOn, setVol, toggle(){ setOn(!on); },
+    fx(k,a){ fx(k,a); }, get music(){ return musVol; }, setMusic, get mood(){ return mus&&mus.mood; },
     open(kind){ if(live()) open(kind); },
     pain(e,dying){ if(live()) pain(e,dying); },
     level(){ if(!ctx) return 0; if(!L.an){ L.an=ctx.createAnalyser(); L.an.fftSize=2048; master.connect(L.an); } const d=new Float32Array(2048); L.an.getFloatTimeDomainData(d); let pk=0; d.forEach(x=>{ pk=Math.max(pk,Math.abs(x)); }); return pk; },   // the loudest sample right now, for checking
@@ -17732,11 +17813,13 @@ const SND=(()=>{
       else if(/raise|bone|spear|shield/.test(n)){ for(let q=0;q<6;q++) noise(0.02,0.25,'bandpass',R(1500,2600),R(1500,2600),3,sfx,{at:q*R(0.04,0.08),a:0.001}); tone('sine',80,45,0.5,0.25); }
       else { tone('sawtooth',900,180,0.35,0.08,sfx,{lp:3000,a:0.01}); tone('sine',1200,300,0.3,0.12); } },
   };
-  function syncUi(){ const b=document.getElementById('snd-toggle'); if(b) b.textContent='Sound: '+(on?'On':'Off'); const s=document.getElementById('snd-vol'); if(s){ s.value=Math.round(vol*100); s.parentNode.style.display=on?'flex':'none'; } }
+  function syncUi(){ const b=document.getElementById('snd-toggle'); if(b) b.textContent='Sound: '+(on?'On':'Off'); const s=document.getElementById('snd-vol'); if(s){ s.value=Math.round(vol*100); } document.querySelectorAll('.snd-row').forEach(r=>r.style.display=on?'flex':'none'); }
 })();
 { const b=document.getElementById('snd-toggle'), s=document.getElementById('snd-vol');
-  if(b){ b.textContent='Sound: '+(SND.on?'On':'Off'); b.addEventListener('click',()=>{ SND.toggle(); b.textContent='Sound: '+(SND.on?'On':'Off'); s.parentNode.style.display=SND.on?'flex':'none'; }); }
-  if(s){ s.value=Math.round(SND.vol*100); s.parentNode.style.display=SND.on?'flex':'none'; s.addEventListener('input',()=>SND.setVol(s.value/100)); }
+  if(b){ b.textContent='Sound: '+(SND.on?'On':'Off'); b.addEventListener('click',()=>{ SND.toggle(); b.textContent='Sound: '+(SND.on?'On':'Off'); document.querySelectorAll('.snd-row').forEach(r=>r.style.display=SND.on?'flex':'none'); }); }
+  if(s){ s.value=Math.round(SND.vol*100); s.addEventListener('input',()=>SND.setVol(s.value/100)); }
+  const mv=document.getElementById('mus-vol'); if(mv){ mv.value=Math.round(SND.music*100); mv.addEventListener('input',()=>SND.setMusic(mv.value/100)); }
+  document.querySelectorAll('.snd-row').forEach(r=>r.style.display=SND.on?'flex':'none');
   if(SND.on){ const wake=()=>{ SND.setOn(true); window.removeEventListener('pointerdown',wake,true); window.removeEventListener('keydown',wake,true); };   // browsers only let sound start after a click or a key
     window.addEventListener('pointerdown',wake,true); window.addEventListener('keydown',wake,true); } }
 // ════════ VOICES: the browser's own speech reads the dialogue aloud, each speaker with a voice of their own. Off by default ════════

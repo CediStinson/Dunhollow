@@ -10375,7 +10375,7 @@ function sellTo(who,back,o){                     // o (optional): only these ite
   say(who,[goods.length?(o&&o.greet||"“Let us see what you have.” (Only what is in your pack, not what you wear.)"):(o&&o.none||"“Nothing in your pack I'd buy.”")],[{label:'Back.',fn:back},bye],true);
   if(!goods.length) return;
   const box=document.getElementById('dlg-opts'), grid=document.createElement('div'); grid.className='shop-grid';
-  goods.forEach(({id,k})=>{ const pr=o&&o.price?o.price(id):Math.max(1,Math.round(PRICES[id]*SELL_RATE)); const cell=document.createElement('div'); cell.className='shop-cell';
+  goods.forEach(({id,k})=>{ const pr=o&&o.price?o.price(id):Math.max(1,Math.round(PRICES[id]*sellRate())); const cell=document.createElement('div'); cell.className='shop-cell';
     const sl=document.createElement('div'); sl.className='slot filled shop-slot'; sl.dataset.item=id; const cv=document.createElement('canvas'); cv.width=cv.height=104; cv.style.width=cv.style.height='52px'; drawItemIcon(cv.getContext('2d'),id,104); sl.appendChild(cv);
     const pl=document.createElement('div'); pl.className='shop-price'; pl.textContent='+'+formatCoin(pr); cell.appendChild(sl); cell.appendChild(pl);
     cell.addEventListener('pointerdown',e=>{ cell._touch=e.pointerType==='touch'; });
@@ -10440,7 +10440,7 @@ function heraldTalk(){ say(BARON_DOWN()?'Crown Herald':"Baron's Herald", BARON_D
 function mguardTalk(){ say(BARON_DOWN()?'Crown Soldier':"Baron's Guard", BARON_DOWN() ? "“The Baron's men took off their red and put on blue. Mostly the same men. Don't tell the Magistrate.”" : "“Keep walking. The Baron doesn't like crowds that aren't cheering.”",[bye]); }
 function fenceSell(){
   const opts=[];
-  player.inv.forEach((id,k)=>{ if(!id || ITEMS[id].slot==='misc' && id!=='moonbloom' || !PRICES[id]) return; const pr=Math.max(1,Math.round(PRICES[id]*SELL_RATE*1.35));
+  player.inv.forEach((id,k)=>{ if(!id || ITEMS[id].slot==='misc' && id!=='moonbloom' || !PRICES[id]) return; const pr=Math.max(1,Math.round(PRICES[id]*sellRate()*1.35));
     opts.push({label:itemLabel(id), note:'+'+formatCoin(pr), fn:()=>{ player.inv[k]=null; player.purse+=pr; updateHud(); if(id==='moonbloom' && !CHOICE.maren) remember('maren','sold'); logMsg('Sold '+ITEMS[id].name+' for '+formatCoin(pr)+'.','#e8c060'); fenceSell(); }}); });
   say('Sella the Fence', opts.length?"“I pay better than Marta. I also ask fewer questions.”":"“Nothing to sell? Then stop blocking my light.”",[...opts,bye],true);
 }
@@ -10619,7 +10619,7 @@ function openJournal(){ try{ SND.fx('page'); }catch(e){}
   const act=rows.filter(r=>r.s==='active'), done=rows.filter(r=>r.s==='done'), failed=rows.filter(r=>r.s==='failed');
   const li=r=>`<div class="jq ${r.s}">${r.s==='active'?`<span class="jt${isTracked(r.t)?'':' off'}" data-q="${r.t.replace(/"/g,'&quot;')}">${isTracked(r.t)?'◉ Followed':'○ Follow'}</span>`:''}<b>${r.t}</b><span>${r.x}</span></div>`;
   const rk=renownRank();
-  document.getElementById('note-title').innerHTML=player.name+"'s Journal<div style='font-size:11px;letter-spacing:1px;margin-top:4px;color:#8a6a3a'>Renown: "+RENOWN[rk]+" &nbsp;·&nbsp; +"+rk*4+" max HP &nbsp;·&nbsp; "+(nightAmt()>0.5?'night':nightAmt()>0.1?'dusk':'day')+"</div>";
+  document.getElementById('note-title').innerHTML=player.name+"'s Journal<div style='font-size:11px;letter-spacing:1px;margin-top:4px;color:#8a6a3a'>Renown: "+RENOWN[rk]+(rk<RENOWN_AT.length-1?" ("+renownDone()+"/"+RENOWN_AT[rk+1]+" quests)":"")+" &nbsp;·&nbsp; "+(RENOWN_PERK[rk]||'no favours yet')+" &nbsp;·&nbsp; "+(nightAmt()>0.5?'night':nightAmt()>0.1?'dusk':'day')+"</div>";
   const st=storyStep(); for(let k=act.length-1;k>=0;k--) if(act[k].t===st[0]) act.splice(k,1);
   document.getElementById('note-body').innerHTML=`<div class="jh">The Road Ahead</div><div class="jq active main"><span class="jt${isTracked(MAIN_Q)?'':' off'}" data-q="${MAIN_Q}">${isTracked(MAIN_Q)?'◉ Followed':'○ Follow'}</span><b>${st[0]}</b><span>${st[1]}</span></div><div class="jh">Open</div>${act.length?act.map(li).join(''):'<i>Nothing pressing. The roads are quiet, for now.</i>'}<div class="jh">Done</div>${done.length?done.map(li).join(''):'<i>Nothing yet.</i>'}${failed.length?`<div class="jh">Failed</div>${failed.map(li).join('')}`:''}`;
   document.querySelectorAll('#note-body .jt').forEach(el=>el.addEventListener('click',e=>{ e.stopPropagation(); const q=el.dataset.q; CHOICE.untrack={...(CHOICE.untrack||{})}; if(CHOICE.untrack[q]) delete CHOICE.untrack[q]; else CHOICE.untrack[q]=true; openJournal(); updateHud(); }));
@@ -10954,7 +10954,7 @@ function moonTalk(){
 }
 Object.assign(TALKERS,{ moon_ithil:moonTalk, moon_nel:moonTalk });
 // ════════ After the Baron: who rules, and who pays the men he paid ════════
-const PRICE_MUL=()=>({orrin:1.1, guild:0.9}[CHOICE.ruler]||1)*(GB_RANK()==='Partner'?0.9:GB_RANK()==='Associate'?0.95:1);   // who rules, and your standing with the Gold Brothers
+const PRICE_MUL=()=>({orrin:1.1, guild:0.9}[CHOICE.ruler]||1)*(GB_RANK()==='Partner'?0.9:GB_RANK()==='Associate'?0.95:1)*RENOWN_OFF();   // who rules, and your standing with the Gold Brothers
 function rulerTalk(){
   const nimNote = CHOICE.nim==='free' ? " You think of Nim, and what a curfew would mean for a girl who steals bread." : "";
   say('Magistrate Aldous',["Aldous looks older than he did. “The Baron is in chains. Good. And now nobody is collecting taxes, nobody is paying the guard, and three people have been in my chapel since dawn, each explaining why the town should be theirs.”",
@@ -11228,7 +11228,7 @@ function berthaTalk(){ const day=Math.floor(dayClock/DAY_LEN);
   if(BARON_DOWN()) news.push("“No more Baron's men drinking on credit! I've had to learn what coin looks like again.”"); if(CHOICE.hobb==='done') news.push("“Hobb's mule bit the smith. Everybody's very happy about it.”");
   news.push(["“The ale's brown and wet. That's the whole menu.”","“Gunnar's been arm-wrestling for pennies again. He's never lost. Never.”","“Tobb drinks here after dark. Says the graveyard's too quiet, or too loud. Depends.”"][day%3]);
   say('Bertha of the Wheatsheaf',["A big woman polishing a cup that will never be clean.",news[0],...news.slice(1,2)],[
-    {label:CHOICE.innDay===day?'Rent a bed (slept already)':'Rent a bed and sleep. (2 copper)', off:player.purse<2||CHOICE.innDay===day, note:'-2c', fn:()=>{ player.purse-=2; CHOICE.innDay=day; cureBruise(); CHOICE.lastBed={a:areaId,i:player.i,j:player.j}; player.hp=player.maxHp; dayClock+=DAY_LEN*0.3; updateHud(); say('Bertha of the Wheatsheaf',"The straw is fresh and the blanket smells of smoke. You sleep like the dead, which in Dunhollow is saying something. <i>You are fully healed.</i>",[bye]); }},
+    {label:CHOICE.innDay===day?'Rent a bed (slept already)':renownRank()>=4?'Sleep upstairs. (on the house)':'Rent a bed and sleep. (2 copper)', off:(renownRank()<4&&player.purse<2)||CHOICE.innDay===day, note:renownRank()>=4?'free':'-2c', fn:()=>{ if(renownRank()<4) player.purse-=2; CHOICE.innDay=day; cureBruise(); CHOICE.lastBed={a:areaId,i:player.i,j:player.j}; player.hp=player.maxHp; dayClock+=DAY_LEN*0.3; updateHud(); say('Bertha of the Wheatsheaf',"The straw is fresh and the blanket smells of smoke. You sleep like the dead, which in Dunhollow is saying something. <i>You are fully healed.</i>",[bye]); }},
     bye]); }
 function gunnarTalk(){
   say('Gunnar the Ploughman',[CHOICE.gunnarNight?"Gunnar sees you come in and goes red from the beard to the ears. Then he grins, and plants an elbow on the table.":"A man with forearms like hams plants an elbow on the table.","“Arm-wrestle? Five coppers says you can't hold me for a count of three.”"],[
@@ -11742,8 +11742,13 @@ function makeDummy(){
 const RENOWN=['Stranger','Wanderer','Known Face','Respected','Local Hero','Legend of the Valley'];
 let lastRenown=-1;
 function renownDone(){ try{ return JOURNAL.filter(([t,f])=>{ if(t==='The Fallen Oak') return false; const r=f(); return r && r[0]==='done'; }).length; }catch(e){ return 0; } }
-function renownRank(){ return Math.min(RENOWN.length-1, Math.floor(renownDone()/3)); }
-function refreshPlayerHp(full){ const rk=renownRank(); if(lastRenown>=0 && rk>lastRenown && running) logMsg('Renown: you are now "'+RENOWN[rk]+'" in the valley. (+4 max HP)','#e8c060'); lastRenown=rk;
+const RENOWN_AT=[0,4,10,18,28,40];                   // quests done for each rank: the later ones take real work
+const RENOWN_PERK=['','+4 max health','+8 max health · traders sell to you 10% cheaper','+12 max health · traders pay you a third more for your goods','+16 max health · a free bed at the Wheatsheaf','+20 max health · traders sell to you 20% cheaper · the valley’s thanks'];
+function renownRank(){ const n=renownDone(); let r=0; RENOWN_AT.forEach((a,k)=>{ if(n>=a) r=k; }); return r; }
+const RENOWN_OFF=()=>{ const r=renownRank(); return r>=5?0.8:r>=2?0.9:1; };      // what fame knocks off a price
+const sellRate=()=> SELL_RATE*(renownRank()>=3?4/3:1);
+function refreshPlayerHp(full){ const rk=renownRank(); if(lastRenown>=0 && rk>lastRenown && running){ logMsg('Renown: you are now "'+RENOWN[rk]+'" in the valley. '+RENOWN_PERK[rk]+'.','#e8c060'); banner(RENOWN[rk],'#e8c060',2200);
+    if(rk>=5 && !CHOICE.legendGift){ CHOICE.legendGift=true; player.purse+=200; logMsg('Elder Hamond sends a purse from the whole valley: 2 silver, and a note that just says “Thank you.”','#e8c060'); } } lastRenown=rk;
   player.maxHp=maxHpOf(player.opts?player.opts.equip:defaultEquip(),PARRY.hpBase)+rk*4+(CHOICE.moonBless?10:0)+(CHOICE.bless||0)*5+(bathBuffOn()?10:0);   // +10 fresh from a bath (counted before clamping, or the buff's top 10 HP never refill)
   if(full||player.hp==null) player.hp=player.maxHp; player.hp=Math.min(player.hp,player.maxHp);
   if(CHOICE.bruised) player.hp=Math.min(player.hp,hpCap()); }
@@ -16374,7 +16379,7 @@ function activeEffects(){ const L=[], hrs=t=>Math.max(0,(t-dayClock)/DAY_LEN*24)
   if(bathBuffOn()){ const h=hrs(CHOICE.bathBuff); L.push({ico:'≈',name:'Refreshed',kind:'Bath',rows:[['Max health','+10'],['Time left',h>=1?Math.round(h)+' h':'under an hour']],short:h>=1?Math.round(h)+'h':'<1h',tip:'A hot bath and clean clothes. You feel ready for anything.'}); }
   if(CHOICE.moonBless) L.push({ico:'☾',name:'Moonlit Blessing',kind:'Blessing',rows:[['Max health','+10']],tip:'You sent the moonlight walking to the altar of the Drowned Shrine. It stays with you.'});
   if(CHOICE.bless) L.push({ico:'✝',name:"Mother Hild's Blessing",kind:'Blessing · rank '+CHOICE.bless,rows:[['Max health','+'+CHOICE.bless*5]],short:'×'+CHOICE.bless,tip:'Bought at the chapel, one candle at a time. Lasting.'});
-  const rk=renownRank(); if(rk>0) L.push({ico:'★',name:'Renown',kind:RENOWN[rk],rows:[['Max health','+'+rk*4]],tip:'What the valley thinks of you. It grows as you finish quests.'});
+  const rk=renownRank(); if(rk>0) L.push({ico:'★',name:'Renown',kind:RENOWN[rk],rows:[['Max health','+'+rk*4],...(RENOWN_OFF()<1?[['Prices',Math.round((1-RENOWN_OFF())*100)+'% off']]:[]),...(rk>=3?[['Selling','a third more']]:[]),...(rk>=4?[['Inn beds','free']]:[])],tip:'What the valley thinks of you. It grows as you finish quests: the next rank at '+(RENOWN_AT[rk+1]||'—')+'.'});
   const ag=(CHOICE.brannTaught?1:0)+(CHOICE.brannTrap==='done'?1:0); if(ag) L.push({ico:'➶',name:"Brann's Lessons",kind:'Training',rows:[['Agility','+'+ag+' ('+Math.round(ag*AGI_DODGE*100)+'% dodge)']],tip:'What the hunter taught you about moving quietly.'});
   if(CHOICE.temper) L.push({ico:'⚒',name:'Trained at Arms',kind:'Training',rows:[['Attack power','+'+CHOICE.temper+' (+'+CHOICE.temper*3+'% weapon damage)']],tip:'Lasting.'});
   if(CHOICE.attune) L.push({ico:'✧',name:'Attuned',kind:'Training',rows:[['Spell power','+'+CHOICE.attune+' (+'+CHOICE.attune*4+'% spell damage)']],tip:'Lasting.'});

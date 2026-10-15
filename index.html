@@ -17690,21 +17690,28 @@ const VOICE=(()=>{
   const FEM=/female|samantha|victoria|karen|moira|tessa|fiona|zira|susan|hazel|serena|kate|libby|sonia|jenny|aria|emma|amy|joanna|salli|kimberly|ivy|olivia|natasha|clara|maisie|ava|allison|catherine|veena|martha/i;
   const MAL=/\bmale|daniel|alex\b|fred|david|mark|george|rishi|ryan|guy|brian|matthew|joey|justin|thomas|arthur|oliver|aaron|gordon|lee\b|james|william|eric|christopher|roger|tom\b/i;
   const hash=s=>[...s].reduce((a,c)=>(a*31+c.charCodeAt(0))>>>0,7);
-  function pick(g,seed){ if(!voices.length) load(); if(!voices.length) return null;
-    const gb=v=>/en-GB|en_GB/i.test(v.lang)?2:/en-(IE|AU|NZ)/i.test(v.lang)?1:0, good=v=>/natural|neural|online|google|premium|enhanced/i.test(v.name)?2:0;   // old-world accents and the better voices first
-    let pool=voices.filter(v=> g==='f' ? FEM.test(v.name) && !/\bmale/i.test(v.name.replace(/female/i,'')) : g==='m' ? MAL.test(v.name) && !FEM.test(v.name) : true);
+  const CKEY='dunhollow.cast'; let CAST={}; try{ CAST=JSON.parse(localStorage.getItem(CKEY)||'{}')||{}; }catch(e){}
+  function pick(g,seed,key){ if(!voices.length) load(); if(!voices.length) return null;
+    const isF=v=>FEM.test(v.name.replace(/\bmale\b/i,'')) && !/\bmale\b/i.test(v.name), isM=v=>MAL.test(v.name) && !FEM.test(v.name);
+    let pool=voices.filter(v=> g==='f' ? isF(v) : g==='m' ? isM(v) : !isF(v) && !isM(v));
+    if(!pool.length && g) pool=voices.filter(v=>!(g==='f'?isM(v):isF(v)));                // nothing tagged that way: anything not plainly the other
     if(!pool.length) pool=voices;
-    pool=pool.slice().sort((a,b)=>(gb(b)+good(b))-(gb(a)+good(a)));
-    const best=pool.filter(v=>gb(v)+good(v)===gb(pool[0])+good(pool[0])); const pool2=best.length>1?best:pool.slice(0,Math.min(3,pool.length));
-    return pool2[seed%pool2.length]; }
-  function who(name){ const n=(typeof NPCS!=='undefined' && NPCS.find(x=>x.name===name || (x.name && name && name.startsWith(x.name.split(',')[0])))) || null;
-    const o=n&&n.opts||{}; let g=o.gender||null;
+    const good=v=>/natural|neural|online|google|premium|enhanced/i.test(v.name), best=pool.filter(good);
+    if(best.length>=3) pool=best;                                                        // enough good voices to go round: only those
+    pool=pool.slice().sort((a,b)=>a.name<b.name?-1:1);
+    if(key==null) return pool[seed%pool.length];
+    const had=CAST[key] && pool.find(v=>v.name===CAST[key]); if(had) return had;          // they keep the voice they were given
+    const used={}; Object.values(CAST).forEach(n=>{ used[n]=(used[n]||0)+1; });
+    const least=Math.min(...pool.map(v=>used[v.name]||0)), free=pool.filter(v=>(used[v.name]||0)===least), v=free[seed%free.length];   // the least-used voice that fits
+    CAST[key]=v.name; try{ localStorage.setItem(CKEY,JSON.stringify(CAST)); }catch(e){} return v; }
+  function who(name,opts){ const n=opts?null:(typeof NPCS!=='undefined' && NPCS.find(x=>x.name===name || (x.name && name && name.startsWith(x.name.split(',')[0])))) || null;
+    const o=opts||n&&n.opts||{}; let g=o.gender||null;
     if(!g){ if(/\b(Old )?(Wenna|Bertha|Morwen|Vesna|Marta|Ada|Yselde|Nimuë|Ithilwen|Nelloth|Tessaly|Saelle|Maelis|Aerwen|Lady|Mother|Sister|Dalla|Mara|Hag|Witch|Widow)\b/i.test(name)) g='f';
       else if(/\b(Gunnar|Tobb|Orvell|Brann|Oswin|Corwin|Hamond|Edric|Gerd|Calandor|Tirnel|Faelan|Baron|Brother|Father|Magister|Sir|Lord|Captain|Warden|Craban|Alaric|Ruvin|Pim|Pip|Gerrit|Aldo|Tomas|Hobb|Venn|Orrin|Corran|Ithrel)\b/i.test(name)) g='m'; }
     const h=hash(name||'?'), elf=o.race==='elf' || /Ithil|Nell|Aerwen|Calandor|Tirnel|Faelan|Maelis|Nimuë|Ithrel|Warden/.test(name||''), old=/\bOld\b|Elder|Morwen|Wenna|Tobb|Orvell|Hag|Grandm/i.test(name||''), gob=/goblin|Gratis|Gob/i.test(name||'');
-    let pitch=(g==='f'?1.05:0.9)+((h%7)-3)*0.035, rate=1.02+((h>>3)%5-2)*0.03;
+    let pitch=(g==='f'?1.05:0.9)+(((h>>7)%9)-4)*0.045, rate=1.02+((h>>3)%5-2)*0.035;
     if(elf){ pitch+=0.08; rate-=0.06; } if(old){ pitch-=0.12; rate-=0.08; } if(gob){ pitch+=0.45; rate+=0.12; }
-    return {voice:pick(g,h), pitch:Math.max(0.3,Math.min(1.9,pitch)), rate:Math.max(0.6,Math.min(1.4,rate))}; }
+    return {voice:pick(g,h,(name||'?').split(/,| the | of /)[0]), pitch:Math.max(0.3,Math.min(1.9,pitch)), rate:Math.max(0.6,Math.min(1.4,rate))}; }
   const clean=t=>String(t).replace(/<br\s*\/?>/gi,' ').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();
   function parts(text){ const out=[]; [].concat(text).map(clean).forEach(p=>{ const re=/“([^”]*)”|"([^"]*)"/g; let last=0, m;
       while((m=re.exec(p))){ const before=p.slice(last,m.index).trim(); if(before) out.push(['n',before]); out.push(['s',(m[1]??m[2]).trim()]); last=re.lastIndex; }
@@ -17718,6 +17725,20 @@ const VOICE=(()=>{
     // no quotes at all in 'speech' mode: someone talking plainly (“Farewell”-style lines without marks) still gets a voice if it reads like speech
     if(!any && mode==='speech'){ const p=parts(text); if(p.length===1 && !/^(You|Your|The|A |An |She|He|They|It|Through|Across|Somewhere|For a)/.test(p[0][1])) utter(p[0][1],v); } }
   function stop(){ try{ if(S) S.cancel(); }catch(e){} }
+  // speech bubbles: a cutscene line cuts in (it is timed); anything else waits its turn, and chatter far away is not heard
+  let seen=new WeakSet(), lastG=null, lastP=null, lastCs=null, chatT=0;
+  const say1=(text,v,cut)=>{ const t=clean(text).replace(/[“”"]/g,'').trim(); if(!t || !/[a-z]/i.test(t) || /^(Grr+|Hm+|\.+)!?$/i.test(t)) return; if(cut) S.cancel(); else if(S.speaking || S.pending) return; utter(t,v); };
+  const youV=()=>who(player.name||'you', player.opts||{});
+  setInterval(()=>{ if(!S || mode==='off' || typeof NPCS==='undefined' || document.hidden) return;
+    try{
+      const cs=CS.say; if(cs && cs!==lastCs){ lastCs=cs; const e=cs.ent; say1(cs.text, e===player ? youV() : who(e&&e.name||'', e&&e.opts), true); } else if(!cs) lastCs=null;
+      if(typeof GSAY!=='undefined' && GSAY && GSAY!==lastG){ lastG=GSAY; say1(GSAY.text,{voice:pick(null,5), pitch:0.55, rate:0.78}, true); }       // the dead speak low and slow
+      if(typeof PSAY!=='undefined' && PSAY && PSAY!==lastP){ lastP=PSAY; say1(PSAY.text,youV(),false); }
+      chatT=Math.max(0,chatT-0.1);
+      NPCS.forEach(n=>{ const b=n.bark; if(!b || seen.has(b)) return; seen.add(b);
+        const d=Math.hypot((n.x??n.i+0.5)-player.x,(n.y??n.j+0.5)-player.y);
+        if(CS.on ? d<14 : (d<5 && chatT<=0 && !dlgOverlay.classList.contains('open'))){ say1(b.text,who(n.name,n.opts),CS.on); if(!CS.on) chatT=5; } });
+    }catch(e){} },100);
   function setMode(m){ mode=MODES.includes(m)?m:'off'; try{ localStorage.setItem(KEY,mode); }catch(e){} if(mode==='off') stop(); const b=document.getElementById('voice-toggle'); if(b) b.textContent=LABEL[mode]; }
   return { get mode(){ return mode; }, read, stop, setMode, cycle(){ setMode(MODES[(MODES.indexOf(mode)+1)%MODES.length]); if(mode!=='off'){ S && S.cancel(); read('Old Tobb','“Can you hear me? Good. Now go and do something useful.”'); } }, supported:!!S, _parts:parts, _who:who };
 })();

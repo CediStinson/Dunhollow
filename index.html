@@ -5260,7 +5260,7 @@ function breakObject(o){
   const idx=OBJECTS.indexOf(o); if(idx<0) return;
   if(player.inv.indexOf(null)<0){ floatText([o.i,o.j],'Inventory is full','#e0b070'); logMsg('Inventory is full.','#e0b070'); return; }   // leave it shut until there is room
   OBJECTS.splice(idx,1); blocked.delete(o.i+','+o.j);
-  const key=areaId+':'+o.i+','+o.j; destroyedBreakables.add(key); OPENED_KIND[key]=o.type;
+  const key=areaId+':'+o.i+','+o.j; destroyedBreakables.add(key); OPENED_KIND[key]=o.type;  try{ SND.open(o.type); }catch(e){}
   OBJECTS.push({type:'opened', kind:OPENED_KIND[key], i:o.i, j:o.j}); blocked.add(o.i+','+o.j);   // it stays where it stood, lid off
   if(Math.random()<0.15){
     const id=FARM_LOOT[Math.floor(Math.random()*FARM_LOOT.length)];
@@ -11361,7 +11361,7 @@ const NAMED_BARKS={
   venn:()=>["Luck's a lady!","Two dice, high roll wins!"],
 };
 function cityBarks(dt){
-  NPCS.forEach(n=>{ if(n.bark){ n.bark.t+=dt; if(n.bark.t>4) n.bark=null; } });
+  NPCS.forEach(n=>{ if(n.bark){ n.bark.t+=dt; if(typeof VOICE!=='undefined' && VOICE.holds(n.bark)) n.bark.t=Math.min(n.bark.t,3); if(n.bark.t>4) n.bark=null; } });
   if(!AREAS[areaId] || combat.active) return; const TH=AREAS[areaId].theme; if(!['city','village','elf'].includes(TH) && !['wheatsheaf','inn','steamcellar','moonbath','dicenden'].includes(areaId)) return;
   barkT-=dt; if(barkT>0) return; barkT=3.5+Math.random()*3;
   const near=NPCS.filter(n=>(n.wander||NAMED_BARKS[n.id]) && Math.hypot((n.x??n.i)-player.x,(n.y??n.j)-player.y)<9); if(!near.length) return;
@@ -12180,7 +12180,7 @@ function hurtPlayer(n,label){
   else {
     if(n>0 && f && hasStatus(f,'weak')) n=Math.max(1,Math.ceil(n*0.5));  // a withered foe hits soft
     if(combat.practice) n=0;
-    player.hp-=n; player.flash=0.45; shake=Math.max(shake,n?7:3); SND.hurt(f&&f.type==='wolf');
+    player.hp-=n; player.flash=0.45; shake=Math.max(shake,n?7:3); SND.hurt(f&&f.type==='wolf'); if(n>0) SND.pain(player,player.hp<=0);
     duel.st='hit'; duel.t=PARRY.hitStun;
     floatText(tileOf(player),n?'-'+n:'Hit','#ff7a6a',true);
     if(label) floatText([player.i,player.j-0.001],label,'#f0c0a0');
@@ -12237,6 +12237,7 @@ function wound(f,n,label,col){                       // a blow lands on a foe
   else if(f && f.type==='barrowking' && (f.cphase||1)<3){ const th=ckTh(f), pre=f.hp; f.hp+=1000; woundRaw(f,n,label,col); const dealt=pre+1000-f.hp; f.hp=Math.max(th,pre-dealt); }   // his phases end at fixed thresholds, however hard the blow
   else woundRaw(f,n,label,col);
   if(f && !f.warded && HIT_SRC==='melee') SND.hit(n);
+  if(f && !f.warded && n>0 && f.hp>0 && f.type!=='dummy') SND.pain(f);           // they feel it
   if(f!==player && HIT_SRC==='melee' && W.wither && n>0 && !f.dead && f.hp>0){ const sp=1+gearSum('magic')*0.04;     // the Drowned Blade: wither and drain, stronger with spell power
     if(Math.random()<W.wither*sp) addStatus(f,'weak',Math.round(3*sp*10)/10,0);
     if(Math.random()<W.drain*sp){ const h=Math.min(Math.round(3*sp),player.maxHp-player.hp); if(h>0){ player.hp+=h; floatText(tileOf(player),'+'+h,'#8ae07a'); updateHud(); } } }
@@ -12294,7 +12295,7 @@ function meleeHit(){
     if(f.hp>0){ f.guardDir=GUARD_AFTER[f.guardDir]; }   // he shifts his guard after being tagged
   }
 }
-function foeDown(f){ SND.fall();
+function foeDown(f){ SND.fall(); if(f && f.type!=='dummy') SND.pain(f,true);
   try{ const b=typeof beastOf==='function' && beastOf(f); if(b && !combat.practice){ const e=BEST()[b.k]=BEST()[b.k]||{met:1,kills:0}; e.kills=(e.kills||0)+1; } }catch(e){}   // one more for the bestiary
   if(f.type==='dummy'){
     f.hp=f.maxHp; f.state='guard'; banner('Well fought!','#8ab0d8',1200);
@@ -14433,11 +14434,12 @@ function drawCsSpeech(){ if(typeof drawGraveSpeech==='function'){ drawGraveSpeec
   const S=CS.say; if(!CS.on || !S) return;
   const e=S.ent, q=P(e.x??e.i+0.5, e.y??e.j+0.5); speechBubble(q.x,q.y-124,S.text,Math.min(1,S.t*5)); }
 function csEnd(){ CS.say=null; CS.on=false; CS.focus=null; csUI(false); const f=CS.onEnd; CS.onEnd=null; if(f) try{ f(); }catch(e){} const q=CS.queued; CS.queued=[]; q.forEach(a=>showDialog(...a)); }
-function csSkip(){ if(!CS.on) return; for(let k=CS.k;k<CS.steps.length;k++){ const s=CS.steps[k]; if(!s._s && s.start) s.start(); s._s=1; if(s.skip) s.skip(); else if(s.end) s.end(); } CS.k=CS.steps.length; csEnd(); }
+function csSkip(){ if(!CS.on) return; try{ VOICE.stop(); }catch(e){} for(let k=CS.k;k<CS.steps.length;k++){ const s=CS.steps[k]; if(!s._s && s.start) s.start(); s._s=1; if(s.skip) s.skip(); else if(s.end) s.end(); } CS.k=CS.steps.length; csEnd(); }
 function csTick(dt){ if(!CS.on) return; const s=CS.steps[CS.k]; if(!s){ csEnd(); return; }
   if(!s._s){ s._s=1; if(s.start) s.start(); } CS.t+=dt; if(CS.say) CS.say.t+=dt; if(s.tick) s.tick(dt,CS.t);
   if(CS.focus){ const f=CS.focus, fx=f.x??f.i+0.5, fy=f.y??f.j+0.5, tx=-(fx-fy)*TW/2, ty=gc.height/2-ORIGIN_Y-(fx+fy)*TH/2-40, r=Math.min(1,dt*2.6); cam.x+=(tx-cam.x)*r; cam.y+=(ty-cam.y)*r; }
   if(s.until && CS.t>10){ if(s.skip) s.skip(); else if(s.end) s.end(); CS.k++; CS.t=0; return; }     // never get stuck
+  if(!s.until && CS.t>=(s.dur||0) && CS.t<(s.dur||0)+8 && typeof VOICE!=='undefined' && VOICE.busy()) return;   // a line still being read aloud: let it finish
   if(s.until ? s.until() : CS.t>=(s.dur||0)){ if(s.end) s.end(); CS.k++; CS.t=0; } }
 window.addEventListener('keydown',e=>{ if(!CS.on) return; if(e.key==='Escape'||e.key===' '||e.key==='Enter') csSkip(); e.stopImmediatePropagation(); e.preventDefault(); },true);
 const csWait=d=>({dur:d});
@@ -17652,10 +17654,84 @@ const SND=(()=>{
   function drip(){ const f=R(1100,1900); tone('sine',f,f*1.9,0.07,0.04,amb,{a:0.002}); tone('sine',f*1.5,f*2.4,0.05,0.012,amb,{at:0.32,a:0.002}); }
   function crackle(s){ const n=Math.floor(R(1,4)); for(let q=0;q<n;q++) noise(R(0.006,0.02),R(0.03,0.09)*s,'highpass',R(1500,3500),R(1500,3500),0,amb,{at:R(0,0.25),a:0.001}); }
   function lap(){ noise(R(0.25,0.5),0.025,'bandpass',R(500,800),R(300,500),1.2,amb,{a:0.08}); }
+  // ── steps, doors, coins, things picked up: watched from outside, so nothing else needs to call in ──
+  function surface(x,y){ const A=AREAS[areaId]||{}, id=areaId||'';
+    if(typeof poolDepth==='function' && poolDepth(x,y)>0.05) return 'water';
+    if(/cave|crypt|barrow|warren|tunnel|vault|mine|pit/.test(id)) return 'stone';
+    if(A.theme==='interior' || A.inside) return /cellar|bath/.test(id) ? 'stone' : 'wood';
+    if(A.theme==='city') return 'stone'; if(A.theme==='ash') return 'cinder'; if(A.theme==='bog'||A.theme==='fen') return 'mud';
+    try{ const gd=groundAt(x,y); if(gd.path>0.5) return 'dirt'; if(gd.mud>0.5) return 'mud'; }catch(e){}
+    return 'grass'; }
+  function step(kind,v){ v=v||1; const p=R(0.9,1.1);
+    if(kind==='grass'){ noise(0.09,0.09*v,'bandpass',1400*p,900*p,0.8,sfx,{a:0.012}); noise(0.05,0.05*v,'highpass',4000,4000,0,sfx,{a:0.005,at:0.01}); }
+    else if(kind==='dirt'){ noise(0.06,0.13*v,'bandpass',1100*p,700*p,1.1,sfx,{a:0.004}); for(let q=0;q<3;q++) noise(0.008,0.06*v,'highpass',R(2500,4500),R(2500,4500),0,sfx,{a:0.001,at:R(0,0.04)}); }
+    else if(kind==='wood'){ tone('sine',130*p,85*p,0.08,0.16*v); noise(0.05,0.08*v,'bandpass',500*p,350*p,1.5,sfx,{a:0.002}); }
+    else if(kind==='stone'){ noise(0.035,0.12*v,'highpass',2200*p,1800*p,0,sfx,{a:0.001}); tone('sine',95*p,70*p,0.05,0.08*v); }
+    else if(kind==='mud'){ noise(0.16,0.12*v,'lowpass',700*p,300*p,0,sfx,{a:0.03}); tone('sine',95*p,55*p,0.12,0.05*v,sfx,{at:0.04}); }
+    else if(kind==='water'){ noise(0.22,0.14*v,'bandpass',1100*p,450*p,1,sfx,{a:0.01}); noise(0.1,0.05*v,'highpass',3000,3000,0,sfx,{a:0.005,at:0.05}); }
+    else if(kind==='cinder'){ for(let q=0;q<4;q++) noise(0.01,0.09*v,'bandpass',R(1500,3500),R(1500,3500),2,sfx,{a:0.001,at:R(0,0.05)}); } }
+  function door(){ const t0=0; tone('sawtooth',170,235,0.35,0.03,sfx,{lp:900,a:0.05}); tone('sine',95,48,0.18,0.25,sfx,{at:0.33}); noise(0.08,0.12,'lowpass',700,300,0,sfx,{a:0.003,at:0.33}); }
+  function coins(up){ const n=up?4:3; for(let q=0;q<n;q++){ const f=R(2600,4300)*(up?1:0.85); tone('sine',f,f*0.99,0.18,0.05,sfx,{at:q*R(0.04,0.07),a:0.002}); tone('sine',f*1.5,f*1.5,0.1,0.02,sfx,{at:q*0.05+0.005,a:0.002}); } }
+  function open(kind){ const chest=/chest/.test(kind||''), barrel=/barrel/.test(kind||'');
+    if(chest){ tone('sine',2200,2100,0.05,0.05,sfx,{a:0.001}); tone('sawtooth',140,200,0.45,0.03,sfx,{lp:700,a:0.06,at:0.06}); tone('sine',80,45,0.2,0.22,sfx,{at:0.5}); }   // the latch, the slow lid, the thump
+    else if(barrel){ tone('sine',150,90,0.12,0.09); noise(0.12,0.12,'bandpass',600,400,1.2,sfx,{a:0.003}); tone('sine',110,70,0.15,0.06,sfx,{at:0.12}); }                    // the hoop knocks, the lid comes off
+    else { for(let q=0;q<5;q++) noise(R(0.01,0.03),R(0.08,0.16),'bandpass',R(700,1600),R(500,1200),2,sfx,{a:0.001,at:q*R(0.03,0.06)}); tone('sine',120,70,0.12,0.18,sfx,{at:0.05}); }   // a crate: slats crack and give
+    noise(0.15,0.05,'highpass',2500,2500,0,sfx,{a:0.03,at:0.2}); }
+  const MAT=id=>{ id=id||''; return /plate|mail|helm|kettle|gauntlet|bevor|bascinet|coif|greave|shield|sallet|obsidian|brightmail|blackmail|cuirass/.test(id) ? 'metal'
+    : /sword|blade|dagger|axe|mace|spear|morningstar|hatchet|longsword|pitchfork|shovel|spade/.test(id) ? 'blade' : /staff|club|wand/.test(id) ? 'wood'
+    : /amulet|necklace|ring|torc|locket|focus|circlet|brooch|fang/.test(id) ? 'trinket' : /leather|boots|studded|belt|glove|bracer|jerkin|riding/.test(id) ? 'leather' : 'cloth'; };
+  function gear(id,off){ const m=MAT(id), k=off?0.85:1;
+    if(m==='metal'){ for(let q=0;q<4;q++){ const f=R(1800,3200)*k; tone('sine',f,f,0.12,0.04,sfx,{at:q*R(0.03,0.07),a:0.002}); } noise(0.18,0.08,'highpass',3000,3000,0,sfx,{a:0.02}); }
+    else if(m==='blade'){ noise(0.32,0.3,'bandpass',3200*k,5200*k,3,sfx,{a:0.04}); tone('sine',2900*k,2900*k,0.25,0.04,sfx,{at:0.3}); }      // into (or out of) the sheath
+    else if(m==='wood'){ tone('sine',220*k,140*k,0.08,0.18); noise(0.05,0.06,'bandpass',800,600,1,sfx,{a:0.002}); }
+    else if(m==='trinket'){ [0,0.07].forEach(d=>{ const f=R(3500,5200)*k; tone('sine',f,f,0.22,0.08,sfx,{at:d,a:0.002}); }); }
+    else if(m==='leather'){ tone('sawtooth',260*k,190*k,0.16,0.06,sfx,{lp:900,a:0.03}); noise(0.14,0.15,'bandpass',900,600,1.5,sfx,{a:0.03}); }
+    else { noise(0.28,0.18,'bandpass',2200*k,1400*k,0.7,sfx,{a:0.06}); noise(0.2,0.08,'highpass',5000,5000,0,sfx,{a:0.05,at:0.08}); } }   // cloth: a soft rustle
+  // a grunt, a cry, a groan: a buzzing voice through two mouth-shapes, so it sounds like a throat and not a whistle
+  function voiceOf(e){ if(!e) return {kind:'m',f:120}; const o=e.opts||{}, t=e.type||'', nm=e.name||'';
+    if(t==='wolf' || /wolf|hound|greymaw/i.test(nm)) return {kind:'wolf'};
+    if(/skelet|risen|bones|wight|barrow-?king|dead\b/i.test(nm) || t==='skeleton' || t==='barrowking') return {kind:'bone'};
+    if(/ember|wisp|sprite|shade|spirit/i.test(nm) || t==='ember') return {kind:'hiss'};
+    if(/goblin/i.test(nm) || t==='goblin') return {kind:'m', f:260};
+    const f0=o.gender==='f' ? 210 : 115, h=[...nm].reduce((a,c)=>a+c.charCodeAt(0),0);
+    return {kind:o.gender==='f'?'f':'m', f:f0*(0.9+(h%7)*0.03)}; }
+  function pain(e,dying){ const V=voiceOf(e), t=ctx.currentTime;
+    if(V.kind==='wolf'){ tone('sine',dying?900:1300,dying?300:600,dying?0.7:0.22,0.1,sfx,{a:0.01}); tone('sine',dying?1350:1950,dying?450:900,dying?0.7:0.22,0.03,sfx,{a:0.01}); return; }   // a yelp, or a long whine
+    if(V.kind==='bone'){ for(let q=0;q<(dying?9:4);q++) noise(0.015,0.35,'bandpass',R(1400,2800),R(1400,2800),3,sfx,{a:0.001,at:q*R(0.03,0.07)}); return; }
+    if(V.kind==='hiss'){ noise(dying?0.8:0.3,0.12,'highpass',3000,dying?1200:2200,0,sfx,{a:0.02}); return; }
+    const dur=dying?R(0.7,1.0):R(0.16,0.3), f=V.f*R(0.92,1.1), vow=[[650,1100],[750,1250],[560,950],[500,1500]][Math.floor(R(0,4))];   // uh, ah, oh, eh
+    const o=ctx.createOscillator(), gn=ctx.createGain(), out=ctx.createGain(); o.type='sawtooth';
+    o.frequency.setValueAtTime(f*(dying?1.15:1.25),t); o.frequency.exponentialRampToValueAtTime(f*(dying?0.7:0.85),t+dur);   // the voice falls as the breath goes
+    const vib=ctx.createOscillator(), vg=ctx.createGain(); vib.frequency.value=dying?5:9; vg.gain.value=f*0.03; vib.connect(vg); vg.connect(o.frequency);
+    const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=V.kind==='f'?3200:2400; o.connect(lp);
+    vow.forEach((F,q)=>{ const b=ctx.createBiquadFilter(); b.type='bandpass'; b.frequency.value=F*(V.kind==='f'?1.15:1); b.Q.value=q?9:6; lp.connect(b); const bg=ctx.createGain(); bg.gain.value=q?0.5:1; b.connect(bg); bg.connect(gn); });
+    gn.connect(out); out.connect(sfx); out.gain.value=dying?1.5:1.6;
+    gn.gain.setValueAtTime(0.0001,t); gn.gain.exponentialRampToValueAtTime(0.5,t+0.02); gn.gain.setValueAtTime(0.5,t+dur*0.35); gn.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.start(t); vib.start(t); o.stop(t+dur+0.05); vib.stop(t+dur+0.05);
+    noise(dur*0.8,0.03,'bandpass',1800,900,0.8,sfx,{a:0.01}); }                     // and the breath behind it
+  function pickup(){ noise(0.08,0.16,'bandpass',1800,1200,1,sfx,{a:0.01}); tone('sine',620,940,0.1,0.12,sfx,{at:0.03}); }
+  const W={x:null,y:null,acc:0,area:null,purse:null,inv:null,npc:new WeakMap()};
+  setInterval(()=>{ if(!live() || typeof player==='undefined' || !player || typeof areaId==='undefined') return;
+    try{
+      if(W.area!==areaId){ if(W.area && ((AREAS[W.area]||{}).inside || (AREAS[areaId]||{}).inside || /cellar|crypt|barrow|cave/.test(W.area+areaId))) door(); W.area=areaId; W.x=null; }
+      const fight=typeof combat!=='undefined' && combat.active;
+      if(W.x!=null && !fight && !(typeof CS!=='undefined' && CS.on && !player.moving)){ const d=Math.hypot(player.x-W.x,player.y-W.y); if(d<1.5){ W.acc+=d; if(W.acc>=0.62){ W.acc=0; step(surface(player.x,player.y)); } } }
+      W.x=player.x; W.y=player.y;
+      if(!fight && typeof NPCS!=='undefined') NPCS.forEach(n=>{ if(!n.moving) return; const nx=n.x??n.i+0.5, ny=n.y??n.j+0.5, dd=Math.hypot(nx-player.x,ny-player.y); if(dd>5) return;   // folk walking close by, softer with distance
+        const L0=W.npc.get(n)||{x:nx,y:ny,acc:0}; L0.acc+=Math.min(1.5,Math.hypot(nx-L0.x,ny-L0.y)); L0.x=nx; L0.y=ny; if(L0.acc>=0.7){ L0.acc=0; step(surface(nx,ny),0.45*(1-dd/6)); } W.npc.set(n,L0); });
+      const pu=player.purse; if(W.purse!=null && pu!==W.purse) coins(pu>W.purse); W.purse=pu;
+      const E=(player.opts&&player.opts.equip)||{}, eq=JSON.stringify(E); let geared=false;
+      if(W.eq!=null && eq!==W.eq && W.area===areaId){ const was=JSON.parse(W.eq), ch=Object.keys(E).filter(k=>E[k]!==was[k]);    // one sound for whatever changed first (stripping for a bath is one rustle, not nine)
+        if(ch.length){ const k=ch[0]; gear(E[k]||was[k], !E[k]); geared=true; } }
+      W.eq=eq;
+      const iv=(player.inv||[]).filter(Boolean).length; if(W.inv!=null && iv>W.inv && !geared) pickup(); W.inv=iv;
+    }catch(e){} },50);
   // ── the fight ──
   const heavy=w=>/axe|mace|morningstar|club|hammer|longsword|spade|shovel/.test(w||'');
   return {
     get on(){ return on; }, get vol(){ return vol; }, setOn, setVol, toggle(){ setOn(!on); },
+    open(kind){ if(live()) open(kind); },
+    pain(e,dying){ if(live()) pain(e,dying); },
     level(){ if(!ctx) return 0; if(!L.an){ L.an=ctx.createAnalyser(); L.an.fftSize=2048; master.connect(L.an); } const d=new Float32Array(2048); L.an.getFloatTimeDomainData(d); let pk=0; d.forEach(x=>{ pk=Math.max(pk,Math.abs(x)); }); return pk; },   // the loudest sample right now, for checking
     swing(w){ if(!live()) return; const h=heavy(w); noise(h?0.24:0.16,h?0.55:0.45,'bandpass',h?500:900,h?1500:2800,1.1,sfx,{a:0.03}); },
     hit(n){ if(!live()) return; const s=Math.min(1,0.45+(n||5)/20); tone('sine',140,48,0.16,0.35*s); noise(0.08,0.25*s,'lowpass',1400,500,0,sfx,{a:0.002}); },
@@ -17709,7 +17785,7 @@ const VOICE=(()=>{
     if(!g){ if(/\b(Old )?(Wenna|Bertha|Morwen|Vesna|Marta|Ada|Yselde|Nimuë|Ithilwen|Nelloth|Tessaly|Saelle|Maelis|Aerwen|Lady|Mother|Sister|Dalla|Mara|Hag|Witch|Widow)\b/i.test(name)) g='f';
       else if(/\b(Gunnar|Tobb|Orvell|Brann|Oswin|Corwin|Hamond|Edric|Gerd|Calandor|Tirnel|Faelan|Baron|Brother|Father|Magister|Sir|Lord|Captain|Warden|Craban|Alaric|Ruvin|Pim|Pip|Gerrit|Aldo|Tomas|Hobb|Venn|Orrin|Corran|Ithrel)\b/i.test(name)) g='m'; }
     const h=hash(name||'?'), elf=o.race==='elf' || /Ithil|Nell|Aerwen|Calandor|Tirnel|Faelan|Maelis|Nimuë|Ithrel|Warden/.test(name||''), old=/\bOld\b|Elder|Morwen|Wenna|Tobb|Orvell|Hag|Grandm/i.test(name||''), gob=/goblin|Gratis|Gob/i.test(name||'');
-    let pitch=(g==='f'?1.05:0.9)+(((h>>7)%9)-4)*0.045, rate=1.02+((h>>3)%5-2)*0.035;
+    let pitch=(g==='f'?1.05:0.9)+(((h>>7)%9)-4)*0.045, rate=1.1+((h>>3)%5-2)*0.035;
     if(elf){ pitch+=0.08; rate-=0.06; } if(old){ pitch-=0.12; rate-=0.08; } if(gob){ pitch+=0.45; rate+=0.12; }
     return {voice:pick(g,h,(name||'?').split(/,| the | of /)[0]), pitch:Math.max(0.3,Math.min(1.9,pitch)), rate:Math.max(0.6,Math.min(1.4,rate))}; }
   const clean=t=>String(t).replace(/<br\s*\/?>/gi,' ').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();
@@ -17717,30 +17793,31 @@ const VOICE=(()=>{
       while((m=re.exec(p))){ const before=p.slice(last,m.index).trim(); if(before) out.push(['n',before]); out.push(['s',(m[1]??m[2]).trim()]); last=re.lastIndex; }
       const rest=p.slice(last).trim(); if(rest) out.push([out.length||!/[“"]/.test(p)?'n':'s',rest]); });
     return out.filter(([k,t])=>t && /[a-z0-9]/i.test(t)); }
-  function utter(text,v){ const u=new SpeechSynthesisUtterance(text); if(v.voice) u.voice=v.voice; u.lang=(v.voice&&v.voice.lang)||'en-GB'; u.pitch=v.pitch; u.rate=v.rate; u.volume=1; S.speak(u); }
-  const NARR={pitch:0.92, rate:0.98};
+  function utter(text,v){ const u=new SpeechSynthesisUtterance(text); if(v.voice) u.voice=v.voice; u.lang=(v.voice&&v.voice.lang)||'en-GB'; u.pitch=v.pitch; u.rate=v.rate; u.volume=1; S.speak(u); return u; }
+  const NARR={pitch:0.95, rate:1.22};                    // the narrator keeps a brisk pace
   function read(name,text){ if(!S || mode==='off') return; S.cancel();
     const v=who(name), nv={...NARR, voice:pick(null,11)}; let any=false;
     parts(text).forEach(([k,t])=>{ if(k==='s'){ utter(t,v); any=true; } else if(mode==='all'){ utter(t,nv); any=true; } });
     // no quotes at all in 'speech' mode: someone talking plainly (“Farewell”-style lines without marks) still gets a voice if it reads like speech
     if(!any && mode==='speech'){ const p=parts(text); if(p.length===1 && !/^(You|Your|The|A |An |She|He|They|It|Through|Across|Somewhere|For a)/.test(p[0][1])) utter(p[0][1],v); } }
-  function stop(){ try{ if(S) S.cancel(); }catch(e){} }
+  function stop(){ held=null; try{ if(S) S.cancel(); }catch(e){} }
   // speech bubbles: a cutscene line cuts in (it is timed); anything else waits its turn, and chatter far away is not heard
   let seen=new WeakSet(), lastG=null, lastP=null, lastCs=null, chatT=0;
-  const say1=(text,v,cut)=>{ const t=clean(text).replace(/[“”"]/g,'').trim(); if(!t || !/[a-z]/i.test(t) || /^(Grr+|Hm+|\.+)!?$/i.test(t)) return; if(cut) S.cancel(); else if(S.speaking || S.pending) return; utter(t,v); };
+  let held=null;                                            // the bubble being spoken: it stays up, and a cutscene waits for it
+  const say1=(text,v,cut,obj)=>{ const t=clean(text).replace(/[“”"]/g,'').trim(); if(!t || !/[a-z]/i.test(t) || /^(Grr+|Hm+|\.+)!?$/i.test(t)) return; if(cut) S.cancel(); else if(S.speaking || S.pending) return; const u=utter(t,v); if(u && obj){ held=obj; u.onend=u.onerror=()=>{ if(held===obj) held=null; }; } };
   const youV=()=>who(player.name||'you', player.opts||{});
   setInterval(()=>{ if(!S || mode==='off' || typeof NPCS==='undefined' || document.hidden) return;
     try{
-      const cs=CS.say; if(cs && cs!==lastCs){ lastCs=cs; const e=cs.ent; say1(cs.text, e===player ? youV() : who(e&&e.name||'', e&&e.opts), true); } else if(!cs) lastCs=null;
-      if(typeof GSAY!=='undefined' && GSAY && GSAY!==lastG){ lastG=GSAY; say1(GSAY.text,{voice:pick(null,5), pitch:0.55, rate:0.78}, true); }       // the dead speak low and slow
+      const cs=CS.say; if(cs && cs!==lastCs){ lastCs=cs; const e=cs.ent; say1(cs.text, e===player ? youV() : who(e&&e.name||'', e&&e.opts), true, cs); } else if(!cs) lastCs=null;
+      if(typeof GSAY!=='undefined' && GSAY && GSAY!==lastG){ lastG=GSAY; say1(GSAY.text,{voice:pick(null,5), pitch:0.55, rate:0.78}, true, GSAY); }       // the dead speak low and slow
       if(typeof PSAY!=='undefined' && PSAY && PSAY!==lastP){ lastP=PSAY; say1(PSAY.text,youV(),false); }
       chatT=Math.max(0,chatT-0.1);
       NPCS.forEach(n=>{ const b=n.bark; if(!b || seen.has(b)) return; seen.add(b);
         const d=Math.hypot((n.x??n.i+0.5)-player.x,(n.y??n.j+0.5)-player.y);
-        if(CS.on ? d<14 : (d<5 && chatT<=0 && !dlgOverlay.classList.contains('open'))){ say1(b.text,who(n.name,n.opts),CS.on); if(!CS.on) chatT=5; } });
+        if(CS.on ? d<14 : (d<5 && chatT<=0 && !dlgOverlay.classList.contains('open'))){ say1(b.text,who(n.name,n.opts),CS.on,b); if(!CS.on) chatT=5; } });
     }catch(e){} },100);
   function setMode(m){ mode=MODES.includes(m)?m:'off'; try{ localStorage.setItem(KEY,mode); }catch(e){} if(mode==='off') stop(); const b=document.getElementById('voice-toggle'); if(b) b.textContent=LABEL[mode]; }
-  return { get mode(){ return mode; }, read, stop, setMode, cycle(){ setMode(MODES[(MODES.indexOf(mode)+1)%MODES.length]); if(mode!=='off'){ S && S.cancel(); read('Old Tobb','“Can you hear me? Good. Now go and do something useful.”'); } }, supported:!!S, _parts:parts, _who:who };
+  return { holds(o){ return !!o && held===o && mode!=='off' && S && S.speaking; }, busy(){ return !!held && mode!=='off' && S && S.speaking; }, get mode(){ return mode; }, read, stop, setMode, cycle(){ setMode(MODES[(MODES.indexOf(mode)+1)%MODES.length]); if(mode!=='off'){ S && S.cancel(); read('Old Tobb','“Can you hear me? Good. Now go and do something useful.”'); } }, supported:!!S, _parts:parts, _who:who };
 })();
 { const b=document.getElementById('voice-toggle'); if(b){ if(!VOICE.supported){ b.style.display='none'; } else { b.textContent={off:'Voices: Off',speech:'Voices: Speech only',all:'Voices: Everything'}[VOICE.mode]; b.addEventListener('click',()=>VOICE.cycle()); } } }
 </script>

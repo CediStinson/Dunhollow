@@ -17959,6 +17959,8 @@ const SND=(()=>{
 const VOICE=(()=>{
   const KEY='dunhollow.voices', EKEY='dunhollow.voiceEngine', S=window.speechSynthesis, MODES=['off','speech','all'], LABEL={off:'Voices: Off', speech:'Voices: Speech only', all:'Voices: Everything'};
   let mode='off', engine='browser'; try{ const m=localStorage.getItem(KEY); if(MODES.includes(m)) mode=m; if(localStorage.getItem(EKEY)==='online') engine='online'; }catch(e){}
+  try{ if(localStorage.getItem(EKEY)==='ai'){ localStorage.setItem(EKEY,'browser'); localStorage.removeItem('dunhollow.castAI'); }   // the old in-browser AI voices are gone:
+    if(window.caches) ['kokoro-voices','transformers-cache'].forEach(n=>caches.delete(n).catch(()=>{})); }catch(e){}                // free the space their download took
   let voices=[]; const load=()=>{ try{ voices=S.getVoices().filter(v=>/^en/i.test(v.lang)); }catch(e){} }; if(S){ load(); S.onvoiceschanged=load; }
   const FEM=/female|samantha|victoria|karen|moira|tessa|fiona|zira|susan|hazel|serena|kate|libby|sonia|jenny|aria|emma|amy|joanna|salli|kimberly|ivy|olivia|natasha|clara|maisie|ava|allison|catherine|veena|martha/i;
   const MAL=/\bmale|daniel|alex\b|fred|david|mark|george|rishi|ryan|guy|brian|matthew|joey|justin|thomas|arthur|oliver|aaron|gordon|lee\b|james|william|eric|christopher|roger|tom\b/i;
@@ -18012,7 +18014,9 @@ const VOICE=(()=>{
   // one queue for both engines: a line is a list of [text, voice] pieces, spoken one after another; stop() drops it all
   let gen=0, busyNow=false, curAudio=null;
   function playUrl(a,v){ return new Promise(res=>{ curAudio=a; a.playbackRate=v.speed||1; a.volume=typeof SND!=='undefined' ? Math.min(1,0.45+SND.vol*0.8) : 1;
-      a.onended=()=>res(true); a.onerror=()=>res(false); const p=a.play(); if(p && p.catch) p.catch(()=>res(false)); }); }
+      let done=false; const fin=ok=>{ if(done) return; done=true; clearTimeout(wait); res(ok); };
+      const wait=setTimeout(()=>{ if(!a.currentTime){ try{ a.pause(); }catch(e){} fin(false); } },2500);      // not playing after 2.5 s: the browser's voice reads it instead
+      a.onended=()=>fin(true); a.onerror=()=>fin(false); const p=a.play(); if(p && p.catch) p.catch(()=>fin(false)); }); }
   function sysSay(t,v){ return new Promise(res=>{ if(!S) return res(); const u=new SpeechSynthesisUtterance(t); if(v.voice) u.voice=v.voice; u.lang=(v.voice&&v.voice.lang)||'en-GB'; u.pitch=v.pitch; u.rate=v.rate; u.volume=1; u.onend=u.onerror=()=>res(); S.speak(u); }); }
   async function run(list,onEnd){ const my=++gen; busyNow=true;
     try{

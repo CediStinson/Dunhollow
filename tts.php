@@ -1,11 +1,14 @@
 <?php
-// Dunhollow voices: speaks a line once through OpenAI's text-to-speech, keeps the MP3, and serves the
-// kept file to every later player. Upload next to index.html, with tts-config.php (see tts-config.sample.php).
+// Dunhollow voices: serves a recorded MP3 for each line, the same file to every player.
+// Free mode (no API key): a line nobody has recorded yet goes on a waiting list (tts-cache/_queue.jsonl); you record
+//   the list on your own computer with voicegen.js (Kokoro, free) and upload the clips. Until then the game uses the
+//   browser's voices for that line.
+// Paid mode (an OpenAI key in tts-config.php): a new line is spoken at once, then kept.
 // The game asks:  tts.php?v=<voice>&s=<style>&t=<text>
 declare(strict_types=1);
 
-$cfg = @include __DIR__ . '/tts-config.php';
-if (!is_array($cfg) || empty($cfg['api_key'])) { http_response_code(503); exit('not configured'); }
+$cfg = @include __DIR__ . '/tts-config.php'; if (!is_array($cfg)) $cfg = [];
+$KEYED = !empty($cfg['api_key']) && strpos($cfg['api_key'], 'PUT-YOUR') === false;
 $CACHE  = rtrim($cfg['cache_dir'] ?? (__DIR__ . '/tts-cache'), '/');
 $DAILY  = (int)($cfg['daily_chars'] ?? 60000);      // new characters per day, for everyone together: the budget cap
 $PER_IP = (int)($cfg['ip_lines_per_hour'] ?? 120);  // new lines per visitor per hour
@@ -32,7 +35,7 @@ if (!in_array($voice, $VOICES, true) || !isset($STYLES[$style])) { http_response
 $len = mb_strlen($text);
 if ($len < 1 || $len > 600 || !preg_match('/\p{L}/u', $text)) { http_response_code(400); exit('bad text'); }
 
-$key  = sha1($MODEL . '|' . $voice . '|' . $style . '|' . $text);
+$key  = sha1('dunhollow1|' . $voice . '|' . $style . '|' . $text);   // the same name whoever recorded it (voicegen.js uses this too)
 $dir  = $CACHE . '/' . substr($key, 0, 2);
 $file = $dir . '/' . $key . '.mp3';
 
@@ -57,6 +60,13 @@ $over = $g['chars'] + $len > $DAILY || ($g['ips'][$ip] ?? 0) >= $PER_IP;
 if (!$over) { $g['chars'] += $len; $g['ips'][$ip] = ($g['ips'][$ip] ?? 0) + 1; }
 ftruncate($fh, 0); rewind($fh); fwrite($fh, json_encode($g)); flock($fh, LOCK_UN); fclose($fh);
 if ($over) { http_response_code(429); exit('budget'); }             // the game falls back to the browser's own voices
+
+if (!$KEYED) {                                                     // free mode: put it on the list for voicegen.js, once
+  $mark = $CACHE . '/_queued/' . $key;
+  if (!is_file($mark)) { @mkdir($CACHE . '/_queued', 0755, true); @touch($mark);
+    file_put_contents($CACHE . '/_queue.jsonl', json_encode(['k' => $key, 'v' => $voice, 's' => $style, 't' => $text], JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND | LOCK_EX); }
+  http_response_code(404); exit('not recorded yet');
+}
 
 $ch = curl_init($API);
 curl_setopt_array($ch, [

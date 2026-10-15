@@ -1,10 +1,11 @@
 <?php
-// Copy this file to tts-config.php (same folder as tts.php) and put your OpenAI API key in it.
-// Get a key at https://platform.openai.com/api-keys (and add a few dollars of credit under Billing).
-// Keep tts-config.php private: never post it anywhere. tts.php reads it on the server; players never see it.
+// OPTIONAL. Without this file the voices are free: lines go on a waiting list (tts-cache/_queue.jsonl) that you
+// record on your own computer with voicegen.js and upload (see voicegen.js for the steps).
+//
+// With an OpenAI key here, new lines are spoken at once instead (paid, a few dollars for the whole game, once).
+// Copy this file to tts-config.php next to tts.php. Keep it private; players never see it.
 return [
-  'api_key'           => 'sk-PUT-YOUR-KEY-HERE',
-  'daily_chars'       => 60000,   // most new text spoken per day, all players together (~$1 at most); spoken lines are free forever after
+  'api_key'           => 'sk-PUT-YOUR-KEY-HERE',   // leave as is for the free way
+  'daily_chars'       => 60000,   // most new text per day, all players together (caps the bill, and the waiting list)
   'ip_lines_per_hour' => 120,     // most new lines one visitor can cause per hour
-  // 'cache_dir'      => __DIR__ . '/tts-cache',   // where the MP3s are kept (made automatically)
 ];

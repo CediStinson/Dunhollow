@@ -455,6 +455,7 @@ html,body{touch-action:none;overscroll-behavior:none;-webkit-tap-highlight-color
         </div>
         <canvas id="creator-canvas" width="440" height="560" style="width:220px;height:280px"></canvas>
       </div>
+      <button type="button" class="load-btn" id="creator-random" style="margin-top:8px;padding:8px 12px;color:#e8c878;border-color:#6a4a18" title="Keeps your gender and race, picks everything else">🎲 Randomize Look</button>
     </div>
     <div class="options-panel">
       <div class="opt-col">
@@ -4526,7 +4527,19 @@ function buildCreatorUI(){
   if(rotCw) rotCw.addEventListener('click',()=>{ creatorDir=(creatorDir+1)%8; drawCreator(); });
 
   document.getElementById('start-btn').addEventListener('click', startGame);
+  const rnd=document.getElementById('creator-random'); if(rnd) rnd.addEventListener('click',randomizeLook);
 }
+// a whole new face and head for the gender and race you have picked
+function randomizeLook(){ const R=n=>Math.floor(Math.random()*n), elf=charOpts.race==='elf', male=charOpts.gender!=='f';
+  const skins=SKINS.map((c,i)=>c&&i<20?i:-1).filter(i=>i>=0); charOpts.skin=skins[R(skins.length)];   // the creator's own tones, never the goblin greens
+  charOpts.eyeColor=R(EYE_COLORS.length); charOpts.hairColor=R(HAIR_COLORS.length);
+  charOpts.face=R(FACES[male?'m':'f'].length); charOpts.hair=R(8);
+  if(male && !elf){ const b=[0,0,2,3,4,4,5,5]; charOpts.beard=b[R(b.length)]; charOpts.stubble=Math.random()<0.3; } else { charOpts.beard=0; charOpts.stubble=false; }
+  const M=charOpts.marks={};
+  MARKS.forEach(([k,,isElf,val])=>{ if(isElf && !elf) return; const p=k==='eyePatch'?0.04:isElf?0.25:k==='earrings'?0.2:0.08; if(Math.random()>=p) return;   // a few details, seldom a crowd of them
+    if(val===undefined) M[k]=true; else if(STACK_MARKS.has(k)){ const L=marksOf(M,k); if(!L.includes(val)) M[k]=[...L,val]; } else if(!M[k]) M[k]=val; });
+  [['skin-swatches',skins.indexOf(charOpts.skin)],['eye-colors',charOpts.eyeColor],['hair-colors',charOpts.hairColor]].forEach(([id,v])=>document.querySelectorAll('#'+id+' .swatch').forEach((x,k)=>x.classList.toggle('active',k===v)));
+  creatorClothed=true; refreshCreator(); }
 
 // ════════════════════════════════════════════════════════════
 //  GAME
@@ -6128,16 +6141,16 @@ function drawFaceExtras(c,x,B,opts,P,pr,LN,skin){ const Y=BODY, M=opts.marks, F=
       else if(k===1){ c.moveTo(x+rx-0.8*k0,B+ry-1.2); c.lineTo(x+rx+0.8*k0,B+ry+0.2); }
       else { c.moveTo(x+rx,B+ry-0.2); c.lineTo(x+rx-0.8*k0,B+ry+1.0); c.moveTo(x+rx,B+ry-0.2); c.lineTo(x+rx+0.8*k0,B+ry+1.0); } c.stroke(); }); } }
   c.restore(); c.save(); c.lineCap='round';                   // piercings and the eye patch sit on the face, not clipped to it
-  const metal='#d8d4c8', metalD='#7a7468';
+  const metal='#f0c040', metalD='#6a4a10';                  // gold: it shows on every skin
   if(M.browRing){ const sd=sdOf(false); if(sd!=null){ const e=eyeAt(sd), bx=e.cx+(pr>0.3?0.3:sd)*e.w*0.32, by=Y.BROW-1.3;   // two beads through the outer end of the right brow
-    c.strokeStyle=metalD; c.lineWidth=0.35; c.beginPath(); c.moveTo(x+bx,B+by-1.1); c.lineTo(x+bx+0.2,B+by+1.1); c.stroke();
-    [[0,-1.2],[0.2,1.2]].forEach(([dx,dy])=>{ c.fillStyle=metal; c.beginPath(); c.arc(x+bx+dx,B+by+dy,0.5,0,Math.PI*2); c.fill(); }); } }
+    c.strokeStyle=metal; c.lineWidth=0.35; c.beginPath(); c.moveTo(x+bx,B+by-1.1); c.lineTo(x+bx+0.2,B+by+1.1); c.stroke();
+    [[0,-1.2],[0.2,1.2]].forEach(([dx,dy])=>{ c.fillStyle=metalD; c.beginPath(); c.arc(x+bx+dx,B+by+dy,0.72,0,Math.PI*2); c.fill(); c.fillStyle=metal; c.beginPath(); c.arc(x+bx+dx,B+by+dy,0.52,0,Math.PI*2); c.fill(); }); } }
   const NR=markVal(M,'noseRing');
   if(NR && pr<=0.8){ const ny=Y.NOSE+(F?1.5:3.0), nx=fo+(pr>0.3?0.6:0);
-    c.strokeStyle=metal; c.lineWidth=0.4;
-    if(NR===2){ c.beginPath(); c.arc(x+nx,B+ny+0.6,0.9,0.1,Math.PI-0.1); c.stroke(); }                                   // septum ring
-    else { const sd=sdOf(true); if(sd!=null){ const rx=nx+sd*(F?0.8:1.7)*(1-pr*0.5); c.beginPath(); c.arc(x+rx,B+ny+0.2,0.85,-0.6,Math.PI+0.2); c.stroke(); } } }   // a hoop in the left nostril
-  else if(NR && pr>0.8 && (NR===2 || CUR_FLIP)){ c.strokeStyle=metal; c.lineWidth=0.4; c.beginPath(); c.arc(x+LN+HW+(F?-0.1:0.1),B+Y.NOSE+(F?1.6:2.1),0.6,-0.3,Math.PI+0.3); c.stroke(); }   // under the tip of the nose
+    const ring=(fn)=>{ c.strokeStyle=metalD; c.lineWidth=0.75; fn(); c.stroke(); c.strokeStyle=metal; c.lineWidth=0.45; fn(); c.stroke(); };   // a dark edge, then the gold
+    if(NR===2) ring(()=>{ c.beginPath(); c.arc(x+nx,B+ny+0.6,0.9,0.1,Math.PI-0.1); });                                   // septum ring
+    else { const sd=sdOf(true); if(sd!=null){ const rx=nx+sd*(F?0.8:1.7)*(1-pr*0.5); ring(()=>{ c.beginPath(); c.arc(x+rx,B+ny+0.2,0.85,-0.6,Math.PI+0.2); }); } } }   // a hoop in the left nostril
+  else if(NR && pr>0.8 && (NR===2 || CUR_FLIP)){ [[metalD,0.75],[metal,0.45]].forEach(([col,w])=>{ c.strokeStyle=col; c.lineWidth=w; c.beginPath(); c.arc(x+LN+HW+(F?-0.1:0.1),B+Y.NOSE+(F?1.6:2.1),0.6,-0.3,Math.PI+0.3); c.stroke(); }); }   // under the tip of the nose
   if(M.eyePatch){ const sd=sdOf(true);                                           // a leather patch over the left eye, its cord round the head
     c.strokeStyle='#241810'; c.lineWidth=0.6;
     if(sd!=null){ const e=eyeAt(sd), rx=e.w/2+1.1, ry=Y.EYE_H/2+1.6, py=cy+0.3, cl=[e.cx-rx*0.8,py-ry*0.6], cr=[e.cx+rx*0.8,py-ry*0.6];

@@ -149,7 +149,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0e0b06;color:#e8d5a
 .p-btn canvas{width:44px;height:44px;}
 .p-btn b{font-size:15px;letter-spacing:1px;}
 .p-btn small{font-size:10px;color:#8a6a34;}
-.p-btn.atk:hover{border-color:#c0483a;} .p-btn.par:hover{border-color:#4a86c8;}
+.p-btn.atk:hover{border-color:#c0483a;} .p-btn.par:hover{border-color:#4a86c8;} .p-btn.tech{border-color:#8a6a20;} .p-btn.tech b{color:#f0c060;} .p-btn.tech:hover{border-color:#e0b040;}
 .p-btn.flash{transform:translateY(2px) scale(0.97);background:rgba(60,40,12,0.95);}
 .p-btn.busy{opacity:0.5;}
 #p-rule{text-align:center;font-size:11px;color:#c8a860;margin-top:7px;text-shadow:0 1px 2px #000;}
@@ -518,6 +518,7 @@ html,body{touch-action:none;overscroll-behavior:none;-webkit-tap-highlight-color
     <div class="p-row">
       <button class="p-btn atk" id="p-atk"><canvas width="44" height="44"></canvas><b>Attack</b><small id="p-atk-lbl">left click</small></button>
       <button class="p-btn par" id="p-par"><canvas width="44" height="44"></canvas><b>Parry</b><small id="p-par-lbl">right click</small></button>
+      <button class="p-btn tech" id="p-tech" style="display:none"><b>Technique</b><small>Q</small></button>
     </div>
     <div id="p-rule">Hold a direction · Attack the side he is not guarding · Parry the side he swings from</div>
     <div id="p-shield-note" style="display:none;text-align:center;font-size:10px;color:#8ab0d8;margin-top:3px;">Shield equipped: wider timing on both block and perfect</div>
@@ -12095,7 +12096,7 @@ function thugTalk(m){
 }
 function startCombat(target){
   if(CS.on) return;                                     // never during a cutscene
-  SND.engage();
+  SND.engage(); player.mom=20; duel.ripUntil=0; duel.tech=null;
   player.st=(player.st||[]).filter(s=>s.kind==='bleed');   // only bleeding carries over from the last fight
   setTimeout(()=>{ try{ refreshFoodBar(); }catch(e){} },0);
   const practice = !!target && target.type==='dummy';
@@ -12168,7 +12169,7 @@ function hurtPlayer(n,label){
   else {
     if(n>0 && f && hasStatus(f,'weak')) n=Math.max(1,Math.ceil(n*0.5));  // a withered foe hits soft
     if(combat.practice) n=0;
-    player.hp-=n; player.flash=0.45; shake=Math.max(shake,n?7:3); SND.hurt(f&&f.type==='wolf'); if(n>0) SND.pain(player,player.hp<=0);
+    player.hp-=n; player.flash=0.45; shake=Math.max(shake,n?7:3); if(n>0) momGain(-10); duel.ripUntil=0; SND.hurt(f&&f.type==='wolf'); if(n>0) SND.pain(player,player.hp<=0);
     duel.st='hit'; duel.t=PARRY.hitStun;
     floatText(tileOf(player),n?'-'+n:'Hit','#ff7a6a',true);
     if(label) floatText([player.i,player.j-0.001],label,'#f0c0a0');
@@ -12192,15 +12193,16 @@ function impact(f){                                   // a foe's swing lands (or
   if(sideOk && since<=perfectFor(player)){
     f.state='stagger'; f.t=foeDef(f).stagger;
     slowmo.scale=0.25; slowmo.t=0.22; shake=Math.max(shake,5);
-    floatText(tileOf(player),'PERFECT!','#ffffff',true); SND.perfect();
+    floatText(tileOf(player),'PERFECT!','#ffffff',true); SND.perfect(); momGain(30);
     if(typeof manaGain==='function' && isMagicWeapon()) manaGain(15);
     burst(player,f,'#fff4c0',16);
     logMsg(`Perfect parry! ${shortName(f)} staggers.`,'#f0c060');
     if(!f.quick) f.k++;
+    if(duel.ripUntil>clock && !f.dead) riposteCounter(f);
   } else {
     const fdmg=weaponOf(f).dmg;
     if(sideOk && since<=windowFor(player)){
-      const note=timingNote(since); floatText(tileOf(player),'Blocked'+(note?' · '+note:''),'#a8c8f0'); burst(player,f,'#c8d8f0',7); SND.clang(1);
+      const note=timingNote(since); floatText(tileOf(player),'Blocked'+(note?' · '+note:''),'#a8c8f0'); burst(player,f,'#c8d8f0',7); SND.clang(1); momGain(15);
     } else if(duel.st==='parry'){
       hurtPlayer(fdmg, 'Wrong side!');
     } else {
@@ -12208,6 +12210,7 @@ function impact(f){                                   // a foe's swing lands (or
     }
     f.state='recover'; f.t=f.quick?0.5:s.after;
     if(!f.quick) f.k++;
+    if(sideOk && since<=windowFor(player) && duel.ripUntil>clock && !f.dead) riposteCounter(f);
     if(player.hp<=0) defeat();
   }
   const hurt=player.hp<hp0 && player.hp>0;
@@ -12224,7 +12227,7 @@ function wound(f,n,label,col){                       // a blow lands on a foe
   if(f && f.warded){ floatText(tileOf(f),'Warded','#c8e0f0'); SND.clang(0.6); }
   else if(f && f.type==='barrowking' && (f.cphase||1)<3){ const th=ckTh(f), pre=f.hp; f.hp+=1000; woundRaw(f,n,label,col); const dealt=pre+1000-f.hp; f.hp=Math.max(th,pre-dealt); }   // his phases end at fixed thresholds, however hard the blow
   else woundRaw(f,n,label,col);
-  if(f && !f.warded && HIT_SRC==='melee') SND.hit(n);
+  if(f && !f.warded && HIT_SRC==='melee'){ SND.hit(n); if(n>0) momGain(10); }
   if(f && !f.warded && n>0 && f.hp>0 && f.type!=='dummy') SND.pain(f);           // they feel it
   if(f!==player && HIT_SRC==='melee' && W.wither && n>0 && !f.dead && f.hp>0){ const sp=1+gearSum('magic')*0.04;     // the Drowned Blade: wither and drain, stronger with spell power
     if(Math.random()<W.wither*sp) addStatus(f,'weak',Math.round(3*sp*10)/10,0);
@@ -12260,6 +12263,7 @@ function playerHit(){                                // your attack lands: a spe
 }
 function strike(){ HIT_SRC='melee'; try{ if(!castSpell()){ const f=combat.foe, h0=f?f.hp:0; meleeHit(); if(f && isMagicWeapon() && f.hp<h0 && typeof manaGain==='function') manaGain(5); } } finally{ HIT_SRC=null; } }   // a staff blow gives a little breath back
 function meleeHit(){
+  if(duel.tech){ const T=duel.tech; duel.tech=null; return techHit(T,combat.foe); }      // a technique, not a plain swing
   const f=combat.foe; lunge(player,f); duel.caught=false; SND.swing(player.opts.equip.weapon);
   const dmg=weaponOf(player).dmg;
   if(f.state==='recover' || f.state==='stagger'){ wound(f,dmg); return; }
@@ -13082,6 +13086,8 @@ function drawActorFigure(e){ drawActorBase(e);         // then status pips over 
       else if(st.kind==='burn'){ g.moveTo(x,y-3.6); g.quadraticCurveTo(x+3.4,y,x+1.4,y+3); g.lineTo(x-1.4,y+3); g.quadraticCurveTo(x-3.4,y,x,y-3.6); }
       else { for(let a=0;a<6;a++){ const an=a*Math.PI/3; g.moveTo(x,y); g.lineTo(x+Math.cos(an)*3.4,y+Math.sin(an)*3.4); } g.strokeStyle=D.col; g.lineWidth=1.1; g.stroke(); }
       g.fill(); }); }
+    if(e===player && combat.active && !isMagicWeapon() && anyTech()){ const mw=40, y=ty+32, r=Math.max(0,(player.mom||0)/100);          // momentum, for a blade
+      g.fillStyle='rgba(20,14,4,0.85)'; g.fillRect(s.x-mw/2,y,mw,4); g.fillStyle=duel.ripUntil>clock?'#fff0b0':'#e0b040'; g.fillRect(s.x-mw/2,y,mw*r,4); g.strokeStyle='rgba(0,0,0,0.6)'; g.strokeRect(s.x-mw/2+0.5,y+0.5,mw-1,3); }
     if(e===player && combat.active && isMagicWeapon()){ const mw=40, y=ty+32, r=Math.max(0,(player.mana??100)/100);          // the mana bar, under the health bar
       g.fillStyle='rgba(10,8,20,0.85)'; g.fillRect(s.x-mw/2,y,mw,4); g.fillStyle='#6a78e8'; g.fillRect(s.x-mw/2,y,mw*r,4); g.strokeStyle='rgba(0,0,0,0.6)'; g.strokeRect(s.x-mw/2+0.5,y+0.5,mw-1,3);
       const S=!SPELL_KNOWN() ? {name:'Staff strike', cost:0} : {...spellsFor()[playerGuard], cost:spellCost(spellsFor()[playerGuard]||{cost:0})}; if(S && combat.phase==='fight'){ g.font='600 9px "Segoe UI", system-ui, sans-serif'; g.textAlign='center'; g.textAlign='left'; g.fillStyle='rgba(12,8,3,0.8)'; const lbl=S.name+(player.mana<S.cost?' (no mana)':''), lw=g.measureText(lbl).width; g.fillRect(s.x+mw/2+3,y-3,lw+6,11); g.fillStyle=S.col; g.fillText(lbl,s.x+mw/2+6,y+5); } }
@@ -17569,6 +17575,60 @@ window.addEventListener('keydown',e=>{ if(!(e.key==='b'||e.key==='B') || !runnin
   const place=()=>{ try{ const cs=getComputedStyle(jb), r=jb.getBoundingClientRect(); ['background','backgroundImage','border','borderRadius','color','fontSize','fontFamily','padding','boxShadow','cursor'].forEach(k=>sb.style[k]=cs[k]);
       sb.style.position='absolute'; sb.style.top=cs.top; sb.style.right=(innerWidth-r.left+8)+'px'; sb.style.zIndex=cs.zIndex; sb.style.display=(running && bookSchools().length)?'block':'none'; }catch(e){} };
   setInterval(place,1000); addEventListener('resize',place); sb.addEventListener('click',e=>{ e.stopPropagation(); bookPanel.style.display==='block'?closeBook():openBook(); }); }
+// ════════ SWORD TECHNIQUES: momentum from good fighting, spent on three moves taught by three people ════════
+// left: Lunge (Brann) · up: Shield Bash (Oswin) · right: Riposte (Harl). Like spells, the guard you hold picks the move. Q or the Technique button.
+const TECHS={ left:{id:'lunge', name:'Lunge', cost:40, who:'Brann the Hunter', how:'A long thrust that goes through a guard and cuts a swing short.'},
+  up:{id:'bash', name:'Shield Bash', cost:50, who:'Oswin the Armourer', how:'Your shield in his face: he staggers, wide open. Needs a shield.'},
+  right:{id:'riposte', name:'Riposte', cost:30, who:'Harl the Watchman', how:'A stance: block his next blow and strike back at once, hard.'} };
+const techKnown=id=>!!(CHOICE.tech||{})[id];
+const anyTech=()=>Object.values(TECHS).some(T=>techKnown(T.id));
+const meleeHeld=()=>!isMagicWeapon();
+function momGain(n){ if(!meleeHeld() || !anyTech()) return; const m0=player.mom||0; player.mom=Math.max(0,Math.min(100,m0+n)); }
+function learnTech(id){ CHOICE.tech={...(CHOICE.tech||{}), [id]:true}; const T=Object.values(TECHS).find(x=>x.id===id);
+  logMsg('You learned '+T.name+'. In a fight with a blade, hold that side and press Q (or the Technique button). Blocks, parries and clean hits build momentum.','#f0c060'); banner(T.name,'#f0c060',1800);
+  try{ SND.fx('quest'); }catch(e){} updateHud(); try{ autosaveSoon(400); }catch(e){} }
+function doTech(){ if(!inFight() || duel.st!=='ready' || !meleeHeld()) return;
+  const T=TECHS[playerGuard]||TECHS.left, f=combat.foe; if(!f) return;
+  if(!techKnown(T.id)){ floatText(tileOf(player),anyTech()?'Not learned':'No technique','#a09080'); return; }
+  if(T.id==='bash' && !/shield/.test(player.opts.equip.offhand||'')){ floatText(tileOf(player),'Needs a shield','#a09080'); return; }
+  if((player.mom||0)<T.cost){ floatText(tileOf(player),'Not enough momentum','#d8b060'); return; }
+  player.mom-=T.cost; pressFx('p-tech');
+  if(T.id==='riposte'){ duel.ripUntil=clock+1.4; floatText(tileOf(player),'Riposte stance','#ffe0a0'); duel.st='parryRecover'; duel.t=0.12; return; }   // you settle; the counter comes when you block
+  duel.tech=T.id; duel.st='attack'; duel.atkWind=T.id==='lunge'?0.14:0.2; duel.t=duel.atkWind; }
+function techHit(id,f){ const dmg=weaponOf(player).dmg; lunge(player,f); duel.caught=false; SND.swing(player.opts.equip.weapon);
+  if(id==='lunge'){ if(f.state==='windup'){ f.state='stagger'; f.t=PARRY.interruptStun; }
+    wound(f,Math.round(dmg*1.4),'Lunge!','#ffd070'); shake=Math.max(shake,4); return; }
+  if(id==='bash'){ SND.clang(1.3); f.state='stagger'; f.t=foeDef(f).stagger*(f.boss||f.type==='barrowking'?0.5:0.9); shake=Math.max(shake,7); burst(f,player,'#d8c8a0',12);
+    wound(f,Math.max(1,Math.round(dmg*0.5)),'Bash!','#e8d8a0'); } }
+function riposteCounter(f){ duel.ripUntil=0; const dmg=weaponOf(player).dmg; lunge(player,f); SND.swing(player.opts.equip.weapon);
+  const was=HIT_SRC; HIT_SRC='melee'; try{ wound(f,Math.round(dmg*1.6),'Riposte!','#ffe0a0'); } finally{ HIT_SRC=was; }
+  if(!f.dead && f.hp>0){ f.state='stagger'; f.t=Math.max(f.t||0,0.5); } slowmo.scale=0.4; slowmo.t=0.15; }
+window.addEventListener('keydown',e=>{ if((e.key==='q'||e.key==='Q') && !(e.target&&e.target.tagName==='INPUT') && inFight()){ e.preventDefault(); doTech(); } });
+{ const b=document.getElementById('p-tech'); if(b) b.addEventListener('pointerdown',e=>{ e.preventDefault(); doTech(); }); }
+setInterval(()=>{ try{ const b=document.getElementById('p-tech'); if(!b) return; const show=inFight() && meleeHeld() && anyTech(); b.style.display=show?'':'none'; if(!show) return;
+    const T=TECHS[playerGuard]||TECHS.left, ok=techKnown(T.id); b.querySelector('b').textContent=ok?T.name:'Technique'; b.querySelector('small').textContent=ok?T.cost+' · Q':'not learned';
+    b.classList.toggle('busy', duel.st!=='ready' || !ok || (player.mom||0)<T.cost); }catch(e){} },120);
+// ── the teachers ──
+{ const prevBrann=TALKERS.hunter; TALKERS.hunter=()=>{ if(techKnown('lunge') || !(QUEST.wolves>=2)) return prevBrann();
+    const meat=player.inv.filter(x=>x==='raw_meat').length;
+    say('Brann the Hunter',["Brann watches you come up the path the way he watches deer.","“You killed the wolves. Badly. You stand there and trade blows like a man splitting logs. A wolf doesn't. It waits, and then it's at your throat in one motion.”","“Two cuts of raw meat for my dogs, and I'll show you the <b>lunge</b>.”"],[
+      {label:meat>=2?'Give him two cuts of meat.':'(You need two cuts of raw meat.)', off:meat<2, fn:()=>{ for(let k=0;k<2;k++) player.inv[player.inv.indexOf('raw_meat')]=null; updateHud();
+        say('Brann the Hunter',["He sets a hide target on a stump and hands you a stick.","“Weight on the back foot. Wait for his arm to go up. Then everything at once: foot, hip, point.” You try it a dozen times. On the thirteenth the stick goes through the hide.","“That. Through his guard, or into his swing before it lands. It costs you breath, so earn it first: block, parry, hit clean.”"],[{label:'Learn the Lunge.', fn:()=>{ learnTech('lunge'); closeDialog(); }}]); }},
+      {label:'Something else.', fn:prevBrann}, bye]); }; }
+{ const prevSmith=TALKERS.smith; TALKERS.smith=()=>{ if(techKnown('bash')) return prevSmith();
+    const shield=/shield/.test(player.opts.equip.offhand||'') || player.inv.some(x=>x && /shield/.test(x));
+    say('Oswin the Armourer',["Oswin looks up from the anvil.","“Buying, or bleeding? You carry a sword like a farm tool. A shield isn't a door to hide behind, you know. It's a hammer with a handle.”"],[
+      {label:'Trade.', fn:prevSmith},
+      {label:shield?'“Show me.” (40 copper)':'“Show me.” (bring a shield, and 40 copper)', off:!shield||player.purse<40, note:'-40c', fn:()=>{ player.purse-=40; updateHud();
+        say('Oswin the Armourer',["He takes you into the yard behind the smithy, straps a padded post to the wall and stands you in front of it.","“Rim first. Not the face of it, the rim. Step in as he winds up, and put your whole weight behind it.” The post rocks. So does your shoulder.","“Good. He'll stagger, and he'll be wide open. Use it.”"],[{label:'Learn the Shield Bash.', fn:()=>{ learnTech('bash'); closeDialog(); }}]); }},
+      bye]); }; }
+{ const prevHarl=TALKERS.harl_v; TALKERS.harl_v=()=>{ if(techKnown('riposte')) return prevHarl();
+    say('Harl the Watchman',["The old sergeant leans on his spear by the well.","“You paid my lads out of your own purse. I've nothing to pay you back with. Except this: twenty years in the Baron's drill yard.”"],[
+      {label:'“Teach me.”', fn:()=>say('Harl the Watchman',["He hands you a stave and takes one himself. “Swing at me.” You do. He turns it aside, and his stave is at your ribs before yours has stopped moving.","“The <b>riposte</b>. You set yourself, you take his blow on the right side, and you answer in the same breath. Not before. Not after. Again.”","By the end of the hour your ribs ache and you've touched his twice."],[{label:'Learn the Riposte.', fn:()=>{ learnTech('riposte'); closeDialog(); }}])},
+      {label:'Something else.', fn:prevHarl}, bye]); }; }
+JOURNAL.push(["Sword Techniques", ()=>{ const k=Object.values(TECHS).filter(T=>techKnown(T.id)); if(!k.length && !(QUEST.wolves>=2) && CHOICE.unpaid!=='paid') return null;
+  const lines=Object.entries(TECHS).map(([d,T])=>techKnown(T.id)?`<b>${T.name}</b> (hold ${d==='up'?'up':d}, Q): ${T.how} Costs ${T.cost} momentum.`:`${T.name}: ${T.id==='lunge'?(QUEST.wolves>=2?'Brann the Hunter will teach it for two cuts of raw meat.':'Brann the Hunter might teach it once the wolves are dealt with.'):T.id==='bash'?'Oswin the Armourer in Hollowmere teaches it, if you bring a shield.':(CHOICE.unpaid==='paid'?'Harl the Watchman, by the well in Dunhollow, owes you a lesson.':CHOICE.unpaid==='fought'?'The man who could have taught it is dead.':'Someone who served in the Baron’s drill yard would know it.')}`);
+  return [k.length===3?'done':'active', lines.join('<br>')+'<br><i>Momentum (the gold bar) fills when you block, parry and land clean hits, and drains when you are hit.</i>']; }]);
 // ════════ SOUND: all of it made on the spot with Web Audio, nothing to download. Silent until switched on in the Menu ════════
 const SND=(()=>{
   const KEY='dunhollow.sound', VKEY='dunhollow.volume';

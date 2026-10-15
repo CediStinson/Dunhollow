@@ -17958,7 +17958,7 @@ const SND=(()=>{
 // ════════ VOICES: the browser's own speech reads the dialogue aloud, each speaker with a voice of their own. Off by default ════════
 const VOICE=(()=>{
   const KEY='dunhollow.voices', EKEY='dunhollow.voiceEngine', S=window.speechSynthesis, MODES=['off','speech','all'], LABEL={off:'Voices: Off', speech:'Voices: Speech only', all:'Voices: Everything'};
-  let mode='off', engine='browser'; try{ const m=localStorage.getItem(KEY); if(MODES.includes(m)) mode=m; if(localStorage.getItem(EKEY)==='ai') engine='ai'; }catch(e){}
+  let mode='off', engine='browser'; try{ const m=localStorage.getItem(KEY); if(MODES.includes(m)) mode=m; if(localStorage.getItem(EKEY)==='online') engine='online'; }catch(e){}
   let voices=[]; const load=()=>{ try{ voices=S.getVoices().filter(v=>/^en/i.test(v.lang)); }catch(e){} }; if(S){ load(); S.onvoiceschanged=load; }
   const FEM=/female|samantha|victoria|karen|moira|tessa|fiona|zira|susan|hazel|serena|kate|libby|sonia|jenny|aria|emma|amy|joanna|salli|kimberly|ivy|olivia|natasha|clara|maisie|ava|allison|catherine|veena|martha/i;
   const MAL=/\bmale|daniel|alex\b|fred|david|mark|george|rishi|ryan|guy|brian|matthew|joey|justin|thomas|arthur|oliver|aaron|gordon|lee\b|james|william|eric|christopher|roger|tom\b/i;
@@ -17970,7 +17970,7 @@ const VOICE=(()=>{
     const least=Math.min(...pool.map(v=>used[v]||0)), free=pool.filter(v=>(used[v]||0)===least), v=free[seed%free.length];
     store.map[key]=v; try{ localStorage.setItem(store.k,JSON.stringify(store.map)); }catch(e){} return v; };
   const mk=k=>{ let m={}; try{ m=JSON.parse(localStorage.getItem(k)||'{}')||{}; }catch(e){} return {k,map:m}; };
-  const CAST_B=mk('dunhollow.cast'), CAST_AI=mk('dunhollow.castAI');
+  const CAST_B=mk('dunhollow.cast'), CAST_AI=mk('dunhollow.castOnline');
   function pickB(g,seed,key){ if(!voices.length) load(); if(!voices.length) return null;
     const isF=v=>FEM.test(v.name.replace(/\bmale\b/i,'')) && !/\bmale\b/i.test(v.name), isM=v=>MAL.test(v.name) && !FEM.test(v.name);
     let pool=voices.filter(v=> g==='f' ? isF(v) : g==='m' ? isM(v) : !isF(v) && !isM(v));
@@ -17979,13 +17979,12 @@ const VOICE=(()=>{
     const good=v=>/natural|neural|online|google|premium|enhanced/i.test(v.name), best=pool.filter(good);
     if(best.length>=3) pool=best;
     const names=pool.map(v=>v.name).sort(), n=cast(CAST_B,names,seed,key); return pool.find(v=>v.name===n); }
-  // Kokoro's English voices: British first in each list, so they come up first for the valley's folk
-  const AI_F=['bf_emma','bf_isabella','bf_alice','bf_lily','af_heart','af_bella','af_nicole','af_sarah','af_sky','af_nova','af_river','af_kore','af_aoede','af_jessica','af_alloy'];
-  const AI_M=['bm_george','bm_lewis','bm_daniel','bm_fable','am_michael','am_fenrir','am_echo','am_eric','am_liam','am_adam','am_onyx'];   // (not Santa: he only does Christmas)
+  // the online voices (OpenAI): who sounds like whom, and in what manner (the manner is a short instruction kept on the server)
+  const OA_F=['coral','nova','shimmer','sage'], OA_M=['ash','echo','onyx','verse','ballad'];   // fable is the narrator's own
   function who(name,opts){ const n=opts?null:(typeof NPCS!=='undefined' && NPCS.find(x=>x.name===name || (x.name && name && name.startsWith(x.name.split(',')[0])))) || null;
     const o=opts||n&&n.opts||{}; let g=o.gender||null;
     if(!g){ if(/\b(Old )?(Wenna|Bertha|Morwen|Vesna|Marta|Ada|Yselde|Nimuë|Ithilwen|Nelloth|Tessaly|Saelle|Maelis|Aerwen|Lady|Mother|Sister|Dalla|Mara|Hag|Witch|Widow)\b/i.test(name)) g='f';
-      else if(/\b(Gunnar|Tobb|Orvell|Brann|Oswin|Corwin|Hamond|Edric|Gerd|Calandor|Tirnel|Faelan|Baron|Brother|Father|Magister|Sir|Lord|Captain|Warden|Craban|Alaric|Ruvin|Pim|Pip|Gerrit|Aldo|Tomas|Hobb|Venn|Orrin|Corran|Ithrel|Harl|Bruno|Grell)\b/i.test(name)) g='m'; }
+      else if(/\b(Gunnar|Tobb|Orvell|Brann|Oswin|Corwin|Hamond|Edric|Gerd|Calandor|Tirnel|Faelan|Baron|Brother|Father|Magister|Sir|Lord|Captain|Warden|Craban|Alaric|Ruvin|Pim|Pip|Gerrit|Aldo|Tomas|Hobb|Venn|Orrin|Corran|Ithrel|Harl|Bruno|Grell|Gratis|Snagtooth)\b/i.test(name)) g='m'; }
     const h=hash(name||'?'), elf=o.race==='elf' || /Ithil|Nell|Aerwen|Calandor|Tirnel|Faelan|Maelis|Nimuë|Ithrel|Warden/.test(name||''), old=/\bOld\b|Elder|Morwen|Wenna|Tobb|Orvell|Hag|Grandm/i.test(name||''), gob=/goblin|Gratis|Gob/i.test(name||'');
     let pitch=(g==='f'?1.05:0.9)+(((h>>7)%9)-4)*0.045, rate=1.16+((h>>3)%5-2)*0.012;
     if(elf) pitch+=0.08;
@@ -17993,51 +17992,40 @@ const VOICE=(()=>{
     if(gob){ pitch+=0.45; rate+=0.08; }
     const key=(name||'?').split(/,| the | of /)[0];
     return {voice:pickB(g,h,key), pitch:Math.max(0.3,Math.min(1.9,pitch)), rate:Math.max(1.08,Math.min(1.4,rate)),
-      ai: gob ? 'am_puck' : cast(CAST_AI, g==='f'?AI_F:g==='m'?AI_M:[...AI_M,...AI_F], h, key), speed: gob?1.12:old?1.04:1 }; }
+      oa: cast(CAST_AI, g==='f'?OA_F:g==='m'?OA_M:[...OA_M,...OA_F], h, key),
+      st: gob?'goblin' : elf?'elf' : old?'old' : /\b(Baron|Lady|Lord|Sir|Magistrate|Magister|Captain|Warden)\b/.test(name||'')?'noble' : /\b(Saelle|Nim|Dalla|Jory|Mags|Rolf|Sella|Venn|Hal)\b/.test(name||'')?'rogue' : 'villager', speed: gob?1.08:1.04 }; }
   const clean=t=>String(t).replace(/<br\s*\/?>/gi,' ').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();
   function parts(text){ const out=[]; [].concat(text).map(clean).forEach(p=>{ const re=/“([^”]*)”|"([^"]*)"/g; let last=0, m;
       while((m=re.exec(p))){ const before=p.slice(last,m.index).trim(); if(before) out.push(['n',before]); out.push(['s',(m[1]??m[2]).trim()]); last=re.lastIndex; }
       const rest=p.slice(last).trim(); if(rest) out.push([out.length||!/[“"]/.test(p)?'n':'s',rest]); });
     return out.filter(([k,t])=>t && /[a-z0-9]/i.test(t)); }
-  // ── the AI engine: Kokoro, run in the player's own browser; fetched only when it is switched on ──
-  const KOKORO_JS='https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js', KOKORO_MODEL='onnx-community/Kokoro-82M-v1.0-ONNX';
-  const KOKORO_LOCAL='kokoro/';                           // upload the kokoro folder next to index.html to serve the voices yourself (see kokoro/README.txt)
-  const ai={state:'off', tts:null, pct:0, ctx:null, src:null, err:''};
+  // ── the online engine: tts.php on your own server speaks a line once (OpenAI) and keeps it; players fetch small MP3s ──
+  const TTS_URL='tts.php';
+  const ai={state:'off', err:''};
   function status(t){ const el=document.getElementById('voice-status'); if(el) el.textContent=t||''; syncUi(); }
-  async function loadAI(){ if(ai.state==='ready'||ai.state==='loading') return; ai.state='loading'; ai.pct=0; status('Downloading AI voices… (about 115 MB, once)');
-    try{ let M=window.KOKORO_MOCK;
-      if(!M){ try{                                                     // your own web space first: the kokoro/ folder next to this file
-          const base=new URL(KOKORO_LOCAL,location.href).href; M=await import(base+'kokoro.web.js');
-          globalThis.KOKORO_VOICES=base+'voices/'; M.env.wasmPaths=base;
-          const has=await fetch(base+'models/'+KOKORO_MODEL+'/onnx/model_quantized.onnx',{method:'HEAD'}).then(r=>r.ok).catch(()=>false);
-          const T=M.env.transformers; if(has && T){ T.localModelPath=base+'models/'; T.allowLocalModels=true; T.allowRemoteModels=false; }
-        }catch(e){ M=null; console.info('No kokoro/ folder on this server, using the public one.'); } }
-      if(!M) M=await import(KOKORO_JS);
-      const files={};
-      ai.tts=await M.KokoroTTS.from_pretrained(KOKORO_MODEL,{ dtype:'q8', device:'wasm', progress_callback:p=>{ if(ai.state==='loading' && p && p.status==='progress' && p.file){ files[p.file]=[p.loaded||0,p.total||0]; const L=Object.values(files), a=L.reduce((s,x)=>s+x[0],0), b=L.reduce((s,x)=>s+x[1],0); if(b){ ai.pct=Math.round(100*a/b); status('Downloading AI voices… '+ai.pct+'%'); } } } });
-      ai.state='ready'; status('AI voices ready.'); setTimeout(()=>{ if(ai.state==='ready') status(''); },3000);
-    }catch(e){ ai.state='failed'; ai.err=String(e&&e.message||e); status('AI voices could not load here, so the browser’s voices are used.'); console.warn('Kokoro failed',e); } }
+  async function loadAI(){ if(ai.state==='ready'||ai.state==='loading') return; ai.state='loading'; status('Checking the online voices…');
+    try{ const r=await fetch(TTS_URL+'?v=check',{cache:'no-store'});
+      if(r.status===400){ ai.state='ready'; status('Online voices ready.'); setTimeout(()=>{ if(ai.state==='ready') status(''); },2500); }
+      else { ai.state='failed'; status(r.status===503?'Online voices are not set up on this server yet (tts-config.php), so the browser’s voices are used.':'Online voices are not available here, so the browser’s voices are used.'); }
+    }catch(e){ ai.state='failed'; status('Online voices are not available here, so the browser’s voices are used.'); } }
+  const ttsUrl=(t,v)=>TTS_URL+'?v='+encodeURIComponent(v.oa||'fable')+'&s='+encodeURIComponent(v.st||'villager')+'&t='+encodeURIComponent(t);
   // one queue for both engines: a line is a list of [text, voice] pieces, spoken one after another; stop() drops it all
-  let gen=0, busyNow=false, curEnd=null;
-  function playBuf(a){ return new Promise(res=>{ try{ if(!ai.ctx) ai.ctx=new (window.AudioContext||window.webkitAudioContext)(); ai.ctx.resume();
-      const b=ai.ctx.createBuffer(1,a.audio.length,a.sampling_rate); b.copyToChannel(a.audio,0); const s=ai.ctx.createBufferSource(); s.buffer=b;
-      const g=ai.ctx.createGain(); g.gain.value=typeof SND!=='undefined' ? 0.4+SND.vol*0.9 : 1; s.connect(g); g.connect(ai.ctx.destination); s.onended=()=>res(); ai.src=s; s.start(); }catch(e){ res(); } }); }
-  function sysSay(t,v){ return new Promise(res=>{ const u=new SpeechSynthesisUtterance(t); if(v.voice) u.voice=v.voice; u.lang=(v.voice&&v.voice.lang)||'en-GB'; u.pitch=v.pitch; u.rate=v.rate; u.volume=1; u.onend=u.onerror=()=>res(); S.speak(u); }); }
-  const sentences=t=>(t.match(/[^.!?…]+[.!?…]+["”’)]*|[^.!?…]+$/g)||[t]).map(x=>x.trim()).filter(Boolean);
+  let gen=0, busyNow=false, curAudio=null;
+  function playUrl(a,v){ return new Promise(res=>{ curAudio=a; a.playbackRate=v.speed||1; a.volume=typeof SND!=='undefined' ? Math.min(1,0.45+SND.vol*0.8) : 1;
+      a.onended=()=>res(true); a.onerror=()=>res(false); const p=a.play(); if(p && p.catch) p.catch(()=>res(false)); }); }
+  function sysSay(t,v){ return new Promise(res=>{ if(!S) return res(); const u=new SpeechSynthesisUtterance(t); if(v.voice) u.voice=v.voice; u.lang=(v.voice&&v.voice.lang)||'en-GB'; u.pitch=v.pitch; u.rate=v.rate; u.volume=1; u.onend=u.onerror=()=>res(); S.speak(u); }); }
   async function run(list,onEnd){ const my=++gen; busyNow=true;
     try{
-      if(engine==='ai' && ai.state==='ready'){ const jobs=[]; list.forEach(([t,v])=>sentences(t).forEach(s=>jobs.push([s,v])));   // sentence by sentence: the first starts sooner, the next is made while this one plays
-        let next=jobs.length?ai.tts.generate(jobs[0][0],{voice:jobs[0][1].ai||'bm_lewis', speed:jobs[0][1].speed||1}):null;
-        for(let k=0;k<jobs.length;k++){ const a=await next; if(my!==gen) return;
-          next=k+1<jobs.length?ai.tts.generate(jobs[k+1][0],{voice:jobs[k+1][1].ai||'bm_lewis', speed:jobs[k+1][1].speed||1}):null;
-          await playBuf(a); if(my!==gen) return; } }
+      if(engine==='online' && ai.state==='ready'){
+        const clips=list.map(([t,v])=>{ const a=new Audio(); a.preload='auto'; a.src=ttsUrl(t,v); return a; });   // every piece starts loading at once; they play in turn
+        for(let k=0;k<list.length;k++){ const ok=await playUrl(clips[k],list[k][1]); if(my!==gen) return; if(!ok){ await sysSay(list[k][0],list[k][1]); if(my!==gen) return; } } }
       else if(S){ for(const [t,v] of list){ await sysSay(t,v); if(my!==gen) return; } }
     }catch(e){ console.warn(e); }
-    finally{ if(my===gen){ busyNow=false; if(onEnd) onEnd(); } } }
-  function hush(){ gen++; busyNow=false; try{ if(S) S.cancel(); }catch(e){} try{ if(ai.src){ ai.src.onended=null; ai.src.stop(); } }catch(e){} ai.src=null; }
-  const NARR={pitch:0.95, rate:1.15, ai:'bm_lewis', speed:1.02};          // the narrator keeps a brisk pace
+    finally{ if(my===gen){ busyNow=false; curAudio=null; if(onEnd) onEnd(); } } }
+  function hush(){ gen++; busyNow=false; try{ if(S) S.cancel(); }catch(e){} try{ if(curAudio){ curAudio.onended=null; curAudio.pause(); } }catch(e){} curAudio=null; }
+  const NARR={pitch:0.95, rate:1.15, oa:'fable', st:'narrator', speed:1.06};          // the narrator keeps a brisk pace
   const heard=new Map();                                   // name|text → when it was last read: 'Back', a second purchase, a shop redrawn don't repeat it
-  function read(name,text){ if(mode==='off' || (!S && engine!=='ai')) return;
+  function read(name,text){ if(mode==='off' || (!S && engine!=='online')) return;
     const key=name+'|'+[].concat(text).join(' '), now=performance.now(), last=heard.get(key);
     heard.set(key,now); if(last && now-last<90000) return;
     if(heard.size>300) heard.clear();
@@ -18051,8 +18039,8 @@ const VOICE=(()=>{
   let seen=new WeakSet(), lastG=null, lastP=null, lastCs=null, held=null;
   const say1=(text,v,cut,obj)=>{ const t=clean(text).replace(/[“”"]/g,'').trim(); if(!t || !/[a-z]/i.test(t) || /^(Grr+|Hm+|\.+)!?$/i.test(t)) return;
     if(cut) hush(); else if(talking()) return; if(obj) held=obj; run([[t,v]],()=>{ if(held===obj) held=null; }); };
-  const youV=()=>who(player.name||'you', player.opts||{});
-  const DEAD={pitch:0.55, rate:0.95, ai:'am_onyx', speed:0.9};
+  const youV=()=>({...who(player.name||'you', player.opts||{}), st:'hero'});
+  const DEAD={pitch:0.55, rate:0.95, oa:'onyx', st:'dead', speed:1};
   setInterval(()=>{ if(mode==='off' || typeof NPCS==='undefined' || document.hidden) return;
     try{
       const cs=CS.say; if(cs && cs!==lastCs){ lastCs=cs; const e=cs.ent; say1(cs.text, e===player ? youV() : who(e&&e.name||'', e&&e.opts), true, cs); } else if(!cs) lastCs=null;
@@ -18063,11 +18051,11 @@ const VOICE=(()=>{
         if(CS.on && d<14) say1(b.text,who(n.name,n.opts),true,b); });          // only lines in a scene
     }catch(e){} },100);
   function syncUi(){ const b=document.getElementById('voice-toggle'); if(b) b.textContent=LABEL[mode];
-    const e=document.getElementById('voice-engine'); if(e){ e.style.display=mode==='off'?'none':''; e.textContent='Voice engine: '+(engine==='ai'?(ai.state==='failed'?'AI (unavailable)':ai.state==='loading'?'AI (loading '+ai.pct+'%)':'AI (Kokoro)'):'Browser'); } }
-  function setMode(m){ mode=MODES.includes(m)?m:'off'; try{ localStorage.setItem(KEY,mode); }catch(e){} if(mode==='off') stop(); else if(engine==='ai') loadAI(); syncUi(); }
-  function setEngine(x){ engine=x==='ai'?'ai':'browser'; try{ localStorage.setItem(EKEY,engine); }catch(e){} stop(); if(engine==='ai' && mode!=='off') loadAI(); else status(''); syncUi(); }
-  if(engine==='ai' && mode!=='off') setTimeout(loadAI,1500);              // it was on last time: start fetching (from the browser's cache, after the first time)
-  const talking=()=> busyNow && (engine==='ai' && ai.state==='ready' ? true : !!S && (S.speaking||S.pending));   // the browser's own word for it, in case a line never reports its end
+    const e=document.getElementById('voice-engine'); if(e){ e.style.display=mode==='off'?'none':''; e.textContent='Voice engine: '+(engine==='online'?(ai.state==='failed'?'Online (unavailable)':'Online voices'):'Browser'); } }
+  function setMode(m){ mode=MODES.includes(m)?m:'off'; try{ localStorage.setItem(KEY,mode); }catch(e){} if(mode==='off') stop(); else if(engine==='online') loadAI(); syncUi(); }
+  function setEngine(x){ engine=x==='online'?'online':'browser'; try{ localStorage.setItem(EKEY,engine); }catch(e){} stop(); if(engine==='online' && mode!=='off'){ ai.state='off'; loadAI(); } else status(''); syncUi(); }
+  if(engine==='online' && mode!=='off') setTimeout(loadAI,1500);          // it was on last time
+  const talking=()=> busyNow && (engine==='online' && ai.state==='ready' ? true : !!S && (S.speaking||S.pending));   // the browser's own word for it, in case a line never reports its end
   return { holds(o){ return !!o && held===o && mode!=='off' && talking(); }, busy(){ return !!held && mode!=='off' && talking(); }, get mode(){ return mode; }, get engine(){ return engine; }, get aiState(){ return ai.state; },
     read, stop, setMode, setEngine, syncUi,
     cycle(){ setMode(MODES[(MODES.indexOf(mode)+1)%MODES.length]); if(mode!=='off'){ hush(); heard.clear(); read('Old Tobb','“Can you hear me? Good. Now go and do something useful.”'); } },
@@ -18075,7 +18063,7 @@ const VOICE=(()=>{
 })();
 { const b=document.getElementById('voice-toggle'), e=document.getElementById('voice-engine');
   if(b){ if(!VOICE.supported) b.style.display='none'; else b.addEventListener('click',()=>VOICE.cycle()); }
-  if(e) e.addEventListener('click',()=>{ VOICE.setEngine(VOICE.engine==='ai'?'browser':'ai'); if(VOICE.mode!=='off') setTimeout(()=>{ VOICE.stop(); },10); });
+  if(e) e.addEventListener('click',()=>{ VOICE.setEngine(VOICE.engine==='online'?'browser':'online'); });
   VOICE.syncUi(); }
 </script>
 </body>

@@ -555,6 +555,8 @@ html,body{touch-action:none;overscroll-behavior:none;-webkit-tap-highlight-color
     <button class="menu-btn" id="fs-toggle">Fullscreen</button>
     <button class="menu-btn" id="snd-toggle">Sound: Off</button>
     <button class="menu-btn" id="voice-toggle">Voices: Off</button>
+    <button class="menu-btn" id="voice-engine" style="display:none">Voice engine: Browser</button>
+    <div id="voice-status" style="font-size:11px;color:#c8b890;min-height:0;text-align:center"></div>
     <div class="file-row snd-row" style="align-items:center;gap:10px;display:none"><span class="menu-label" style="width:52px">Volume</span><input id="snd-vol" type="range" min="0" max="100" value="70" style="flex:1;accent-color:#c09040"></div>
     <div class="file-row snd-row" style="align-items:center;gap:10px;display:none"><span class="menu-label" style="width:52px">Music</span><input id="mus-vol" type="range" min="0" max="100" value="45" style="flex:1;accent-color:#c09040"></div>
     <div class="menu-label">Promoter's Key</div>
@@ -17918,70 +17920,118 @@ const SND=(()=>{
     window.addEventListener('pointerdown',wake,true); window.addEventListener('keydown',wake,true); } }
 // ════════ VOICES: the browser's own speech reads the dialogue aloud, each speaker with a voice of their own. Off by default ════════
 const VOICE=(()=>{
-  const KEY='dunhollow.voices', S=window.speechSynthesis, MODES=['off','speech','all'], LABEL={off:'Voices: Off', speech:'Voices: Speech only', all:'Voices: Everything'};
-  let mode='off'; try{ const m=localStorage.getItem(KEY); if(MODES.includes(m)) mode=m; }catch(e){}
+  const KEY='dunhollow.voices', EKEY='dunhollow.voiceEngine', S=window.speechSynthesis, MODES=['off','speech','all'], LABEL={off:'Voices: Off', speech:'Voices: Speech only', all:'Voices: Everything'};
+  let mode='off', engine='browser'; try{ const m=localStorage.getItem(KEY); if(MODES.includes(m)) mode=m; if(localStorage.getItem(EKEY)==='ai') engine='ai'; }catch(e){}
   let voices=[]; const load=()=>{ try{ voices=S.getVoices().filter(v=>/^en/i.test(v.lang)); }catch(e){} }; if(S){ load(); S.onvoiceschanged=load; }
   const FEM=/female|samantha|victoria|karen|moira|tessa|fiona|zira|susan|hazel|serena|kate|libby|sonia|jenny|aria|emma|amy|joanna|salli|kimberly|ivy|olivia|natasha|clara|maisie|ava|allison|catherine|veena|martha/i;
   const MAL=/\bmale|daniel|alex\b|fred|david|mark|george|rishi|ryan|guy|brian|matthew|joey|justin|thomas|arthur|oliver|aaron|gordon|lee\b|james|william|eric|christopher|roger|tom\b/i;
   const hash=s=>[...s].reduce((a,c)=>(a*31+c.charCodeAt(0))>>>0,7);
-  const CKEY='dunhollow.cast'; let CAST={}; try{ CAST=JSON.parse(localStorage.getItem(CKEY)||'{}')||{}; }catch(e){}
-  function pick(g,seed,key){ if(!voices.length) load(); if(!voices.length) return null;
+  // casting: each speaker gets the least-used voice that fits, and keeps it (one cast list for the browser's voices, one for the AI's)
+  const cast=(store,pool,seed,key)=>{ if(key==null) return pool[seed%pool.length];
+    if(store.map[key] && pool.includes(store.map[key])) return store.map[key];
+    const used={}; Object.values(store.map).forEach(n=>{ used[n]=(used[n]||0)+1; });
+    const least=Math.min(...pool.map(v=>used[v]||0)), free=pool.filter(v=>(used[v]||0)===least), v=free[seed%free.length];
+    store.map[key]=v; try{ localStorage.setItem(store.k,JSON.stringify(store.map)); }catch(e){} return v; };
+  const mk=k=>{ let m={}; try{ m=JSON.parse(localStorage.getItem(k)||'{}')||{}; }catch(e){} return {k,map:m}; };
+  const CAST_B=mk('dunhollow.cast'), CAST_AI=mk('dunhollow.castAI');
+  function pickB(g,seed,key){ if(!voices.length) load(); if(!voices.length) return null;
     const isF=v=>FEM.test(v.name.replace(/\bmale\b/i,'')) && !/\bmale\b/i.test(v.name), isM=v=>MAL.test(v.name) && !FEM.test(v.name);
     let pool=voices.filter(v=> g==='f' ? isF(v) : g==='m' ? isM(v) : !isF(v) && !isM(v));
-    if(!pool.length && g) pool=voices.filter(v=>!(g==='f'?isM(v):isF(v)));                // nothing tagged that way: anything not plainly the other
+    if(!pool.length && g) pool=voices.filter(v=>!(g==='f'?isM(v):isF(v)));
     if(!pool.length) pool=voices;
     const good=v=>/natural|neural|online|google|premium|enhanced/i.test(v.name), best=pool.filter(good);
-    if(best.length>=3) pool=best;                                                        // enough good voices to go round: only those
-    pool=pool.slice().sort((a,b)=>a.name<b.name?-1:1);
-    if(key==null) return pool[seed%pool.length];
-    const had=CAST[key] && pool.find(v=>v.name===CAST[key]); if(had) return had;          // they keep the voice they were given
-    const used={}; Object.values(CAST).forEach(n=>{ used[n]=(used[n]||0)+1; });
-    const least=Math.min(...pool.map(v=>used[v.name]||0)), free=pool.filter(v=>(used[v.name]||0)===least), v=free[seed%free.length];   // the least-used voice that fits
-    CAST[key]=v.name; try{ localStorage.setItem(CKEY,JSON.stringify(CAST)); }catch(e){} return v; }
+    if(best.length>=3) pool=best;
+    const names=pool.map(v=>v.name).sort(), n=cast(CAST_B,names,seed,key); return pool.find(v=>v.name===n); }
+  // Kokoro's English voices: British first in each list, so they come up first for the valley's folk
+  const AI_F=['bf_emma','bf_isabella','bf_alice','bf_lily','af_heart','af_bella','af_nicole','af_sarah','af_sky','af_nova','af_river','af_kore','af_aoede','af_jessica','af_alloy'];
+  const AI_M=['bm_george','bm_lewis','bm_daniel','bm_fable','am_michael','am_fenrir','am_echo','am_eric','am_liam','am_adam','am_onyx'];   // (not Santa: he only does Christmas)
   function who(name,opts){ const n=opts?null:(typeof NPCS!=='undefined' && NPCS.find(x=>x.name===name || (x.name && name && name.startsWith(x.name.split(',')[0])))) || null;
     const o=opts||n&&n.opts||{}; let g=o.gender||null;
     if(!g){ if(/\b(Old )?(Wenna|Bertha|Morwen|Vesna|Marta|Ada|Yselde|Nimuë|Ithilwen|Nelloth|Tessaly|Saelle|Maelis|Aerwen|Lady|Mother|Sister|Dalla|Mara|Hag|Witch|Widow)\b/i.test(name)) g='f';
-      else if(/\b(Gunnar|Tobb|Orvell|Brann|Oswin|Corwin|Hamond|Edric|Gerd|Calandor|Tirnel|Faelan|Baron|Brother|Father|Magister|Sir|Lord|Captain|Warden|Craban|Alaric|Ruvin|Pim|Pip|Gerrit|Aldo|Tomas|Hobb|Venn|Orrin|Corran|Ithrel)\b/i.test(name)) g='m'; }
+      else if(/\b(Gunnar|Tobb|Orvell|Brann|Oswin|Corwin|Hamond|Edric|Gerd|Calandor|Tirnel|Faelan|Baron|Brother|Father|Magister|Sir|Lord|Captain|Warden|Craban|Alaric|Ruvin|Pim|Pip|Gerrit|Aldo|Tomas|Hobb|Venn|Orrin|Corran|Ithrel|Harl|Bruno|Grell)\b/i.test(name)) g='m'; }
     const h=hash(name||'?'), elf=o.race==='elf' || /Ithil|Nell|Aerwen|Calandor|Tirnel|Faelan|Maelis|Nimuë|Ithrel|Warden/.test(name||''), old=/\bOld\b|Elder|Morwen|Wenna|Tobb|Orvell|Hag|Grandm/i.test(name||''), gob=/goblin|Gratis|Gob/i.test(name||'');
     let pitch=(g==='f'?1.05:0.9)+(((h>>7)%9)-4)*0.045, rate=1.16+((h>>3)%5-2)*0.012;
-    if(elf){ pitch+=0.08; } if(old){ pitch-=0.12; rate+=0.07; }     // a deep voice sounds slower than it is: the old get a touch more pace if(gob){ pitch+=0.45; rate+=0.08; }        // age and kin change the voice, not the pace
-    return {voice:pick(g,h,(name||'?').split(/,| the | of /)[0]), pitch:Math.max(0.3,Math.min(1.9,pitch)), rate:Math.max(1.08,Math.min(1.4,rate))}; }
+    if(elf) pitch+=0.08;
+    if(old){ pitch-=0.12; rate+=0.07; }                   // a deep voice sounds slower than it is: the old get a touch more pace
+    if(gob){ pitch+=0.45; rate+=0.08; }
+    const key=(name||'?').split(/,| the | of /)[0];
+    return {voice:pickB(g,h,key), pitch:Math.max(0.3,Math.min(1.9,pitch)), rate:Math.max(1.08,Math.min(1.4,rate)),
+      ai: gob ? 'am_puck' : cast(CAST_AI, g==='f'?AI_F:g==='m'?AI_M:[...AI_M,...AI_F], h, key), speed: gob?1.12:old?1.04:1 }; }
   const clean=t=>String(t).replace(/<br\s*\/?>/gi,' ').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();
   function parts(text){ const out=[]; [].concat(text).map(clean).forEach(p=>{ const re=/“([^”]*)”|"([^"]*)"/g; let last=0, m;
       while((m=re.exec(p))){ const before=p.slice(last,m.index).trim(); if(before) out.push(['n',before]); out.push(['s',(m[1]??m[2]).trim()]); last=re.lastIndex; }
       const rest=p.slice(last).trim(); if(rest) out.push([out.length||!/[“"]/.test(p)?'n':'s',rest]); });
     return out.filter(([k,t])=>t && /[a-z0-9]/i.test(t)); }
-  function utter(text,v){ const u=new SpeechSynthesisUtterance(text); if(v.voice) u.voice=v.voice; u.lang=(v.voice&&v.voice.lang)||'en-GB'; u.pitch=v.pitch; u.rate=v.rate; u.volume=1; S.speak(u); return u; }
-  const NARR={pitch:0.95, rate:1.15};                    // the narrator keeps a brisk pace
+  // ── the AI engine: Kokoro, run in the player's own browser; fetched only when it is switched on ──
+  const KOKORO_JS='https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js', KOKORO_MODEL='onnx-community/Kokoro-82M-v1.0-ONNX';
+  const ai={state:'off', tts:null, pct:0, ctx:null, src:null, err:''};
+  function status(t){ const el=document.getElementById('voice-status'); if(el) el.textContent=t||''; syncUi(); }
+  async function loadAI(){ if(ai.state==='ready'||ai.state==='loading') return; ai.state='loading'; ai.pct=0; status('Downloading AI voices… (about 90 MB, once)');
+    try{ const M=window.KOKORO_MOCK || await import(KOKORO_JS);
+      const files={};
+      ai.tts=await M.KokoroTTS.from_pretrained(KOKORO_MODEL,{ dtype:'q8', device:'wasm', progress_callback:p=>{ if(p && p.status==='progress' && p.file){ files[p.file]=[p.loaded||0,p.total||0]; const L=Object.values(files), a=L.reduce((s,x)=>s+x[0],0), b=L.reduce((s,x)=>s+x[1],0); if(b){ ai.pct=Math.round(100*a/b); status('Downloading AI voices… '+ai.pct+'%'); } } } });
+      ai.state='ready'; status('AI voices ready.'); setTimeout(()=>{ if(ai.state==='ready') status(''); },3000);
+    }catch(e){ ai.state='failed'; ai.err=String(e&&e.message||e); status('AI voices could not load here, so the browser’s voices are used.'); console.warn('Kokoro failed',e); } }
+  // one queue for both engines: a line is a list of [text, voice] pieces, spoken one after another; stop() drops it all
+  let gen=0, busyNow=false, curEnd=null;
+  function playBuf(a){ return new Promise(res=>{ try{ if(!ai.ctx) ai.ctx=new (window.AudioContext||window.webkitAudioContext)(); ai.ctx.resume();
+      const b=ai.ctx.createBuffer(1,a.audio.length,a.sampling_rate); b.copyToChannel(a.audio,0); const s=ai.ctx.createBufferSource(); s.buffer=b;
+      const g=ai.ctx.createGain(); g.gain.value=typeof SND!=='undefined' ? 0.4+SND.vol*0.9 : 1; s.connect(g); g.connect(ai.ctx.destination); s.onended=()=>res(); ai.src=s; s.start(); }catch(e){ res(); } }); }
+  function sysSay(t,v){ return new Promise(res=>{ const u=new SpeechSynthesisUtterance(t); if(v.voice) u.voice=v.voice; u.lang=(v.voice&&v.voice.lang)||'en-GB'; u.pitch=v.pitch; u.rate=v.rate; u.volume=1; u.onend=u.onerror=()=>res(); S.speak(u); }); }
+  const sentences=t=>(t.match(/[^.!?…]+[.!?…]+["”’)]*|[^.!?…]+$/g)||[t]).map(x=>x.trim()).filter(Boolean);
+  async function run(list,onEnd){ const my=++gen; busyNow=true;
+    try{
+      if(engine==='ai' && ai.state==='ready'){ const jobs=[]; list.forEach(([t,v])=>sentences(t).forEach(s=>jobs.push([s,v])));   // sentence by sentence: the first starts sooner, the next is made while this one plays
+        let next=jobs.length?ai.tts.generate(jobs[0][0],{voice:jobs[0][1].ai||'bm_lewis', speed:jobs[0][1].speed||1}):null;
+        for(let k=0;k<jobs.length;k++){ const a=await next; if(my!==gen) return;
+          next=k+1<jobs.length?ai.tts.generate(jobs[k+1][0],{voice:jobs[k+1][1].ai||'bm_lewis', speed:jobs[k+1][1].speed||1}):null;
+          await playBuf(a); if(my!==gen) return; } }
+      else if(S){ for(const [t,v] of list){ await sysSay(t,v); if(my!==gen) return; } }
+    }catch(e){ console.warn(e); }
+    finally{ if(my===gen){ busyNow=false; if(onEnd) onEnd(); } } }
+  function hush(){ gen++; busyNow=false; try{ if(S) S.cancel(); }catch(e){} try{ if(ai.src){ ai.src.onended=null; ai.src.stop(); } }catch(e){} ai.src=null; }
+  const NARR={pitch:0.95, rate:1.15, ai:'bm_lewis', speed:1.02};          // the narrator keeps a brisk pace
   const heard=new Map();                                   // name|text → when it was last read: 'Back', a second purchase, a shop redrawn don't repeat it
-  function read(name,text){ if(!S || mode==='off') return;
+  function read(name,text){ if(mode==='off' || (!S && engine!=='ai')) return;
     const key=name+'|'+[].concat(text).join(' '), now=performance.now(), last=heard.get(key);
     heard.set(key,now); if(last && now-last<90000) return;
     if(heard.size>300) heard.clear();
-    S.cancel();
-    const v=who(name), nv={...NARR, voice:pick(null,11)}; let any=false;
-    parts(text).forEach(([k,t])=>{ if(k==='s'){ utter(t,v); any=true; } else if(mode==='all'){ utter(t,nv); any=true; } });
-    // no quotes at all in 'speech' mode: someone talking plainly (“Farewell”-style lines without marks) still gets a voice if it reads like speech
-    if(!any && mode==='speech'){ const p=parts(text); if(p.length===1 && !/^(You|Your|The|A |An |She|He|They|It|Through|Across|Somewhere|For a)/.test(p[0][1])) utter(p[0][1],v); } }
-  function stop(){ held=null; try{ if(S) S.cancel(); }catch(e){} }
-  // speech bubbles: a cutscene line cuts in (it is timed); anything else waits its turn, and chatter far away is not heard
-  let seen=new WeakSet(), lastG=null, lastP=null, lastCs=null;
-  let held=null;                                            // the bubble being spoken: it stays up, and a cutscene waits for it
-  const say1=(text,v,cut,obj)=>{ const t=clean(text).replace(/[“”"]/g,'').trim(); if(!t || !/[a-z]/i.test(t) || /^(Grr+|Hm+|\.+)!?$/i.test(t)) return; if(cut) S.cancel(); else if(S.speaking || S.pending) return; const u=utter(t,v); if(u && obj){ held=obj; u.onend=u.onerror=()=>{ if(held===obj) held=null; }; } };
+    const v=who(name), nv={...NARR, voice:pickB(null,11)}, list=[];
+    parts(text).forEach(([k,t])=>{ if(k==='s') list.push([t,v]); else if(mode==='all') list.push([t,nv]); });
+    // no quotes at all in 'speech' mode: someone talking plainly still gets a voice if it reads like speech
+    if(!list.length && mode==='speech'){ const p=parts(text); if(p.length===1 && !/^(You|Your|The|A |An |She|He|They|It|Through|Across|Somewhere|For a)/.test(p[0][1])) list.push([p[0][1],v]); }
+    if(!list.length) return; hush(); held=null; run(list); }
+  function stop(){ held=null; hush(); }
+  // speech bubbles: a cutscene line cuts in (it is timed) and the scene waits for it to finish
+  let seen=new WeakSet(), lastG=null, lastP=null, lastCs=null, held=null;
+  const say1=(text,v,cut,obj)=>{ const t=clean(text).replace(/[“”"]/g,'').trim(); if(!t || !/[a-z]/i.test(t) || /^(Grr+|Hm+|\.+)!?$/i.test(t)) return;
+    if(cut) hush(); else if(talking()) return; if(obj) held=obj; run([[t,v]],()=>{ if(held===obj) held=null; }); };
   const youV=()=>who(player.name||'you', player.opts||{});
-  setInterval(()=>{ if(!S || mode==='off' || typeof NPCS==='undefined' || document.hidden) return;
+  const DEAD={pitch:0.55, rate:0.95, ai:'am_onyx', speed:0.9};
+  setInterval(()=>{ if(mode==='off' || typeof NPCS==='undefined' || document.hidden) return;
     try{
       const cs=CS.say; if(cs && cs!==lastCs){ lastCs=cs; const e=cs.ent; say1(cs.text, e===player ? youV() : who(e&&e.name||'', e&&e.opts), true, cs); } else if(!cs) lastCs=null;
-      if(typeof GSAY!=='undefined' && GSAY && GSAY!==lastG){ lastG=GSAY; say1(GSAY.text,{voice:pick(null,5), pitch:0.55, rate:0.95}, true, GSAY); }       // the dead speak low and slow
+      if(typeof GSAY!=='undefined' && GSAY && GSAY!==lastG){ lastG=GSAY; say1(GSAY.text,{...DEAD, voice:pickB(null,5)}, true, GSAY); }       // the dead speak low and slow
       if(typeof PSAY!=='undefined' && PSAY && PSAY!==lastP){ lastP=PSAY; say1(PSAY.text,youV(),false); }
       NPCS.forEach(n=>{ const b=n.bark; if(!b || seen.has(b)) return; seen.add(b);
         const d=Math.hypot((n.x??n.i+0.5)-player.x,(n.y??n.j+0.5)-player.y);
-        if(CS.on && d<14) say1(b.text,who(n.name,n.opts),true,b); });          // only lines in a scene: the passers-by's chatter stays on the page
+        if(CS.on && d<14) say1(b.text,who(n.name,n.opts),true,b); });          // only lines in a scene
     }catch(e){} },100);
-  function setMode(m){ mode=MODES.includes(m)?m:'off'; try{ localStorage.setItem(KEY,mode); }catch(e){} if(mode==='off') stop(); const b=document.getElementById('voice-toggle'); if(b) b.textContent=LABEL[mode]; }
-  return { holds(o){ return !!o && held===o && mode!=='off' && S && S.speaking; }, busy(){ return !!held && mode!=='off' && S && S.speaking; }, get mode(){ return mode; }, read, stop, setMode, cycle(){ setMode(MODES[(MODES.indexOf(mode)+1)%MODES.length]); if(mode!=='off'){ S && S.cancel(); read('Old Tobb','“Can you hear me? Good. Now go and do something useful.”'); } }, supported:!!S, _parts:parts, _who:who };
+  function syncUi(){ const b=document.getElementById('voice-toggle'); if(b) b.textContent=LABEL[mode];
+    const e=document.getElementById('voice-engine'); if(e){ e.style.display=mode==='off'?'none':''; e.textContent='Voice engine: '+(engine==='ai'?(ai.state==='failed'?'AI (unavailable)':ai.state==='loading'?'AI (loading '+ai.pct+'%)':'AI (Kokoro)'):'Browser'); } }
+  function setMode(m){ mode=MODES.includes(m)?m:'off'; try{ localStorage.setItem(KEY,mode); }catch(e){} if(mode==='off') stop(); else if(engine==='ai') loadAI(); syncUi(); }
+  function setEngine(x){ engine=x==='ai'?'ai':'browser'; try{ localStorage.setItem(EKEY,engine); }catch(e){} stop(); if(engine==='ai' && mode!=='off') loadAI(); else status(''); syncUi(); }
+  if(engine==='ai' && mode!=='off') setTimeout(loadAI,1500);              // it was on last time: start fetching (from the browser's cache, after the first time)
+  const talking=()=> busyNow && (engine==='ai' && ai.state==='ready' ? true : !!S && (S.speaking||S.pending));   // the browser's own word for it, in case a line never reports its end
+  return { holds(o){ return !!o && held===o && mode!=='off' && talking(); }, busy(){ return !!held && mode!=='off' && talking(); }, get mode(){ return mode; }, get engine(){ return engine; }, get aiState(){ return ai.state; },
+    read, stop, setMode, setEngine, syncUi,
+    cycle(){ setMode(MODES[(MODES.indexOf(mode)+1)%MODES.length]); if(mode!=='off'){ hush(); heard.clear(); read('Old Tobb','“Can you hear me? Good. Now go and do something useful.”'); } },
+    supported:!!S || !!window.AudioContext, _parts:parts, _who:who };
 })();
-{ const b=document.getElementById('voice-toggle'); if(b){ if(!VOICE.supported){ b.style.display='none'; } else { b.textContent={off:'Voices: Off',speech:'Voices: Speech only',all:'Voices: Everything'}[VOICE.mode]; b.addEventListener('click',()=>VOICE.cycle()); } } }
+{ const b=document.getElementById('voice-toggle'), e=document.getElementById('voice-engine');
+  if(b){ if(!VOICE.supported) b.style.display='none'; else b.addEventListener('click',()=>VOICE.cycle()); }
+  if(e) e.addEventListener('click',()=>{ VOICE.setEngine(VOICE.engine==='ai'?'browser':'ai'); if(VOICE.mode!=='off') setTimeout(()=>{ VOICE.stop(); },10); });
+  VOICE.syncUi(); }
 </script>
 </body>
 </html>

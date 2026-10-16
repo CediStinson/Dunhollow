@@ -10946,6 +10946,14 @@ function moonBathers(){ const t=(dayClock%DAY_LEN)/DAY_LEN, day=Math.floor(dayCl
   const a=BATHER('moon_ithil','Ithilwen',6,10,1,A), b=BATHER('moon_nel','Nelloth',3,12,3,N); a.bathe=b.bathe=false; a.sit='lounge'; b.sit=(day%2===1)?'knees':false;
   if(day%3===1) a.silk='#e8e4f4'; if(day%2===0) b.silk='#cfe0f0';
   return [a,b]; }
+// at dawn they climb out, dress, and walk home up the road to Silvergate, Nelloth first, rather than blinking out
+const moonLeaving=()=>NPCS.some(n=>n.id.startsWith('moon_') && n.leaving);
+setInterval(()=>{ try{ if(!running || CS.on || areaId!=='elfroad' || nightAmt()>=0.5 || (typeof ROM!=='undefined' && ROM.on) || dlgOverlay.classList.contains('open')) return;
+  const ex=exitToward('silvergate'); if(!ex) return;
+  ['moon_nel','moon_ithil'].forEach((id,k)=>{ const n=NPCS.find(x=>x.id===id); if(!n || n.leaving) return; const nel=NPCS.find(x=>x.id==='moon_nel'); if(k===1 && nel && !(nel.leaving && performance.now()-nel.leftAt>3500)) return;   // Ithilwen lingers a moment longer
+    n.leaving=true; n.leftAt=performance.now(); n.route='moon_leave'; n.bathe=false; n.sit=false; n.silk=null; n.wander=null; n.path=[]; n.goto=ex; n.vanish=true; n.speed=1.1; if(n.x==null){ n.x=n.i+0.5; n.y=n.j+0.5; }
+    n.opts={...n.opts, equip:{...n.opts.equip, torso:'elf_robe', armor:'elf_cloak', feet:'elf_boots'}}; delete n.opts._ck;
+    if(id==='moon_nel') logMsg('Dawn. The moon-bathers wring out their hair, dress, and walk off up the road to Silvergate.','#c8a0e0'); }); }catch(e){} },1000);
 function moonFight(){ closeDialog(); FIGHT_UNDO=()=>{ CHOICE.moon=null; CHOICE.moonAtoned=null; }; MOB_SPAWNS.length=0; MOB_SPAWNS.push(
           { name:"Baron's Trapper", type:'bandit', i:1, j:13, faction:'trapper', opts:BANDIT({skin:2,hair:2,beard:3,equip:{head:'hood',torso:'tunic_green',armor:'studded',hands:'gloves',legs:'hose_grey',feet:'boots',weapon:'spear',offhand:null}}) },
           { name:"Trapper's Mate", type:'bandit', i:6, j:8, faction:'trapper', opts:BANDIT({skin:1,hair:0,beard:1,equip:{head:'hood',torso:'smock',armor:'jerkin',hands:null,legs:'trousers',feet:'boots',weapon:'hatchet',offhand:null}}) });
@@ -10955,6 +10963,7 @@ wrap('elfroad','mobs',l=> CHOICE.brannTrap==='asked' && !defeatedMobs.has("elfro
   { name:"Baron's Trapper", type:'bandit', i:1, j:13, faction:'trapper', opts:BANDIT({skin:2,hair:2,beard:3,equip:{head:'hood',torso:'tunic_green',armor:'studded',hands:'gloves',legs:'hose_grey',feet:'boots',weapon:'spear',offhand:null}}) }] : l);
 wrap('elfroad','objects',l=> CHOICE.brannTrap==='asked' && !defeatedMobs.has("elfroad:Baron's Trapper") ? [...l,{type:'snare', i:2, j:16, open:false, noblock:true},{type:'snare', i:3, j:10, open:false, noblock:true}] : l);
 function moonTalk(){
+  if(moonLeaving()){ say('Ithilwen',"She is dressed already, her hair still dripping down the back of her cloak. “The sun is up, and the moon is asleep. Come back tonight.”",[bye]); return; }
   const day=Math.floor(dayClock/DAY_LEN);
   const wronged = CHOICE.faelan==='left' || CHOICE.faelan==='robbed';
   if(!CHOICE.moon && wronged){ say('Nelloth',["Two elves stand in the moon pool, silver to the shoulders. The singing stops when they see you.","“We know your face. Faelan described it, from the trap in the reeds. He walks with a stick now.”","“There are eyes in the trees tonight. Keep watch, if you want to be something other than what he says you are. Or go.”"],[
@@ -14366,7 +14375,7 @@ function openBathChest(o){ const c=CHOICE.bathChest; if(!c) return;   // what yo
 function moonJoined(){ return CHOICE.moonJoin!=null && dayClock-CHOICE.moonJoin < DAY_LEN*0.12 && dayClock>=CHOICE.moonJoin; }
 function moonJoin(){ const was=NPCS.filter(n=>(n.id==='moon_ithil'||n.id==='moon_nel') && n.silk).map(n=>({i:n.i, j:n.j, col:n.silk}));
   CHOICE.moonJoin=dayClock; CHOICE.moonTowels=was.length?was:(CHOICE.moonTowels&&moonJoined()?CHOICE.moonTowels:null);
-  if(areaId==='elfroad' && AREAS.elfroad.npcs){ NPCS.length=0; NPCS.push(...AREAS.elfroad.npcs()); (CHOICE.moonTowels||[]).forEach(t=>OBJECTS.push({type:'towel', i:t.i, j:t.j, col:t.col, noblock:true})); } }
+  if(areaId==='elfroad' && AREAS.elfroad.npcs && nightAmt()>0.5){ NPCS.length=0; NPCS.push(...AREAS.elfroad.npcs()); (CHOICE.moonTowels||[]).forEach(t=>OBJECTS.push({type:'towel', i:t.i, j:t.j, col:t.col, noblock:true})); } }
 wrap('elfroad','objects',l=> moonJoined() && CHOICE.moonTowels ? [...l, ...CHOICE.moonTowels.map(t=>({type:'towel', i:t.i, j:t.j, col:t.col, noblock:true}))] : l);
 // a towel dropped on the ground: a crumpled heap of cloth
 function drawTowelHeap(o){ const q=P(o.i+0.5,o.j+0.6), c=o.col||'#f4efe4';
@@ -14708,7 +14717,7 @@ setInterval(()=>{ try{ if(!running || CS.on) return; const h=HOUR();
 function walkRoutes(dt){                       // townsfolk on their daily rounds walk to where their routine says
     for(let q=NPCS.length-1;q>=0;q--){ const n=NPCS[q]; if(!n.route || !n.goto) continue; if(n.x==null){ n.x=n.i+0.5; n.y=n.j+0.5; } if(!n.path) n.path=[];
       if(!n.path.length){ if(n.i===n.goto[0] && n.j===n.goto[1]){ n.moving=false;
-          if(n.vanish){ ROUTINES[n.route].gone={slot:n.slot, at:Math.floor(dayClock/(DAY_LEN/48))}; NPCS.splice(q,1); continue; }
+          if(n.vanish){ if(ROUTINES[n.route]) ROUTINES[n.route].gone={slot:n.slot, at:Math.floor(dayClock/(DAY_LEN/48))}; NPCS.splice(q,1); continue; }
           const s=n.arrive||n.slot; n.goto=null; n.dir=s.dir??n.dir; if(s.bed){ rtLieDown(n,s); continue; } if(s.sit) n.sit=true; if(s.chop){ n.chop=true; n.chopPh=Math.random(); } if(s.wander){ n.wander=s.wander; n.wait=2; } continue; }
         const was=blocked.has(n.goto[0]+','+n.goto[1]); blocked.delete(n.goto[0]+','+n.goto[1]);
         n.path=(findPath(n.i,n.j,n.goto[0],n.goto[1])||[]).slice(0,60); if(was) blocked.add(n.goto[0]+','+n.goto[1]);

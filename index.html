@@ -10460,7 +10460,7 @@ function heraldTalk(){ say(BARON_DOWN()?'Crown Herald':"Baron's Herald", BARON_D
 function mguardTalk(){ say(BARON_DOWN()?'Crown Soldier':"Baron's Guard", BARON_DOWN() ? "“The Baron's men took off their red and put on blue. Mostly the same men. Don't tell the Magistrate.”" : "“Keep walking. The Baron doesn't like crowds that aren't cheering.”",[bye]); }
 function fenceSell(){
   const opts=[];
-  player.inv.forEach((id,k)=>{ if(!id || ITEMS[id].slot==='misc' && id!=='moonbloom' || !PRICES[id]) return; const pr=Math.max(1,Math.round(PRICES[id]*sellRate()*1.35));
+  player.inv.forEach((id,k)=>{ if(!id || ITEMS[id].slot==='misc' && id!=='moonbloom' || !PRICES[id]) return; const pr=Math.max(1,Math.round(PRICES[id]*sellRate()*1.35*(CHOICE.saelle3?1.15:1)));   // Saelle's friend gets a better price
     opts.push({label:itemLabel(id), note:'+'+formatCoin(pr), fn:()=>{ player.inv[k]=null; player.purse+=pr; updateHud(); if(id==='moonbloom' && !CHOICE.maren) remember('maren','sold'); logMsg('Sold '+ITEMS[id].name+' for '+formatCoin(pr)+'.','#e8c060'); fenceSell(); }}); });
   say('Sella the Fence', opts.length?"“I pay better than Marta. I also ask fewer questions.”":"“Nothing to sell? Then stop blocking my light.”",[...opts,bye],true);
 }
@@ -11252,6 +11252,7 @@ function berthaTalk(){ const day=Math.floor(dayClock/DAY_LEN);
     bye]); }
 function gunnarTalk(){
   say('Gunnar the Ploughman',[CHOICE.gunnarNight?"Gunnar sees you come in and goes red from the beard to the ears. Then he grins, and plants an elbow on the table.":"A man with forearms like hams plants an elbow on the table.","“Arm-wrestle? Five coppers says you can't hold me for a count of three.”"],[
+    ...(CHOICE.gunnar2 && CHOICE.gunnarRoast!==Math.floor(dayClock/DAY_LEN) ? [{label:'Take the roast he kept for you.', fn:()=>{ if(giveQuestItem('cooked_meat')){ CHOICE.gunnarRoast=Math.floor(dayClock/DAY_LEN); updateHud(); say('Gunnar the Ploughman',"He pushes a plate across the table, still hot, and watches you eat the first bite before he looks away. <i>You receive a roast.</i>",[bye]); } else say('Gunnar the Ploughman',"“Your pack's full. I'll keep it warm.”",[bye]); }}] : []),
     {label:'Wrestle him. (5 copper)', off:player.purse<5, note:'5c', fn:()=>{ const strong=(player.opts.equip.hands==='gauntlets')||player.maxHp>=90, win=Math.random()<(strong?0.45:0.2);
       if(win){ player.purse+=5; CHOICE.gunnarBeat=true; say('Gunnar the Ploughman',"His arm goes down with a thump. The whole tavern goes quiet. Then Gunnar roars with laughter and buys everyone a drink with your winnings' twin. <i>You win 5 copper.</i>",[bye]); }
       else { player.purse-=5; say('Gunnar the Ploughman',"It's like arm-wrestling a plough. Your knuckles hit the table. “Never lost,” Gunnar says kindly. <i>You lose 5 copper.</i>",[bye]); }
@@ -11294,6 +11295,12 @@ function drawRomFX(W,H){ if(ROM.dark<0.01 && ROM.black<0.01) return;
   if(ROM.black>0.005){ g.fillStyle=`rgba(0,0,0,${Math.min(1,ROM.black)})`; g.fillRect(0,0,W,H); } }
 function nightPasses(f){ dayClock+=DAY_LEN*(f||0.25); cureBruise(); refreshPlayerHp(true); updateHud(); try{ autosaveSoon(300); }catch(e){} }
 function ithilScene(){ const I='Ithilwen', N=()=>NPCS.find(n=>n.id==='moon_ithil');
+  if(CHOICE.ithil && !CHOICE.ithil2){ const ans=(txt,reply,k)=>({label:txt, fn:()=>{ remember('ithil2',k,'Ithilwen asked you what humans fear, and remembered your answer.'); refreshPlayerHp(false); updateHud();
+        say(I,[reply,"She takes your wrist, turns it until the ribbon catches the moon, and breathes on it. It glows, faintly, and keeps glowing.","“There. Now a little of the moon goes with you. Come back when it needs filling.” <i>While you carry her ribbon: +5 max health.</i>"],[bye]); }});
+    say(I,["Ithilwen is waiting at the edge of the pool tonight, not singing. She looks at you a long time before she speaks.","“I have lived three of your lifetimes, and I have never asked a human this. What do you fear?”"],[
+      ans('“Getting old while you don’t.”',"She is quiet. Then: “Yes. So do I, a little. That is new.”",'old'),
+      ans('“That one day the moon won’t remember me.”',"She laughs, soft. “The moon forgets nothing. Nor do I. That is the trouble with both of us.”",'moon'),
+      ans('“Wolves. Mostly wolves.”',"She laughs out loud, and the water shivers. “Honest. I like honest. I will keep the wolves off you.”",'wolves')]); return; }
   if(CHOICE.ithil){ say(I,["She swims over without a word and floats on her back beside you, her hair spread silver on the water.","“The moon is jealous tonight,” she says. “Let her be.”"],[
     {label:'Let her be.', fn:()=>{ NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='moon_nel')); romStart(N(),'moon'); say(I,"She finds your hand under the water. Overhead the moon goes slowly down behind the trees, and neither of you notices.",[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.2); romEnd(); }); }}]); }}, bye]); return; }
   say(I,["Nelloth climbs out, wrings out her hair, gives Ithilwen a look you are not meant to understand, and goes off up the road singing.","Ithilwen does not follow. She drifts closer through the silver water until you can see the moon twice, once in the sky and once in her eyes.","“Humans always look away,” she says. “You have stopped looking away. I noticed.”"],[
@@ -11302,6 +11309,11 @@ function ithilScene(){ const I='Ithilwen', N=()=>NPCS.find(n=>n.id==='moon_ithil
         say(I,["You wake on the warm stones at first light with her cloak over the two of you and a strand of silver ribbon wound round your wrist. Ithilwen is already dressed, watching the road.","“Keep it,” she says. “So the moon knows you are mine when you come back.”"],[{label:'Keep the ribbon.', fn:()=>{ nightPasses(0.3); romEnd(); giveQuestItem('moon_ribbon',true); logMsg('You receive Ithilwen\'s silver ribbon.','#dfe6ee'); closeDialog(); }}]); }); }}]); }},
     {label:'“I should go.”', fn:()=>say(I,"“Then go.” She smiles and sinks back into the water, unbothered. “The moon is patient. I am a little less so.”",[bye])}]); }
 function gunnarScene(){ const G='Gunnar the Ploughman', N=()=>NPCS.find(n=>n.id==='gunnar');
+  if(CHOICE.gunnarNight && !CHOICE.gunnar2){ say(G,["Gunnar has combed his beard. Someone has clearly made him comb his beard. He turns his cap round and round in his big hands.","“It's harvest-eve. There's a fiddler. Bertha's moving the tables.” He swallows. “Would you… dance? With me. I'm terrible.”"],[
+      {label:'“Show me how terrible.”', fn:()=>{ remember('gunnar2','danced','You danced with Gunnar on harvest-eve at the Wheatsheaf. He was terrible. You did not care.'); romStart(N(),'hearth');
+        say(G,["He is terrible. He treads on your foot twice and apologises to the fiddler. The whole tavern claps the rhythm for him, and by the third reel he has stopped counting and started laughing, and so have you."],[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.3); romEnd();
+          giveQuestItem('carved_ox',true); say(G,["In the morning there is a little wooden ox on your pillow, carved from pale wood, and Gunnar downstairs pretending he did not make it.","“From now on there's a roast kept back for you. Every day. Bertha's orders.” He goes red. “My orders.” <i>You receive a carved wooden ox.</i>"],[bye]); }); }}]); }},
+      {label:'“Not tonight, Gunnar.”', fn:()=>say(G,"“Right. No. Course not.” He puts his cap back on. Then he takes it off again. “Next harvest, then.”",[bye])}]); return; }
   if(CHOICE.gunnarNight){ say(G,["“Rematch,” he says, very seriously, and loses on purpose so fast that Bertha snorts into her cups."],[
     {label:'Go upstairs.', fn:()=>{ romStart(N(),'hearth'); say(G,"He takes your hand off the table and does not let go of it, all the way up the stairs.",[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.3); CHOICE.innDay=Math.floor(dayClock/DAY_LEN); romEnd(); say(G,"The second time, nobody wrestles very hard at all. <i>You are fully healed.</i>",[bye]); }); }}]); }}, bye]); return; }
   say(G,["“Different stakes?” He leans in until his beard nearly brushes your knuckles. He smells of hay and woodsmoke and ale. “And what are you putting up?”"],[
@@ -11769,7 +11781,7 @@ const RENOWN_OFF=()=>{ const r=renownRank(); return r>=5?0.8:r>=2?0.9:1; };     
 const sellRate=()=> SELL_RATE*(renownRank()>=3?4/3:1);
 function refreshPlayerHp(full){ const rk=renownRank(); if(lastRenown>=0 && rk>lastRenown && running){ logMsg('Renown: you are now "'+RENOWN[rk]+'" in the valley. '+RENOWN_PERK[rk]+'.','#e8c060'); banner(RENOWN[rk],'#e8c060',2200);
     if(rk>=5 && !CHOICE.legendGift){ CHOICE.legendGift=true; player.purse+=200; logMsg('Elder Hamond sends a purse from the whole valley: 2 silver, and a note that just says “Thank you.”','#e8c060'); } } lastRenown=rk;
-  player.maxHp=maxHpOf(player.opts?player.opts.equip:defaultEquip(),PARRY.hpBase)+rk*4+(CHOICE.moonBless?10:0)+(CHOICE.bless||0)*5+(bathBuffOn()?10:0);   // +10 fresh from a bath (counted before clamping, or the buff's top 10 HP never refill)
+  player.maxHp=maxHpOf(player.opts?player.opts.equip:defaultEquip(),PARRY.hpBase)+rk*4+(CHOICE.moonBless?10:0)+(CHOICE.bless||0)*5+(bathBuffOn()?10:0)+(CHOICE.ithil2 && player.inv && player.inv.includes('moon_ribbon')?5:0);   // +10 fresh from a bath (counted before clamping, or the buff's top 10 HP never refill)
   if(full||player.hp==null) player.hp=player.maxHp; player.hp=Math.min(player.hp,player.maxHp);
   if(CHOICE.bruised) player.hp=Math.min(player.hp,hpCap()); }
 
@@ -17616,10 +17628,33 @@ window.addEventListener('keydown',e=>{ if(!(e.key==='b'||e.key==='B') || !runnin
   const place=()=>{ try{ const cs=getComputedStyle(jb), r=jb.getBoundingClientRect(); ['background','backgroundImage','border','borderRadius','color','fontSize','fontFamily','padding','boxShadow','cursor'].forEach(k=>sb.style[k]=cs[k]);
       sb.style.position='absolute'; sb.style.top=cs.top; sb.style.right=(innerWidth-r.left+8)+'px'; sb.style.zIndex=cs.zIndex; sb.style.display=(running && bookSchools().length)?'block':'none'; }catch(e){} };
   setInterval(place,1000); addEventListener('resize',place); sb.addEventListener('click',e=>{ e.stopPropagation(); bookPanel.style.display==='block'?closeBook():openBook(); }); }
+// ── keepsakes of the heart, and a page in the journal ──
+Object.assign(ITEMS,{ carved_ox:{ name:'A Carved Wooden Ox', slot:'misc', title:"Pale wood, carved by big careful hands. One horn is a little shorter than the other. Gunnar says that is on purpose." },
+  saelle_picks:{ name:"Saelle's Lockpicks", slot:'misc', title:"Three bent steel picks in a leather roll, worn bright with use. Sella the Fence knows whose they were, and pays you better for it." } });
+ITEM_ICON.carved_ox=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); const W='#d8b47a', D='#8a6638';
+  g2.fillStyle=W; g2.strokeStyle=D; g2.lineWidth=1.1; g2.beginPath(); g2.ellipse(19,22,10,6.5,0,0,Math.PI*2); g2.fill(); g2.stroke();   // body
+  g2.beginPath(); g2.ellipse(30,18,5,4.2,0,0,Math.PI*2); g2.fill(); g2.stroke();                                                          // head
+  g2.strokeStyle=D; g2.lineWidth=1.6; g2.beginPath(); g2.moveTo(29,14.5); g2.quadraticCurveTo(28,10,25,10); g2.moveTo(32,14.5); g2.quadraticCurveTo(34,11,36,11.5); g2.stroke();   // horns, one shorter
+  g2.lineWidth=2.4; [[12,27],[16,28],[22,28],[26,27]].forEach(([x,y])=>{ g2.beginPath(); g2.moveTo(x,y); g2.lineTo(x,y+5); g2.stroke(); });
+  g2.fillStyle='#4a3420'; g2.beginPath(); g2.arc(31.5,17,0.9,0,Math.PI*2); g2.fill(); g2.restore(); };
+ITEM_ICON.saelle_picks=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.fillStyle='#7a4a2a'; g2.strokeStyle='#4a2a14'; g2.lineWidth=1; g2.beginPath(); g2.roundRect(6,22,28,10,3); g2.fill(); g2.stroke();
+  g2.strokeStyle='#c8ccd4'; g2.lineCap='round'; g2.lineWidth=1.6; [[10,27,30,8,0],[14,27,33,12,1],[18,27,28,6,2]].forEach(([x,y,x2,y2,k])=>{ g2.beginPath(); g2.moveTo(x,y); g2.lineTo(x2,y2); g2.lineTo(x2+(k===1?3:2),y2+(k===2?3:1)); g2.stroke(); });
+  g2.fillStyle='#e8c060'; g2.beginPath(); g2.arc(9,27,1.4,0,Math.PI*2); g2.fill(); g2.restore(); };
+JOURNAL.push(["Matters of the Heart", ()=>{ const L=[];
+  if(CHOICE.ithil) L.push(CHOICE.ithil2 ? "Ithilwen asked what you fear, and filled her ribbon with moonlight for you. While you carry it, you are a little harder to kill." : "Ithilwen of the moon pool. She has something to ask you, some night.");
+  if(CHOICE.gunnarNight) L.push(CHOICE.gunnar2 ? "You danced with Gunnar on harvest-eve. There is a roast kept back for you at the Wheatsheaf every day, by his orders." : "Gunnar the Ploughman goes red whenever you walk into the Wheatsheaf. He seems to be working up to something.");
+  if(CHOICE.saelle2==='helped' && CHOICE.saelleNight) L.push(CHOICE.saelle3 ? {yes:"Saelle asked if you would leave the valley with her on the spring ship. You said yes.", stay:"Saelle asked if you would leave the valley with her. You told her it is your home; she says she will come back through the window.", spring:"Saelle asked if you would leave the valley with her. You told her to ask again in spring. She says she will, every day."}[CHOICE.saelle3]+" Sella the Fence pays you better for her sake." : "Saelle's rooms above the Lowstreets. She keeps looking at the ships.");
+  return L.length ? [ (CHOICE.ithil?!!CHOICE.ithil2:true) && (CHOICE.gunnarNight?!!CHOICE.gunnar2:true) && (CHOICE.saelle2==='helped'&&CHOICE.saelleNight?!!CHOICE.saelle3:true) ? 'done':'active', L.join('<br>') ] : null; }]);
 // ── Saelle again: the woman from the bathhouse, in the Lowstreets at night, with a job only a stranger can do ──
 const SAELLE_OPTS={gender:'f',skin:1,hair:3,hairColor:0,face:2,marks:{earrings:'hoop'},equip:{head:'hood',torso:'tunic_green',armor:null,hands:'gloves',legs:'hose_grey',feet:'riding_boots',weapon:null,offhand:null}};
 wrap('lowstreets','npcs',l=> CHOICE.saelle && CHOICE.saelle2!=='betrayed' && nightAmt()>0.5 ? [...l,{ id:'saelle_l', name:'Saelle', i:17, j:12, dir:1, opts:SAELLE_OPTS }] : l);
 TALKERS.saelle_l=()=>{ const S='Saelle', robbed=CHOICE.saelle==='robbed';
+  if(CHOICE.saelle2==='helped' && CHOICE.saelleNight && !CHOICE.saelle3){ const ans=(txt,reply,k)=>({label:txt, fn:()=>{ remember('saelle3',k,'Saelle asked whether you would ever leave Hollowmere with her.'); giveQuestItem('saelle_picks',true); updateHud();
+        say(S,[reply,"She presses a little leather roll into your hand: three bent steel picks, worn bright with use. “My spares. Sella will know whose they were, and she'll pay you better for it.” <i>You receive Saelle's lockpicks.</i>"],[bye]); }});
+    say(S,["Saelle is sitting on the sill again, not eating an apple this time. She is turning her gold earring round and round.","“Grell's letters are ash. Nobody owns me now.” She looks out over the roofs. “There's a ship from Port Fearn every spring. I've never been on one. Would you ever leave this valley? With someone?”"],[
+      ans('“With you? Yes.”',"For once she has nothing clever to say. She just nods, and keeps nodding, and looks out of the window so you will not see her face.",'yes'),
+      ans('“This valley is my home.”',"“I know.” She smiles anyway. “I'd have said the same, once. Keep the door locked, then, and I'll come back through the window.”",'stay'),
+      ans('“Ask me again in spring.”',"“Oh, I will.” She grins, all teeth. “Every day until then.”",'spring')]); return; }
   if(CHOICE.saelle2==='helped'){ say(S,["Saelle leans in a doorway with her hood down, a tin cup of something hot in both hands.",CHOICE.saelleNight?"“Back again? Good. The kettle's on, and the door still locks.”":"“My rooms are just up there. The door locks. I find that I'm in no hurry to be alone.”"],[
       {label:'Go up with her.', fn:()=>{ const n=NPCS.find(x=>x.id==='saelle_l'); romStart(n,'hearth'); CHOICE.saelleNight=true;
         say(S,"Her rooms are one room, small and warm and full of books she has clearly stolen. She shuts the shutters, and then she shuts your mouth with hers.",[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.3); romEnd(); say(S,"You wake to rain on the shutters and the smell of her rosewater on the pillow. She is sitting on the sill, already dressed, eating an apple. “Your purse is where you left it,” she says. “I checked.” <i>You are fully healed.</i>",[bye]); }); }}]); }},
@@ -17982,7 +18017,9 @@ const VOICE=(()=>{
     if(best.length>=3) pool=best;
     const names=pool.map(v=>v.name).sort(), n=cast(CAST_B,names,seed,key); return pool.find(v=>v.name===n); }
   // the online voices (OpenAI): who sounds like whom, and in what manner (the manner is a short instruction kept on the server)
-  const OA_F=['coral','nova','shimmer','sage'], OA_M=['ash','echo','onyx','verse','ballad'];   // fable is the narrator's own
+  // Kokoro's English voices, British first: 15 women, 10 men (the narrator bm_fable, the goblins' am_puck and the dead's am_onyx are kept apart)
+  const OA_F=['bf_emma','bf_isabella','bf_alice','bf_lily','af_heart','af_bella','af_nicole','af_sarah','af_sky','af_nova','af_river','af_kore','af_aoede','af_jessica','af_alloy'],
+        OA_M=['bm_george','bm_lewis','bm_daniel','am_michael','am_fenrir','am_echo','am_eric','am_liam','am_adam','am_santa'].filter(v=>v!=='am_santa');
   function who(name,opts){ const n=opts?null:(typeof NPCS!=='undefined' && NPCS.find(x=>x.name===name || (x.name && name && name.startsWith(x.name.split(',')[0])))) || null;
     const o=opts||n&&n.opts||{}; let g=o.gender||null;
     if(!g){ if(/\b(Old )?(Wenna|Bertha|Morwen|Vesna|Marta|Ada|Yselde|Nimuë|Ithilwen|Nelloth|Tessaly|Saelle|Maelis|Aerwen|Lady|Mother|Sister|Dalla|Mara|Hag|Witch|Widow)\b/i.test(name)) g='f';
@@ -17994,7 +18031,7 @@ const VOICE=(()=>{
     if(gob){ pitch+=0.45; rate+=0.08; }
     const key=(name||'?').split(/,| the | of /)[0];
     return {voice:pickB(g,h,key), pitch:Math.max(0.3,Math.min(1.9,pitch)), rate:Math.max(1.08,Math.min(1.4,rate)),
-      oa: (L=>L[h%L.length])(g==='f'?OA_F:g==='m'?OA_M:[...OA_M,...OA_F]),          // fixed per name, the same for every player, so one recording serves all
+      oa: gob ? 'am_puck' : (L=>L[h%L.length])(g==='f'?OA_F:g==='m'?OA_M:[...OA_M,...OA_F]),          // fixed per name, the same for every player, so one recording serves all
       st: gob?'goblin' : elf?'elf' : old?'old' : /\b(Baron|Lady|Lord|Sir|Magistrate|Magister|Captain|Warden)\b/.test(name||'')?'noble' : /\b(Saelle|Nim|Dalla|Jory|Mags|Rolf|Sella|Venn|Hal)\b/.test(name||'')?'rogue' : 'villager', speed: gob?1.08:1.04 }; }
   const clean=t=>String(t).replace(/<br\s*\/?>/gi,' ').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();
   function parts(text){ const out=[]; [].concat(text).map(clean).forEach(p=>{ const re=/“([^”]*)”|"([^"]*)"/g; let last=0, m;
@@ -18010,7 +18047,7 @@ const VOICE=(()=>{
       if(r.status===400){ ai.state='ready'; status('Online voices ready.'); setTimeout(()=>{ if(ai.state==='ready') status(''); },2500); }
       else { ai.state='failed'; status(r.status===503?'Online voices are not set up on this server yet (tts-config.php), so the browser’s voices are used.':'Online voices are not available here, so the browser’s voices are used.'); }
     }catch(e){ ai.state='failed'; status('Online voices are not available here, so the browser’s voices are used.'); } }
-  const ttsUrl=(t,v)=>TTS_URL+'?v='+encodeURIComponent(v.oa||'fable')+'&s='+encodeURIComponent(v.st||'villager')+'&t='+encodeURIComponent(t);
+  const ttsUrl=(t,v)=>TTS_URL+'?v='+encodeURIComponent(v.oa||'bm_fable')+'&s='+encodeURIComponent(v.st||'villager')+'&t='+encodeURIComponent(t);
   // one queue for both engines: a line is a list of [text, voice] pieces, spoken one after another; stop() drops it all
   let gen=0, busyNow=false, curAudio=null;
   function playUrl(a,v){ return new Promise(res=>{ curAudio=a; a.playbackRate=v.speed||1; a.volume=typeof SND!=='undefined' ? Math.min(1,0.45+SND.vol*0.8) : 1;
@@ -18027,7 +18064,7 @@ const VOICE=(()=>{
     }catch(e){ console.warn(e); }
     finally{ if(my===gen){ busyNow=false; curAudio=null; if(onEnd) onEnd(); } } }
   function hush(){ gen++; busyNow=false; try{ if(S) S.cancel(); }catch(e){} try{ if(curAudio){ curAudio.onended=null; curAudio.pause(); } }catch(e){} curAudio=null; }
-  const NARR={pitch:0.95, rate:1.15, oa:'fable', st:'narrator', speed:1.06};          // the narrator keeps a brisk pace
+  const NARR={pitch:0.95, rate:1.15, oa:'bm_fable', st:'narrator', speed:1.06};          // the narrator keeps a brisk pace
   const heard=new Map();                                   // name|text → when it was last read: 'Back', a second purchase, a shop redrawn don't repeat it
   function read(name,text){ if(mode==='off' || (!S && engine!=='online')) return;
     const key=name+'|'+[].concat(text).join(' '), now=performance.now(), last=heard.get(key);
@@ -18044,7 +18081,7 @@ const VOICE=(()=>{
   const say1=(text,v,cut,obj)=>{ const t=clean(text).replace(/[“”"]/g,'').trim(); if(!t || !/[a-z]/i.test(t) || /^(Grr+|Hm+|\.+)!?$/i.test(t)) return;
     if(cut) hush(); else if(talking()) return; if(obj) held=obj; run([[t,v]],()=>{ if(held===obj) held=null; }); };
   const youV=()=>({...who(player.name||'you', player.opts||{}), st:'hero'});
-  const DEAD={pitch:0.55, rate:0.95, oa:'onyx', st:'dead', speed:1};
+  const DEAD={pitch:0.55, rate:0.95, oa:'am_onyx', st:'dead', speed:1};
   setInterval(()=>{ if(mode==='off' || typeof NPCS==='undefined' || document.hidden) return;
     try{
       const cs=CS.say; if(cs && cs!==lastCs){ lastCs=cs; const e=cs.ent; say1(cs.text, e===player ? youV() : who(e&&e.name||'', e&&e.opts), true, cs); } else if(!cs) lastCs=null;
@@ -18063,7 +18100,11 @@ const VOICE=(()=>{
   return { holds(o){ return !!o && held===o && mode!=='off' && talking(); }, busy(){ return !!held && mode!=='off' && talking(); }, get mode(){ return mode; }, get engine(){ return engine; }, get aiState(){ return ai.state; },
     read, stop, setMode, setEngine, syncUi,
     cycle(){ setMode(MODES[(MODES.indexOf(mode)+1)%MODES.length]); if(mode!=='off'){ hush(); heard.clear(); read('Old Tobb','“Can you hear me? Good. Now go and do something useful.”'); } },
-    supported:!!S || !!window.AudioContext, _parts:parts, _who:who };
+    supported:!!S || !!window.AudioContext, _parts:parts, _who:who,
+    _requests(name,text){ const v=who(name), out=[]; const P=parts(text);           // for tooling: the clips a dialog asks for, in either voice mode
+      P.forEach(([k,t])=>out.push(k==='s'?[v.oa||'bm_fable',v.st||'villager',t]:[NARR.oa,NARR.st,t]));
+      if(P.length===1 && P[0][0]==='n' && !/^(You|Your|The|A |An |She|He|They|It|Through|Across|Somewhere|For a)/.test(P[0][1])) out.push([v.oa||'bm_fable',v.st||'villager',P[0][1]]);
+      return out; } };
 })();
 { const b=document.getElementById('voice-toggle'), e=document.getElementById('voice-engine');
   if(b){ if(!VOICE.supported) b.style.display='none'; else b.addEventListener('click',()=>VOICE.cycle()); }

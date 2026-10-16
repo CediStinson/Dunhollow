@@ -16,7 +16,11 @@ $API    = $cfg['api_url'] ?? 'https://api.openai.com/v1/audio/speech';
 $MODEL  = $cfg['model'] ?? 'gpt-4o-mini-tts';
 
 // only the game's own voices and styles: nobody can send their own instructions through your key
-$VOICES = ['alloy','ash','ballad','coral','echo','fable','nova','onyx','sage','shimmer','verse'];
+$KOKORO = ['bf_emma'=>'coral','bf_isabella'=>'nova','bf_alice'=>'sage','bf_lily'=>'shimmer','af_heart'=>'alloy','af_bella'=>'shimmer','af_nicole'=>'nova','af_sarah'=>'coral',
+  'af_sky'=>'sage','af_nova'=>'nova','af_river'=>'alloy','af_kore'=>'coral','af_aoede'=>'shimmer','af_jessica'=>'sage','af_alloy'=>'alloy',
+  'bm_george'=>'ash','bm_lewis'=>'echo','bm_daniel'=>'verse','bm_fable'=>'fable','am_michael'=>'ballad','am_fenrir'=>'onyx','am_echo'=>'echo',
+  'am_eric'=>'ash','am_liam'=>'verse','am_adam'=>'ballad','am_onyx'=>'onyx','am_puck'=>'verse'];   // the game's voices are Kokoro's; for OpenAI, the nearest of its own
+$VOICES = array_keys($KOKORO);
 $STYLES = [
   'villager' => 'A villager in a small medieval English valley. Warm, plain-spoken, a little rough. British accent. Natural pace.',
   'noble'    => 'A proud medieval noble. Measured, precise, a little cold. Refined British accent.',
@@ -72,7 +76,7 @@ $ch = curl_init($API);
 curl_setopt_array($ch, [
   CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 40,
   CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $cfg['api_key'], 'Content-Type: application/json'],
-  CURLOPT_POSTFIELDS => json_encode(['model' => $MODEL, 'voice' => $voice, 'input' => $text,
+  CURLOPT_POSTFIELDS => json_encode(['model' => $MODEL, 'voice' => $KOKORO[$voice], 'input' => $text,
                                      'instructions' => $STYLES[$style], 'response_format' => 'mp3']),
 ]);
 $audio = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE); curl_close($ch);

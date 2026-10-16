@@ -2,7 +2,7 @@
 //
 //   1. Install Node.js (https://nodejs.org), then in this folder, once:   npm install kokoro-js lamejs
 //   2. The whole game at once (do this first; it takes a while, leave it running):   node voicegen.js voicelines.jsonl
-//      voicelines.jsonl comes with the game: every line that can be known in advance (about 2,300).
+//      voicelines.jsonl comes with the game: every line that can be known in advance (about 2,500), each with its own voice from Kokoro's 28.
 //   3. Upload the folders inside ./tts-cache to tts-cache/ on your web space.
 //   Later, for the few lines that change during play (names, numbers, cutscene bubbles): download
 //   tts-cache/_queue.jsonl from your web space, run   node voicegen.js _queue.jsonl , upload again,
@@ -48,7 +48,7 @@ function toMp3(f32, rate) {
   const tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', { dtype: 'q8', device: 'cpu' });
   let n = 0;
   for (const q of todo) {
-    const st = STYLE[q.s] || STYLE.villager, voice = st.voice || VOICE[q.v] || 'bm_george';
+    const st = STYLE[q.s] || STYLE.villager, voice = st.voice || (/^[ab][fm]_/.test(q.v) ? q.v : VOICE[q.v]) || 'bm_george';   // the game names Kokoro's voices itself now
     try {
       const a = await tts.generate(q.t, { voice, speed: st.speed || 1 });
       const dir = path.join(outDir, q.k.slice(0, 2)); fs.mkdirSync(dir, { recursive: true });

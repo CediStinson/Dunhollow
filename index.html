@@ -13858,6 +13858,7 @@ const dodgeChance=a=>Math.min(DODGE_CAP,a*AGI_DODGE);
 // every stat a piece of gear carries, in words
 function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
   if(id==='fen_boots') L.push(['Walking speed','+15%']);
+  if(id==='moon_ribbon' && CHOICE.ithil2) L.push(['Health','+5 <small>(her moonlight)</small>']);
   if(WEAPONS[id] && WEAPONS[id].ember) L.push(['Grows with','Attack + Spell Power <small>(+4% each point); every cut burns</small>']);
   if(WEAPONS[id] && WEAPONS[id].burn) L.push(['Special',Math.round(WEAPONS[id].burn*100)+'% to set the foe burning']);
   if(WEAPONS[id] && WEAPONS[id].wither) L.push(['Special',Math.round(WEAPONS[id].wither*100)+'% to wither the foe, '+Math.round(WEAPONS[id].drain*100)+'% to drain life <small>(both grow with spell power)</small>']);
@@ -13880,13 +13881,16 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
     const keys=new Set(L.map(r=>r[0])); if(M) Object.keys(M).forEach(k=>{ if(!keys.has(k) && /Health|Agility|Magic|Damage|Attack|Spell power/.test(k)) L.push([k,'0']); });
     return `<b>${ITEMS[id].name}</b><i>${SLOT_NAMES[ITEMS[id].slot]||''}</i>`+(L.length?L.map(([k,v])=>{ let d='';
       if(M){ const df=num(v)-num(M[k]||0); if(Math.abs(df)>0.001 && !/Special|×/.test(k+v)){ const inv=/Swing/.test(k), dd=inv?df.toFixed(2):df; d=` <em class="${(inv?df<0:df>0)?'up':'dn'}">(${df>0?'+':''}${dd}${inv?'s':''})</em>`; } }
-      return `<div class="r">${k}<span>${v}${d}</span></div>`; }).join(''):ITEMS[id].slot==='food'?'':'<small>No bonuses. Looks good, though.</small>')+extraTip(id)+(eq?'<div class="eqfoot"><span class="eqh">equipped</span></div>':''); };
+      return `<div class="r">${k}<span>${v}${d}</span></div>`; }).join(''):ITEMS[id].slot==='food'||window.itemFlavor(id)?'':'<small>No bonuses. Looks good, though.</small>')+extraTip(id)+(eq?'<div class="eqfoot"><span class="eqh">equipped</span></div>':''); };
   const FOOD_TIP={ fish_perch:'A striped perch, still flapping. Better grilled over a campfire.', fish_trout:'A speckled trout. Grill it over a campfire.', fish_carp:'A fat fen carp. It tastes of mud raw; grilled, it is a meal.', fish_eel:'A slippery eel. Nobody eats these raw. Cook it.', fish_herring:'A silver herring from the salt water. Grill it.', grilled_fish:'Crisp skin, flaky and hot from the fire. A proper meal.', warm_tonic:'Ginger, pepper and strong spirit. It burns going down, and the cold goes out of your hands.', burn_salve:'A cold green salve of comfrey and fen-moss. Smear it on and the burning stops.', rue_water:'Bitter rue steeped in well water. It drives the withering out of your blood.', linen_wrap:'A roll of clean linen. Bind a bleeding wound and it closes.', apple:'A crisp apple. A small bite between fights.', bread:'A dense brown loaf. Fills the belly.', potion:'Red, bitter, and it works fast. The best thing to have in a bad fight.', raw_meat:'Edible, barely. Cook it over any campfire and it heals far more.', cooked_meat:'Spit-roasted and salted. A proper meal.', mana_potion:'Cold, blue, and it tastes of tin and thunder. The power comes back into your fingers.' };
   const extraTip=id=>{ const it=ITEMS[id];
     if(typeof bookTip==='function'){ const t=bookTip(id); if(t!==null) return t; }   // staves: your three spells and what can still be learned
     if(it.slot==='food') return (it.cure?`<div class="r">Cures<span>${STATUS_DEF[it.cure].name}</span></div>`:'')+`<div class="r">Restores<span>${it.mana?'+'+it.mana+' Mana':'+'+it.heal+' Health'}</span></div><div class="fl">${FOOD_TIP[id]||''}</div><small>Double-click to ${(id==='potion'||it.mana)?'drink':'eat'} it. In a fight, use the food bar beside the attack buttons.</small>`;
-    if(typeof GEAR_LORE!=='undefined' && GEAR_LORE && GEAR_LORE[id]) return `<div class="fl" style="color:#b8c8a8">${GEAR_LORE[id]}</div>`;
-    return ''; };
+    const b=baseOf(id); if(typeof GEAR_LORE!=='undefined' && GEAR_LORE && GEAR_LORE[b]) return `<div class="fl" style="color:#b8c8a8">${GEAR_LORE[b]}</div>`;
+    const fl=flavorOf(id); return fl?`<div class="fl">${fl}</div>`:''; };
+  const baseOf=id=>String(id).replace(/^[wt]_/,'').replace(/^[wt]_/,'');                 // woven and tempered pieces read like the plain one
+  const flavorOf=id=>{ const b=baseOf(id); return FLAVOR[b] || (typeof ITEM_LORE!=='undefined' && ITEM_LORE[b]) || (ITEMS[b] && ITEMS[b].title) || ''; };
+  window.itemFlavor=id=>{ const b=baseOf(id); return (typeof GEAR_LORE!=='undefined' && GEAR_LORE && GEAR_LORE[b]) || flavorOf(id); };
   const FLAVOR={ necro_robe:'Vesna\'s old robe: black wool worn thin and grey, the hem gone to long rags, fen mud soaked into it, a sprig of dried bog-myrtle in the cord at the throat.', necro_bustier:'A black bodice, frayed at every edge and laced with a leather cord. It smells of peat smoke.', necro_leggings:'Black knitted stockings, laddered and worn through at the knee, muddy to the shin. A fen-witch does not care.', grave_mote:'A little cold light that sits in your palm like a moth. It came up out of an old grave.', heartshard:'A cracked crystal the size of a fist, from the heart of the goblin cave. Green light turns inside it. Someone who knows staves could use it.', raw_meat:'A bloody cut. Better roasted: an inn, or a hunter\'s fire, will cook it.', cooked_meat:'Spit-roasted, salted, still warm. Keeps you going.', wolf_fang:'A long yellow fang. Traders buy them for charms.', morwen_lantern:'A little iron lantern with a green flame that never goes out. Old Morwen wants it back.', bog_coins:'Coins so old the faces on them have no names. Still silver, though.', silver_torc:'A twisted silver neck-ring, black with bog water. A trader would pay well.', amber_brooch:'A lump of amber in a bronze setting, with a fly caught inside it forever.', wight_ring:'Black gold, cold as the barrow. The Barrow-King wore it for a thousand years.', pelt:'A grey wolf hide, still smelling of the wood. Someone will pay for it.',
     letter:"Found on the bandits at the farm. The seal on it belongs to the Baron.",
     seal:"Orders in the Baron's own hand, his seal pressed into red wax. Proof, if anyone dares to read it.",
@@ -13908,7 +13912,7 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
     greencrystal:'It hums faintly whenever there is gold nearby.',
     cartwheel:"Hobb's spare cart wheel. He will want it back.",
     brooch:'A silver brooch, worn smooth by some thumb that is not yours.' };
-  const misc=id=>{ const it=ITEMS[id]; return `<b>${it.name}</b><i>${it.junk?'Junk · worth a few coppers':it.tool?'Tool':QUEST_ITEMS.has(id)?'Quest item':(typeof SELL_MISC!=='undefined'&&SELL_MISC.has(id))?'Valuable':'Keepsake'}</i><div class="fl">${FLAVOR[id]||it.title||''}</div>`+(it.read?'<small>Double-click to read.</small>':''); };
+  const misc=id=>{ const it=ITEMS[id]; return `<b>${it.name}</b><i>${it.junk?'Junk · worth a few coppers':it.tool?'Tool':QUEST_ITEMS.has(id)?'Quest item':(typeof SELL_MISC!=='undefined'&&SELL_MISC.has(id))?'Valuable':'Keepsake'}</i><div class="fl">${flavorOf(id)}</div>`+(it.read?'<small>Double-click to read.</small>':''); };
   const idOf=el=> el.classList.contains('shop-slot') ? el.dataset.item : getAt(slotLoc(el));
   const isEq=el=>{ const l=!el.classList.contains('shop-slot') && slotLoc(el); return !!(l && l.kind==='eq'); };
   const hide=()=>{ tip.style.display='none'; tip2.style.display='none'; };
@@ -17615,7 +17619,7 @@ const SPELL_TIP=(id,m)=>{ const S=SPELL_DEF[id], d=Math.round((S.dmg||0)*m), c=M
     iceward:'the next blow breaks on it and numbs him', kindle:'a fire that grows each second', doppel:'your double fights beside you', spear:d+' damage, through any guard', grasp:d+' damage, holds him: interrupts his swing' })[id]+' · '+c+' mana'; };
 function bookTip(id){ const sc=NECRO_STAVES.includes(id)?'necro':['staff_oak','staff_star','staff_cinder','staff_crystal'].includes(id)?'mage':null; if(!sc) return null;
   const m=WEAPONS[id].magic*(1+(typeof gearSum==='function'?gearSum('magic'):0)*0.04), b=BOOK(sc), C=sc==='necro'?'#b8a8e8':'#9adcf0', arrow={left:'◀',up:'▲',right:'▶'};
-  const lore=(sc==='mage' && typeof GEAR_LORE!=='undefined' && GEAR_LORE && GEAR_LORE[id])?`<div class="fl" style="color:#b8c8a8">${GEAR_LORE[id]}</div>`:'';
+  const lore=window.itemFlavor && window.itemFlavor(id) ? `<div class="fl" style="color:#b8c8a8">${window.itemFlavor(id)}</div>`:'';
   const rows=['left','up','right'].map(d=>arrow[d]+' '+SPELL_TIP(b[d],m)).join('<br>');
   const extra=sc==='necro' ? ['grasp','spear','boneshield'] : ['doppel','iceward','kindle'], miss=extra.filter(x=>!(sc==='necro'?NECRO_EXTRA(x):MAGE_EXTRA(x))).length;
   const who=sc==='necro' ? "Vesna the Grave-Speaker, in the Dunhollow graveyard at night," : (CHOICE.appr==='taken' ? null : (typeof ORVELL_AT_INN==='function' && ORVELL_AT_INN()) ? "Magister Orvell, at the Wheatsheaf in Dunhollow," : "Magister Orvell, in the Castle Ward of Hollowmere,");
@@ -17657,6 +17661,109 @@ window.addEventListener('keydown',e=>{ if(!(e.key==='b'||e.key==='B') || !runnin
   const place=()=>{ try{ const cs=getComputedStyle(jb), r=jb.getBoundingClientRect(); ['background','backgroundImage','border','borderRadius','color','fontSize','fontFamily','padding','boxShadow','cursor'].forEach(k=>sb.style[k]=cs[k]);
       sb.style.position='absolute'; sb.style.top=cs.top; sb.style.right=(innerWidth-r.left+8)+'px'; sb.style.zIndex=cs.zIndex; sb.style.display=(running && bookSchools().length)?'block':'none'; }catch(e){} };
   setInterval(place,1000); addEventListener('resize',place); sb.addEventListener('click',e=>{ e.stopPropagation(); bookPanel.style.display==='block'?closeBook():openBook(); }); }
+// ── a few words about every piece of gear, so nothing in your pack is just a list of numbers ──
+var ITEM_LORE={
+  shirt:"Patched at both elbows and frayed at the hem. It has been washed in the Dunhollow brook so many times it has forgotten its colour.",
+  trousers:"Farm trousers, knees gone thin from kneeling in furrows. Comfortable, which is the most anyone has ever said for them.",
+  boots:"Plain brown leather, resoled twice. They know the road to the village by heart.",
+  jerkin:"Boiled leather over linen, stiff as a board until it learns your shape. Turns a glancing cut and lets you move.",
+  mail:"Thousands of riveted iron rings, heavy on the shoulders and loud on the stairs. Worth every ounce when a blade comes at you.",
+  robe:"Undyed wool, a deep hood, and pockets sewn inside the sleeves for things a traveller would rather keep dry. A hedge-scholar's habit.",
+  robe_blue:"Blue wool with ink stains on the cuffs. Somebody wore this through a lot of long nights over books.",
+  robe_black:"Black as a moonless field and cut to move quietly. Nobody notices a robe like this until it is too late.",
+  robe_elf:"Spun from moonlight caught in the pool on the Old Elven Road. It weighs nothing and is never quite cold.",
+  hood:"Thick grey wool, warm in the rain. It keeps the wind out and a little of the world, too.",
+  kettle:"A wide iron brim, beaten from a single sheet. Footsoldiers love it: arrows and rain both run off it.",
+  gloves:"Supple leather, the palms worn smooth by a sword grip. Your hand is a little quicker in them.",
+  dagger:"More rust than steel, and the grip is wrapped in old twine. Short and quick, and better than bare hands. Barely.",
+  sword:"A plain arming sword, straight and honest, the kind every lord's man carries. Good balance, a good edge, nothing to boast about.",
+  morningstar:"A ball of iron spikes on an ash haft. Slow to swing, and nobody wants to be there when it lands.",
+  pitchfork:"Three iron tines on a long handle, made for hay and turned to other work. Farmers have fought with worse.",
+  shield:"Lime-wood boards, a rawhide rim and an iron boss. Hold it up at the right moment and it makes a perfect parry almost easy.",
+  tunic_linen:"Linen bleached in the sun until it is nearly white. It catches every speck of dirt, so it says you can afford to keep it clean.",
+  tunic_blue:"Wool dyed with woad, the blue of a cold morning. A good tunic for market days.",
+  tunic_green:"Wool the green of hedgerows in May. Foresters wear it, and so do people who would rather not be seen among trees.",
+  tunic_red:"Dyed with madder root, the most expensive red in the valley. Aldo the Clothier swears it is his best.",
+  smock:"Brown homespun, loose and long, made for hard work. It hides mud well, which is the point.",
+  hose_grey:"Close-fitting grey hose, the kind city men wear under their tunics. Easy to run in.",
+  breeches:"Sturdy green breeches with a leather seat. Made for the saddle and the long road.",
+  riding_boots:"Tall black boots of fine calf, polished to a shine. Worn by people who ride while others walk.",
+  plate_boots:"Leather boots with steel plates riveted over the shin and toe. You will hear yourself coming.",
+  hood_red:"A scarlet chaperon with a long tail you can wind round your neck. Fashionable in Hollowmere, ridiculous anywhere else.",
+  straw_hat:"Woven from last summer's wheat straw. It keeps the sun off and does nothing else whatsoever.",
+  bandana:"A square of purple silk knotted at the back. Sailors, rogues and people who want to look like either wear these.",
+  coif:"A hood of fine mail that falls over the shoulders. It keeps a blade off your throat, and it pinches your ears.",
+  helm_full:"A great barrel of steel with eye-slits and breathing holes. Your own breath roars in it. Nobody gets to your face.",
+  gambeson:"Layer on layer of linen, quilted and stuffed with wool. Soldiers wear it under mail; poor soldiers wear it instead.",
+  studded:"Leather stiffened with rows of iron studs. A sellsword's coat: tough, light, and it never lets you forget a fight.",
+  blackmail:"Steel plates riveted inside dark cloth, a whole armoury hidden under velvet. It looks like a coat until someone hits it.",
+  brightmail:"Long mail polished until it shines like water. A knight's hauberk, heavy as a sack of grain and worth a farm.",
+  gauntlets:"Articulated iron plates over leather gloves. A fist in one of these is a weapon of its own.",
+  shield_red:"A heater shield painted red, its point long enough to guard your knee. Wider than a round shield, and kinder to a late block.",
+  shield_iron:"A tall kite shield faced with iron, from chin to shin. Hide behind it and almost nothing gets through; you must be quick to parry with it.",
+  elf_robe:"Starwoven: thread so fine it seems made of evening light. Elves wear it the way you might wear a shirt.",
+  elf_bustier:"Silver lacing over moon-pale silk. Elven tailors do not believe in modesty, only in grace.",
+  elf_tunic:"Leaves of green silk overlapping like the canopy of a beech wood. It whispers when you move.",
+  elf_leggings:"Soft grey-green leggings that move like a second skin. Sylvhaven's scouts wear nothing else.",
+  elf_boots:"Soft leather that wraps the foot like a hand. You will not hear your own steps in them.",
+  elf_cloak:"Grey-green, the colour of lichen on old stone. In the woods, even you lose sight of where it ends.",
+  elf_scale:"Hundreds of small steel leaves, overlapping like a pinecone. Elven smiths take a year to make one.",
+  elf_circlet:"A thin band of elven silver, set with a single pale stone. It hums, very faintly, when you cast.",
+  elf_shirt:"Nettle linen, soft as old flannel. The elves of the road make it from plants humans pull out of their gardens.",
+  elf_trousers:"Elven breeks, rolled at the calf for wading. They have crossed a great many streams.",
+  elf_tunic_worn:"A leafweave tunic that has seen a few seasons on the road. Some of the silk leaves have gone brown, like real ones.",
+  elf_leggings_worn:"Elven leggings, patched at the knee in a green that almost matches. Still lighter than anything a human could make.",
+  elf_boots_worn:"Wrap-boots laced to the knee, scuffed from long walks between the Silver Gate and the old road. Light and silent.",
+  elf_blade:"A narrow blade with a leaf-shaped point, light enough to dance with. Elven steel holds its edge for a lifetime, an elven one.",
+  hatchet:"A woodsman's hatchet, its head notched from years of kindling. Quick in the hand.",
+  axe:"A bearded axe, its lower edge hooked to catch a shield rim. Slow, heavy, and it bites deep.",
+  spear:"A boar spear with a crossbar below the blade, so the boar cannot run up the shaft at you. Works on people, too.",
+  mace:"A flanged iron head on a short steel haft. Armour does not help much against it.",
+  longsword:"A hand-and-a-half sword, long in the blade and the grip. The finest thing a smith in Hollowmere can sell you.",
+  club:"A knot of oak root, the handle whittled smooth. The oldest weapon in the world, and it still works.",
+  tunic_gold:"The livery of the Gold Brothers Trading Company: deep cloth, gold thread at the collar. In Hollowmere, doors open for it.",
+  staff_hex:"Blackthorn, knotted and crooked, tied with charms of bone and feather. It has the cold feel of things kept in graveyards.",
+  staff_oak:"A straight length of oak, capped with a little blue glass. Every apprentice of the Magisters starts with one of these.",
+  staff_star:"Pale starwood, so light it seems to want to float. It has passed from master to apprentice for longer than anyone in Hollowmere remembers.",
+  staff_cinder:"Charred wood bound in iron, the head still glowing faintly. It is never cold, and it smells of smoke.",
+  staff_crystal:"Three bronze prongs hold the heart of the goblin cave: a cluster of green crystals that hum faintly whenever you cast.",
+  moon_amulet:"A silver cage around a drop of moonlight that never fades. Maelis made it from the pool's own light.",
+  fen_boots:"Tall boots of black eel-hide, from the Barrow-King's hoard. The fen does not take you in them; you walk on it.",
+  staff_bone:"Bones, bound with gut to a length of yew. Old Tobb kept it out of sight for years, and would rather you had it than him.",
+  staff_barrow:"The Barrow-King's own rod, wound with green-black bronze. The dead remember who carried it, and listen.",
+  staff_bog:"Bog-oak, dripping even on dry days. The Bog-Hag leaned on it for longer than anyone in the valley has been alive.",
+  fire_blade:"Forged in the Sunken Forge, where the mountain still burns. The steel is warm to the touch and every cut smokes.",
+  emberbrand:"The Fire Blade, woken by Ilka, the spirit of the Sunken Forge. It burns brighter in the hands of someone who has learned both steel and spell.",
+  ember_core:"A stone that glows like a coal and never cools. It throbs slowly, like a heart.",
+  ash_mantle:"Cloth woven with ash-grey thread that does not burn. It came out of the fire whole when nothing else did.",
+  cinder_gloves:"Gloves of fire-hardened hide, the fingertips blackened. You could pick up a coal in them.",
+  obsidian_helm:"A half-helm of volcanic glass on an iron frame. Black, sharp-edged and lighter than it looks.",
+  scorched_greaves:"Shin guards blackened by fire and never polished since. The heat of the Sunken Forge is still in them.",
+  emberstep_boots:"Boots soled with something that is not quite leather and not quite stone. Hot ground does not bother them.",
+  old_bone:"A long bone, yellow with age. Somebody's once. Vesna the Grave-Speaker buys these, and does not say why.",
+  old_skull:"It grins at you. Vesna would pay a few coppers for it, and give it a good home.",
+  rusted_blade:"A sword left so long in a grave that the rust has eaten through it in places. There is still something in it: Vesna might know what.",
+  grave_ring:"A ring black with damp, taken from a bone finger. The dead do not need it, Vesna says. Mostly.",
+  clean_blade:"The grave-blade, scoured of a hundred years of rust. Bright again, and somehow still cold.",
+  shovel:"An iron spade with a long ash handle, good for digging and not bad in a fight. The dead in their barrows know the sound of it.",
+  baron_tabard:"The Baron's colours, his sigil stitched on the chest. People in the valley look at you differently in it, and not kindly.",
+  beret:"A soft black beret with a little white feather, worn tipped to one side. City fashion, straight from Hollowmere.",
+  vest_black:"A black waistcoat with braided frogging down the front. A merchant prince's idea of modest.",
+  cowl_black:"A short black capelet with a hood bunched at the nape. Over the shoulders, open at the throat.",
+  shirt_white:"Fine white linen, full in the sleeves, with ties at the collar. Somebody else always did the washing.",
+  breeches_cream:"Knee breeches of cream wool, buttoned at the knee. For people who do not kneel.",
+  trousers_black:"Plain black wool, well cut. They look expensive without shouting it.",
+  boots_black:"Black boots, polished every morning by somebody who is not the wearer.",
+  bevor:"A steel collar that guards the throat and jaw. Most killing blows come from below the chin. Not with this on.",
+  copper_chain:"A chain of copper links, green at the clasp. A pedlar's trinket, cheerful enough.",
+  bone_charm:"Knucklebones strung on a leather thong. Soldiers wear them for luck. It seems to work, a little.",
+  glass_beads:"Blue and green glass beads, made in Hollowmere. They catch the light like the moon pool does.",
+  tin_medal:"A tin medal stamped with a saint nobody remembers the name of. It is supposed to keep you whole.",
+  wolf_necklace:"Wolf teeth on a sinew cord, drilled and strung by Brann the Hunter. Wolves smell it on you, and hesitate.",
+  grave_salt:"A locket of black iron filled with salt from a grave-mound. Vesna fills them. It keeps a spell-caster's breath steady.",
+  fishing_rod:"Hazel rod, horsehair line, a bent iron hook. Find quiet water and be patient.",
+  old_boot:"An old boot, full of water and a very surprised frog. Nobody wants it."
+};
 // ── keepsakes of the heart, and a page in the journal ──
 Object.assign(ITEMS,{ carved_ox:{ name:'A Carved Wooden Ox', slot:'misc', title:"Pale wood, carved by big careful hands. One horn is a little shorter than the other. Gunnar says that is on purpose." },
   saelle_picks:{ name:"Saelle's Lockpicks", slot:'misc', title:"Three bent steel picks in a leather roll, worn bright with use. Sella the Fence knows whose they were, and pays you better for it." } });

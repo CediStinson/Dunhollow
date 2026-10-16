@@ -767,7 +767,7 @@ const ITEMS = {
           "Do this quietly. If the farmers come asking who sent you, tell them nothing.",
           "— B."] },
 };
-const SLOTS = ['head','torso','armor','hands','legs','feet','weapon','offhand','neck'];
+const SLOTS = ['head','torso','armor','hands','legs','feet','weapon','offhand','neck','special'];
 // what Marta asks for her wares, in copper; she pays two fifths of it for yours
 const PRICES = { shirt:6, trousers:6, boots:14, gloves:12, hood:10, jerkin:35, kettle:30, mail:95, dagger:12, sword:45, morningstar:60, pitchfork:5, shield:28, pelt:20,
   tunic_linen:9, tunic_blue:12, tunic_green:12, tunic_red:14, smock:8, hose_grey:8, breeches:10, riding_boots:24,
@@ -775,7 +775,7 @@ const PRICES = { shirt:6, trousers:6, boots:14, gloves:12, hood:10, jerkin:35, k
   hatchet:14, axe:40, spear:34, mace:55, longsword:80, club:4,
   elf_robe:70, elf_tunic:45, elf_leggings:25, elf_boots:40, elf_cloak:60, elf_scale:160, elf_circlet:55, elf_blade:120, moonbloom:40, elf_tunic_worn:10, elf_leggings_worn:8, elf_boots_worn:12, elf_shirt:6, elf_trousers:6 };
 const SHOP_STOCK = ['apple','bread','potion','tunic_blue','tunic_green','tunic_red','breeches','hood_red','straw_hat','gambeson','studded','gloves','kettle','mail','shield','shield_red','hatchet','spear','sword','axe'];
-const SLOT_NAMES = { food:'Provisions', head:'Head', torso:'Torso', armor:'Armor', hands:'Hands', legs:'Legs', feet:'Feet', weapon:'Weapon', offhand:'Offhand', neck:'Neck' };
+const SLOT_NAMES = { food:'Provisions', head:'Head', torso:'Torso', armor:'Armor', hands:'Hands', legs:'Legs', feet:'Feet', weapon:'Weapon', offhand:'Offhand', neck:'Neck', special:'Special' };
 // Weapons: how fast you swing, how hard you hit, and whether the swings are heavies
 // Unarmed = fists.
 const WEAPONS = {
@@ -794,7 +794,7 @@ const WEAPONS = {
 };
 const weaponOf = e => (e.type==='wolf') ? {wind:0.35,dmg:9} : WEAPONS[(e.opts && e.opts.equip && e.opts.equip.weapon) || 'fists'] || WEAPONS.fists;
 const INV_SIZE = 30;
-function defaultEquip(){ return { head:null, torso:'shirt', armor:null, hands:null, legs:'trousers', feet:null, weapon:null, offhand:null, neck:null }; }
+function defaultEquip(){ return { head:null, torso:'shirt', armor:null, hands:null, legs:'trousers', feet:null, weapon:null, offhand:null, neck:null, special:null }; }
 function defaultInv(){
   return Array(INV_SIZE).fill(null);   // the farm gives up its gear reluctantly
 }
@@ -1513,6 +1513,12 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       c.fillStyle=tone(GEAR.glove,0.06-0.18*depth); c.fillRect(x+x0-0.8,B+hy-2.6,hw+1.6,3);
       c.fillStyle=tone(GEAR.glove,-0.45); c.fillRect(x+x0-0.8,B+hy-2.6,hw+1.6,0.7);
     }
+    if(E.special==='moon_ribbon' && s<0 && !(E.hands==='gloves' && vH==='gauntlets')){   // Ithilwen's ribbon, wound round the wrist
+      const wy=B+hy-(E.hands==='gloves'?3.6:1.8), a=1-0.45*depth; c.save(); c.globalAlpha=a;
+      c.fillStyle='rgba(210,225,255,0.22)'; c.fillRect(x+x0-1.6,wy-1.6,hw+3.2,3.6);                                 // a little moonlight
+      c.fillStyle='#e4eaf6'; c.fillRect(x+x0-0.7,wy-0.6,hw+1.4,1.5); c.fillStyle='#9aa6c0'; c.fillRect(x+x0-0.7,wy+0.6,hw+1.4,0.4);
+      c.strokeStyle='#d8e0f2'; c.lineWidth=0.7; c.beginPath(); c.moveTo(x+x0+hw*0.7,wy+0.6); c.quadraticCurveTo(x+x0+hw+0.6,wy+3,x+x0+hw+0.2,wy+4.6);
+      c.moveTo(x+x0+hw*0.55,wy+0.8); c.quadraticCurveTo(x+x0+hw*0.4,wy+3.4,x+x0+hw*0.8,wy+5); c.stroke(); c.restore(); }
   };
 
   // ── women: short torn skirt, rope belt, fitted top with a scooped neckline ──
@@ -8884,6 +8890,7 @@ function applySave(sv){
   player.opts.equip = sv.opts.equip ? {...defaultEquip(player.opts.gender), ...sv.opts.equip} : defaultEquip(player.opts.gender);
   if(!sv.opts.equip || !('offhand' in sv.opts.equip)) player.opts.equip.offhand=null;
   if(!('neck' in player.opts.equip)) player.opts.equip.neck=null;
+  if(!('special' in player.opts.equip)) player.opts.equip.special=null;
   if(player.opts.equip.offhand==='moon_amulet'){ player.opts.equip.neck=player.opts.equip.neck||'moon_amulet'; player.opts.equip.offhand=null; }   // the focus hangs at the neck now
   if(!sv.opts.equip || !('weapon' in sv.opts.equip)) player.opts.equip.weapon='sword';   // saves from before weapons existed
   rescueStrayItems();
@@ -9555,7 +9562,7 @@ function makeSlot(kind,key){
   el.addEventListener('dblclick',()=>quickMove(slotLoc(el)));
   return el;
 }
-const HIDEABLE=['head','torso','armor','hands','legs','feet','offhand','neck'];
+const HIDEABLE=['head','torso','armor','hands','legs','feet','offhand','neck','special'];
 const isHidden=k=>!!(player.opts && ((player.opts.hide||{})[k] || (k==='head' && player.opts.hideHelm)));
 const EYE_OPEN='<svg viewBox="0 0 16 16" width="11" height="11"><path d="M1 8s2.6-4.5 7-4.5S15 8 15 8s-2.6 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="2.1" fill="currentColor"/></svg>';
 const EYE_SHUT='<svg viewBox="0 0 16 16" width="11" height="11"><path d="M1 8s2.6-4.5 7-4.5S15 8 15 8s-2.6 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2 14L14 2" stroke="currentColor" stroke-width="1.8"/></svg>';
@@ -9569,7 +9576,7 @@ function buildInventoryUI(){
   const L=document.getElementById('eq-left'), Rt=document.getElementById('eq-right');
   window.syncHelmToggle=()=>syncHideEyes();
   ['head','neck','torso','armor','weapon'].forEach(k=>L.appendChild(makeSlot('eq',k)));
-  ['hands','legs','feet','offhand'].forEach(k=>Rt.appendChild(makeSlot('eq',k)));
+  ['hands','legs','feet','offhand','special'].forEach(k=>Rt.appendChild(makeSlot('eq',k)));
   for(let i=0;i<INV_SIZE;i++) invGrid.appendChild(makeSlot('inv',i));
   { const box=document.createElement('div'); box.id='stash-box'; box.innerHTML='<div class="menu-label">The Wheatsheaf Crate</div><div id="stash-grid"></div><div class="stash-help">Double-click moves things between the crate and your pack.</div>';
     const bag=document.querySelector('#inv-overlay .bag'); bag.insertBefore(box,document.getElementById('inv-trash'));
@@ -11305,7 +11312,7 @@ function drawRomFX(W,H){ if(ROM.dark<0.01 && ROM.black<0.01) return;
 function nightPasses(f){ dayClock+=DAY_LEN*(f||0.25); cureBruise(); refreshPlayerHp(true); updateHud(); try{ autosaveSoon(300); }catch(e){} }
 function ithilScene(){ const I='Ithilwen', N=()=>NPCS.find(n=>n.id==='moon_ithil');
   if(CHOICE.ithil && !CHOICE.ithil2){ const ans=(txt,reply,k)=>({label:txt, fn:()=>{ remember('ithil2',k,'Ithilwen asked you what humans fear, and remembered your answer.'); refreshPlayerHp(false); updateHud();
-        say(I,[reply,"She takes your wrist, turns it until the ribbon catches the moon, and breathes on it. It glows, faintly, and keeps glowing.","“There. Now a little of the moon goes with you. Come back when it needs filling.” <i>While you carry her ribbon: +5 max health.</i>"],[bye]); }});
+        say(I,[reply,"She takes your wrist, turns it until the ribbon catches the moon, and breathes on it. It glows, faintly, and keeps glowing.","“There. Now a little of the moon goes with you. Come back when it needs filling.” <i>While you wear her ribbon: +5 max health.</i>"],[bye]); }});
     say(I,["Ithilwen is waiting at the edge of the pool tonight, not singing. She looks at you a long time before she speaks.","“I have lived three of your lifetimes, and I have never asked a human this. What do you fear?”"],[
       ans('“Getting old while you don’t.”',"She is quiet. Then: “Yes. So do I, a little. That is new.”",'old'),
       ans('“That one day the moon won’t remember me.”',"She laughs, soft. “The moon forgets nothing. Nor do I. That is the trouble with both of us.”",'moon'),
@@ -11315,7 +11322,7 @@ function ithilScene(){ const I='Ithilwen', N=()=>NPCS.find(n=>n.id==='moon_ithil
   say(I,["Nelloth climbs out, wrings out her hair, gives Ithilwen a look you are not meant to understand, and goes off up the road singing.","Ithilwen does not follow. She drifts closer through the silver water until you can see the moon twice, once in the sky and once in her eyes.","“Humans always look away,” she says. “You have stopped looking away. I noticed.”"],[
     {label:'Kiss her.', fn:()=>{ remember('ithil','lover','Ithilwen of the moon pool kept you company until the moon went down.'); NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='moon_nel')); romStart(N(),'moon');
       say(I,["Her mouth tastes of cold water and something like honey. She laughs against your lips, and her arms come round your neck, and the pool goes very still around the two of you."],[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{
-        say(I,["You wake on the warm stones at first light with her cloak over the two of you and a strand of silver ribbon wound round your wrist. Ithilwen is already dressed, watching the road.","“Keep it,” she says. “So the moon knows you are mine when you come back.”"],[{label:'Keep the ribbon.', fn:()=>{ nightPasses(0.3); romEnd(); giveQuestItem('moon_ribbon',true); logMsg('You receive Ithilwen\'s silver ribbon.','#dfe6ee'); closeDialog(); }}]); }); }}]); }},
+        say(I,["You wake on the warm stones at first light with her cloak over the two of you and a strand of silver ribbon wound round your wrist. Ithilwen is already dressed, watching the road.","“Keep it,” she says. “So the moon knows you are mine when you come back.”"],[{label:'Keep the ribbon.', fn:()=>{ nightPasses(0.3); romEnd(); giveQuestItem('moon_ribbon',true); wearSpecial('moon_ribbon'); logMsg('You receive Ithilwen\'s silver ribbon. She tied it round your wrist (the Special slot).','#dfe6ee'); closeDialog(); }}]); }); }}]); }},
     {label:'“I should go.”', fn:()=>say(I,"“Then go.” She smiles and sinks back into the water, unbothered. “The moon is patient. I am a little less so.”",[bye])}]); }
 function gunnarScene(){ const G='Gunnar the Ploughman', N=()=>NPCS.find(n=>n.id==='gunnar');
   if(CHOICE.gunnarNight && !CHOICE.gunnar2){ say(G,["Gunnar has combed his beard. Someone has clearly made him comb his beard. He turns his cap round and round in his big hands.","“It's harvest-eve. There's a fiddler. Bertha's moving the tables.” He swallows. “Would you… dance? With me. I'm terrible.”"],[
@@ -11344,8 +11351,10 @@ function saelleScene(){ const S='Saelle';
       say(S,["The room behind the boiler is all copper and steam. She kisses you before the door is even shut, and you forget about the door, and the steam, and most other things."],night(()=>{ const took=Math.min(player.purse,20); player.purse-=took; nightPasses(0.15); giveQuestItem('saelle_note',true); if(took) logMsg('Saelle took '+formatCoin(took)+' from your purse.','#e8a060');
         say(S,["Afterwards you doze. When you wake, the water has gone lukewarm and you are alone. Out at your chest, your clothes are folded more neatly than you left them, and your purse is lighter.","Tucked into it, a note that smells of rosewater: <i>“For the room. And for the lesson: always keep the key on your wrist. It was worth it, wasn't it? — S.”</i>"],[bye]); })); }},
     {label:'Smile, and stay where you are.', fn:()=>say(S,"She shrugs, one wet shoulder out of the water. “Your loss, sweet.” She sinks lower, and keeps watching.",[bye])}]); }
-Object.assign(ITEMS,{ moon_ribbon:{ name:"Ithilwen's Silver Ribbon", slot:'misc', title:"A strand of elven ribbon that holds a little moonlight even in daylight. It was wound round your wrist when you woke." },
+Object.assign(ITEMS,{ moon_ribbon:{ name:"Ithilwen's Silver Ribbon", slot:'special', title:"A strand of elven ribbon that holds a little moonlight even in daylight. Worn round the wrist, where she tied it." },
   saelle_note:{ name:'A Rosewater Note', slot:'misc', title:"Folded twice, sealed with nothing but a lip-print. It still smells of rosewater and the bathhouse." } });
+function wearSpecial(id){ const E=player.opts&&player.opts.equip, k=player.inv.indexOf(id); if(!E || E.special || k<0) return; player.inv[k]=null; E.special=id; delete player.opts._ck; try{ refreshPlayerHp(false); }catch(e){} updateHud(); }
+{ const prevApply=applySave; applySave=function(...a){ const r=prevApply.apply(this,a); try{ if(player.opts && player.opts.equip && !player.opts.equip.special && player.inv.includes('moon_ribbon')){ wearSpecial('moon_ribbon'); } }catch(e){} return r; }; }
 ITEM_ICON.moon_ribbon=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.lineCap='round'; g2.strokeStyle='rgba(220,230,255,0.35)'; g2.lineWidth=6; const P=()=>{ g2.beginPath(); g2.moveTo(7,30); g2.bezierCurveTo(14,8,22,34,27,16); g2.bezierCurveTo(30,8,35,14,32,22); }; P(); g2.stroke(); g2.strokeStyle='#dfe6f2'; g2.lineWidth=2.6; P(); g2.stroke(); g2.strokeStyle='#8a96b0'; g2.lineWidth=0.8; P(); g2.stroke(); g2.fillStyle='#f4f8ff'; [[12,20],[25,24],[31,12]].forEach(([x,y])=>{ g2.beginPath(); g2.arc(x,y,1,0,Math.PI*2); g2.fill(); }); g2.restore(); };
 ITEM_ICON.saelle_note=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.lineJoin='round'; g2.fillStyle='#efe4cc'; g2.strokeStyle='#8a7a5a'; g2.lineWidth=1; g2.beginPath(); g2.moveTo(7,12); g2.lineTo(33,10); g2.lineTo(34,30); g2.lineTo(6,31); g2.closePath(); g2.fill(); g2.stroke(); g2.beginPath(); g2.moveTo(7,12); g2.lineTo(20,22); g2.lineTo(33,10); g2.stroke();
   g2.fillStyle='#c0304a'; g2.beginPath(); g2.ellipse(17,23,3.2,1.6,0,0,Math.PI*2); g2.ellipse(23,23,3.2,1.6,0,0,Math.PI*2); g2.fill(); g2.fillStyle='#8a1a30'; g2.fillRect(14,22.8,12,0.7); g2.restore(); };
@@ -11790,7 +11799,7 @@ const RENOWN_OFF=()=>{ const r=renownRank(); return r>=5?0.8:r>=2?0.9:1; };     
 const sellRate=()=> SELL_RATE*(renownRank()>=3?4/3:1);
 function refreshPlayerHp(full){ const rk=renownRank(); if(lastRenown>=0 && rk>lastRenown && running){ logMsg('Renown: you are now "'+RENOWN[rk]+'" in the valley. '+RENOWN_PERK[rk]+'.','#e8c060'); banner(RENOWN[rk],'#e8c060',2200);
     if(rk>=5 && !CHOICE.legendGift){ CHOICE.legendGift=true; player.purse+=200; logMsg('Elder Hamond sends a purse from the whole valley: 2 silver, and a note that just says “Thank you.”','#e8c060'); } } lastRenown=rk;
-  player.maxHp=maxHpOf(player.opts?player.opts.equip:defaultEquip(),PARRY.hpBase)+rk*4+(CHOICE.moonBless?10:0)+(CHOICE.bless||0)*5+(bathBuffOn()?10:0)+(CHOICE.ithil2 && player.inv && player.inv.includes('moon_ribbon')?5:0);   // +10 fresh from a bath (counted before clamping, or the buff's top 10 HP never refill)
+  player.maxHp=maxHpOf(player.opts?player.opts.equip:defaultEquip(),PARRY.hpBase)+rk*4+(CHOICE.moonBless?10:0)+(CHOICE.bless||0)*5+(bathBuffOn()?10:0)+(CHOICE.ithil2 && player.opts && player.opts.equip && player.opts.equip.special==='moon_ribbon'?5:0);   // +10 fresh from a bath (counted before clamping, or the buff's top 10 HP never refill)
   if(full||player.hp==null) player.hp=player.maxHp; player.hp=Math.min(player.hp,player.maxHp);
   if(CHOICE.bruised) player.hp=Math.min(player.hp,hpCap()); }
 
@@ -12181,6 +12190,7 @@ function beginFight(){
   if(combat.practice) banner('Practice!','#8ab0d8',1100);
   else if(foeDef(f).unguarded) banner('No guard: strike it, parry the lunge!','#e8c878',1800);
   else { banner(combat.first?'Match his guard, hit the open side!':foeDef(f).label+'!', '#e8c878', combat.first?2200:1100); combat.first=false; }
+  setTimeout(()=>{ try{ techTeachIntro(); techReadyTeach(); }catch(e){} },60);   // after the fight's own card, which comes first
   if(foeDef(f).unguarded) teach('wolf','No guard',["This one has <b>no guard</b>: every side is open. Just <b>Attack</b>.","But it lunges fast and with little warning. Watch for the ring and <b>Parry</b> the side it lunges from."]);
   else teach('duel','Your first fight',["<b>Hold a direction</b> (<b>A</b> / <b>W</b> / <b>D</b>, the arrow keys, or the buttons) to choose a side: left, high, right.",
     "The shield over your foe shows the side he is <b>guarding</b>. <b>Attack</b> (<b>J</b> or left click) one of the <b>other</b> sides.",
@@ -17618,16 +17628,26 @@ document.body.appendChild(bookPanel);
 let BOOK_TAB=null;
 function bookSchools(){ const has=ids=>[player.opts&&player.opts.equip.weapon,...player.inv,...(Array.isArray(CHOICE.stash)?CHOICE.stash:[])].some(x=>ids.includes(x));
   const L=[]; if(has(['staff_oak','staff_star','staff_cinder','staff_crystal']) || ['doppel','iceward','kindle'].some(MAGE_EXTRA)) L.push('mage');
-  if(has(NECRO_STAVES) || ['grasp','spear'].some(NECRO_EXTRA)) L.push('necro'); return L; }
-function openBook(){ if(combat.active){ flash('Not in the middle of a fight.'); return; } const L=bookSchools(); if(!L.length){ flash('You carry no staff: there is nothing to write in a spellbook.'); return; }
-  if(!BOOK_TAB || !L.includes(BOOK_TAB)) BOOK_TAB=L.includes(SCHOOL())?SCHOOL():L[0]; renderBook(); bookPanel.style.display='block'; }
+  if(has(NECRO_STAVES) || ['grasp','spear'].some(NECRO_EXTRA)) L.push('necro'); if(typeof anyTech==='function' && anyTech()) L.push('blade'); return L; }
+function openBook(){ if(combat.active){ flash('Not in the middle of a fight.'); return; } const L=bookSchools(); if(!L.length){ flash('You carry no staff and know no sword technique: there is nothing to write in a spellbook.'); return; }
+  if(!BOOK_TAB || !L.includes(BOOK_TAB)) BOOK_TAB=(L.includes('blade') && !isMagicWeapon())?'blade':L.includes(SCHOOL())?SCHOOL():L[0]; renderBook(); bookPanel.style.display='block'; }
 function closeBook(){ bookPanel.style.display='none'; }
-function renderBook(){ const L=bookSchools(), sc=BOOK_TAB, b=BOOK(sc), all=bookSpells(sc), arrow={left:'◀ Left',up:'▲ Up',right:'▶ Right'}, m=SPM();
-  const tabs=L.length>1?`<div style="display:flex;gap:6px;margin-bottom:10px">${L.map(x=>`<button data-tab="${x}" style="flex:1;padding:5px;border-radius:6px;border:1px solid ${x===sc?'#c09040':'#5a4020'};background:${x===sc?'#3a2810':'#1a120a'};color:#f0dca0;font:12px Georgia,serif;cursor:pointer">${x==='necro'?'Necromancer':'Magister'}</button>`).join('')}</div>`:'';
+function renderBook(){ if(BOOK_TAB==='blade') return renderBlade(); const L=bookSchools(), sc=BOOK_TAB, b=BOOK(sc), all=bookSpells(sc), arrow={left:'◀ Left',up:'▲ Up',right:'▶ Right'}, m=SPM();
+  const tabs=L.length>1?`<div style="display:flex;gap:6px;margin-bottom:10px">${L.map(x=>`<button data-tab="${x}" style="flex:1;padding:5px;border-radius:6px;border:1px solid ${x===sc?'#c09040':'#5a4020'};background:${x===sc?'#3a2810':'#1a120a'};color:#f0dca0;font:12px Georgia,serif;cursor:pointer">${BOOK_TABNAME[x]}</button>`).join('')}</div>`:'';
   const row=d=>`<div style="margin:6px 0"><div style="font-size:11px;color:#a08050;letter-spacing:1px">${arrow[d]}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px">${all.map(id=>`<button data-slot="${d}" data-spell="${id}" style="padding:4px 8px;border-radius:6px;border:1px solid ${b[d]===id?SPELL_DEF[id].col:'#4a3820'};background:${b[d]===id?'rgba(255,255,255,0.08)':'transparent'};color:${b[d]===id?SPELL_DEF[id].col:'#c8b088'};font:12px Georgia,serif;cursor:pointer">${SPELL_DEF[id].name}</button>`).join('')}</div></div>`;
   const pas=sc==='necro' && NECRO_EXTRA('boneshield') ? '<div style="margin-top:8px;font-size:12px;color:#e8e4d0">Bone Shield: cast Raise Dead again while your skeleton stands.</div>' : '';
   const sel=['left','up','right'].map(d=>SPELL_TIP(b[d],m)).map(t=>`<div style="font-size:11px;color:#c8b898;margin-top:2px">${t}</div>`).join('');
   bookPanel.innerHTML=`<div style="font-size:11px;letter-spacing:2px;color:#a08050;margin-bottom:8px">SPELLBOOK</div>${tabs}${['left','up','right'].map(row).join('')}${pas}<div style="margin-top:10px;border-top:1px solid #3a2a14;padding-top:6px">${sel}</div><div style="text-align:right;margin-top:10px"><button data-close="1" style="padding:4px 12px;border-radius:6px;border:1px solid #6a5030;background:#2a1e10;color:#d8c090;font:12px Georgia,serif;cursor:pointer">Close</button></div>`; }
+const BOOK_TABNAME={necro:'Necromancer', mage:'Magister', blade:'Sword'};
+function bookTabs(sc){ const L=bookSchools(); return L.length>1?`<div style="display:flex;gap:6px;margin-bottom:10px">${L.map(x=>`<button data-tab="${x}" style="flex:1;padding:5px;border-radius:6px;border:1px solid ${x===sc?'#c09040':'#5a4020'};background:${x===sc?'#3a2810':'#1a120a'};color:#f0dca0;font:12px Georgia,serif;cursor:pointer">${BOOK_TABNAME[x]}</button>`).join('')}</div>`:''; }
+function renderBlade(){ const arrow={left:'◀ Left · A',up:'▲ Up · W',right:'▶ Right · D'};
+  const rows=Object.entries(TECHS).map(([d,T])=>{ const k=techKnown(T.id);
+    return `<div style="margin:8px 0;padding:7px 9px;border-radius:7px;border:1px solid ${k?'#8a6a2a':'#3a2a14'};background:${k?'rgba(240,192,96,0.06)':'transparent'}">
+      <div style="display:flex;justify-content:space-between"><b style="color:${k?'#f0c060':'#8a7858'}">${k?T.name:'? ? ?'}</b><span style="font-size:11px;color:#a08050">${arrow[d]} + Q</span></div>
+      <div style="font-size:12px;color:${k?'#e0d0b0':'#8a7858'};margin-top:3px">${k?TECH_TEACH[T.id].join(' ')+` <span style="color:#d8b060">Costs ${T.cost} momentum.</span>`:'Not learned. '+techWhere(T)}</div></div>`; }).join('');
+  bookPanel.innerHTML=`<div style="font-size:11px;letter-spacing:2px;color:#a08050;margin-bottom:8px">SWORD TECHNIQUES</div>${bookTabs('blade')}${rows}
+    <div style="font-size:11px;color:#c8b898;margin-top:8px;border-top:1px solid #3a2a14;padding-top:6px">In a fight with a blade, the side you hold picks the technique; <b>Q</b> or the Technique button uses it. <b>Momentum</b> (the gold bar) fills when you block, parry and land clean hits, and drains when you are hit. Each fight starts with a little.</div>
+    <div style="text-align:right;margin-top:10px"><button data-close="1" style="padding:4px 12px;border-radius:6px;border:1px solid #6a5030;background:#2a1e10;color:#d8c090;font:12px Georgia,serif;cursor:pointer">Close</button></div>`; }
 bookPanel.addEventListener('click',e=>{ const t=e.target.closest('button'); if(!t) return; e.stopPropagation();
   if(t.dataset.close){ closeBook(); return; } if(t.dataset.tab){ BOOK_TAB=t.dataset.tab; renderBook(); return; }
   if(t.dataset.slot){ const sc=BOOK_TAB, b=BOOK(sc), d=t.dataset.slot, id=t.dataset.spell, other=['left','up','right'].find(x=>x!==d && b[x]===id);
@@ -17650,7 +17670,7 @@ ITEM_ICON.saelle_picks=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.
   g2.strokeStyle='#c8ccd4'; g2.lineCap='round'; g2.lineWidth=1.6; [[10,27,30,8,0],[14,27,33,12,1],[18,27,28,6,2]].forEach(([x,y,x2,y2,k])=>{ g2.beginPath(); g2.moveTo(x,y); g2.lineTo(x2,y2); g2.lineTo(x2+(k===1?3:2),y2+(k===2?3:1)); g2.stroke(); });
   g2.fillStyle='#e8c060'; g2.beginPath(); g2.arc(9,27,1.4,0,Math.PI*2); g2.fill(); g2.restore(); };
 JOURNAL.push(["Matters of the Heart", ()=>{ const L=[];
-  if(CHOICE.ithil) L.push(CHOICE.ithil2 ? "Ithilwen asked what you fear, and filled her ribbon with moonlight for you. While you carry it, you are a little harder to kill." : "Ithilwen of the moon pool. She has something to ask you, some night.");
+  if(CHOICE.ithil) L.push(CHOICE.ithil2 ? "Ithilwen asked what you fear, and filled her ribbon with moonlight for you. While you wear it on your wrist, you are a little harder to kill." : "Ithilwen of the moon pool. She has something to ask you, some night.");
   if(CHOICE.gunnarNight) L.push(CHOICE.gunnar2 ? "You danced with Gunnar on harvest-eve. There is a roast kept back for you at the Wheatsheaf every day, by his orders." : "Gunnar the Ploughman goes red whenever you walk into the Wheatsheaf. He seems to be working up to something.");
   if(CHOICE.saelle2==='helped' && CHOICE.saelleNight) L.push(CHOICE.saelle3 ? {yes:"Saelle asked if you would leave the valley with her on the spring ship. You said yes.", stay:"Saelle asked if you would leave the valley with her. You told her it is your home; she says she will come back through the window.", spring:"Saelle asked if you would leave the valley with her. You told her to ask again in spring. She says she will, every day."}[CHOICE.saelle3]+" Sella the Fence pays you better for her sake." : "Saelle's rooms above the Lowstreets. She keeps looking at the ships.");
   return L.length ? [ (CHOICE.ithil?!!CHOICE.ithil2:true) && (CHOICE.gunnarNight?!!CHOICE.gunnar2:true) && (CHOICE.saelle2==='helped'&&CHOICE.saelleNight?!!CHOICE.saelle3:true) ? 'done':'active', L.join('<br>') ] : null; }]);
@@ -17694,9 +17714,18 @@ const TECHS={ left:{id:'lunge', name:'Lunge', cost:45, who:'Brann the Hunter', h
 const techKnown=id=>!!(CHOICE.tech||{})[id];
 const anyTech=()=>Object.values(TECHS).some(T=>techKnown(T.id));
 const meleeHeld=()=>!isMagicWeapon();
-function momGain(n){ if(!meleeHeld() || !anyTech()) return; const m0=player.mom||0; player.mom=Math.max(0,Math.min(100,m0+n)); }
+function momGain(n){ if(!meleeHeld() || !anyTech()) return; const m0=player.mom||0; player.mom=Math.max(0,Math.min(100,m0+n)); techReadyTeach(); }
+const TECH_KEYS={left:'<b>left</b> (A / ←)', up:'<b>up</b> (W / ↑)', right:'<b>right</b> (D / →)'};
+const TECH_TEACH={ lunge:["Hold "+TECH_KEYS.left+" and press <b>Q</b> (or the <b>Technique</b> button).","The lunge goes <b>straight through his guard</b> for heavy damage. Best the moment he <b>raises his arm</b>: it cuts the swing short and staggers him."],
+  bash:["Hold "+TECH_KEYS.up+" and press <b>Q</b>. You need a <b>shield</b> in your off hand.","Your shield rim in his face: he <b>staggers, wide open</b>. Follow up with quick attacks on any side."],
+  riposte:["Hold "+TECH_KEYS.right+" and press <b>Q</b> to take the stance.","Then <b>block his next blow</b>: you strike back at once, hard, and he staggers. Mistime the block and the stance is wasted."] };
+function techTeachIntro(){ if(!inFight() || !meleeHeld() || !anyTech()) return;
+  teach('momentum','Momentum',["The <b>gold bar</b> under your health is <b>momentum</b>. Your sword techniques spend it.","It fills when you <b>block</b>, <b>parry</b> (a perfect parry most of all) and land <b>clean hits</b>. Getting hit drains it.","Your techniques and what they do are in the <b>Spells</b> book (<b>B</b>), on the Sword page."]); }
+function techReadyTeach(){ if(!inFight() || !meleeHeld()) return; const mom=player.mom||0;
+  Object.values(TECHS).forEach(T=>{ if(techKnown(T.id) && mom>=T.cost && !(T.id==='bash' && !/shield/.test(player.opts.equip.offhand||''))) teach('tech_'+T.id,T.name+' is ready',TECH_TEACH[T.id]); }); }
+function techWhere(T){ return T.id==='lunge'?(QUEST.wolves>=2?'Brann the Hunter will teach it for two cuts of raw meat.':'Brann the Hunter might teach it once the wolves are dealt with.'):T.id==='bash'?'Oswin the Armourer in Hollowmere teaches it, if you bring a shield.':(CHOICE.unpaid==='paid'?'Harl the Watchman, by the well in Dunhollow, owes you a lesson.':CHOICE.unpaid==='fought'?'The man who could have taught it is dead.':'Someone who served in the Baron’s drill yard would know it.'); }
 function learnTech(id){ CHOICE.tech={...(CHOICE.tech||{}), [id]:true}; const T=Object.values(TECHS).find(x=>x.id===id);
-  logMsg('You learned '+T.name+'. In a fight with a blade, hold that side and press Q (or the Technique button). Blocks, parries and clean hits build momentum.','#f0c060'); banner(T.name,'#f0c060',1800);
+  logMsg('You learned '+T.name+'. In a fight with a blade, hold that side and press Q (or the Technique button). It is written up in your Spells book (B), on the Sword page.','#f0c060'); banner(T.name,'#f0c060',1800);
   try{ SND.fx('quest'); }catch(e){} updateHud(); try{ autosaveSoon(400); }catch(e){} }
 function doTech(){ if(!inFight() || duel.st!=='ready' || !meleeHeld()) return;
   const T=TECHS[playerGuard]||TECHS.left, f=combat.foe; if(!f) return;
@@ -17738,7 +17767,7 @@ setInterval(()=>{ try{ const b=document.getElementById('p-tech'); if(!b) return;
       {label:'“Teach me.”', fn:()=>say('Harl the Watchman',["He hands you a stave and takes one himself. “Swing at me.” You do. He turns it aside, and his stave is at your ribs before yours has stopped moving.","“The <b>riposte</b>. You set yourself, you take his blow on the right side, and you answer in the same breath. Not before. Not after. Again.”","By the end of the hour your ribs ache and you've touched his twice."],[{label:'Learn the Riposte.', fn:()=>{ learnTech('riposte'); closeDialog(); }}])},
       {label:'Something else.', fn:prevHarl}, bye]); }; }
 JOURNAL.push(["Sword Techniques", ()=>{ const k=Object.values(TECHS).filter(T=>techKnown(T.id)); if(!k.length && !(QUEST.wolves>=2) && CHOICE.unpaid!=='paid') return null;
-  const lines=Object.entries(TECHS).map(([d,T])=>techKnown(T.id)?`<b>${T.name}</b> (hold ${d==='up'?'up':d}, Q): ${T.how} Costs ${T.cost} momentum.`:`${T.name}: ${T.id==='lunge'?(QUEST.wolves>=2?'Brann the Hunter will teach it for two cuts of raw meat.':'Brann the Hunter might teach it once the wolves are dealt with.'):T.id==='bash'?'Oswin the Armourer in Hollowmere teaches it, if you bring a shield.':(CHOICE.unpaid==='paid'?'Harl the Watchman, by the well in Dunhollow, owes you a lesson.':CHOICE.unpaid==='fought'?'The man who could have taught it is dead.':'Someone who served in the Baron’s drill yard would know it.')}`);
+  const lines=Object.entries(TECHS).map(([d,T])=>techKnown(T.id)?`<b>${T.name}</b> (hold ${d==='up'?'up':d}, Q): ${T.how} Costs ${T.cost} momentum.`:`${T.name}: ${techWhere(T)}`);
   return [k.length===3?'done':'active', lines.join('<br>')+'<br><i>Momentum (the gold bar) fills when you block, parry and land clean hits, and drains when you are hit.</i>']; }]);
 // ════════ SOUND: all of it made on the spot with Web Audio, nothing to download. Silent until switched on in the Menu ════════
 const SND=(()=>{

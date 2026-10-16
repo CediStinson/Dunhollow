@@ -1,10 +1,12 @@
 // Records Dunhollow's voice lines on your own computer, for free, with Kokoro (an open voice model).
 //
 //   1. Install Node.js (https://nodejs.org), then in this folder, once:   npm install kokoro-js lamejs
-//   2. Download tts-cache/_queue.jsonl from your web space (the lines players have asked for).
-//   3. Run:   node voicegen.js _queue.jsonl
-//      (or straight from your site:   node voicegen.js https://your-site/tts-cache/_queue.jsonl)
-//   4. Upload the new folders inside ./tts-cache to tts-cache/ on your web space. Then delete _queue.jsonl there.
+//   2. The whole game at once (do this first; it takes a while, leave it running):   node voicegen.js voicelines.jsonl
+//      voicelines.jsonl comes with the game: every line that can be known in advance (about 2,300).
+//   3. Upload the folders inside ./tts-cache to tts-cache/ on your web space.
+//   Later, for the few lines that change during play (names, numbers, cutscene bubbles): download
+//   tts-cache/_queue.jsonl from your web space, run   node voicegen.js _queue.jsonl , upload again,
+//   and delete _queue.jsonl there.
 //
 // The first run downloads the voice model once (about 90 MB, to your computer only). Lines already recorded
 // in ./tts-cache are skipped, so keep the folder and run it again whenever the list has grown.

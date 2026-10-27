@@ -9778,12 +9778,11 @@ function strangerTalk(){
   if(CHOICE.letter){ say('A Stranger in Grey', CHOICE.letter==='sold' ? "“We have done our business, you and I. Forget my face.”" : "He watches you from under his hood and says nothing.",[bye]); return; }
   if(!hasItem('letter')){ say('A Stranger in Grey',"“Travelling light? Wise. The roads have ears.”",[bye]); return; }
   if(QUEST.letter>=2){ say('A Stranger in Grey',["The man in grey looks at your pack, then at the village behind you.","“The old man has read it, then.” He shrugs. “Paper can still burn. People too. Good day.”"],[bye]); return; }
-  say('A Stranger in Grey',["A thin man in a grey cloak steps out from behind the hedge. His boots are too clean for the road.",
-    "“You carry a letter sealed with a B. My master would pay handsomely to have it back, unread by village elders. Thirty-five copper. More than those farmers will ever give you.”"],[
+  say('A Stranger in Grey',["“You carry a letter sealed with a B. My master would pay handsomely to have it back, unread by village elders. Thirty-five copper. More than those farmers will ever give you.”"],[
     {label:'Sell it to him. (+35 copper)', fn:()=>{ const k=player.inv.indexOf('letter'); if(k>=0) player.inv[k]=null; player.purse+=35; updateHud(); remember('letter','sold','You sold the Baron\'s letter. Nobody in Dunhollow will ever know who sent the bandits.');
-      say('A Stranger in Grey',"“A sensible soul.” The coins are cold. By the time you look up, the road is empty.",[bye]); }},
-    {label:'“This letter belongs to Dunhollow.”', fn:()=>{ remember('letter','kept'); say('A Stranger in Grey',"“Then may Dunhollow bury you with it.” He steps back into the trees.",[bye]); }},
-    {label:'“Seventy, and you carry my bags.”', fn:()=>say('A Stranger in Grey',"For a moment something like a smile. “I carry nothing for anyone. Thirty-five.”",[{label:'Sell it. (+35 copper)',fn:()=>{ const k=player.inv.indexOf('letter'); if(k>=0) player.inv[k]=null; player.purse+=35; updateHud(); remember('letter','sold','You sold the Baron\'s letter.'); closeDialog(); }},{label:'Keep it.',fn:()=>{ remember('letter','kept'); closeDialog(); }}])},
+      say('A Stranger in Grey',"“A sensible soul.”",[{label:'Farewell.', fn:greyLeave}]); }},
+    {label:'“This letter belongs to Dunhollow.”', fn:()=>{ remember('letter','kept'); say('A Stranger in Grey',"“Then may Dunhollow bury you with it.”",[{label:'Farewell.', fn:greyLeave}]); }},
+    {label:'“Seventy, and you carry my bags.”', fn:()=>say('A Stranger in Grey',"For a moment something like a smile. “I carry nothing for anyone. Thirty-five.”",[{label:'Sell it. (+35 copper)',fn:()=>{ const k=player.inv.indexOf('letter'); if(k>=0) player.inv[k]=null; player.purse+=35; updateHud(); remember('letter','sold','You sold the Baron\'s letter.'); greyLeave(); }},{label:'Keep it.',fn:()=>{ remember('letter','kept'); greyLeave(); }}])},
   ]);
 }
 // Mara Blackthorn, before the fight
@@ -10735,7 +10734,21 @@ Object.assign(AREAS,{
 });
 AREA_PATHS.lane=[ [[-0.5,23.5],[4,23.3],[8.6,22.6],[12,21.2],[13.4,18.6],[13,15.6],[10.8,14.2],[7,13.8],[3.4,13.2],[1.9,11],[2.3,8.6],[4.4,6.4],[7.6,5.3],[9.6,3.6],[10.4,1.6],[10.5,-0.5]] ];   // in from the forest road on the west, wandering up to Dunhollow
 // Dunhollow Lane: the man in grey comes back for his master's letter
-wrap('lane','npcs',list=> CHOICE.letter==='sold' || ambushReady() ? list : [...list, ...AREAS.crossroads._strangerDef().map(n=>({...n, i:9, j:14, dir:1}))]);
+wrap('lane','npcs',list=> CHOICE.letter==='sold' || ambushReady() || greyWaits() ? list : [...list, ...AREAS.crossroads._strangerDef().map(n=>({...n, i:9, j:14, dir:1}))]);
+// with the Baron's letter in your pack, he is not standing about: he waits in the trees, and steps out when you come by
+const greyWaits=()=>!CHOICE.letter && !CHOICE.greyOut && hasItem('letter') && QUEST.letter<2;
+const GREY_HIDE=[10.5,11.4];                                       // just inside the tree line above the road
+function csGlide(a,x,y,speed=1.5){ return { start:()=>{ if(a.x==null){ a.x=a.i+0.5; a.y=a.j+0.5; } },
+  tick:(dt)=>{ const dx=x-a.x, dy=y-a.y, d=Math.hypot(dx,dy); if(d<0.03){ a.moving=false; return; } const st=Math.min(d,dt*speed); a.x+=dx/d*st; a.y+=dy/d*st; a.i=Math.floor(a.x); a.j=Math.floor(a.y); a.dir=dirFromDelta(dx,dy); a.moving=true; },
+  until:()=>Math.hypot(x-a.x,y-a.y)<0.03, skip:()=>{ a.x=x; a.y=y; a.i=Math.floor(x); a.j=Math.floor(y); a.moving=false; }, end:()=>{ a.moving=false; } }; }
+setInterval(()=>{ try{ if(!running || CS.on || areaId!=='lane' || !greyWaits() || combat.active || dlgOverlay.classList.contains('open')) return;
+  const px=player.x??player.i+0.5, py=player.y??player.j+0.5; if(Math.hypot(px-9.5,py-14.5)>4.2) return;
+  const g={...AREAS.crossroads._strangerDef()[0], x:GREY_HIDE[0], y:GREY_HIDE[1], i:Math.floor(GREY_HIDE[0]), j:Math.floor(GREY_HIDE[1]), dir:3, path:[]}; NPCS.push(g); CHOICE.greyOut=true;
+  const dx=px-g.x, dy=py-g.y, d=Math.hypot(dx,dy)||1, tx=px-dx/d*1.1, ty=py-dy/d*1.1;   // stops a pace short of you
+  cutscene([ csFocus(g,0.5), csGlide(g,tx,ty,1.4), csLook(g,player), csLook(player,g), csWait(0.25) ], ()=>{ strangerTalk(); }); }catch(e){} },250);
+// and back into the trees when you are done with each other
+function greyLeave(){ closeDialog(); const g=NPCS.find(n=>n.id==='stranger'); if(!g) return;
+  if(!cutscene([ csGlide(g,GREY_HIDE[0],GREY_HIDE[1]-0.4,1.6), csDo(()=>{ const k=NPCS.indexOf(g); if(k>=0) NPCS.splice(k,1); }) ])){ const k=NPCS.indexOf(g); if(k>=0) NPCS.splice(k,1); } }
 wrap('lane','mobs',list=> ambushReady() ? [...list,
   { name:'The Man in Grey', type:'brute', i:9, j:14, faction:'grey', opts:{gender:'m',skin:0,hair:1,hairColor:0,beard:0,equip:{head:'hood',torso:'shirt',armor:'mail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'sword',offhand:null}} },
   { name:'Hired Blade', type:'bandit', i:6, j:13, faction:'grey', opts:BANDIT({skin:3,hair:3,hairColor:2,beard:4}) } ] : list);

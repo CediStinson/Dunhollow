@@ -288,6 +288,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0e0b06;color:#e8d5a
 .shop-price{font:11px Georgia,serif;color:#e8c060;}
 .shop-hint{font-size:11px;color:#7a5a22;text-align:center;margin:2px 0 4px;}
 .dlg-purse{font-size:12px;color:#7a5a22;text-align:right;margin-top:4px;}
+#dlg-text p.dlg-next{margin-top:10px;padding-top:6px;border-top:1px solid rgba(122,90,34,0.35);font-size:13px;font-style:italic;color:#7a5a22;}
+#dlg-text p.dlg-next::before{content:'➜ ';font-style:normal;}
+#next-toast{position:fixed;left:50%;bottom:84px;transform:translate(-50%,10px);max-width:min(560px,calc(100vw - 32px));padding:9px 16px;border-radius:8px;background:rgba(24,16,8,0.92);border:1px solid #9a7a32;color:#f0d890;font:italic 14px/1.4 Georgia,serif;text-align:center;opacity:0;pointer-events:none;transition:opacity .35s,transform .35s;z-index:55;}
+#next-toast.show{opacity:1;transform:translate(-50%,0);}
 
 /* ── wide screens: a big preview beside three columns of options, everything visible at once ── */
 .creator-actions{display:flex;flex-direction:column;gap:8px;align-items:center;}
@@ -9666,7 +9670,7 @@ function showDialog(name,text,opts,purse){
   if(CS.on){ CS.queued.push([name,text,opts,purse]); return; }   // during a cutscene it waits for the end
   if(BATH_NOTE){ text=[BATH_NOTE,...[].concat(text)]; BATH_NOTE=null; }
   document.getElementById('dlg-name').textContent=name;
-  document.getElementById('dlg-text').innerHTML=(Array.isArray(text)?text:[text]).map(p=>`<p>${p}</p>`).join('')+(purse?`<div class="dlg-purse">Your purse: ${formatCoin(player.purse)}</div>`:'');
+  const nx=dlgNext(); DLG_SHOWN=nx||DLG_SHOWN; document.getElementById('dlg-text').innerHTML=(Array.isArray(text)?text:[text]).map(p=>`<p>${p}</p>`).join('')+(nx?`<p class="dlg-next">${nx}</p>`:'')+(purse?`<div class="dlg-purse">Your purse: ${formatCoin(player.purse)}</div>`:'');
   const box=document.getElementById('dlg-opts'); box.innerHTML='';
   opts.forEach(o=>{ const b=document.createElement('button'); b.className='dlg-opt'+(o.off?' off':'');
     b.innerHTML=`<span>${o.label}</span>${o.note?`<small>${o.note}</small>`:''}`;
@@ -9674,7 +9678,18 @@ function showDialog(name,text,opts,purse){
   dlgOverlay.classList.add('open');
   try{ VOICE.read(name,text); }catch(e){}                 // read aloud, if voices are on
 }
-function closeDialog(){ dlgOverlay.classList.remove('open'); try{ VOICE.stop(); }catch(e){} }
+function closeDialog(){ const was=dlgOverlay.classList.contains('open'); dlgOverlay.classList.remove('open'); try{ VOICE.stop(); }catch(e){}
+  if(was && DLG_J0){ const nx=dlgNext(); if(nx && nx!==DLG_SHOWN) nextToast(nx); } DLG_J0=null; DLG_SHOWN=''; }
+let DLG_SHOWN='';
+function nextToast(t){ let el=document.getElementById('next-toast'); if(!el){ el=document.createElement('div'); el.id='next-toast'; document.body.appendChild(el); }
+  el.textContent='➜ '+t; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); clearTimeout(nextToast.t); nextToast.t=setTimeout(()=>el.classList.remove('show'),6500); }
+// what to do next: when a conversation moves a quest on, the journal's new line for it closes the dialog box (shown, not spoken)
+let DLG_J0=null;
+function jrnSnap(){ const m={}; try{ JOURNAL.forEach(([t,f])=>{ try{ const r=f(); if(r) m[t]=r[0]+'|'+(typeof r[1]==='string'?r[1]:''); }catch(e){} }); }catch(e){} return m; }
+function dlgNext(){ if(!DLG_J0){ DLG_J0=jrnSnap(); return ''; }                     // the first screen of a conversation: remember where things stood
+  const now=jrnSnap(); let out='';
+  for(const t in now){ if(now[t]===DLG_J0[t]) continue; const [st,tx]=now[t].split(/\|([\s\S]*)/); if(st==='active' && tx) out=tx.replace(/<br>/g,' '); }
+  return out; }
 const hasItem=id=>player.inv.includes(id);
 const bye={label:'Farewell.', fn:closeDialog};
 function npcHasNews(n){                                // '!' new business, '?' something to hand in, null nothing
@@ -10398,7 +10413,7 @@ function todaysStock(who,pool,n){
 // selling: any trader buys what is in your pack (not story items), at forty percent of its price
 function sellTo(who,back,o){                     // o (optional): only these items, at this buyer's own price, with his own words
   const goods=player.inv.map((id,k)=>({id,k})).filter(({id,k})=>id && PRICES[id] && !(id==='fishing_rod' && player.inv.indexOf(id)===k) && !(typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(id)) && (ITEMS[id].slot!=='misc' || SELL_MISC.has(id) || (o && o.only && o.only.has(id))) && (!o || !o.only || o.only.has(id)));
-  say(who,[goods.length?(o&&o.greet||"“Let us see what you have.” (Only what is in your pack, not what you wear.)"):(o&&o.none||"“Nothing in your pack I'd buy.”")],[{label:'Back.',fn:back},bye],true);
+  say(who,[goods.length?(o&&o.greet||"“Let us see what you have.” <i>Only what is in your pack can be sold, not what you wear.</i>"):(o&&o.none||"“Nothing in your pack I'd buy.”")],[{label:'Back.',fn:back},bye],true);
   if(!goods.length) return;
   const box=document.getElementById('dlg-opts'), grid=document.createElement('div'); grid.className='shop-grid';
   goods.forEach(({id,k})=>{ const pr=o&&o.price?o.price(id):Math.max(1,Math.round(PRICES[id]*sellRate())); const cell=document.createElement('div'); cell.className='shop-cell';
@@ -18222,7 +18237,8 @@ const VOICE=(()=>{
       oa: gob ? 'am_puck' : (L=>L[h%L.length])(g==='f'?OA_F:g==='m'?OA_M:[...OA_M,...OA_F]),          // fixed per name, the same for every player, so one recording serves all
       st: gob?'goblin' : elf?'elf' : old?'old' : /\b(Baron|Lady|Lord|Sir|Magistrate|Magister|Captain|Warden)\b/.test(name||'')?'noble' : /\b(Saelle|Nim|Dalla|Jory|Mags|Rolf|Sella|Venn|Hal)\b/.test(name||'')?'rogue' : 'villager', speed: gob?1.08:1.04 }; }
   const clean=t=>String(t).replace(/<br\s*\/?>/gi,' ').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();
-  function parts(text){ const out=[]; [].concat(text).map(clean).forEach(p=>{ const re=/“([^”]*)”|"([^"]*)"/g; let last=0, m;
+  const unspoken=t=>String(t).split(/(“[^”]*”)/).map((seg,k)=>k%2 ? seg : seg.replace(/<i>[\s\S]*?<\/i>/g,' ').replace(/<span class="nt">[\s\S]*?<\/span>/g,' ')).join('');   // game notes in italics: shown, never read aloud
+  function parts(text){ const out=[]; [].concat(text).map(t=>clean(unspoken(t))).forEach(p=>{ const re=/“([^”]*)”|"([^"]*)"/g; let last=0, m;
       while((m=re.exec(p))){ const before=p.slice(last,m.index).trim(); if(before) out.push(['n',before]); out.push(['s',(m[1]??m[2]).trim()]); last=re.lastIndex; }
       const rest=p.slice(last).trim(); if(rest) out.push([out.length||!/[“"]/.test(p)?'n':'s',rest]); });
     return out.filter(([k,t])=>t && /[a-z0-9]/i.test(t)); }

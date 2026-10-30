@@ -7290,6 +7290,7 @@ const OBJ_DRAW={ crag:drawCrag, dirtmound:drawDirtMound, dugpit:drawDugPit, cryp
   rockridge:drawRockRidge, rubble:drawRubble, mineframe:drawMineFrame };
 function drawObject(o){
   if(o.type==='critter' && o.kind==='goat') return drawGoatLive(o);
+  if(o.type==='critter' && o.kind==='goatdown') return;
   const own=OBJ_DRAW[o.type] || PUZ_DRAW[o.type]; if(own) return own(o);
   const {x,y}=P(o.i+0.5,o.j+0.5);
   if(o.type==='stall'){
@@ -7487,7 +7488,8 @@ function drawObject(o){
     drawCached('lamp',x,y,30,110,15,104,paintStreetLamp);
     g.save(); g.globalCompositeOperation='lighter'; glow(x,y-86,34,34,'255,210,130',0.32+Math.sin(gt*7+o.i*3)*0.05); g.restore();
   } else if(o.type==='cart'){
-    CART_NOWHEEL=!!o.nowheel; drawCached(o.nowheel?'cart_nw':'cart',x,y,160,90,60,60,paintCart); CART_NOWHEEL=false;
+    const jt=o.jolt?(performance.now()-o.jolt)/1000:0, jy=jt>0&&jt<1.2?-Math.abs(Math.sin(jt*9))*5*(1-jt/1.2):0;      // being levered up while the wheel goes on
+    CART_NOWHEEL=!!o.nowheel; drawCached(o.nowheel?'cart_nw':'cart',x,y+jy,160,90,60,60,paintCart); CART_NOWHEEL=false;
   } else if(o.type==='washline'){
     drawCached('wash',x,y,150,170,75,160,paintWashLine);
   } else if(o.type==='haystack'){
@@ -9874,7 +9876,11 @@ function wennaTalk(){
   say('Old Wenna',["“Barnabas! Get down off my roof, you wretch! Look at him, eating my thatch!”"+(ELFP()?" “Elf, are you? Good. You lot are supposed to be good with animals.”":""),
     "“That's Barnabas. Third time this week. He'll eat the whole roof and Hamond will blame me. Get him down, would you? Carefully, he bites.”"],[
     {label:'Climb up and carry him down.', fn:()=>{ remember('goat','helped','You rescued Barnabas the goat. He bit you twice.'); player.hp=Math.max(1,player.hp-3); updateHud();
-      say('Old Wenna',"Barnabas bites you on the way up and again on the way down. Wenna pinches your cheek and gives you a heel of bread and a coin. <i>You receive 2 copper.</i>",[bye]); player.purse+=2; updateHud(); }},
+      player.purse+=2; updateHud(); closeDialog();
+      const roof=OBJECTS.find(o=>o.kind==='goatroof'), talk=()=>say('Old Wenna',"“Bitten twice? He likes you, then. Here, bread and a coin for your trouble.” <i>You receive 2 copper.</i>",[bye]);
+      const bite=()=>{ player.flash=0.35; floatText(tileOf(player),'Ouch!','#ff9a7a'); try{ SND.hurt(false); }catch(e){} };
+      if(roof){ roof.kind='goatdown'; roof.t0=0; }
+      if(!roof || !cutscene([csFocus({x:10.2,y:0.6},0.5), csWait(0.3), csDo(()=>{ roof.t0=performance.now(); }), csWait(0.9), csDo(bite), csWait(0.9), csDo(bite), csWait(0.8), csDo(()=>{ roof.kind='goat'; roof.i=13; roof.j=2; roof.noblock=false; }), csFocus(player,0.3)], talk)) talk(); }},
     {label:'Offer to buy the goat. (5 copper)', off:player.purse<5, note:'-5c', fn:()=>{ player.purse-=5; updateHud(); remember('goat','sold','You bought Barnabas and gave him to Marta.');
       say('Old Wenna',"“Buy him? BUY Barnabas?” She thinks. “…Deal. He's yours. You'll regret it.” You hand him straight to Marta, who is delighted.",[bye]); }},
     {label:'“Honestly, he looks happy up there.”', fn:()=>{ remember('goat','roof','You left Barnabas on the roof.'); say('Old Wenna',"“…He does, doesn't he.”",[bye]); }},
@@ -10836,8 +10842,11 @@ function hobbQuest(){
       ...(hasItem('cartwheel')?[{label:'“A wheel like this one?” Roll it over.', fn:()=>{ CHOICE.hobb='asked'; hobbQuest(); }}]:[]),
       {label:'“I will find your wheel.”', fn:()=>{ remember('hobb','asked',"Hobb the carter's wheel was stolen by goblins. Their warren lies beyond the Wolfwood."); say('Hobb the Carter',"“They'll have taken it home. Mind the big one; they say he bites.”",[bye]); }}, bye]); return; }
   if(hasItem('cartwheel')){ say('Hobb the Carter',["“Hah! They didn't even eat it!”"],[
-      {label:'Help him fit the wheel.', fn:()=>{ takeW(); remember('hobb','done','Hobb\'s cart runs again. He will drive you along any road you know.'); player.purse+=5; updateHud(); 
-        say('Hobb the Carter',["Together you lever the cart up and knock the wheel home. The mule looks almost disappointed.","“Five coppers for your trouble, and your rides are cheap from now on. One more thing. On washdays I drive four women from Dunhollow out past the Hunter's Clearing, to the Willow Pool. Old custom, older than the chapel. If you ever go that way… make some noise first. A lot of noise.” <i>You receive 5 copper.</i>"],[bye]); }}, bye]); return; }
+      {label:'Help him fit the wheel.', fn:()=>{ takeW(); remember('hobb','done','Hobb\'s cart runs again. He will drive you along any road you know.'); player.purse+=5; updateHud(); closeDialog();
+        const cart=OBJECTS.find(o=>o.type==='cart' && o.nowheel), talk=()=>say('Hobb the Carter',["“Five coppers for your trouble, and your rides are cheap from now on. One more thing. On washdays I drive four women from Dunhollow out past the Hunter's Clearing, to the Willow Pool. Old custom, older than the chapel. If you ever go that way… make some noise first. A lot of noise.” <i>You receive 5 copper.</i>"],[bye]);
+        const fit=()=>{ if(!cart) return; cart.nowheel=false; cart.jolt=0; try{ SND.clang(1.1); }catch(e){} floatText([cart.i,cart.j],'Clunk!','#e8d8a0');
+          if(cart.i+1<ROOM.w && !OBJECTS.some(o=>o.i===cart.i+1 && o.j===cart.j)) OBJECTS.push({type:'mule', i:cart.i+1, j:cart.j}); };
+        if(!cart || !cutscene([csFocus({x:cart.i+0.5,y:cart.j+0.5},0.4), csDo(()=>{ cart.jolt=performance.now(); }), csWait(0.9), csDo(fit), csWait(0.6), csFocus(player,0.3)], talk)){ fit(); talk(); } }}, bye]); return; }
   say('Hobb the Carter',"“No wheel yet? The goblins den beyond the Wolfwood. Follow the smell of burnt everything.”",[bye]);
 }
 // the goblins' hoard holds what they stole, whether or not anyone has asked you to look for it yet
@@ -12947,6 +12956,7 @@ function drawCombatOver(){
     g.save(); g.strokeStyle=`rgba(140,190,255,${a})`; g.lineWidth=4; g.lineCap='round';
     g.beginPath(); g.arc(ps.x,ps.y-52,26,ang-0.9,ang+0.9); g.stroke(); g.restore();
   }
+  OBJECTS.forEach(o=>{ if(o.kind==='goatdown') drawGoatDown(o); });
   sparks.forEach(sp=>{
     const s=P(sp.wx,sp.wy), a=1-sp.t/0.45;
     const x=s.x+sp.vx*sp.t, y=s.y-56+sp.vy*sp.t+120*sp.t*sp.t;
@@ -14025,7 +14035,7 @@ function deadSil(x,y,ht,col,lit,seed){ const r=k=>rnd01(seed,k,760);
 
 // ── chopping: a woodsman's swing, as a pose the character drawing already understands ──
 function chopPose(e){ const ph=((gt*0.9+(e.chopPh||0))%1); if(ph<0.7) return {kind:'raise', t:ph/0.7, dir:'up'}; return {kind:'strike', t:(ph-0.7)/0.1, dir:'up'}; }
-function NPC_POSE(n){ return n && n.chop ? chopPose(n) : null; }
+function NPC_POSE(n){ return n && n.bar ? {kind:'guard', dir:'up'} : n && n.chop ? chopPose(n) : null; }   // bar: a spear held across the way
 // the loggers in the Fellings are at work until you interrupt them
 wrap('fellings','mobs',l=>l.map((m,k)=> m.name==='Logger Wat' ? {...m, chop:true, chopPh:0.1} : m.name==='Logger Hobb' ? {...m, chop:true, chopPh:0.55} : m));
 // chips fly when the axe bites
@@ -15185,7 +15195,12 @@ TALKERS.vesna=function(){ if(areaId==='fen') return vesnaFen(); return VESNA_NEC
 // the two guards at the gate on the King's Road
 ['krgateguard0','krgateguard1'].forEach(id=>{ TALKERS[id]=()=>{ const N=BARON_DOWN()?'Crown Soldier':"Baron's Gate Guard";
     if(!wildDone()){ gateDenied(); return; }
-    if(!cityOpen()){ say(N,["The guard plants his spear across the gate.","“Nobody in from the valley without papers. A letter from your elder, a lord, anybody. No letter, no Hollowmere.”"],[bye]); return; }
+    if(!cityOpen()){ const g=NPCS.find(x=>x.id===id), line=["“Nobody in from the valley without papers. A letter from your elder, a lord, anybody. No letter, no Hollowmere.”"];
+      if(!g || g.barring){ say(N,line,[bye]); return; }
+      g.barring=true; const home=[g.x??g.i+0.5, g.y??g.j+0.5], hd=g.dir;                     // he steps into the gateway and bars it with his spear
+      if(!cutscene([csGlide(g,4.9,1.45,2.4), csLook(g,player), csDo(()=>{ g.bar=true; try{ SND.clang(0.6); }catch(e){} }), csWait(0.25)],
+          ()=>{ say(N,line,[bye]); afterTalk(()=>{ g.bar=false; if(!cutscene([csGlide(g,home[0],home[1],1.7), csDo(()=>{ g.dir=hd; g.barring=false; })])){ g.x=home[0]; g.y=home[1]; g.dir=hd; g.barring=false; } }); })){ g.barring=false; say(N,line,[bye]); }
+      return; }
     say(N,[BARON_DOWN()?"“The Crown keeps the gate now. Go on in, and mind your manners in the city.”":"“Papers are in order. Go on through, and don't make trouble.”"],[bye]); }; });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -15746,6 +15761,11 @@ function temperSpark(g2,size){                    // a hammer-spark in the botto
 const BATH_BUFF_LEN=()=>DAY_LEN*0.5, bathBuffOn=()=> CHOICE.bathBuff!=null && dayClock<CHOICE.bathBuff && dayClock>CHOICE.bathBuff-BATH_BUFF_LEN()-1;
 let BATH_WAS=false; setInterval(()=>{ try{ const on=bathBuffOn(); if(BATH_WAS && !on && running){ refreshPlayerHp(false); updateHud(); logMsg('The glow of the bath has worn off.','#8aa8b8'); } BATH_WAS=on; }catch(e){} },2000);
 // ── goats are goats: they amble about near home, crop the grass, lie down in the sun and stare at nothing
+// Barnabas coming down off the roof: drawn over everything, or the thatch would hide him on the way down
+function drawGoatDown(o){ const h=OBJECTS.find(q=>q.type==='house'); if(!h) return; const N=h.fp[0], a0=P(h.i+1.2*N/3,h.j+1.2*N/3), a={x:a0.x, y:a0.y-190-(N-3)*42}, b=P(13.5,2.5);
+    const u=Math.max(0,Math.min(1,(performance.now()-(o.t0||performance.now()))/2400)), mid={x:(a.x+b.x)/2, y:a.y+(b.y-a.y)*0.55}, hop=k=>Math.sin(Math.PI*k);
+    const q = u<0.5 ? {x:a.x+(mid.x-a.x)*(u/0.5), y:a.y+(mid.y-a.y)*(u/0.5)-hop(u/0.5)*26} : {x:mid.x+(b.x-mid.x)*((u-0.5)/0.5), y:mid.y+(b.y-mid.y)*((u-0.5)/0.5)-hop((u-0.5)/0.5)*20};
+    drawCached('goat',q.x,q.y,50,40,25,34,paintGoat); }
 function goatTick(o){ const now=gt; if(o.gx==null){ o.hx=o.i+0.5; o.hy=o.j+0.5; o.gx=o.hx; o.gy=o.hy; o.gs='idle'; o.gt=now+1+Math.random()*2; o.face=1; o.lt=now; }
   const dt=Math.min(0.1,now-o.lt); o.lt=now; if(CS.on && o.gs==='walk'){ o.gs='idle'; }
   if(o.gs==='walk'){ const dx=o.tx-o.gx, dy=o.ty-o.gy, d=Math.hypot(dx,dy), sp=0.55*dt; if(d<=sp){ o.gx=o.tx; o.gy=o.ty; o.gs=Math.random()<0.65?'graze':'idle'; o.gt=now+3+Math.random()*5; } else { o.gx+=dx/d*sp; o.gy+=dy/d*sp; } }

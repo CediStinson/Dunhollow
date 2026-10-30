@@ -9699,7 +9699,9 @@ let DLG_J0=null;
 function jrnSnap(){ const m={}; try{ JOURNAL.forEach(([t,f])=>{ try{ const r=f(); if(r) m[t]=r[0]+'|'+(typeof r[1]==='string'?r[1]:''); }catch(e){} }); }catch(e){} return m; }
 function dlgNext(){ if(!DLG_J0){ DLG_J0=jrnSnap(); return ''; }                     // the first screen of a conversation: remember where things stood
   const now=jrnSnap(); let out='';
-  for(const t in now){ if(now[t]===DLG_J0[t]) continue; const [st,tx]=now[t].split(/\|([\s\S]*)/); if(st==='active' && tx) out=tx.replace(/<br>/g,' '); }
+  for(const t in now){ if(now[t]===DLG_J0[t]) continue; const [st,tx]=now[t].split(/\|([\s\S]*)/); if(st!=='active' || !tx) continue;
+    const was=((DLG_J0[t]||'').split(/\|([\s\S]*)/)[1]||'').split('<br>'), fresh=tx.split('<br>').filter(l=>!was.includes(l));   // an entry of several lines: only the line that changed
+    out=(fresh.length?fresh:tx.split('<br>')).join(' '); }
   return out; }
 const hasItem=id=>player.inv.includes(id);
 const bye={label:'Farewell.', fn:closeDialog};
@@ -11017,10 +11019,11 @@ function moonTalk(){
   if(!CHOICE.moon){ say('Ithilwen',[ELFP()?"“Sister-kin. The moon's water is for all our people. Come in, or keep watch. Both are honoured.”":"“A human, on the old road at night. Among us there is no shame in the moon's water. Come in if you wish. Or keep watch: there are eyes in the trees tonight that are not yours.”"],[
       {label:'Keep watch for them.', fn:()=>{ remember('moon','guarded','You kept watch over the moon-bathers on the Old Elven Road.'); moonFight(); }},
       {label:'Wade in and join them.', fn:()=>{ moonJoin(); bathStrip('Ithilwen'); remember('moon','joined','You bathed in the moon pool with the elves.'); CHOICE.moonDay=day; player.hp=player.maxHp; updateHud();
-        say('Ithilwen',["You leave your things on the stones and step in. The water is cold as starlight, then not cold at all.","Nelloth laughs at your face. “Everyone makes that face.” Every ache is gone. <i>You are fully healed.</i>"],[bye]); }},
+        const nel=NPCS.find(x=>x.id==='moon_nel'); if(nel) gesture(nel,'laugh');
+        say('Ithilwen',["“Cold, then not cold at all. Nelloth is laughing at your face. Everyone makes that face.” <i>You are fully healed.</i>"],[bye]); }},
       {label:'Stay on the bank and stare.', fn:()=>{ remember('moon','stared','You stared at the moon-bathers. The Old Road\'s lanterns burn a little dimmer for you now.'); closeDialog(); NPCS.filter(n=>n.id.startsWith('moon_')).forEach((n,k)=>fadeOff(n,{sink:true, slow:2.2, delay:k*0.3})); setTimeout(()=>logMsg('The pool is empty. Somewhere, a lantern goes out.','#c8a0e0'),1600); }},
     ]); return; }
-  const opts=[{label:CHOICE.moonDay===day?'Bathe (already tonight)':'Wade in and bathe.', off:CHOICE.moonDay===day, fn:()=>{ moonJoin(); bathStrip('Ithilwen'); CHOICE.moonDay=day; CHOICE.moonBaths=(CHOICE.moonBaths||0)+1; player.hp=player.maxHp; updateHud(); say('Ithilwen',"The moon's water takes every ache. <i>You are fully healed.</i>",[bye]); }}, bye];
+  const opts=[{label:CHOICE.moonDay===day?'Bathe (already tonight)':'Wade in and bathe.', off:CHOICE.moonDay===day, fn:()=>{ moonJoin(); bathStrip('Ithilwen'); CHOICE.moonDay=day; CHOICE.moonBaths=(CHOICE.moonBaths||0)+1; player.hp=player.maxHp; updateHud(); say('Ithilwen',"“The moon's water takes every ache.” <i>You are fully healed.</i>",[bye]); }}, bye];
   if(CHOICE.moonDay===day && (CHOICE.moonBaths||0)>=2 && CHOICE.moon!=='stared') opts.unshift({label:CHOICE.ithil?'Stay with Ithilwen a while.':'Stay in the water when Nelloth leaves.', fn:ithilScene});
   const bank=(dayClock%DAY_LEN)/DAY_LEN>=0.5;
   say('Ithilwen', bank ? (CHOICE.moon==='guarded' ? "“Watcher! The water is still singing. Go in, we'll keep the road.”" : "“The water is singing tonight. Go in.”") : CHOICE.moon==='guarded' ? "“The watcher on the road! The trappers have not come back. Bathe with us, friend, and let us keep watch this time.”" : "“Back again? The moon remembers you.”", opts);
@@ -11329,7 +11332,7 @@ function romStart(n,tint){ const W=poolDepth(player.x,player.y)>0.4 || (player.s
 function romBlack(cb){ ROM.blackT=1; setTimeout(()=>{ try{ cb&&cb(); }catch(e){ console.error(e); } },1300); }
 function romEnd(){ ROM.blackT=0; ROM.darkT=0; ROM.on=false; const n=ROM.who, w=ROM.was;
   if(n && w){ Object.assign(n,w); if(w.x===undefined){ delete n.x; delete n.y; } } ROM.who=null; ROM.was=null; }
-function romTick(dt){ if(ROM.on && ROM.blackT===0 && (ROM.area!==areaId || !dlgOverlay.classList.contains('open'))){ ROM.idle=(ROM.idle||0)+dt; if(ROM.idle>0.6){ romEnd(); if(NPCS.some(n=>n.id==='saelle')) saelleGone(); } } else ROM.idle=0;   // walked off, or closed the dialog: let go
+function romTick(dt){ if(ROM.on && ROM.blackT===0 && !CS.on && (ROM.area!==areaId || !dlgOverlay.classList.contains('open'))){ ROM.idle=(ROM.idle||0)+dt; if(ROM.idle>0.6){ romEnd(); if(NPCS.some(n=>n.id==='saelle')) saelleGone(); } } else ROM.idle=0;   // walked off, or closed the dialog: let go
   ROM.dark+=(ROM.darkT-ROM.dark)*Math.min(1,dt*1.2); ROM.black+=(ROM.blackT-ROM.black)*Math.min(1,dt*(ROM.blackT>ROM.black?2.2:0.9));
   if(ROM.on && ROM.motes.length<26 && Math.random()<dt*9) ROM.motes.push({x:Math.random(), y:ROM.tint==='steam'?1.05:0.4+Math.random()*0.6, t:0, r:Math.random()});
   ROM.motes.forEach(m=>{ m.t+=dt; m.y-=dt*(ROM.tint==='steam'?0.05:0.025); m.x+=Math.sin(m.t*0.8+m.r*6)*dt*0.01; }); ROM.motes=ROM.motes.filter(m=>m.t<(ROM.tint==='steam'?9:6)); }
@@ -11347,8 +11350,8 @@ function drawRomFX(W,H){ if(ROM.dark<0.01 && ROM.black<0.01) return;
 function nightPasses(f){ dayClock+=DAY_LEN*(f||0.25); cureBruise(); refreshPlayerHp(true); updateHud(); try{ autosaveSoon(300); }catch(e){} }
 function ithilScene(){ const I='Ithilwen', N=()=>NPCS.find(n=>n.id==='moon_ithil');
   if(CHOICE.ithil && !CHOICE.ithil2){ const ans=(txt,reply,k)=>({label:txt, fn:()=>{ remember('ithil2',k,'Ithilwen asked you what humans fear, and remembered your answer.'); CHOICE.ithil2Day=Math.floor(dayClock/DAY_LEN); refreshPlayerHp(false); updateHud();
-        say(I,[reply,"She takes your wrist, turns it until the ribbon catches the moon, and breathes on it. It glows, faintly, and keeps glowing.","“There. Now a little of the moon goes with you. Come back when it needs filling.” <i>While you wear her ribbon: +5 max health.</i>"],[bye]); }});
-    say(I,["Ithilwen is waiting at the edge of the pool tonight, not singing. She looks at you a long time before she speaks.","“I have lived three of your lifetimes, and I have never asked a human this. What do you fear?”"],[
+        say(I,[reply,"“Give me your wrist. Hold still.” She breathes on the ribbon, and it begins to glow. “There. Now a little of the moon goes with you. Come back when it needs filling.” <i>While you wear her ribbon: +5 max health.</i>"],[bye]); }});
+    say(I,["“I have lived three of your lifetimes, and I have never asked a human this. What do you fear?”"],[
       ans('“Getting old while you don’t.”',"“Yes. So do I, a little. That is new.”",'old'),
       ans('“That one day the moon won’t remember me.”',"“The moon forgets nothing. Nor do I. That is the trouble with both of us.”",'moon'),
       ans('“Wolves. Mostly wolves.”',"“Honest. I like honest. I will keep the wolves off you.”",'wolves')]); return; }
@@ -11360,40 +11363,57 @@ function ithilScene(){ const I='Ithilwen', N=()=>NPCS.find(n=>n.id==='moon_ithil
           refreshPlayerHp(false); updateHud(); if(n) n.gest={k:'laugh', t0:performance.now()};
           say(I,["“Oh. Oh, it is loud. Nelloth was right.”","“Hold out your wrist. A strand of my hair, braided in with the moonlight. Now the sun knows you are mine as well.” <i>Her ribbon: +10 max health while you wear it.</i>"],[{label:'…', fn:()=>{ romEnd(); closeDialog(); }}]); }); }}]); }},
       {label:'“Another night.”', fn:()=>say(I,"“Another night, then. The sun has waited this long.”",[bye])}]); return; }
-  if(CHOICE.ithil){ say(I,["She swims over without a word and floats on her back beside you, her hair spread silver on the water.","“The moon is jealous tonight,” she says. “Let her be.”"],[
-    {label:'Let her be.', fn:()=>{ NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='moon_nel')); romStart(N(),'moon'); say(I,"She finds your hand under the water. Overhead the moon goes slowly down behind the trees, and neither of you notices.",[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.2); romEnd(); }); }}]); }}, bye]); return; }
-  say(I,["Nelloth climbs out, wrings out her hair, gives Ithilwen a look you are not meant to understand, and goes off up the road singing.","Ithilwen does not follow. She drifts closer through the silver water until you can see the moon twice, once in the sky and once in her eyes.","“Humans always look away,” she says. “You have stopped looking away. I noticed.”"],[
+  if(CHOICE.ithil){ const n0=N(); if(n0){ n0.bathe=true; n0.sit=false; n0.x=player.x+0.6; n0.y=player.y+0.3; }   // she drifts over to you
+    say(I,["“The moon is jealous tonight. Let her be.”"],[
+    {label:'Let her be.', fn:()=>{ NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='moon_nel')); romStart(N(),'moon'); say(I,"“Give me your hand. Don't talk. Watch her go down with me.”",[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.2); romEnd(); }); }}]); }}, bye]); return; }
+  const nel=NPCS.find(n=>n.id==='moon_nel'), ith=N(), first=()=>ithilFirst(I,N);
+  if(!nel || !ith || !cutscene([csFocus(ith,0.3), csBark(nel,'Don\'t keep her up all night.',1.6), csDo(()=>{ gesture(nel,'laugh'); nel.bathe=false; goOff(nel,2,0,{speed:1.4}); }), csWait(1.8),
+      csGlide(ith,player.x+0.6,player.y+0.25,0.9), csLook(ith,player), csWait(0.3)],first)) first(); }
+function ithilFirst(I,N){
+  say(I,["“Humans always look away. You have stopped looking away. I noticed.”"],[
     {label:'Kiss her.', fn:()=>{ remember('ithil','lover','Ithilwen of the moon pool kept you company until the moon went down.'); NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='moon_nel')); romStart(N(),'moon');
-      say(I,["Her mouth tastes of cold water and something like honey. She laughs against your lips, and her arms come round your neck, and the pool goes very still around the two of you."],[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{
-        say(I,["You wake on the warm stones at first light with her cloak over the two of you and a strand of silver ribbon wound round your wrist. Ithilwen is already dressed, watching the road.","“Keep it,” she says. “So the moon knows you are mine when you come back.”"],[{label:'Keep the ribbon.', fn:()=>{ nightPasses(0.3); romEnd(); giveQuestItem('moon_ribbon',true); wearSpecial('moon_ribbon'); logMsg('You receive Ithilwen\'s silver ribbon. She tied it round your wrist (the Special slot).','#dfe6ee'); closeDialog(); }}]); }); }}]); }},
-    {label:'“I should go.”', fn:()=>say(I,"“Then go.” She smiles and sinks back into the water, unbothered. “The moon is patient. I am a little less so.”",[bye])}]); }
+      const n=N(); if(n) gesture(n,'laugh');
+      say(I,["“You taste of road-dust. Come here.”"],[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.3); ROM.tint='hearth'; ROM.blackT=0;
+        say(I,["“Morning. You were asleep on my cloak. Hold out your wrist. Keep this ribbon, so the moon knows you are mine when you come back.”"],[{label:'Keep the ribbon.', fn:()=>{ romEnd(); giveQuestItem('moon_ribbon',true); wearSpecial('moon_ribbon'); logMsg('You receive Ithilwen\'s silver ribbon. She tied it round your wrist (the Special slot).','#dfe6ee'); closeDialog(); }}]); }); }}]); }},
+    {label:'“I should go.”', fn:()=>{ const n=N(); if(n) gesture(n,'shrug'); say(I,"“Then go. The moon is patient. I am a little less so.”",[bye]); }}]); }
 function gunnarScene(){ const G='Gunnar the Ploughman', N=()=>NPCS.find(n=>n.id==='gunnar');
-  if(CHOICE.gunnarNight && !CHOICE.gunnar2){ say(G,["Gunnar has combed his beard. Someone has clearly made him comb his beard. He turns his cap round and round in his big hands.","“It's harvest-eve. There's a fiddler. Bertha's moving the tables.” He swallows. “Would you… dance? With me. I'm terrible.”"],[
-      {label:'“Show me how terrible.”', fn:()=>{ remember('gunnar2','danced','You danced with Gunnar on harvest-eve at the Wheatsheaf. He was terrible. You did not care.'); romStart(N(),'hearth');
-        say(G,["He is terrible. He treads on your foot twice and apologises to the fiddler. The whole tavern claps the rhythm for him, and by the third reel he has stopped counting and started laughing, and so have you."],[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.3); romEnd();
-          giveQuestItem('carved_ox',true); say(G,["In the morning there is a little wooden ox on your pillow, carved from pale wood, and Gunnar downstairs pretending he did not make it.","“From now on there's a roast kept back for you. Every day. Bertha's orders.” He goes red. “My orders.” <i>You receive a carved wooden ox.</i>"],[bye]); }); }}]); }},
-      {label:'“Not tonight, Gunnar.”', fn:()=>say(G,"“Right. No. Course not.” He puts his cap back on. Then he takes it off again. “Next harvest, then.”",[bye])}]); return; }
-  if(CHOICE.gunnarNight){ say(G,["“Rematch,” he says, very seriously, and loses on purpose so fast that Bertha snorts into her cups."],[
-    {label:'Go upstairs.', fn:()=>{ romStart(N(),'hearth'); say(G,"He takes your hand off the table and does not let go of it, all the way up the stairs.",[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.3); CHOICE.innDay=Math.floor(dayClock/DAY_LEN); romEnd(); say(G,"The second time, nobody wrestles very hard at all. <i>You are fully healed.</i>",[bye]); }); }}]); }}, bye]); return; }
-  say(G,["“Different stakes?” He leans in until his beard nearly brushes your knuckles. He smells of hay and woodsmoke and ale. “And what are you putting up?”"],[
-    {label:'“Loser pays for the room upstairs.”', fn:()=>{ remember('gunnarNight',true,'You and Gunnar wrestled for the room upstairs. Nobody remembers who won.'); romStart(N(),'hearth');
-      say(G,["For a moment Gunnar the Ploughman, who has never lost, looks like a man who has just been hit with his own plough.","Then he laughs, loud enough to stop the tavern, takes your hand off the table, and does not let go of it. The stairs creak under the two of you.","Bertha does not look up from her cup. “Mind the bed,” she calls after you. “It's older than he is.”"],[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{
-        say(G,"In the morning the bed is in one piece, mostly, and Gunnar is singing badly downstairs. He has paid for the room, and for your breakfast. <i>You are fully healed.</i>",[{label:'Go down to breakfast.', fn:()=>{ nightPasses(0.3); CHOICE.innDay=Math.floor(dayClock/DAY_LEN); CHOICE.lastBed={a:areaId,i:player.i,j:player.j}; romEnd(); closeDialog(); }}]); }); }}]); }},
-    {label:'“Just the five coppers.”', fn:()=>say(G,"“Shame,” he says, and means it. He rolls his shoulder. “Ask again when you're braver.”",[bye])}]); }
+  if(CHOICE.gunnarNight && !CHOICE.gunnar2){ const n0=N(); if(n0) gesture(n0,'shrug');
+    say(G,["“I combed my beard. Bertha made me. It's harvest-eve, there's a fiddler, and she's moving the tables.”","“Would you… dance? With me. I'm terrible.”"],[
+      {label:'“Show me how terrible.”', fn:()=>{ remember('gunnar2','danced','You danced with Gunnar on harvest-eve at the Wheatsheaf. He was terrible. You did not care.'); const n=N(); romStart(n,'hearth'); const B=NPCS.find(x=>x.id==='bertha'), morning=()=>romBlack(()=>{ nightPasses(0.3); romEnd(); giveQuestItem('carved_ox',true);
+          say(G,["“That ox? On your pillow? Never seen it before. Somebody carved it, I expect. Somebody with big careful hands.”","“From now on there's a roast kept back for you. Every day. Bertha's orders. My orders.” <i>You receive a carved wooden ox.</i>"],[bye]); });
+        if(!n || !cutscene([csBark(B,'Clap for him, you lot!',1.2), ...gunnarDance(n), csWait(0.4)], morning)) morning(); }},
+      {label:'“Not tonight, Gunnar.”', fn:()=>{ const n=N(); if(n) gesture(n,'nod'); say(G,"“Right. No. Course not. Next harvest, then.”",[bye]); }}]); return; }
+  if(CHOICE.gunnarNight){ say(G,["“Rematch. I'll lose quick, mind. Bertha's watching.”"],[
+    {label:'Go upstairs.', fn:()=>{ romStart(N(),'hearth'); say(G,"“Come on, then. Mind the third stair, it talks.”",[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.3); CHOICE.innDay=Math.floor(dayClock/DAY_LEN); romEnd(); say(G,"“Bertha says the bed's held twice now. She's started a tally.” <i>You are fully healed.</i>",[bye]); }); }}]); }}, bye]); return; }
+  say(G,["“Different stakes? And what are you putting up?”"],[
+    {label:'“Loser pays for the room upstairs.”', fn:()=>{ remember('gunnarNight',true,'You and Gunnar wrestled for the room upstairs. Nobody remembers who won.'); const n=N(); romStart(n,'hearth'); if(n){ gesture(n,'start'); setTimeout(()=>gesture(n,'laugh'),900); } const B=NPCS.find(x=>x.id==='bertha'); if(B) setTimeout(()=>{ B.bark={text:'Mind the bed. It\'s older than he is.', t:0}; },1600);
+      say(G,["“The room? The… Ha! Done. Done, before you change your mind.”"],[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{
+        say(G,"“Morning! Bed's in one piece. Mostly. I paid for the room, and your breakfast, so don't argue.” <i>You are fully healed.</i>",[{label:'Go down to breakfast.', fn:()=>{ nightPasses(0.3); CHOICE.innDay=Math.floor(dayClock/DAY_LEN); CHOICE.lastBed={a:areaId,i:player.i,j:player.j}; romEnd(); closeDialog(); }}]); }); }}]); }},
+    {label:'“Just the five coppers.”', fn:()=>{ const n=N(); if(n) gesture(n,'shrug'); say(G,"“Shame. Ask again when you're braver.”",[bye]); }}]); }
+// harvest-eve: a terrible dance, the two of you round and round, Gunnar stumbling and laughing
+function gunnarDance(n){ const P0={x:player.x,y:player.y}, N0={x:n.x??n.i+0.5,y:n.y??n.j+0.5}, c={x:(P0.x+N0.x)/2, y:(P0.y+N0.y)/2};
+  const step={dur:5.2, start:()=>{ try{ SND.fx&&SND.fx('fiddle'); }catch(e){} }, tick:(dt,t)=>{ const a=t*2.4, r=0.42, hop=Math.abs(Math.sin(t*7))*0.04;
+      player.x=c.x+Math.cos(a)*r; player.y=c.y+Math.sin(a)*r-hop; n.x=c.x-Math.cos(a)*r; n.y=c.y-Math.sin(a)*r-hop;
+      player.dir=dirFromDelta(n.x-player.x,n.y-player.y); n.dir=dirFromDelta(player.x-n.x,player.y-n.y);
+      if(t>1.4 && !step._a){ step._a=1; gesture(n,'start'); floatText(tileOf(player),'Ow!','#ffcf9a'); }
+      if(t>2.9 && !step._b){ step._b=1; gesture(n,'start'); floatText(tileOf(player),'Ow!','#ffcf9a'); }
+      if(t>3.8 && !step._c){ step._c=1; gesture(n,'laugh'); } },
+    end:()=>{ player.x=P0.x; player.y=P0.y; n.x=N0.x; n.y=N0.y; n.dir=dirFromDelta(P0.x-N0.x,P0.y-N0.y); } };
+  step.skip=step.end; return [step]; }
 function saelleNpc(){ let n=NPCS.find(x=>x.id==='saelle'); if(n) return n;
   n={ id:'saelle', name:'Saelle', i:player.i, j:player.j, dir:0, opts:{gender:'f',skin:1,hair:3,hairColor:0,face:2,equip:{head:null,torso:'smock',armor:null,hands:null,legs:null,feet:null,weapon:null,offhand:null}} };   // wrapped in a bath sheet when she is out of the water
   NPCS.push(n); return n; }
 function saelleGone(){ NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='saelle')); }
 function saelleScene(){ const S='Saelle';
   const night=(after,item)=>{ romStart(saelleNpc(),'steam'); return [{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ romEnd(); saelleGone(); after(); }); }}]; };
-  say(S,["Through the steam: a woman with dark wet hair piled on her head and a gold ring in one ear, up to her collarbones in the far pool. She has been watching you since you came in, and she does not stop now that you have noticed.","“Yselde rents a private room behind the boiler,” she says. “Hotter water. A door that locks. I have the key and nobody to share it with.”"],[
+  say(S,["“You've been looking. So have I.”","“Yselde rents a private room behind the boiler. Hotter water. A door that locks. I have the key and nobody to share it with.”"],[
     {label:'Follow her, and keep your chest key on your wrist.', fn:()=>{ remember('saelle','wary','Saelle of the bathhouse took you to the room behind the boiler. Your chest key stayed on your wrist the whole time.');
-      say(S,["The room behind the boiler is all copper and steam. She kisses you before the door is even shut, then reaches for your wrist, finds the key cord there, and laughs against your neck.","“Clever,” she murmurs. “I like clever.”"],night(()=>{ nightPasses(0.15); giveQuestItem('saelle_note',true);
-        say(S,["You come out pink and boneless. She is gone, but your purse is untouched and there is a folded note under it, smelling of rosewater.","<i>“The only one who ever kept the key. Hollowmere is a small city. — S.”</i>"],[bye]); })); }},
+      { const n=saelleNpc(); setTimeout(()=>gesture(n,'laugh'),700); } say(S,["“Shut the door. What's this, your key, on your wrist? Clever. I like clever.”"],night(()=>{ nightPasses(0.15); giveQuestItem('saelle_note',true);
+        say(S,["“The only one who ever kept the key. Hollowmere is a small city.” <i>She is gone. Under your purse, untouched, a note that smells of rosewater.</i>"],[bye]); })); }},
     {label:'Follow her.', fn:()=>{ remember('saelle','robbed','Saelle of the bathhouse took you to the room behind the boiler, and your purse paid for it.');
-      say(S,["The room behind the boiler is all copper and steam. She kisses you before the door is even shut, and you forget about the door, and the steam, and most other things."],night(()=>{ const took=Math.min(player.purse,20); player.purse-=took; nightPasses(0.15); giveQuestItem('saelle_note',true); if(took) logMsg('Saelle took '+formatCoin(took)+' from your purse.','#e8a060');
-        say(S,["Afterwards you doze. When you wake, the water has gone lukewarm and you are alone. Out at your chest, your clothes are folded more neatly than you left them, and your purse is lighter.","Tucked into it, a note that smells of rosewater: <i>“For the room. And for the lesson: always keep the key on your wrist. It was worth it, wasn't it? — S.”</i>"],[bye]); })); }},
-    {label:'Smile, and stay where you are.', fn:()=>say(S,"She shrugs, one wet shoulder out of the water. “Your loss, sweet.” She sinks lower, and keeps watching.",[bye])}]); }
+      say(S,["“Shut the door. No, leave it. Come here.”"],night(()=>{ const took=Math.min(player.purse,20); player.purse-=took; nightPasses(0.15); giveQuestItem('saelle_note',true); if(took) logMsg('Saelle took '+formatCoin(took)+' from your purse.','#e8a060');
+        say(S,["“For the room. And for the lesson: always keep the key on your wrist. It was worth it, wasn't it?” <i>She is gone, and your purse is lighter. Tucked into it, a note that smells of rosewater.</i>"],[bye]); })); }},
+    {label:'Smile, and stay where you are.', fn:()=>{ const n=NPCS.find(x=>x.id==='saelle'||x.id==='bathsaelle'); if(n) gesture(n,'shrug'); say(S,"“Your loss, sweet.”",[bye]); }}]); }
 Object.assign(ITEMS,{ moon_ribbon:{ name:"Ithilwen's Silver Ribbon", slot:'special', title:"A strand of elven ribbon that holds a little moonlight even in daylight. Worn round the wrist, where she tied it." },
   saelle_note:{ name:'A Rosewater Note', slot:'misc', title:"Folded twice, sealed with nothing but a lip-print. It still smells of rosewater and the bathhouse." } });
 function wearSpecial(id){ const E=player.opts&&player.opts.equip, k=player.inv.indexOf(id); if(!E || E.special || k<0) return; player.inv[k]=null; E.special=id; delete player.opts._ck; try{ refreshPlayerHp(false); }catch(e){} updateHud(); }
@@ -18019,7 +18039,7 @@ TALKERS.saelle_l=()=>{ const S='Saelle', robbed=CHOICE.saelle==='robbed';
   if(CHOICE.saelle2==='helped' && CHOICE.saelleNight && !CHOICE.saelle3){ const ans=(txt,reply,k)=>({label:txt, fn:()=>{ remember('saelle3',k,'Saelle asked whether you would ever leave Hollowmere with her.'); CHOICE.saelle3Day=Math.floor(dayClock/DAY_LEN); giveQuestItem('saelle_picks',true); updateHud();
         say(S,[reply,"“My spares. Sella will know whose they were, and she'll pay you better for it.” <i>You receive Saelle's lockpicks.</i>"],[bye]); }});
     say(S,["“Grell's letters are ash. Nobody owns me now. There's a ship from Port Fearn every spring. I've never been on one. Would you ever leave this valley? With someone?”"],[
-      ans('“With you? Yes.”',"For once she has nothing clever to say. She just nods, and keeps nodding, and looks out of the window so you will not see her face.",'yes'),
+      ans('“With you? Yes.”',"“…Good. Yes. Good.”",'yes'),
       ans('“This valley is my home.”',"“I know. I'd have said the same, once. Keep the door locked, then, and I'll come back through the window.”",'stay'),
       ans('“Ask me again in spring.”',"“Oh, I will. Every day until then.”",'spring')]); return; }
   if(CHOICE.saelle3 && !CHOICE.saelle4 && Math.floor(dayClock/DAY_LEN)>(CHOICE.saelle3Day||0)){
@@ -18030,7 +18050,7 @@ TALKERS.saelle_l=()=>{ const S='Saelle', robbed=CHOICE.saelle==='robbed';
       {label:'“Not tonight.”', fn:()=>say(S,"“Suit yourself. The roof isn't going anywhere. Neither am I.”",[bye])}]); return; }
   if(CHOICE.saelle2==='helped'){ say(S,[CHOICE.saelleNight?"“Back again? Good. The kettle's on, and the door still locks.”":"“My rooms are just up there. The door locks. I find that I'm in no hurry to be alone.”"],[
       {label:'Go up with her.', fn:()=>{ const n=NPCS.find(x=>x.id==='saelle_l'); romStart(n,'hearth'); CHOICE.saelleNight=true;
-        say(S,"Her rooms are one room, small and warm and full of books she has clearly stolen. She shuts the shutters, and then she shuts your mouth with hers.",[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.3); romEnd(); say(S,"You wake to rain on the shutters and the smell of her rosewater on the pillow. She is sitting on the sill, already dressed, eating an apple. “Your purse is where you left it,” she says. “I checked.” <i>You are fully healed.</i>",[bye]); }); }}]); }},
+        say(S,"“Mind the books. Most of them aren't mine. Shutters. There.”",[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.3); romEnd(); say(S,"“Morning. It's raining. Your purse is where you left it. I checked.” <i>You are fully healed.</i>",[bye]); }); }}]); }},
       bye]); return; }
   if(CHOICE.saelle2==='refused'){ say(S,"“Changed your mind? No. I didn't think so.”",[{label:'“Tell me about the letters again.”', fn:()=>{ CHOICE.saelle2=null; TALKERS.saelle_l(); }}, bye]); return; }
   say(S,[robbed?"“Don't shout. Yes, the bathhouse. Yes, your purse.”":"“You came. The note worked, then.”",

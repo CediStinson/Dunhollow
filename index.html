@@ -11077,7 +11077,7 @@ wrap('village','npcs',l=> CHOICE.unpaid==='paid' ? [...l,{ id:'harl_v', name:'Ha
 TALKERS.harl_v=()=>say('Harl the Watchman',["“Hamond needed a watch. Turns out I needed a village. Nobody's robbed on the forest road while I'm awake, and I sleep very little.”"],[bye]);
 wrap('road','mobs',l=> CHOICE.unpaid==='paid' ? l.filter(m=>m.faction!=='roadthief') : l);
 wrap('kingsroad','mobs',l=> CHOICE.unpaid==='ignored' && nightAmt()>0.5 ? [...l,
-  { name:'Red Deserter', type:'bandit', i:4, j:9, faction:'deserters', daily:true, opts:BANDIT({skin:1,hair:2,beard:3,equip:{head:'kettle',torso:'tunic_red',armor:'gambeson',hands:null,legs:'breeches',feet:'boots',weapon:'sword',offhand:null}}) },
+  { name:'Red Deserter', type:'bandit', i:4, j:9, faction:'deserters', daily:true, style:'shield', opts:BANDIT({skin:1,hair:2,beard:3,equip:{head:'kettle',torso:'tunic_red',armor:'gambeson',hands:null,legs:'breeches',feet:'boots',weapon:'sword',offhand:'shield_iron'}}) },   // he kept his shield when he ran
   { name:'Hungry Deserter', type:'bandit', i:6, j:11, faction:'deserters', daily:true, opts:BANDIT({skin:2,hair:1,beard:1,equip:{head:null,torso:'tunic_red',armor:null,hands:null,legs:'breeches',feet:'boots',weapon:'spear',offhand:null}}) }] : l);
 // ════════ Hollowmere comes alive: doors you can use, rooms behind them, and people talking ════════
 const CROOM=(label,w,h,back,backEntry,objs,npcs)=>({ ...INSIDE_BASE, w, h, theme:'interior', label, mini:{x:0,y:0},
@@ -11827,7 +11827,7 @@ function resetMobs(){
     const isWolf=s.type==='wolf';
     const hp=isWolf?WOLF.base:maxHpOf(s.opts.equip,FOES[s.type].base);
     const key=s.daily ? s.name+'@'+Math.floor(dayClock/DAY_LEN) : s.name, dead=defeatedMobs.has(areaId+':'+key);
-    return { id:k, key, name:s.name, type:s.type, opts:s.opts, coat:s.coat, faction:s.faction, spawn:[s.i,s.j], i:s.i, j:s.j, x:s.i+0.5, y:s.j+0.5,
+    return { id:k, key, name:s.name, type:s.type, opts:s.opts, coat:s.coat, faction:s.faction, style:s.style, spawn:[s.i,s.j], i:s.i, j:s.j, x:s.i+0.5, y:s.j+0.5,
              dir:k?7:1, hp:dead?0:hp, maxHp:hp, path:[], moving:false, dead, gone:false, fade:1, flash:0, lunge:null,
              state:dead?'down':'guard', t:0, k:0, wind:1, quick:false, guardDir:isWolf?null:'up', ox:0, oy:0, hostile:!dead, fallT:dead?999:0 }; });
   if(DUMMY_SPAWN) mobs.push(makeDummy());
@@ -12324,7 +12324,7 @@ const STYLES={
     {wait:0.9, wind:0.80, after:0.50, dir:'left', feint:'up'},
     {wait:0.5, wind:0.55, after:0.70, dir:'right'} ]} };
 // two who fight as a pair: while you duel one, the other jabs from the side, and often only pretends to, so his friend can strike
-const PAIR_NAMES=new Set(['Hired Blade','Second Blade','Footpad','Footpad Lookout',"Mara's Man","Mara's Woman","Baron's Trapper","Trapper's Mate"]);
+const PAIR_NAMES=new Set(['Hired Blade','Second Blade','Footpad','Footpad Lookout',"Mara's Man","Mara's Woman","Baron's Trapper","Trapper's Mate",'Cutpurse Jory','Cutpurse Mags','Red Deserter','Hungry Deserter']);
 const partnerOf=f=> f && PAIR_NAMES.has(f.name) ? mobs.find(m=>m!==f && m.hostile && !m.dead && m.faction===f.faction && PAIR_NAMES.has(m.name)) : null;
 const NAME_STYLE={ 'Cutpurse Jory':'street', 'Cutpurse Mags':'street', 'Dalla':'street', 'Nim':'street', 'Road Thief':'street',
   'Deserter':'drilled', 'Red Deserter':'drilled', 'Hungry Deserter':'drilled', 'Hired Blade':'drilled', 'Second Blade':'drilled', "Baron's Guard":'drilled', "Baron's Sergeant":'veteran',
@@ -12401,7 +12401,7 @@ function impact(f){                                   // a foe's swing lands (or
     if(!f.quick) f.k++;
     if(duel.ripUntil>clock && !f.dead) riposteCounter(f);
   } else {
-    const fdmg=weaponOf(f).dmg;
+    const fdmg=f.shove ? Math.max(1,Math.round(weaponOf(f).dmg*0.5)) : weaponOf(f).dmg; f.shove=false;   // a shield shove is a push, not a cut
     if(sideOk && since<=windowFor(player)){
       const note=timingNote(since); floatText(tileOf(player),'Blocked'+(note?' · '+note:''),'#a8c8f0'); burst(player,f,'#c8d8f0',7); SND.clang(1); momGain(10);
     } else if(duel.st==='parry'){
@@ -12468,7 +12468,7 @@ function meleeHit(){
   const f=combat.foe; lunge(player,f); duel.caught=false; SND.swing(player.opts.equip.weapon);
   const dmg=weaponOf(player).dmg;
   if(shieldUp(f)){ floatText(tileOf(f),'Shield','#b8c8d8'); burst(f,player,'#b8c8d8',6); duel.caught=true; SND.clang(0.9); f.blocks=(f.blocks||0)+1;
-    if(f.blocks>=3 && f.state==='guard'){ f.blocks=0; beginWind(f,true); floatText([f.i,f.j-0.001],'Shove!','#ffb070'); }
+    if(f.blocks>=3 && f.state==='guard'){ f.blocks=0; beginWind(f,true); f.shove=true; floatText([f.i,f.j-0.001],'Shove!','#ffb070'); }
     return; }
   if(styleOf(f)==='shield' && f.openUntil>clock && f.state!=='stagger'){ wound(f,dmg,'Open!','#ffe0a0'); f.openUntil=0; return; }
   if(f.state==='recover' || f.state==='stagger'){ wound(f,dmg); return; }
@@ -15064,6 +15064,7 @@ AREAS.emberpass={ fence:{r:false,l:false}, w:16, h:9, theme:'interior', inside:t
     { name:'Ash Hound', type:'wolf', i:11, j:5, faction:'ashhound', coat:'#2a201c' },
     { name:'Ash Hound Alpha', type:'wolf', i:10, j:3, faction:'ashhound', coat:'#3a2a24' },
     { name:'Flamesworn Zealot', type:'mage', i:5, j:3, faction:'flamesworn', opts:FLAMESWORN({skin:2,hair:5,beard:4,hairColor:7,equip:{head:null,torso:'shirt',armor:'ash_mantle',hands:'cinder_gloves',legs:'scorched_greaves',feet:'emberstep_boots',weapon:'staff_cinder',offhand:null}}) },
+    { name:'Flamesworn Shieldbearer', type:'bandit', i:9, j:4, faction:'flamesworn', style:'shield', opts:FLAMESWORN({skin:1,hair:1,beard:2,hairColor:2,equip:{head:'obsidian_helm',torso:'shirt',armor:'ash_mantle',hands:'cinder_gloves',legs:'scorched_greaves',feet:'emberstep_boots',weapon:'sword',offhand:'shield_iron'}}) },
     { name:'Flamesworn Captain', type:'bandit', i:3, j:5, faction:'flamesworn', opts:FLAMESWORN({}) } ],
   npcs:()=>[],
   entries:{ fromWarren:{i:14,j:4}, fromDeeps:{i:14,j:4}, fromForge:{i:1,j:4} } };

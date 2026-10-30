@@ -11982,7 +11982,7 @@ function drawClock(box){
   c.fillStyle='#2a1c0c'; c.beginPath(); c.moveTo(0,H); c.quadraticCurveTo(W*0.25,H-12,W*0.5,H-6); c.quadraticCurveTo(W*0.75,H-1,W,H-10); c.lineTo(W,H); c.closePath(); c.fill();   // the hills
   c.restore(); c.strokeStyle='#6a4a1c'; c.lineWidth=2; c.beginPath(); c.roundRect(2,2,W-4,H-4,10); c.stroke();
   const name = isDay ? (f<0.12?'Dawn':f<0.4?'Morning':f<0.6?'Midday':f<0.88?'Afternoon':'Dusk') : (f<0.15?'Evening':f<0.85?'Night':'Before dawn');
-  const day=Math.max(1,Math.floor((dayClock-DAY_LEN*0.5)/DAY_LEN)+1), lb=document.getElementById('mm-clock-label'); if(lb) lb.textContent=name+' · Day '+day+' · '+(harvestEve()?'Harvest-eve':shipDay()?'Ship Day':seasonOf(day));
+  const day=Math.max(1,Math.floor((dayClock-DAY_LEN*0.5)/DAY_LEN)+1), lb=document.getElementById('mm-clock-label'); if(lb) lb.textContent=name+' · Day '+day+(harvestEve()?' · Harvest-eve':shipDay()?' · Ship Day':'');
 }
 // ── the big map: drag to pan, wheel or pinch to zoom ──
 const BIGMAP={open:false, zoom:1, px:0, py:0};
@@ -13783,23 +13783,19 @@ TALKERS.testgob=()=>testGobTalk();
 
 // ════════ The sky and the weather: warm dusks, pink dawns, rain, fog and storms ════════
 const DAYF=()=>(dayClock%DAY_LEN)/DAY_LEN;       // 0 noon · 0.25 dusk · 0.5 midnight · 0.75 dawn
-// ── the calendar: four seasons of six days; you arrive at the start of summer. Harvest-eve opens autumn, the spring ship sails on the first of spring ──
-const SEASON_LEN=6, YEAR_LEN=24, SEASONS=['Spring','Summer','Autumn','Winter'];
+// ── the calendar: no seasons (the world will hold deserts and snowfields alike), only feast days that come round every 24 days ──
+const YEAR_LEN=24, VOYAGE=6;
 function calDay(){ return Math.max(1,Math.floor((dayClock-DAY_LEN*0.5)/DAY_LEN)+1); }
-function yearDay(d){ return ((d??calDay())-1+SEASON_LEN)%YEAR_LEN; }                    // day 1 is the first of summer
-function seasonOf(d){ return SEASONS[Math.floor(yearDay(d)/SEASON_LEN)]; }
-const HARVEST_EVE=SEASON_LEN*2, SHIP_DAY=0;                                           // days of the year
+function yearDay(d){ return ((d??calDay())-1+6)%YEAR_LEN; }
+const HARVEST_EVE=12, SHIP_DAY=0;                                                      // the days of the turn they fall on: harvest-eve on day 7, the ship on day 19, and every 24 days after
 function harvestEve(){ return yearDay()===HARVEST_EVE; }
 function shipDay(){ return yearDay()===SHIP_DAY; }
 function daysUntil(yd){ return (yd-yearDay()+YEAR_LEN)%YEAR_LEN; }
-function weatherToday(){ const d=Math.floor(dayClock/DAY_LEN), r=rnd01(d*13+7,d*5+3,880), se=seasonOf(calDay());
-  const [rain,fog]={Spring:[0.36,0.12], Summer:[0.16,0.06], Autumn:[0.3,0.26], Winter:[0.34,0.16]}[se];
-  return d<1 ? 'clear' : r<1-rain-fog ? 'clear' : r<1-fog ? (se==='Winter'?'snow':'rain') : 'fog'; }   // the first day is always fair; in winter the rain comes down as snow
-let SNOW=[];
+function weatherToday(){ const d=Math.floor(dayClock/DAY_LEN), r=rnd01(d*13+7,d*5+3,880);
+  return d<1 ? 'clear' : r<0.52 ? 'clear' : r<0.78 ? 'rain' : 'fog'; }                // the first day is always fair
 setInterval(()=>{ try{ if(!running) return; const d=calDay(); if(CHOICE.calNews===d) return; CHOICE.calNews=d;
     if(harvestEve()) logMsg("It is harvest-eve. There will be a fiddler at the Wheatsheaf tonight.",'#e8c878');
-    else if(shipDay()) logMsg("The first day of spring. The spring ship is at the river docks in Hollowmere today.",'#e8c878');
-    else if(yearDay()%SEASON_LEN===0) logMsg(seasonOf(d)==='Winter'?'Winter comes to the valley.':seasonOf(d)==='Autumn'?'The leaves are turning. Autumn.':seasonOf(d)+' comes to the valley.','#c8b890'); }catch(e){} },2000);
+    else if(shipDay()) logMsg("The spring ship is at the river docks in Hollowmere today.",'#e8c878'); }catch(e){} },2000);
 const WET_THEMES=new Set(['farm','road','crossroads','village','wood','fen','elf','city','bog']);
 let RAIN=[], lightningT=0, lastWeather=null;
 function drawSkyWeather(){ const A=AREAS[areaId];   // dusk and dawn colour, rain, fog and storms
@@ -13812,10 +13808,7 @@ function drawSkyWeather(){ const A=AREAS[areaId];   // dusk and dawn colour, rai
       g.globalCompositeOperation='lighter'; const gr=g.createLinearGradient(0,0,0,H*0.6); gr.addColorStop(0,`rgba(255,150,70,${0.16*dusk})`); gr.addColorStop(1,'rgba(255,150,70,0)'); g.fillStyle=gr; g.fillRect(0,0,W,H*0.6); }
     if(dawn>0){ g.globalCompositeOperation='overlay'; g.fillStyle=`rgba(240,150,190,${0.3*dawn})`; g.fillRect(0,0,W,H);
       g.globalCompositeOperation='lighter'; const gr=g.createLinearGradient(0,0,0,H*0.5); gr.addColorStop(0,`rgba(170,190,255,${0.14*dawn})`); gr.addColorStop(1,'rgba(170,190,255,0)'); g.fillStyle=gr; g.fillRect(0,0,W,H*0.5); }
-    const wx=weatherToday(); if(wx!==lastWeather){ const first=lastWeather===null; lastWeather=wx; if(running && !first) logMsg(wx==='rain'?'Clouds roll in. It starts to rain.':wx==='snow'?'It starts to snow.':wx==='fog'?'A grey fog settles over the valley.':'The sky clears.','#a8b8c8'); }
-    if(WET_THEMES.has(A.theme) && wx==='snow'){ g.globalCompositeOperation='screen'; g.fillStyle='rgba(60,66,80,1)'; g.globalAlpha=0.25; g.fillRect(0,0,W,H); g.globalAlpha=1; g.globalCompositeOperation='source-over';
-      const N=LOW_FX?70:160; if(SNOW.length!==N){ SNOW=[]; for(let k=0;k<N;k++) SNOW.push({x:Math.random()*W,y:Math.random()*H,v:30+Math.random()*50,r:0.8+Math.random()*1.8,p:Math.random()*6}); }
-      g.fillStyle='rgba(240,244,252,0.85)'; SNOW.forEach(f=>{ f.y+=f.v/60; f.x+=Math.sin(gt*1.3+f.p)*0.4; if(f.y>H){ f.y=-6; f.x=Math.random()*W; } g.beginPath(); g.arc(f.x,f.y,f.r,0,Math.PI*2); g.fill(); }); }
+    const wx=weatherToday(); if(wx!==lastWeather){ const first=lastWeather===null; lastWeather=wx; if(running && !first) logMsg(wx==='rain'?'Clouds roll in. It starts to rain.':wx==='fog'?'A grey fog settles over the valley.':'The sky clears.','#a8b8c8'); }
     if(WET_THEMES.has(A.theme)){
       if(wx==='rain'){ g.globalCompositeOperation='multiply'; g.fillStyle='rgba(150,160,180,1)'; g.globalAlpha=0.35; g.fillRect(0,0,W,H); g.globalAlpha=1;
         g.globalCompositeOperation='source-over'; const N=LOW_FX?60:150; if(RAIN.length!==N){ RAIN=[]; for(let k=0;k<N;k++) RAIN.push({x:Math.random()*W,y:Math.random()*H,v:700+Math.random()*400,l:10+Math.random()*12}); }
@@ -15437,12 +15430,11 @@ function pupUpdate(dt){
   }
 }
 
-// ── your wolf has opinions about places: it howls in the Wolfwood, bristles at the dead, drinks at pools, shakes off the rain, romps in snow, runs to its kin ──
+// ── your wolf has opinions about places: it howls in the Wolfwood, bristles at the dead, drinks at pools, shakes off the rain, runs to its kin ──
 function pupReactFor(){ const A=AREAS[areaId]||{}, out=!A.inside, n=nightAmt(), wx=out?weatherToday():'clear';
   if(areaId==='village' && CHOICE.pupSt==='adopted' && PUPS.some(q=>q.mode==='home')) return 'greet';
   if(/graveyard|crypt|barrow|fen|hanged/.test(areaId) || A.volcanic) return 'growl';
   if(areaId==='wolfwood' || (out && n>0.6 && /wood|elf/.test(A.theme))) return 'howl';
-  if(out && wx==='snow') return 'romp';
   if(out && wx==='rain') return 'shake';
   if(OBJECTS.some(o=>o.type==='pool' && o.kind!=='bath')) return 'drink';
   return null; }
@@ -18179,9 +18171,9 @@ JOURNAL.push(["Matters of the Heart", ()=>{ const L=[];
   if(CHOICE.ithil) L.push(CHOICE.ithil3 ? "You stayed with Ithilwen until the sun came up, the first time anyone has. She braided a strand of her hair into your ribbon; while you wear it, you are harder to kill." : CHOICE.ithil2 ? "Ithilwen asked what you fear, and filled her ribbon with moonlight for you. While you wear it on your wrist, you are a little harder to kill. She wants to ask you something else, another night." : "Ithilwen of the moon pool. She has something to ask you, some night.");
   if(CHOICE.gunnarNight) L.push(CHOICE.gunnar3 ? "Gunnar's mam came in from the farm and pinched you, which means she approves. Gunnar bent a horseshoe nail into a ring for you, and there is still a roast kept back every day." : CHOICE.gunnar2 ? "You danced with Gunnar on harvest-eve. There is a roast kept back for you at the Wheatsheaf every day, by his orders. He looks nervous about something lately." : "Gunnar the Ploughman goes red whenever you walk into the Wheatsheaf. He seems to be working up to something"+(harvestEve()?": it is harvest-eve tonight.":", and harvest-eve is in "+daysUntil(HARVEST_EVE)+" days."));
   if(CHOICE.saelle2==='helped' && CHOICE.saelleNight) L.push(CHOICE.saelle3 ? {yes:"Saelle asked if you would leave the valley with her on the spring ship. You said yes.", stay:"Saelle asked if you would leave the valley with her. You told her it is your home; she says she will come back through the window.", spring:"Saelle asked if you would leave the valley with her. You told her to ask again in spring. She says she will, every day."}[CHOICE.saelle3]+" Sella the Fence pays you better for her sake."+(CHOICE.saelle4?" She showed you her roof above the Lowstreets and tied a thieves' knot round your wrist.":" She says there is somewhere she wants to show you.")
-      +(CHOICE.saelleShip==='sailed'?" You sailed with her on the spring ship, and came back with sea-glass.":CHOICE.saelleShip==='alone'?" She sailed on the spring ship alone, and promised to come back after a season.":saelleWaits()?(shipDay()?" The spring ship is at the river docks today. She is waiting.":" The spring ship calls at the river docks on the first of spring, in "+daysUntil(SHIP_DAY)+" days."):"") : "Saelle's rooms above the Lowstreets. She keeps looking at the ships.");
+      +(CHOICE.saelleShip==='sailed'?" You sailed with her on the spring ship, and came back with sea-glass.":CHOICE.saelleShip==='alone'?" She sailed on the spring ship alone, and promised to come back within the week.":saelleWaits()?(shipDay()?" The spring ship is at the river docks today. She is waiting.":" The spring ship calls at the river docks on the first of spring, in "+daysUntil(SHIP_DAY)+" days."):"") : "Saelle's rooms above the Lowstreets. She keeps looking at the ships.");
   return L.length ? [ (CHOICE.tess?CHOICE.tess==='lover':true) && (CHOICE.ithil?!!CHOICE.ithil3:true) && (CHOICE.gunnarNight?!!CHOICE.gunnar3:true) && (CHOICE.saelle2==='helped'&&CHOICE.saelleNight?!!CHOICE.saelle4:true) ? 'done':'active', L.join('<br>') ] : null; }]);
-// ── the spring ship: on the first of spring it calls at the river docks, and Saelle is waiting with a bag ──
+// ── the spring ship: on Ship Day it calls at the river docks, and Saelle is waiting with a bag ──
 const saelleWaits=()=> CHOICE.saelle2==='helped' && (CHOICE.saelle3==='yes'||CHOICE.saelle3==='spring') && !CHOICE.saelleShip;
 const saelleAway=()=> CHOICE.saelleShip==='alone' && calDay()<(CHOICE.saelleBack||0) || (saelleWaits() && shipDay());
 wrap('docks','objects',l=> shipDay() && !l.some(o=>o.type==='cog') ? [...l,{type:'cog', i:7, j:2}] : l);
@@ -18193,18 +18185,18 @@ TALKERS.saelle_ship=()=>{ const S='Saelle', n=NPCS.find(x=>x.id==='saelle_ship')
       csDo(()=>{ if(n) n._alpha=0.0001; if(both) player._hide=true; }),
       { dur:4.2, tick:(dt,t)=>{ if(!cog) return; cog.dx=-t*t*22; cog.dy=-t*t*6; cog.fade=1-Math.max(0,t-2.6)/1.6; }, end:()=>{ if(cog){ cog.fade=0; } } }];
     const after=()=>{ if(cog){ cog.dx=0; cog.dy=0; cog.fade=null; } NPCS.splice(0,NPCS.length,...NPCS.filter(x=>x.id!=='saelle_ship'));
-      if(!both){ CHOICE.saelleBack=calDay()+SEASON_LEN; logMsg('The spring ship is a speck on the river, and then it is gone.','#c8b890'); return; }
+      if(!both){ CHOICE.saelleBack=calDay()+VOYAGE; logMsg('The spring ship is a speck on the river, and then it is gone.','#c8b890'); return; }
       ROM.blackT=1; ROM.black=1; player._hide=false;
       setTimeout(()=>say(S,["“Look at that. Nothing but water, all the way round. I thought I'd be frightened.”","“I'm not. Don't let go of the rail, though.”"],[{label:'…', fn:()=>{
-        say(S,["“Islands. Salt fish. A man who sold me a parrot that turned out to be a painted crow. I'm keeping it.”","“A whole season at sea and I've stolen nothing. Well. Almost nothing.”"],[{label:'…', fn:()=>{ closeDialog();
-          dayClock+=DAY_LEN*SEASON_LEN; nightPasses(0.05); giveQuestItem('sea_glass',true); switchArea('docks'); ROM.blackT=0;
+        say(S,["“Islands. Salt fish. A man who sold me a parrot that turned out to be a painted crow. I'm keeping it.”","“All those days at sea and I've stolen nothing. Well. Almost nothing.”"],[{label:'…', fn:()=>{ closeDialog();
+          dayClock+=DAY_LEN*VOYAGE; nightPasses(0.05); giveQuestItem('sea_glass',true); switchArea('docks'); ROM.blackT=0;
           setTimeout(()=>say(S,["“Home. Your valley looks smaller from the river. I like it anyway.”","“Here. Sea-glass, from the beach where you fell asleep. So you remember we went.” <i>You receive a piece of green sea-glass.</i>"],[bye]),900); }}]); }}]),400); };
     if(!n || !cutscene(steps,after)) after(); };
   const ask = CHOICE.saelle3==='yes'
     ? ["“You came. The tide won't wait, and neither will I.”","“Last chance to say you didn't mean it.”"]
-    : ["“It's spring. I said I'd ask every day, and today I mean it. The ship's right there.”","“Will you come?”"];
+    : ["“The ship's in. I said I'd ask every day, and today I mean it. It's right there.”","“Will you come?”"];
   say(S,ask,[{label:'Board the ship with her.', fn:()=>sail(true)},
-    {label:'“I can’t go. Not now.”', fn:()=>{ if(n) gesture(n,'nod'); say(S,["“I know. I think I knew.”","“Then I'll go, and I'll come back. A season. Keep the window unlatched.”"],[{label:'Watch her go.', fn:()=>sail(false)}]); }}]); };
+    {label:'“I can’t go. Not now.”', fn:()=>{ if(n) gesture(n,'nod'); say(S,["“I know. I think I knew.”","“Then I'll go, and I'll come back. A week, maybe. Keep the window unlatched.”"],[{label:'Watch her go.', fn:()=>sail(false)}]); }}]); };
 Object.assign(ITEMS,{ sea_glass:{ name:'A Piece of Sea-Glass', slot:'misc', title:"Green, smooth as a pebble, from a beach on an island whose name Saelle never learned. She says you fell asleep on that beach and snored at the gulls." } });
 ITEM_ICON.sea_glass=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.fillStyle='rgba(90,170,120,0.85)'; g2.strokeStyle='#2a6a4a'; g2.lineWidth=1; g2.beginPath(); g2.moveTo(12,20); g2.quadraticCurveTo(14,10,24,11); g2.quadraticCurveTo(33,14,30,24); g2.quadraticCurveTo(26,32,17,30); g2.quadraticCurveTo(10,27,12,20); g2.fill(); g2.stroke();
   g2.fillStyle='rgba(220,255,235,0.6)'; g2.beginPath(); g2.ellipse(19,17,4,2,-0.5,0,Math.PI*2); g2.fill(); g2.restore(); };

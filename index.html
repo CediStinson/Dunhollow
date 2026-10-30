@@ -7441,7 +7441,7 @@ function drawObject(o){
     if(o.s){ g.save(); g.translate(x,y+Math.sin(gt*1.1+o.i)*1.2); g.scale(o.flip?-o.s:o.s,o.s); drawCached('boat',0,0,100,50,50,34,paintBoat); g.restore(); }
     else drawCached('boat',x,y,100,50,50,34,paintBoat);
   } else if(o.type==='cog'){
-    const bob=Math.sin(gt*0.9)*1.5, S=0.72; g.save(); g.translate(x,y+bob); g.scale(S,S);
+    const bob=Math.sin(gt*0.9)*1.5, S=0.72; g.save(); if(o.fade!=null) g.globalAlpha*=Math.max(0,o.fade); g.translate(x+(o.dx||0),y+bob+(o.dy||0)); g.scale(S,S);
     drawCached('cog4',0,0,520,480,240,380,paintCog);
     const fl=Math.sin(gt*3)*3; g.fillStyle='#b08a2a'; g.beginPath(); g.moveTo(32,-310); g.quadraticCurveTo(52,-314+fl,72,-306+fl*1.4); g.lineTo(52,-300+fl*0.6); g.lineTo(32,-298); g.closePath(); g.fill();   // the pennant
     g.restore();
@@ -13789,7 +13789,7 @@ function weatherToday(){ const d=Math.floor(dayClock/DAY_LEN), r=rnd01(d*13+7,d*
 let SNOW=[];
 setInterval(()=>{ try{ if(!running) return; const d=calDay(); if(CHOICE.calNews===d) return; CHOICE.calNews=d;
     if(harvestEve()) logMsg("It is harvest-eve. There will be a fiddler at the Wheatsheaf tonight.",'#e8c878');
-    else if(shipDay()) logMsg("The first day of spring. The spring ship sails from Port Fearn today.",'#e8c878');
+    else if(shipDay()) logMsg("The first day of spring. The spring ship is at the river docks in Hollowmere today.",'#e8c878');
     else if(yearDay()%SEASON_LEN===0) logMsg(seasonOf(d)==='Winter'?'Winter comes to the valley.':seasonOf(d)==='Autumn'?'The leaves are turning. Autumn.':seasonOf(d)+' comes to the valley.','#c8b890'); }catch(e){} },2000);
 const WET_THEMES=new Set(['farm','road','crossroads','village','wood','fen','elf','city','bog']);
 let RAIN=[], lightningT=0, lastWeather=null;
@@ -18051,7 +18051,7 @@ function goersTick(dt){ for(let q=GOERS.length-1;q>=0;q--){ const G=GOERS[q], e=
     try{ G.done&&G.done(); }catch(err){} } }
 { const base=drawNPC; drawNPC=function(n){ if(n._alpha==null || n._alpha>=1) return base(n); if(n._alpha<=0) return;
     g.save(); g.globalAlpha*=n._alpha; if(n._sink){ const q=P(n.x??n.i+0.5,n.y??n.j+0.5); g.beginPath(); g.rect(q.x-80,q.y-260,160,260-6); g.clip(); g.translate(0,n._sink); } try{ return base(n); } finally{ g.restore(); } }; }
-{ const base=drawActor; drawActor=function(e){ if(e===player || e._alpha==null || e._alpha>=1) return base(e); if(e._alpha<=0) return;
+{ const base=drawActor; drawActor=function(e){ if(e===player && player._hide) return; if(e===player || e._alpha==null || e._alpha>=1) return base(e); if(e._alpha<=0) return;
     g.save(); g.globalAlpha*=e._alpha; try{ return base(e); } finally{ g.restore(); } }; }
 // when a conversation ends, the scene it set going plays out
 const AFTER_TALK=[]; const afterTalk=fn=>AFTER_TALK.push(fn);
@@ -18136,11 +18136,39 @@ JOURNAL.push(["Matters of the Heart", ()=>{ const L=[];
   if(CHOICE.tess) L.push(CHOICE.tess==='lover' ? "Tessaly asked you to stay, and not for the book. She carved you a ring from his old staff."+(CHOICE.tess3?" She named a star after you, in ink.":"") : "You read star-names to Tessaly until the candle went. She says the book will keep.");
   if(CHOICE.ithil) L.push(CHOICE.ithil3 ? "You stayed with Ithilwen until the sun came up, the first time anyone has. She braided a strand of her hair into your ribbon; while you wear it, you are harder to kill." : CHOICE.ithil2 ? "Ithilwen asked what you fear, and filled her ribbon with moonlight for you. While you wear it on your wrist, you are a little harder to kill. She wants to ask you something else, another night." : "Ithilwen of the moon pool. She has something to ask you, some night.");
   if(CHOICE.gunnarNight) L.push(CHOICE.gunnar3 ? "Gunnar's mam came in from the farm and pinched you, which means she approves. Gunnar bent a horseshoe nail into a ring for you, and there is still a roast kept back every day." : CHOICE.gunnar2 ? "You danced with Gunnar on harvest-eve. There is a roast kept back for you at the Wheatsheaf every day, by his orders. He looks nervous about something lately." : "Gunnar the Ploughman goes red whenever you walk into the Wheatsheaf. He seems to be working up to something"+(harvestEve()?": it is harvest-eve tonight.":", and harvest-eve is in "+daysUntil(HARVEST_EVE)+" days."));
-  if(CHOICE.saelle2==='helped' && CHOICE.saelleNight) L.push(CHOICE.saelle3 ? {yes:"Saelle asked if you would leave the valley with her on the spring ship. You said yes.", stay:"Saelle asked if you would leave the valley with her. You told her it is your home; she says she will come back through the window.", spring:"Saelle asked if you would leave the valley with her. You told her to ask again in spring. She says she will, every day."}[CHOICE.saelle3]+" Sella the Fence pays you better for her sake."+(CHOICE.saelle4?" She showed you her roof above the Lowstreets and tied a thieves' knot round your wrist.":" She says there is somewhere she wants to show you.") : "Saelle's rooms above the Lowstreets. She keeps looking at the ships.");
+  if(CHOICE.saelle2==='helped' && CHOICE.saelleNight) L.push(CHOICE.saelle3 ? {yes:"Saelle asked if you would leave the valley with her on the spring ship. You said yes.", stay:"Saelle asked if you would leave the valley with her. You told her it is your home; she says she will come back through the window.", spring:"Saelle asked if you would leave the valley with her. You told her to ask again in spring. She says she will, every day."}[CHOICE.saelle3]+" Sella the Fence pays you better for her sake."+(CHOICE.saelle4?" She showed you her roof above the Lowstreets and tied a thieves' knot round your wrist.":" She says there is somewhere she wants to show you.")
+      +(CHOICE.saelleShip==='sailed'?" You sailed with her on the spring ship, and came back with sea-glass.":CHOICE.saelleShip==='alone'?" She sailed on the spring ship alone, and promised to come back after a season.":saelleWaits()?(shipDay()?" The spring ship is at the river docks today. She is waiting.":" The spring ship calls at the river docks on the first of spring, in "+daysUntil(SHIP_DAY)+" days."):"") : "Saelle's rooms above the Lowstreets. She keeps looking at the ships.");
   return L.length ? [ (CHOICE.tess?CHOICE.tess==='lover':true) && (CHOICE.ithil?!!CHOICE.ithil3:true) && (CHOICE.gunnarNight?!!CHOICE.gunnar3:true) && (CHOICE.saelle2==='helped'&&CHOICE.saelleNight?!!CHOICE.saelle4:true) ? 'done':'active', L.join('<br>') ] : null; }]);
+// ── the spring ship: on the first of spring it calls at the river docks, and Saelle is waiting with a bag ──
+const saelleWaits=()=> CHOICE.saelle2==='helped' && (CHOICE.saelle3==='yes'||CHOICE.saelle3==='spring') && !CHOICE.saelleShip;
+const saelleAway=()=> CHOICE.saelleShip==='alone' && calDay()<(CHOICE.saelleBack||0) || (saelleWaits() && shipDay());
+wrap('docks','objects',l=> shipDay() && !l.some(o=>o.type==='cog') ? [...l,{type:'cog', i:7, j:2}] : l);
+wrap('docks','npcs',l=> saelleWaits() && shipDay() ? [...l,{ id:'saelle_ship', name:'Saelle', i:9, j:4, dir:1, opts:{...SAELLE_OPTS, equip:{...SAELLE_OPTS.equip, head:null}} }] : l);
+TALKERS.saelle_ship=()=>{ const S='Saelle', n=NPCS.find(x=>x.id==='saelle_ship'), cog=OBJECTS.find(o=>o.type==='cog');
+  const sail=(both)=>{ remember('saelleShip',both?'sailed':'alone', both?'You sailed with Saelle on the spring ship.':'Saelle sailed on the spring ship without you. She said she would come back.');
+    closeDialog(); const gang={x:(cog?cog.i:7)+0.5, y:(cog?cog.j:2)+1.6};
+    const steps=[csFocus({x:gang.x,y:gang.y},0.4), csGlide(n,gang.x,gang.y,1.3), ...(both?[csGlide(player,gang.x+0.4,gang.y+0.2,1.3)]:[csLook(n,player), csBark(n,'Keep the window unlatched.',1.8)]),
+      csDo(()=>{ if(n) n._alpha=0.0001; if(both) player._hide=true; }),
+      { dur:4.2, tick:(dt,t)=>{ if(!cog) return; cog.dx=-t*t*22; cog.dy=-t*t*6; cog.fade=1-Math.max(0,t-2.6)/1.6; }, end:()=>{ if(cog){ cog.fade=0; } } }];
+    const after=()=>{ if(cog){ cog.dx=0; cog.dy=0; cog.fade=null; } NPCS.splice(0,NPCS.length,...NPCS.filter(x=>x.id!=='saelle_ship'));
+      if(!both){ CHOICE.saelleBack=calDay()+SEASON_LEN; logMsg('The spring ship is a speck on the river, and then it is gone.','#c8b890'); return; }
+      ROM.blackT=1; ROM.black=1; player._hide=false;
+      setTimeout(()=>say(S,["“Look at that. Nothing but water, all the way round. I thought I'd be frightened.”","“I'm not. Don't let go of the rail, though.”"],[{label:'…', fn:()=>{
+        say(S,["“Islands. Salt fish. A man who sold me a parrot that turned out to be a painted crow. I'm keeping it.”","“A whole season at sea and I've stolen nothing. Well. Almost nothing.”"],[{label:'…', fn:()=>{ closeDialog();
+          dayClock+=DAY_LEN*SEASON_LEN; nightPasses(0.05); giveQuestItem('sea_glass',true); switchArea('docks'); ROM.blackT=0;
+          setTimeout(()=>say(S,["“Home. Your valley looks smaller from the river. I like it anyway.”","“Here. Sea-glass, from the beach where you fell asleep. So you remember we went.” <i>You receive a piece of green sea-glass.</i>"],[bye]),900); }}]); }}]),400); };
+    if(!n || !cutscene(steps,after)) after(); };
+  const ask = CHOICE.saelle3==='yes'
+    ? ["“You came. The tide won't wait, and neither will I.”","“Last chance to say you didn't mean it.”"]
+    : ["“It's spring. I said I'd ask every day, and today I mean it. The ship's right there.”","“Will you come?”"];
+  say(S,ask,[{label:'Board the ship with her.', fn:()=>sail(true)},
+    {label:'“I can’t go. Not now.”', fn:()=>{ if(n) gesture(n,'nod'); say(S,["“I know. I think I knew.”","“Then I'll go, and I'll come back. A season. Keep the window unlatched.”"],[{label:'Watch her go.', fn:()=>sail(false)}]); }}]); };
+Object.assign(ITEMS,{ sea_glass:{ name:'A Piece of Sea-Glass', slot:'misc', title:"Green, smooth as a pebble, from a beach on an island whose name Saelle never learned. She says you fell asleep on that beach and snored at the gulls." } });
+ITEM_ICON.sea_glass=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.fillStyle='rgba(90,170,120,0.85)'; g2.strokeStyle='#2a6a4a'; g2.lineWidth=1; g2.beginPath(); g2.moveTo(12,20); g2.quadraticCurveTo(14,10,24,11); g2.quadraticCurveTo(33,14,30,24); g2.quadraticCurveTo(26,32,17,30); g2.quadraticCurveTo(10,27,12,20); g2.fill(); g2.stroke();
+  g2.fillStyle='rgba(220,255,235,0.6)'; g2.beginPath(); g2.ellipse(19,17,4,2,-0.5,0,Math.PI*2); g2.fill(); g2.restore(); };
 // ── Saelle again: the woman from the bathhouse, in the Lowstreets at night, with a job only a stranger can do ──
 const SAELLE_OPTS={gender:'f',skin:1,hair:3,hairColor:0,face:2,marks:{earrings:'hoop'},equip:{head:'hood',torso:'tunic_green',armor:null,hands:'gloves',legs:'hose_grey',feet:'riding_boots',weapon:null,offhand:null}};
-wrap('lowstreets','npcs',l=> CHOICE.saelle && CHOICE.saelle2!=='betrayed' && nightAmt()>0.5 ? [...l,{ id:'saelle_l', name:'Saelle', i:17, j:12, dir:1, opts:SAELLE_OPTS }] : l);
+wrap('lowstreets','npcs',l=> !saelleAway() && CHOICE.saelle && CHOICE.saelle2!=='betrayed' && nightAmt()>0.5 ? [...l,{ id:'saelle_l', name:'Saelle', i:17, j:12, dir:1, opts:SAELLE_OPTS }] : l);
 TALKERS.saelle_l=()=>{ const S='Saelle', robbed=CHOICE.saelle==='robbed';
   if(CHOICE.saelle2==='helped' && CHOICE.saelleNight && !CHOICE.saelle3){ const ans=(txt,reply,k)=>({label:txt, fn:()=>{ remember('saelle3',k,'Saelle asked whether you would ever leave Hollowmere with her.'); CHOICE.saelle3Day=Math.floor(dayClock/DAY_LEN); giveQuestItem('saelle_picks',true); updateHud();
         say(S,[reply,"“My spares. Sella will know whose they were, and she'll pay you better for it.” <i>You receive Saelle's lockpicks.</i>"],[bye]); }});

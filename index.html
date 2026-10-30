@@ -17929,11 +17929,50 @@ ITEM_ICON.carved_ox=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); const 
 ITEM_ICON.saelle_picks=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.fillStyle='#7a4a2a'; g2.strokeStyle='#4a2a14'; g2.lineWidth=1; g2.beginPath(); g2.roundRect(6,22,28,10,3); g2.fill(); g2.stroke();
   g2.strokeStyle='#c8ccd4'; g2.lineCap='round'; g2.lineWidth=1.6; [[10,27,30,8,0],[14,27,33,12,1],[18,27,28,6,2]].forEach(([x,y,x2,y2,k])=>{ g2.beginPath(); g2.moveTo(x,y); g2.lineTo(x2,y2); g2.lineTo(x2+(k===1?3:2),y2+(k===2?3:1)); g2.stroke(); });
   g2.fillStyle='#e8c060'; g2.beginPath(); g2.arc(9,27,1.4,0,Math.PI*2); g2.fill(); g2.restore(); };
+// ════════ Tessaly: a book of star-names, a candle, and the one who let her choose ════════
+Object.assign(ITEMS,{ tess_ring:{ name:"Tessaly's Starwood Ring", slot:'special', title:"A plain ring carved from an offcut of starwood, ink still in the grain. It hums, very faintly, when you cast. Tessaly says she made it from his old staff, and not to tell him." } });
+ITEM_STATS.tess_ring={magic:1};
+ITEM_ICON.tess_ring=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.lineWidth=5; g2.strokeStyle='#d8d0b8'; g2.beginPath(); g2.ellipse(20,22,10,8,0,0,Math.PI*2); g2.stroke();
+  g2.lineWidth=1; g2.strokeStyle='#6a6050'; g2.beginPath(); g2.ellipse(20,22,12.5,10.5,0,0,Math.PI*2); g2.stroke(); g2.beginPath(); g2.ellipse(20,22,7.5,5.5,0,0,Math.PI*2); g2.stroke();
+  g2.strokeStyle='rgba(40,40,70,0.6)'; g2.lineWidth=0.8; [[13,17,15,15],[24,27,27,25],[27,18,28,21]].forEach(([a,b,c,d])=>{ g2.beginPath(); g2.moveTo(a,b); g2.lineTo(c,d); g2.stroke(); });
+  g2.fillStyle='rgba(230,225,255,0.5)'; g2.beginPath(); g2.arc(14,15,1.6,0,Math.PI*2); g2.fill(); g2.restore(); };
+function tessRomance(T,n){ if(!CHOICE.tessLesson) return false; const day=Math.floor(dayClock/DAY_LEN);
+  if(!CHOICE.tess){ say(T,["“You came back. Good. The elves lent me a book of star-names, and I can read three words in four. Your eyes are better in this light than mine.”","“Read it to me? Only until the candle goes.”"],[
+      {label:'Read to her.', fn:()=>{ remember('tess','read','You read star-names to Tessaly by candlelight until the candle went.'); CHOICE.tessDay=day; romStart(n,'hearth');
+        say(T,"“…Ilmar, the lantern-bearer. The one that never sets. Go on.”",[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.15); romEnd(); say(T,"“The candle went an hour ago. You kept reading anyway. From memory, I think.”",[bye]); }); }}]); }},
+      {label:'“Another night.”', fn:()=>say(T,"“The book will keep. So will I.”",[bye])}]); return true; }
+  if(CHOICE.tess==='read' && day>(CHOICE.tessDay||0)){ say(T,["“I finished the book. Without you. It was worse.”","“Stay tonight. Not for the book.”"],[
+      {label:'Stay.', fn:()=>{ remember('tess','lover','Tessaly asked you to stay, and not for the book.'); romStart(n,'hearth');
+        say(T,"“Blow out the candle. No, not like that. Whisper it.”",[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.3); romEnd(); giveQuestItem('tess_ring',true); if(typeof wearSpecial==='function') wearSpecial('tess_ring');
+          say(T,"“I carved it from the offcut of his old staff. Don't tell him that either.” <i>You receive Tessaly's Starwood Ring (Special slot: +1 Spell Power).</i>",[bye]); }); }}]); }},
+      {label:'“Not yet.”', fn:()=>say(T,"“Then come back when it is yet.”",[bye])}]); return true; }
+  if(CHOICE.tess==='lover'){ say(T,"“There you are. I saved you half a candle.”",[
+      {label:'Stay the night.', fn:()=>{ romStart(n,'hearth'); say(T,"“Whisper.”",[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.3); romEnd(); say(T,"“Go on, then. The book will still be here. So will I.” <i>You are fully healed.</i>",[bye]); }); }}]); }}, bye]); return true; }
+  return false; }
+['tessaly_s','tessaly_k'].forEach(id=>{ const prev=TALKERS[id]; TALKERS[id]=()=>{ const n=NPCS.find(x=>x.id===id); if(!tessRomance('Tessaly',n)) prev(); }; });
+// ── partners: a greeting when you come by, and now and then something saved for you ──
+const PARTNERS=[
+  { id:'moon_ithil', on:()=>!!CHOICE.ithil, lines:["“The moon told me you were coming.”","“You smell of the road. Come and wash it off.”","“There you are. I was beginning to count stars.”"],
+    gift:'potion', giftLine:"“Moon-water, bottled. For the bruises you will not tell me about.”" },
+  { id:'gunnar', on:()=>!!CHOICE.gunnarNight, lines:["“Oi! Over here!”","“Sit down, I'll get you a cup.”","“Thought I heard your boots.”"] },
+  { id:'saelle_l', on:()=>!!CHOICE.saelleNight && CHOICE.saelle2==='helped', lines:["“Psst. Up here.”","“Took your time.”","“Don't look now. You're being followed. By me.”"],
+    gift:'$10', giftLine:"“Found this in a pocket. Not mine. Not yours either, until now.”" },
+  { id:'tessaly_s', on:()=>CHOICE.tess==='lover', lines:["“You're late. I counted.”","“Come and see what I found.”","“There you are.”"], gift:'mana_potion', giftLine:"“I brewed too much. Take it before I drink it.”" },
+  { id:'tessaly_k', on:()=>CHOICE.tess==='lover', lines:["“You're late. I counted.”","“He's asleep. Quietly.”","“There you are.”"], gift:'mana_potion', giftLine:"“I brewed too much. Take it before I drink it.”" } ];
+setInterval(()=>{ try{ if(!running || CS.on || combat.active || dlgOverlay.classList.contains('open')) return; const day=Math.floor(dayClock/DAY_LEN), G=CHOICE.greet=CHOICE.greet||{};
+  PARTNERS.forEach(P=>{ const n=NPCS.find(x=>x.id===P.id); if(!n || !P.on() || G[P.id]===day || n.bark) return;
+    if(Math.hypot((n.x??n.i+0.5)-player.x,(n.y??n.j+0.5)-player.y)>6) return;
+    G[P.id]=day; n.bark={text:P.lines[(day+P.id.length)%P.lines.length].replace(/[“”]/g,''), t:0}; }); }catch(e){} },1200);
+PARTNERS.filter(P=>P.gift).forEach(P=>{ const prev=TALKERS[P.id]; if(!prev) return; TALKERS[P.id]=()=>{ const day=Math.floor(dayClock/DAY_LEN), Gd=CHOICE.gifted=CHOICE.gifted||{}, n=NPCS.find(x=>x.id===P.id);
+    if(!P.on() || (Gd[P.id]!=null && day-Gd[P.id]<3)){ prev(); return; }
+    Gd[P.id]=day; if(P.gift[0]==='$'){ player.purse+=+P.gift.slice(1); updateHud(); } else giveQuestItem(P.gift);
+    say(n?n.name:P.id,P.giftLine,[{label:'“Thank you.”', fn:prev}, bye]); }; });
 JOURNAL.push(["Matters of the Heart", ()=>{ const L=[];
+  if(CHOICE.tess) L.push(CHOICE.tess==='lover' ? "Tessaly asked you to stay, and not for the book. She carved you a ring from his old staff." : "You read star-names to Tessaly until the candle went. She says the book will keep.");
   if(CHOICE.ithil) L.push(CHOICE.ithil2 ? "Ithilwen asked what you fear, and filled her ribbon with moonlight for you. While you wear it on your wrist, you are a little harder to kill." : "Ithilwen of the moon pool. She has something to ask you, some night.");
   if(CHOICE.gunnarNight) L.push(CHOICE.gunnar2 ? "You danced with Gunnar on harvest-eve. There is a roast kept back for you at the Wheatsheaf every day, by his orders." : "Gunnar the Ploughman goes red whenever you walk into the Wheatsheaf. He seems to be working up to something.");
   if(CHOICE.saelle2==='helped' && CHOICE.saelleNight) L.push(CHOICE.saelle3 ? {yes:"Saelle asked if you would leave the valley with her on the spring ship. You said yes.", stay:"Saelle asked if you would leave the valley with her. You told her it is your home; she says she will come back through the window.", spring:"Saelle asked if you would leave the valley with her. You told her to ask again in spring. She says she will, every day."}[CHOICE.saelle3]+" Sella the Fence pays you better for her sake." : "Saelle's rooms above the Lowstreets. She keeps looking at the ships.");
-  return L.length ? [ (CHOICE.ithil?!!CHOICE.ithil2:true) && (CHOICE.gunnarNight?!!CHOICE.gunnar2:true) && (CHOICE.saelle2==='helped'&&CHOICE.saelleNight?!!CHOICE.saelle3:true) ? 'done':'active', L.join('<br>') ] : null; }]);
+  return L.length ? [ (CHOICE.tess?CHOICE.tess==='lover':true) && (CHOICE.ithil?!!CHOICE.ithil2:true) && (CHOICE.gunnarNight?!!CHOICE.gunnar2:true) && (CHOICE.saelle2==='helped'&&CHOICE.saelleNight?!!CHOICE.saelle3:true) ? 'done':'active', L.join('<br>') ] : null; }]);
 // ── Saelle again: the woman from the bathhouse, in the Lowstreets at night, with a job only a stranger can do ──
 const SAELLE_OPTS={gender:'f',skin:1,hair:3,hairColor:0,face:2,marks:{earrings:'hoop'},equip:{head:'hood',torso:'tunic_green',armor:null,hands:'gloves',legs:'hose_grey',feet:'riding_boots',weapon:null,offhand:null}};
 wrap('lowstreets','npcs',l=> CHOICE.saelle && CHOICE.saelle2!=='betrayed' && nightAmt()>0.5 ? [...l,{ id:'saelle_l', name:'Saelle', i:17, j:12, dir:1, opts:SAELLE_OPTS }] : l);

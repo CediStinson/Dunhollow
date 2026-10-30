@@ -13280,10 +13280,14 @@ function drawSkelFig(x0,y0,o){
     if(at && performance.now()-at>1600){ at=0; const S=SKEL; if(!S || S.crumble || S.asm<1 || combat.active) return;
       const k=/graveyard|crypt|barrow/.test(areaId) ? 'wary' : /wheatsheaf|inn|lantern|tavern/.test(areaId) ? 'jig' : null; if(!k) return;
       S.react={k,t:0,dir0:S.dir}; try{ SND.fx('rattle'); }catch(e){} } }catch(e){} },300); }
-function skelReactTick(S,dt){ const R=S.react; if(!R) return; R.t+=dt; if(player.moving || combat.active || R.t>3.2){ S.react=null; return; }
+setInterval(()=>{ try{ const S=SKEL; if(!running || !S || S.crumble || S.asm<1 || S.react || combat.active) return; const v=NPCS.find(n=>n.id==='vesna'); if(!v) return;
+  if(Math.hypot((v.x??v.i+0.5)-S.x,(v.y??v.j+0.5)-S.y)>3.5) return; const day=Math.floor(dayClock/DAY_LEN); if(CHOICE.skelBow===day) return; CHOICE.skelBow=day;
+  S.react={k:'bow', t:0, dir0:S.dir}; S.dir=dirFromDelta((v.x??v.i+0.5)-S.x,(v.y??v.j+0.5)-S.y); try{ SND.fx('rattle'); }catch(e){} }catch(e){} },700);   // it knows who gave it the word
+function skelReactTick(S,dt){ const R=S.react; if(!R) return; R.t+=dt; if(player.moving || combat.active || R.t>(R.k==='bow'?1.7:3.2)){ S.react=null; return; }
   if(R.k==='wary') S.dir=(R.dir0+[0,1,2,1,0,7,6,7][Math.floor(R.t*2.5)%8])%8;                 // it looks round at the graves, one way, then the other
   if(R.k==='jig' && Math.floor(R.t*4)!==Math.floor((R.t-dt)*4)){ S.dir=(S.dir+2)%8; if(Math.random()<0.5) try{ SND.fx('rattle'); }catch(e){} } }
-function drawSkel(S){ if(S.react && S.react.k==='jig'){ const h=Math.abs(Math.sin(S.react.t*12))*5; g.save(); g.translate(0,-h); try{ return drawSkel0(S); } finally{ g.restore(); } } return drawSkel0(S); }
+function drawSkel(S){ if(S.react && S.react.k==='bow'){ const q=P(S.x,S.y), b=Math.sin(Math.min(1,S.react.t/1.6)*Math.PI)*0.35, side=P(NPCS.find(n=>n.id==='vesna')?.x??S.x+1,0).x>=q.x?1:-1; g.save(); g.translate(q.x,q.y); g.rotate(side*b); g.translate(-q.x,-q.y); try{ return drawSkel0(S); } finally{ g.restore(); } }
+  if(S.react && S.react.k==='jig'){ const h=Math.abs(Math.sin(S.react.t*12))*5; g.save(); g.translate(0,-h); try{ return drawSkel0(S); } finally{ g.restore(); } } return drawSkel0(S); }
 function drawSkel0(S){ const base=P(S.x,S.y), f=S.hostile?player:(combat.active?combat.foe:null), tgt=f?P(f.x,f.y):base, k=S.anim>0?Math.sin((0.3-S.anim)/0.3*Math.PI)*0.35:0;
   const x=base.x+(tgt.x-base.x)*k, y=base.y+(tgt.y-base.y)*k, stand=!S.crumble && S.asm>=1;
   const mound=S.crumble?0:Math.min(1,S.asm*5)*(1-clamp01((S.asm-0.8)/0.2));
@@ -15435,6 +15439,7 @@ function pupUpdate(dt){
 function pupReactFor(){ const A=AREAS[areaId]||{}, out=!A.inside, n=nightAmt(), wx=out?weatherToday():'clear';
   if(areaId==='village' && CHOICE.pupSt==='adopted' && PUPS.some(q=>q.mode==='home')) return 'greet';
   if(/graveyard|crypt|barrow|fen|hanged/.test(areaId) || A.volcanic) return 'growl';
+  if(areaId==='steamcellar') return 'pant';
   if(areaId==='wolfwood' || (out && n>0.6 && /wood|elf/.test(A.theme))) return 'howl';
   if(out && wx==='rain') return 'shake';
   if(OBJECTS.some(o=>o.type==='pool' && o.kind!=='bath')) return 'drink';
@@ -15450,6 +15455,9 @@ function pupReact(p,dt){ const R=p.react; R.t+=dt; p.lie=0; p.sleep=false; p.mun
   if(player.moving && R.t>0.6 && R.k!=='romp'){ if(R.sib) R.sib.munch=false; p.munch=false; p.react=null; return false; }                 // you walk on: it follows
   if(R.k==='howl'){ p.moving=false; if(!R.s && R.t>0.3){ R.s=1; try{ SND.fx('howl'); }catch(e){} } if(R.t>3.2) p.react=null; return true; }
   if(R.k==='growl'){ p.moving=false; p.dir=player.dir; if(!R.s){ R.s=1; try{ SND.fx('growl'); }catch(e){} } if(R.t>2.4) p.react=null; return true; }
+  if(R.k==='pant'){ p.moving=false; p.munch=true; if(R.t>2.2){ p.munch=false; p.react=null; } return true; }
+  if(R.k==='fire'){ if(player.moving){ p.react=null; return false; } if(go(R.x,R.y,2.2)){ p.dir=dirFromDelta(R.fx-p.x,R.fy-p.y); R.lay=Math.min(1,(R.lay||0)+dt*1.5); p.lie=R.lay; p.sleep=R.lay>=1 && R.t>8; } return true; }
+  if(R.k==='sniff'){ if(go(R.x,R.y,2.4)){ p.dir=dirFromDelta(R.fx-p.x,R.fy-p.y); p.munch=true; if(!R.t0) R.t0=R.t; if(R.t-R.t0>1.8){ p.munch=false; p.react=null; } } else if(R.t>6) p.react=null; return true; }
   if(R.k==='shake'){ p.moving=false; if(!R.s && R.t>0.2){ R.s=1; try{ SND.fx('shake'); }catch(e){} } if(R.t>1.4) p.react=null; return true; }
   if(R.k==='romp'){ const a=R.t*3.2, x=player.x+Math.cos(a)*1.1, y=player.y+Math.sin(a)*0.9; go(x,y,4.5); if(!R.s && R.t>0.8){ R.s=1; try{ SND.fx('yip'); }catch(e){} } if(R.t>3.4) p.react=null; return true; }
   if(R.k==='drink'){ if(go(R.x,R.y,2.6)){ p.dir=dirFromDelta(R.face.x-p.x,R.face.y-p.y); p.munch=true; if(!R.s){ R.s=1; R.t0=R.t; try{ SND.fx('lap'); }catch(e){} } if(R.t-R.t0>2.2) p.react=null; } else if(R.t>6) p.react=null; return true; }
@@ -15459,6 +15467,18 @@ function pupReact(p,dt){ const R=p.react; R.t+=dt; p.lie=0; p.sleep=false; p.mun
     if(at && performance.now()-at>1400){ at=0; const p=PUPS.find(q=>q.mode==='comp'); if(!p || p.react || combat.active || CS.on || dlgOpen()) return;
       const DAY=Math.floor(dayClock/DAY_LEN), seen=CHOICE.pupSeen=CHOICE.pupSeen||{}, k=pupReactFor(); if(!k) return;
       const key=areaId+':'+k; if(seen[key]===DAY && k!=='growl') return; if(Math.random()<0.25 && k!=='greet') return; seen[key]=DAY; pupReactStart(p,k); } }catch(e){} },300); }
+function pupSpotBy(o,fp,p){ let best=null; const [fw,fh]=fp||[1,1];
+  for(let i=o.i-1;i<=o.i+fw;i++) for(let j=o.j-1;j<=o.j+fh;j++){ if(i>=o.i&&i<o.i+fw&&j>=o.j&&j<o.j+fh) continue; if(!walkable(i,j) || NPCS.some(n=>n.i===i&&n.j===j)) continue;
+    const d=Math.hypot(i+0.5-p.x,j+0.5-p.y); if(!best||d<best.d) best={d,x:i+0.5,y:j+0.5}; } return best; }
+{ let still=0; setInterval(()=>{ try{ if(!running) return; const p=PUPS.find(q=>q.mode==='comp'); if(!p || combat.active || CS.on || dlgOpen()){ still=0; return; }
+    if(player.moving){ still=0; return; } still+=0.6; if(p.react) return;
+    const near=(o,r)=>Math.hypot(o.i+0.5-player.x,o.j+0.5-player.y)<r, rain=typeof rainingHere==='function' && rainingHere();
+    const fire=still>2.4 && OBJECTS.find(o=>(o.type==='hearth' || (o.type==='campfire' && !rain)) && near(o,4));
+    if(fire){ const sp=pupSpotBy(fire,null,p); if(sp){ p.react={k:'fire', t:0, x:sp.x, y:sp.y, fx:fire.i+0.5, fy:fire.j+0.5}; return; } }
+    const seen=CHOICE.pupSniff=CHOICE.pupSniff||{}, day=Math.floor(dayClock/DAY_LEN);
+    const st=still>1.2 && OBJECTS.find(o=>o.type==='stall' && near(o,3.5) && seen[areaId+':'+o.i+','+o.j]!==day);
+    if(st){ seen[areaId+':'+st.i+','+st.j]=day; const sp=pupSpotBy(st,st.fp,p); if(sp) p.react={k:'sniff', t:0, x:sp.x, y:sp.y, fx:st.i+0.5, fy:st.j+0.5}; }
+  }catch(e){} },600); }
 // ── drawing: little wolves, little bodies, and the blood in the wood ──
 function drawPupFigure(p){
   p.name=PUP_NAMES[p.v]||'';

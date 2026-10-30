@@ -12254,9 +12254,14 @@ function beginFight(){
   f.t=curStep(f).wait+0.9;
   if(combat.practice) banner('Practice!','#8ab0d8',1100);
   else if(foeDef(f).unguarded) banner('No guard: strike it, parry the lunge!','#e8c878',1800);
-  else { const S=STYLES[styleOf(f)]; banner(combat.first?'Match his guard, hit the open side!':(S?S.label:foeDef(f).label)+'!', '#e8c878', combat.first?2200:1100); combat.first=false; duel.lastSide=null;
+  else { const S=STYLES[styleOf(f)]; const first=combat.first && !(S && S.shield); banner(first?'Match his guard, hit the open side!':(S?S.label:foeDef(f).label)+'!', '#e8c878', first?2200:1100); combat.first=false; duel.lastSide=null;
     if(S && styleOf(f)==='veteran') teach('veteran','A veteran',["This one has fought for years. Expect <b>long combos</b> (right, right, left, high, high), <b>feints</b>, and a guard that <b>follows your blows</b>.","Parry the combo one strike at a time; the opening comes after the last blow."]);
-    else if(S && styleOf(f)==='drilled') teach('drilled','A drilled soldier',["Soldiers strike in <b>threes</b>: right, right, left, or left, high, high. Learn the rhythm and parry each one."]); }
+    else if(S && styleOf(f)==='drilled') teach('drilled','A drilled soldier',["Soldiers strike in <b>threes</b>: right, right, left, or left, high, high. Learn the rhythm and parry each one."]);
+    else if(S && styleOf(f)==='shield') teach('shieldwall','A shield-bearer',["His shield covers <b>every side</b>. Hammer on it and he will shove you back.","<b>Parry his swing</b>: the shield drops as he strikes, and for a moment he is <b>open</b>. Strike then.","A <b>Shield Bash</b> knocks it aside. Lunge and Riposte get past it too."]);
+    else if(S && styleOf(f)==='duelist') teach('duelist','A duelist',["A duelist <b>shifts his guard</b> while you are still choosing a side. A faint arrow shows where it goes next.","He is quick and he feints. Watch the arrow until the ring is nearly closed."]); }
+  { const pt=partnerOf(f); if(pt){ pt.pj=2.2; const free=DIR_DELTA.map(([di,dj])=>[player.i+di,player.j+dj]).filter(([i,j])=>walkable(i,j) && !(i===f.i&&j===f.j) && !mobs.some(m=>!m.dead && m!==pt && m.i===i && m.j===j));
+      if(cheb(tileOf(pt),tileOf(player))>1 && free.length){ const best=free.map(t=>findPath(pt.i,pt.j,t[0],t[1])).filter(Boolean).sort((a,b)=>a.length-b.length)[0]; pt.path=best||[]; }
+      teach('pair','Two at once',["While you fight one, his partner <b>jabs from the side</b>: a second, purple ring.","Many of those jabs are <b>feints</b> to draw your parry while his friend strikes. Parry the ring that is about to land, not the first one you see."]); } }
   setTimeout(()=>{ try{ techTeachIntro(); techReadyTeach(); }catch(e){} },60);   // after the fight's own card, which comes first
   if(foeDef(f).unguarded) teach('wolf','No guard',["This one has <b>no guard</b>: every side is open. Just <b>Attack</b>.","But it lunges fast and with little warning. Watch for the ring and <b>Parry</b> the side it lunges from."]);
   else teach('duel','Your first fight',["<b>Hold a direction</b> (<b>A</b> / <b>W</b> / <b>D</b>, the arrow keys, or the buttons) to choose a side: left, high, right.",
@@ -12285,11 +12290,26 @@ const STYLES={
     {wait:0.0, wind:0.70, after:0.20, dir:'up'},
     {wait:0.0, wind:0.65, after:0.85, dir:'up'},
     {wait:1.3, wind:1.15, after:0.70, dir:'left', feint:'right'},
-    {wait:1.0, wind:1.00, after:0.60, dir:'right', feint:'up'} ]} };
+    {wait:1.0, wind:1.00, after:0.60, dir:'right', feint:'up'} ]},
+  // a shield-bearer: the shield covers every side. It drops when he swings (parry him, then strike), or a Shield Bash knocks it aside
+  shield:{ label:'Shield-Bearer', shield:true, guardAfter:{left:'up', up:'right', right:'left'}, pattern:[
+    {wait:1.5, wind:1.10, after:0.50, dir:'right'},
+    {wait:1.3, wind:1.00, after:0.50, dir:'left'},
+    {wait:1.4, wind:1.20, after:0.60, dir:'up'} ]},
+  // a duelist: quick, feints, and shifts his guard while you are still choosing a side
+  duelist:{ label:'Duelist', shifts:true, guardAfter:{left:'right', up:'left', right:'up'}, pattern:[
+    {wait:1.0, wind:0.75, after:0.45, dir:'right', feint:'left'},
+    {wait:0.6, wind:0.60, after:0.50, dir:'up'},
+    {wait:0.9, wind:0.80, after:0.50, dir:'left', feint:'up'},
+    {wait:0.5, wind:0.55, after:0.70, dir:'right'} ]} };
+// two who fight as a pair: while you duel one, the other jabs from the side, and often only pretends to, so his friend can strike
+const PAIR_NAMES=new Set(['Hired Blade','Second Blade','Footpad','Footpad Lookout',"Mara's Man","Mara's Woman","Baron's Trapper","Trapper's Mate"]);
+const partnerOf=f=> f && PAIR_NAMES.has(f.name) ? mobs.find(m=>m!==f && m.hostile && !m.dead && m.faction===f.faction && PAIR_NAMES.has(m.name)) : null;
 const NAME_STYLE={ 'Cutpurse Jory':'street', 'Cutpurse Mags':'street', 'Dalla':'street', 'Nim':'street', 'Road Thief':'street',
   'Deserter':'drilled', 'Red Deserter':'drilled', 'Hungry Deserter':'drilled', 'Hired Blade':'drilled', 'Second Blade':'drilled', "Baron's Guard":'drilled', "Baron's Sergeant":'veteran',
-  'Mara Blackthorn':'veteran', 'Sergeant Harl':'veteran', 'The Man in Grey':'veteran', 'Flamesworn Captain':'veteran' };
-const styleOf=f=> f ? (f.style || NAME_STYLE[f.name] || null) : null;
+  'Mara Blackthorn':'veteran', 'Sergeant Harl':'veteran', 'The Man in Grey':'veteran', 'Flamesworn Captain':'veteran', 'Highwayman':'duelist' };
+const styleOf=f=> f ? (f.style || NAME_STYLE[f.name] || (f.type!=='wolf' && f.type!=='mage' && /shield/.test((f.opts&&f.opts.equip&&f.opts.equip.offhand)||'') ? 'shield' : null)) : null;
+const shieldUp=f=> styleOf(f)==='shield' && !(f.openUntil>clock) && f.state!=='stagger' && f.state!=='windup';
 const patternOf=f=>{ const S=STYLES[styleOf(f)]; return (S && f.type!=='wolf' && f.type!=='mage') ? S.pattern : foeDef(f).pattern; };
 const curStep = f => patternOf(f)[f.k % patternOf(f).length];
 function beginWind(f,quick){
@@ -12306,6 +12326,19 @@ function beginWind(f,quick){
         "Parry just as the ring meets the white circle for a <b>perfect parry</b>: he staggers and is wide open. Hit him then!",
         "Parry the wrong side, or too late, and you take the blow."]);
 }
+function partnerTick(f,dt){ const pt=partnerOf(f); if(!pt || combat.practice) return;
+  if(pt.path && pt.path.length){ stepAlong(pt,dt,3); return; }
+  if(cheb(tileOf(pt),tileOf(player))>1) return;                                   // too far off to reach you
+  pt.dir=dirTo(tileOf(pt),tileOf(player));
+  if(pt.pw==null){ pt.pj=(pt.pj??2.5)-dt;
+    if(pt.pj<=0 && f.state==='guard' && f.t>1.0 && clock-(duel.lastImpact||-9)>0.8){ const real=Math.random()<0.35;
+      pt.pwin=real?0.8:0.95; pt.pw=pt.pwin; pt.pdir=DIRS3[Math.floor(Math.random()*3)]; pt.preal=real; pt.pfeint=real?0:pt.pwin*0.4;
+      if(!real) f.t=Math.min(f.t,pt.pwin*0.6+0.1); } return; }                    // the feint is cover: his friend swings as he pulls back
+  pt.pw-=dt; const p=1-pt.pw/pt.pwin, d=[pt.i-player.i,pt.j-player.j], l=Math.hypot(d[0],d[1])||1; pt.ox=d[0]/l*0.12*p; pt.oy=d[1]/l*0.12*p;
+  if(!pt.preal && pt.pw<=pt.pfeint){ pt.pw=null; pt.ox=pt.oy=0; pt.pj=2.6+Math.random()*1.6; floatText(tileOf(pt),'Feint!','#c8a0ff'); return; }
+  if(pt.pw<=0){ pt.pw=null; pt.ox=pt.oy=0; pt.pj=3+Math.random()*1.8; lunge(pt,player); SND.swing(pt.opts&&pt.opts.equip&&pt.opts.equip.weapon); duel.lastImpact=clock;
+    if(duel.st==='parry' && duel.parryDir===pt.pdir && clock-duel.parryAt<=windowFor(player)){ floatText(tileOf(player),'Blocked','#a8c8f0'); SND.clang(1); momGain(8); }
+    else { hurtPlayer(Math.max(1,Math.round(weaponOf(pt).dmg*0.6)),'From the side!'); if(player.hp<=0) defeat(); } } }
 function hurtPlayer(n,label){
   if(typeof wardTakes==='function' && wardTakes(n)) return;          // Ice Ward or Bone Shield takes it whole
   const f=combat.foe;
@@ -12336,6 +12369,7 @@ function impact(f){                                   // a foe's swing lands (or
   const since=clock-duel.parryAt;
   duel.lastImpact=clock;
   if(S){ SND.spell(S.name); spellImpact(f,S,s,sideOk,since,hp0); return; }   // a spell is not a sword: it lands by the same rules as yours do on him
+  if(sideOk && since<=windowFor(player) && styleOf(f)==='shield'){ f.openUntil=clock+1.3; floatText([f.i,f.j-0.002],'Shield down!','#ffe0a0'); }
   if(sideOk && since<=perfectFor(player)){
     f.state='stagger'; f.t=foeDef(f).stagger;
     slowmo.scale=0.25; slowmo.t=0.22; shake=Math.max(shake,5);
@@ -12412,6 +12446,10 @@ function meleeHit(){
   if(duel.tech){ const T=duel.tech; duel.tech=null; return techHit(T,combat.foe); }      // a technique, not a plain swing
   const f=combat.foe; lunge(player,f); duel.caught=false; SND.swing(player.opts.equip.weapon);
   const dmg=weaponOf(player).dmg;
+  if(shieldUp(f)){ floatText(tileOf(f),'Shield','#b8c8d8'); burst(f,player,'#b8c8d8',6); duel.caught=true; SND.clang(0.9); f.blocks=(f.blocks||0)+1;
+    if(f.blocks>=3 && f.state==='guard'){ f.blocks=0; beginWind(f,true); floatText([f.i,f.j-0.001],'Shove!','#ffb070'); }
+    return; }
+  if(styleOf(f)==='shield' && f.openUntil>clock && f.state!=='stagger'){ wound(f,dmg,'Open!','#ffe0a0'); f.openUntil=0; return; }
   if(f.state==='recover' || f.state==='stagger'){ wound(f,dmg); return; }
   if(f.state==='windup'){
     const punish=PARRY.punish;
@@ -12695,6 +12733,10 @@ function combatStep(dt){
   f.t-=dt;
   if(f.state==='windup' && f.feintAt && f.t<=f.feintAt){ f.feintAt=0; f.swingDir=curStep(f).dir; floatText(tileOf(f),'Feint!','#ffb070');
     teach('feint','A feint',["The arrow <b>changed sides</b> halfway through the swing: that was a <b>feint</b>.","Cunning fighters show you one side, then strike from another. Don't parry at the first sight of the arrow: watch it until the ring is nearly closed."]); }
+  if(f.state==='guard' && STYLES[styleOf(f)] && STYLES[styleOf(f)].shifts && f.guardDir){ f.sw=(f.sw??1.4)-dt;
+    if(f.sw<=0.4 && !f.nextGuard){ const o=DIRS3.filter(d=>d!==f.guardDir); f.nextGuard=o[Math.floor(Math.random()*o.length)]; }
+    if(f.sw<=0){ f.guardDir=f.nextGuard||f.guardDir; f.nextGuard=null; f.sw=1.1+Math.random()*0.7; } } else if(f.state!=='guard'){ f.nextGuard=null; }
+  partnerTick(f,dt);
   if(f.state==='guard' && f.t<=0) beginWind(f,false);
   else if(f.state==='windup' && f.t<=0) impact(f);
   else if((f.state==='recover'||f.state==='stagger') && f.t<=0){ f.state='guard'; f.t=curStep(f).wait; }
@@ -12971,9 +13013,13 @@ function drawCombatOver(){
       }
       drawDirGlyph(g,cx,cy-r-30,f.swingDir,1.1,'#ffb060');
       drawSword(g,cx,cy,0.9);
+    } else if(styleOf(f)==='shield' && (f.state==='guard'||f.state==='recover')){
+      if(shieldUp(f)){ drawShield(g,cx,fs.y-150,1.0,'#5a6a7a'); g.save(); g.font='700 10px "Segoe UI", system-ui, sans-serif'; g.textAlign='center'; g.lineWidth=3; g.strokeStyle='rgba(0,0,0,0.7)'; g.strokeText('ALL SIDES',cx,fs.y-178); g.fillStyle='#c8d4e0'; g.fillText('ALL SIDES',cx,fs.y-178); g.restore(); }
+      else { g.save(); g.font='700 12px "Segoe UI", system-ui, sans-serif'; g.textAlign='center'; g.lineWidth=3; g.strokeStyle='rgba(0,0,0,0.7)'; g.strokeText('OPEN',cx,fs.y-152); g.fillStyle='#ffd070'; g.fillText('OPEN',cx,fs.y-152); g.restore(); }
     } else if(f.state==='guard' && f.guardDir){
       drawShield(g,cx,fs.y-150,0.7,'#3a5a80');
       drawDirGlyph(g,cx,fs.y-172,f.guardDir,0.95,'#7ab0e0');
+      if(f.nextGuard){ g.save(); g.globalAlpha=0.35+0.3*Math.sin(gt*20); drawDirGlyph(g,cx+28,fs.y-160,f.nextGuard,0.7,'#7ab0e0'); g.restore(); }
     } else if(f.state==='guard'){                 // no guard at all (wolves): say so instead of showing a shield
       g.save(); g.font='700 11px "Segoe UI", system-ui, sans-serif'; g.textAlign='center';
       g.lineWidth=3; g.strokeStyle='rgba(0,0,0,0.7)'; g.strokeText('OPEN',cx,fs.y-(f.type==='wolf'?84:152));
@@ -12983,6 +13029,10 @@ function drawCombatOver(){
         g.fillStyle='#ffe070'; g.beginPath(); g.arc(cx+Math.cos(a)*14,fs.y-150+Math.sin(a)*4,2.4,0,Math.PI*2); g.fill(); }
     }
   }
+  { const pt=combat.foe && combat.phase==='fight' && partnerOf(combat.foe); if(pt && pt.pw!=null){ const ps=P(pt.x+(pt.ox||0),pt.y+(pt.oy||0)), q=pt.pw/pt.pwin, r=16+q*44;
+      g.save(); g.lineWidth=3; g.strokeStyle=`rgba(190,140,255,${0.35+0.65*(1-q)})`; g.beginPath(); g.ellipse(ps.x,ps.y-52,r,r*0.9,0,0,Math.PI*2); g.stroke();
+      g.lineWidth=2; g.strokeStyle='rgba(255,255,255,0.3)'; g.beginPath(); g.ellipse(ps.x,ps.y-52,16,14,0,0,Math.PI*2); g.stroke(); g.restore();
+      drawDirGlyph(g,ps.x,ps.y-52-r-24,pt.pdir,0.9,'#c8a0ff'); } }
   if(duel.parryFx>0 && combat.foe){
     const ps=P(player.x,player.y), fs=P(combat.foe.x,combat.foe.y);
     const ang=Math.atan2((fs.y-ps.y),(fs.x-ps.x)), a=duel.parryFx/0.28;
@@ -18103,6 +18153,7 @@ function techHit(id,f){ const dmg=weaponOf(player).dmg; lunge(player,f); duel.ca
   if(id==='lunge'){ if(f.state==='windup'){ f.state='stagger'; f.t=PARRY.interruptStun; }
     wound(f,Math.round(dmg*1.4),'Lunge!','#ffd070'); shake=Math.max(shake,4); return; }
   if(id==='bash'){ SND.clang(1.3); f.state='stagger'; f.t=foeDef(f).stagger*(f.boss||f.type==='barrowking'?0.4:0.6); shake=Math.max(shake,7); burst(f,player,'#d8c8a0',12);
+    if(styleOf(f)==='shield'){ f.openUntil=clock+2.6; f.t=Math.max(f.t,1.2); floatText([f.i,f.j-0.003],'Shield aside!','#ffe0a0'); }
     wound(f,Math.max(1,Math.round(dmg*0.5)),'Bash!','#e8d8a0'); } }
 function riposteCounter(f){ duel.ripUntil=0; const dmg=weaponOf(player).dmg; lunge(player,f); SND.swing(player.opts.equip.weapon);
   const was=HIT_SRC; HIT_SRC='melee'; try{ wound(f,Math.round(dmg*1.6),'Riposte!','#ffe0a0'); } finally{ HIT_SRC=was; }

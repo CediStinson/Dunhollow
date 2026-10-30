@@ -9682,6 +9682,7 @@ function showDialog(name,text,opts,purse){
 }
 function closeDialog(){ const was=dlgOverlay.classList.contains('open'); dlgOverlay.classList.remove('open'); try{ VOICE.stop(); }catch(e){}
   try{ if(was) gestHandover(); }catch(e){} GEST_INV=null;
+  if(was && AFTER_TALK.length){ const L=AFTER_TALK.splice(0); setTimeout(()=>L.forEach(f=>{ try{ f(); }catch(e){} }),120); }
   if(was && DLG_J0){ const nx=dlgNext(); if(nx && nx!==DLG_SHOWN) nextToast(nx); } DLG_J0=null; DLG_SHOWN=''; }
 let DLG_SHOWN='';
 function nextToast(t){ let el=document.getElementById('next-toast'); if(!el){ el=document.createElement('div'); el.id='next-toast'; document.body.appendChild(el); }
@@ -10024,7 +10025,7 @@ function surveyorTalk(){
   if(CHOICE.stones==='fight'){ say('Surveyor Quill',"“Guards! GUARDS!”",[bye]); return; }
   const opts=[];
   if(hasItem('seal')) opts.push({label:"Show him the Baron's seal and the orders it carries.", fn:()=>{ remember('stones','saved_seal','The surveyor fled when he saw the Baron\'s seal in your hands.'); stonesAfter(); stonesLeave(['surveyor','stguard1','stguard2'],3.2);
-    say('Surveyor Quill',["He reads it twice. The colour leaves his face. “This… this is the Baron's own hand. Ordering murder. I was never here.” He runs, and his two soldiers run after him. You pull the stakes up one by one.",WRIT_TEXT],[bye]); }});
+    say('Surveyor Quill',["“This… this is the Baron's own hand. Ordering murder. I was never here.”",WRIT_TEXT],[bye]); afterTalk(()=>{ stonesLeave(['surveyor','stguard1','stguard2'],2.8,true); }); }});
   if(QUEST.letter>=2 && !hasItem('seal')) opts.push({label:"“Hamond has written to the lords about your Baron.” (-15 copper to sweeten it)", off:player.purse<15, note:'-15c', fn:()=>{ player.purse-=15; updateHud(); remember('stones','saved_word','You talked the surveyor out of his work, with a little silver.'); stonesAfter(); stonesLeave(['surveyor','stguard1','stguard2'],1.4);
     say('Surveyor Quill',["“Written, you say? To the lords? Measurements are so often wrong. Such a pity.”",WRIT_TEXT],[bye]); }});
   opts.push({label:'Pull up the stakes. By force if you must.', fn:()=>{ remember('stones','fight'); FIGHT_UNDO=()=>{ CHOICE.stones=null; }; closeDialog(); NPCS.splice(0,NPCS.length,...NPCS.filter(n=>!/^stguard/.test(n.id)));   /* the two standing guards are the ones who now fight */ MOB_SPAWNS.length=0; MOB_SPAWNS.push(...AREAS.stones.mobs()); resetMobs(); mobs.forEach(m=>{ m.hostile=true; FOOLED[areaId+':'+m.name]=false; }); startCombat(); }});
@@ -10469,9 +10470,9 @@ function grocerTalk(){
 function nimTalk(){
   if(CHOICE.nim){ say('Nim', CHOICE.nim==='free' ? "“Psst. The crates behind the tannery. Nobody's watching them tonight. You didn't hear it from me.”" : "“Thanks for the bread.”",[bye]); return; }
   say('Nim',["“It's for my brother. He's little. Please don't tell the guard.”"],[
-    {label:'Pay Gerd for the bread. (-2c)', off:player.purse<2, note:'-2c', fn:()=>{ player.purse-=2; updateHud(); remember('nim','paid','You paid for a hungry girl\'s bread.'); say('Nim',"She stares at you like you grew a second head. Then she's gone into the crowd, bread and all.",[bye]); }},
+    {label:'Pay Gerd for the bread. (-2c)', off:player.purse<2, note:'-2c', fn:()=>{ player.purse-=2; updateHud(); remember('nim','paid','You paid for a hungry girl\'s bread.'); say('Nim',"“You… paid for it? Huh.”",[bye]); afterTalk(()=>{ const n=NPCS.find(x=>x.id==='nim'); if(n) goOff(n,Math.max(0,n.i-6),n.j+3,{speed:3.2}); }); }},
     {label:'Call the guard.', fn:()=>{ remember('nim','guard','You handed Nim to the Baron\'s guard.'); say('Nim',"The guard's glove closes on her shoulder. She doesn't cry. She just looks at you, and remembers you.",[{label:'Leave.',fn:()=>{ closeDialog(); switchArea('market','fromKeep'); }}]); }},
-    {label:'“Run. Now.”', fn:()=>{ remember('nim','free','You let Nim run. She owes you one.'); say('Nim',"She grins, gap-toothed. “I owe you one, stranger.” And she vanishes, leaving Gerd yelling at the empty air.",[bye]); }} ]);
+    {label:'“Run. Now.”', fn:()=>{ remember('nim','free','You let Nim run. She owes you one.'); say('Nim',"“I owe you one, stranger.”",[bye]); afterTalk(()=>{ const n=NPCS.find(x=>x.id==='nim'); if(n) goOff(n,Math.max(0,n.i-6),n.j+3,{speed:3.6}); }); }} ]);
 }
 function heraldTalk(){ say(BARON_DOWN()?'Crown Herald':"Baron's Herald", BARON_DOWN() ? "“The Crown's justice has come to Hollowmere. The statue will be recast as a horse trough. Everyone agrees this is an improvement.”" :
   ["“…and by the grace of Baron Bertram the pasture of Dunhollow shall be improved by its annexation, for the good of the sheep, who are not consulted…”"],[bye]); }
@@ -10577,8 +10578,8 @@ function snagTalk(){
   say('Snagtooth',["“Oi! Big-folk! This Snagtooth hole. Snagtooth rules it. You give shiny, you walk away with all your fingers. Very generous. Snagtooth famous for generous.”"],[
     {label:'Fight.', fn:()=>{ remember('gob','fight'); closeDialog(); mobs.forEach(m=>{ m.hostile=true; FOOLED[areaId+':'+m.name]=false; }); startCombat(); }},
     {label:'Pay 10 copper of "shiny". (-10c)', off:player.purse<10, note:'-10c', fn:()=>{ player.purse-=10; updateHud(); remember('gob','paid','You paid the goblins to leave you alone. They took the money and the warren with them.');
-      mobs.forEach(m=>{ m.dead=true; m.gone=true; m.hostile=false; });
-      say('Snagtooth',"He bites every coin. Then he bites one of his goblins, for luck. “Deal! Snagtooth moving house anyway. Too many wolves. Too many YOU.” They scatter into the cave and out the other side.",[bye]); }},
+      mobs.forEach(m=>{ m.hostile=false; m.path=[]; });
+      say('Snagtooth',"“Deal! Snagtooth moving house anyway. Too many wolves. Too many YOU.”",[bye]); afterTalk(()=>mobs.forEach((m,k)=>{ if(!m.gone) goOff(m,5+(k%2),1,{speed:2.6+k*0.2, delay:k*0.25, mob:true}); })); }},
     {label:'“Your helmet is on backwards.”', fn:()=>say('Snagtooth',"“Is FRONT now. Because Snagtooth SAYS.”",[{label:'Fight.', fn:()=>{ remember('gob','fight'); closeDialog(); mobs.forEach(m=>{ m.hostile=true; FOOLED[areaId+':'+m.name]=false; }); startCombat(); }},{label:'Pay them. (-10c)', off:player.purse<10, fn:()=>{ player.purse-=10; updateHud(); remember('gob','paid'); mobs.forEach(m=>{ m.dead=true; m.gone=true; m.hostile=false; }); closeDialog(); }}])},
   ]);
 }
@@ -10925,7 +10926,7 @@ wrap('graveyard','npcs',list=> (CHOICE.shade==='asked'||CHOICE.shade==='ada') &&
 function shadeFight(){ closeDialog(); const ps=CHOICE.shade; FIGHT_UNDO=()=>{ CHOICE.shade=ps; }; CHOICE.shade='fight';
   MOB_SPAWNS.length=0; MOB_SPAWNS.push({ name:"Edric's Shade", type:'brute', i:2, j:8, faction:'shade', opts:{gender:'m',skin:0,hair:1,hairColor:13,beard:2,face:1,ghost:true,equip:{head:null,torso:'shirt',armor:null,hands:'gauntlets',legs:'trousers',feet:null,weapon:'pitchfork',offhand:null}} });
   NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='shade')); resetMobs(); mobs.forEach(m=>{ m.hostile=true; FOOLED[areaId+':'+m.name]=false; }); startCombat(); }
-const shadeRest=(msg,how)=>{ CHOICE.shadeHow=how||CHOICE.shadeHow||'avenged'; remember('shade','rest','Edric\'s shade has found rest.'); say("Edric's Shade",[msg,"The pale shape thins like breath on a cold morning, and then there is only the grave, and the owls."],[{label:'Stand there a while.', fn:()=>{ closeDialog(); NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='shade')); }}]); };
+const shadeRest=(msg,how)=>{ CHOICE.shadeHow=how||CHOICE.shadeHow||'avenged'; remember('shade','rest','Edric\'s shade has found rest.'); say("Edric's Shade",[msg],[{label:'Stand there a while.', fn:()=>{ closeDialog(); fadeOff(NPCS.find(n=>n.id==='shade'),{slow:3}); }}]); };
 function shadeTalk(){
   const open=["A pale man stands over the fresh grave, turning his head as if listening for something far away. His shirt is torn where the blade went in.","“I can't find the way. Something holds me. Something undone.”"];
   if(CHOICE.grave==='robbed'){ say("Edric's Shade",[...open,"“My ring. Ada's ring. It was on my finger when they put me in the ground. Where is it?”"],[
@@ -10952,7 +10953,7 @@ function strippedTalk(){ const top=player.inv.find(id=>id && ITEMS[id] && ITEMS[
     {label: top?'Give him your '+ITEMS[top].name+'.':'Give him a shirt. (you have none in your bag)', off:!top, fn:()=>{ player.inv[player.inv.indexOf(top)]=null; remember('strip','clothed','You gave a robbed merchant the shirt off your back. Well, out of your bag.'); CHOICE.aldoShirt=top;
       const n=NPCS.find(x=>x.id==='stripped'); if(n){ n.opts={...n.opts, equip:{...n.opts.equip, torso:top}}; delete n.opts._ck; } updateHud();   // he puts it on, there and then
       say('Aldo',"“Find me in the Gate Ward. Aldo pays his debts. Usually with interest, which is more than the bank does.”",[bye]); }},
-    {label:'Give him 5 copper for the road.', off:player.purse<5, note:'-5c', fn:()=>{ player.purse-=5; updateHud(); remember('strip','coin','You gave a robbed merchant five coppers.'); say('Aldo',"“Five coppers. I'll buy a very small blanket.” He waddles off toward the city.",[bye]); }},
+    {label:'Give him 5 copper for the road.', off:player.purse<5, note:'-5c', fn:()=>{ player.purse-=5; updateHud(); remember('strip','coin','You gave a robbed merchant five coppers.'); say('Aldo',"“Five coppers. I'll buy a very small blanket.”",[bye]); afterTalk(()=>{ const n=NPCS.find(x=>x.id==='stripped'); if(n) goOff(n,4,1,{speed:1.1}); }); }},
     {label:'Laugh and walk on.', fn:()=>{ remember('strip','laughed','You laughed at a naked merchant on the King\'s Road.'); say('Aldo',"“Oh yes, hilarious. I'll remember that face.”",[bye]); }},
   ]); }
 wrap('citygate','npcs',l=> CHOICE.strip ? [...l,{ id:'aldo', name:'Aldo the Clothier', i:5, j:16, dir:1,
@@ -11003,7 +11004,7 @@ function moonTalk(){
       {label:'Keep watch for them.', fn:()=>{ remember('moon','guarded','You kept watch over the moon-bathers on the Old Elven Road.'); moonFight(); }},
       {label:'Wade in and join them.', fn:()=>{ moonJoin(); bathStrip('Ithilwen'); remember('moon','joined','You bathed in the moon pool with the elves.'); CHOICE.moonDay=day; player.hp=player.maxHp; updateHud();
         say('Ithilwen',["You leave your things on the stones and step in. The water is cold as starlight, then not cold at all.","Nelloth laughs at your face. “Everyone makes that face.” Every ache is gone. <i>You are fully healed.</i>"],[bye]); }},
-      {label:'Stay on the bank and stare.', fn:()=>{ remember('moon','stared','You stared at the moon-bathers. The Old Road\'s lanterns burn a little dimmer for you now.'); say('Ithilwen',"She stops singing. Both elves sink under the silver surface and do not come up. The pool is empty. Somewhere, a lantern goes out.",[{label:'Leave.', fn:()=>{ closeDialog(); NPCS.splice(0,NPCS.length,...NPCS.filter(n=>!n.id.startsWith('moon_'))); }}]); }},
+      {label:'Stay on the bank and stare.', fn:()=>{ remember('moon','stared','You stared at the moon-bathers. The Old Road\'s lanterns burn a little dimmer for you now.'); closeDialog(); NPCS.filter(n=>n.id.startsWith('moon_')).forEach((n,k)=>fadeOff(n,{sink:true, slow:2.2, delay:k*0.3})); setTimeout(()=>logMsg('The pool is empty. Somewhere, a lantern goes out.','#c8a0e0'),1600); }},
     ]); return; }
   const opts=[{label:CHOICE.moonDay===day?'Bathe (already tonight)':'Wade in and bathe.', off:CHOICE.moonDay===day, fn:()=>{ moonJoin(); bathStrip('Ithilwen'); CHOICE.moonDay=day; CHOICE.moonBaths=(CHOICE.moonBaths||0)+1; player.hp=player.maxHp; updateHud(); say('Ithilwen',"The moon's water takes every ache. <i>You are fully healed.</i>",[bye]); }}, bye];
   if(CHOICE.moonDay===day && (CHOICE.moonBaths||0)>=2 && CHOICE.moon!=='stared') opts.unshift({label:CHOICE.ithil?'Stay with Ithilwen a while.':'Stay in the water when Nelloth leaves.', fn:ithilScene});
@@ -11044,7 +11045,7 @@ function harlTalk(){
     {label:'Draw steel. Robbers are robbers.', fn:harlSpawn},
     {label:'Walk on. Not your war.', fn:()=>{ remember('unpaid','ignored','You walked past the deserters on the King\'s Road. Other travellers were not so lucky.'); say('Sergeant Harl',"“Wise.” He steps aside. Behind you, later, you hear a cart stop, and a woman shouting.",[bye]); }} ];
   if(CHOICE.camp==='spared') opts.unshift({label:'“Mara Blackthorn\'s colliers need hands. Honest work.”', fn:()=>{ remember('unpaid','mara','You sent the Baron\'s deserters to work with Mara\'s colliers, the people they once hunted.');
-    say('Sergeant Harl',["“Blackthorn? We burned her people out of the Pits. …And she'd take us?”","“She took me in,” says the youngest deserter quietly, “before I signed on with the Baron.” Harl looks at him for a long time. Then they go east."],[bye]); }});
+    say('Sergeant Harl',["“Blackthorn? We burned her people out of the Pits. …And she'd take us?”","“She took me in,” says the youngest deserter quietly, “before I signed on with the Baron.”"],[bye]); afterTalk(()=>{ const n=NPCS.find(x=>x.id==='harl'); if(n) goOff(n,ROOM.w-1,n.j,{speed:1.4}); }); }});
   say('Sergeant Harl',["“Toll,” he says, and then, more tiredly: “No. It's not a toll. The Baron's gone, the Crown doesn't pay us, and we've got wives. So it's a robbery. I'm sorry. Purse, please.”"],[...opts,bye]);
 }
 Object.assign(TALKERS,{ harl:harlTalk });
@@ -13292,7 +13293,7 @@ function tessalyTalk(){
     {label:'“Come back with me. Face him.”', fn:()=>{ remember('appr','returned','You brought Tessaly back to Magister Orvell.'); player.purse+=25; updateHud();
       say('Tessaly',"She lets the staff drop. “Fine. But I'm telling him to his face.” Later, Orvell pays you twenty-five copper and does not look at you. <i>You receive 25 copper.</i>",[bye]); NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='tessaly')); }},
     {label:'“Go. I will tell him I did not find you.”', fn:()=>{ remember('appr','freed','You let Tessaly go. She gave you her master\'s starwood staff.'); giveQuestItem('staff_star',true);
-      say('Tessaly',"She stares at you. Then she presses the staff into your hands. “Take it. It was always his. I'll make my own.” She is gone into the mist before you can answer. <i>You receive the Starwood Staff.</i>",[bye]); NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='tessaly')); }},
+      say('Tessaly',"“Take it. It was always his. I'll make my own.” <i>You receive the Starwood Staff.</i>",[bye]); afterTalk(()=>fadeOff(NPCS.find(n=>n.id==='tessaly'),{slow:2.5})); }},
     {label:'“Give me the staff. Now.”', fn:()=>say('Tessaly',["“Take it, then. If you can.”"],[{label:'Fight her for it.', fn:apprFight},{label:'“…Never mind.”', fn:tessalyTalk}])} ]); }
 // taking the staff by force is a fight now, and a mage who has nothing left to lose fights hard
 const TESSALY_FOE={ name:'Tessaly', type:'mage', i:4, j:2, faction:'tessaly', opts:{gender:'f',skin:1,hair:1,hairColor:6,face:3,equip:{head:null,torso:'elf_robe',armor:null,hands:null,legs:null,feet:null,weapon:'staff_star',offhand:null}} };
@@ -17852,7 +17853,26 @@ const COIN_ICON=(()=>{ const c=document.createElement('canvas'); c.width=c.heigh
 const FLY_ICON={};
 function flyIcon(id){ if(id==='$') return COIN_ICON; if(!FLY_ICON[id]){ const c=document.createElement('canvas'); c.width=c.height=64; try{ drawItemIcon(c.getContext('2d'),id,64); }catch(e){} FLY_ICON[id]=c; } return FLY_ICON[id]; }
 let FLY_LAST=0;
-function drawFlies(){ const now=performance.now(), dt=Math.min(0.05,(now-(FLY_LAST||now))/1000); FLY_LAST=now; if(!FLIES.length) return;
+const GOERS=[];
+function goOff(e,ti,tj,o={}){ if(!e) return; if(e.x==null){ e.x=e.i+0.5; e.y=e.j+0.5; }
+  const p=findPath(Math.floor(e.x),Math.floor(e.y),ti,tj), pts=(p&&p.length?p:[[ti,tj]]).map(([i,j])=>[i+0.5,j+0.5]);
+  e.path=[]; e.goto=null; e.wander=null; e.sit=false; e.leaving=true; GOERS.push({e, pts, speed:o.speed||1.6, alpha:1, done:o.done, mob:!!o.mob, delay:o.delay||0}); }
+function fadeOff(e,o={}){ if(!e) return; GOERS.push({e, pts:[], speed:0, alpha:1, done:o.done, mob:!!o.mob, delay:o.delay||0, sink:!!o.sink, slow:o.slow||1}); }
+function goersTick(dt){ for(let q=GOERS.length-1;q>=0;q--){ const G=GOERS[q], e=G.e; if(G.delay>0){ G.delay-=dt; continue; }
+    if(G.pts.length){ const [tx,ty]=G.pts[0], dx=tx-e.x, dy=ty-e.y, d=Math.hypot(dx,dy), st=dt*G.speed;
+      if(d<=st){ e.x=tx; e.y=ty; G.pts.shift(); } else { e.x+=dx/d*st; e.y+=dy/d*st; e.dir=dirFromDelta(dx,dy); }
+      e.i=Math.floor(e.x); e.j=Math.floor(e.y); e.moving=true; if(G.pts.length>1 || G.pts.length===1 && d>0.6) continue; }
+    e.moving=false; G.alpha-=dt*1.6/G.slow; e._alpha=Math.max(0,G.alpha); if(G.sink) e._sink=(1-G.alpha)*40;
+    if(G.alpha>0) continue; GOERS.splice(q,1);
+    if(G.mob){ e.gone=true; e.dead=true; e.hostile=false; } else { const k=NPCS.indexOf(e); if(k>=0) NPCS.splice(k,1); }
+    try{ G.done&&G.done(); }catch(err){} } }
+{ const base=drawNPC; drawNPC=function(n){ if(n._alpha==null || n._alpha>=1) return base(n); if(n._alpha<=0) return;
+    g.save(); g.globalAlpha*=n._alpha; if(n._sink){ const q=P(n.x??n.i+0.5,n.y??n.j+0.5); g.beginPath(); g.rect(q.x-80,q.y-260,160,260-6); g.clip(); g.translate(0,n._sink); } try{ return base(n); } finally{ g.restore(); } }; }
+{ const base=drawActor; drawActor=function(e){ if(e===player || e._alpha==null || e._alpha>=1) return base(e); if(e._alpha<=0) return;
+    g.save(); g.globalAlpha*=e._alpha; try{ return base(e); } finally{ g.restore(); } }; }
+// when a conversation ends, the scene it set going plays out
+const AFTER_TALK=[]; const afterTalk=fn=>AFTER_TALK.push(fn);
+function drawFlies(){ const now=performance.now(), dt=Math.min(0.05,(now-(FLY_LAST||now))/1000); FLY_LAST=now; goersTick(dt); if(!FLIES.length) return;
   for(let q=FLIES.length-1;q>=0;q--){ const f=FLIES[q]; f.t+=dt; if(f.t<0) continue; const u=Math.min(1,f.t/f.dur);
     const a=P(f.from.x??f.from.i+0.5, f.from.y??f.from.j+0.5), b=P(f.to.x??f.to.i+0.5, f.to.y??f.to.j+0.5), e=u<0.5?2*u*u:1-Math.pow(-2*u+2,2)/2;
     const x=a.x+(b.x-a.x)*e, y=(a.y-62)+((b.y-58)-(a.y-62))*e-Math.sin(Math.PI*u)*42, s=f.id==='$'?24:28, al=u<0.12?u/0.12:u>0.9?(1-u)/0.1:1;
@@ -17897,7 +17917,7 @@ TALKERS.saelle_l=()=>{ const S='Saelle', robbed=CHOICE.saelle==='robbed';
     "“Keep Bruno busy for the time it takes to count to two hundred. That's all.”"],[
     {label:'“I’ll keep him busy.”', fn:saelleJob},
     {label:'Tell Bruno what she is planning.', fn:()=>{ remember('saelle2','betrayed','You told Master Grell\'s door-man about Saelle. The watch took her away.'); player.purse+=40; updateHud();
-      say('Bruno',["The big door-man listens, then whistles through his fingers. Two of the watch come at a run.","Saelle doesn't fight. As they take her past you she says, quite quietly, “I'd have paid you back.” Bruno presses forty copper into your hand. <i>You receive 40 copper.</i>"],[bye]); NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='saelle_l')); }},
+      say('Bruno',["The big door-man listens, then whistles through his fingers. Two of the watch come at a run.","Saelle doesn't fight. As they take her past you she says, quite quietly, “I'd have paid you back.” <i>You receive 40 copper.</i>"],[bye]); afterTalk(()=>{ const n=NPCS.find(x=>x.id==='saelle_l'); if(n) goOff(n,Math.min(ROOM.w-1,n.i+8),n.j,{speed:1.2}); }); }},
     {label:'“Not my business.”', fn:()=>{ CHOICE.saelle2='refused'; say(S,"“Fair. It never is, until it is.”",[bye]); }}]); };
 function saelleJob(){ const B='Bruno';
   const done=how=>{ remember('saelle2','helped','You kept Grell\'s door-man busy while Saelle took back her letters.'); const back=CHOICE.saelle==='robbed'?50:30; player.purse+=back; updateHud();

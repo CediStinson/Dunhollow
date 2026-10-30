@@ -5654,7 +5654,10 @@ function windowSky(){
 function paintInteriorWalls(){
   if(AREAS[areaId] && AREAS[areaId].cave){              // rock, with the dark (or daylit) mouths of the passages out
     const {w,h}=ROOM, H=AREAS[areaId].mine?120:150, o=P(0,0), rEnd=P(w,0), lEnd=P(0,h), crys=['cave1','cave2','cave3','cave4'].includes(areaId);
-    rockFace(o,rEnd,H,'#57524a',3,crys); rockFace(lEnd,o,H,'#46423b',7,crys);
+    const VOL=AREAS[areaId].volcanic; rockFace(o,rEnd,H,VOL?'#3a2c26':'#57524a',3,crys); rockFace(lEnd,o,H,VOL?'#2e2420':'#46423b',7,crys);
+    if(VOL){ g.save(); g.globalCompositeOperation='lighter'; [[o,rEnd],[lEnd,o]].forEach(([a,b],s)=>{ for(let t=0.08;t<1;t+=0.17){ const x=a.x+(b.x-a.x)*t, y=a.y+(b.y-a.y)*t, k=rnd01(Math.round(t*40),s,881);
+        if(k<0.45) continue; const gl=g.createLinearGradient(0,y-H*0.7,0,y); gl.addColorStop(0,'rgba(255,90,30,0)'); gl.addColorStop(1,'rgba(255,110,40,'+(0.18+0.12*k)+')'); g.fillStyle=gl;   // seams of fire low in the rock
+        g.beginPath(); g.moveTo(x-3,y); g.lineTo(x+2+k*6,y-H*(0.3+0.4*k)); g.lineTo(x+5+k*6,y-H*(0.3+0.4*k)); g.lineTo(x+4,y); g.closePath(); g.fill(); } }); g.restore(); }
     backDoorGaps().forEach(d=>{ const m0=WPT(d.side,d.u-0.8,0), m1=WPT(d.side,d.u+0.8,0), mt=WPT(d.side,d.u,74);
       const arch=(dx,dy)=>{ g.beginPath(); g.moveTo(m0.x-dx,m0.y+dy); g.quadraticCurveTo(m0.x-dx,mt.y+10-dy,mt.x,mt.y-dy); g.quadraticCurveTo(m1.x+dx,mt.y+10-dy,m1.x+dx,m1.y+dy); g.closePath(); };
       g.fillStyle='#24211c'; arch(6,1); g.fill();
@@ -8247,7 +8250,7 @@ function buildWorldCache(){
 function drawWorldCache(){
   if(!worldCache || worldCache.area!==areaId || (worldCache.sky && worldCache.sky!==windowSky().key)) buildWorldCache();   // windows change with the hour
   g.drawImage(worldCache.cv, gc.width/2+cam.x-worldCache.ox, ORIGIN_Y+cam.y-worldCache.oy);
-  if(AREAS[areaId].theme==='ash') OBJECTS.forEach(o=>{ if(o.type==='lava') drawLava(o); });
+  if(AREAS[areaId].theme==='ash' || AREAS[areaId].volcanic) OBJECTS.forEach(o=>{ if(o.type==='lava') drawLava(o); });
 }
 
 // ── the ground: painted per-pixel in grid space, then mapped onto the iso plane
@@ -8262,7 +8265,7 @@ function paintGroundTexture(){
   for(let py=0;py<THp;py++) for(let px=0;px<TWp;px++){
     const gx=(px+0.5)/S, gy=(py+0.5)/S;
     const G=groundAt(gx,gy);
-    if(theme==='interior' && AREAS[areaId] && AREAS[areaId].cave){                 // rough cave stone, damp, with a faint green glow in the cracks
+    if(theme==='interior' && AREAS[areaId] && AREAS[areaId].cave && !AREAS[areaId].volcanic){                 // rough cave stone, damp, with a faint green glow in the cracks
       const n=fbm(gx*0.9,gy*0.9,41), n2=fbm(gx*4,gy*4,43), n3=fbm(gx*11,gy*11,44), crack=Math.abs(fbm(gx*1.3,gy*1.3,42)-0.5)<0.012, crack2=Math.abs(fbm(gx*2.7,gy*2.7,46)-0.5)<0.008;
       const MINE=AREAS[areaId].mine, CRYS=['cave1','cave2','cave3','cave4'].includes(areaId);
       let pc=MINE ? mixC([86,70,52],[52,42,32],n*0.6+n2*0.4) : mixC([62,58,52],[34,32,29],n*0.65+n2*0.35);                     // rough stone; packed dirt in the mine
@@ -8283,7 +8286,7 @@ function paintGroundTexture(){
       let pc=mixC([232,232,226],[204,208,212],vein); if(((tx+ty)&1)) pc=mixC(pc,[214,220,226],0.5); if(edge) pc=mixC(pc,[150,156,162],0.6);
       const o=(py*TWp+px)*4, k=1-0.18*(1-smooth(0,1.3,Math.min(gx,gy)));
       D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
-    if(theme==='interior'){ const plank=Math.floor(gy*2.2), seam=Math.abs(gy*2.2-plank-0.5)>0.46, grain=fbm(gx*3,gy*18+plank*7,15);
+    if(theme==='interior' && !AREAS[areaId].volcanic){ const plank=Math.floor(gy*2.2), seam=Math.abs(gy*2.2-plank-0.5)>0.46, grain=fbm(gx*3,gy*18+plank*7,15);
       let pc=mixC([128,90,54],[96,66,38],grain); if(seam) pc=mixC(pc,[40,26,14],0.7); if(((plank*37)%11)<2) pc=mixC(pc,[150,110,70],0.3);
       const o=(py*TWp+px)*4, k=1-0.3*(1-smooth(0,1.3,Math.min(gx,gy)));
       D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
@@ -8301,7 +8304,7 @@ function paintGroundTexture(){
         let gc=mixC([58,82,34],[104,130,56],gn); if(bl>0.9) gc=mixC(gc,[140,150,80],0.4); sc=mixC(sc,gc,clamp01(gr*1.15)); }
       const ao=1-0.35*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.04-0.1*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.06), o=(py*TWp+px)*4;
       D[o]=sc[0]*k; D[o+1]=sc[1]*k; D[o+2]=sc[2]*k; D[o+3]=255; continue; }
-    if(theme==='ash'){                                       // volcanic: black basalt and red scoria, glowing cracks, a path of trodden grey ash
+    if(theme==='ash' || (AREAS[areaId] && AREAS[areaId].volcanic)){                                       // volcanic: black basalt and red scoria, glowing cracks, a path of trodden grey ash
       const n=fbm(gx*0.5,gy*0.5,71), n2=fbm(gx*2.4,gy*2.4,72), n3=fbm(gx*7,gy*7,73), cr=Math.abs(fbm(gx*1.1,gy*1.1,74)-0.5);
       let pc=mixC([42,37,35],[72,62,56],n2); pc=mixC(pc,[96,56,40],smooth(0.6,0.8,n)*0.5);
       if(n3>0.72) pc=mixC(pc,[110,100,92],0.35);
@@ -8309,7 +8312,7 @@ function paintGroundTexture(){
       const hot=smooth(0.45,0.7,fbm(gx*0.3,gy*0.3,76));                                  // the cracks only glow in some stretches of the floor
       if(cr<0.022 && off>0 && hot>0) pc=mixC(pc,cr<0.008?[255,128,44]:[120,50,26],(cr<0.008?0.9:0.4)*off*hot);
       if(G.path>0){ let tr=mixC([118,110,102],[92,86,80],fbm(gx*2.2,gy*2.2,75)); pc=mixC(pc,tr,smooth(0.25,0.75,G.path)*0.85); }
-      const ao=1-0.42*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.02-0.08*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.08), o=(py*TWp+px)*4;
+      const VD=AREAS[areaId]&&AREAS[areaId].volcanic&&!(cr<0.008)?0.62:1, ao=VD*(1-0.42*(1-smooth(0,1.1,Math.min(gx,gy)))), k=ao*(1.02-0.08*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.08), o=(py*TWp+px)*4;
       D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
     if(theme==='bog'){                                       // the fen: olive mud, black standing water, moss, a trodden track
       const n=fbm(gx*0.42,gy*0.42,61), n2=fbm(gx*1.6,gy*1.6,62), n3=fbm(gx*6,gy*6,63);
@@ -8547,7 +8550,7 @@ function drawLightFX(){
     if(m.fire) glow(p.x,p.y-zz,7,7,'210,255,140',0.6*tw); else glow(p.x,p.y-zz,4,4,'255,235,190',0.28*tw);
   }
   g.restore();
-  if(AREAS[areaId].theme==='ash'){                    // the ash lands: a red cast and embers drifting up
+  if(AREAS[areaId].theme==='ash' || AREAS[areaId].volcanic){                    // the ash lands: a red cast and embers drifting up
     const W=gc.width, H=gc.height; g.save(); g.setTransform(1,0,0,1,0,0); g.globalCompositeOperation='multiply'; g.fillStyle='rgb(255,226,212)'; g.fillRect(0,0,W,H);
     g.globalCompositeOperation='lighter'; for(let k=0;k<40;k++){ const ph=(gt*(0.05+rnd01(k,1,776)*0.06)+rnd01(k,2,777))%1, x=rnd01(k,3,778)*W+Math.sin(gt*0.7+k)*20, y=H*(1.05-ph*1.2);
       g.fillStyle=`rgba(255,${120+Math.round(rnd01(k,4,779)*80)},40,${0.7*Math.sin(ph*Math.PI)})`; g.fillRect(x,y,2,2); } g.restore(); }
@@ -15024,12 +15027,12 @@ function drawActor(e){                               // you, a foe, a wolf
 
 // ── the places ──
 const FLAMESWORN=(o)=>({gender:'m',race:'human',skin:4,hair:2,hairColor:0,beard:0,face:3,marks:{warPaint:2},equip:{head:'obsidian_helm',torso:'shirt',armor:'ash_mantle',hands:'cinder_gloves',legs:'scorched_greaves',feet:'emberstep_boots',weapon:'fire_blade',offhand:null},...o});
-AREAS.emberpass={ fence:{r:false,l:false}, w:16, h:9, theme:'ash', label:'Cinder Pass', mini:{x:0,y:0}, tier:4,
+AREAS.emberpass={ fence:{r:false,l:false}, w:16, h:9, theme:'interior', inside:true, cave:true, volcanic:true, label:'The Cinder Deeps', mini:{x:0,y:0}, tier:4,
   notches:()=>[], dummy:null,
-  objects:()=>[ {type:'teleporter', i:15, j:4, to:'warren', entry:'fromPass'}, {type:'teleporter', i:0, j:4, to:'emberforge', entry:'fromPass'},
+  objects:()=>[ {type:'teleporter', i:15, j:4, to:'steamcellar', entry:'fromDeeps'}, {type:'teleporter', i:0, j:4, to:'emberforge', entry:'fromPass'},
     {type:'lava', i:4, j:6, fp:[3,2]}, {type:'lava', i:9, j:0, fp:[3,2]}, {type:'lava', i:12, j:6, fp:[2,2]}, {type:'lava', i:2, j:0, fp:[2,2]},
     ...rockRow(8,7,10,[]), {type:'boulder', i:14, j:1, v:1}, {type:'boulder', i:7, j:1, v:2}, {type:'bones', i:8, j:6, noblock:true}, {type:'bones', i:3, j:3, noblock:true},
-    {type:'rune', i:13, j:2, text:"Scratched into black glass with a knife point: <i>“The Flamesworn burn the weak and keep the strong. Their captain's blade was quenched in the old forge, west. The forge still remembers.”</i>"},
+    {type:'rune', i:13, j:2, text:"Scratched into black glass with a knife point: <i>“The Flamesworn burn the weak and keep the strong. Their captain's blade was quenched in the old forge, deeper down. The forge still remembers.”</i>"},
     ...(collectedPickups.has('emberpass:7,7') ? [] : [{type:'pickup', i:7, j:7, item:'ember_core'}]),
     ...(collectedPickups.has('emberpass:12,2') ? [] : [{type:'pickup', i:12, j:2, item:'ember_core'}]) ],
   mobs:()=>[
@@ -15038,8 +15041,8 @@ AREAS.emberpass={ fence:{r:false,l:false}, w:16, h:9, theme:'ash', label:'Cinder
     { name:'Flamesworn Zealot', type:'mage', i:5, j:3, faction:'flamesworn', opts:FLAMESWORN({skin:2,hair:5,beard:4,hairColor:7,equip:{head:null,torso:'shirt',armor:'ash_mantle',hands:'cinder_gloves',legs:'scorched_greaves',feet:'emberstep_boots',weapon:'staff_cinder',offhand:null}}) },
     { name:'Flamesworn Captain', type:'bandit', i:3, j:5, faction:'flamesworn', opts:FLAMESWORN({}) } ],
   npcs:()=>[],
-  entries:{ fromWarren:{i:14,j:4}, fromForge:{i:1,j:4} } };
-AREAS.emberforge={ fence:{r:false,l:false}, w:13, h:11, theme:'ash', label:'The Sunken Forge', mini:{x:0,y:0}, tier:5,
+  entries:{ fromWarren:{i:14,j:4}, fromDeeps:{i:14,j:4}, fromForge:{i:1,j:4} } };
+AREAS.emberforge={ fence:{r:false,l:false}, w:13, h:11, theme:'interior', inside:true, cave:true, volcanic:true, label:'The Sunken Forge', mini:{x:0,y:0}, tier:5,
   notches:()=>[], dummy:null,
   objects:()=>[ {type:'teleporter', i:12, j:5, to:'emberpass', entry:'fromForge'},
     {type:'forge', i:5, j:1}, {type:'anvil', i:7, j:2},
@@ -15053,9 +15056,10 @@ AREAS.emberforge={ fence:{r:false,l:false}, w:13, h:11, theme:'ash', label:'The 
   entries:{ fromPass:{i:11,j:5} } };
 AREA_PATHS.emberpass=[ [[16,4.5],[12,4.6],[8,4.2],[4,4.6],[-0.5,4.5]] ];
 AREA_PATHS.emberforge=[ [[13,5.5],[9,5.6],[7,4],[6,3.4]] ];
-wrap('warren','objects',l=>[...l,{type:'teleporter', i:0, j:5, to:'emberpass', entry:'fromWarren'}]);
-AREAS.warren.entries.fromPass={i:1,j:5};
-AREA_PATHS.warren.push([[-0.5,5.5],[3,5.6],[6,5]]);
+AREAS.warren.entries.fromPass={i:1,j:5};                                                   // (older saves may still name it)
+// the bathhouse boiler is warmed from below: an iron hatch behind it, and a stair down into the deep fire
+wrap('steamcellar','objects',l=>[...l, {type:'trapdoor', i:6, j:0, noblock:true, iron:true}, {type:'teleporter', i:6, j:0, to:'emberpass', entry:'fromWarren'}]);
+AREAS.steamcellar.entries.fromDeeps={i:6,j:1};
 AREA_TIER.emberpass=4; AREA_TIER.emberforge=5;
 if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
 
@@ -15084,7 +15088,7 @@ function ilkaTalk(){
         CHOICE.emberbrand=true; CHOICE.ilka='done'; updateHud(); try{ refreshInventory(); }catch(e){} banner('The Emberbrand','#ffb060',1800); logMsg('You receive the Emberbrand: it grows with Attack Power and Spell Power, and every cut burns.','#ffb060'); closeDialog(); }}]); }
 TALKERS.ilka=ilkaTalk;
 JOURNAL.push(['The Sunken Forge', ()=> !(visitedAreas.emberpass) ? null : CHOICE.emberbrand ? ['done',"Ilka, the spirit of the Sunken Forge, woke the Fire Blade into the Emberbrand."]
-  : ['active', !CHOICE.fireBlade ? "West of the goblin warren lies Cinder Pass. The Flamesworn there follow a captain with a burning sword. A carving says it was quenched in an old forge further west."
+  : ['active', !CHOICE.fireBlade ? "Under Hollowmere, through an iron hatch in the Steam Cellar, lie the Cinder Deeps. The Flamesworn there follow a captain with a burning sword. A carving says it was quenched in an old forge further down."
     : !CHOICE.warden ? "You took the Fire Blade from the Flamesworn captain. Somewhere west, in the Sunken Forge, something guards the old smithy."
     : "Ilka, the forge spirit, will wake the Fire Blade if you bring it and three ember cores ("+coreCount()+"/3). They form where lava cools; the ash hounds swallow them."]]);
 Object.assign(CHOICE,{ fireBlade:CHOICE.fireBlade??null, warden:CHOICE.warden??null, ilka:CHOICE.ilka??null, emberbrand:CHOICE.emberbrand??null });
@@ -16575,7 +16579,8 @@ function secretWayTalk(){ say('Alaric Craban',["“The Company has a way in and 
       if(box && !box.querySelector('.dlg-opt.secret')){ const b=document.createElement('button'); b.className='dlg-opt secret'; b.innerHTML='<span>“Is there a quieter way in and out of the city?”</span>'; b.addEventListener('click',secretWayTalk); box.insertBefore(b,box.lastElementChild); } } }; }
 // the hatch behind the counter (always there; it only opens for those who know)
 function drawTrapdoor(o){ const a=P(o.i+0.1,o.j+0.15), b=P(o.i+0.9,o.j+0.15), c=P(o.i+0.9,o.j+0.85), d=P(o.i+0.1,o.j+0.85);
-  g.fillStyle='#5a3c1e'; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c.x,c.y); g.lineTo(d.x,d.y); g.closePath(); g.fill(); g.strokeStyle='#2a1a0c'; g.lineWidth=2; g.stroke();
+  if(o.iron){ const m=P(o.i+0.5,o.j+0.5); g.save(); g.globalCompositeOperation='lighter'; glow(m.x,m.y,46,26,'255,110,40',0.22+0.06*Math.sin(gt*2)); g.restore(); }   // warm from below
+  g.fillStyle=o.iron?'#3a3634':'#5a3c1e'; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c.x,c.y); g.lineTo(d.x,d.y); g.closePath(); g.fill(); g.strokeStyle='#2a1a0c'; g.lineWidth=2; g.stroke();
   g.strokeStyle='rgba(30,18,8,0.6)'; g.lineWidth=1; for(const t of [0.33,0.66]){ const p=P(o.i+0.1+0.8*t,o.j+0.15), q=P(o.i+0.1+0.8*t,o.j+0.85); g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(q.x,q.y); g.stroke(); }   // the boards
   g.strokeStyle='#3a3a40'; g.lineWidth=2.2; for(const t of [0.3,0.7]){ const p=P(o.i+0.1,o.j+0.15+0.7*t), q=P(o.i+0.9,o.j+0.15+0.7*t); g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(q.x,q.y); g.stroke(); }   // iron straps
   const r=P(o.i+0.5,o.j+0.5); g.strokeStyle='#8a8a90'; g.lineWidth=1.4; g.beginPath(); g.ellipse(r.x,r.y,5,2.4,0,0,Math.PI*2); g.stroke(); }   // the ring
@@ -18249,7 +18254,7 @@ const SND=(()=>{
   function place(){ const A=AREAS[areaId]||{}, id=areaId||'', night=typeof nightAmt==='function'?nightAmt():0, rain=!A.inside && typeof weatherToday==='function' && weatherToday()==='rain';
     const cave=/cave|crypt|barrow|warren|tunnel|cellar|vault|mine|pit/.test(id) && !/steamcellar/.test(id), inside=!!A.inside || cave, th=A.theme;
     const fire=OBJECTS.some(o=>/hearth|fireplace|campfire|forge|oven/.test(o.type)), pool=OBJECTS.some(o=>o.type==='pool');
-    return {night, rain, cave, inside, th, fire, pool, city:th==='city', wet:th==='bog'||th==='fen', wood:th==='wood'||th==='elf', ash:th==='ash'}; }
+    return {night, rain, cave, inside, th, fire, pool, city:th==='city', wet:th==='bog'||th==='fen', wood:th==='wood'||th==='elf', ash:th==='ash'||!!A.volcanic}; }
   const T=(layer,v,tc)=>{ L[layer].g.gain.setTargetAtTime(v,ctx.currentTime,tc||1.2); };
   let gust=0.5, gustT=0;
   function tick(){ if(!live() || typeof areaId==='undefined' || !AREAS[areaId]) return;
@@ -18289,7 +18294,7 @@ const SND=(()=>{
     if(typeof poolDepth==='function' && poolDepth(x,y)>0.05) return 'water';
     if(/cave|crypt|barrow|warren|tunnel|vault|mine|pit/.test(id)) return 'stone';
     if(A.theme==='interior' || A.inside) return /cellar|bath/.test(id) ? 'stone' : 'wood';
-    if(A.theme==='city') return 'stone'; if(A.theme==='ash') return 'cinder'; if(A.theme==='bog'||A.theme==='fen') return 'mud';
+    if(A.theme==='city') return 'stone'; if(A.theme==='ash' || A.volcanic) return 'cinder'; if(A.theme==='bog'||A.theme==='fen') return 'mud';
     try{ const gd=groundAt(x,y); if(gd.path>0.5) return 'dirt'; if(gd.mud>0.5) return 'mud'; }catch(e){}
     return 'grass'; }
   function step(kind,v){ v=v||1; const p=R(0.9,1.1);

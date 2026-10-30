@@ -18391,14 +18391,19 @@ const VOICE=(()=>{
   let gen=0, busyNow=false, curAudio=null;
   function playUrl(a,v){ return new Promise(res=>{ curAudio=a; a.playbackRate=v.speed||1; a.volume=typeof SND!=='undefined' ? Math.min(1,0.45+SND.vol*0.8) : 1;
       let done=false; const fin=ok=>{ if(done) return; done=true; clearTimeout(wait); res(ok); };
-      const wait=setTimeout(()=>{ if(!a.currentTime){ try{ a.pause(); }catch(e){} fin(false); } },2500);      // not playing after 2.5 s: the browser's voice reads it instead
+      const wait=setTimeout(()=>{ if(!a.currentTime){ try{ a.pause(); }catch(e){} fin(false); } },9000);      // a slow server is waited for: one voice per dialog beats a quick switch to another
       a.onended=()=>fin(true); a.onerror=()=>fin(false); const p=a.play(); if(p && p.catch) p.catch(()=>fin(false)); }); }
   function sysSay(t,v){ return new Promise(res=>{ if(!S) return res(); const u=new SpeechSynthesisUtterance(t); if(v.voice) u.voice=v.voice; u.lang=(v.voice&&v.voice.lang)||'en-GB'; u.pitch=v.pitch; u.rate=v.rate; u.volume=1; u.onend=u.onerror=()=>res(); S.speak(u); }); }
   async function run(list,onEnd){ const my=++gen; busyNow=true;
     try{
       if(engine==='online' && ai.state==='ready'){
         const clips=list.map(([t,v])=>{ const a=new Audio(); a.preload='auto'; a.src=ttsUrl(t,v); return a; });   // every piece starts loading at once; they play in turn
-        for(let k=0;k<list.length;k++){ const ok=await playUrl(clips[k],list[k][1]); if(my!==gen) return; if(!ok){ await sysSay(list[k][0],list[k][1]); if(my!==gen) return; } } }
+        // which pieces are recorded? (a missing one answers at once with an error; a slow one is given time)
+        const ready=a=>new Promise(r=>{ if(a.readyState>=3) return r(true); const t=setTimeout(()=>r(false),9000); a.addEventListener('canplay',()=>{ clearTimeout(t); r(true); },{once:true}); a.addEventListener('error',()=>{ clearTimeout(t); r(false); },{once:true}); });
+        const have=await Promise.all(clips.map(ready)); if(my!==gen) return;
+        if(!have.some(Boolean)){ for(const [t,v] of list){ await sysSay(t,v); if(my!==gen) return; } }      // nothing recorded yet: the browser reads all of it, in one voice
+        else for(let k=0;k<list.length;k++){ if(!have[k]) continue;                                          // recorded pieces only: one that isn't yet stays silent rather than switch voices
+          await playUrl(clips[k],list[k][1]); if(my!==gen) return; } }
       else if(S){ for(const [t,v] of list){ await sysSay(t,v); if(my!==gen) return; } }
     }catch(e){ console.warn(e); }
     finally{ if(my===gen){ busyNow=false; curAudio=null; if(onEnd) onEnd(); } } }

@@ -940,6 +940,9 @@ function drawWeapon(c,hx,hy,ang,id,s=1){
     c.fillStyle=woodD;
     [-spread,0,spread].forEach(dy=>c.fillRect(tx-1.4, dy*1.05-0.5, 3, 1));   // a touch of shading near each tip
   } else {
+    if(id==='scimitar'){ c.fillStyle=woodD; c.fillRect(-4,-1.1,6,2.2); c.fillStyle=brass; c.beginPath(); c.arc(-4.6,0,1.5,0,Math.PI*2); c.fill(); c.fillRect(2,-3,1.6,6);
+      c.fillStyle=steel; c.beginPath(); c.moveTo(3.6,-1.4); c.quadraticCurveTo(16,-2.6,25,-6.5); c.quadraticCurveTo(22,-1.5,16,1.8); c.quadraticCurveTo(9,2.4,3.6,1.4); c.closePath(); c.fill();   // a curved blade, widening toward the point
+      c.fillStyle=steelD; c.beginPath(); c.moveTo(5,-0.6); c.quadraticCurveTo(15,-1.3,22,-4.6); c.lineTo(22,-4); c.quadraticCurveTo(15,-0.6,5,0); c.closePath(); c.fill(); c.restore(); return; }
     const len = id==='dagger' ? 10 : id==='longsword' ? 28 : 21, w = id==='dagger' ? 2.2 : id==='longsword' ? 2.9 : 2.6;
     if(id==='longsword'){ c.fillStyle=woodD; c.fillRect(-9,-1.1,6,2.2); c.fillStyle=brass; c.beginPath(); c.arc(-9.6,0,1.7,0,Math.PI*2); c.fill(); }
     c.fillStyle=woodD; c.fillRect(-4,-1.1,6,2.2);                       // grip
@@ -5093,12 +5096,15 @@ function paintFern(x,y,s){
       g.beginPath(); g.moveTo(px,py); g.lineTo(px+Math.cos(a-1.2)*ll,py+Math.sin(a-1.2)*ll); g.moveTo(px,py); g.lineTo(px+Math.cos(a+1.2)*ll,py+Math.sin(a+1.2)*ll); g.stroke(); }
   }
 }
+function paintDryTuft(x,y,s){ g.strokeStyle='#8a7444'; g.lineWidth=1.1; for(let k=0;k<7;k++){ const a=-Math.PI/2+(k-3)*0.28, l=(7+((k*37)%5))*s; g.beginPath(); g.moveTo(x,y); g.quadraticCurveTo(x+Math.cos(a)*l*0.4,y+Math.sin(a)*l*0.6,x+Math.cos(a)*l,y+Math.sin(a)*l); g.stroke(); }
+  g.strokeStyle='#b8a066'; g.lineWidth=0.8; for(let k=0;k<4;k++){ const a=-Math.PI/2+(k-1.5)*0.35, l=6*s; g.beginPath(); g.moveTo(x,y); g.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l); g.stroke(); } }
+function paintPebbles(x,y,s){ ['#a88a66','#8a7050','#c8aa80'].forEach((c,k)=>{ g.fillStyle=c; g.beginPath(); g.ellipse(x+(k-1)*4*s,y+(k%2)*2*s,2.2*s,1.4*s,0,0,Math.PI*2); g.fill(); }); }
 function paintRock(x,y,s){
   g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(x+2*s,y+1,9*s,3.5*s,0,0,Math.PI*2); g.fill();
   const rg=g.createRadialGradient(x-3*s,y-5*s,1,x,y-2*s,9*s);
   rg.addColorStop(0,'#9a968a'); rg.addColorStop(0.6,'#67635a'); rg.addColorStop(1,'#34322c');
   g.fillStyle=rg; g.beginPath(); g.moveTo(x-8*s,y); g.quadraticCurveTo(x-8*s,y-7*s,x-2*s,y-8*s); g.quadraticCurveTo(x+6*s,y-8*s,x+8*s,y-2*s); g.lineTo(x+7*s,y+1); g.closePath(); g.fill();
-  g.fillStyle='rgba(90,130,50,0.75)'; g.beginPath(); g.ellipse(x-2*s,y-6.5*s,4.5*s,1.6*s,-0.2,0,Math.PI*2); g.fill();   // moss cap
+  if(AREAS[areaId].theme!=='sand'){ g.fillStyle='rgba(90,130,50,0.75)'; g.beginPath(); g.ellipse(x-2*s,y-6.5*s,4.5*s,1.6*s,-0.2,0,Math.PI*2); g.fill(); }   // moss cap (none in the desert)
 }
 // ── trees are real, depth-sorted objects (they block their tile, so nobody walks through a trunk) ──
 const TREE_DENSITY = { farm:0.08, road:0.7, crossroads:0.6, village:0.2, wood:0.9, fen:0.5, elf:0.7, bog:0.2 };
@@ -5232,7 +5238,7 @@ function drawRoadDecor(){
   const theme=AREAS[areaId].theme;
 
   const {w,h}=ROOM, spots=[];
-  const dens = theme==='city'||theme==='ash' ? 0 : theme==='farm' ? 0.18 : theme==='village' ? 0.7 : theme==='wood' ? 3.2 : theme==='bog' ? 1.8 : 2.4;
+  const dens = theme==='city'||theme==='ash' ? 0 : theme==='sand' ? 0.4 : theme==='farm' ? 0.18 : theme==='village' ? 0.7 : theme==='wood' ? 3.2 : theme==='bog' ? 1.8 : 2.4;
   for(let k=0;k<w*h*dens;k++){
     const gx=0.3+rnd01(k,1,70)*(w-0.6), gy=0.3+rnd01(k,2,71)*(h-0.6);
     const G=groundAt(gx,gy); if(G.path>0.2 || G.notch) continue;
@@ -5244,6 +5250,7 @@ function drawRoadDecor(){
   spots.sort((a,b)=>(a[0]+a[1])-(b[0]+b[1]));              // paint back to front
   spots.forEach(([gx,gy,r])=>{ const p=P(gx,gy);
     const q0=rnd01(Math.round(gx*10),Math.round(gy*10),105), q = q0<0.2 ? q0*0.5 : q0<0.85 ? q0 : 1.2+q0;   // tiny, normal, sometimes big
+    if(theme==='sand'){ if(r<0.55) paintDryTuft(p.x,p.y,0.7+q*0.6); else if(r<0.85) paintPebbles(p.x,p.y,0.6+q*0.5); else paintRock(p.x,p.y,0.4+q*0.4); return; }
     if(theme==='bog'){ if(fbm(gx*0.42,gy*0.42,61)>0.57) return;                   // nothing grows on the open water
       if(r<0.5) paintGrassClump(p.x,p.y,0.7+q*0.6); else if(r<0.72){ paintGrassClump(p.x,p.y,0.9+q*0.5); g.fillStyle='#4a2e18'; for(let c=0;c<3;c++){ g.beginPath(); g.ellipse(p.x+(c-1)*3,p.y-14-c*2,1.4,3.6,0,0,Math.PI*2); g.fill(); } }
       else if(r<0.8) paintLog(p.x,p.y,0.7+q*0.3); else if(r<0.9) paintRock(p.x,p.y,0.5+q*0.5); else paintMushrooms(p.x,p.y,0.7+q*0.3); return; }
@@ -6560,6 +6567,26 @@ const CITY_PAL=[ // plaster, timber, roof, stone
   {pl:'#e2d6bc',tb:'#4a2e1a',rf:'#9a4a32',st:'#8a8274'}, {pl:'#d8c8a0',tb:'#3a2616',rf:'#7a5a3a',st:'#7e776a'},
   {pl:'#cfd2c8',tb:'#40342a',rf:'#4e5660',st:'#8a8a84'}, {pl:'#e8d8c4',tb:'#5a3a22',rf:'#a85a3a',st:'#908574'},
   {pl:'#d4b890',tb:'#3a2818',rf:'#6a3a2a',st:'#7a7064'}, {pl:'#c8c0b0',tb:'#2e2620',rf:'#5a4a40',st:'#6e6a62'} ];
+// the desert's edge: far flat-topped mesas, then dune after dune, all the colours of a loaf crust
+function paintSandBackdrop(){
+  const {w,h}=ROOM, H=WALL_H, o=P(0,0), rEnd=P(w,0), lEnd=P(0,h);
+  const wash=(a,b)=>{ const gr=g.createLinearGradient(0,a.y-H*1.4,0,a.y); gr.addColorStop(0,'rgba(220,180,130,0)'); gr.addColorStop(0.5,'rgba(196,150,100,0.55)'); gr.addColorStop(1,'#b8895a');
+    g.fillStyle=gr; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(b.x,b.y-H*1.4); g.lineTo(a.x,a.y-H*1.4); g.closePath(); g.fill(); };
+  wash(o,rEnd); wash(lEnd,o);
+  const edge=(axis,len,fn)=>{ for(let u=-0.6;u<len+0.6;u+=0.25){ if(gapAt(axis,u,1)) continue; fn(axis==='r'?P(u,0):P(0,u),u); } };
+  DOOR_GAPS=backDoorGaps();
+  const mesa=(axis,len)=>{ for(let u=0.5;u<len;u+=3.4+rnd01(Math.round(u*7),3,331)*2){ const p=axis==='r'?P(u,0):P(0,u), j=rnd01(Math.round(u*9),axis==='r'?1:2,332);
+      if(j<0.35) continue; const wd=70+j*90, ht=60+j*50, y=p.y-H*0.55;
+      g.fillStyle='#a8785a'; g.beginPath(); g.moveTo(p.x-wd*0.7,y); g.lineTo(p.x-wd*0.45,y-ht); g.lineTo(p.x+wd*0.45,y-ht); g.lineTo(p.x+wd*0.7,y); g.closePath(); g.fill();
+      g.fillStyle='rgba(255,220,180,0.25)'; g.beginPath(); g.moveTo(p.x-wd*0.45,y-ht); g.lineTo(p.x+wd*0.45,y-ht); g.lineTo(p.x+wd*0.4,y-ht+8); g.lineTo(p.x-wd*0.42,y-ht+8); g.closePath(); g.fill(); } };
+  mesa('r',w); mesa('l',h);
+  const dune=(depth,col,lit)=>['r','l'].forEach(axis=>{ const len=axis==='r'?w:h; g.fillStyle=col; g.beginPath(); let first=true, last=null;
+      for(let u=-0.6;u<=len+0.6;u+=0.2){ const p=axis==='r'?P(u,0):P(0,u), hh=(18+depth*14)*(0.6+0.5*Math.sin(u*(0.9-depth*0.15)+depth*2+(axis==='r'?0:1.7))+0.3*Math.sin(u*2.3+depth)), y=p.y-(2-depth)*14-hh;
+        if(first){ g.moveTo(p.x,p.y); g.lineTo(p.x,y); first=false; } else g.lineTo(p.x,y); last=p; }
+      g.lineTo(last.x,last.y); g.closePath(); g.fill();
+      g.strokeStyle=lit; g.lineWidth=1.5; g.beginPath(); first=true;
+      for(let u=-0.6;u<=len+0.6;u+=0.2){ const p=axis==='r'?P(u,0):P(0,u), hh=(18+depth*14)*(0.6+0.5*Math.sin(u*(0.9-depth*0.15)+depth*2+(axis==='r'?0:1.7))+0.3*Math.sin(u*2.3+depth)), y=p.y-(2-depth)*14-hh; first?(g.moveTo(p.x,y),first=false):g.lineTo(p.x,y); } g.stroke(); });
+  dune(0,'#c49662','rgba(255,228,180,0.5)'); dune(1,'#d2a66e','rgba(255,232,190,0.55)'); dune(2,'#ddb47c','rgba(255,238,200,0.6)'); }
 function paintCityBackdrop(){
   const {w,h}=ROOM;
   const row=(axis,len,depth)=>{ for(let u=-0.5;u<len+0.5;u+=0.9+depth*0.5){
@@ -8242,7 +8269,7 @@ function buildWorldCache(){
     if(AREAS[areaId].theme==='interior') paintInteriorWalls(); else paintBackdrop();
     // (no earth cut under the map)
     paintGroundTexture();
-    if(AREAS[areaId].theme==='city') paintCityDetail(); else if(AREAS[areaId].theme!=='interior' && AREAS[areaId].theme!=='ash') paintGroundDetail();
+    if(AREAS[areaId].theme==='city') paintCityDetail(); else if(AREAS[areaId].theme!=='interior' && AREAS[areaId].theme!=='ash' && AREAS[areaId].theme!=='sand') paintGroundDetail();
     paintPools();
     paintFence();
     if(AREAS[areaId].theme!=='interior') drawRoadDecor();
@@ -8306,6 +8333,13 @@ function paintGroundTexture(){
         let gc=mixC([58,82,34],[104,130,56],gn); if(bl>0.9) gc=mixC(gc,[140,150,80],0.4); sc=mixC(sc,gc,clamp01(gr*1.15)); }
       const ao=1-0.35*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.04-0.1*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.06), o=(py*TWp+px)*4;
       D[o]=sc[0]*k; D[o+1]=sc[1]*k; D[o+2]=sc[2]*k; D[o+3]=255; continue; }
+    if(theme==='sand'){                                      // the desert: warm sand in wind ripples, darker drifts, a hard-packed caravan track
+      const n=fbm(gx*0.35,gy*0.35,81), n2=fbm(gx*1.8,gy*1.8,82), rip=Math.sin((gx*0.8+gy*1.6)*5.5+fbm(gx*0.6,gy*0.6,83)*6)*0.5+0.5;
+      let pc=mixC([214,178,122],[236,206,152],n2); pc=mixC(pc,[190,146,92],smooth(0.55,0.8,n)*0.45); pc=mixC(pc,[248,224,176],rip*0.18); pc=mixC(pc,[176,134,86],(1-rip)*0.12);
+      if(AREAS[areaId].scrub){ const sc=smooth(0.45,0.75,fbm(gx*0.5,gy*0.5,84))*AREAS[areaId].scrub(gy); pc=mixC(pc,[120,104,64],sc*0.6); }
+      if(G.path>0){ const tr=mixC([184,150,104],[164,128,86],fbm(gx*2.6,gy*2.6,85)); pc=mixC(pc,tr,smooth(0.25,0.8,G.path)*0.8); }
+      const ao=1-0.25*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1+((hsh(px,py)%1000)/1000-0.5)*0.06), o=(py*TWp+px)*4;
+      D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
     if(theme==='ash' || (AREAS[areaId] && AREAS[areaId].volcanic)){                                       // volcanic: black basalt and red scoria, glowing cracks, a path of trodden grey ash
       const n=fbm(gx*0.5,gy*0.5,71), n2=fbm(gx*2.4,gy*2.4,72), n3=fbm(gx*7,gy*7,73), cr=Math.abs(fbm(gx*1.1,gy*1.1,74)-0.5);
       let pc=mixC([42,37,35],[72,62,56],n2); pc=mixC(pc,[96,56,40],smooth(0.6,0.8,n)*0.5);
@@ -8424,6 +8458,7 @@ function paintEarthEdge(){
 // ── the forest wall behind the clearing: layered trees and a misty treeline
 function paintBackdrop(){
   if(AREAS[areaId].theme==='city'){ paintCityBackdrop(); return; }
+  if(AREAS[areaId].theme==='sand'){ paintSandBackdrop(); return; }
   const {w,h}=ROOM, H=WALL_H, o=P(0,0), rEnd=P(w,0), lEnd=P(0,h);
   const baseFill=(a,b)=>{
     const gr=g.createLinearGradient(0,a.y-H,0,a.y);
@@ -8553,6 +8588,10 @@ function drawLightFX(){
     if(m.fire) glow(p.x,p.y-zz,7,7,'210,255,140',0.6*tw); else glow(p.x,p.y-zz,4,4,'255,235,190',0.28*tw);
   }
   g.restore();
+  if(AREAS[areaId].theme==='sand'){ const W=gc.width, H=gc.height, day=1-nightAmt(); if(day>0.05){ g.save(); g.setTransform(1,0,0,1,0,0);
+      g.globalCompositeOperation='multiply'; g.fillStyle=`rgba(255,${236+Math.round(19*(1-day))},${214+Math.round(41*(1-day))},1)`; g.fillRect(0,0,W,H);
+      if(!LOW_FX){ g.globalCompositeOperation='lighter'; for(let k=0;k<7;k++){ const y=H*(0.3+k*0.09)+Math.sin(gt*1.3+k)*3; const gr=g.createLinearGradient(0,y-6,0,y+6); gr.addColorStop(0,'rgba(255,240,210,0)'); gr.addColorStop(0.5,`rgba(255,240,210,${0.035*day})`); gr.addColorStop(1,'rgba(255,240,210,0)'); g.fillStyle=gr; g.fillRect(0,y-6,W,12); } }
+      g.restore(); } }
   if(AREAS[areaId].theme==='ash' || AREAS[areaId].volcanic){                    // the ash lands: a red cast and embers drifting up
     const W=gc.width, H=gc.height; g.save(); g.setTransform(1,0,0,1,0,0); g.globalCompositeOperation='multiply'; g.fillStyle='rgb(255,226,212)'; g.fillRect(0,0,W,H);
     g.globalCompositeOperation='lighter'; for(let k=0;k<40;k++){ const ph=(gt*(0.05+rnd01(k,1,776)*0.06)+rnd01(k,2,777))%1, x=rnd01(k,3,778)*W+Math.sin(gt*0.7+k)*20, y=H*(1.05-ph*1.2);
@@ -9341,8 +9380,8 @@ function paintItemArtBase(g2,id,size){
       for(let k=0;k<6;k++){ g2.save(); g2.translate(20,17); g2.rotate(k*Math.PI/3); E(0,-6,3,6,'#f4f0ff'); g2.restore(); } E(20,17,2.6,2.6,'#f0d870'); break; }
     case 'elegy': case 'journal': { R(8,8,24,26,id==='elegy'?'#d8d0c0':'#6a4626'); R(10,10,20,22,id==='elegy'?'#e8e2d4':'#e8dcb8');
       g2.fillStyle='rgba(60,50,40,0.6)'; for(let k=0;k<6;k++) R(12,13+k*3,16-(k%2)*4,1,'rgba(60,50,40,0.6)'); if(id==='journal') R(19.4,8,1.2,26,'#4a2e14'); break; }
-    case 'staff_bog': case 'staff_hex': case 'staff_bone': case 'staff_barrow': case 'staff_oak': case 'staff_star': case 'staff_cinder': case 'staff_crystal': case 'dagger': case 'sword': case 'morningstar': case 'pitchfork': case 'club': case 'hatchet': case 'axe': case 'spear': case 'mace': case 'longsword': case 'elf_blade': case 'shovel': {
-      const T={shovel:[6,30,0.85],staff_bone:[6,33,0.75],staff_barrow:[6,33,0.75],staff_bog:[6,33,0.75],staff_hex:[6,33,0.75],staff_crystal:[6,33,0.75],staff_oak:[6,33,0.75],staff_star:[6,33,0.75],staff_cinder:[6,33,0.75],morningstar:[6,26,1.05],pitchfork:[5,24,0.85],dagger:[10,30,1.45],sword:[10,30,1.05],club:[7,29,1.3],hatchet:[8,29,1.45],axe:[6,28,1.05],spear:[5,33,0.8],mace:[7,28,1.15],longsword:[11,31,0.85],elf_blade:[11,31,0.85]}[id];
+    case 'staff_bog': case 'staff_hex': case 'staff_bone': case 'staff_barrow': case 'staff_oak': case 'staff_star': case 'staff_cinder': case 'staff_crystal': case 'dagger': case 'sword': case 'morningstar': case 'pitchfork': case 'club': case 'hatchet': case 'axe': case 'spear': case 'mace': case 'longsword': case 'elf_blade': case 'shovel': case 'scimitar': {
+      const T={scimitar:[9,30,1.1],shovel:[6,30,0.85],staff_bone:[6,33,0.75],staff_barrow:[6,33,0.75],staff_bog:[6,33,0.75],staff_hex:[6,33,0.75],staff_crystal:[6,33,0.75],staff_oak:[6,33,0.75],staff_star:[6,33,0.75],staff_cinder:[6,33,0.75],morningstar:[6,26,1.05],pitchfork:[5,24,0.85],dagger:[10,30,1.45],sword:[10,30,1.05],club:[7,29,1.3],hatchet:[8,29,1.45],axe:[6,28,1.05],spear:[5,33,0.8],mace:[7,28,1.15],longsword:[11,31,0.85],elf_blade:[11,31,0.85]}[id];
       g2.save(); g2.translate(T[0],T[1]); g2.rotate(-Math.PI/4);
       drawWeapon(g2,0,0,0,id, T[2]);
       g2.restore(); break; }
@@ -12279,6 +12318,7 @@ function beginFight(){
     if(S && styleOf(f)==='veteran') teach('veteran','A veteran',["This one has fought for years. Expect <b>long combos</b> (right, right, left, high, high), <b>feints</b>, and a guard that <b>follows your blows</b>.","Parry the combo one strike at a time; the opening comes after the last blow."]);
     else if(S && styleOf(f)==='drilled') teach('drilled','A drilled soldier',["Soldiers strike in <b>threes</b>: right, right, left, or left, high, high. Learn the rhythm and parry each one."]);
     else if(S && styleOf(f)==='shield') teach('shieldwall','A shield-bearer',["His shield covers <b>every side</b>. Hammer on it and he will shove you back.","<b>Parry his swing</b>: the shield drops as he strikes, and for a moment he is <b>open</b>. Strike then.","A <b>Shield Bash</b> knocks it aside. Lunge and Riposte get past it too."]);
+    else if(S && styleOf(f)==='raider') teach('raider','A dune raider',["Raiders cut in <b>sweeping threes</b>: left, right, left, fast. Parry each one.","Then a <b>high cut that starts like a side cut</b>. Watch the arrow change."]);
     else if(S && styleOf(f)==='duelist') teach('duelist','A duelist',["A duelist <b>shifts his guard</b> while you are still choosing a side. A faint arrow shows where it goes next.","He is quick and he feints. Watch the arrow until the ring is nearly closed."]); }
   { const pt=partnerOf(f); if(pt){ pt.pj=2.2; const free=DIR_DELTA.map(([di,dj])=>[player.i+di,player.j+dj]).filter(([i,j])=>walkable(i,j) && !(i===f.i&&j===f.j) && !mobs.some(m=>!m.dead && m!==pt && m.i===i && m.j===j));
       if(cheb(tileOf(pt),tileOf(player))>1 && free.length){ const best=free.map(t=>findPath(pt.i,pt.j,t[0],t[1])).filter(Boolean).sort((a,b)=>a.length-b.length)[0]; pt.path=best||[]; }
@@ -12317,6 +12357,12 @@ const STYLES={
     {wait:1.5, wind:1.10, after:0.50, dir:'right'},
     {wait:1.3, wind:1.00, after:0.50, dir:'left'},
     {wait:1.4, wind:1.20, after:0.60, dir:'up'} ]},
+  // a dune raider: curved blades in sweeping threes, left-right-left, then a high cut that starts like a side cut
+  raider:{ label:'Dune Raider', guardAfter:{left:'right', up:'left', right:'up'}, pattern:[
+    {wait:1.0, wind:0.65, after:0.15, dir:'left'},
+    {wait:0.0, wind:0.50, after:0.15, dir:'right'},
+    {wait:0.0, wind:0.55, after:0.65, dir:'left'},
+    {wait:1.1, wind:0.90, after:0.70, dir:'up', feint:'right'} ]},
   // a duelist: quick, feints, and shifts his guard while you are still choosing a side
   duelist:{ label:'Duelist', shifts:true, guardAfter:{left:'right', up:'left', right:'up'}, pattern:[
     {wait:1.0, wind:0.75, after:0.45, dir:'right', feint:'left'},
@@ -12328,7 +12374,7 @@ const PAIR_NAMES=new Set(['Hired Blade','Second Blade','Footpad','Footpad Lookou
 const partnerOf=f=> f && PAIR_NAMES.has(f.name) ? mobs.find(m=>m!==f && m.hostile && !m.dead && m.faction===f.faction && PAIR_NAMES.has(m.name)) : null;
 const NAME_STYLE={ 'Cutpurse Jory':'street', 'Cutpurse Mags':'street', 'Dalla':'street', 'Nim':'street', 'Road Thief':'street',
   'Deserter':'drilled', 'Red Deserter':'drilled', 'Hungry Deserter':'drilled', 'Hired Blade':'drilled', 'Second Blade':'drilled', "Baron's Guard":'drilled', "Baron's Sergeant":'veteran',
-  'Mara Blackthorn':'veteran', 'Sergeant Harl':'veteran', 'The Man in Grey':'veteran', 'Flamesworn Captain':'veteran', 'Highwayman':'duelist' };
+  'Mara Blackthorn':'veteran', 'Sergeant Harl':'veteran', 'The Man in Grey':'veteran', 'Flamesworn Captain':'veteran', 'Highwayman':'duelist', 'Dune Raider':'raider', 'Raider Outrider':'raider', 'Tarek of the Red Mesa':'raider' };
 const styleOf=f=> f ? (f.style || NAME_STYLE[f.name] || (f.type!=='wolf' && f.type!=='mage' && /shield/.test((f.opts&&f.opts.equip&&f.opts.equip.offhand)||'') ? 'shield' : null)) : null;
 const shieldUp=f=> styleOf(f)==='shield' && !(f.openUntil>clock) && f.state!=='stagger' && f.state!=='windup';
 const patternOf=f=>{ const S=STYLES[styleOf(f)]; return (S && f.type!=='wolf' && f.type!=='mage') ? S.pattern : foeDef(f).pattern; };
@@ -13663,11 +13709,11 @@ function paintCrag(X,Y,o){ const [w,h]=o.fp, sd=o.i*31+o.j*17+(o.v||0)*7, R=(k,s
   { const pts=[...base,...top].map(p=>({x:p.x,y:p.y})).sort((a,b)=>a.x-b.x||a.y-b.y), cr=(o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x), lo=[], hi=[];   // a solid body behind the faces: no gap between them ever shows the ground
     pts.forEach(p=>{ while(lo.length>1 && cr(lo[lo.length-2],lo[lo.length-1],p)<=0) lo.pop(); lo.push(p); });
     for(let q=pts.length-1;q>=0;q--){ const p=pts[q]; while(hi.length>1 && cr(hi[hi.length-2],hi[hi.length-1],p)<=0) hi.pop(); hi.push(p); }
-    const hull=[...lo.slice(0,-1),...hi.slice(0,-1)]; g.fillStyle=tone(o.dark?'#3e3a35':'#7a766c',-0.3); g.beginPath(); hull.forEach((p,k)=>k?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); g.fill(); }
+    const hull=[...lo.slice(0,-1),...hi.slice(0,-1)]; g.fillStyle=tone(o.sand?'#c09060':o.dark?'#3e3a35':'#7a766c',-0.3); g.beginPath(); hull.forEach((p,k)=>k?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); g.fill(); }
   const faces=base.map((p,k)=>{ const n=(k+1)%N; return {k, n, d:(p.y+base[n].y)/2}; }).sort((a,b)=>a.d-b.d);
   faces.forEach(({k,n})=>{ const a=base[k], b=base[n], sx=(a.ux+b.ux)/2-(a.uy+b.uy)/2, sy=(a.ux+b.ux)/2+(a.uy+b.uy)/2;   // screen-ish facing of this face
     const lit=Math.max(0,Math.min(1,0.55-sx*0.32-sy*0.1+(R(k,804)-0.5)*0.18));
-    g.fillStyle=tone(o.dark?'#3e3a35':'#7a766c',-0.42+lit*0.62); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(top[n].x,top[n].y); g.lineTo(top[k].x,top[k].y); g.closePath(); g.fill();
+    g.fillStyle=tone(o.sand?'#c09060':o.dark?'#3e3a35':'#7a766c',-0.42+lit*0.62); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(top[n].x,top[n].y); g.lineTo(top[k].x,top[k].y); g.closePath(); g.fill();
     g.strokeStyle='rgba(20,18,14,0.35)'; g.lineWidth=0.8; g.stroke(); });
   const GC=cragGround(base);                                                    // what it stands on: the foot fades into it
   if(GC){ g.save(); g.beginPath(); faces.forEach(({k,n})=>{ g.moveTo(base[k].x,base[k].y); g.lineTo(base[n].x,base[n].y); g.lineTo(top[n].x,top[n].y); g.lineTo(top[k].x,top[k].y); g.closePath(); }); g.clip();
@@ -13679,12 +13725,12 @@ function paintCrag(X,Y,o){ const [w,h]=o.fp, sd=o.i*31+o.j*17+(o.v||0)*7, R=(k,s
   g.fillStyle=o.dark?'#4a4640':'#8e8a80'; g.beginPath(); top.forEach((p,k)=>k?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); g.fill();               // the weathered top
   const tg=g.createLinearGradient(X-60,Y-H-30,X+60,Y-H+30); tg.addColorStop(0,'rgba(255,248,230,0.22)'); tg.addColorStop(1,'rgba(0,0,0,0.12)'); g.fillStyle=tg; g.fill();
   g.strokeStyle='rgba(30,28,22,0.55)'; g.lineWidth=1; for(let c=0;c<3+w;c++){ const k=Math.floor(R(c,805)*N), p=top[k], b=base[k]; g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(p.x+(b.x-p.x)*0.5+(R(c,806)-0.5)*8,p.y+(b.y-p.y)*0.5); g.stroke(); }   // cracks
-  g.fillStyle='rgba(84,112,48,0.55)'; for(let m=0;m<3+w;m++){ const p=top[Math.floor(R(m,807)*N)]; g.beginPath(); g.ellipse(p.x+(X-p.x)*0.35,p.y+(Y-H*0.8-p.y)*0.3,6+R(m,808)*9,3+R(m,809)*3,0,0,Math.PI*2); g.fill(); }   // moss
+  if(!o.sand){ g.fillStyle='rgba(84,112,48,0.55)'; } else g.fillStyle='rgba(0,0,0,0)'; for(let m=0;m<3+w;m++){ const p=top[Math.floor(R(m,807)*N)]; g.beginPath(); g.ellipse(p.x+(X-p.x)*0.35,p.y+(Y-H*0.8-p.y)*0.3,6+R(m,808)*9,3+R(m,809)*3,0,0,Math.PI*2); g.fill(); }   // moss
   if(GC) base.forEach((p,k)=>{ if(p.ux+p.uy<-0.25) return; const c=GC[k], rg=g.createRadialGradient(p.x,p.y+1,0,p.x,p.y+1,11+R(k,813)*6);   // the front foot: ground spills over the edge
       rg.addColorStop(0,`rgba(${c[0]},${c[1]},${c[2]},0.85)`); rg.addColorStop(1,`rgba(${c[0]},${c[1]},${c[2]},0)`); g.fillStyle=rg; g.beginPath(); g.ellipse(p.x,p.y+1,17,7,0,0,Math.PI*2); g.fill();
       if(c[1]>c[0]+6 && c[1]>c[2]+6) for(let b=0;b<4;b++){ const bx=p.x+(R(k*5+b,814)-0.5)*16, hh=5+R(k*5+b,815)*7, lean=(R(k*5+b,816)-0.5)*5, tn=R(k*5+b,817)<0.5?-0.18:0.14;   // grass: a few blades against the stone
         g.strokeStyle=`rgb(${Math.round(c[0]*(1+tn))},${Math.round(c[1]*(1+tn))},${Math.round(c[2]*(1+tn))})`; g.lineWidth=1.2; g.beginPath(); g.moveTo(bx,p.y+2); g.quadraticCurveTo(bx+lean*0.3,p.y+2-hh*0.6,bx+lean,p.y+2-hh); g.stroke(); } });
-  else { g.fillStyle='rgba(60,84,34,0.5)'; base.forEach((p,k)=>{ if(R(k,810)<0.4){ g.beginPath(); g.ellipse(p.x,p.y-2,5+R(k,811)*5,2.5,0,0,Math.PI*2); g.fill(); } }); } }   // grass and moss at its foot
+  else if(!o.sand){ g.fillStyle='rgba(60,84,34,0.5)'; base.forEach((p,k)=>{ if(R(k,810)<0.4){ g.beginPath(); g.ellipse(p.x,p.y-2,5+R(k,811)*5,2.5,0,0,Math.PI*2); g.fill(); } }); } }   // grass and moss at its foot
 // the colour of the painted ground just outside each point of a rock's foot (from the cached ground layer), or null
 let CRAG_GROUND=null;                                                            // a quarter-size copy of the ground layer, read back once per area
 function cragGround(base){ try{ if(!worldCache || worldCache.area!==areaId) return null;
@@ -13812,7 +13858,7 @@ function drawSkyWeather(){ const A=AREAS[areaId];   // dusk and dawn colour, rai
       g.globalCompositeOperation='lighter'; const gr=g.createLinearGradient(0,0,0,H*0.6); gr.addColorStop(0,`rgba(255,150,70,${0.16*dusk})`); gr.addColorStop(1,'rgba(255,150,70,0)'); g.fillStyle=gr; g.fillRect(0,0,W,H*0.6); }
     if(dawn>0){ g.globalCompositeOperation='overlay'; g.fillStyle=`rgba(240,150,190,${0.3*dawn})`; g.fillRect(0,0,W,H);
       g.globalCompositeOperation='lighter'; const gr=g.createLinearGradient(0,0,0,H*0.5); gr.addColorStop(0,`rgba(170,190,255,${0.14*dawn})`); gr.addColorStop(1,'rgba(170,190,255,0)'); g.fillStyle=gr; g.fillRect(0,0,W,H*0.5); }
-    const wx=weatherToday(); if(wx!==lastWeather){ const first=lastWeather===null; lastWeather=wx; if(running && !first) logMsg(wx==='rain'?'Clouds roll in. It starts to rain.':wx==='fog'?'A grey fog settles over the valley.':'The sky clears.','#a8b8c8'); }
+    const wx=weatherToday(); if(wx!==lastWeather){ const first=lastWeather===null; lastWeather=wx; if(running && !first && WET_THEMES.has(A.theme)) logMsg(wx==='rain'?'Clouds roll in. It starts to rain.':wx==='fog'?'A grey fog settles over the valley.':'The sky clears.','#a8b8c8'); }
     if(WET_THEMES.has(A.theme)){
       if(wx==='rain'){ g.globalCompositeOperation='multiply'; g.fillStyle='rgba(150,160,180,1)'; g.globalAlpha=0.35; g.fillRect(0,0,W,H); g.globalAlpha=1;
         g.globalCompositeOperation='source-over'; const N=LOW_FX?60:150; if(RAIN.length!==N){ RAIN=[]; for(let k=0;k<N;k++) RAIN.push({x:Math.random()*W,y:Math.random()*H,v:700+Math.random()*400,l:10+Math.random()*12}); }
@@ -16745,6 +16791,15 @@ function refreshEffects(){ buildBeltUI(); const box=document.getElementById('fx-
 const ROCK_DARK=()=>!!(AREAS[areaId] && AREAS[areaId].cave);                  // under the earth the stone is darker
 OBJ_DRAW.rockridge=o=>drawCrag({...o, fp:[o.fp[0],1], v:(o.v||0)+11, dark:ROCK_DARK()});
 OBJ_DRAW.boulder=o=>drawCrag({...o, fp:[1,1], v:(o.v||0)+21, dark:ROCK_DARK()});
+OBJ_DRAW.sandrock=o=>drawCrag({...o, fp:o.fp||[1,1], v:(o.v||0)+41, sand:true});           // sandstone, wind-cut
+// a date palm: a leaning ringed trunk and a crown of drooping fronds
+OBJ_DRAW.palm=o=>{ const q=P(o.i+0.5,o.j+0.5), s=o.s||1, lean=(o.v%2?1:-1)*(10+(o.v||0)*3); drawCached('palm'+(o.v||0)+'_'+s,q.x,q.y,220*s,260*s,110*s,240*s,(X,Y)=>{
+    g.fillStyle='rgba(0,0,0,0.22)'; g.beginPath(); g.ellipse(X+lean*0.6,Y+2,26*s,8*s,0,0,Math.PI*2); g.fill();
+    const top={x:X+lean*s, y:Y-150*s}; for(let k=0;k<14;k++){ const t=k/14, x=X+lean*s*t*t, y=Y-150*s*t; g.fillStyle=k%2?'#7a5a34':'#8a6a40'; g.beginPath(); g.ellipse(x,y,(7-t*2)*s,6*s,0,0,Math.PI*2); g.fill(); }
+    for(let f=0;f<9;f++){ const a=f/9*Math.PI*2+0.3, len=(58+((f*29)%17))*s, ex=top.x+Math.cos(a)*len, ey=top.y+Math.sin(a)*len*0.35+22*s;
+      g.strokeStyle=f%2?'#4e7a2a':'#5f8a34'; g.lineWidth=5*s; g.lineCap='round'; g.beginPath(); g.moveTo(top.x,top.y); g.quadraticCurveTo(top.x+Math.cos(a)*len*0.5,top.y-14*s+Math.sin(a)*len*0.15,ex,ey); g.stroke();
+      g.strokeStyle='#3e6420'; g.lineWidth=1.2*s; for(let l=1;l<7;l++){ const u=l/7, bx=top.x+(ex-top.x)*u, by=top.y+(ey-top.y)*u-Math.sin(u*Math.PI)*12*s; g.beginPath(); g.moveTo(bx,by); g.lineTo(bx+Math.cos(a+1.2)*9*s,by+8*s); g.moveTo(bx,by); g.lineTo(bx+Math.cos(a-1.2)*9*s,by+8*s); g.stroke(); } }
+    g.fillStyle='#8a4a22'; [[-6,8],[5,10],[0,14]].forEach(([dx,dy])=>{ g.beginPath(); g.arc(top.x+dx*s,top.y+dy*s,3.4*s,0,Math.PI*2); g.fill(); }); }); };   // and a cluster of dates
 
 // ════════ Foe spells land by your rules: ward with a staff, catch with a shield, or step aside; and they do what yours do ════════
 function spellImpact(f,S,s,sideOk,since,hp0){
@@ -18194,6 +18249,74 @@ JOURNAL.push(["Matters of the Heart", ()=>{ const L=[];
   if(CHOICE.saelle2==='helped' && CHOICE.saelleNight) L.push(CHOICE.saelle3 ? {yes:"Saelle asked if you would leave the valley with her on the spring ship. You said yes.", stay:"Saelle asked if you would leave the valley with her. You told her it is your home; she says she will come back through the window.", spring:"Saelle asked if you would leave the valley with her. You told her to ask again in spring. She says she will, every day."}[CHOICE.saelle3]+" Sella the Fence pays you better for her sake."+(CHOICE.saelle4?" She showed you her roof above the Lowstreets and tied a thieves' knot round your wrist.":" She says there is somewhere she wants to show you.")
       +(CHOICE.saelleShip==='sailed'?" You sailed with her on the spring ship, and came back with sea-glass.":CHOICE.saelleShip==='alone'?" She sailed on the spring ship alone, and promised to come back within the week.":saelleWaits()?(shipDay()?" The spring ship is at the river docks today. She is waiting.":" The spring ship calls at the river docks on the first of spring, in "+daysUntil(SHIP_DAY)+" days."):"") : "Saelle's rooms above the Lowstreets. She keeps looking at the ships.");
   return L.length ? [ (CHOICE.tess?CHOICE.tess==='lover':true) && (CHOICE.ithil?!!CHOICE.ithil3:true) && (CHOICE.gunnarNight?!!CHOICE.gunnar3:true) && (CHOICE.saelle2==='helped'&&CHOICE.saelleNight?!!CHOICE.saelle4:true) ? 'done':'active', L.join('<br>') ] : null; }]);
+// ════════ THE SUNSCAR: the desert south of the Charcoal Pits ════════
+Object.assign(ITEMS,{ scimitar:{ name:'Dune Scimitar', slot:'weapon', title:"A curved blade of the southern caravans, light and quick, made for cutting from the saddle. The grip is wrapped in camel leather, worn dark by a hand that is not yours." },
+  dates:{ name:'Dried Dates', slot:'food', heal:10, title:"Sticky, brown and sweet as honey. Caravan folk say a handful will carry you a day across the sand." },
+  hamid_ring:{ name:"Hamid's Signet", slot:'misc', title:"A heavy silver ring with a running camel cut into its face. Kadir's brother never took it off." } });
+Object.assign(WEAPONS,{ scimitar:{ wind:0.15, dmg:11, len:22 } }); PRICES.scimitar=140; PRICES.dates=4;
+ITEM_ICON.dates=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); [[13,24],[20,20],[26,25],[18,28],[24,30]].forEach(([x,y],k)=>{ g2.fillStyle=k%2?'#6a3418':'#7e4420'; g2.beginPath(); g2.ellipse(x,y,5.5,3.4,0.5,0,Math.PI*2); g2.fill(); g2.fillStyle='rgba(255,200,140,0.35)'; g2.beginPath(); g2.ellipse(x-1.5,y-1.3,2,0.9,0.5,0,Math.PI*2); g2.fill(); }); g2.restore(); };
+ITEM_ICON.hamid_ring=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.lineWidth=4.5; g2.strokeStyle='#c8ccd4'; g2.beginPath(); g2.ellipse(20,24,9,7,0,0,Math.PI*2); g2.stroke(); g2.fillStyle='#d8dce4'; g2.strokeStyle='#7a7e88'; g2.lineWidth=1; g2.beginPath(); g2.ellipse(20,15,6,4.5,0,0,Math.PI*2); g2.fill(); g2.stroke();
+  g2.strokeStyle='#5a5e68'; g2.lineWidth=0.9; g2.beginPath(); g2.moveTo(16.5,16.5); g2.lineTo(18,13.5); g2.lineTo(21,13.5); g2.lineTo(22,12.5); g2.moveTo(18,15); g2.lineTo(18,17); g2.moveTo(21,14); g2.lineTo(21,17); g2.stroke(); g2.restore(); };
+const DESERT=(o)=>({gender:'m',skin:3,hair:1,hairColor:0,beard:2,face:1,...o,equip:{head:'hood',torso:'tunic_linen',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null,...(o&&o.equip||{})}});
+const RAIDER=(o)=>BANDIT({skin:4,hair:2,hairColor:0,beard:3,face:2,...o,equip:{head:'hood',torso:'tunic_linen',armor:'jerkin',hands:'gloves',legs:'hose_grey',feet:'boots',weapon:'scimitar',offhand:null,...(o&&o.equip||{})}});
+wrap('pits','objects',l=>[...l,{type:'teleporter', i:6, j:8, to:'drywash', entry:'fromPits'}]);
+AREAS.pits.entries.fromWash={i:5,j:7};
+Object.assign(AREAS,{
+  drywash:{ fence:{r:false,l:false}, w:8, h:22, theme:'sand', label:'The Dry Wash', mini:{x:0,y:0}, scrub:gy=>Math.max(0,1-gy/9),
+    notches:()=>[], dummy:null,
+    objects:()=>[ {type:'teleporter', i:4, j:0, to:'pits', entry:'fromWash'}, {type:'teleporter', i:4, j:21, to:'waystation', entry:'fromWash'},
+      {type:'deadtree', i:1, j:3, s:0.9}, {type:'deadtree', i:6, j:6, s:0.7}, {type:'sandrock', i:1, j:9, v:1}, {type:'sandrock', i:6, j:11, fp:[2,1], v:2}, {type:'bones', i:5, j:15, noblock:true},
+      {type:'sandrock', i:0, j:17, v:3}, {type:'sandrock', i:7, j:19, v:4} ],
+    npcs:()=>[],
+    mobs:()=>[ { name:'Sand Jackal', type:'wolf', i:2, j:13, faction:'jackals', daily:true, coat:'#b8915a' }, { name:'Sand Jackal Bitch', type:'wolf', i:5, j:12, faction:'jackals', daily:true, coat:'#c8a06a' } ],
+    entries:{ fromPits:{i:4,j:1}, fromWell:{i:4,j:20} } },
+  waystation:{ fence:{r:false,l:false}, w:14, h:12, theme:'sand', label:"Sefa's Well", mini:{x:0,y:0},
+    notches:()=>[], dummy:null,
+    objects:()=>[ {type:'teleporter', i:7, j:0, to:'drywash', entry:'fromWell'}, {type:'teleporter', i:7, j:11, to:'glassdunes', entry:'fromWell'},
+      {type:'pool', i:4, j:2, fp:[4,3]}, {type:'palm', i:3, j:1, v:1}, {type:'palm', i:9, j:2, v:2, s:1.1}, {type:'palm', i:3, j:5, v:3, s:0.9}, {type:'palm', i:12, j:9, v:4}, {type:'palm', i:1, j:9, v:5, s:1.15},
+      {type:'well', i:10, j:7}, {type:'tent', i:11, j:3, fp:[2,2]}, {type:'cart', i:1, j:6, nomule:false}, {type:'crate', i:4, j:8}, {type:'crate', i:5, j:8}, {type:'barrel', i:9, j:9}, {type:'campfire', i:6, j:7}, {type:'sandrock', i:0, j:1, v:5} ],
+    npcs:()=>[ { id:'sefa', name:'Sefa of the Well', i:10, j:8, dir:1, opts:DESERT({gender:'f',skin:3,hair:4,hairColor:12,beard:0,face:0,equip:{head:'hood',torso:'smock',legs:'trousers',feet:null}}) },
+      { id:'kadir', name:'Kadir the Caravan Master', i:3, j:7, dir:1, opts:DESERT({skin:4,hair:2,hairColor:0,beard:4,face:2,equip:{head:'straw_hat',torso:'tunic_red',armor:'jerkin',feet:'riding_boots'}}) },
+      { id:'yusra', name:'Yusra the Trader', i:11, j:5, dir:1, opts:DESERT({gender:'f',skin:3,hair:3,hairColor:0,beard:0,face:2,equip:{head:'hood',torso:'tunic_green',legs:'hose_grey'}}) } ],
+    mobs:()=>[], entries:{ fromWash:{i:7,j:1}, fromDunes:{i:7,j:10} } },
+  glassdunes:{ fence:{r:false,l:false}, w:16, h:12, theme:'sand', label:'The Glass Dunes', mini:{x:0,y:0},
+    notches:()=>[], dummy:null,
+    objects:()=>{ const l=[ {type:'teleporter', i:7, j:0, to:'waystation', entry:'fromDunes'},
+        {type:'teleporter', i:8, j:11, to:'glassdunes', entry:'fromWell', locked:()=>true, onLocked:()=>setTimeout(()=>say('The Raiders\' Tracks',"<i>The tracks run on south, toward a red smudge on the horizon: the Red Mesa. Not today. Not alone.</i>",[bye]),60)},
+        {type:'sandrock', i:2, j:3, fp:[2,2], v:6}, {type:'sandrock', i:13, j:2, v:7}, {type:'sandrock', i:1, j:9, v:8}, {type:'sandrock', i:14, j:8, fp:[1,2], v:9},
+        {type:'cart', i:10, j:5, nowheel:true, nomule:true}, {type:'crate', i:12, j:6, breakable:true}, {type:'bones', i:9, j:7, noblock:true}, {type:'bones', i:4, j:8, noblock:true} ];
+      if(CHOICE.caravan==='asked' && !hasItem('hamid_ring') && !collectedPickups.has('glassdunes:11,7')) l.push({type:'pickup', i:11, j:7, item:'hamid_ring'});
+      return l; },
+    npcs:()=>[],
+    mobs:()=>[ { name:'Dune Raider', type:'bandit', i:9, j:8, faction:'raiders', opts:RAIDER({}) },
+      { name:'Raider Outrider', type:'bandit', i:12, j:8, faction:'raiders', opts:RAIDER({skin:2,hair:4,beard:1,equip:{head:null,armor:'studded'}}) },
+      { name:'Sand Jackal', type:'wolf', i:4, j:5, faction:'jackals', daily:true, coat:'#b8915a' } ],
+    entries:{ fromWell:{i:7,j:1} } } });
+AREA_PATHS.drywash=[ [[4.5,-0.5],[4.2,6],[4.8,12],[4.3,18],[4.5,22.5]] ];
+AREA_PATHS.waystation=[ [[7.5,-0.5],[7.4,5.5],[7.6,12.5]], [[7.4,5.5],[10.5,6.5]], [[7.4,6],[3.5,6.5]] ];
+AREA_PATHS.glassdunes=[ [[7.5,-0.5],[8,4],[10,5.5]], [[8,4],[8.5,12.5]] ];
+Object.assign(AREA_TIER,{ drywash:2, waystation:1, glassdunes:3 });
+PAIR_NAMES.add('Dune Raider'); PAIR_NAMES.add('Raider Outrider');
+if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
+// Sefa keeps the well; the water is sweet, and free
+TALKERS.sefa=()=>{ const S='Sefa of the Well';
+  say(S,[CHOICE.sefaMet?"“Back from the sand? Drink. The well never asks who you are.”":"“A northerner! Charcoal on your boots. Welcome to the last sweet water before the Sunscar.”","“The well is free. It has been free for three hundred years, and it will stay free while I keep it.”"],[
+    {label:'Drink from the well.', fn:()=>{ CHOICE.sefaMet=true; player.hp=player.maxHp; try{ cureBruise(); }catch(e){} updateHud(); say(S,"“Cold, isn't it? From very deep down. Every ache goes.” <i>You are fully healed.</i>",[bye]); }},
+    {label:'“What is the Sunscar?”', fn:()=>{ CHOICE.sefaMet=true; say(S,["“Everything south of here. Dunes that sing at night, glass where lightning hits the sand, and the Red Mesa, where Tarek keeps his raiders.”","“Caravans come through twice a season. Fewer, this year. Ask Kadir why.”"],[bye]); }}, bye]); };
+TALKERS.yusra=()=>shopFrom('Yusra the Trader',['scimitar','dates','potion','bread','raw_meat'],1,"“Blades from the south, dates from the palms, and draughts for when the blades fail. Look, touch, pay.”");
+// ── The Lost Caravan: Kadir's brother never came out of the Glass Dunes ──
+TALKERS.kadir=()=>{ const K='Kadir the Caravan Master';
+  if(!CHOICE.caravan){ say(K,["“My brother Hamid took our second caravan into the Glass Dunes six days ago. Four carts, nine mules, our whole season. He should have been here three days ago.”","“The raiders have grown bold this year. I would go myself, but if I leave these carts, they will be gone by morning too. Will you look for him? South, through the dunes.”"],[
+      {label:'“I will find your brother.”', fn:()=>{ remember('caravan','asked',"Kadir's brother Hamid took a caravan into the Glass Dunes, south of Sefa's Well, and never came out."); say(K,"“Bless you. Look for a cart with a running camel painted on the side. Hamid paints it on everything.”",[bye]); }}, bye]); return; }
+  if(CHOICE.caravan==='asked' && hasItem('hamid_ring')){ say(K,["“That ring. Hamid's. He would never take it off. Unless… he left it for me to find.”","“Raider tracks going south? Then they took him to the Red Mesa, to Tarek. Alive, then. Tarek sells men; he doesn't bury them.”","“Here. Hamid's spare blade, and the coin I can spare. When I have a ransom together, I will need you again.”"],[
+      {label:'Give him the ring.', fn:()=>{ const k=player.inv.indexOf('hamid_ring'); if(k>=0) player.inv[k]=null; remember('caravan','ring',"You found Hamid's signet at the wreck of his caravan in the Glass Dunes. The raiders took him south, to Tarek at the Red Mesa."); player.purse+=30; giveQuestItem('scimitar',true); updateHud();
+        say(K,"“Keep the blade sharp. The Red Mesa is no place for a dull one.” <i>You receive a Dune Scimitar and 30 copper.</i>",[bye]); }}]); return; }
+  if(CHOICE.caravan==='asked'){ say(K,"“Nothing yet? South, through the dunes. A cart with a running camel on the side.”",[bye]); return; }
+  say(K,"“I am counting coin for Tarek. It is going slowly. Come back when the road south is open.”",[bye]); };
+JOURNAL.push(['The Lost Caravan', ()=> !CHOICE.caravan ? null : CHOICE.caravan==='asked'
+  ? ['active', hasItem('hamid_ring') ? "You found Hamid's signet at the wreck of his caravan. Bring it to Kadir at Sefa's Well." : "Kadir's brother Hamid took a caravan into the Glass Dunes, south of Sefa's Well, and never came out. Look for a cart with a running camel on the side."]
+  : ['active', "Hamid is alive, held by Tarek's raiders at the Red Mesa, south of the Glass Dunes. Kadir is gathering a ransom."]]);
+{ const prev=npcHasNews; npcHasNews=function(n){ if(n.id==='kadir'){ if(!CHOICE.caravan) return '!'; if(CHOICE.caravan==='asked' && hasItem('hamid_ring')) return '?'; } return prev(n); }; }
 // ── feast days you can see: bunting and dancing on harvest-eve, a busy quay on ship day ──
 OBJ_DRAW.bunting=o=>{ const a=P(o.a[0],o.a[1]), b=P(o.b[0],o.b[1]), h=o.h||90, N=14, cols=['#c83a2a','#e8c040','#3a7ac8','#4a9a4a','#e8e0d0'];
   const pt=t=>({x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t-h+Math.sin(Math.PI*t)*22});
@@ -18419,7 +18542,7 @@ const SND=(()=>{
     if(typeof poolDepth==='function' && poolDepth(x,y)>0.05) return 'water';
     if(/cave|crypt|barrow|warren|tunnel|vault|mine|pit/.test(id)) return 'stone';
     if(A.theme==='interior' || A.inside) return /cellar|bath/.test(id) ? 'stone' : 'wood';
-    if(A.theme==='city') return 'stone'; if(A.theme==='ash' || A.volcanic) return 'cinder'; if(A.theme==='bog'||A.theme==='fen') return 'mud';
+    if(A.theme==='city') return 'stone'; if(A.theme==='ash' || A.volcanic || A.theme==='sand') return 'cinder'; if(A.theme==='bog'||A.theme==='fen') return 'mud';
     try{ const gd=groundAt(x,y); if(gd.path>0.5) return 'dirt'; if(gd.mud>0.5) return 'mud'; }catch(e){}
     return 'grass'; }
   function step(kind,v){ v=v||1; const p=R(0.9,1.1);
@@ -18641,7 +18764,7 @@ const VOICE=(()=>{
     const o=opts||n&&n.opts||{}; let g=o.gender||null;
     if(!g){ if(/\b(Old )?(Wenna|Bertha|Morwen|Vesna|Marta|Ada|Yselde|Nimuë|Ithilwen|Nelloth|Tessaly|Saelle|Maelis|Aerwen|Lady|Mother|Sister|Dalla|Mara|Hag|Witch|Widow)\b/i.test(name)) g='f';
       else if(/\b(Gunnar|Tobb|Orvell|Brann|Oswin|Corwin|Hamond|Edric|Gerd|Calandor|Tirnel|Faelan|Baron|Brother|Father|Magister|Sir|Lord|Captain|Warden|Craban|Alaric|Ruvin|Pim|Pip|Gerrit|Aldo|Tomas|Hobb|Venn|Orrin|Corran|Ithrel|Harl|Bruno|Grell|Gratis|Snagtooth)\b/i.test(name)) g='m'; }
-    const h=hash(name||'?'), elf=o.race==='elf' || /Ithil|Nell|Aerwen|Calandor|Tirnel|Faelan|Maelis|Nimuë|Ithrel|Warden/.test(name||''), old=/\bOld\b|Elder|Morwen|Wenna|Tobb|Orvell|Hag|Grandm/i.test(name||''), gob=/goblin|Gratis|Gob/i.test(name||'');
+    const h=hash(name||'?'), elf=o.race==='elf' || /Ithil|Nell|Aerwen|Calandor|Tirnel|Faelan|Maelis|Nimuë|Ithrel|Warden/.test(name||''), old=/\bOld\b|Elder|Morwen|Wenna|Tobb|Orvell|Hag|Grandm|Sefa/i.test(name||''), gob=/goblin|Gratis|Gob/i.test(name||'');
     let pitch=(g==='f'?1.05:0.9)+(((h>>7)%9)-4)*0.045, rate=1.16+((h>>3)%5-2)*0.012;
     if(elf) pitch+=0.08;
     if(old){ pitch-=0.12; rate+=0.07; }                   // a deep voice sounds slower than it is: the old get a touch more pace

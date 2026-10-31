@@ -12480,12 +12480,15 @@ function impact(f){                                   // a foe's swing lands (or
     if(f.type==='wolf'){ addStatus(player,'bleed',4.2,1); logMsg('The bite tears. You are bleeding.','#d0342c'); }
     else if(f.opts && BLEEDERS.has(f.opts.equip&&f.opts.equip.weapon) && Math.random()<0.25) addStatus(player,'bleed',3.2,1); }
   if(f.phase2 && hurt) addStatus(player,'bleed',5,2);
+  if(hurt && f.type==='scorpion' && s.sting){ addStatus(player,'venom',7,2); teach('venom','Venom',["The sting <b>envenomed</b> you: it costs a little health every second for a while.","A <b>Scorpion Antidote</b> (Yusra at Sefa's Well) stops it."]); }
   if(hurt && FIRE_FOE(f) && Math.random()<(/Slag|Kindled/.test(f.name)?1:/^Ember/.test(f.name)?0.6:0.35)) addStatus(player,'burn',3,2);
   if(f.type==='barrowking' && f.cphase>=3 && player.hp<hp0 && !f.dead){ const h=Math.min(5,f.maxHp-f.hp); if(h>0){ f.hp+=h; floatText(tileOf(f),'+'+h,'#9ad0e8'); } }
   if(hurt && f.opts && f.opts.equip && f.opts.equip.weapon==='barrow_blade' && Math.random()<0.3) addStatus(player,'weak',3,0);
 }
 function wound(f,n,label,col){                       // a blow lands on a foe
   const W=WEAPONS[player.opts&&player.opts.equip.weapon]||{};
+  if(f && f.type==='scorpion' && HIT_SRC==='melee' && n>0 && f.state!=='recover' && f.state!=='stagger'){ n=Math.max(1,Math.ceil(n*foeDef(f).shell)); floatText([f.i,f.j-0.003],'Shell','#c8b088');
+    teach('shell','A hard shell',["The scorpion's <b>shell</b> turns your blows to half.","<b>Parry its sting</b> (the slow strike from high), then hit it while it recovers: open, it takes full damage."]); }
   if(f && f.warded){ floatText(tileOf(f),'Warded','#c8e0f0'); SND.clang(0.6); }
   else if(f && f.type==='barrowking' && (f.cphase||1)<3){ const th=ckTh(f), pre=f.hp; f.hp+=1000; woundRaw(f,n,label,col); const dealt=pre+1000-f.hp; f.hp=Math.max(th,pre-dealt); }   // his phases end at fixed thresholds, however hard the blow
   else woundRaw(f,n,label,col);
@@ -13047,13 +13050,14 @@ function drawActorBase(e){
   if(e.type==='dummy') drawDummy(s.x,B,e);
   else if(e.type==='wolf'){ const live=(combat.active && (e===combat.foe||isP)) || e.moving, ps=live?poseFor(e):litPose(poseFor(e)); drawLitSprite(s.x,B,()=>drawWolf(s.x,B,e,e.dir||0,ps),1.2,live?null:'w:'+(e.id??e.name),(e.dir||0)+'|'+(e.moving?gt.toFixed(2):'')+'|'+litSig(ps)+'|'+e.coat+'|'+(e.dead?1:0)); }
   else if(e.type==='lurker') drawLurker(s.x,B,e,poseFor(e));
+  else if(e.type==='scorpion') drawScorpion(s.x,B,e,poseFor(e));
   else if(e.type==='ember') drawEmber(s.x,B,e,poseFor(e));
   else if(e.type==='skeleton') drawRisen(s.x,B,e,poseFor(e));
   else { const live=(combat.active && (e===combat.foe||isP)) || e.moving, ps=live?poseFor(e):litPose(poseFor(e)), sw=e.moving?Math.sin(gt*10)*5:0; drawLitSprite(s.x,B,()=>drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps),1,live?null:isP?'p':'a:'+(e.id??e.name),(e.dir||0)+'|'+Math.round(sw*4)+'|'+litSig(ps)+'|'+litSig(e.opts)+'|'+(isP?Math.round((player.wet||0)*10):'')); }
   g.restore();
   if(!isP && e.dead) return;
   if(isP && romHush()) return;
-  const ty=B-(e.type==='wolf'?66:114);
+  const ty=B-(e.type==='wolf'||e.type==='scorpion'?66:114);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const deadly=!isP && e.type!=='dummy' && e.hostile!==false && player.maxHp>0 && ((e.maxHp||0)*(((weaponOf(e)||{}).dmg)||5)*tierDmg(e)) >= 2*player.maxHp*Math.max(8,playerHitDmg());   // far stronger than you: a skull
   const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  '+'◆'.repeat(e.tier) : ''), tw=g.measureText(label).width;
@@ -13148,12 +13152,12 @@ refreshCreator();
 
 // ════════ Combat, deeper: bleeding, burning, chill — and magic from a staff ════════
 // status effects on anyone in a fight: {kind, t (seconds left), dmg per tick, tick, acc}
-const STATUS_DEF = { kindle:{ col:'#ffa040', name:'Kindled', tick:1.0, max:1 }, weak:{ col:'#a070c0', name:'Withered', tick:0, max:1 }, bleed:{ col:'#d0342c', name:'Bleeding', tick:0.8, max:3 }, burn:{ col:'#f08a30', name:'Burning', tick:0.6, max:1 }, chill:{ col:'#8ac8f0', name:'Chilled', tick:0, max:1 } };
+const STATUS_DEF = { venom:{ col:'#8ac040', name:'Envenomed', tick:1.0, max:1 }, kindle:{ col:'#ffa040', name:'Kindled', tick:1.0, max:1 }, weak:{ col:'#a070c0', name:'Withered', tick:0, max:1 }, bleed:{ col:'#d0342c', name:'Bleeding', tick:0.8, max:3 }, burn:{ col:'#f08a30', name:'Burning', tick:0.6, max:1 }, chill:{ col:'#8ac8f0', name:'Chilled', tick:0, max:1 } };
 function addStatus(e,kind,dur,dmg){ e.st=e.st||[]; const D=STATUS_DEF[kind], same=e.st.filter(s=>s.kind===kind);
   if(same.length>=D.max){ same[0].t=Math.max(same[0].t,dur); return; }
   e.st.push({kind,t:dur,dmg,acc:0}); floatText(tileOf(e),D.name+'!',D.col);
   if(e===player && STATUS_ON_YOU[kind]) logMsg(STATUS_ON_YOU[kind],D.col); }
-const STATUS_ON_YOU={ weak:'You are withered: your blows land weaker for a few seconds.', chill:'You are chilled: your swings come slower and your parries must be quicker.', burn:'You are burning!' };   // (bleeding has its own words)
+const STATUS_ON_YOU={ venom:'Venom! It burns through you a little at a time. An antidote stops it.', weak:'You are withered: your blows land weaker for a few seconds.', chill:'You are chilled: your swings come slower and your parries must be quicker.', burn:'You are burning!' };   // (bleeding has its own words)
 const hasStatus=(e,kind)=>!!(e.st&&e.st.some(s=>s.kind===kind));
 function tickStatus(e,dt){ if(!e.st||!e.st.length) return;
   e.st.forEach(s=>{ s.t-=dt; const D=STATUS_DEF[s.kind]; if(!D.tick) return; s.acc+=dt;
@@ -14266,6 +14270,35 @@ function drawLurker(x,B,e,pose){
   g.fillStyle='rgba(40,36,20,0.8)'; for(let d=0;d<3;d++){ const t=((gt*0.7+d*0.33)%1), dx=x+(d-1)*W*0.6; g.beginPath(); g.ellipse(dx,y-H*0.3+t*H*0.3,1.4,2.2,0,0,Math.PI*2); g.fill(); }
   g.restore(); }
 
+// ── the giant scorpion of the Sunscar: two snapping pincers, then the sting from high; the shell turns blows unless it is open ──
+FOES.scorpion={ label:'Giant Scorpion', base:46, stagger:1.1, unguarded:true, shell:0.5, pattern:[
+  {wait:1.1, wind:0.55, after:0.2, dir:'left'}, {wait:0.0, wind:0.5, after:0.45, dir:'right'}, {wait:1.0, wind:1.15, after:0.95, dir:'up', sting:true} ]};
+Object.assign(WEAPONS,{ sting:{ wind:0.3, dmg:9, len:18 } });
+const SCORP=(o)=>({gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:'sting',offhand:null},...o});
+function drawScorpion(x,B,e,pose){ const big=e.opts&&e.opts.big?1.3:1, raise=pose&&pose.kind==='raise'?Math.min(1,pose.t):0, strike=pose&&pose.kind==='strike'?Math.min(1,pose.t):0;
+  const face=(e.dir||0)>=2&&(e.dir||0)<=5?-1:1, sc=big, C=e.opts&&e.opts.col||'#a8783e', D=tone(C,-0.45), L=tone(C,0.3), walk=e.moving?gt*14:0, y=B-10*sc;
+  g.save(); g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(x,B+1,34*sc,8*sc,0,0,Math.PI*2); g.fill();
+  for(let k=0;k<4;k++) [-1,1].forEach(sd=>{ const lx=x+face*(-10+k*7)*sc, ph=Math.sin(walk+k*1.3+(sd>0?0:Math.PI))*3;   // eight legs, jointed
+    g.strokeStyle=D; g.lineWidth=2.4*sc; g.beginPath(); g.moveTo(lx,y-2*sc); g.lineTo(lx+sd*(8+k)*sc*0.6+ph,y-12*sc); g.lineTo(lx+sd*(13+k*1.5)*sc*0.7+ph,B); g.stroke(); });
+  for(let k=0;k<5;k++){ const bx=x-face*(k*6.5-6)*sc, r=(11-k*0.8)*sc; g.fillStyle=k%2?C:tone(C,-0.12); g.beginPath(); g.ellipse(bx,y-5*sc,r,r*0.62,0,0,Math.PI*2); g.fill(); g.strokeStyle=D; g.lineWidth=1; g.stroke(); }   // the body, plate on plate
+  g.fillStyle=L; g.beginPath(); g.ellipse(x+face*3*sc,y-9*sc,7*sc,2*sc,0,0,Math.PI*2); g.fill();
+  // the tail: a curl rising from the last plate, arching up and over the back; cocked further before the sting, whipped forward on it
+  const bx0=x-face*26*sc, by0=y-6*sc, R=(13+raise*3)*sc, cx=bx0, cy=by0-R, a0=Math.PI/2, a1=Math.PI*(1.72+raise*0.12), tail=[];
+  for(let k=1;k<=7;k++){ const an=a0+(a1-a0)*(k/7); tail.push([cx+face*Math.cos(an)*R, cy+Math.sin(an)*R*1.15]); }
+  if(strike>0){ const T=tail[6], to=[x+face*26*sc,y-8*sc]; tail[6]=[T[0]+(to[0]-T[0])*strike*0.8, T[1]+(to[1]-T[1])*strike*0.8]; tail[5]=[tail[5][0]+(to[0]-tail[5][0])*strike*0.4, tail[5][1]+(to[1]-tail[5][1])*strike*0.4]; }
+  let px=bx0, py=by0; tail.forEach(([qx,qy],k)=>{ g.strokeStyle=D; g.lineWidth=(7.5-k*0.6)*sc; g.lineCap='round'; g.beginPath(); g.moveTo(px,py); g.lineTo(qx,qy); g.stroke();
+    g.strokeStyle=k%2?C:tone(C,0.12); g.lineWidth=(5.5-k*0.5)*sc; g.beginPath(); g.moveTo(px,py); g.lineTo(qx,qy); g.stroke(); px=qx; py=qy; });
+  g.fillStyle='#3a2414'; g.beginPath(); g.moveTo(px,py); g.lineTo(px+face*7*sc,py+3*sc); g.lineTo(px+face*1*sc,py+6*sc); g.closePath(); g.fill();   // the sting
+  if(raise>0.3){ g.save(); g.globalCompositeOperation='lighter'; glow(px,py,8,8,'160,220,90',0.5*raise); g.restore(); }
+  [-1,1].forEach(sd=>{ const ax=x+face*12*sc, ay=y-6*sc+sd*3, snap=(raise>0||strike>0)?Math.sin(gt*20)*1.5:0, ex=ax+face*(14+strike*6)*sc, ey=ay+sd*(5+snap)*sc;   // the pincers
+    g.strokeStyle=D; g.lineWidth=3.4*sc; g.beginPath(); g.moveTo(ax,ay); g.lineTo(ex,ey); g.stroke();
+    g.fillStyle=C; g.beginPath(); g.ellipse(ex+face*5*sc,ey,7*sc,4*sc,0,0,Math.PI*2); g.fill(); g.strokeStyle=D; g.lineWidth=1; g.stroke();
+    g.strokeStyle=D; g.lineWidth=2*sc; g.beginPath(); g.moveTo(ex+face*9*sc,ey-2*sc); g.lineTo(ex+face*15*sc,ey-(4+snap)*sc); g.moveTo(ex+face*9*sc,ey+2*sc); g.lineTo(ex+face*15*sc,ey+(1+snap)*sc); g.stroke(); });
+  g.fillStyle='#1a0e06'; [[-2,0],[2,0]].forEach(([dx])=>{ g.beginPath(); g.arc(x+face*(9+dx)*sc,y-9*sc,1.3*sc,0,Math.PI*2); g.fill(); });
+  g.restore(); }
+Object.assign(ITEMS,{ antidote:{ name:'Scorpion Antidote', slot:'food', heal:4, cure:'venom', title:"Bitter green syrup in a clay vial. Yusra says the taste is part of the cure. The taste disagrees." } }); PRICES.antidote=9;
+ITEM_ICON.antidote=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.fillStyle='#8a5a34'; g2.beginPath(); g2.moveTo(14,14); g2.lineTo(26,14); g2.quadraticCurveTo(31,24,27,33); g2.lineTo(13,33); g2.quadraticCurveTo(9,24,14,14); g2.fill();
+  g2.fillStyle='#6aa032'; g2.beginPath(); g2.moveTo(12,24); g2.lineTo(28,24); g2.quadraticCurveTo(29,30,27,33); g2.lineTo(13,33); g2.quadraticCurveTo(11,30,12,24); g2.fill(); g2.fillStyle='#d8c8a0'; g2.fillRect(16,9,8,6); g2.restore(); };
 // ── items ──
 Object.assign(ITEMS,{
   fen_boots:{ name:'Fenwalker Boots', slot:'feet', base:'boots', col:'#3a4428' },
@@ -15298,6 +15331,18 @@ const RISEN_ARMS=['dagger','club','hatchet','sword','axe','mace','spear','mornin
 const RISEN=name=>{ const day=Math.floor(dayClock/DAY_LEN), h=[...(name||'')].reduce((a,ch)=>a*31+ch.charCodeAt(0)|0,7);        // whatever they were buried with: a different one each day
   return {gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:RISEN_ARMS[hsh(day+3,h)%RISEN_ARMS.length],offhand:null}}; };
 function drawRisen(x,B,e,pose){
+  if(e.opts && e.opts.wrapped){ const r=drawRisen0(x,B,e,pose); if(e.dead) return r; drawWraps(x,B,e); return r; }
+  return drawRisen0(x,B,e,pose); }
+// the sand-dried dead: bones still bound in the linen they were buried in, the loose ends lifting in a wind that isn't there
+function drawWraps(x,B,e){ const sd=(e.id||0)*7.3; g.save(); g.lineCap='round';
+  const band=(y0,y1,w0,w1,n)=>{ for(let k=0;k<n;k++){ const t=k/(n-1||1), y=y0+(y1-y0)*t, w=w0+(w1-w0)*t, tilt=((k+Math.floor(sd))%2?1:-1)*3;
+      g.strokeStyle=k%2?'rgba(206,188,148,0.92)':'rgba(186,166,124,0.92)'; g.lineWidth=3.2; g.beginPath(); g.moveTo(x-w,y+tilt); g.quadraticCurveTo(x,y-tilt*0.4+1.5,x+w,y-tilt); g.stroke();
+      g.strokeStyle='rgba(110,92,64,0.5)'; g.lineWidth=0.6; g.beginPath(); g.moveTo(x-w,y+tilt+1.4); g.quadraticCurveTo(x,y-tilt*0.4+3,x+w,y-tilt+1.4); g.stroke(); } };
+  band(B-96,B-82,5.5,6,4); band(B-76,B-48,9,7.5,8); band(B-42,B-6,6.5,4.5,9);
+  g.strokeStyle='rgba(206,188,148,0.85)'; g.lineWidth=2.2;
+  for(let k=0;k<3;k++){ const ax=x+(k-1)*7, ay=B-(70-k*18), sw=Math.sin(gt*2+sd+k)*5; g.beginPath(); g.moveTo(ax,ay); g.quadraticCurveTo(ax+8+sw,ay+5,ax+14+sw*1.5,ay+12+Math.cos(gt*1.7+k)*2); g.stroke(); }   // loose ends
+  g.restore(); }
+function drawRisen0(x,B,e,pose){
   if(e.dead){ const t=e.fallT||0; drawSkelFig(x,B,{asm:Math.max(0.25,1-t*1.4), emerge:1, dir:e.dir||0, weapon:e.opts.equip.weapon}); return; }      // it comes apart and lies there in a heap
   const k=pose&&pose.kind==='raise'?-0.45*Math.min(1,pose.t):pose&&pose.kind==='strike'?Math.max(0,1-Math.min(1,pose.t)*0.6):0;
   drawSkelFig(x,B,{asm:1, stand:true, dir:e.dir||0, moving:!!e.moving, walk:gt*9+(e.id||0), k, weapon:e.opts.equip.weapon}); }
@@ -18301,6 +18346,11 @@ Object.assign(WEAPONS,{ scimitar:{ wind:0.15, dmg:11, len:22 } }); PRICES.scimit
 ITEM_ICON.dates=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); [[13,24],[20,20],[26,25],[18,28],[24,30]].forEach(([x,y],k)=>{ g2.fillStyle=k%2?'#6a3418':'#7e4420'; g2.beginPath(); g2.ellipse(x,y,5.5,3.4,0.5,0,Math.PI*2); g2.fill(); g2.fillStyle='rgba(255,200,140,0.35)'; g2.beginPath(); g2.ellipse(x-1.5,y-1.3,2,0.9,0.5,0,Math.PI*2); g2.fill(); }); g2.restore(); };
 ITEM_ICON.hamid_ring=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.lineWidth=4.5; g2.strokeStyle='#c8ccd4'; g2.beginPath(); g2.ellipse(20,24,9,7,0,0,Math.PI*2); g2.stroke(); g2.fillStyle='#d8dce4'; g2.strokeStyle='#7a7e88'; g2.lineWidth=1; g2.beginPath(); g2.ellipse(20,15,6,4.5,0,0,Math.PI*2); g2.fill(); g2.stroke();
   g2.strokeStyle='#5a5e68'; g2.lineWidth=0.9; g2.beginPath(); g2.moveTo(16.5,16.5); g2.lineTo(18,13.5); g2.lineTo(21,13.5); g2.lineTo(22,12.5); g2.moveTo(18,15); g2.lineTo(18,17); g2.moveTo(21,14); g2.lineTo(21,17); g2.stroke(); g2.restore(); };
+BEASTS.push({ k:'scorpion', is:f=>f.type==='scorpion', name:'Giant Scorpions', kind:'Beasts · the Sunscar',
+  how:'No guard: two quick pincer snaps, left and right, then a slow sting from high.', res:'The shell turns your blows to half, unless it is open after a sting.', aff:'Envenomed by the sting: it eats at you a little at a time.',
+  ans:'Parry the snaps, then parry the sting and strike while it recovers. Carry an antidote from Yusra.' },
+  { k:'sanddead', is:f=>!!(f.opts&&f.opts.wrapped), name:'The Sand-dried Dead', kind:'Undead · the desert temple',
+  how:'Old bones bound in burial linen, quick as the risen of the fen.', res:'Undead: your spells barely touch them.', aff:'Nothing worse than the cut.', ans:'Steel, and patience.' });
 const DESERT=(o)=>({gender:'m',skin:3,hair:1,hairColor:0,beard:2,face:1,...o,equip:{head:'turban',torso:'desert_shirt',armor:'caravan_robe',hands:null,legs:'sirwal',feet:'desert_boots',weapon:null,offhand:null,...(o&&o.equip||{})}});
 const RAIDER=(o)=>BANDIT({skin:4,hair:2,hairColor:0,beard:3,face:2,...o,equip:{head:'turban_veil',torso:'desert_shirt',armor:'sun_leather',hands:'hand_wraps',legs:'sirwal',feet:'desert_boots',weapon:'scimitar',offhand:null,...(o&&o.equip||{})}});
 wrap('pits','objects',l=>[...l,{type:'teleporter', i:6, j:8, to:'drywash', entry:'fromPits'}]);
@@ -18312,7 +18362,8 @@ Object.assign(AREAS,{
       {type:'deadtree', i:1, j:3, s:0.9}, {type:'deadtree', i:6, j:6, s:0.7}, {type:'sandrock', i:1, j:9, v:1}, {type:'sandrock', i:6, j:11, fp:[2,1], v:2}, {type:'bones', i:5, j:15, noblock:true},
       {type:'sandrock', i:0, j:17, v:3}, {type:'sandrock', i:7, j:19, v:4} ],
     npcs:()=>[],
-    mobs:()=>[ { name:'Sand Jackal', type:'wolf', i:2, j:13, faction:'jackals', daily:true, coat:'#b8915a' }, { name:'Sand Jackal Bitch', type:'wolf', i:5, j:12, faction:'jackals', daily:true, coat:'#c8a06a' } ],
+    mobs:()=>[ { name:'Sand Jackal', type:'wolf', i:2, j:13, faction:'jackals', daily:true, coat:'#b8915a' }, { name:'Sand Jackal Bitch', type:'wolf', i:5, j:12, faction:'jackals', daily:true, coat:'#c8a06a' },
+      ...(nightAmt()>0.5?[{ name:'Night Scorpion', type:'scorpion', i:3, j:18, faction:'scorpion', daily:true, opts:SCORP({col:'#5a4a3a'}) }]:[]) ],
     entries:{ fromPits:{i:4,j:1}, fromWell:{i:4,j:20} } },
   waystation:{ fence:{r:false,l:false}, w:14, h:12, theme:'sand', label:"Sefa's Well", mini:{x:0,y:0},
     notches:()=>[], dummy:null,
@@ -18334,7 +18385,8 @@ Object.assign(AREAS,{
     npcs:()=>[],
     mobs:()=>[ { name:'Dune Raider', type:'bandit', i:9, j:8, faction:'raiders', opts:RAIDER({}) },
       { name:'Raider Outrider', type:'bandit', i:12, j:8, faction:'raiders', opts:RAIDER({skin:2,hair:4,beard:1,equip:{head:'turban',armor:'lamellar'}}) },
-      { name:'Sand Jackal', type:'wolf', i:4, j:5, faction:'jackals', daily:true, coat:'#b8915a' } ],
+      { name:'Sand Jackal', type:'wolf', i:4, j:5, faction:'jackals', daily:true, coat:'#b8915a' },
+      { name:'Giant Scorpion', type:'scorpion', i:3, j:9, faction:'scorpion', daily:true, opts:SCORP({}) } ],
     entries:{ fromWell:{i:7,j:1} } } });
 AREA_PATHS.drywash=[ [[4.5,-0.5],[4.2,6],[4.8,12],[4.3,18],[4.5,22.5]] ];
 AREA_PATHS.waystation=[ [[7.5,-0.5],[7.4,5.5],[7.6,12.5]], [[7.4,5.5],[10.5,6.5]], [[7.4,6],[3.5,6.5]] ];
@@ -18347,7 +18399,7 @@ TALKERS.sefa=()=>{ const S='Sefa of the Well';
   say(S,[CHOICE.sefaMet?"“Back from the sand? Drink. The well never asks who you are.”":"“A northerner! Charcoal on your boots. Welcome to the last sweet water before the Sunscar.”","“The well is free. It has been free for three hundred years, and it will stay free while I keep it.”"],[
     {label:'Drink from the well.', fn:()=>{ CHOICE.sefaMet=true; player.hp=player.maxHp; try{ cureBruise(); }catch(e){} updateHud(); say(S,"“Cold, isn't it? From very deep down. Every ache goes.” <i>You are fully healed.</i>",[bye]); }},
     {label:'“What is the Sunscar?”', fn:()=>{ CHOICE.sefaMet=true; say(S,["“Everything south of here. Dunes that sing at night, glass where lightning hits the sand, and the Red Mesa, where Tarek keeps his raiders.”","“Caravans come through twice a season. Fewer, this year. Ask Kadir why.”"],[bye]); }}, bye]); };
-TALKERS.yusra=()=>shopFrom('Yusra the Trader',['scimitar','dates','potion','turban','turban_indigo','sand_wrap','caravan_robe','indigo_robe','sun_leather','lamellar','desert_shirt','saffron_tunic','sirwal','indigo_trousers','desert_boots','hand_wraps'],1,"“Cloth for the sun, blades from the south, dates from the palms, and draughts for when the blades fail. Look, touch, pay.”");
+TALKERS.yusra=()=>shopFrom('Yusra the Trader',['scimitar','dates','potion','antidote','turban','turban_indigo','sand_wrap','caravan_robe','indigo_robe','sun_leather','lamellar','desert_shirt','saffron_tunic','sirwal','indigo_trousers','desert_boots','hand_wraps'],1,"“Cloth for the sun, blades from the south, dates from the palms, and draughts for when the blades fail. Look, touch, pay.”");
 // ── The Lost Caravan: Kadir's brother never came out of the Glass Dunes ──
 TALKERS.kadir=()=>{ const K='Kadir the Caravan Master';
   if(!CHOICE.caravan){ say(K,["“My brother Hamid took our second caravan into the Glass Dunes six days ago. Four carts, nine mules, our whole season. He should have been here three days ago.”","“The raiders have grown bold this year. I would go myself, but if I leave these carts, they will be gone by morning too. Will you look for him? South, through the dunes.”"],[

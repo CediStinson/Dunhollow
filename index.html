@@ -940,7 +940,7 @@ function drawWeapon(c,hx,hy,ang,id,s=1){
     c.fillStyle=woodD;
     [-spread,0,spread].forEach(dy=>c.fillRect(tx-1.4, dy*1.05-0.5, 3, 1));   // a touch of shading near each tip
   } else {
-    if(id==='scimitar'){ c.fillStyle=woodD; c.fillRect(-4,-1.1,6,2.2); c.fillStyle=brass; c.beginPath(); c.arc(-4.6,0,1.5,0,Math.PI*2); c.fill(); c.fillRect(2,-3,1.6,6);
+    if(id==='scimitar' || id==='khopesh'){ c.fillStyle=woodD; c.fillRect(-4,-1.1,6,2.2); c.fillStyle=brass; c.beginPath(); c.arc(-4.6,0,1.5,0,Math.PI*2); c.fill(); c.fillRect(2,-3,1.6,6);
       c.fillStyle=steel; c.beginPath(); c.moveTo(3.6,-1.4); c.quadraticCurveTo(16,-2.6,25,-6.5); c.quadraticCurveTo(22,-1.5,16,1.8); c.quadraticCurveTo(9,2.4,3.6,1.4); c.closePath(); c.fill();   // a curved blade, widening toward the point
       c.fillStyle=steelD; c.beginPath(); c.moveTo(5,-0.6); c.quadraticCurveTo(15,-1.3,22,-4.6); c.lineTo(22,-4); c.quadraticCurveTo(15,-0.6,5,0); c.closePath(); c.fill(); c.restore(); return; }
     const len = id==='dagger' ? 10 : id==='longsword' ? 28 : 21, w = id==='dagger' ? 2.2 : id==='longsword' ? 2.9 : 2.6;
@@ -5676,7 +5676,11 @@ function windowSky(){
 function paintInteriorWalls(){
   if(AREAS[areaId] && AREAS[areaId].cave){              // rock, with the dark (or daylit) mouths of the passages out
     const {w,h}=ROOM, H=AREAS[areaId].mine?120:150, o=P(0,0), rEnd=P(w,0), lEnd=P(0,h), crys=['cave1','cave2','cave3','cave4'].includes(areaId);
-    const VOL=AREAS[areaId].volcanic; rockFace(o,rEnd,H,VOL?'#3a2c26':'#57524a',3,crys); rockFace(lEnd,o,H,VOL?'#2e2420':'#46423b',7,crys);
+    const VOL=AREAS[areaId].volcanic, TMP=AREAS[areaId].temple; rockFace(o,rEnd,H,VOL?'#3a2c26':TMP?'#a07850':'#57524a',3,crys); rockFace(lEnd,o,H,VOL?'#2e2420':TMP?'#8a6440':'#46423b',7,crys);
+    if(TMP) [[o,rEnd],[lEnd,o]].forEach(([a,b])=>{ const at=(t,h)=>({x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t-h}); g.save(); g.fillStyle='rgba(120,40,24,0.55)'; g.strokeStyle='rgba(60,30,14,0.6)'; g.lineWidth=1;   // a painted band of suns and birds along the walls
+      for(let t=0.04;t<0.98;t+=0.07){ const q=at(t,H*0.62), k=Math.round(t*100)%3; g.beginPath(); if(k===0){ g.arc(q.x,q.y,4.5,0,Math.PI*2); g.fill(); for(let r=0;r<8;r++){ const an=r*Math.PI/4; g.moveTo(q.x+Math.cos(an)*6,q.y+Math.sin(an)*6); g.lineTo(q.x+Math.cos(an)*9,q.y+Math.sin(an)*9); } g.stroke(); }
+        else if(k===1){ g.moveTo(q.x-6,q.y+3); g.quadraticCurveTo(q.x,q.y-6,q.x+6,q.y+3); g.moveTo(q.x,q.y-2); g.lineTo(q.x,q.y+5); g.stroke(); } else { g.fillRect(q.x-1,q.y-7,2,14); g.fillRect(q.x-5,q.y-3,10,2); } }
+      const s0=at(0,H*0.5), s1=at(1,H*0.5), s2=at(0,H*0.74), s3=at(1,H*0.74); g.strokeStyle='rgba(90,40,20,0.5)'; g.lineWidth=1.4; g.beginPath(); g.moveTo(s0.x,s0.y); g.lineTo(s1.x,s1.y); g.moveTo(s2.x,s2.y); g.lineTo(s3.x,s3.y); g.stroke(); g.restore(); });
     if(VOL){ g.save(); g.globalCompositeOperation='lighter'; [[o,rEnd],[lEnd,o]].forEach(([a,b],s)=>{ for(let t=0.08;t<1;t+=0.17){ const x=a.x+(b.x-a.x)*t, y=a.y+(b.y-a.y)*t, k=rnd01(Math.round(t*40),s,881);
         if(k<0.45) continue; const gl=g.createLinearGradient(0,y-H*0.7,0,y); gl.addColorStop(0,'rgba(255,90,30,0)'); gl.addColorStop(1,'rgba(255,110,40,'+(0.18+0.12*k)+')'); g.fillStyle=gl;   // seams of fire low in the rock
         g.beginPath(); g.moveTo(x-3,y); g.lineTo(x+2+k*6,y-H*(0.3+0.4*k)); g.lineTo(x+5+k*6,y-H*(0.3+0.4*k)); g.lineTo(x+4,y); g.closePath(); g.fill(); } }); g.restore(); }
@@ -8309,6 +8313,11 @@ function paintGroundTexture(){
   for(let py=0;py<THp;py++) for(let px=0;px<TWp;px++){
     const gx=(px+0.5)/S, gy=(py+0.5)/S;
     const G=groundAt(gx,gy);
+    if(theme==='interior' && AREAS[areaId] && AREAS[areaId].temple){            // the temple: big sandstone slabs, worn joints, sand blown in at the edges
+      const sx=gx*1.0, sy=gy*1.0, fx=sx-Math.floor(sx), fy=sy-Math.floor(sy), joint=fx<0.04||fx>0.96||fy<0.04||fy>0.96, n=fbm(gx*1.2,gy*1.2,91), n2=fbm(gx*5,gy*5,92);
+      let pc=mixC([176,140,96],[204,170,122],n*0.6+n2*0.4); if(((Math.floor(sx)+Math.floor(sy))%2)===0) pc=mixC(pc,[160,124,84],0.25); if(joint) pc=mixC(pc,[96,72,46],0.7);
+      if(n2>0.72) pc=mixC(pc,[120,92,60],0.3); const drift=smooth(0.5,0.75,fbm(gx*0.6,gy*0.6,93))*(1-smooth(0,2.2,Math.min(gx,gy,ROOM.w-gx,ROOM.h-gy))); pc=mixC(pc,[226,196,146],drift*0.85);
+      const o=(py*TWp+px)*4, k=1-0.3*(1-smooth(0,1.3,Math.min(gx,gy))); D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
     if(theme==='interior' && AREAS[areaId] && AREAS[areaId].cave && !AREAS[areaId].volcanic){                 // rough cave stone, damp, with a faint green glow in the cracks
       const n=fbm(gx*0.9,gy*0.9,41), n2=fbm(gx*4,gy*4,43), n3=fbm(gx*11,gy*11,44), crack=Math.abs(fbm(gx*1.3,gy*1.3,42)-0.5)<0.012, crack2=Math.abs(fbm(gx*2.7,gy*2.7,46)-0.5)<0.008;
       const MINE=AREAS[areaId].mine, CRYS=['cave1','cave2','cave3','cave4'].includes(areaId);
@@ -9395,8 +9404,8 @@ function paintItemArtBase(g2,id,size){
       for(let k=0;k<6;k++){ g2.save(); g2.translate(20,17); g2.rotate(k*Math.PI/3); E(0,-6,3,6,'#f4f0ff'); g2.restore(); } E(20,17,2.6,2.6,'#f0d870'); break; }
     case 'elegy': case 'journal': { R(8,8,24,26,id==='elegy'?'#d8d0c0':'#6a4626'); R(10,10,20,22,id==='elegy'?'#e8e2d4':'#e8dcb8');
       g2.fillStyle='rgba(60,50,40,0.6)'; for(let k=0;k<6;k++) R(12,13+k*3,16-(k%2)*4,1,'rgba(60,50,40,0.6)'); if(id==='journal') R(19.4,8,1.2,26,'#4a2e14'); break; }
-    case 'staff_bog': case 'staff_hex': case 'staff_bone': case 'staff_barrow': case 'staff_oak': case 'staff_star': case 'staff_cinder': case 'staff_crystal': case 'dagger': case 'sword': case 'morningstar': case 'pitchfork': case 'club': case 'hatchet': case 'axe': case 'spear': case 'mace': case 'longsword': case 'elf_blade': case 'shovel': case 'scimitar': {
-      const T={scimitar:[9,30,1.1],shovel:[6,30,0.85],staff_bone:[6,33,0.75],staff_barrow:[6,33,0.75],staff_bog:[6,33,0.75],staff_hex:[6,33,0.75],staff_crystal:[6,33,0.75],staff_oak:[6,33,0.75],staff_star:[6,33,0.75],staff_cinder:[6,33,0.75],morningstar:[6,26,1.05],pitchfork:[5,24,0.85],dagger:[10,30,1.45],sword:[10,30,1.05],club:[7,29,1.3],hatchet:[8,29,1.45],axe:[6,28,1.05],spear:[5,33,0.8],mace:[7,28,1.15],longsword:[11,31,0.85],elf_blade:[11,31,0.85]}[id];
+    case 'staff_bog': case 'staff_hex': case 'staff_bone': case 'staff_barrow': case 'staff_oak': case 'staff_star': case 'staff_cinder': case 'staff_crystal': case 'dagger': case 'sword': case 'morningstar': case 'pitchfork': case 'club': case 'hatchet': case 'axe': case 'spear': case 'mace': case 'longsword': case 'elf_blade': case 'shovel': case 'scimitar': case 'khopesh': {
+      const T={scimitar:[9,30,1.1],khopesh:[9,30,1.1],shovel:[6,30,0.85],staff_bone:[6,33,0.75],staff_barrow:[6,33,0.75],staff_bog:[6,33,0.75],staff_hex:[6,33,0.75],staff_crystal:[6,33,0.75],staff_oak:[6,33,0.75],staff_star:[6,33,0.75],staff_cinder:[6,33,0.75],morningstar:[6,26,1.05],pitchfork:[5,24,0.85],dagger:[10,30,1.45],sword:[10,30,1.05],club:[7,29,1.3],hatchet:[8,29,1.45],axe:[6,28,1.05],spear:[5,33,0.8],mace:[7,28,1.15],longsword:[11,31,0.85],elf_blade:[11,31,0.85]}[id];
       g2.save(); g2.translate(T[0],T[1]); g2.rotate(-Math.PI/4);
       drawWeapon(g2,0,0,0,id, T[2]);
       g2.restore(); break; }
@@ -13053,6 +13062,7 @@ function drawActorBase(e){
   else if(e.type==='scorpion') drawScorpion(s.x,B,e,poseFor(e));
   else if(e.type==='ember') drawEmber(s.x,B,e,poseFor(e));
   else if(e.type==='skeleton') drawRisen(s.x,B,e,poseFor(e));
+  else if(e.opts && e.opts.wrapped && !e.dead){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); drawWraps(s.x,B,e); if(e.warded){ g.save(); g.globalCompositeOperation='lighter'; glow(s.x,B-60,60,90,'255,200,90',0.35+Math.sin(gt*4)*0.08); g.restore(); } }
   else { const live=(combat.active && (e===combat.foe||isP)) || e.moving, ps=live?poseFor(e):litPose(poseFor(e)), sw=e.moving?Math.sin(gt*10)*5:0; drawLitSprite(s.x,B,()=>drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps),1,live?null:isP?'p':'a:'+(e.id??e.name),(e.dir||0)+'|'+Math.round(sw*4)+'|'+litSig(ps)+'|'+litSig(e.opts)+'|'+(isP?Math.round((player.wet||0)*10):'')); }
   g.restore();
   if(!isP && e.dead) return;
@@ -13716,7 +13726,7 @@ const rockRow=(j,from,to,skip)=>{ const l=[]; let i=from;
   return l; };
 // a great boulder over several tiles: a ring of rough faces rising to a mossy top, lit from the upper left
 function drawCrag(o){ const [w,h]=o.fp, q=P(o.i+w/2,o.j+h/2), Hm=34+24*Math.sqrt(w*h)+20, hx=(w+h)*TW/4+30, hy=(w+h)*TH/4;
-  drawCached('crag_'+areaId+'_'+o.i+'_'+o.j+'_'+w+'_'+h+'_'+(o.v||0)+(o.dark?'d':''),q.x,q.y,hx*2,Math.ceil(hy*2+Hm+40),hx,Math.ceil(hy+Hm+20),(X,Y)=>paintCrag(X,Y,o)); }
+  drawCached('crag_'+areaId+'_'+o.i+'_'+o.j+'_'+w+'_'+h+'_'+(o.v||0)+(o.dark?'d':'')+(o.sand?'s':''),q.x,q.y,hx*2,Math.ceil(hy*2+Hm+40),hx,Math.ceil(hy+Hm+20),(X,Y)=>paintCrag(X,Y,o)); }
 function paintCrag(X,Y,o){ const [w,h]=o.fp, sd=o.i*31+o.j*17+(o.v||0)*7, R=(k,s)=>rnd01(k,sd,s);
   const pt=(a,b,z)=>({x:X+((a-w/2)-(b-h/2))*TW/2, y:Y+((a-w/2)+(b-h/2))*TH/2-z});
   const H=26+20*Math.sqrt(w*h)*(0.8+0.4*R(1,800)), N=18, sq=v=>Math.sign(v)*Math.pow(Math.abs(v),0.55);   // a squarish blob that fills its footprint
@@ -16849,8 +16859,9 @@ function refreshEffects(){ buildBeltUI(); const box=document.getElementById('fx-
   if(!refreshEffects._h){ refreshEffects._h=1; document.addEventListener('pointerdown',ev=>{ if(!ev.target.closest('.fx')) hide(); },true); new MutationObserver(()=>{ if(!invOverlay.classList.contains('open')) hide(); }).observe(invOverlay,{attributes:true,attributeFilter:['class']}); } }
 // ════════ One-tile rocks (ridges and lone boulders) drawn like the great crags: faces, mossy top, one tile deep ════════
 const ROCK_DARK=()=>!!(AREAS[areaId] && AREAS[areaId].cave);                  // under the earth the stone is darker
-OBJ_DRAW.rockridge=o=>drawCrag({...o, fp:[o.fp[0],1], v:(o.v||0)+11, dark:ROCK_DARK()});
-OBJ_DRAW.boulder=o=>drawCrag({...o, fp:[1,1], v:(o.v||0)+21, dark:ROCK_DARK()});
+const ROCK_SAND=()=>!!(AREAS[areaId] && (AREAS[areaId].temple || AREAS[areaId].theme==='sand'));
+OBJ_DRAW.rockridge=o=>drawCrag({...o, fp:[o.fp[0],1], v:(o.v||0)+11, dark:ROCK_DARK(), sand:ROCK_SAND()});
+OBJ_DRAW.boulder=o=>drawCrag({...o, fp:[1,1], v:(o.v||0)+21, dark:ROCK_DARK(), sand:ROCK_SAND()});
 OBJ_DRAW.sandrock=o=>drawCrag({...o, fp:o.fp||[1,1], v:(o.v||0)+41, sand:true});           // sandstone, wind-cut
 // a date palm: a leaning ringed trunk and a crown of drooping fronds
 OBJ_DRAW.palm=o=>{ const q=P(o.i+0.5,o.j+0.5), s=o.s||1, lean=(o.v%2?1:-1)*(10+(o.v||0)*3); drawCached('palm'+(o.v||0)+'_'+s,q.x,q.y,220*s,260*s,110*s,240*s,(X,Y)=>{
@@ -18413,6 +18424,181 @@ JOURNAL.push(['The Lost Caravan', ()=> !CHOICE.caravan ? null : CHOICE.caravan==
   ? ['active', hasItem('hamid_ring') ? "You found Hamid's signet at the wreck of his caravan. Bring it to Kadir at Sefa's Well." : "Kadir's brother Hamid took a caravan into the Glass Dunes, south of Sefa's Well, and never came out. Look for a cart with a running camel on the side."]
   : ['active', "Hamid is alive, held by Tarek's raiders at the Red Mesa, south of the Glass Dunes. Kadir is gathering a ransom."]]);
 { const prev=npcHasNews; npcHasNews=function(n){ if(n.id==='kadir'){ if(!CHOICE.caravan) return '!'; if(CHOICE.caravan==='asked' && hasItem('hamid_ring')) return '?'; } return prev(n); }; }
+// ════════ THE TEMPLE OF THE HOLLOW SUN: riddles under the Glass Dunes, and the queen who ate the sun ════════
+const TEMPLE=(label,w,h,objs,extra)=>({ ...INSIDE_BASE, w, h, theme:'interior', cave:true, temple:true, label, mini:{x:0,y:0}, objects:objs, npcs:()=>[], ...extra });
+Object.assign(ITEMS,{ khopesh:{ name:"Ankhet's Khopesh", slot:'weapon', title:"A sickle-sword of red-gold bronze, the inside of the curve sharp as a scythe. It is warm, always, as if it had been lying in the sun." },
+  sun_disc:{ name:'The Hollow Sun', slot:'neck', title:"A disc of beaten gold with a hole where the sun's face should be. Look through it at noon and the world goes dark at the edges and bright in the middle." },
+  temple_tablet:{ name:'A Clay Tablet', slot:'misc', read:true, title:'A tablet from the Sun Throne', body:["Cut in the old sign-script, under a drawing of a woman swallowing a sun:","<i>“Ankhet, who was given the sun to keep and would not give it back. Her people walled her in with it, and the sand came over the door.”</i>"] } });
+Object.assign(WEAPONS,{ khopesh:{ wind:0.16, dmg:15, len:22, burn:0.2 } }); Object.assign(ITEM_STATS,{ sun_disc:{hp:6,magic:2,agi:1} }); GEAR_HP.sun_disc=6; PRICES.khopesh=300; PRICES.sun_disc=260;
+ITEM_ICON.sun_disc=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.strokeStyle='#7a5a1a'; g2.lineWidth=1; g2.fillStyle='#e0b040'; g2.beginPath(); g2.arc(20,22,11,0,Math.PI*2); g2.fill(); g2.stroke();
+  g2.fillStyle='#2a1a0a'; g2.beginPath(); g2.arc(20,22,4.5,0,Math.PI*2); g2.fill(); g2.strokeStyle='#f8d870'; for(let r=0;r<12;r++){ const a=r*Math.PI/6; g2.beginPath(); g2.moveTo(20+Math.cos(a)*6.5,22+Math.sin(a)*6.5); g2.lineTo(20+Math.cos(a)*10,22+Math.sin(a)*10); g2.stroke(); }
+  g2.strokeStyle='#5a3a10'; g2.lineWidth=1.2; g2.beginPath(); g2.moveTo(14,8); g2.quadraticCurveTo(20,4,26,8); g2.stroke(); g2.restore(); };
+// the way in: a half-buried portal in the Glass Dunes
+OBJ_DRAW.sunportal=o=>{ const q=P(o.i+1.5,o.j+0.5); drawCached('sunportal',q.x,q.y,260,260,130,230,(X,Y)=>{
+    const col=(cx,ht)=>{ g.fillStyle='#b08858'; g.fillRect(cx-11,Y-ht,22,ht); g.fillStyle='rgba(255,230,180,0.25)'; g.fillRect(cx-11,Y-ht,6,ht); g.strokeStyle='rgba(80,50,20,0.5)'; for(let k=1;k<6;k++){ g.beginPath(); g.moveTo(cx-11,Y-ht*k/6); g.lineTo(cx+11,Y-ht*k/6); g.stroke(); } };
+    g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(X,Y+4,110,22,0,0,Math.PI*2); g.fill();
+    g.fillStyle='#1a120a'; g.fillRect(X-42,Y-120,84,120);                                                       // the dark doorway
+    col(X-54,150); col(X+54,150); g.fillStyle='#a07848'; g.fillRect(X-74,Y-176,148,30); g.fillStyle='rgba(255,230,180,0.3)'; g.fillRect(X-74,Y-176,148,6);   // pillars and lintel
+    g.fillStyle='#d8a838'; g.beginPath(); g.arc(X,Y-161,11,0,Math.PI*2); g.fill(); g.fillStyle='#1a120a'; g.beginPath(); g.arc(X,Y-161,4,0,Math.PI*2); g.fill();   // the hollow sun
+    [[-1,1],[1,-1]].forEach(([sd])=>{ g.strokeStyle='#8a6438'; g.lineWidth=3; g.beginPath(); g.moveTo(X+sd*18,Y-161); g.quadraticCurveTo(X+sd*40,Y-172,X+sd*60,Y-158); g.stroke(); });   // wings
+    g.fillStyle='#e0c08a'; g.beginPath(); g.moveTo(X-120,Y+6); g.quadraticCurveTo(X-70,Y-36,X-30,Y-8); g.quadraticCurveTo(X,Y+2,X+30,Y-10); g.quadraticCurveTo(X+80,Y-46,X+120,Y+6); g.closePath(); g.fill(); }); };   // the dune it is sinking into
+OBJ_DRAW.sunpillar=o=>{ const q=P(o.i+0.5,o.j+0.5); drawCached('sunpillar'+(o.broken?'b':''),q.x,q.y,60,200,30,190,(X,Y)=>{ const ht=o.broken?70:160;
+    g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(X,Y+2,20,7,0,0,Math.PI*2); g.fill(); g.fillStyle='#a88050'; g.fillRect(X-13,Y-ht,26,ht); g.fillStyle='rgba(255,230,180,0.28)'; g.fillRect(X-13,Y-ht,7,ht); g.fillStyle='rgba(60,30,10,0.25)'; g.fillRect(X+6,Y-ht,7,ht);
+    g.fillStyle='#8a6440'; g.fillRect(X-16,Y-ht-8,32,9); g.fillRect(X-16,Y-8,32,8); g.fillStyle='rgba(120,40,24,0.55)'; for(let k=0;k<3;k++){ g.beginPath(); g.arc(X,Y-ht*0.35-k*ht*0.2,3,0,Math.PI*2); g.fill(); }
+    if(o.broken){ g.fillStyle='#8a6440'; g.beginPath(); g.moveTo(X-13,Y-ht); g.lineTo(X-4,Y-ht-12); g.lineTo(X+5,Y-ht-4); g.lineTo(X+13,Y-ht-14); g.lineTo(X+13,Y-ht); g.closePath(); g.fill(); } }); };
+// puzzle one: the scales. Three of the four jars weigh seven between them; only one set of three does
+const SCALE_W=[1,2,4,6];
+PUZ_DRAW.scales=o=>{ const q=P(o.i+0.5,o.j+0.5), on=(PZ().tA_on||[]), sum=on.reduce((a,k)=>a+SCALE_W[k],0), tilt=PZ().tA?0:Math.max(-0.25,Math.min(0.25,(sum-7)*0.05));
+  g.save(); g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(q.x,q.y+2,30,9,0,0,Math.PI*2); g.fill(); g.fillStyle='#8a6438'; g.fillRect(q.x-4,q.y-86,8,86); g.fillRect(q.x-14,q.y-6,28,6);
+  g.translate(q.x,q.y-86); g.rotate(tilt); g.fillStyle='#c09040'; g.fillRect(-46,-3,92,6);
+  [[-1,on.length,'#7a5a2a'],[1,0,'#7a5a2a']].forEach(([sd])=>{ g.strokeStyle='#5a4020'; g.lineWidth=1; g.beginPath(); g.moveTo(sd*42,0); g.lineTo(sd*42-10,30); g.moveTo(sd*42,0); g.lineTo(sd*42+10,30); g.stroke(); g.fillStyle='#c09040'; g.beginPath(); g.ellipse(sd*42,32,15,4,0,0,Math.PI*2); g.fill(); });
+  on.forEach((k,n)=>drawJarAt(-42+(n-1)*9,26,k,0.55)); g.fillStyle='#4a3a2a'; g.beginPath(); g.arc(42,24,7,0,Math.PI*2); g.fill(); g.fillStyle='#e8d0a0'; g.font='bold 9px Georgia'; g.textAlign='center'; g.fillText('7',42,27);
+  g.restore(); };
+function drawJarAt(x,y,k,s=1){ g.save(); g.translate(x,y); g.scale(s,s); g.fillStyle='#a05a30'; g.beginPath(); g.moveTo(-8,-26); g.lineTo(8,-26); g.quadraticCurveTo(14,-14,9,0); g.lineTo(-9,0); g.quadraticCurveTo(-14,-14,-8,-26); g.fill();
+  g.fillStyle='#7a3a1a'; g.fillRect(-7,-30,14,5); g.fillStyle='#f0dcb0'; const n=SCALE_W[k]; for(let d=0;d<n;d++){ g.beginPath(); g.arc(-6+(d%3)*6,-18+Math.floor(d/3)*6,1.8,0,Math.PI*2); g.fill(); } g.restore(); }
+PUZ_DRAW.jar=o=>{ if((PZ().tA_on||[]).includes(o.k)){ const q=P(o.i+0.5,o.j+0.5); g.fillStyle='#8a6440'; g.fillRect(q.x-12,q.y-14,24,14); return; } const q=P(o.i+0.5,o.j+0.5); g.fillStyle='#8a6440'; g.fillRect(q.x-12,q.y-14,24,14); drawJarAt(q.x,q.y-14,o.k); };
+onUse(['jar'],o=>{ const P=PZ(); if(P.tA){ pzSay('The scale is settled. The jars can stay where they are.'); return; } P.tA_on=P.tA_on||[]; const i=P.tA_on.indexOf(o.k);
+  if(i>=0){ P.tA_on.splice(i,1); pzSay('You lift the jar back onto its plinth.'); return; }
+  if(P.tA_on.length>=3){ pzSay('The pan holds three jars. Take one off first.'); return; }
+  P.tA_on.push(o.k); try{ SND.clang(0.4); }catch(e){} const sum=P.tA_on.reduce((a,k)=>a+SCALE_W[k],0);
+  if(P.tA_on.length<3){ pzSay('The jar goes onto the pan. The beam shifts.'); return; }
+  if(sum===7){ P.tA=true; const g0=OBJECTS.find(x=>x.type==='gate'); if(g0) OBJECTS.splice(OBJECTS.indexOf(g0),1); pzRebuild(); shake=6; banner('The scale settles level','#e8c878',1800); logMsg('Somewhere behind the wall, sand runs out of a weight, and a door rises.','#e8c060'); return; }
+  P.tA_on=[]; shake=4; player.hp=Math.max(1,player.hp-4); player.flash=0.4; updateHud(); pzSay('The beam crashes down. Sand hisses from the ceiling, and the jars tip back onto their plinths.','#e09070'); });
+onUse(['scales'],o=>{ const P=PZ(), on=P.tA_on||[]; pzSay(P.tA?'The scale hangs level, its riddle answered.':on.length?('On the pan: '+on.map(k=>SCALE_W[k]+' mark'+(SCALE_W[k]>1?'s':'')).join(', ')+'.'):'An empty pan on one side; a stone marked seven on the other.'); });
+// puzzle two: the day road. Dawn, noon, dusk, and dawn again: step on anything else and the floor drops you
+const DAYROAD=[[3,7],[3,6],[2,6],[1,6],[1,5],[1,4],[2,4],[3,4],[4,4],[5,4],[5,3],[4,3],[3,3],[3,2]], DAY_G=['dawn','noon','dusk'];
+PUZ_DRAW.glyph=o=>{ const q=tileQuad(o.i,o.j,0.06); fillQuad(q,o.g==='moon'?'#8a7c68':'#b49464'); const c=P(o.i+0.5,o.j+0.5); g.save(); g.translate(c.x,c.y); g.scale(1,TH/TW);
+  g.strokeStyle='rgba(70,40,20,0.75)'; g.fillStyle='rgba(70,40,20,0.75)'; g.lineWidth=2.2;
+  if(o.g==='moon'){ g.beginPath(); g.arc(0,0,13,0.6,Math.PI*2-0.6); g.arc(6,0,10,Math.PI*2-0.9,0.9,true); g.fill(); }
+  else { const up=o.g==='dawn'?6:o.g==='noon'?-6:10; g.beginPath(); g.moveTo(-22,8); g.lineTo(22,8); g.stroke(); g.beginPath(); g.arc(o.g==='dusk'?8:o.g==='dawn'?-8:0,up-4,8,o.g==='noon'?0:Math.PI,o.g==='noon'?Math.PI*2:Math.PI*2); g.fill();
+    if(o.g==='noon') for(let r=0;r<8;r++){ const a=r*Math.PI/4; g.beginPath(); g.moveTo(Math.cos(a)*11,up-4+Math.sin(a)*11); g.lineTo(Math.cos(a)*15,up-4+Math.sin(a)*15); g.stroke(); } }
+  g.restore(); };
+// puzzle three: the hourglass. Turn it, and the gate stands open while the sand runs
+PUZ_DRAW.hourglass=o=>{ const q=P(o.i+0.5,o.j+0.5), T=TMPL.hg, run=T&&T.t>0?T.t/T.len:0; g.save(); g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(q.x,q.y+2,22,7,0,0,Math.PI*2); g.fill();
+  g.fillStyle='#7a5a30'; g.fillRect(q.x-20,q.y-8,40,8); g.fillRect(q.x-20,q.y-96,40,8); g.fillRect(q.x-18,q.y-92,4,86); g.fillRect(q.x+14,q.y-92,4,86);
+  g.fillStyle='rgba(220,235,240,0.35)'; g.beginPath(); g.moveTo(q.x-12,q.y-88); g.lineTo(q.x+12,q.y-88); g.lineTo(q.x+2,q.y-50); g.lineTo(q.x+12,q.y-10); g.lineTo(q.x-12,q.y-10); g.lineTo(q.x-2,q.y-50); g.closePath(); g.fill();
+  const top=run, bot=T&&T.t>0?1-run:1; g.fillStyle='#e0c080'; g.beginPath(); g.moveTo(q.x-10*top,q.y-50-36*top); g.lineTo(q.x+10*top,q.y-50-36*top); g.lineTo(q.x+1,q.y-52); g.lineTo(q.x-1,q.y-52); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(q.x-11,q.y-10); g.lineTo(q.x+11,q.y-10); g.lineTo(q.x+11*(1-bot*0.6),q.y-10-34*bot); g.lineTo(q.x-11*(1-bot*0.6),q.y-10-34*bot); g.closePath(); g.fill();
+  if(T&&T.t>0){ g.fillRect(q.x-0.6,q.y-50,1.2,40); g.font='bold 13px Georgia'; g.textAlign='center'; g.fillStyle='#fff0c0'; g.strokeStyle='rgba(0,0,0,0.7)'; g.lineWidth=3; const s2=Math.ceil(T.t)+''; g.strokeText(s2,q.x,q.y-104); g.fillText(s2,q.x,q.y-104); }
+  g.restore(); };
+const TMPL={ hg:null, trapAt:null };
+onUse(['hourglass'],o=>{ const P=PZ(); if(P.tC){ pzSay('The sand has done its work. The gate stays open.'); return; } if(TMPL.hg && TMPL.hg.t>0){ pzSay('The sand is already running. Run!'); return; }
+  TMPL.hg={ t:6.5, len:6.5 }; const g0=OBJECTS.find(x=>x.type==='gate'); if(g0){ TMPL.hg.gate=g0; OBJECTS.splice(OBJECTS.indexOf(g0),1); pzRebuild(); } shake=3; banner('The gate rises. Run!','#e8c878',1300); try{ SND.clang(0.8); }catch(e){} });
+// the boss room: bronze mirrors to turn her ray, and canopic jars that hold her ward
+PUZ_DRAW.bronzemirror=o=>{ const q=P(o.i+0.5,o.j+0.5); g.save(); g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(q.x,q.y+2,16,6,0,0,Math.PI*2); g.fill(); g.fillStyle='#6a4a20'; g.fillRect(q.x-3,q.y-40,6,40);
+  g.fillStyle=o.cracked?'#6a5030':'#d8a848'; g.beginPath(); g.ellipse(q.x,q.y-58,16,20,0,0,Math.PI*2); g.fill(); g.strokeStyle='#5a3a10'; g.lineWidth=2; g.stroke();
+  if(o.cracked){ g.strokeStyle='#2a1a0a'; g.lineWidth=1.2; g.beginPath(); g.moveTo(q.x-10,q.y-70); g.lineTo(q.x+2,q.y-56); g.lineTo(q.x-4,q.y-48); g.moveTo(q.x+2,q.y-56); g.lineTo(q.x+12,q.y-60); g.stroke(); }
+  else { g.fillStyle='rgba(255,250,220,0.5)'; g.beginPath(); g.ellipse(q.x-5,q.y-64,4,8,-0.3,0,Math.PI*2); g.fill(); } g.restore(); };
+PUZ_DRAW.canopic=o=>{ const q=P(o.i+0.5,o.j+0.5); g.save(); g.globalCompositeOperation='lighter'; glow(q.x,q.y-20,22,26,'255,190,80',0.25+Math.sin(gt*5+o.i)*0.1); g.restore();
+  drawJarAt(q.x,q.y,1,1.2); g.fillStyle='#c09040'; g.beginPath(); g.arc(q.x,q.y-38,6,0,Math.PI*2); g.fill(); };
+onUse(['bronzemirror'],o=>pzSay(o.cracked?'The mirror is cracked across. It will not turn a ray again.':'A tall mirror of polished bronze on a heavy stand. Stand by it, and the sun has somewhere else to go.','#e8c878'));
+onUse(['canopic'],o=>{ if(!SQ || SQ.mode!=='glass'){ pzSay('A sealed jar with a jackal\'s head for a lid. It hums.'); return; } OBJECTS.splice(OBJECTS.indexOf(o),1); pzRebuild(); shake=5; try{ SND.clang(1.2); }catch(e){} burst({x:o.i+0.5,y:o.j+0.5},player,'#ffcf70',16);
+  pzSay('The jar shatters. Something golden goes out of it like breath.','#ffcf70'); });
+// the rooms
+Object.assign(AREAS,{
+  templeA: TEMPLE('The Hollow Sun · The Scales',9,9,()=>{ const P=PZ(), l=[{type:'teleporter', i:4, j:8, to:'glassdunes', entry:'fromTemple'}, {type:'teleporter', i:4, j:0, to:'templeB', entry:'fromA'},
+      {type:'scales', i:4, j:3}, ...SCALE_W.map((w,k)=>({type:'jar', i:[1,3,5,7][k], j:[5,6,6,5][k], k})), {type:'sunpillar', i:1, j:2}, {type:'sunpillar', i:7, j:2},
+      {type:'rune', i:0, j:7, text:"Cut deep in the old sign-script, and below it again in a rougher hand: <i>“The Scale of the Just weighs seven. Give it seven in three vessels: no more, no less, and no fewer.”</i>"},
+      ...rockRow(1,0,8,[4])];
+    if(!P.tA) l.push({type:'gate', i:4, j:1}); return l; },
+    { entries:{ fromDunes:{i:4,j:7}, fromB:{i:4,j:2} }, mobs:()=> PZ().tA ? [] : [{ name:'Sand-dried Dead', type:'skeleton', i:2, j:4, faction:'sanddead', opts:{...RISEN('Sand-dried Dead'), wrapped:true} }] }),
+  templeB: TEMPLE('The Hollow Sun · The Day Road',7,10,()=>{ const P=PZ(), l=[{type:'teleporter', i:3, j:9, to:'templeA', entry:'fromB'}, {type:'teleporter', i:3, j:0, to:'templeC', entry:'fromB'},
+      {type:'rune', i:0, j:8, text:"<i>“Walk the sun's own day: dawn, then noon, then dusk, and dawn again. The floor remembers who walks by night.”</i>"},
+      ...rockRow(1,0,6,[3])];
+    for(let i=0;i<7;i++) for(let j=2;j<=7;j++){ const k=DAYROAD.findIndex(([a,b])=>a===i&&b===j); const gl=k>=0 ? DAY_G[k%3] : (['moon','dawn','noon','dusk','moon'][(i*7+j*3)%5]);
+      l.push({type:'glyph', i, j, g:gl, road:k>=0, noblock:true}); }
+    return l; }, { entries:{ fromA:{i:3,j:8}, fromC:{i:3,j:1} } }),
+  templeC: TEMPLE('The Hollow Sun · The Hourglass',9,9,()=>{ const P=PZ(), l=[{type:'teleporter', i:4, j:8, to:'templeB', entry:'fromC'}, {type:'teleporter', i:4, j:0, to:'templeD', entry:'fromC'},
+      {type:'hourglass', i:4, j:6}, {type:'rune', i:8, j:7, text:"<i>“The sand runs for the swift. Turn the glass, and do not stop to read.”</i>"},
+      ...rockRow(1,0,8,[4]), ...rockRow(5,0,6,[]), ...rockRow(3,2,8,[]), {type:'sunpillar', i:7, j:6}, {type:'sunpillar', i:1, j:6}];
+    if(!P.tC) l.push({type:'gate', i:4, j:1}); return l; }, { entries:{ fromB:{i:4,j:7}, fromD:{i:4,j:2} } }),
+  templeD: TEMPLE('The Hollow Sun · The Sun Throne',11,11,()=>{ const P=PZ(), l=[{type:'teleporter', i:5, j:10, to:'templeC', entry:'fromD', locked:()=>sqSealed(), onLocked:()=>pzSay('Sand pours down across the doorway. Not until she falls.','#e8c878')},
+      {type:'sunpillar', i:2, j:2}, {type:'sunpillar', i:8, j:2}, {type:'sunpillar', i:2, j:8, broken:true}, {type:'sunpillar', i:8, j:8},
+      ...SQ_MIRRORS.map(([i,j],k)=>({type:'bronzemirror', i, j, k, cracked:(P.sqCracked||[]).includes(k) && !P.sunboss}))];
+    if(P.sunboss){ if(!collectedPickups.has('templeD:5,3')) l.push({type:'pickup', i:5, j:3, item:'khopesh'}); if(!collectedPickups.has('templeD:4,3')) l.push({type:'pickup', i:4, j:3, item:'sun_disc'}); if(!collectedPickups.has('templeD:6,3')) l.push({type:'pickup', i:6, j:3, item:'temple_tablet'}); }
+    return l; }, { entries:{ fromC:{i:5,j:9} }, mobs:()=> PZ().sunboss ? [] : [{ name:'Ankhet the Sun-Eater', type:'sunqueen', i:5, j:3, faction:'sunqueen', opts:ANKHET() }] }) });
+Object.assign(AREA_TIER,{ templeA:3, templeB:3, templeC:3, templeD:5 });
+wrap('glassdunes','objects',l=>[...l.filter(o=>!(o.type==='sandrock'&&o.i===13&&o.j===2)), {type:'sunportal', i:12, j:0, fp:[3,1]}, {type:'teleporter', i:13, j:1, to:'templeA', entry:'fromDunes'}, {type:'sandrock', i:1, j:1, v:7}]);
+AREAS.glassdunes.entries.fromTemple={i:13,j:2};
+// the day road: step off the sun's path and the floor drops you back to the start
+// the hourglass: run before the sand does
+// the queen: her pattern, her look, and her two set pieces
+FOES.sunqueen={ label:'Sun-Eater', base:110, stagger:0.85, pattern:[
+  {wait:1.2, wind:0.95, after:0.45, dir:'right'}, {wait:0.2, wind:0.6, after:0.35, dir:'left'}, {wait:1.3, wind:1.2, after:0.7, dir:'up', feint:'left'},
+  {wait:0.9, wind:0.75, after:0.4, dir:'left'}, {wait:0.0, wind:0.6, after:0.7, dir:'right'} ]};
+const SQ_PAT1=FOES.sunqueen.pattern, SQ_PAT3=[
+  {wait:0.8, wind:0.75, after:0.35, dir:'up', feint:'right'}, {wait:0.2, wind:0.5, after:0.3, dir:'left'}, {wait:0.0, wind:0.5, after:0.5, dir:'right'},
+  {wait:0.9, wind:0.9, after:0.5, dir:'left', feint:'up'}, {wait:0.5, wind:0.6, after:0.6, dir:'up'} ];
+const ANKHET=()=>({gender:'f',skin:0,hair:3,hairColor:0,face:2,wrapped:true,equip:{head:'turban_indigo',torso:'saffron_tunic',armor:'lamellar',hands:'hand_wraps',legs:'sirwal',feet:'desert_boots',weapon:'khopesh',offhand:null}});
+const SQ_MIRRORS=[[2,6],[8,6],[5,8]], SQ_JARS=[[1,1],[9,1],[1,9],[9,9]], SQ_DAIS=[5,2];
+let SQ=null;
+const sqQueen=()=>areaId==='templeD' && mobs.find(m=>m.type==='sunqueen' && !m.dead);
+function sqSealed(){ const K=sqQueen(); return !!K && (!!SQ || combat.active || K.hp<K.maxHp); }
+const sqTh=K=>{ const ph=K.sqphase||1; return ph>=3?0:Math.floor(K.maxHp*(ph===1?0.66:0.33)); };
+function sqRay(K){ ckBreakDuel(K); ckPlace(K,SQ_DAIS[0],SQ_DAIS[1]); banner('Stand by a mirror!','#ffd070',2200);
+  logMsg('Ankhet lifts her hands and the hollow sun above her fills with light. Stand beside a bronze mirror before it falls on you!','#ffd070'); SQ={mode:'ray', t:3.4, len:3.4, n:0}; }
+function sqGlass(K){ ckBreakDuel(K); ckPlace(K,SQ_DAIS[0],SQ_DAIS[1]); K.warded=true; FOES.sunqueen.pattern=SQ_PAT1;
+  SQ_JARS.forEach(([i,j])=>{ if(!OBJECTS.some(o=>o.type==='canopic'&&o.i===i&&o.j===j)) OBJECTS.push({type:'canopic', i, j}); }); pzRebuild();
+  banner('Break her four jars!','#ffcf70',2400); logMsg('She draws the gold of the sun into four jars, and the sand begins to fall. Break the jars before it buries you!','#ffcf70');
+  SQ={mode:'glass', t:22, len:22, fall:1.2, tiles:null}; }
+function sqHurt(n,label){ ckHurt(n,label); if(player.hp<=0) SQ=null; }
+function sqTick(dt){
+  // the day road
+  if(areaId==='templeB'){ const i=Math.floor(player.x), j=Math.floor(player.y), k=i+','+j; if(j<=1 && !PZ().tB){ PZ().tB=true; banner('The Day Road is walked','#e8c878',1400); }
+    if(k!==TMPL.trapAt){ TMPL.trapAt=k; const t=OBJECTS.find(o=>o.type==='glyph'&&o.i===i&&o.j===j);
+      if(t && !t.road){ player.path=[]; ckHurt(Math.max(6,Math.round(player.maxHp*0.1)),'The floor drops!'); shake=6; logMsg('The tile tips under you and you slide down a chute of hot sand, all the way back to the start.','#e09070');
+        setTimeout(()=>{ if(areaId==='templeB'){ player.i=3; player.j=8; player.x=3.5; player.y=8.5; player.path=[]; TMPL.trapAt='3,8'; } },250); } } }
+  // the hourglass
+  if(TMPL.hg && TMPL.hg.t>0){ TMPL.hg.t-=dt; if(areaId==='templeC' && player.y<1.6 && !PZ().tC){ PZ().tC=true; TMPL.hg.t=0; banner('Through!','#e8c878',1000); }
+    if(TMPL.hg.t<=0 && !PZ().tC){ if(areaId==='templeC' && TMPL.hg.gate && !OBJECTS.includes(TMPL.hg.gate)){ OBJECTS.push(TMPL.hg.gate); pzRebuild(); shake=4; pzSay('The last grain falls. The gate slams down.','#e09070'); } TMPL.hg=null; } }
+  // the queen
+  const K=sqQueen(); if(!K){ SQ=null; return; }
+  if(!SQ){ if(K.sqphase===undefined){ K.sqphase=1; FOES.sunqueen.pattern=SQ_PAT1; }
+    const th=sqTh(K); if(th && K.hp<=th && combat.phase!=='down'){ K.hp=th; K.sqphase++; if(K.sqphase===2) sqRay(K); else sqGlass(K); } return; }
+  if(combat.phase==='down'){ SQ=null; return; }
+  K.dir=dirTo(tileOf(K),tileOf(player));
+  if(SQ.mode==='ray'){ SQ.t-=dt; if(SQ.t>0) return;
+    const P=PZ(), cr=P.sqCracked=P.sqCracked||[], mi=SQ_MIRRORS.findIndex(([a,b],k)=>!cr.includes(k) && cheb([a,b],tileOf(player))<=1);
+    if(mi>=0){ cr.push(mi); const m=OBJECTS.find(o=>o.type==='bronzemirror'&&o.k===mi); if(m) m.cracked=true; SQ.reflect=0.6; SQ.from=SQ_MIRRORS[mi];
+      K.hp=Math.max(1,K.hp-Math.round(K.maxHp*0.07)); K.flash=0.5; floatText(tileOf(K),'Reflected!','#fff0a0',true); shake=8; logMsg('The ray strikes the bronze and leaps back into her. The mirror cracks across.','#ffe080'); }
+    else { SQ.burnt=0.5; sqHurt(Math.max(16,Math.round(player.maxHp*0.34)),'Noon Ray!'); }
+    if(!SQ) return; SQ.n++;
+    const left=SQ_MIRRORS.filter((m,k)=>!(PZ().sqCracked||[]).includes(k)).length;
+    if(SQ.n>=3 || left===0){ const k0=K; SQ={mode:'wait'}; setTimeout(()=>{ if(areaId==='templeD' && !k0.dead){ SQ=null; ckResume(k0,'Ankhet comes down from the dais!'); } },900); return; }
+    SQ.t=SQ.len=Math.max(2.4,3.4-SQ.n*0.4); banner('Again! Another mirror!','#ffd070',1300); return; }
+  if(SQ.mode==='glass'){ SQ.t-=dt; SQ.fall-=dt;
+    if(!OBJECTS.some(o=>o.type==='canopic')){ K.warded=false; FOES.sunqueen.pattern=SQ_PAT3; const k0=K; SQ={mode:'wait'}; logMsg('The last jar breaks. Her gold goes out of her like a candle, and she comes for you with nothing left to lose.','#ffcf70');
+      setTimeout(()=>{ if(areaId==='templeD' && !k0.dead){ SQ=null; ckResume(k0,'Her ward breaks!'); } },900); return; }
+    if(SQ.fall<=0 && !SQ.tiles){ const A=AREAS[areaId], t=[]; for(let n=0;n<7;n++){ const i=1+Math.floor(Math.random()*(A.w-2)), j=1+Math.floor(Math.random()*(A.h-2)); if(!blocked.has(i+','+j)) t.push(i+','+j); } t.push(Math.floor(player.x)+','+Math.floor(player.y)); SQ.tiles=t; SQ.fall=1.1; }
+    else if(SQ.fall<=0 && SQ.tiles){ const here=Math.floor(player.x)+','+Math.floor(player.y); SQ.burstTiles=SQ.tiles; SQ.burst=0.5; if(SQ.tiles.includes(here)) sqHurt(Math.max(6,Math.round(player.maxHp*0.1)),'Falling sand!'); SQ.tiles=null; SQ.fall=0.6; if(!SQ) return; }
+    if(SQ.burst) SQ.burst=Math.max(0,SQ.burst-dt);
+    if(SQ.t<=0){ sqHurt(Math.max(20,Math.round(player.maxHp*0.3)),'The sand runs out!'); if(!SQ) return; SQ.t=SQ.len; banner('She turns the glass again!','#ffcf70',1500); }
+    return; } }
+{ const prev=ckTick; ckTick=function(dt){ prev(dt); try{ sqTick(dt); }catch(e){ console.error(e); } }; }
+// the set pieces, drawn on the floor: the ray, the falling sand, the hourglass of the third phase
+{ const oSDI=skelDrawItems; skelDrawItems=function(items){ oSDI(items); if(!SQ || areaId!=='templeD') return; const K=sqQueen(); if(!K) return;
+    items.push({d:1e6, fn:()=>{ const kq=P(K.x,K.y), pp=P(player.x,player.y);
+      if(SQ.mode==='ray'){ const a=1-SQ.t/SQ.len; g.save(); g.globalCompositeOperation='lighter';
+        g.strokeStyle=`rgba(255,220,120,${0.15+a*0.6})`; g.lineWidth=2+a*16; g.lineCap='round'; g.beginPath(); g.moveTo(kq.x,kq.y-130); g.lineTo(pp.x,pp.y-50); g.stroke();
+        glow(kq.x,kq.y-130,30+a*30,30+a*30,'255,230,140',0.4+a*0.5); SQ_MIRRORS.forEach(([i,j],k)=>{ if((PZ().sqCracked||[]).includes(k)) return; const c=P(i+0.5,j+0.5); for(let r=0;r<3;r++){ const tl=tileQuad(i-1+r,j,0.08); } glow(c.x,c.y-58,26,30,'255,240,180',0.25+Math.sin(gt*6)*0.1); });
+        g.restore(); }
+      if(SQ.reflect>0){ SQ.reflect-=1/60; const c=P(SQ.from[0]+0.5,SQ.from[1]+0.5); g.save(); g.globalCompositeOperation='lighter'; g.strokeStyle=`rgba(255,250,200,${SQ.reflect*1.4})`; g.lineWidth=10; g.beginPath(); g.moveTo(pp.x,pp.y-50); g.lineTo(c.x,c.y-58); g.lineTo(kq.x,kq.y-60); g.stroke(); g.restore(); }
+      if(SQ.burnt>0){ SQ.burnt-=1/60; g.save(); g.globalCompositeOperation='lighter'; glow(pp.x,pp.y-40,60,80,'255,200,90',SQ.burnt); g.restore(); }
+      if(SQ.mode==='glass'){ (SQ.tiles||[]).forEach(k=>{ const [i,j]=k.split(',').map(Number); fillQuad(tileQuad(i,j,0.1),`rgba(240,200,120,${0.25+Math.sin(gt*12)*0.12})`); const c=P(i+0.5,j+0.5); g.fillStyle='rgba(230,200,140,0.55)'; for(let n=0;n<6;n++) g.fillRect(c.x-8+n*3,c.y-200+((gt*300+n*40)%190),1.5,8); });
+        if(SQ.burst && SQ.burstTiles) SQ.burstTiles.forEach(k=>{ const [i,j]=k.split(',').map(Number); fillQuad(tileQuad(i,j,0.02),`rgba(220,190,130,${SQ.burst*1.6})`); });
+        g.save(); g.font='bold 16px Georgia'; g.textAlign='center'; g.fillStyle='#fff0c0'; g.strokeStyle='rgba(0,0,0,0.7)'; g.lineWidth=3; const t2='⌛ '+Math.ceil(SQ.t); g.strokeText(t2,kq.x,kq.y-170); g.fillText(t2,kq.x,kq.y-170); g.restore(); } } }); }; }
+// her blows cannot carry her through a phase; a ward makes her untouchable
+// (she is undead, and a queen: no bleeding, no sleep)
+{ const prev=wound; wound=function(f,n,label,col){ if(f && f.type==='sunqueen' && !f.warded && (f.sqphase||1)<3 && n>0){ const th=sqTh(f), pre=f.hp; f.hp+=1000; const r=prev(f,n,label,col); const dealt=pre+1000-f.hp; f.hp=Math.max(th,pre-dealt); return r; } return prev(f,n,label,col); }; }
+{ const prev=foeDown; foeDown=function(f){ const r=prev(f); if(f && f.type==='sunqueen'){ PZ().sunboss=true; SQ=null; FOES.sunqueen.pattern=SQ_PAT1;
+      setTimeout(()=>{ try{ banner('The Hollow Sun is empty','#ffd070',2400); logMsg('Ankhet falls, and goes to sand inside her linen. The hollow sun over the throne goes dark for the first time in a thousand years.','#ffd070');
+        const add=[['khopesh',5,3],['sun_disc',4,3],['temple_tablet',6,3]]; add.forEach(([item,i,j])=>{ if(!collectedPickups.has('templeD:'+i+','+j)) OBJECTS.push({type:'pickup', i, j, item}); }); OBJECTS.filter(o=>o.type==='canopic').forEach(o=>OBJECTS.splice(OBJECTS.indexOf(o),1)); pzRebuild(); }catch(e){} },1500); } return r; }; }
+TALKERS.sefa=(prevSefa=>()=>{ if(CHOICE.sefaTemple || !CHOICE.sefaMet) return prevSefa(); CHOICE.sefaTemple=true;
+  say('Sefa of the Well',["“You have the look of someone who goes where they shouldn't. So I'll tell you, before you find it yourself.”","“In the Glass Dunes, a door in the sand. The Temple of the Hollow Sun. Riddles at every door, my grandmother said, and a queen at the bottom who would not give the sun back.”","“Nobody has come out of it in my lifetime. Drink first.”"],[bye]); })(TALKERS.sefa);
+JOURNAL.push(['The Temple of the Hollow Sun', ()=>{ const P=PZ(); if(!visitedAreas.templeA && !CHOICE.sefaTemple) return null;
+  if(P.sunboss) return ['done',"You walked the Hollow Sun to its throne and broke the queen who would not give the sun back. Her khopesh, her sun-disc and a tablet with her story were yours for the taking."];
+  const steps=[P.tA?'the Scales':null, P.tB?'the Day Road':null, P.tC?'the Hourglass':null].filter(Boolean);
+  return ['active', "A door in the sand of the Glass Dunes: the Temple of the Hollow Sun, a riddle at every door and a queen at the bottom."+(steps.length?" You have passed "+steps.join(', ')+".":" Sefa says nobody has come out of it in her lifetime.")]; }]);
 // ── feast days you can see: bunting and dancing on harvest-eve, a busy quay on ship day ──
 OBJ_DRAW.bunting=o=>{ const a=P(o.a[0],o.a[1]), b=P(o.b[0],o.b[1]), h=o.h||90, N=14, cols=['#c83a2a','#e8c040','#3a7ac8','#4a9a4a','#e8e0d0'];
   const pt=t=>({x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t-h+Math.sin(Math.PI*t)*22});

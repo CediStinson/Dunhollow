@@ -8370,13 +8370,20 @@ function paintGroundTexture(){
       const o=(py*TWp+px)*4, k=1-0.3*(1-smooth(0,1.3,Math.min(gx,gy))); D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
     if(theme==='interior' && AREAS[areaId] && AREAS[areaId].maze){ const MZ=mazeGrid(areaId), ti=Math.floor(gx), tj=Math.floor(gy), at=(i,j)=>i>=0&&j>=0&&i<w&&j<h&&MZ[j*w+i], o=(py*TWp+px)*4;
       if(!at(ti,tj)){ const fx=gx-ti, fy=gy-tj, n=hsh(Math.floor(gx*3),Math.floor(gy*3))%1000/1000, glint=(hsh(Math.floor(gx*7)+3,Math.floor(gy*7)+5)%997)<4;   // the drop: near black, a glint of the drowned town far below
-        let pc=mixC([0,0,1],[4,5,7],n*0.5); if(glint) pc=[30,42,50];
+        const HEAT=AREAS[areaId].heat||0; let pc=mixC([0,0,1],[4,5,7],n*0.5); if(glint) pc=[30,42,50];
+        if(HEAT){ const lv=fbm(gx*0.7,gy*0.7,81), riv=Math.abs(fbm(gx*0.45+3,gy*0.45,82)-0.5); pc=mixC(pc,[40,8,2],HEAT*smooth(0.45,0.8,lv));   // heat from far below, and in the deepest quarter, rivers of fire
+          if(HEAT>=1 && riv<0.05){ const c=1-riv/0.05; pc=mixC(pc,c>0.7?[255,200,90]:[230,90,20],Math.min(1,c*1.3)); } else if(HEAT>=1 && riv<0.09) pc=mixC(pc,[120,30,8],1-(riv-0.05)/0.04); }
         const face=Math.min(at(ti-1,tj)?fx:9, at(ti,tj-1)?fy:9);                     // the side of the walkway you can see: stone, falling away into the dark
         if(face<0.32){ const t=face/0.32, rough=(hsh(Math.floor(gx*9),Math.floor(gy*9))%100)/100; pc=mixC(mixC([64,56,46],[34,30,25],rough*0.5),pc,Math.sqrt(t)); if(face<0.03) pc=[20,17,14]; }
         const back=Math.min(at(ti+1,tj)?1-fx:9, at(ti,tj+1)?1-fy:9); if(back<0.08) pc=mixC([30,26,22],pc,back/0.08);
         D[o]=pc[0]; D[o+1]=pc[1]; D[o+2]=pc[2]; D[o+3]=255; continue; }
-      const fx=gx-ti, fy=gy-tj, n=fbm(gx*3,gy*3,73), grain=fbm(gx*9,gy*1.5,74), slab=((ti*7+tj*13)%5)/5;
-      let pc=mixC([132,122,104],[100,92,78],n*0.6+slab*0.4); if(fx<0.05||fy<0.05) pc=mixC(pc,[34,30,26],0.6); if(grain>0.68) pc=mixC(pc,[110,102,90],0.3);
+      const fx=gx-ti, fy=gy-tj, n=fbm(gx*3,gy*3,73), grain=fbm(gx*9,gy*1.5,74), slab=((ti*7+tj*13)%5)/5, HOT=(AREAS[areaId].heat||0)>=1;
+      const lr=at(ti-1,tj)&&at(ti+1,tj)&&!at(ti,tj-1)&&!at(ti,tj+1), ud=at(ti,tj-1)&&at(ti,tj+1)&&!at(ti-1,tj)&&!at(ti+1,tj), reg=hsh(Math.floor(ti/5)*3+(AREAS[areaId].seedSalt||0),Math.floor(tj/5)*7)%5;
+      let pc=HOT?mixC([84,72,64],[58,48,42],n*0.6+slab*0.4):mixC([132,122,104],[100,92,78],n*0.6+slab*0.4); if(fx<0.05||fy<0.05) pc=mixC(pc,[34,30,26],0.6); if(grain>0.68) pc=mixC(pc,[110,102,90],0.3);
+      if((lr||ud) && hsh(ti*5+1,tj*3+2)%3===0){ const u=lr?fx:fy, v=lr?fy:fx, pl=u*4, seam=Math.abs(pl-Math.round(pl))<0.06, gr=fbm(gx*(lr?14:2),gy*(lr?2:14),75);   // a plank bridge from roof to roof
+        pc=mixC([128,92,58],[92,64,38],gr); if(seam) pc=[44,30,18]; if(v<0.1||v>0.9) pc=mixC([70,52,34],pc,0.3); if(Math.abs(v-0.08)<0.025||Math.abs(v-0.92)<0.025) pc=[60,46,30]; }
+      else if(!HOT && reg===1){ const row=Math.floor(gy*4), off=(row%2)*0.5, sx=gx*4+off, sf=sx-Math.floor(sx), yf=gy*4-row;   // old roof tiles, still in their rows
+        pc=mixC([126,66,46],[96,50,36],(hsh(Math.floor(sx),row)%100)/100); if(yf>0.82) pc=mixC(pc,[40,22,16],0.6); if(sf<0.06) pc=mixC(pc,[60,32,24],0.5); }
       const e=Math.min(at(ti-1,tj)?9:fx,at(ti+1,tj)?9:1-fx,at(ti,tj-1)?9:fy,at(ti,tj+1)?9:1-fy); if(e<0.12) pc=mixC([20,18,16],pc,e/0.12); else if(e<0.2) pc=mixC(pc,[130,120,104],0.35);   // the lip, worn pale by feet
       D[o]=pc[0]; D[o+1]=pc[1]; D[o+2]=pc[2]; D[o+3]=255; continue; }
     if(theme==='interior' && AREAS[areaId] && AREAS[areaId].cave && !AREAS[areaId].volcanic){                 // rough cave stone, damp, with a faint green glow in the cracks
@@ -19859,6 +19866,61 @@ AREAS.emberpass.layer=-1; AREAS.emberforge.layer=-1;
 wrap('keepward','objects',l=>[...l, {type:'well', i:13, j:5}, {type:'teleporter', i:14, j:5, to:'under_nw', entry:'fromWell'}]); AREAS.keepward.entries.fromWell={i:14,j:6};
 MM_COL.interior='#5a524a';
 if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
+
+// ════════ THE UNDERCITY, seen properly: what rises out of the dark, and the fire below ════════
+// landmarks stand in the drop beside the crossings, so you can steer by them: the rooster spire, the gable with the lit window, the saint with her hand up
+const UC_KINDS={ chimney:"A chimney stack, its top still black with soot. Somewhere down there, somebody's hearth.", spire:"The tip of a church spire, a rusted iron rooster on top. It still turns a little in the warm air coming up.",
+  gable:"The gable end of a house, a round window in it. There is a light behind the glass. There cannot be.", statue:"A stone saint, up to her chest in the dark, one hand raised. Pilgrims rubbed her fingers for luck. Some still shine.",
+  mast:"The mast of a river barge, standing straight up out of the black, a rag of sail on it. The river came through here, once.", bell:"A bell in a little open tower, green with age. You do not touch it.",
+  brazier:"An iron brazier, burning. The Flamesworn keep them lit to find their way. The fire does not smell like wood.", lavafall:"Fire pours over a broken roof edge far below, like water from a gutter, and lights everything orange." };
+OBJ_DRAW.ucmark=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, K=o.kind, t=gt; g.save();
+  const fade=(y0,y1)=>{ const gr=g.createLinearGradient(0,y0,0,y1); gr.addColorStop(0,'rgba(0,0,0,0)'); gr.addColorStop(1,'rgba(0,0,0,0.95)'); return gr; };
+  if(K==='chimney'){ g.fillStyle='#6a3a2a'; g.fillRect(x-10,y-46,20,72); g.fillStyle='#7a4632'; g.fillRect(x-10,y-46,8,72); g.strokeStyle='rgba(30,14,8,0.6)'; g.lineWidth=1; for(let k=0;k<6;k++){ g.beginPath(); g.moveTo(x-10,y-40+k*12); g.lineTo(x+10,y-40+k*12); g.stroke(); }
+    g.fillStyle='#3a2018'; g.fillRect(x-13,y-52,26,7); g.fillStyle='#1a0e0a'; g.fillRect(x-7,y-52,14,3); g.fillStyle=fade(y-14,y+26); g.fillRect(x-14,y-14,28,42); }
+  else if(K==='spire'){ g.fillStyle='#4a4a52'; g.beginPath(); g.moveTo(x,y-96); g.lineTo(x+16,y+24); g.lineTo(x-16,y+24); g.closePath(); g.fill(); g.fillStyle='#5a5a64'; g.beginPath(); g.moveTo(x,y-96); g.lineTo(x-16,y+24); g.lineTo(x-4,y+24); g.closePath(); g.fill();
+    g.strokeStyle='#5a3a20'; g.lineWidth=1.5; g.beginPath(); g.moveTo(x,y-96); g.lineTo(x,y-114); g.stroke(); const sw=Math.sin(t*0.6+o.i)*0.4; g.save(); g.translate(x,y-112); g.scale(Math.cos(sw),1);
+    g.fillStyle='#7a4a24'; g.beginPath(); g.moveTo(-9,0); g.quadraticCurveTo(-4,-9,2,-7); g.lineTo(4,-12); g.lineTo(6,-6); g.lineTo(10,-2); g.lineTo(4,1); g.closePath(); g.fill(); g.restore(); g.fillStyle=fade(y-24,y+24); g.fillRect(x-22,y-24,44,50); }
+  else if(K==='gable'){ g.fillStyle='#5a4a3a'; g.beginPath(); g.moveTo(x-30,y+24); g.lineTo(x-30,y-20); g.lineTo(x,y-56); g.lineTo(x+30,y-20); g.lineTo(x+30,y+24); g.closePath(); g.fill(); g.strokeStyle='#2a1e14'; g.lineWidth=2; g.stroke();
+    g.fillStyle='#7a3a28'; g.beginPath(); g.moveTo(x-36,y-16); g.lineTo(x,y-62); g.lineTo(x+36,y-16); g.lineTo(x+30,y-16); g.lineTo(x,y-54); g.lineTo(x-30,y-16); g.closePath(); g.fill();
+    const fl=0.75+Math.sin(t*3+o.j)*0.1; g.fillStyle=`rgba(255,200,110,${fl})`; g.beginPath(); g.arc(x,y-26,8,0,Math.PI*2); g.fill(); g.strokeStyle='#2a1e14'; g.lineWidth=1.5; g.beginPath(); g.moveTo(x-8,y-26); g.lineTo(x+8,y-26); g.moveTo(x,y-34); g.lineTo(x,y-18); g.stroke();
+    g.globalCompositeOperation='lighter'; glow(x,y-26,26,26,'255,170,80',0.35); g.globalCompositeOperation='source-over'; g.fillStyle=fade(y-8,y+24); g.fillRect(x-32,y-8,64,34); }
+  else if(K==='statue'){ g.fillStyle='#8a867a'; g.beginPath(); g.ellipse(x,y+10,20,26,0,Math.PI,Math.PI*2); g.lineTo(x+20,y+24); g.lineTo(x-20,y+24); g.closePath(); g.fill();
+    g.beginPath(); g.arc(x,y-28,11,0,Math.PI*2); g.fill(); g.fillStyle='#6a665a'; g.beginPath(); g.arc(x+3,y-28,11,-0.6,1.2); g.fill(); g.fillStyle='#9a968a'; g.beginPath(); g.ellipse(x,y-40,14,4,0,0,Math.PI*2); g.fill();   // her veil
+    g.strokeStyle='#8a867a'; g.lineWidth=7; g.lineCap='round'; g.beginPath(); g.moveTo(x+16,y-6); g.lineTo(x+24,y-30); g.lineTo(x+24,y-48); g.stroke(); g.fillStyle='#e0d0a0'; g.beginPath(); g.arc(x+24,y-50,3,0,Math.PI*2); g.fill();
+    g.fillStyle=fade(y-6,y+24); g.fillRect(x-24,y-6,50,32); }
+  else if(K==='mast'){ g.strokeStyle='#4a3420'; g.lineWidth=5; g.beginPath(); g.moveTo(x,y+24); g.lineTo(x+4,y-104); g.stroke(); g.lineWidth=3; g.beginPath(); g.moveTo(x-22,y-80); g.lineTo(x+28,y-86); g.stroke();
+    g.fillStyle='rgba(200,184,150,0.8)'; g.beginPath(); g.moveTo(x-20,y-78); g.quadraticCurveTo(x+4+Math.sin(t+o.i)*4,y-60,x-6,y-30); g.lineTo(x-16,y-44); g.closePath(); g.fill();
+    g.strokeStyle='rgba(80,60,40,0.7)'; g.lineWidth=1; g.beginPath(); g.moveTo(x+4,y-104); g.lineTo(x+30,y+14); g.moveTo(x+4,y-104); g.lineTo(x-26,y+16); g.stroke(); g.fillStyle=fade(y-6,y+24); g.fillRect(x-30,y-6,64,32); }
+  else if(K==='bell'){ g.fillStyle='#5a5048'; g.fillRect(x-18,y-70,4,94); g.fillRect(x+14,y-70,4,94); g.fillStyle='#6a3a28'; g.beginPath(); g.moveTo(x-24,y-70); g.lineTo(x,y-92); g.lineTo(x+24,y-70); g.closePath(); g.fill();
+    const sw=Math.sin(t*0.8+o.i)*0.12; g.save(); g.translate(x,y-66); g.rotate(sw); g.fillStyle='#4a7a5a'; g.beginPath(); g.moveTo(-6,0); g.quadraticCurveTo(-8,14,-13,22); g.lineTo(13,22); g.quadraticCurveTo(8,14,6,0); g.closePath(); g.fill(); g.fillStyle='#2a4a34'; g.beginPath(); g.arc(0,23,3,0,Math.PI*2); g.fill(); g.restore();
+    g.fillStyle=fade(y-20,y+24); g.fillRect(x-22,y-20,44,46); }
+  else if(K==='brazier'){ g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(x,y+2,14,5,0,0,Math.PI*2); g.fill(); g.strokeStyle='#2a2420'; g.lineWidth=2.5; [-8,0,8].forEach(d=>{ g.beginPath(); g.moveTo(x+d*1.3,y); g.lineTo(x+d,y-20); g.stroke(); });
+    g.fillStyle='#3a302a'; g.beginPath(); g.ellipse(x,y-22,14,5,0,0,Math.PI*2); g.fill(); g.globalCompositeOperation='lighter';
+    for(let k=0;k<5;k++){ const ph=(t*1.8+k*0.37)%1, fx=x+Math.sin(k*2.1+t*3)*5; g.fillStyle=`rgba(255,${120+k*20},40,${0.6*(1-ph)})`; g.beginPath(); g.ellipse(fx,y-26-ph*24,6*(1-ph)+2,9*(1-ph)+2,0,0,Math.PI*2); g.fill(); }
+    glow(x,y-30,40,40,'255,130,50',0.4); g.globalCompositeOperation='source-over'; }
+  else if(K==='lavafall'){ g.globalCompositeOperation='lighter'; const W2=14;
+    for(let k=0;k<3;k++){ const gr=g.createLinearGradient(0,y-40,0,y+60); gr.addColorStop(0,'rgba(255,220,120,0.9)'); gr.addColorStop(0.5,'rgba(255,120,30,0.7)'); gr.addColorStop(1,'rgba(120,20,0,0)'); g.fillStyle=gr;
+      const ph=(t*0.9+k*0.33)%1; g.fillRect(x-W2/2+k*4-4,y-40,W2-k*4,66); g.fillStyle=`rgba(255,240,180,${0.5*(1-ph)})`; g.fillRect(x-3+k*2,y-40+ph*56,4,10); }
+    glow(x,y+16,50,30,'255,110,30',0.45); g.globalCompositeOperation='source-over'; g.fillStyle='#2a201a'; g.fillRect(x-18,y-46,36,8); }
+  g.restore(); };
+onUse(['ucmark'],o=>say(o.kind==='brazier'?'A Brazier':'In the Dark',["<i>"+UC_KINDS[o.kind]+"</i>"],[bye]));
+// where they stand: in the drop beside crossings, a few in every quarter, the same each time
+const UC_SET={ under_nw:['chimney','spire','gable','statue','chimney','mast','gable','chimney','bell','spire'], under_ne:['gable','chimney','chimney','spire','statue','gable','mast','chimney','bell','gable'],
+  under_sw:['bell','spire','statue','chimney','gable','chimney','spire','statue','mast','lavafall'], under_se:['lavafall','chimney','lavafall','spire','lavafall','statue','lavafall','chimney','lavafall','gable','lavafall','lavafall'] };
+function ucMarks(id){ const G=mazeGrid(id), N=MZ_N, out=[], used=new Set(), list=UC_SET[id]||[]; let k=0;
+  const cand=[]; for(let j=2;j<N-2;j++) for(let i=2;i<N-2;i++){ if(G[j*N+i]) continue; const nb=[[1,0],[-1,0],[0,1],[0,-1]].filter(([a,b])=>G[(j+b)*N+i+a]); if(!nb.length) continue;
+    const cross=nb.some(([a,b])=>[[1,0],[-1,0],[0,1],[0,-1]].filter(([c,d])=>G[(j+b+d)*N+i+a+c]).length>=3); if(cross) cand.push([i,j]); }
+  cand.sort((a,b)=>hsh(a[0]*13+3,a[1]*7+(UNDER_Q[id].seed&255))-hsh(b[0]*13+3,b[1]*7+(UNDER_Q[id].seed&255)));
+  for(const [i,j] of cand){ if(k>=list.length) break; if([...used].some(u=>{ const [a,b]=u.split(',').map(Number); return Math.abs(a-i)+Math.abs(b-j)<7; })) continue; used.add(i+','+j); out.push({type:'ucmark', kind:list[k++], i, j}); }
+  return out; }
+Object.keys(UNDER_Q).forEach((id,q)=>{ AREAS[id].seedSalt=q*11; wrap(id,'objects',l=>[...l, ...ucMarks(id)]); });
+// the lower quarters run hot: the Chapel Roofs glow from below, the last quarter is the Ember Stair, with the Flamesworn on its walkways
+AREAS.under_sw.heat=0.5; AREAS.under_se.heat=1; AREAS.under_se.volcanic=true; AREAS.under_se.label=UNDER_Q.under_se.label='The Undercity · The Ember Stair';
+UNDER_LORE.under_se[0][2]="The cistern is cracked through, and fire runs in the cracks far below. The Flamesworn have hung their braziers along the walkways from here on down.";
+wrap('under_se','objects',l=>{ const room=(cx,cy)=>[2*cx+1,2*cy+1]; return [...l, ...[[3,3],[11,2],[13,13],[6,14]].map(([cx,cy],k)=>{ const [i,j]=room(cx,cy); return {type:'ucmark', kind:'brazier', i:i+1, j:j+1, noblock:false}; })]; });
+wrap('under_se','mobs',l=>[...l.filter(m=>!/^Undercity Dead|^Deep Lurker/.test(m.name)),
+  { name:'Flamesworn Sentry', type:'bandit', i:2*3+1, j:2*3+1, faction:'und_se_fs1', style:'shield', opts:FLAMESWORN({skin:3,hair:1,beard:2,equip:{head:'obsidian_helm',torso:'shirt',armor:'ash_mantle',hands:'cinder_gloves',legs:'scorched_greaves',feet:'emberstep_boots',weapon:'sword',offhand:'shield_iron'}}) },
+  { name:'Ash Hound', type:'wolf', i:2*11+1, j:2*2+1, faction:'und_se_ash', coat:'#2a201c' }, { name:'Ash Hound Bitch', type:'wolf', i:2*11+1+1, j:2*2+1, faction:'und_se_ash', coat:'#3a2a24' } ]);
 </script>
 </body>
 </html>

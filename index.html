@@ -12024,7 +12024,7 @@ function mapLayout(){
       pos[t.to]=cand; queue.push(t.to); } }
   return MAP_LAYOUT=pos;
 }
-const MM_COL={ ash:'#5a3a30', bog:'#4e5434', farm:'#8a9a4a', road:'#4e6a34', crossroads:'#5a7a3a', village:'#9aa058', wood:'#3a5a2c', fen:'#44583e', elf:'#7a9a5a' };
+const MM_COL={ sand:'#c8a464', ash:'#5a3a30', bog:'#4e5434', farm:'#8a9a4a', road:'#4e6a34', crossroads:'#5a7a3a', village:'#9aa058', wood:'#3a5a2c', fen:'#44583e', elf:'#7a9a5a' };
 function renderMap(cv,V){                             // V: {zoom, px, py, labels} — zoom/pan on top of fitting the whole explored world
   const c=cv.getContext('2d'), L=mapLayout();
   c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,cv.width,cv.height);
@@ -12364,8 +12364,9 @@ function nextFoe(first,target){
   if(foe.type==='dummy'){ foe.hp=foe.maxHp; foe.state='guard'; foe.k=0; foe.guardDir='up'; combat.phase='approach'; foe.path=[]; logMsg('Practice: attack the side he is not guarding, or parry his swing.','#8ab0d8'); return; }
   foe.state='guard'; foe.k=0;
   foe.guardDir = foeDef(foe).unguarded ? null : DIRS3[Math.floor(Math.random()*3)];
-  if(foeDef(foe).unguarded) logMsg('It has no guard — but its bite is fast. Watch for the lunge.','#c0483a');
-  logMsg(`${foe.name} steps up.`,'#c0483a');
+  if(foe.type==='sandworm') logMsg('The worm rears up out of the sand, its mouth opening like a flower full of teeth.','#c0483a');
+  else { if(foeDef(foe).unguarded) logMsg('It has no guard — but its bite is fast. Watch for the lunge.','#c0483a');
+    logMsg(`${foe.name} steps up.`,'#c0483a'); }
   // walk up beside you (side by side on screen reads best as a duel)
   let best=null, bs=1e9;
   const pref={'1,-1':0,'-1,1':0,'1,0':2,'0,1':2,'0,-1':2,'-1,0':2,'1,1':4,'-1,-1':4};
@@ -12539,6 +12540,7 @@ function impact(f){                                   // a foe's swing lands (or
     if(f.type==='wolf'){ addStatus(player,'bleed',4.2,1); logMsg('The bite tears. You are bleeding.','#d0342c'); }
     else if(f.opts && BLEEDERS.has(f.opts.equip&&f.opts.equip.weapon) && Math.random()<0.25) addStatus(player,'bleed',3.2,1); }
   if(f.phase2 && hurt) addStatus(player,'bleed',5,2);
+  if(hurt && f.type==='sandworm' && s.dive){ shake=Math.max(shake,10); addStatus(player,'bleed',3,1); }
   if(hurt && f.type==='scorpion' && s.sting){ addStatus(player,'venom',7,2); teach('venom','Venom',["The sting <b>envenomed</b> you: it costs a little health every second for a while.","A <b>Scorpion Antidote</b> (Yusra at Sefa's Well) stops it."]); }
   if(hurt && FIRE_FOE(f) && Math.random()<(/Slag|Kindled/.test(f.name)?1:/^Ember/.test(f.name)?0.6:0.35)) addStatus(player,'burn',3,2);
   if(f.type==='barrowking' && f.cphase>=3 && player.hp<hp0 && !f.dead){ const h=Math.min(5,f.maxHp-f.hp); if(h>0){ f.hp+=h; floatText(tileOf(f),'+'+h,'#9ad0e8'); } }
@@ -12546,7 +12548,9 @@ function impact(f){                                   // a foe's swing lands (or
 }
 function wound(f,n,label,col){                       // a blow lands on a foe
   const W=WEAPONS[player.opts&&player.opts.equip.weapon]||{};
-  if(f && f.type==='scorpion' && HIT_SRC==='melee' && n>0 && f.state!=='recover' && f.state!=='stagger'){ n=Math.max(1,Math.ceil(n*foeDef(f).shell)); floatText([f.i,f.j-0.003],'Shell','#c8b088');
+  if(f && f.type==='sandworm' && HIT_SRC==='melee' && n>0 && f.state!=='recover' && f.state!=='stagger'){ n=Math.max(1,Math.ceil(n*foeDef(f).shell)); floatText([f.i,f.j-0.003],'Scales','#e0c080');
+    teach('wormscale','Scales like shields',["The worm's <b>scales</b> turn most of a blow.","After it <b>dives at you from high</b>, it lies <b>open</b> for a moment, its soft throat showing. Parry the dive, then strike."]); }
+  else if(f && f.type==='scorpion' && HIT_SRC==='melee' && n>0 && f.state!=='recover' && f.state!=='stagger'){ n=Math.max(1,Math.ceil(n*foeDef(f).shell)); floatText([f.i,f.j-0.003],'Shell','#c8b088');
     teach('shell','A hard shell',["The scorpion's <b>shell</b> turns your blows to half.","<b>Parry its sting</b> (the slow strike from high), then hit it while it recovers: open, it takes full damage."]); }
   if(f && f.warded){ floatText(tileOf(f),'Warded','#c8e0f0'); SND.clang(0.6); }
   else if(f && f.type==='barrowking' && (f.cphase||1)<3){ const th=ckTh(f), pre=f.hp; f.hp+=1000; woundRaw(f,n,label,col); const dealt=pre+1000-f.hp; f.hp=Math.max(th,pre-dealt); }   // his phases end at fixed thresholds, however hard the blow
@@ -12677,6 +12681,7 @@ function victory(faction){
       if(R()<0.08) give('rusted_blade'); if(R()<0.04) give('grave_ring'); return; }                                                                 // and now and then something it was buried with
     if(m.type==='lurker'){ if(R()<0.4) coin(2,5); if(R()<0.2){ const pool=LOOT_TIERS[0]; give(pool[Math.floor(R()*pool.length)]); logMsg('…something it swallowed, a while ago.','#a8a080'); } return; }
     if(m.opts && (m.opts.ghost||m.opts.bones)){ if(R()<0.5) coin(4,12); return; }                // the dead carry nothing but old coin
+    if(m.type==='sandworm'){ const n=2+(R()<0.5?1:0); for(let k=0;k<n;k++) give('worm_scale'); if(R()<0.5) coin(8,20); logMsg('The worm shrinks back into the sand, leaving its shed scales behind. They are warm, and ring like bronze when you knock them together.','#a89878'); return; }
     if(m.type==='ember'){ if(R()<0.6) coin(2,6); if(m.opts.big) give('ember_heart'); return; }                 // a fire-sprite leaves warm coins in the ashes, and the big one its heart
     if(m.type!=='barrowking' && m.type!=='goblin'){ if(R()<0.3) give('old_bone'); if(R()<0.07) give('old_skull'); }   // men who died badly: Vesna has a use for what is left
     if(m.type==='goblin'){ if(R()<0.35) coin(1,3); if(R()<0.15) give(['apple','apple','bread','raw_meat'][Math.floor(R()*4)]); if(R()<0.2) give(['dagger','hood','shirt','club'][Math.floor(R()*4)]); return; }
@@ -13110,6 +13115,7 @@ function drawActorBase(e){
   else if(e.type==='wolf'){ const live=(combat.active && (e===combat.foe||isP)) || e.moving, ps=live?poseFor(e):litPose(poseFor(e)); drawLitSprite(s.x,B,()=>drawWolf(s.x,B,e,e.dir||0,ps),1.2,live?null:'w:'+(e.id??e.name),(e.dir||0)+'|'+(e.moving?gt.toFixed(2):'')+'|'+litSig(ps)+'|'+e.coat+'|'+(e.dead?1:0)); }
   else if(e.type==='lurker') drawLurker(s.x,B,e,poseFor(e));
   else if(e.type==='scorpion') drawScorpion(s.x,B,e,poseFor(e));
+  else if(e.type==='sandworm') drawSandworm(s.x,B,e,poseFor(e));
   else if(e.type==='ember') drawEmber(s.x,B,e,poseFor(e));
   else if(e.type==='skeleton') drawRisen(s.x,B,e,poseFor(e));
   else if(e.opts && e.opts.wrapped && !e.dead){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); drawWraps(s.x,B,e); if(e.warded){ g.save(); g.globalCompositeOperation='lighter'; glow(s.x,B-60,60,90,'255,200,90',0.35+Math.sin(gt*4)*0.08); g.restore(); } }
@@ -13117,7 +13123,7 @@ function drawActorBase(e){
   g.restore();
   if(!isP && e.dead) return;
   if(isP && romHush()) return;
-  const ty=B-(e.type==='wolf'||e.type==='scorpion'?66:114);
+  const ty=B-(e.type==='wolf'||e.type==='scorpion'?66:e.type==='sandworm'?178:114);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const deadly=!isP && e.type!=='dummy' && e.hostile!==false && player.maxHp>0 && ((e.maxHp||0)*(((weaponOf(e)||{}).dmg)||5)*tierDmg(e)) >= 2*player.maxHp*Math.max(8,playerHitDmg());   // far stronger than you: a skull
   const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  '+'◆'.repeat(e.tier) : ''), tw=g.measureText(label).width;
@@ -19285,6 +19291,96 @@ const VOICE=(()=>{
 ['glassdunes',15,10,{coin:40},"A merchant's iron box, rusted shut. You break it open on a stone. Somebody's whole profit, from somebody's whole year."],
 ['glassdunes',0,4,{item:'scarab_circlet'},"A temple priest's circlet, the gold scoured bright by the sand. The scarab on it is facing the sun, the way it always was."],
 ['templeA',8,2,{coin:30,item:'potion'},"Sand drifted into a corner of the temple, and under it an offering jar: coin, and a draught the priests left for whoever came next."] ].forEach(m=>{ MOUNDS.push(m); wrap(m[0],'objects',l=>[...l, (CHOICE.dug||{})[moundKey(m)] ? {type:'dugpit', i:m[1], j:m[2], noblock:true} : {type:'dirtmound', i:m[1], j:m[2], mound:m}]); });
+
+// ════════ THE SAND WORM: rare, under the Glass Dunes and the Dry Wash. You only see the sand moving when you are right beside it ════════
+//   CHOICE.wormDay : the day you last killed one (it is a while before another comes up)
+FOES.sandworm={ label:'Great Sand Worm', base:240, stagger:0.55, unguarded:true, shell:0.3, pattern:[
+  {wait:1.2, wind:0.6, after:0.25, dir:'left'}, {wait:0.15, wind:0.55, after:0.3, dir:'right'}, {wait:0.9, wind:0.6, after:0.3, dir:'left'}, {wait:1.1, wind:1.35, after:1.25, dir:'up', dive:true} ]};
+Object.assign(WEAPONS,{ worm_maw:{ wind:0.35, dmg:15, len:24 } });
+BEASTS.push({ k:'sandworm', is:f=>f.type==='sandworm', name:'The Great Sand Worm', kind:'Beasts · under the Sunscar',
+  how:'A sweep of its body left and right, then it rears up high and dives on you.', res:'Its scales turn most of a blow, unless it is open after the dive.', aff:'The dive tears: you bleed.',
+  ans:'Watch for sand moving under your feet, and decide before it decides for you. Parry the dive, then cut at the soft throat.' });
+function drawSandworm(x,B,e,pose){ const raise=pose&&pose.kind==='raise'?Math.min(1,pose.t):0, strike=pose&&pose.kind==='strike'?Math.min(1,pose.t):0;
+  const pp=P(player.x??player.i+0.5,player.y??player.j+0.5), face=pp.x>=x?1:-1, C='#b8884a', D='#5a3a18', L='#ecd09a', sway=Math.sin(gt*2.2+(e.id||0))*5, up=e.rise==null?1:e.rise;
+  g.save(); g.fillStyle='rgba(60,30,0,0.28)'; g.beginPath(); g.ellipse(x,B+2,42,12,0,0,Math.PI*2); g.fill();
+  g.fillStyle='#c8a464'; g.beginPath(); g.ellipse(x,B,36,11,0,0,Math.PI*2); g.fill(); g.fillStyle='#6a4a22'; g.beginPath(); g.ellipse(x,B-1,24,7,0,0,Math.PI*2); g.fill();   // the hole it came out of
+  const hx=x+face*(20+strike*40-raise*14)+sway, hy=B-(26+92*up)-raise*20+strike*52, c1=[x-face*30,B-40*up], c2=[x+face*28,B-70*up], seg=13, P0=[x-face*4,B-2];
+  const bz=(t,a,b2,c3,d)=>(1-t)**3*a+3*(1-t)**2*t*b2+3*(1-t)*t*t*c3+t**3*d, pts=[];
+  for(let k=0;k<=seg;k++){ const t=k/seg; pts.push([bz(t,P0[0],c1[0],c2[0],hx), bz(t,P0[1],c1[1],c2[1],hy)]); }
+  pts.forEach(([px,py],k)=>{ if(k===seg || py>B-3) return; const r=17-k*0.45;   // the body, ring on ring, curving up out of the hole
+    g.fillStyle=k%2?C:tone(C,-0.14); g.beginPath(); g.ellipse(px,py,r,r*0.86,0,0,Math.PI*2); g.fill(); g.strokeStyle=D; g.lineWidth=1.3; g.stroke();
+    g.fillStyle=L; g.beginPath(); g.ellipse(px+face*r*0.42,py+1,r*0.4,r*0.66,0,0,Math.PI*2); g.fill();   // the pale belly
+    g.fillStyle='rgba(255,240,200,0.35)'; g.beginPath(); g.ellipse(px-face*r*0.35,py-r*0.4,r*0.3,r*0.16,0,0,Math.PI*2); g.fill(); });
+  const [qx,qy]=pts[seg], op=0.3+raise*0.7+strike*0.25;   // the head: plated, the front of it all mouth
+  g.fillStyle=tone(C,-0.04); g.beginPath(); g.ellipse(qx,qy,20,18,0,0,Math.PI*2); g.fill(); g.strokeStyle=D; g.lineWidth=1.5; g.stroke();
+  [-1,1].forEach(sd=>{ g.fillStyle=tone(C,0.1); g.beginPath(); g.moveTo(qx-face*6,qy+sd*6); g.quadraticCurveTo(qx+face*10,qy+sd*(18+op*6),qx+face*(22+op*6),qy+sd*(8+op*12)); g.lineTo(qx+face*12,qy+sd*3); g.closePath(); g.fill(); g.strokeStyle=D; g.lineWidth=1.1; g.stroke(); });   // the jaw-petals
+  const mx=qx+face*13, rx=4+op*6, ry=6+op*9;
+  const th=g.createRadialGradient(mx,qy,0,mx,qy,ry); th.addColorStop(0,raise>0.3?'#ff9040':'#5a1a10'); th.addColorStop(0.5,'#4a1008'); th.addColorStop(1,'#200604');
+  g.fillStyle=th; g.beginPath(); g.ellipse(mx,qy,rx,ry,0,0,Math.PI*2); g.fill();
+  g.fillStyle='#f4ead0'; for(let k=0;k<12;k++){ const a=k/12*Math.PI*2, tx=mx+Math.cos(a)*rx, ty=qy+Math.sin(a)*ry, ix=mx+Math.cos(a)*rx*0.55, iy=qy+Math.sin(a)*ry*0.55;   // a ring of teeth pointing inwards
+    g.beginPath(); g.moveTo(tx-Math.sin(a)*1.6,ty+Math.cos(a)*1.6); g.lineTo(ix,iy); g.lineTo(tx+Math.sin(a)*1.6,ty-Math.cos(a)*1.6); g.closePath(); g.fill(); }
+  if(raise>0.3){ g.save(); g.globalCompositeOperation='lighter'; glow(mx,qy,16,16,'255,140,60',0.4*raise); g.restore(); }
+  g.fillStyle='#c8a464'; g.beginPath(); g.moveTo(x-36,B); g.quadraticCurveTo(x,B+13,x+36,B); g.quadraticCurveTo(x,B+4,x-36,B); g.fill();   // the near lip of sand over its body
+  g.fillStyle='#d8b878'; for(let k=0;k<8;k++){ const a=gt*3+k; g.fillRect(x+Math.cos(a)*30,B-2+Math.sin(a*1.3)*3-((gt*40+k*9)%14),1.6,1.6); }   // sand pouring off it
+  g.restore(); }
+// where it hides: a spot of slowly turning sand, one of these per area, on some days
+const WORM_SPOTS={ glassdunes:[[6,3],[11,9],[3,10]], drywash:[[4,7],[2,14],[5,19]] };
+const wormHere=a=>{ const S=WORM_SPOTS[a]; if(!S) return null; const day=Math.floor(dayClock/DAY_LEN); if(CHOICE.wormDay!=null && day-CHOICE.wormDay<3) return null;
+  let h=11; for(const ch of a+':'+day) h=(h*31+ch.charCodeAt(0))>>>0; return h%3===0 ? S[(h>>3)%S.length] : null; };
+Object.keys(WORM_SPOTS).forEach(a=>wrap(a,'objects',l=>{ const w=wormHere(a); return w ? [...l,{type:'sandstir', i:w[0], j:w[1], noblock:true}] : l; }));
+OBJ_DRAW.sandstir=function(o){ const d=Math.max(Math.abs(player.i-o.i),Math.abs(player.j-o.j)); if(d>1 && !o.woke) return;   // only close up do you notice it
+  const q=P(o.i+0.5,o.j+0.5), t=gt; g.save();
+  for(let k=0;k<3;k++){ const ph=((t*0.6+k/3)%1); g.strokeStyle='rgba(120,80,30,'+(0.5*(1-ph))+')'; g.lineWidth=1.4; g.beginPath(); g.ellipse(q.x,q.y,6+ph*24,2.4+ph*9,0,0,Math.PI*2); g.stroke(); }
+  g.fillStyle='rgba(110,75,30,0.35)'; g.beginPath(); g.ellipse(q.x,q.y,7,2.6,0,0,Math.PI*2); g.fill();
+  g.fillStyle='#d8b878'; for(let k=0;k<10;k++){ const a=t*1.4+k*0.63, r=4+((k*7+t*9)%18); g.fillRect(q.x+Math.cos(a)*r,q.y+Math.sin(a)*r*0.38,1.4,1.4); }   // grains sliding in towards the middle
+  g.restore(); };
+let WORM_NEAR=0;
+function wormRise(o){ const idx=OBJECTS.indexOf(o); if(idx>=0) OBJECTS.splice(idx,1);
+  let spot=[o.i,o.j]; if(player.i===o.i && player.j===o.j){ spot=null; for(const [di,dj] of [[1,0],[0,1],[-1,0],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]]){ const i=o.i+di, j=o.j+dj; if(i<0||j<0||i>=ROOM.w||j>=ROOM.h||blocked.has(i+','+j)||mobAt(i,j)) continue; spot=[i,j]; break; } if(!spot) spot=[o.i,o.j]; }
+  const hp=FOES.sandworm.base, name='Great Sand Worm';
+  const m={ id:mobs.length+60, key:name+'@'+Math.floor(dayClock), name, type:'sandworm', opts:{ equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:'worm_maw',offhand:null} }, faction:'sandworm', spawn:spot, i:spot[0], j:spot[1], x:spot[0]+0.5, y:spot[1]+0.5,
+    dir:spot[0]<player.i||spot[1]<player.j?1:5, hp, maxHp:hp, path:[], moving:false, dead:false, gone:false, fade:1, flash:0, lunge:null, state:'guard', t:0, k:0, wind:1, quick:false, guardDir:'up', ox:0, oy:0, hostile:true, fallT:0, tier:3, rise:0 };
+  mobs.push(m); try{ FOOLED[areaId+':'+name]=false; }catch(e){}
+  CHOICE.wormSeen=true; shake=Math.max(shake,12); player.dir=dirTo(tileOf(player),spot);
+  for(let n=0;n<26;n++) sparks.push({wx:spot[0]+0.5,wy:spot[1]+0.5,vx:(Math.random()-0.5)*220,vy:-60-Math.random()*160,t:0,col:['#d8b878','#b08848','#ecd29a'][n%3]});
+  banner('The sand opens!','#e8c080',1400);
+  const t0=performance.now(), grow=()=>{ m.rise=Math.min(1,(performance.now()-t0)/700); if(m.rise<1) requestAnimationFrame(grow); }; grow();
+  const go=()=>{ try{ if(m.dead || !mobs.includes(m)) return; if(CS.on || dlgIsOpen()){ setTimeout(go,400); return; } if(!combat.active) startCombat(); }catch(e){} }; setTimeout(go,900); }
+setInterval(()=>{ try{ if(combat.active || CS.on || dlgIsOpen() || !WORM_SPOTS[areaId]) { WORM_NEAR=0; return; }
+    const dd=o=>Math.max(Math.abs(player.i-o.i),Math.abs(player.j-o.j)), o=OBJECTS.filter(o=>o.type==='sandstir').sort((a,b)=>dd(a)-dd(b))[0]; if(!o){ WORM_NEAR=0; return; }
+    const d=dd(o);
+    if(d===0) return wormRise(o);                                  // you stepped right on it
+    if(d===1){ WORM_NEAR+=0.2; if(WORM_NEAR>=1.6) return wormRise(o); } else WORM_NEAR=0;   // or stood beside it too long
+  }catch(e){} },200);
+setInterval(()=>{ try{ if(combat.active) return; mobs.forEach(m=>{ if(m.type!=='sandworm' || !m.dead || m.counted) return; m.counted=true; CHOICE.wormDay=Math.floor(dayClock/DAY_LEN); CHOICE.wormKills=(CHOICE.wormKills||0)+1; try{ autosaveSoon(300); }catch(e){} }); }catch(e){} },400);
+// what it leaves: scales Tamir can work into armour
+Object.assign(ITEMS,{ worm_scale:{ name:'Sand Worm Scale', slot:'misc', title:"A scale as broad as your palm, gold-brown and ringing like bronze when you knock it. Tamir says nothing in the south turns a blade like it." },
+  wyrm_hauberk:{ name:'Wormscale Hauberk', slot:'armor', base:'mail', col:'#c89a50', title:"Sand worm scales overlapped on a leather coat, each one riveted at the top so they move like the worm moved. It is cool in the sun, and sand slides off it like water." },
+  wyrm_shield:{ name:'Wormscale Shield', slot:'offhand', base:'shield', col:'#b8884a', title:"Two great worm scales on a frame of palm wood, rimmed in bronze. It rings when it takes a blow, and the blow does not get through." },
+  wyrm_helm:{ name:'Wormscale Helm', slot:'head', base:'kettle', col:'#c89a50', title:"A cap of small worm scales, lapped like roof tiles. Tamir made it out of the pieces too small for anything else, and is prouder of it than of anything." } });
+Object.assign(ITEM_STATS,{ wyrm_hauberk:{hp:13,agi:2}, wyrm_shield:{hp:5,agi:1}, wyrm_helm:{hp:4,agi:1} }); Object.assign(GEAR_HP,{ wyrm_hauberk:13, wyrm_shield:5, wyrm_helm:4 });
+Object.assign(PRICES,{ worm_scale:25, wyrm_hauberk:420, wyrm_shield:160, wyrm_helm:140 }); SELL_MISC.add('worm_scale');
+ITEM_ICON.worm_scale=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); const gr=g2.createLinearGradient(10,8,30,34); gr.addColorStop(0,'#f0d090'); gr.addColorStop(0.5,'#c8964a'); gr.addColorStop(1,'#7a5420');
+  g2.fillStyle=gr; g2.beginPath(); g2.moveTo(20,6); g2.quadraticCurveTo(34,10,32,24); g2.quadraticCurveTo(28,34,20,36); g2.quadraticCurveTo(12,34,8,24); g2.quadraticCurveTo(6,10,20,6); g2.fill(); g2.strokeStyle='#5a3a14'; g2.lineWidth=1.2; g2.stroke();
+  g2.strokeStyle='rgba(90,60,20,0.6)'; g2.lineWidth=0.8; [14,20,26].forEach(y=>{ g2.beginPath(); g2.moveTo(11,y+2); g2.quadraticCurveTo(20,y-3,29,y+2); g2.stroke(); }); g2.fillStyle='rgba(255,250,220,0.6)'; g2.beginPath(); g2.ellipse(15,13,3,1.6,-0.6,0,Math.PI*2); g2.fill(); g2.restore(); };
+// Tamir works the scales: a day at the anvil for each piece
+const WYRM_RECIPES=[['wyrm_hauberk',5,120],['wyrm_shield',2,40],['wyrm_helm',2,40]];
+{ const oldT=TALKERS.tamir; TALKERS.tamir=(...a)=>{ const T='Tamir the Bladesmith', day=Math.floor(dayClock/DAY_LEN), sc=player.inv.filter(x=>x==='worm_scale').length, W=CHOICE.wyrmWork;
+    if(W && typeof W.day==='number'){ if(day<=W.day){ say(T,["“Not yet. Scale cracks if you rivet it cold. Tomorrow.”"],[{label:'Something else.',fn:()=>oldT(...a)},bye]); return; }
+      if(player.inv.indexOf(null)<0){ say(T,"“It is done, but you have nowhere to put it. Make room.”",[bye]); return; }
+      say(T,["<i>Tamir lifts it off the anvil, still warm, and knocks a knuckle against it. It rings.</i>","“There. Nothing in the Sunscar will bite through that. I know. I tried.”"],[{label:'Take it.', fn:()=>{ const id=W.id; CHOICE.wyrmWork=null; giveQuestItem(id,true); logMsg('Tamir made you a '+ITEMS[id].name+'.','#8ac070'); closeDialog(); }}]); return; }
+    if(sc>0){ const opts=WYRM_RECIPES.filter(([id,n])=>sc>=n).map(([id,n,c])=>({label:'“Make me a '+ITEMS[id].name.replace('Wormscale ','scale ').toLowerCase()+".” ("+n+' scales, '+formatCoin(c)+')', fn:()=>{
+        if(player.purse<c){ say(T,"“Scales I have now. Coin I do not. Come back with "+formatCoin(c)+".”",[bye]); return; }
+        for(let k=0;k<n;k++) player.inv[player.inv.indexOf('worm_scale')]=null; player.purse-=c; CHOICE.wyrmWork={id,day}; updateHud(); logMsg('You give Tamir '+n+' worm scales and '+formatCoin(c)+'. It will be ready tomorrow.','#8ac070');
+        say(T,"“Tomorrow. Don't let anyone tell you they've seen better.”",[bye]); }}));
+      say(T,[!CHOICE.wyrmTalk?"“Is that… let me see. Worm scale. You killed one? Out there, alone?” <i>He turns it over and over.</i>":"“More scale. Good. What shall it be?”",
+        !CHOICE.wyrmTalk?"“My grandfather made a coat of this for a queen. Bring me enough and I'll make you one. A hauberk takes five. A shield or a helm, two.”":"“Five for the hauberk. Two for a shield or a helm.”"],
+        [...opts,{label:'Something else.', fn:()=>{ CHOICE.wyrmTalk=true; oldT(...a); }},bye]); CHOICE.wyrmTalk=true; return; }
+    return oldT(...a); }; }
+// Sefa has heard of them
+{ const oldS=TALKERS.sefa; if(oldS) TALKERS.sefa=(...a)=>{ if(CHOICE.sefaMet && CHOICE.sefaTemple && !CHOICE.wormRumour && !CHOICE.wormSeen){ CHOICE.wormRumour=true;
+      say('Sefa of the Well',["“If you go into the dunes, watch the sand at your feet. When it turns round and round, like water going down a drain, walk away. Quickly.”","“Something lives under there. The caravans call it the Mouth. Every few years it takes a camel. Once it took a man.”"],[{label:'Something else.',fn:()=>oldS(...a)},bye]); return; }
+    return oldS(...a); }; }
 </script>
 </body>
 </html>

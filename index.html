@@ -13161,7 +13161,7 @@ function drawActorBase(e){
   if(isP && romHush()) return;
   const ty=B-(e.type==='wolf'||e.type==='scorpion'?66:e.type==='sandworm'?178:e.type==='scarab'?78:114);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
-  const deadly=!isP && e.type!=='dummy' && e.hostile!==false && player.maxHp>0 && ((e.maxHp||0)*(((weaponOf(e)||{}).dmg)||5)*tierDmg(e)*(typeof gapIn==='function'?gapIn(e)/gapOut(e):1)*(typeof foeSpell==='function' && foeSpell(e) ? (isMagicWeapon()||hasShield(player) ? 1.3 : 1.8) : 1)) >= 2*player.maxHp*Math.max(8,playerHitDmg());   // far stronger than you: a skull
+  const deadly=!isP && e.type!=='dummy' && e.hostile!==false && e.tier && typeof foeLevel==='function' && foeLevel(e)-playerLevel()>=3;   // far stronger than you: a skull
   const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  Lv '+(typeof foeLevel==='function'?foeLevel(e):e.tier) : ''), tw=g.measureText(label).width;
   g.fillStyle=deadly?'rgba(60,8,6,0.85)':'rgba(12,8,3,0.78)'; g.beginPath(); g.roundRect(s.x-tw/2-7,ty,tw+14,16,4); g.fill();
   if(deadly){ g.strokeStyle='rgba(220,70,50,0.8)'; g.lineWidth=1; g.stroke(); }
@@ -13726,6 +13726,7 @@ function puzAct(o){                                 // you use something in the 
     return; }
   if(o.type==='water'){
     const W=WEAPONS[player.opts.equip.weapon]||{};
+    if(W.magic && NECRO_STAVES.includes(player.opts.equip.weapon)){ pzSay('Your staff knows death, not frost. A heavy stone might fill it.','#b8a8e8'); return; }
     if(W.magic){ player.maxMana=100; if(player.mana==null) player.mana=100; if(player.mana<24){ pzSay('Not enough mana for frost.','#a8a0c8'); return; }
       player.mana-=24; OBJECTS.splice(OBJECTS.indexOf(o),1); OBJECTS.push({type:'ice', i:o.i, j:o.j, noblock:true}); (P.ice=P.ice||[]).push(o.i+','+o.j); pzRebuild();
       bolts.push({from:{x:player.x,y:player.y}, to:{x:o.i+0.5,y:o.j+0.5}, t:0, S:SPELLS.up}); pzSay('Frost! The water freezes solid.','#8ac8f0'); return; }
@@ -13733,10 +13734,12 @@ function puzAct(o){                                 // you use something in the 
   if(o.type==='thorns'){
     const id=player.opts.equip.weapon, W=WEAPONS[id]||{};
     const burn=()=>{ OBJECTS.splice(OBJECTS.indexOf(o),1); P.thorns=true; pzRebuild(); };
+    if(W.magic && NECRO_STAVES.includes(id)){ player.maxMana=100; if(player.mana==null) player.mana=100; if(player.mana<20){ pzSay('Not enough mana to wither them.','#a8a0c8'); return; }   // no fire in a necromancer's hand: Wither takes the life out of the hedge instead
+      player.mana-=20; bolts.push({from:{x:player.x,y:player.y}, to:{x:o.i+0.5,y:o.j+0.5}, t:0, S:HEX_SPELLS.right}); burn(); pzSay('Wither! The thorns grey, shrivel and crumble to dust.','#b07ad0'); return; }
     if(W.magic){ player.maxMana=100; if(player.mana==null) player.mana=100; if(player.mana<30){ pzSay('Not enough mana for fire.','#a8a0c8'); return; }
       player.mana-=30; bolts.push({from:{x:player.x,y:player.y}, to:{x:o.i+0.5,y:o.j+0.5}, t:0, S:SPELLS.left}); burn(); pzSay('Fire! The thorns curl up and burn away.','#f08a30'); return; }
     if(['axe','hatchet'].includes(id)){ burn(); pzSay('You hack through the thorns. It takes a while, and some skin.','#e8c878'); player.hp=Math.max(1,player.hp-3); updateHud(); return; }
-    pzSay('Thorns as thick as a wrist. Fire, or an axe, would clear them.','#c8b890'); return; }
+    pzSay('Thorns as thick as a wrist. Fire, an axe, or something that kills what grows would clear them.','#c8b890'); return; }
   if(o.type==='crystal'){
     if(o.c==='x'||P.c3) { pzSay('The crystal hums.','#9fe0b0'); return; }
     const want=['sea','leaf','dusk']; P.seq=P.seq||[]; P.seq.push(o.c); o.lit=true;
@@ -20008,7 +20011,7 @@ let gapWarned={};
     if(gap>=1){ try{ CHOICE.daring=(CHOICE.daring||0)+1; setTimeout(()=>{ try{ giveXp(killXp(f)); }catch(e){} },600); CHOICE.daringBest=Math.max(CHOICE.daringBest||0,gap); const coin=4*gap*(f.tier||1)+Math.floor(Math.random()*6); player.purse+=coin; updateHud();
       slowmo.scale=0.15; slowmo.t=0.9; shake=Math.max(shake,10);
       setTimeout(()=>{ banner(gap>=2?'Against all odds!':'Beyond your level!','#ffd070',1800); logMsg('You beat '+f.name+' (level '+foeLevel(f)+') at level '+playerLevel()+'. Folk will hear of this. You find '+formatCoin(coin)+' on the body.','#ffd070'); },350);
-      if(CHOICE.daring===1) setTimeout(()=>teach('daring','Beyond your gear',["You beat a foe <b>three or more levels above you</b>. That is hard, and it is worth something: <b>extra coin</b> and <b>double experience</b>, and word of it spreads.","Do it five times and it counts toward your <b>renown</b>."]),1400);
+      if(CHOICE.daring===1) setTimeout(()=>teach('daring','Beyond your level',["You beat a foe <b>three or more levels above you</b>. That is hard, and it is worth something: <b>extra coin</b> and <b>double experience</b>, and word of it spreads.","Do it five times and it counts toward your <b>renown</b>."]),1400);
       autosaveSoon(400); }catch(e){} }
     return r; }; }
 JOURNAL.push(['Beyond Your Level', ()=> !CHOICE.daring ? null : CHOICE.daring>=5 ? ['done',"You have beaten "+CHOICE.daring+" foes you had no business beating, three and more levels above you."+(CHOICE.daringBest>=2?" Once, against all odds.":"")]
@@ -20044,7 +20047,7 @@ function giveXp(n,why){ if(!n || n<1) return; const L0=playerLevel(); CHOICE.xp=
   floatText(tileOf(player),'+'+Math.round(n)+' xp','#e8d070');
   if(L1>L0){ refreshPlayerHp(false); player.hp=player.maxHp; updateHud(); setTimeout(()=>{ banner('Level '+L1+'!','#f0dc80',2000); try{ SND.perfect(); }catch(e){}
       logMsg('You are level '+L1+' now: '+player.maxHp+' health, and your blows land a little harder.','#f0dc80');
-      teach('levels','Levels',["Every foe you fell and every task you finish gives <b>experience</b>. Each <b>level</b> gives you <b>+8 health</b> and <b>+5% damage</b>.","Foes have levels too, shown over their heads. A few levels above you is a <b>hard fight</b> you can still win with good parries and good gear. <b>Five or more</b> above, and it will very likely kill you."]); },300); }
+      teach('levels','Levels',["Every foe you fell and every task you finish gives <b>experience</b>. Each <b>level</b> gives you <b>+8 health</b> and <b>+5% damage</b>.","Foes have levels too, shown over their heads. Three or more levels above you, they carry a <b>☠</b>: a <b>hard fight</b> you can still win with good parries and good gear. <b>Five or more</b> above, and it will very likely kill you."]); },300); }
   updateHud(); }
 function killXp(f){ const d=foeLevel(f)-playerLevel(), base=6*foeLevel(f); return base*(d>=0 ? Math.min(2,1+0.2*d) : Math.max(0,1+0.25*d)); }
 { const _fd=foeDown; foeDown=function(f){ const xp=(f && f.type!=='dummy' && !combat.practice && !f.dead) ? killXp(f) : 0; const r=_fd.apply(this,arguments); if(xp>=1) setTimeout(()=>giveXp(xp),250); return r; }; }

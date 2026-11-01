@@ -11985,7 +11985,7 @@ function resetMobs(){
     const tooClose=(i,j)=> NPCS.some(n=>Math.max(Math.abs(n.i-i),Math.abs(n.j-j))<=3) || [...ents,...tps].some(e=>Math.max(Math.abs(e.i-i),Math.abs(e.j-j))<=2);
     mobs.forEach(m=>{ if(m.dead || m.hostile===false || m.type==='dummy' || !tooClose(m.i,m.j)) return;
       let best=null, bd=1e9;
-      for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++){ if(blocked.has(i+','+j) || inNotch(i,j) || tooClose(i,j) || mobs.some(o=>o!==m && !o.dead && o.i===i && o.j===j)) continue;
+      for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++){ if(blocked.has(i+','+j) || (A.maze && typeof mazeGrid==='function' && !mazeGrid(areaId)[j*ROOM.w+i]) || inNotch(i,j) || tooClose(i,j) || mobs.some(o=>o!==m && !o.dead && o.i===i && o.j===j)) continue;
         const d=Math.abs(i-m.i)+Math.abs(j-m.j); if(d<bd){ bd=d; best=[i,j]; } }
       if(best){ m.i=best[0]; m.j=best[1]; m.x=m.i+0.5; m.y=m.j+0.5; m.spawn=[m.i,m.j]; } }); }
   const day=Math.floor(dayClock/DAY_LEN);              // now and then a road tough is a hedge-caster instead
@@ -17896,7 +17896,7 @@ function emberSummon(o){ closeDialog(); const n=(CHOICE.embers||[]).length, big=
   shake=Math.max(shake,4); floatText([o.i,o.j],'✹','#ffb040');
   logMsg(big?"The fire roars up twice your height, and something in it opens its eyes. It is not small, and it is not pleased.":"The flames stand up on their own, grow arms, and turn round to look at you.",'#ffb070');
   const go=()=>{ try{ if(m.dead || !mobs.includes(m)) return; if(CS.on || dlgIsOpen()){ setTimeout(go,400); return; } if(!combat.active) startCombat(); }catch(e){} }; setTimeout(go,350); }   // wait out any cutscene, then fight
-setInterval(()=>{ try{ if(combat.active) return; mobs.forEach(m=>{ if(m.type!=='ember' || !m.dead || m.counted) return; m.counted=true;
+setInterval(()=>{ try{ if(combat.active) return; mobs.forEach(m=>{ if(m.type!=='ember' || !m.dead || m.counted || !m.emberSite) return; m.counted=true;
       const E=CHOICE.embers=CHOICE.embers||[]; if(!E.includes(m.emberSite)) E.push(m.emberSite);
       banner('The fire is out ('+E.length+'/3)','#ffc080',1600); logMsg(E.length<3?'The sprite gutters out into a wisp of smoke and a few warm coins.':'The Kindled One collapses into a heap of glowing coals. Tell Orvell.','#ffc080'); try{ autosaveSoon(300); }catch(e){} }); }catch(e){} },400);
 
@@ -19921,6 +19921,65 @@ wrap('under_se','objects',l=>{ const room=(cx,cy)=>[2*cx+1,2*cy+1]; return [...l
 wrap('under_se','mobs',l=>[...l.filter(m=>!/^Undercity Dead|^Deep Lurker/.test(m.name)),
   { name:'Flamesworn Sentry', type:'bandit', i:2*3+1, j:2*3+1, faction:'und_se_fs1', style:'shield', opts:FLAMESWORN({skin:3,hair:1,beard:2,equip:{head:'obsidian_helm',torso:'shirt',armor:'ash_mantle',hands:'cinder_gloves',legs:'scorched_greaves',feet:'emberstep_boots',weapon:'sword',offhand:'shield_iron'}}) },
   { name:'Ash Hound', type:'wolf', i:2*11+1, j:2*2+1, faction:'und_se_ash', coat:'#2a201c' }, { name:'Ash Hound Bitch', type:'wolf', i:2*11+1+1, j:2*2+1, faction:'und_se_ash', coat:'#3a2a24' } ]);
+
+// ════════ RESPAWNS for the wide lands and the Undercity: the ordinary things come back a day later; named and story foes do not ════════
+['Dune Jackal','Dune Jackal Bitch','Salt Jackal','Bone Jackal','Bone Jackal Bitch','Sand Jackal','Sand Jackal Bitch','Giant Scorpion','Salt Scorpion','Night Scorpion','Giant Scarab','Glass Scarab','Old Scarab','Dune Raider','Raider Outrider',
+ 'Blackwater Lurker','Deep Lurker','Marsh Wolf','Grey Marsh Wolf','Root Lurker','Reed Lurker','Sludge Lurker',
+ 'Undercity Dead','Undercity Dead ','Cistern Lurker','Rooftop Lurker','Drowned Lurker','Tunnel Cutthroat','Tunnel Cutthroat ','Bell-Ringer','Bell-Ringer ','Cistern Dead','Cistern Dead ','Flamesworn Sentry','Ash Hound Bitch',
+ 'Living Flame','Living Flame ','Wandering Flame','Greater Fire Elemental'].forEach(n=>RESPAWNS.add(n));
+// ════════ FIRE ELEMENTALS: flames that stood up out of the lava under the city ════════
+const FLAME=(big)=>({ ember:true, big:!!big, equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:big?'ember_maw':'ember_touch',offhand:null} });
+UNDER_MOBS.under_se.push(['Living Flame','flame',[6,14,0,0],'L'],['Living Flame ','flame',[6,14,-1,0],'L'],['Greater Fire Elemental','flamebig',[8,8,0,0]]);
+UNDER_MOBS.under_sw.push(['Wandering Flame','flame',[8,13,1,0]]);
+{ const room=(cx,cy)=>[2*cx+1,2*cy+1]; ['under_se','under_sw'].forEach(id=>wrap(id,'mobs',l=>[...l.filter(m=>!UNDER_MOBS[id].some(x=>(x[1]==='flame'||x[1]==='flamebig') && x[0]===m.name)), ...(UNDER_MOBS[id]).filter(x=>x[1]==='flame'||x[1]==='flamebig').map(([name,type,[cx,cy,a,b],fac],k)=>{ const [i,j]=room(cx,cy);
+    return { name, type:'ember', i:i+a, j:j+b, faction:'und_'+id+'_f'+(fac||k), opts:FLAME(type==='flamebig') }; })])); }
+// ════════ THE LAST LAMPLIGHTER: Wenlo kept the lamps lit in the drowned town for forty years, until the Flamesworn came up from the Deeps ════════
+//   CHOICE.lamp : 'asked' (find his pages) → 'hunt' (take the Pathfinder's chart) → 'done'
+UNDER_MOBS.under_sw=UNDER_MOBS.under_sw.filter(x=>x[0]!=='The Sleeper');
+const WENLO_PAGES={ under_ne:'wenlo_page1', under_nw:'wenlo_page2', under_sw:'wenlo_page3', under_se:'wenlo_page4' };
+Object.assign(ITEMS,{
+  wenlo_page1:{ name:"Wenlo's Page (I)", slot:'misc', read:true, title:'A page in a careful hand, damp at the edges', body:["<i>Lamps lit: forty-one. Lamps out: none. The fountain square, the market cross, the chapel roofs, the cistern. I count them every night, and every night they are all there.</i>","<i>Keep to the light. Count your turnings. That is all there is to it, and all I have done for forty years since the river came and the city climbed up onto its own roof.</i>"] },
+  wenlo_page2:{ name:"Wenlo's Page (II)", slot:'misc', read:true, title:'A page torn across the middle', body:["<i>Lights coming up from the stair at the bottom. Not my lamps. Men in black helms, carrying fire in their bare hands. They call themselves the Flamesworn.</i>","<i>Their leader asked me the way up to the city. The bathhouse boiler, he said: there is a stair from the boiler down to here, is there not? I said I did not know. I have known for forty years.</i>"] },
+  wenlo_page3:{ name:"Wenlo's Page (III)", slot:'misc', read:true, title:'A page with a burn through one corner', body:["<i>They mean to bring the fire up. Through the boiler, into the bathhouse, into the Lowstreets, and then into everything. ‘Burn the weak, keep the strong.’ They want to burn Hollowmere and keep whoever crawls out.</i>","<i>I have put out the lamps on the way to the stair. Let them wander. Their Pathfinder draws a chart of every turning. Every night he gets a little closer.</i>"] },
+  wenlo_page4:{ name:"Wenlo's Page (IV)", slot:'misc', read:true, title:'The last page', body:["<i>Lamps lit: three. Lamps out: thirty-eight. He found me today. He was very polite about it.</i>","<i>If anyone reads this: the chart. Take the chart from the Pathfinder and burn it, or keep it, but do not let them have it. And light my lamps again, if you can. I have lost count.</i>"] },
+  pathfinder_chart:{ name:"The Pathfinder's Chart", slot:'misc', read:true, title:'A chart on scorched vellum', body:["Every walkway of the drowned town, drawn in soot and blood, turn by turn. Four quarters, every crossing marked. In red at the top, a stair, and beside it a word: <i>UP.</i>"] },
+  lamplighter_badge:{ name:"Wenlo's Lamplighter Badge", slot:'neck', title:"A brass badge on a chain, a little flame stamped into it. Forty years of nights, and it still shines. You could find your way anywhere wearing this. You probably couldn't, but it feels that way." } });
+['wenlo_page1','wenlo_page2','wenlo_page3','wenlo_page4','pathfinder_chart'].forEach(id=>QUEST_ITEMS.add(id));
+Object.assign(ITEM_STATS,{ lamplighter_badge:{magic:2,agi:2} }); PRICES.lamplighter_badge=60; NECK_LOOKS.lamplighter_badge={cord:'#c09040',w:0.5,p:'disc',col:'#d8aa48'};
+// where his pages fell: the dead end in each quarter furthest from its doors
+function wenloSpot(id){ const D=mazeDeadEnds(id), T=UNDER_LINKS.filter(l=>l[0]===id); let best=null, bd=-1;
+  D.forEach(([i,j])=>{ const d=Math.min(...T.map(t=>Math.abs(t[1]-i)+Math.abs(t[2]-j))); if(d>bd){ bd=d; best=[i,j]; } }); return best; }
+Object.entries(WENLO_PAGES).forEach(([id,item])=>wrap(id,'objects',l=>{ const sp=wenloSpot(id); if(!sp) return l; const L=l.filter(o=>!(o.type==='pickup' && o.i===sp[0] && o.j===sp[1]));
+  return (collectedPickups.has(id+':'+sp[0]+','+sp[1]) || hasItem(item) || CHOICE.lamp==='hunt' || CHOICE.lamp==='done') ? L : [...L,{type:'pickup', i:sp[0], j:sp[1], item}]; }));
+// the Pathfinder walks the Ember Stair with the Sentry
+UNDER_MOBS.under_se=UNDER_MOBS.under_se.filter(x=>x[0]!=='Flamesworn Pathfinder');
+wrap('under_se','mobs',l=> CHOICE.pathfinderDead ? l : [...l, { name:'Flamesworn Pathfinder', type:'bandit', i:2*3+1-1, j:2*3+1, faction:'und_se_pf', style:'duelist',
+  opts:FLAMESWORN({skin:2,hair:5,beard:3,hairColor:7,equip:{head:'obsidian_helm',torso:'shirt',armor:'ash_mantle',hands:'cinder_gloves',legs:'scorched_greaves',feet:'emberstep_boots',weapon:'scimitar',offhand:null}}) }]);
+setInterval(()=>{ try{ if(combat.active || areaId!=='under_se' || CHOICE.pathfinderDead) return; const m=mobs.find(x=>x.name==='Flamesworn Pathfinder' && x.dead); if(!m) return;
+    CHOICE.pathfinderDead=true; if(giveQuestItem('pathfinder_chart',true)) logMsg('In the Pathfinder\'s coat, folded small: a chart of every walkway in the drowned town.','#e8c060'); try{ autosaveSoon(300); }catch(e){} }catch(e){} },500);
+// Wenlo himself: a faint old man by his tally marks on the Chapel Roofs
+wrap('under_sw','npcs',l=> CHOICE.lamp==='done' ? l : [...l,{ id:'wenlo', name:'Wenlo the Lamplighter', i:2*14+1, j:2*11+1, dir:1, opts:{gender:'m',skin:0,hair:1,hairColor:13,beard:5,face:1,ghost:true,equip:{head:'hood',torso:'shirt',armor:'robe',hands:null,legs:'trousers',feet:null,weapon:null,offhand:null}} }]);
+TALKERS.wenlo=()=>{ const W='Wenlo the Lamplighter', pages=Object.values(WENLO_PAGES).filter(id=>hasItem(id)).length;
+  if(!CHOICE.lamp){ say(W,["<i>A faint old man sits by the tally marks, counting on his fingers. He looks up, and through you, and then at you.</i>","“Forty-one. No. Thirty-eight out. Three lit. Or was it… I've lost count. I never lose count.”","“I wrote it all down. Four pages. They took them, or the wind did. One in every quarter, at the very ends of things. Bring them to me and I'll remember.”"],[
+      {label:"“I'll find your pages.”", fn:()=>{ remember('lamp','asked',"Wenlo the Lamplighter haunts the Chapel Roofs in the Undercity. He has lost his four pages: one in each quarter of the maze, at the furthest dead end."); say(W,"“The very ends of things. Keep to the light. Count your turnings.”",[bye]); }}, bye]); return; }
+  if(CHOICE.lamp==='asked'){ if(pages<4){ say(W,["“"+["None yet.","One.","Two.","Three."][pages]+" Good, good. The very ends of things, in every quarter.”"],[bye]); return; }
+    Object.values(WENLO_PAGES).forEach(id=>{ const k=player.inv.indexOf(id); if(k>=0) player.inv[k]=null; }); updateHud();
+    say(W,["<i>He holds the pages close to his face and reads them, lips moving. Then he goes very still.</i>","“Oh. Oh, yes. The Flamesworn. They wanted the stair to the city, and I would not show them. So their Pathfinder drew his chart instead, turning by turning. And then he found me.”",
+      "“He is still down there, on the Ember Stair. If he has drawn the way up, they will bring the fire into Hollowmere through the bathhouse boiler. Take his chart from him. Please.”"],[
+      {label:"“I'll take it from him.”", fn:()=>{ remember('lamp','hunt',"Wenlo's pages tell it: the Flamesworn want to bring the fire up through the bathhouse boiler into Hollowmere. Their Pathfinder, on the Ember Stair, has charted the way. Take his chart."); say(W,"“Keep to the light.”",[bye]); }}]); return; }
+  if(CHOICE.lamp==='hunt' && !hasItem('pathfinder_chart')){ say(W,["“The Ember Stair, at the bottom, where the fire runs under the roofs. He walks with a shieldbearer. He is very polite.”"],[bye]); return; }
+  if(CHOICE.lamp==='hunt'){ say(W,["<i>He takes the chart, and smooths it out on his knee, and runs a finger along every turning. He is smiling.</i>","“There it is. All of it. Every lamp I ever lit. Keep it in your head, now: I've drawn it into yours.”",
+      "“And take this. Somebody should keep the count.” <i>He presses a brass badge into your hand. It is warm.</i>"],[
+      {label:'“Rest now, Wenlo.”', fn:()=>{ const k=player.inv.indexOf('pathfinder_chart'); if(k>=0) player.inv[k]=null; giveQuestItem('lamplighter_badge',true); player.purse+=60; CHOICE.mazeKnown=CHOICE.mazeKnown||{}; Object.keys(UNDER_Q).forEach(q=>CHOICE.mazeKnown[q]=true);
+        remember('lamp','done',"You took the Pathfinder's chart and gave it to Wenlo. He knew every turning again, and rested. The way up is safe; the Undercity is on your map."); updateHud();
+        const n=NPCS.find(x=>x.id==='wenlo'); if(n){ n.bark={text:"Forty-one. All lit.",t:0}; setTimeout(()=>{ const q=NPCS.indexOf(n); if(q>=0) NPCS.splice(q,1); },2600); }
+        logMsg('Wenlo gave you his Lamplighter Badge and 60 copper. The whole Undercity is on your map now.','#8ac070'); closeDialog(); }}]); return; } };
+{ const prev=npcHasNews; npcHasNews=function(n){ if(n.id==='wenlo'){ if(!CHOICE.lamp) return '!'; if(CHOICE.lamp==='asked' && Object.values(WENLO_PAGES).every(id=>hasItem(id))) return '?'; if(CHOICE.lamp==='hunt' && hasItem('pathfinder_chart')) return '?'; } return prev(n); }; }
+JOURNAL.push(['The Last Lamplighter', ()=> !CHOICE.lamp ? null : CHOICE.lamp==='done' ? ['done',"You took the Pathfinder's chart and gave it to Wenlo the Lamplighter. He knew every turning again, and rested. The Flamesworn will not find the way up."] :
+  CHOICE.lamp==='hunt' ? ['active', hasItem('pathfinder_chart') ? "You have the Pathfinder's chart. Bring it to Wenlo on the Chapel Roofs." : "The Flamesworn want to bring the fire up through the bathhouse boiler into Hollowmere. Their Pathfinder walks the Ember Stair, at the bottom of the Undercity. Take his chart."] :
+  ['active', "Wenlo the Lamplighter haunts the Chapel Roofs. Find his four pages, one in each quarter of the Undercity, at the furthest dead end. ("+Object.values(WENLO_PAGES).filter(id=>hasItem(id)).length+"/4)"]]);
+// the tally marks tell the rest
+UNDER_LORE.under_sw[2][2]="Somebody slept here for a long time: a bedroll, a cold lamp, tallies on the stone. Hundreds of them, in rows: lamps lit, lamps out. Then they stop.";
 </script>
 </body>
 </html>

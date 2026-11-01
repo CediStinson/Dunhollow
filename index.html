@@ -19634,6 +19634,134 @@ function addMoundHint(m){ const H=CHOICE.moundHints=CHOICE.moundHints||[]; if(!H
 // what you've heard goes in the journal, under Buried Things
 { const J=JOURNAL.find(j=>j[0]==='Buried Things'); if(J){ const f=J[1]; J[1]=()=>{ const r=f(); if(!r || r[0]==='done') return r; const H=(CHOICE.moundHints||[]).map(k=>MOUNDS.find(m=>moundKey(m)===k)).filter(m=>m && !(CHOICE.dug||{})[moundKey(m)]);
     return H.length ? [r[0], r[1]+'<br>Rumours: '+H.map(m=>moundHint(m)).join(' ')] : r; }; } }
+
+// ════════ THE WIDE LANDS: the Sunscar opens east of the Dry Wash, the swamp runs on past the river docks ════════
+// each new area is laid out by hand where it matters (doors, people, landmarks) and scattered with rock, reed and bone in between, the same every time
+function wideDecor(seed,w,h,keep,specs){ const used=new Set(), out=[], key=(i,j)=>i+','+j;
+  const pad=(i,j,r=1)=>{ for(let a=-r;a<=r;a++) for(let b=-r;b<=r;b++) used.add(key(i+a,j+b)); };
+  (keep.tiles||[]).forEach(([i,j])=>pad(i,j,1));
+  const E=keep.ways||[]; for(let x=0;x<E.length;x++) for(let y=x+1;y<E.length;y++){ let [i,j]=E[x]; const [ti,tj]=E[y];   // a clear way between every pair of doors
+    while(i!==ti){ pad(i,j,1); i+=Math.sign(ti-i); } while(j!==tj){ pad(i,j,1); j+=Math.sign(tj-j); } pad(i,j,1); }
+  specs.forEach(([type,n,props,fp],q)=>{ let k=0, t=0; const [fw,fh]=fp||[1,1], m=type==='pool'?1:0;
+    while(k<n && t<n*60){ t++; const i=Math.floor(rnd01(seed+t*3,q*17+k,7011)*(w-fw)), j=Math.floor(rnd01(seed+t*5,q*29+k,7013)*(h-fh)); let ok=true;
+      for(let a=-m;a<fw+m && ok;a++) for(let b=-m;b<fh+m && ok;b++){ const ii=i+a, jj=j+b; if(used.has(key(ii,jj))) ok=false; }
+      if(!ok) continue; for(let a=-m;a<fw+m;a++) for(let b=-m;b<fh+m;b++) used.add(key(i+a,j+b));
+      const o={type, i, j, ...(typeof props==='function'?props(k):props||{})}; if(fp) o.fp=[fw,fh]; out.push(o); k++; } });
+  return out; }
+const wideCache={};
+const wideObjs=(id,f)=>()=>(wideCache[id]=wideCache[id]||f()).map(o=>({...o}));
+const JACKAL=(n,i,j,c)=>({ name:n, type:'wolf', i, j, faction:'jackals', daily:true, coat:c||'#b8915a' });
+const NIGHT_DEAD=(n,i,j,f)=> ({ name:n, type:'skeleton', i, j, faction:f||'sanddead', daily:true, opts:{...RISEN(n), wrapped:true} });
+// ── the desert ──
+Object.assign(AREAS,{
+  singingdunes:{ fence:{r:false,l:false}, w:30, h:20, theme:'sand', label:'The Singing Dunes', mini:{x:0,y:0}, notches:()=>[], dummy:null,
+    objects:wideObjs('singingdunes',()=>[ {type:'teleporter', i:0, j:8, to:'drywash', entry:'fromSinging'}, {type:'teleporter', i:29, j:6, to:'oasis', entry:'fromDunes'}, {type:'teleporter', i:15, j:19, to:'saltpan', entry:'fromNorth'},
+      {type:'rune', i:14, j:9, text:"A pillar of old stone half sunk in the sand, carved with an open mouth. When the wind blows across the hole at its top, it sings one long low note, and the dunes answer."},
+      ...wideDecor(101,30,20,{ways:[[1,8],[28,6],[15,18],[14,9]],tiles:[[14,9],[6,4],[22,14],[9,15],[24,3],[4,16],[20,8],[11,3]]},[['sandrock',15,k=>({v:20+k})],['sandrock',4,k=>({v:30+k}),[2,2]],['deadtree',7,k=>({s:0.7+(k%3)*0.2})],['bones',9,{noblock:true}],['pillar',2,{broken:true}]]) ]),
+    npcs:()=>[], mobs:()=>[ JACKAL('Dune Jackal',6,4), JACKAL('Dune Jackal Bitch',7,5,'#c8a06a'), { name:'Giant Scorpion', type:'scorpion', i:22, j:14, faction:'scorpion', daily:true, opts:SCORP({}) },
+      { name:'Giant Scarab', type:'scarab', i:9, j:15, faction:'scarab', daily:true, opts:SCARAB({}) },
+      ...(MESA_PEACE()?[]:[{ name:'Dune Raider', type:'bandit', i:24, j:3, faction:'raiders2', opts:RAIDER({equip:{weapon:'tabar'}}) }, { name:'Raider Outrider', type:'bandit', i:20, j:8, faction:'raiders2', opts:RAIDER({skin:2,hair:4,beard:1,equip:{head:'keffiyeh',armor:'sun_leather',weapon:'desert_lance',offhand:'hide_shield'}}) }]),
+      ...(NIGHT()?[NIGHT_DEAD('Singing Dead',11,3)]:[]) ],
+    entries:{ fromWash:{i:1,j:8}, fromOasis:{i:28,j:6}, fromSalt:{i:15,j:18} } },
+  oasis:{ fence:{r:false,l:false}, w:16, h:16, theme:'sand', label:'The Hidden Oasis', mini:{x:0,y:0}, notches:()=>[], dummy:null,
+    objects:wideObjs('oasis',()=>[ {type:'teleporter', i:0, j:6, to:'singingdunes', entry:'fromOasis'}, {type:'teleporter', i:11, j:15, to:'crater', entry:'fromOasis'},
+      {type:'pool', i:8, j:2, fp:[5,4]}, {type:'palm', i:7, j:1, v:1}, {type:'palm', i:13, j:3, v:2, s:1.1}, {type:'palm', i:9, j:7, v:3}, {type:'palm', i:13, j:7, v:4, s:0.9}, {type:'palm', i:2, j:2, v:5}, {type:'palm', i:14, j:12, v:6, s:1.15},
+      {type:'campfire', i:4, j:10}, {type:'tent', i:1, j:12, fp:[2,2]}, {type:'sandrock', i:14, j:0, v:40}, {type:'sandrock', i:0, j:14, v:41} ]),
+    npcs:()=>[{ id:'imra', name:'Imra Who Listens', i:5, j:9, dir:1, opts:DESERT({gender:'f',skin:4,hair:4,hairColor:13,beard:0,face:3,equip:{head:'sand_wrap',torso:'saffron_tunic',armor:'indigo_robe',legs:'indigo_trousers',feet:null}}) }],
+    mobs:()=>[], entries:{ fromDunes:{i:1,j:6}, fromCrater:{i:11,j:14} } },
+  saltpan:{ fence:{r:false,l:false}, w:32, h:20, theme:'sand', label:'The Salt Pan', mini:{x:0,y:0}, notches:()=>[], dummy:null,
+    objects:wideObjs('saltpan',()=>[ {type:'teleporter', i:10, j:0, to:'singingdunes', entry:'fromSalt'}, {type:'teleporter', i:0, j:17, to:'glassdunes', entry:'fromSalt'}, {type:'teleporter', i:31, j:8, to:'crater', entry:'fromSalt'}, {type:'teleporter', i:15, j:19, to:'bonewaste', entry:'fromNorth'},
+      {type:'cart', i:18, j:9, nowheel:true, nomule:true}, {type:'crate', i:20, j:10, breakable:true}, {type:'barrel', i:17, j:11},
+      {type:'rune', i:6, j:6, text:"A post of grey wood, white with salt, with a dozen names cut into it. The last one is only half finished."},
+      ...wideDecor(202,32,20,{ways:[[10,1],[1,17],[30,8],[15,18],[18,9]],tiles:[[6,6],[25,4],[26,15],[8,13],[22,16],[5,2],[13,5]]},[['sandrock',13,k=>({v:50+k})],['bones',12,{noblock:true}],['deadtree',4,{s:0.8}],['sandrock',3,k=>({v:60+k}),[2,1]]]) ]),
+    npcs:()=>[], mobs:()=>[ { name:'Giant Scorpion', type:'scorpion', i:25, j:4, faction:'scorpion', daily:true, opts:SCORP({}) }, { name:'Salt Scorpion', type:'scorpion', i:26, j:15, faction:'scorpion2', daily:true, opts:SCORP({col:'#d8d0c0'}) },
+      JACKAL('Salt Jackal',8,13,'#d0b890'), ...(NIGHT()?[NIGHT_DEAD('Salt-crusted Dead',22,16), NIGHT_DEAD('Salt-crusted Dead ',13,5)]:[]) ],
+    entries:{ fromNorth:{i:10,j:1}, fromDunes:{i:1,j:17}, fromCrater:{i:30,j:8}, fromBones:{i:15,j:18} } },
+  crater:{ fence:{r:false,l:false}, w:22, h:28, theme:'sand', label:'The Glass Crater', mini:{x:0,y:0}, notches:()=>[], dummy:null,
+    objects:wideObjs('crater',()=>[ {type:'teleporter', i:0, j:12, to:'saltpan', entry:'fromCrater'}, {type:'teleporter', i:4, j:0, to:'oasis', entry:'fromCrater'},
+      {type:'rune', i:11, j:14, text:"At the bottom of the crater, the sand has turned to green glass in a great smooth bowl. Something fell here once, burning. Whatever it was, the scarabs have been rolling pieces of it away ever since."},
+      ...wideDecor(303,22,28,{ways:[[1,12],[4,1],[11,14]],tiles:[[11,14],[6,6],[15,8],[8,20],[16,22],[14,3],[5,24]]},[['sandrock',10,k=>({v:70+k})],['sandrock',3,k=>({v:80+k}),[2,2]],['bones',5,{noblock:true}],['pillar',2,{broken:true}]]) ]),
+    npcs:()=>[], mobs:()=>[ { name:'Giant Scarab', type:'scarab', i:6, j:6, faction:'scarab', daily:true, opts:SCARAB({}) }, { name:'Glass Scarab', type:'scarab', i:15, j:8, faction:'scarab2', daily:true, opts:SCARAB({}) },
+      { name:'Old Scarab', type:'scarab', i:8, j:20, faction:'scarab3', daily:true, opts:SCARAB({}) }, { name:'Giant Scorpion', type:'scorpion', i:16, j:22, faction:'scorpion', daily:true, opts:SCORP({}) },
+      ...(NIGHT()?[NIGHT_DEAD('Crater Dead',14,3)]:[]) ],
+    entries:{ fromSalt:{i:1,j:12}, fromOasis:{i:4,j:1} } },
+  bonewaste:{ fence:{r:false,l:false}, w:30, h:16, theme:'sand', label:'The Bone Waste', mini:{x:0,y:0}, notches:()=>[], dummy:null,
+    objects:wideObjs('bonewaste',()=>[ {type:'teleporter', i:15, j:0, to:'saltpan', entry:'fromBones'},
+      {type:'rune', i:15, j:8, text:"Ribs, each one taller than a man, rise out of the sand in two long rows. Something the size of a river died here. The great worms of today are its grandchildren, Imra says, and they come here to die too."},
+      ...Array.from({length:7},(_,k)=>[{type:'rib', i:8+k*2, j:6, side:1, s:1-Math.abs(k-3)*0.08, broken:k===5},{type:'rib', i:8+k*2, j:10, side:-1, s:1-Math.abs(k-3)*0.08, broken:k===1}]).flat(), {type:'wormskull', i:4, j:7, fp:[3,3]},
+      ...wideDecor(404,30,16,{ways:[[15,1],[15,8],[3,13],[27,13]],tiles:[[15,8],[4,4],[25,4],[6,12],[24,12],...Array.from({length:7},(_,k)=>[[8+k*2,6],[8+k*2,10]]).flat(),[4,7],[5,8],[6,9],[5,7],[4,8]]},[['bones',14,{noblock:true}],['sandrock',6,k=>({v:90+k})],['deadtree',3,{s:0.7}]]) ]),
+    npcs:()=>[], mobs:()=>[ NIGHT_DEAD('Bone-Waste Dead',4,4), NIGHT_DEAD('Bone-Waste Dead ',25,4), JACKAL('Bone Jackal',6,12,'#a88a5a'), JACKAL('Bone Jackal Bitch',24,12,'#b89a6a'),
+      ...(NIGHT()?[NIGHT_DEAD('Wandering Dead',20,13)]:[]) ],
+    entries:{ fromNorth:{i:15,j:1} } } });
+wrap('drywash','objects',l=>[...l,{type:'teleporter', i:7, j:8, to:'singingdunes', entry:'fromWash'}]); AREAS.drywash.entries.fromSinging={i:6,j:8};
+wrap('glassdunes','objects',l=>[...l,{type:'teleporter', i:15, j:3, to:'saltpan', entry:'fromDunes'}]); AREAS.glassdunes.entries.fromSalt={i:14,j:3};
+Object.assign(AREA_TIER,{ singingdunes:3, oasis:2, saltpan:3, crater:4, bonewaste:4 });
+['singingdunes','oasis','saltpan','crater','bonewaste'].forEach(a=>HAMID_AREAS.add(a));
+Object.assign(HAMID_SAY,{ singingdunes:"Listen. Hear it? The dunes sing when the wind is right. My grandmother said it was the worms, talking.", oasis:"Imra's oasis. Nobody knows how she found it. Nobody finds it twice, she says. Yet here we are.",
+  saltpan:"An old lake, dried to salt. Don't drink anything here. Don't even lick your lips.", crater:"Something fell here. The scarabs roll the glass away, a little every day, like they're tidying up.", bonewaste:"The bones of the first Mouth. Walk quietly. The dead here don't like visitors." });
+Object.assign(WORM_SPOTS,{ singingdunes:[[5,12],[18,4],[25,11]], saltpan:[[4,9],[23,6],[12,14]], bonewaste:[[5,8],[24,8]] });
+[['singingdunes',3,17,{coin:28,item:'antidote'},"A caravan cook's tin box: coin, and a vial of antidote gone a little thick."],['saltpan',29,17,{item:'scarab_amulet'},"A green stone beetle on a broken cord, in the hand of someone who never let go."],
+ ['crater',19,26,{coin:45},"A glassmaker's purse, heavy with coin, and a pair of tongs worn smooth with use."],['bonewaste',28,2,{item:'worm_scale'},"Under the sand, curled like a leaf: one great scale, old and brown, from the first Mouth itself."]].forEach(m=>{ MOUNDS.push(m); wrap(m[0],'objects',l=>[...l, (CHOICE.dug||{})[moundKey(m)] ? {type:'dugpit', i:m[1], j:m[2], noblock:true} : {type:'dirtmound', i:m[1], j:m[2], mound:m}]); });
+TALKERS.imra=()=>{ const I='Imra Who Listens';
+  say(I,[!CHOICE.imraMet?"“You found it. Most don't. The dunes have to want you to.” <i>An old woman with sand in the lines of her face, sitting very still, her head tilted as if she is hearing music.</i>":"“Sit. Listen with me.”",
+    "“I have water for the thirsty, salve for the stung, and dates. And stories, but those I give away.”"],[
+    {label:'“What do the dunes sing?”', fn:()=>say(I,["“Where the worms are going. Who walked where. The Mouth is the loudest. When the dunes go quiet, it is listening for you.”",
+      "“Go out to the Bone Waste, south past the salt, and you'll see where the first of them lies. Its children are the size of houses, and it was the size of a valley.”"],[{label:'Something else.',fn:TALKERS.imra},bye])},
+    {label:'Trade.', fn:()=>shopFrom(I,['dates','antidote','potion','mana_potion','sand_wrap','indigo_robe'],1,"“Take what you need. Pay what it costs.”")}, bye]); CHOICE.imraMet=true; };
+// ── the swamp ──
+const DROWNED=(n,i,j)=>({ name:n, daily:true, type:'bandit', i, j, faction:'drowned3', opts:{gender:'m',skin:0,hair:1,hairColor:13,beard:2,face:1,ghost:true,equip:{head:null,torso:'shirt',armor:'mail',hands:null,legs:'trousers',feet:null,weapon:'sword',offhand:null}} });
+Object.assign(AREAS,{
+  blackwater:{ fence:{r:false,l:false}, w:28, h:26, theme:'bog', label:'The Blackwater', mini:{x:0,y:0}, notches:()=>[], dummy:null,
+    objects:wideObjs('blackwater',()=>[ {type:'teleporter', i:0, j:10, to:'docks', entry:'fromBlack'}, {type:'teleporter', i:0, j:24, to:'reedbank', entry:'fromBlack'}, {type:'teleporter', i:19, j:25, to:'sunkenwood', entry:'fromBlack'},
+      {type:'stilthut', i:5, j:3, fp:[3,3]}, {type:'pool', i:10, j:4, fp:[8,6], kind:'fen'}, {type:'pool', i:18, j:14, fp:[7,5], kind:'fen'}, {type:'pool', i:4, j:16, fp:[5,4], kind:'fen'},
+      {type:'rune', i:14, j:12, text:"A bell, green with age, hangs from a rotten post at the water's edge. Somebody rang it for the drowned, once a year, until nobody was left to ring it."},
+      ...wideDecor(505,28,26,{ways:[[1,10],[1,24],[19,24],[14,12],[6,7]],tiles:[[14,12],[6,7],[22,4],[12,19],[24,22],[3,13],[9,11],[21,10]]},[['deadtree',10,k=>({s:0.8+(k%4)*0.15})],['reeds',14,k=>({dense:k%3===0})],['ruin',2,k=>({v:k+1})],['bones',3,{noblock:true}],['wisp',5,{noblock:true}],['pool',3,{kind:'fen'},[3,3]]]) ]),
+    npcs:()=>[{ id:'pell', name:'Pell the Eel-Man', i:6, j:7, dir:1, opts:{gender:'m',skin:1,hair:3,hairColor:8,beard:5,face:1,equip:{head:'hood',torso:'shirt',armor:'jerkin',hands:'gloves',legs:'trousers',feet:'fen_boots',weapon:null,offhand:null}} }],
+    mobs:()=>[ { name:'Blackwater Lurker', type:'lurker', i:22, j:4, faction:'bog5', opts:LURK({}) }, { name:'Deep Lurker', type:'lurker', i:12, j:19, faction:'bog6', opts:LURK({}) },
+      { name:'Marsh Wolf', type:'wolf', i:24, j:22, faction:'marshwolf2', coat:'#5a5a4a' }, { name:'Grey Marsh Wolf', type:'wolf', i:21, j:10, faction:'marshwolf2', coat:'#77746a' },
+      ...(NIGHT()?[DROWNED('Drowned of the Blackwater',3,13), DROWNED('Drowned of the Blackwater ',9,11)]:[]) ],
+    entries:{ fromDocks:{i:1,j:10}, fromReed:{i:1,j:24}, fromSunken:{i:19,j:24} } },
+  sunkenwood:{ fence:{r:false,l:false}, w:20, h:10, theme:'bog', label:'The Sunken Wood', mini:{x:0,y:0}, notches:()=>[], dummy:null,
+    objects:wideObjs('sunkenwood',()=>[ {type:'teleporter', i:10, j:0, to:'blackwater', entry:'fromSunken'}, {type:'teleporter', i:8, j:9, to:'fen', entry:'fromSunken'},
+      {type:'rune', i:15, j:4, text:"The trees here drowned standing up. Their roots still hold the old road, a foot under the black water."},
+      ...wideDecor(606,20,10,{ways:[[10,1],[8,8],[15,4]],tiles:[[15,4],[4,3],[16,7],[3,7]]},[['deadtree',12,k=>({s:0.9+(k%3)*0.2})],['reeds',8,k=>({dense:k%2===0})],['pool',3,{kind:'fen'},[3,2]],['wisp',3,{noblock:true}]]) ]),
+    npcs:()=>[], mobs:()=>[ { name:'Marsh Wolf', type:'wolf', i:4, j:3, faction:'marshwolf3', coat:'#5a5a4a' }, { name:'Grey Marsh Wolf', type:'wolf', i:3, j:7, faction:'marshwolf3', coat:'#77746a' },
+      { name:'Root Lurker', type:'lurker', i:16, j:7, faction:'bog7', opts:LURK({}) } ],
+    entries:{ fromBlack:{i:10,j:1}, fromFen:{i:8,j:8} } },
+  reedbank:{ fence:{r:false,l:false}, w:13, h:10, theme:'bog', label:'The Reed Bank', mini:{x:0,y:0}, notches:()=>[], dummy:null,
+    objects:wideObjs('reedbank',()=>[ {type:'teleporter', i:6, j:0, to:'docks', entry:'fromReed'}, {type:'teleporter', i:12, j:5, to:'blackwater', entry:'fromReed'}, {type:'teleporter', i:8, j:9, to:'northroad', entry:'fromReed'},
+      {type:'pool', i:1, j:2, fp:[4,3], kind:'fen'},
+      ...wideDecor(707,13,10,{ways:[[6,1],[11,5],[8,8]],tiles:[[3,7],[8,3]]},[['reeds',12,k=>({dense:k%2===0})],['deadtree',3,{s:0.8}],['bones',2,{noblock:true}]]) ]),
+    npcs:()=>[], mobs:()=>[ { name:'Reed Lurker', type:'lurker', i:3, j:7, faction:'bog8', opts:LURK({}) } ],
+    entries:{ fromDocks:{i:6,j:1}, fromBlack:{i:11,j:5}, fromRoad:{i:8,j:8} } } });
+wrap('docks','objects',l=>[...l,{type:'teleporter', i:13, j:3, to:'blackwater', entry:'fromDocks'},{type:'teleporter', i:7, j:11, to:'reedbank', entry:'fromDocks'}]); Object.assign(AREAS.docks.entries,{ fromBlack:{i:12,j:3}, fromReed:{i:7,j:10} });
+wrap('fen','objects',l=>[...l,{type:'teleporter', i:40, j:0, to:'sunkenwood', entry:'fromFen'}]); AREAS.fen.entries.fromSunken={i:40,j:1};
+wrap('northroad','objects',l=>[...l,{type:'teleporter', i:22, j:0, to:'reedbank', entry:'fromRoad'}]); AREAS.northroad.entries.fromReed={i:22,j:1};
+Object.assign(AREA_TIER,{ blackwater:4, sunkenwood:4, reedbank:3 });
+[['blackwater',26,1,{item:'silver_torc'},"A silver torc in a rotten leather bag, wedged under a drowned root. Someone hid it from the water. The water found it anyway."],['sunkenwood',1,1,{coin:24},"A clay jar of coins under the roots of a drowned oak."]].forEach(m=>{ MOUNDS.push(m); wrap(m[0],'objects',l=>[...l, (CHOICE.dug||{})[moundKey(m)] ? {type:'dugpit', i:m[1], j:m[2], noblock:true} : {type:'dirtmound', i:m[1], j:m[2], mound:m}]); });
+TALKERS.pell=()=>{ const N='Pell the Eel-Man';
+  say(N,[!CHOICE.pellMet?"“Mind the water, it's deeper than it looks. Everything here is.” <i>A man in a fen-stained hood, a basket of eels wriggling at his feet.</i>":"“Back for eels? Everybody comes back for the eels.”",
+    "“I've a pot on, a few draughts, and a dry pair of boots if you're sinking.”"],[
+    {label:'“What is this place?”', fn:()=>say(N,["“The Blackwater. Used to be fields, before the river moved. The bell over there rang for the drowned every spring. Nobody rings it now.”","“At night they come up out of the water looking for it. Don't be here then, if you can help it.”"],[{label:'Something else.',fn:TALKERS.pell},bye])},
+    {label:'Trade.', fn:()=>shopFrom(N,['cooked_meat','bread','potion','mana_potion','fen_boots'],1,"“Fresh. Mostly.”")}, bye]); CHOICE.pellMet=true; };
+if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
+
+// the bones of the first Mouth: ribs like the frame of a burnt ship, and a skull with a mouth you could ride a cart into
+OBJ_DRAW.rib=o=>{ const q=P(o.i+0.5,o.j+0.5), sd=o.side||1, sc=o.s||1, H=(o.broken?70:130)*sc, W=46*sc*sd;
+  g.save(); g.fillStyle='rgba(60,30,0,0.2)'; g.beginPath(); g.ellipse(q.x+W*0.4,q.y+2,30*sc,8,0,0,Math.PI*2); g.fill();
+  const curve=(off,lw,col)=>{ g.strokeStyle=col; g.lineWidth=lw; g.lineCap='round'; g.beginPath(); g.moveTo(q.x+off,q.y); g.bezierCurveTo(q.x-sd*8*sc+off,q.y-H*0.55,q.x+W*0.3+off,q.y-H,q.x+W+off,q.y-H*(o.broken?0.95:0.82)); g.stroke(); };
+  curve(0,13*sc,'#8a7a5a'); curve(-1,10*sc,'#e8dcc0'); curve(-3*sd,3*sc,'rgba(255,250,235,0.7)');
+  g.fillStyle='#c8a464'; g.beginPath(); g.ellipse(q.x,q.y,12*sc,4,0,0,Math.PI*2); g.fill();   // where it goes into the sand
+  g.restore(); };
+OBJ_DRAW.wormskull=o=>{ const q=P(o.i+1.5,o.j+1.5), B=q.y; g.save();
+  g.fillStyle='rgba(60,30,0,0.25)'; g.beginPath(); g.ellipse(q.x,B+4,80,22,0,0,Math.PI*2); g.fill();
+  const gr=g.createRadialGradient(q.x-20,B-60,10,q.x,B-30,90); gr.addColorStop(0,'#f2ead4'); gr.addColorStop(1,'#a89878');
+  g.fillStyle=gr; g.beginPath(); g.ellipse(q.x,B-34,70,46,0,Math.PI,Math.PI*2); g.lineTo(q.x+70,B-8); g.quadraticCurveTo(q.x,B+6,q.x-70,B-8); g.closePath(); g.fill(); g.strokeStyle='#6a5a40'; g.lineWidth=2; g.stroke();
+  g.fillStyle='#2a1a10'; g.beginPath(); g.ellipse(q.x+10,B-26,34,24,0,0,Math.PI*2); g.fill();   // the great round mouth, half full of sand
+  g.fillStyle='#c8a464'; g.beginPath(); g.ellipse(q.x+10,B-14,34,12,0,0,Math.PI); g.fill();
+  g.fillStyle='#ece2c8'; for(let k=0;k<14;k++){ const a=Math.PI+k/13*Math.PI, x=q.x+10+Math.cos(a)*34, y=B-26+Math.sin(a)*24; g.beginPath(); g.moveTo(x-3,y); g.lineTo(q.x+10+Math.cos(a)*24,B-26+Math.sin(a)*16); g.lineTo(x+3,y); g.closePath(); g.fill(); }
+  g.strokeStyle='rgba(90,70,40,0.5)'; g.lineWidth=1.2; [-40,-50,40,52].forEach(dx=>{ g.beginPath(); g.moveTo(q.x+dx,B-50); g.quadraticCurveTo(q.x+dx*1.1,B-30,q.x+dx*0.9,B-10); g.stroke(); });
+  g.restore(); };
 </script>
 </body>
 </html>

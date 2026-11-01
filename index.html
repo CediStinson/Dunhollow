@@ -11885,7 +11885,7 @@ const PARRY = { perfect:0.20, window:0.36, parryRecover:0.28, atkWind:0.18, atkW
                 punish:0.22,   // short window at the START of a wind-up where a hit interrupts
                 caughtRecover:0.42,              // your blade is caught: long recovery on a mistimed or wrong-side swing
                 chainPenalty:0.08, chainMax:0.3, chainWindow:0.8,
-                interruptStun:0.7, guardRecover:0.35,
+                interruptStun:0.7, guardRecover:0.35, fairRead:0.4,
                 shieldPerfect:0.04, shieldWindow:0.05 };   // a shield widens both timing windows
 const unWoven = id => (id && id.startsWith && /^[tw]_/.test(id)) ? id.replace(/^(?:[tw]_)+/,'') : id;   // a woven piece behaves like the piece it was made from
 const isShieldId = id0 => { const id=unWoven(id0); return !!id && (id==='shield' || (ITEMS[id] && ITEMS[id].base==='shield')); };
@@ -12486,6 +12486,11 @@ const styleOf=f=> f ? (f.style || NAME_STYLE[f.name] || (f.type!=='wolf' && f.ty
 const shieldUp=f=> styleOf(f)==='shield' && !(f.openUntil>clock) && f.state!=='stagger' && f.state!=='windup';
 const patternOf=f=>{ const S=STYLES[styleOf(f)]; return (S && f.type!=='wolf' && f.type!=='mage') ? S.pattern : foeDef(f).pattern; };
 const curStep = f => patternOf(f)[f.k % patternOf(f).length];
+// how long before you can raise a parry: the rest of your swing or spell and its recovery, or the stagger of a blow you just took
+function playerBusy(){ if(!duel) return 0; const W=weaponOf(player);
+  if(duel.st==='attack') return Math.max(0,duel.t) + PARRY.atkRecover + (duel.chain||0)*PARRY.chainPenalty + (W.recoverExtra||0);
+  if(duel.st==='atkRecover' || duel.st==='parryRecover' || duel.st==='hit') return Math.max(0,duel.t);
+  return 0; }
 function beginWind(f,quick){
   const s=curStep(f);
   f.state='windup'; f.quick=!!quick;
@@ -12494,6 +12499,7 @@ function beginWind(f,quick){
   if(quick) floatText(tileOf(f),'Counter!','#ffb070');
   if(hasStatus(f,'chill')){ f.wind*=1.45; f.t=f.wind; }       // frost slows the swing
   if(f.phase2){ f.wind*=0.8; f.t=f.wind; }                    // an enraged Greymaw is quicker
+  { const busy=playerBusy(); if(busy+PARRY.fairRead>f.wind){ f.wind=busy+PARRY.fairRead; f.t=f.wind; } }   // never a blow you could not have met: you always get a moment to read it once your own swing or spell is done
   f.feintAt=0; if(!quick && s.feint){ f.swingDir=s.feint; f.feintAt=f.wind*0.45; }   // a feint: the real side shows a little before halfway
   teach('parry','He is about to strike',["A <b>ring</b> closes in around him and an arrow shows the side he swings from.",
         "Hold <b>that same direction</b> and <b>Parry</b> (<b>K</b>, <b>Space</b> or right click) before the ring closes.",
@@ -12812,8 +12818,11 @@ function burst(at,from,col,n){
   for(let k=0;k<n;k++){ const a=Math.random()*Math.PI*2, sp=40+Math.random()*90;
     sparks.push({wx:mx,wy:my,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-30,t:0,col}); }
 }
+// a tile nothing solid stands on any more (a villager who stood there when you came in has since walked off)
+const objOn=(i,j)=>OBJECTS.some(o=>o.type!=='teleporter' && !o.noblock && o.type!=='debris' && (([fw,fh])=>i>=o.i&&i<o.i+fw&&j>=o.j&&j<o.j+fh)(o.fp||[1,1]));
 function stepAlong(e,dt,speed){
   if(!e.path.length){ e.moving=false; return true; }
+  if(!e._freed && e!==player && typeof NPCS!=='undefined' && NPCS.includes(e)){ e._freed=true; const k=e.i+','+e.j; if(blocked.has(k) && !objOn(e.i,e.j) && !inNotch(e.i,e.j)) blocked.delete(k); }
   const [ni,nj]=e.path[0], tx=ni+0.5, ty=nj+0.5, dx=tx-e.x, dy=ty-e.y, d=Math.hypot(dx,dy), st=speed*dt;
   if(d>0.001) e.dir=dirFromDelta(dx,dy);
   if(d<=st){ e.x=tx; e.y=ty; e.i=ni; e.j=nj; e.path.shift(); } else { e.x+=dx/d*st; e.y+=dy/d*st; }
@@ -15559,7 +15568,7 @@ Object.assign(CHOICE,{ pupSt:null, pupT0:null, pupHint:null, pupArr:null, pupDay
 
 const PUP_NAMES=['Bread','Butter','Hamond'], PUP_SEX=['he','she','he'], PUP_COATS=['#7a6a58','#8a7a66','#5e5448'];
 const PUP_TRUST=0;                                              // Bread trusts you from the first moment
-const PUP_HALF=DAY_LEN/2, PUP_RUNAWAY=DAY_LEN;                  // the reminder, and the run
+const PUP_HALF=DAY_LEN*2, PUP_RUNAWAY=DAY_LEN*3;                // the reminder, and the run
 const PUP_GROW=[3,6], PUP_FEED_NEED=8, PUP_CORPSE_LIFE=DAY_LEN*2;
 const PUP_SIZE=[0.5,0.68,0.88], PUP_COMP_SIZE=0.95;
 const PUP_SPOTS=[[2,7],[4,7],[3,8],[1,6],[5,8],[7,7],[8,4],[10,8],[11,6],[5,5],[7,9],[9,5]];   // where the ones left at Marta's like to lie

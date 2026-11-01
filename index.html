@@ -9789,6 +9789,7 @@ function refreshStatPanel(){
   const rows = [
     ['Purse', formatCoin(player.purse)],
     ['Max Health', player.maxHp+(armorBonus?` (+${armorBonus})`:'')],
+    ...(typeof gearLevel==='function' ? [['Gear Level', '◆'.repeat(gearLevel())+'<small style="opacity:.55">'+'◇'.repeat(5-gearLevel())+'</small>']] : []),
     ['Weapon', wname],
     ['Damage', W.dmg],
     ['Critical Chance', Math.round(PARRY.critChance*100)+'%'],
@@ -12513,6 +12514,7 @@ function hurtPlayer(n,label){
   if(typeof wardTakes==='function' && wardTakes(n)) return;          // Ice Ward or Bone Shield takes it whole
   const f=combat.foe;
   if(n>0 && f && f.tier) n=Math.round(n*tierDmg(f));                    // tougher kin of the same foe hit harder
+  if(n>0 && f && typeof gapIn==='function') n=Math.round(n*gapIn(f));     // and harder still if your gear is not up to where you are
   const agi=gearSum('agi');
   if(n>0 && agi>0 && !combat.practice && Math.random()<dodgeChance(agi)){ floatText(tileOf(player),'Dodge!','#a8e0ff',true); player.flash=0.15; SND.dodge(); }
   else {
@@ -12575,6 +12577,7 @@ function impact(f){                                   // a foe's swing lands (or
   if(hurt && f.opts && f.opts.equip && f.opts.equip.weapon==='barrow_blade' && Math.random()<0.3) addStatus(player,'weak',3,0);
 }
 function wound(f,n,label,col){                       // a blow lands on a foe
+  if(n>0 && f && f.type!=='dummy' && !combat.practice && typeof gapOut==='function') n=Math.max(1,Math.round(n*gapOut(f)));   // poor gear: your blows land softer on foes beyond it
   const W=WEAPONS[player.opts&&player.opts.equip.weapon]||{};
   if(f && f.type==='sandworm' && HIT_SRC==='melee' && n>0 && f.state!=='recover' && f.state!=='stagger'){ n=Math.max(1,Math.ceil(n*foeDef(f).shell)); floatText([f.i,f.j-0.003],'Scales','#e0c080');
     teach('wormscale','Scales like shields',["The worm's <b>scales</b> turn most of a blow.","After it <b>dives at you from high</b>, it lies <b>open</b> for a moment, its soft throat showing. Parry the dive, then strike."]); }
@@ -13155,7 +13158,7 @@ function drawActorBase(e){
   if(isP && romHush()) return;
   const ty=B-(e.type==='wolf'||e.type==='scorpion'?66:e.type==='sandworm'?178:e.type==='scarab'?78:114);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
-  const deadly=!isP && e.type!=='dummy' && e.hostile!==false && player.maxHp>0 && ((e.maxHp||0)*(((weaponOf(e)||{}).dmg)||5)*tierDmg(e)) >= 2*player.maxHp*Math.max(8,playerHitDmg());   // far stronger than you: a skull
+  const deadly=!isP && e.type!=='dummy' && e.hostile!==false && player.maxHp>0 && ((e.maxHp||0)*(((weaponOf(e)||{}).dmg)||5)*tierDmg(e)*(typeof gapIn==='function'?gapIn(e)/gapOut(e):1)) >= 2*player.maxHp*Math.max(8,playerHitDmg());   // far stronger than you: a skull
   const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  '+'◆'.repeat(e.tier) : ''), tw=g.measureText(label).width;
   g.fillStyle=deadly?'rgba(60,8,6,0.85)':'rgba(12,8,3,0.78)'; g.beginPath(); g.roundRect(s.x-tw/2-7,ty,tw+14,16,4); g.fill();
   if(deadly){ g.strokeStyle='rgba(220,70,50,0.8)'; g.lineWidth=1; g.stroke(); }
@@ -14214,6 +14217,7 @@ const dodgeChance=a=>Math.min(DODGE_CAP,a*AGI_DODGE);
 // (spell power used to be added flat to every hit; it is now a multiplier, see BALANCE at the end)
 // every stat a piece of gear carries, in words
 function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
+  if(typeof itemLevel==='function' && GEAR_LEVEL_SLOTS[ITEMS[id]&&ITEMS[id].slot]) L.push(['Gear level','◆'.repeat(itemLevel(id))]);
   if(id==='fen_boots') L.push(['Walking speed','+15%']);
   if(id==='moon_ribbon' && CHOICE.ithil2) L.push(['Health',CHOICE.ithil3?'+10 <small>(her moonlight, and a strand of her hair)</small>':'+5 <small>(her moonlight)</small>']);
   if(WEAPONS[id] && WEAPONS[id].ember) L.push(['Grows with','Attack + Spell Power <small>(+4% each point); every cut burns</small>']);
@@ -19980,6 +19984,25 @@ JOURNAL.push(['The Last Lamplighter', ()=> !CHOICE.lamp ? null : CHOICE.lamp==='
   ['active', "Wenlo the Lamplighter haunts the Chapel Roofs. Find his four pages, one in each quarter of the Undercity, at the furthest dead end. ("+Object.values(WENLO_PAGES).filter(id=>hasItem(id)).length+"/4)"]]);
 // the tally marks tell the rest
 UNDER_LORE.under_sw[2][2]="Somebody slept here for a long time: a bedroll, a cold lamp, tallies on the stone. Hundreds of them, in rows: lamps lit, lamps out. Then they stop.";
+
+// ════════ GEAR LEVEL: what you wear decides where you can go ════════
+// every piece has a level, 1 to 5, from its quality; yours is the weighted mean (weapon and body armour count three times, empty slots count nothing).
+// foes in an area deeper than your gear level plus one hit harder, take less, and swing faster than you can read. Geared right, nothing changes.
+const GEAR_LEVEL_SLOTS={ weapon:3, armor:3, head:1, hands:1, feet:1, offhand:1 };
+const ITEM_LEVEL_FIX={ fire_blade:4, emberbrand:5, barrow_blade:4, grave_blade:3, khopesh:5, wyrm_hauberk:5, wyrm_shield:4, wyrm_helm:4, fen_boots:3, sand_boots:4, elf_blade:3, bog_crown:4, obsidian_helm:3, helm_full:3, helm_black:3, kettle:2, coif:2, shield_iron:3, shield:2, gauntlets:2, plate_boots:2 };
+function itemLevel(id){ if(!id || !ITEMS[id]) return 0; const base=(typeof unWoven==='function'?unWoven(id):id); if(ITEM_LEVEL_FIX[base]!=null) return Math.min(5,ITEM_LEVEL_FIX[base]+(base!==id?1:0));
+  const pr=PRICES[id]??PRICES[base]??10; return pr<=20?1:pr<=60?2:pr<=150?3:pr<=280?4:5; }
+function gearLevel(){ const E=(player.opts&&player.opts.equip)||{}; let sum=0, w=0;
+  Object.entries(GEAR_LEVEL_SLOTS).forEach(([k,n])=>{ if(k==='offhand' && !E.offhand) return; sum+=itemLevel(E[k])*n; w+=n; });
+  return Math.max(1,Math.min(5,Math.round(sum/(w||1)))); }
+const gapOf=f=> Math.max(0,((f&&f.tier)||1)-gearLevel()-1);
+const gapIn=f=> 1+0.4*gapOf(f), gapOut=f=> Math.max(0.4,1-0.2*gapOf(f));
+{ const _wf=windowFor; windowFor=e=>{ const w=_wf(e); return (e===player && combat && combat.foe) ? w*Math.max(0.6,1-0.12*gapOf(combat.foe)) : w; }; }
+// a word of warning at the edge of somewhere too deep for you
+let gapWarned={};
+{ const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); try{ const t=tierOf(areaId), gl=gearLevel(); if(t-gl-1>=1 && !gapWarned[areaId] && mobs.some(m=>m.hostile&&!m.dead)){ gapWarned[areaId]=1;
+      setTimeout(()=>{ banner('Too dangerous for your gear','#e07050',2200); logMsg('This place is danger '+'◆'.repeat(t)+'. Your gear is only '+'◆'.repeat(gl)+'. Foes here will hit harder, and shrug off your blows. Better armour and a better blade first.','#e07050');
+        teach('gearlevel','Gear level',["Every area has a <b>danger level</b> (the ◆ beside a foe's name). Your <b>gear level</b> comes from what you wear: your weapon and body armour count most. See it in your inventory.","Go somewhere <b>two or more</b> levels deeper than your gear and foes <b>hit harder</b>, <b>take less</b> from you, and are <b>harder to parry</b>. Buy, find and earn better gear, and come back."]); },900); } }catch(e){} return r; }; }
 </script>
 </body>
 </html>

@@ -16416,7 +16416,7 @@ function wakeAfterDefeat(){
 // ════════ necklaces: cheap trinkets off the dead and out of crates, and Brann's wolf-tooth string ════════
 var NECK_LOOKS={ copper_chain:{cord:'#b8743c',w:0.7,p:'ring',col:'#c8844a'}, bone_charm:{cord:'#5a3a20',w:0.6,p:'bone',col:'#e8e0c8'},
   glass_beads:{cord:'#7a6a58',w:0.4,p:'beads',cols:['#5a9ad0','#7ac08a','#d8a840','#c85a5a']}, tin_medal:{cord:'#6a6a70',w:0.5,p:'disc',col:'#a8aab0'},
-  wolf_necklace:{cord:'#4a3018',w:0.7,p:'fangs',col:'#ece4cc'} };
+  wolf_necklace:{cord:'#4a3018',w:0.7,p:'fangs',col:'#ece4cc'}, scarab_amulet:{cord:'#c09040',w:0.5,p:'disc',col:'#2e8a74'} };
 function drawNecklace(c,ax,top,dip,pr,L){
   const half=pr>0.8?1.6:4, bot=top+dip;            // the cord's lowest point sits on the breastbone
   const at=t=>{ const u=1-t; return { x:u*u*(ax-half)+2*u*t*ax+t*t*(ax+half), y:u*u*(top-0.4)+2*u*t*(2*bot-top)+t*t*(top-0.4) }; };   // a quadratic through the cord
@@ -16454,6 +16454,8 @@ ICON_EXTRA.bevor=(g2,E)=>{                                               // a cu
   g2.fillStyle='#6a4a2a'; g2.fillRect(4,28,6,3); g2.fillRect(30,28,6,3); g2.fillStyle='#c8a050'; [[8,29.5],[32,29.5]].forEach(([a,b])=>{ g2.beginPath(); g2.arc(a,b,1.2,0,Math.PI*2); g2.fill(); }); };
 Object.assign(ITEMS,{ copper_chain:{ name:'Copper Chain', slot:'neck' }, bone_charm:{ name:'Knucklebone Charm', slot:'neck' }, glass_beads:{ name:'Glass Bead Necklace', slot:'neck' },
   tin_medal:{ name:"Tin Saint's Medal", slot:'neck' }, wolf_necklace:{ name:'Wolf-Tooth Necklace', slot:'neck' } });
+Object.assign(ITEMS,{ scarab_amulet:{ name:'Sun-scarab Amulet', slot:'neck', title:"A beetle of green stone on a gold cord, pushing a little gold sun ahead of it. It is warm against the skin, even at night." } });
+Object.assign(ITEM_STATS,{ scarab_amulet:{magic:2,hp:1} }); GEAR_HP.scarab_amulet=1; PRICES.scarab_amulet=45;
 Object.assign(ITEM_STATS,{ copper_chain:{hp:1}, bone_charm:{agi:1}, glass_beads:{magic:1}, tin_medal:{hp:2}, wolf_necklace:{agi:3,hp:1} });
 Object.entries({copper_chain:1,tin_medal:2,wolf_necklace:1}).forEach(([k,v])=>GEAR_HP[k]=v);
 Object.assign(PRICES,{ copper_chain:6, bone_charm:4, glass_beads:8, tin_medal:7, wolf_necklace:40 });
@@ -16730,20 +16732,27 @@ const hasSpade=()=> player.opts && player.opts.equip.weapon==='shovel';
 const ownsSpade=()=> hasSpade() || hasItem('shovel');
 MOUNDS.forEach(m=>wrap(m[0],'objects',l=>[...l, (CHOICE.dug||{})[moundKey(m)] ? {type:'dugpit', i:m[1], j:m[2], noblock:true} : {type:'dirtmound', i:m[1], j:m[2], mound:m}]));
 PUZ_TYPES.add('dirtmound');
+const sandy=()=>{ const A=AREAS[areaId]||{}; return A.theme==='sand' || !!A.temple; };
 function digMound(o){                               // a mound of earth: needs a spade in your hands
     if(!hasSpade()){ CHOICE.moundSeen=true;
-      say('A Mound of Earth',["Someone has heaped the earth up here and stamped it flat, a while ago. Grass is only just coming through it. Something is buried under there.",
+      say(sandy()?'A Mound of Sand':'A Mound of Earth',[sandy()?"The sand is heaped up here, too neat for the wind, with a flat stone set on top so it would not blow away. Something is buried under there.":"Someone has heaped the earth up here and stamped it flat, a while ago. Grass is only just coming through it. Something is buried under there.",
         ownsSpade() ? "<i>You have a spade. Take it in your hands first.</i>" : "<i>You need a spade to dig this up. Maybe find one.</i>"],[{label:'Leave it.', fn:closeDialog}]); return; }
     const m=o.mound, R=m[3]; closeDialog(); player.dir=dirTo(tileOf(player),[o.i,o.j]); player.lunge={dx:0,dy:0,t:0};
     (CHOICE.dug=CHOICE.dug||{})[moundKey(m)]=true;
     const idx=OBJECTS.indexOf(o); if(idx>=0){ OBJECTS.splice(idx,1,{type:'dugpit', i:o.i, j:o.j, noblock:true}); blocked.delete(o.i+','+o.j); }
-    for(let n=0;n<12;n++) sparks.push({wx:o.i+0.5,wy:o.j+0.5,vx:(Math.random()-0.5)*120,vy:-30-Math.random()*70,t:0,col:['#5a4026','#3a2a1a','#7a5a36'][n%3]});
+    for(let n=0;n<12;n++) sparks.push({wx:o.i+0.5,wy:o.j+0.5,vx:(Math.random()-0.5)*120,vy:-30-Math.random()*70,t:0,col:(sandy()?['#d8b878','#b08848','#ecd29a']:['#5a4026','#3a2a1a','#7a5a36'])[n%3]});
     logMsg('You dig. '+m[4],'#e8c060');
     if(R.coin){ player.purse+=R.coin; floatText([o.i,o.j],'+'+formatCoin(R.coin),'#e8c060',true); logMsg('Found: '+formatCoin(R.coin)+'.','#e8c060'); }
     if(R.item){ if(giveQuestItem(R.item,true)){ floatText([o.i,o.j-0.01],'Found: '+ITEMS[R.item].name,'#8ac070',true); logMsg('Found: '+ITEMS[R.item].name+'.','#8ac070'); } }
     const n=Object.keys(CHOICE.dug).length; logMsg('('+n+'/'+MOUNDS.length+' buried things dug up)','#a89878');
     updateHud(); autosaveSoon(200); }
 function drawDirtMound(o){ const q=P(o.i+0.5,o.j+0.5);
+  if(sandy()){ g.fillStyle='rgba(60,30,0,0.18)'; g.beginPath(); g.ellipse(q.x,q.y+2,26,10,0,0,Math.PI*2); g.fill();   // heaped sand, a flat stone on top to hold it, a rib of something showing
+    const gs=g.createRadialGradient(q.x-6,q.y-8,2,q.x,q.y-3,26); gs.addColorStop(0,'#f2dcaa'); gs.addColorStop(1,'#9a7034');
+    g.fillStyle=gs; g.beginPath(); g.moveTo(q.x-24,q.y+1); g.quadraticCurveTo(q.x-12,q.y-15,q.x+2,q.y-13); g.quadraticCurveTo(q.x+18,q.y-11,q.x+24,q.y+1); g.quadraticCurveTo(q.x,q.y+9,q.x-24,q.y+1); g.fill(); g.strokeStyle='rgba(110,70,20,0.55)'; g.lineWidth=1; g.stroke();
+    g.strokeStyle='rgba(140,100,50,0.45)'; g.lineWidth=0.8; [-6,-2,2].forEach(b=>{ g.beginPath(); g.moveTo(q.x-16,q.y+b); g.quadraticCurveTo(q.x,q.y+b-4,q.x+16,q.y+b); g.stroke(); });   // ripples the wind left
+    g.fillStyle='#8a7a68'; g.beginPath(); g.ellipse(q.x+2,q.y-12,6,2.6,-0.15,0,Math.PI*2); g.fill(); g.fillStyle='#a8988a'; g.beginPath(); g.ellipse(q.x+1,q.y-13,5,1.8,-0.15,0,Math.PI*2); g.fill();
+    g.strokeStyle='#ece4cc'; g.lineWidth=1.6; g.beginPath(); g.moveTo(q.x-14,q.y-2); g.quadraticCurveTo(q.x-12,q.y-8,q.x-8,q.y-9); g.stroke(); return; }
   g.fillStyle='rgba(0,0,0,0.22)'; g.beginPath(); g.ellipse(q.x,q.y+2,26,10,0,0,Math.PI*2); g.fill();
   const gr=g.createRadialGradient(q.x-6,q.y-8,2,q.x,q.y-3,26); gr.addColorStop(0,'#7a5a3a'); gr.addColorStop(1,'#3e2c1a');
   g.fillStyle=gr; g.beginPath(); g.moveTo(q.x-24,q.y+1); g.quadraticCurveTo(q.x-12,q.y-15,q.x+2,q.y-13); g.quadraticCurveTo(q.x+18,q.y-11,q.x+24,q.y+1); g.quadraticCurveTo(q.x,q.y+9,q.x-24,q.y+1); g.fill();
@@ -16751,6 +16760,8 @@ function drawDirtMound(o){ const q=P(o.i+0.5,o.j+0.5);
   g.fillStyle='#8a8478'; [[-14,-1],[15,-3]].forEach(([a,b])=>{ g.beginPath(); g.ellipse(q.x+a,q.y+b,2.6,1.6,0,0,Math.PI*2); g.fill(); });               // pebbles
   g.strokeStyle='#5a7a3a'; g.lineWidth=1.2; [[-6,-11],[-4,-12],[9,-9],[11,-10],[0,-12]].forEach(([a,b])=>{ g.beginPath(); g.moveTo(q.x+a,q.y+b); g.lineTo(q.x+a+(a>0?1.4:-1.4),q.y+b-4.5); g.stroke(); }); }   // grass just coming through
 function drawDugPit(o){ const q=P(o.i+0.5,o.j+0.5);
+  if(sandy()){ g.fillStyle='#c8a464'; g.beginPath(); g.ellipse(q.x,q.y,24,10,0,0,Math.PI*2); g.fill(); g.fillStyle='#7a5a2e'; g.beginPath(); g.ellipse(q.x,q.y+1,13,5,0,0,Math.PI*2); g.fill();
+    g.fillStyle='#dcc088'; [[-20,-2],[18,1],[6,-8]].forEach(([a,b])=>{ g.beginPath(); g.ellipse(q.x+a,q.y+b,4,2,0,0,Math.PI*2); g.fill(); }); return; }
   g.fillStyle='#4a3622'; g.beginPath(); g.ellipse(q.x,q.y,24,10,0,0,Math.PI*2); g.fill();
   g.fillStyle='#1a120a'; g.beginPath(); g.ellipse(q.x,q.y+1,14,5.6,0,0,Math.PI*2); g.fill();
   g.fillStyle='#6a4e30'; [[-20,-2],[18,1],[6,-8],[-8,7]].forEach(([a,b])=>{ g.beginPath(); g.ellipse(q.x+a,q.y+b,3.4,1.8,0,0,Math.PI*2); g.fill(); }); }
@@ -16773,8 +16784,8 @@ const barrowKnown=()=> NECRO()>=2 || CHOICE.morwen==='done' || !!CHOICE.barrow;
           else { CHOICE.spadeVesnaWait=true; say('Vesna the Grave-Speaker',["“I know of one. It lies with a king, and you are not ready to meet him.”","“Do something for me first, and then ask me again.”"],[bye]); } }},
         {label:'Something else.', fn:()=>oldV(...a)}, bye]); return; }
     return oldV(...a); }; }
-JOURNAL.push(['Buried Things', ()=> !CHOICE.moundSeen && !ownsSpade() ? null : Object.keys(CHOICE.dug||{}).length>=MOUNDS.length ? ['done',"You dug up every buried thing in the valley."] :
-  ownsSpade() ? ['active',"You have a spade. Hold it and dig up the mounds of stamped earth hidden around the valley, behind trees and in quiet corners. ("+Object.keys(CHOICE.dug||{}).length+"/"+MOUNDS.length+")"] :
+JOURNAL.push(['Buried Things', ()=> !CHOICE.moundSeen && !ownsSpade() ? null : Object.keys(CHOICE.dug||{}).length>=MOUNDS.length ? ['done',"You dug up every buried thing, from the valley to the sand."] :
+  ownsSpade() ? ['active',"You have a spade. Hold it and dig up the mounds of stamped earth hidden around the valley, behind trees and in quiet corners, and the heaps of sand in the south with a flat stone on top. ("+Object.keys(CHOICE.dug||{}).length+"/"+MOUNDS.length+")"] :
   CHOICE.spadeQ==='vesna' ? ['active',"Vesna says the spade that dug the Barrow-King's barrow lies in his hall, under the reeds of the Sunken Hollow."] :
   CHOICE.spadeQ==='tobb' ? ['active',"Old Tobb will not lend you his spade. He says Vesna, who talks to the dead, might know where one lies."] :
   ['active',"Somebody buried something under a mound of earth. You need a spade to dig it up. Maybe Old Tobb, the gravedigger, can help."]]);
@@ -19266,6 +19277,14 @@ const VOICE=(()=>{
   if(b){ if(!VOICE.supported) b.style.display='none'; else b.addEventListener('click',()=>VOICE.cycle()); }
   if(e) e.addEventListener('click',()=>{ VOICE.setEngine(VOICE.engine==='online'?'browser':'online'); });
   VOICE.syncUi(); }
+// ════════ buried in the south: the sand keeps things too (the areas only exist from here on) ════════
+[ ['drywash',7,2,{coin:22,item:'dates'},"A raider's cache in a goatskin bag: coin, and a fistful of dates gone hard as pebbles."],
+['drywash',0,19,{item:'khanjar'},"Bones, curled up small the way people lie down in a sandstorm. In the hand, a dagger made from a scorpion's sting."],
+['waystation',13,1,{item:'antidote'},"A clay flask of bitter green, sealed with pitch. Someone at the well kept it against scorpions, and then forgot where."],
+['waystation',0,10,{coin:12,item:'scarab_amulet'},"A pouch of old coin, and a green stone beetle on a gold cord. The beetle is warm, even in the shade."],
+['glassdunes',15,10,{coin:40},"A merchant's iron box, rusted shut. You break it open on a stone. Somebody's whole profit, from somebody's whole year."],
+['glassdunes',0,4,{item:'scarab_circlet'},"A temple priest's circlet, the gold scoured bright by the sand. The scarab on it is facing the sun, the way it always was."],
+['templeA',8,2,{coin:30,item:'potion'},"Sand drifted into a corner of the temple, and under it an offering jar: coin, and a draught the priests left for whoever came next."] ].forEach(m=>{ MOUNDS.push(m); wrap(m[0],'objects',l=>[...l, (CHOICE.dug||{})[moundKey(m)] ? {type:'dugpit', i:m[1], j:m[2], noblock:true} : {type:'dirtmound', i:m[1], j:m[2], mound:m}]); });
 </script>
 </body>
 </html>

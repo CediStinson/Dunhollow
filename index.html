@@ -141,6 +141,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0e0b06;color:#e8d5a
 .mm-cell.current{background:#e8c060;border:1px solid #fff2c0;box-shadow:0 0 6px rgba(232,192,96,0.7);}
 .mm-label{font-size:9px;color:#c8a860;text-align:center;margin-top:4px;letter-spacing:0.5px;}
 #hp-mini-fill{height:100%;background:linear-gradient(#e0503f,#a02218);transition:width .25s;}
+#hp-mini-xp{position:absolute;left:0;bottom:0;height:3px;background:linear-gradient(90deg,#d8b848,#f0dc80);box-shadow:0 0 4px rgba(240,220,128,0.6);transition:width .4s;}
+#lvl-badge{position:absolute;top:13px;left:200px;display:none;min-width:30px;height:24px;padding:0 7px;border-radius:12px;background:rgba(20,12,6,0.88);border:1px solid #8a6a2c;color:#f0dca0;font:600 12px Georgia,serif;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.5);}
 #hp-mini-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#f6e8c8;text-shadow:0 1px 2px #000;font-weight:600;}
 #duel-hud{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);width:min(440px,94vw);display:none;z-index:8;user-select:none;-webkit-user-select:none;}
 #duel-hud.open{display:block;}
@@ -9789,9 +9791,9 @@ function refreshStatPanel(){
   const rows = [
     ['Purse', formatCoin(player.purse)],
     ['Max Health', player.maxHp+(armorBonus?` (+${armorBonus})`:'')],
-    ...(typeof gearLevel==='function' ? [['Gear Level', '◆'.repeat(gearLevel())+'<small style="opacity:.55">'+'◇'.repeat(5-gearLevel())+'</small>']] : []),
+    ...(typeof playerLevel==='function' ? [['Level', playerLevel()+(playerLevel()<LV_MAX?' <small style="opacity:.6">('+xpInto()+' / '+xpNeed()+' xp)</small>':' <small style="opacity:.6">(max)</small>')], ['Armour', armourTotal()+' <small style="opacity:.6">(−'+Math.round(armourCut()*100)+'% damage)</small>'], ['Gear Level', '◆'.repeat(gearLevel())+'<small style="opacity:.55">'+'◇'.repeat(5-gearLevel())+'</small>']] : []),
     ['Weapon', wname],
-    ['Damage', W.dmg],
+    ['Damage', typeof weaponDmg==='function' ? Math.round(weaponDmg(player.opts.equip.weapon)*levelDmgMult()) : W.dmg],
     ['Critical Chance', Math.round(PARRY.critChance*100)+'%'],
     ['Off Hand', E.offhand ? ITEMS[E.offhand].name : 'None'],
   ];
@@ -12013,7 +12015,7 @@ const RENOWN_OFF=()=>{ const r=renownRank(); return r>=5?0.8:r>=2?0.9:1; };     
 const sellRate=()=> SELL_RATE*(renownRank()>=3?4/3:1);
 function refreshPlayerHp(full){ const rk=renownRank(); if(lastRenown>=0 && rk>lastRenown && running){ logMsg('Renown: you are now "'+RENOWN[rk]+'" in the valley. '+RENOWN_PERK[rk]+'.','#e8c060'); banner(RENOWN[rk],'#e8c060',2200);
     if(rk>=5 && !CHOICE.legendGift){ CHOICE.legendGift=true; player.purse+=200; logMsg('Elder Hamond sends a purse from the whole valley: 2 silver, and a note that just says “Thank you.”','#e8c060'); } } lastRenown=rk;
-  player.maxHp=maxHpOf(player.opts?player.opts.equip:defaultEquip(),PARRY.hpBase)+rk*4+(CHOICE.moonBless?10:0)+(CHOICE.bless||0)*5+(bathBuffOn()?10:0)+(CHOICE.ithil2 && player.opts && player.opts.equip && player.opts.equip.special==='moon_ribbon'?(CHOICE.ithil3?10:5):0);   // +10 fresh from a bath (counted before clamping, or the buff's top 10 HP never refill)
+  player.maxHp=maxHpOf(player.opts?player.opts.equip:defaultEquip(),PARRY.hpBase)+rk*4+(CHOICE.moonBless?10:0)+(CHOICE.bless||0)*5+(bathBuffOn()?10:0)+(CHOICE.ithil2 && player.opts && player.opts.equip && player.opts.equip.special==='moon_ribbon'?(CHOICE.ithil3?10:5):0)+(typeof levelHp==='function'?levelHp():0);   // +10 fresh from a bath (counted before clamping, or the buff's top 10 HP never refill)
   if(full||player.hp==null) player.hp=player.maxHp; player.hp=Math.min(player.hp,player.maxHp);
   if(CHOICE.bruised) player.hp=Math.min(player.hp,hpCap()); }
 
@@ -12176,6 +12178,7 @@ function updateHud(){
   const hh=Math.max(0,player.hp), pct=100*hh/player.maxHp;
   document.getElementById('hp-mini-fill').style.width=pct+'%';
   document.getElementById('hp-mini-text').textContent=Math.ceil(hh)+' / '+player.maxHp+(CHOICE.bruised?' · bruised':'');
+  if(typeof hudLevel==='function') hudLevel();
   document.querySelectorAll('.p-dir').forEach(el=>el.classList.toggle('held', el.dataset.dir===playerGuard));
 }
 function pressFx(id){ const b=document.getElementById(id); b.classList.add('flash'); setTimeout(()=>b.classList.remove('flash'),90); }
@@ -13159,7 +13162,7 @@ function drawActorBase(e){
   const ty=B-(e.type==='wolf'||e.type==='scorpion'?66:e.type==='sandworm'?178:e.type==='scarab'?78:114);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const deadly=!isP && e.type!=='dummy' && e.hostile!==false && player.maxHp>0 && ((e.maxHp||0)*(((weaponOf(e)||{}).dmg)||5)*tierDmg(e)*(typeof gapIn==='function'?gapIn(e)/gapOut(e):1)) >= 2*player.maxHp*Math.max(8,playerHitDmg());   // far stronger than you: a skull
-  const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  '+'◆'.repeat(e.tier) : ''), tw=g.measureText(label).width;
+  const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  Lv '+(typeof foeLevel==='function'?foeLevel(e):e.tier) : ''), tw=g.measureText(label).width;
   g.fillStyle=deadly?'rgba(60,8,6,0.85)':'rgba(12,8,3,0.78)'; g.beginPath(); g.roundRect(s.x-tw/2-7,ty,tw+14,16,4); g.fill();
   if(deadly){ g.strokeStyle='rgba(220,70,50,0.8)'; g.lineWidth=1; g.stroke(); }
   g.fillStyle=isP?'#e8c878':(e.hostile===false?'#a8c4e0':deadly?'#ff9a80':'#f08a70'); g.textAlign='center'; g.textBaseline='middle'; g.fillText(label,s.x,ty+8);
@@ -14223,7 +14226,8 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
   if(WEAPONS[id] && WEAPONS[id].ember) L.push(['Grows with','Attack + Spell Power <small>(+4% each point); every cut burns</small>']);
   if(WEAPONS[id] && WEAPONS[id].burn) L.push(['Special',Math.round(WEAPONS[id].burn*100)+'% to set the foe burning']);
   if(WEAPONS[id] && WEAPONS[id].wither) L.push(['Special',Math.round(WEAPONS[id].wither*100)+'% to wither the foe, '+Math.round(WEAPONS[id].drain*100)+'% to drain life <small>(both grow with spell power)</small>']);
-  if(WEAPONS[id]){ L.push(['Damage',WEAPONS[id].dmg]); L.push(['Swing time',WEAPONS[id].wind.toFixed(2)+'s <small>('+(WEAPONS[id].wind<=0.17?'fast':WEAPONS[id].wind<=0.22?'steady':'slow')+')</small>']); } if(WEAPONS[id]&&WEAPONS[id].magic) L.push(['Spell power','×'+WEAPONS[id].magic]);
+  if(typeof armourOf==='function' && armourOf(id)) L.push(['Armour','+'+armourOf(id)]);
+  if(WEAPONS[id]){ L.push(['Damage',typeof weaponDmg==='function'?weaponDmg(id):WEAPONS[id].dmg]); L.push(['Swing time',WEAPONS[id].wind.toFixed(2)+'s <small>('+(WEAPONS[id].wind<=0.17?'fast':WEAPONS[id].wind<=0.22?'steady':'slow')+')</small>']); } if(WEAPONS[id]&&WEAPONS[id].magic) L.push(['Spell power','×'+WEAPONS[id].magic]);
   const hp=GEAR_HP[id]||0; if(hp) L.push(['Health',(hp>0?'+':'')+hp]);
   if(st.agi) L.push(['Agility','+'+st.agi+' <small>('+Math.round(st.agi*AGI_DODGE*100)+'% dodge)</small>']);
   if(st.ap) L.push(['Attack power','+'+st.ap+' <small>(+'+st.ap*3+'% weapon damage)</small>']);
@@ -19995,26 +19999,68 @@ function itemLevel(id){ if(!id || !ITEMS[id]) return 0; const base=(typeof unWov
 function gearLevel(){ const E=(player.opts&&player.opts.equip)||{}; let sum=0, w=0;
   Object.entries(GEAR_LEVEL_SLOTS).forEach(([k,n])=>{ if(k==='offhand' && !E.offhand) return; sum+=itemLevel(E[k])*n; w+=n; });
   return Math.max(1,Math.min(5,Math.round(sum/(w||1)))); }
-const gapOf=f=> Math.max(0,((f&&f.tier)||1)-gearLevel()-1);
-const gapIn=f=> 1+0.4*gapOf(f), gapOut=f=> Math.max(0.4,1-0.2*gapOf(f));
-{ const _wf=windowFor; windowFor=e=>{ const w=_wf(e); return (e===player && combat && combat.foe) ? w*Math.max(0.6,1-0.12*gapOf(combat.foe)) : w; }; }
+const gapOf=f=> Math.max(0,(typeof foeLevel==='function'?foeLevel(f)-playerLevel()-2:0));   // how far a foe is beyond you (for the warning and the reward; it changes no numbers)
+const gapIn=f=> (typeof foeDmgMult==='function'?foeDmgMult(f):1), gapOut=f=> (typeof playerOutMult==='function'?playerOutMult(f):1);
 // a word of warning at the edge of somewhere too deep for you
 let gapWarned={};
-{ const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); try{ const t=tierOf(areaId), gl=gearLevel(); if(t-gl-1>=1 && !gapWarned[areaId] && mobs.some(m=>m.hostile&&!m.dead)){ gapWarned[areaId]=1;
-      setTimeout(()=>{ banner('Too dangerous for your gear','#e07050',2200); logMsg('This place is danger '+'◆'.repeat(t)+'. Your gear is only '+'◆'.repeat(gl)+'. Foes here will hit harder, and shrug off your blows. Better armour and a better blade first.','#e07050');
-        teach('gearlevel','Gear level',["Every area has a <b>danger level</b> (the ◆ beside a foe's name). Your <b>gear level</b> comes from what you wear: your weapon and body armour count most. See it in your inventory.","Go somewhere <b>two or more</b> levels deeper than your gear and foes <b>hit harder</b>, <b>take less</b> from you, and are <b>harder to parry</b>. Buy, find and earn better gear, and come back."]); },900); } }catch(e){} return r; }; }
+{ const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); try{ const t=tierOf(areaId), gl=gearLevel(), al=2*t, pl=playerLevel(); if(al-pl>=3 && !gapWarned[areaId] && mobs.some(m=>m.hostile&&!m.dead)){ gapWarned[areaId]=1;
+      setTimeout(()=>{ banner('Dangerous for you','#e07050',2200); logMsg('Foes here are around level '+al+'. You are level '+pl+', with '+armourTotal()+' armour. They will hit hard and take a long time to bring down. Go carefully, or come back stronger.','#e07050');
+        teach('gearlevel','Stronger foes',["Foes show their <b>level</b> over their heads. Yours is beside your health bar.","Better <b>armour</b> takes a share off every blow, a better <b>weapon</b> hits harder, and every level adds health and damage. Nothing stops you going anywhere: a foe far above you is not impossible, only very likely to kill you."]); },900); } }catch(e){} return r; }; }
 
 // ════════ BEYOND YOUR GEAR: nothing is locked by your gear; beating something you should not have beaten is worth something ════════
 //   CHOICE.daring: how many foes you have felled two or more levels beyond your gear; CHOICE.daringBest: the widest gap
 { const _fd=foeDown; foeDown=function(f){ let gap=0; try{ gap=(f && f.type!=='dummy' && !combat.practice && !f.dead) ? gapOf(f) : 0; }catch(e){} const r=_fd.apply(this,arguments);
-    if(gap>=1){ try{ CHOICE.daring=(CHOICE.daring||0)+1; CHOICE.daringBest=Math.max(CHOICE.daringBest||0,gap); const coin=4*gap*(f.tier||1)+Math.floor(Math.random()*6); player.purse+=coin; updateHud();
+    if(gap>=1){ try{ CHOICE.daring=(CHOICE.daring||0)+1; setTimeout(()=>{ try{ giveXp(killXp(f)); }catch(e){} },600); CHOICE.daringBest=Math.max(CHOICE.daringBest||0,gap); const coin=4*gap*(f.tier||1)+Math.floor(Math.random()*6); player.purse+=coin; updateHud();
       slowmo.scale=0.15; slowmo.t=0.9; shake=Math.max(shake,10);
-      setTimeout(()=>{ banner(gap>=2?'Against all odds!':'Beyond your gear!','#ffd070',1800); logMsg('You beat '+f.name+' ('+'◆'.repeat(f.tier||1)+') in '+'◆'.repeat(gearLevel())+' gear. Folk will hear of this. You find '+formatCoin(coin)+' on the body.','#ffd070'); },350);
-      if(CHOICE.daring===1) setTimeout(()=>teach('daring','Beyond your gear',["You beat a foe <b>beyond your gear</b>. That is hard, and it is worth something: <b>extra coin</b> every time, and word of it spreads.","Do it five times and it counts toward your <b>renown</b>."]),1400);
+      setTimeout(()=>{ banner(gap>=2?'Against all odds!':'Beyond your level!','#ffd070',1800); logMsg('You beat '+f.name+' (level '+foeLevel(f)+') at level '+playerLevel()+'. Folk will hear of this. You find '+formatCoin(coin)+' on the body.','#ffd070'); },350);
+      if(CHOICE.daring===1) setTimeout(()=>teach('daring','Beyond your gear',["You beat a foe <b>three or more levels above you</b>. That is hard, and it is worth something: <b>extra coin</b> and <b>double experience</b>, and word of it spreads.","Do it five times and it counts toward your <b>renown</b>."]),1400);
       autosaveSoon(400); }catch(e){} }
     return r; }; }
-JOURNAL.push(['Beyond Your Gear', ()=> !CHOICE.daring ? null : CHOICE.daring>=5 ? ['done',"You have beaten "+CHOICE.daring+" foes you had no business beating, in gear that was not up to it."+(CHOICE.daringBest>=2?" Once, against all odds.":"")]
-  : ['active',"Foes far beyond your gear hit harder and take less, but they can be beaten. Each one you fell is worth extra coin, and word gets around. ("+CHOICE.daring+"/5)"]]);
+JOURNAL.push(['Beyond Your Level', ()=> !CHOICE.daring ? null : CHOICE.daring>=5 ? ['done',"You have beaten "+CHOICE.daring+" foes you had no business beating, three and more levels above you."+(CHOICE.daringBest>=2?" Once, against all odds.":"")]
+  : ['active',"Foes far above your level hit hard and take an age to bring down, but they can be beaten. Each one is worth extra coin and experience, and word gets around. ("+CHOICE.daring+"/5)"]]);
+
+// ════════ LEVELS, ARMOUR, AND WEAPONS THAT GET BETTER: real numbers decide where you can go ════════
+//   CHOICE.xp : experience. Level 1-12: each level is +8 health and +5% damage. Foes have a level from where they live (danger ◆ x2).
+//   Armour (from body armour, helms, gauntlets, boots, shields) takes a share off every blow: armour/(armour+40). Better weapons hit harder: +12% per quality level.
+const LV_MAX=12, XP_AT=[0,0,50,130,250,420,640,920,1270,1700,2220,2840,3560];
+const playerLevel=()=>{ const x=CHOICE.xp||0; let L=1; for(let k=2;k<=LV_MAX;k++) if(x>=XP_AT[k]) L=k; return L; };
+const xpInto=()=>{ const L=playerLevel(); return (CHOICE.xp||0)-XP_AT[L]; }, xpNeed=()=>{ const L=playerLevel(); return L>=LV_MAX?0:XP_AT[L+1]-XP_AT[L]; };
+const levelHp=()=>(playerLevel()-1)*8, levelDmgMult=()=>1+0.05*(playerLevel()-1);
+const foeLevel=f=>{ if(!f) return 1; const t=f.tier||tierOf(areaId)||1; return Math.min(14, 2*t + ((f.boss||(f.opts&&f.opts.big)||['barrowking','sunqueen','brute','sandworm'].includes(f.type))?1:0) + (/^(Old |Greater |The )/.test(f.name||'')?1:0)); };
+// what each piece is worth
+const HEAVY=/mail|plate|scale|lamellar|chitin|cuirass|hauberk|helm|kettle|coif|bevor|gauntlet|keffiyeh|crown|obsidian/;
+function armourOf(id){ if(!id || !ITEMS[id]) return 0; const it=ITEMS[id], base=(typeof unWoven==='function'?unWoven(id):id), b=it.base||base, lvl=itemLevel(id), heavy=HEAVY.test(base)||HEAVY.test(b);
+  if(it.slot==='armor') return heavy ? 2+2*lvl : /jerkin|studded|gambeson|leather|sun_|mantle/.test(base+b) ? Math.round(1+1.2*lvl) : Math.round(lvl*0.5);
+  if(it.slot==='head') return heavy ? lvl+1 : Math.round(lvl*0.4);
+  if(it.slot==='hands') return heavy ? lvl : Math.round(lvl*0.5);
+  if(it.slot==='feet') return /plate|wyrm/.test(base) ? lvl+1 : Math.round(lvl*0.5);
+  if(it.slot==='offhand' && (typeof isShieldId==='function' ? isShieldId(id) : /shield/.test(base+b))) return lvl;
+  return 0; }
+const armourTotal=()=>{ const E=(player.opts&&player.opts.equip)||{}; return ['armor','head','hands','feet','offhand'].reduce((a,k)=>a+armourOf(E[k]),0); };
+const armourCut=()=>{ const a=armourTotal(); return a/(a+40); };
+function weaponDmg(id){ const W=WEAPONS[id]||WEAPONS.fists||{dmg:4}; if(!id || (ITEMS[id] && /staff/.test(id))) return W.dmg; return Math.round(W.dmg*(1+0.12*(itemLevel(id)-1))); }
+// what you deal, and what you take
+const FOE_DMG_T=[1,1.1,1.45,1.65,2.2,2.6], FOE_HP_T=[1,1,1.25,1.5,1.65,1.8];
+function playerOutMult(f){ let m=levelDmgMult(); const id=player.opts&&player.opts.equip.weapon; if(HIT_SRC==='melee' && id && WEAPONS[id] && !isMagicWeapon()) m*=weaponDmg(id)/(WEAPONS[id].dmg||1); return m; }
+function foeDmgMult(f){ const t=Math.max(1,Math.min(5,(f&&f.tier)||1)); return FOE_DMG_T[t]*(1-armourCut()); }
+{ const _rm=resetMobs; resetMobs=function(...a){ const r=_rm.apply(this,a); mobs.forEach(m=>{ if(m.type==='dummy' || !m.tier) return; const k=FOE_HP_T[Math.max(1,Math.min(5,m.tier))]; m.maxHp=Math.round(m.maxHp*k); if(!m.dead) m.hp=Math.round(m.hp*k); }); return r; }; }
+// experience: from every foe you fell (less for small fry, more for something beyond you), and a good deal for every task you see through
+function giveXp(n,why){ if(!n || n<1) return; const L0=playerLevel(); CHOICE.xp=(CHOICE.xp||0)+Math.round(n); const L1=playerLevel();
+  floatText(tileOf(player),'+'+Math.round(n)+' xp','#e8d070');
+  if(L1>L0){ refreshPlayerHp(false); player.hp=player.maxHp; updateHud(); setTimeout(()=>{ banner('Level '+L1+'!','#f0dc80',2000); try{ SND.perfect(); }catch(e){}
+      logMsg('You are level '+L1+' now: '+player.maxHp+' health, and your blows land a little harder.','#f0dc80');
+      teach('levels','Levels',["Every foe you fell and every task you finish gives <b>experience</b>. Each <b>level</b> gives you <b>+8 health</b> and <b>+5% damage</b>.","Foes have levels too, shown over their heads. Something <b>three or more levels</b> above you will very likely kill you. Very likely."]); },300); }
+  updateHud(); }
+function killXp(f){ const d=foeLevel(f)-playerLevel(), base=6*foeLevel(f); return base*(d>=0 ? Math.min(2,1+0.2*d) : Math.max(0,1+0.25*d)); }
+{ const _fd=foeDown; foeDown=function(f){ const xp=(f && f.type!=='dummy' && !combat.practice && !f.dead) ? killXp(f) : 0; const r=_fd.apply(this,arguments); if(xp>=1) setTimeout(()=>giveXp(xp),250); return r; }; }
+setInterval(()=>{ try{ if(!running || CHOICE.xpQuests==null) return; const n=renownDone(); if(n>CHOICE.xpQuests){ const k=n-CHOICE.xpQuests; CHOICE.xpQuests=n; giveXp(80*k,'quest'); } }catch(e){} },2500);
+// older saves: a level that fits what you have already done
+setInterval(()=>{ try{ if(!running || CHOICE.xp!=null) return; const n=renownDone(); CHOICE.xp=n*80+Math.min(900,defeatedMobs.size*12); CHOICE.xpQuests=n; refreshPlayerHp(false); updateHud(); }catch(e){} },1000);
+// the HUD
+function hudLevel(){ let b=document.getElementById('lvl-badge'); const hm=document.getElementById('hp-mini'); if(!hm) return;
+  if(!b){ b=document.createElement('div'); b.id='lvl-badge'; hm.parentNode.appendChild(b); const x=document.createElement('div'); x.id='hp-mini-xp'; hm.appendChild(x); }
+  b.style.display = hm.style.display==='none' || getComputedStyle(hm).display==='none' ? 'none' : 'flex'; b.textContent='Lv '+playerLevel();
+  const x=document.getElementById('hp-mini-xp'); if(x) x.style.width=(playerLevel()>=LV_MAX?100:100*xpInto()/Math.max(1,xpNeed()))+'%'; }
 </script>
 </body>
 </html>

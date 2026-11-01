@@ -9791,7 +9791,7 @@ function refreshStatPanel(){
   const rows = [
     ['Purse', formatCoin(player.purse)],
     ['Max Health', player.maxHp+(armorBonus?` (+${armorBonus})`:'')],
-    ...(typeof playerLevel==='function' ? [['Level', playerLevel()+(playerLevel()<LV_MAX?' <small style="opacity:.6">('+xpInto()+' / '+xpNeed()+' xp)</small>':' <small style="opacity:.6">(max)</small>')], ['Armour', armourTotal()+' <small style="opacity:.6">(−'+Math.round(armourCut()*100)+'% damage)</small>'], ['Gear Level', '◆'.repeat(gearLevel())+'<small style="opacity:.55">'+'◇'.repeat(5-gearLevel())+'</small>']] : []),
+    ...(typeof playerLevel==='function' ? [['Level', playerLevel()+(playerLevel()<LV_MAX?' <small style="opacity:.6">('+xpInto()+' / '+xpNeed()+' xp)</small>':' <small style="opacity:.6">(max)</small>')], ['Armour', armourTotal()+' <small style="opacity:.6">(−'+Math.round(armourCut()*100)+'% damage)</small>']] : []),
     ['Weapon', wname],
     ['Damage', typeof weaponDmg==='function' ? Math.round(weaponDmg(player.opts.equip.weapon)*levelDmgMult()) : W.dmg],
     ['Critical Chance', Math.round(PARRY.critChance*100)+'%'],
@@ -13161,7 +13161,7 @@ function drawActorBase(e){
   if(isP && romHush()) return;
   const ty=B-(e.type==='wolf'||e.type==='scorpion'?66:e.type==='sandworm'?178:e.type==='scarab'?78:114);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
-  const deadly=!isP && e.type!=='dummy' && e.hostile!==false && player.maxHp>0 && ((e.maxHp||0)*(((weaponOf(e)||{}).dmg)||5)*tierDmg(e)*(typeof gapIn==='function'?gapIn(e)/gapOut(e):1)) >= 2*player.maxHp*Math.max(8,playerHitDmg());   // far stronger than you: a skull
+  const deadly=!isP && e.type!=='dummy' && e.hostile!==false && player.maxHp>0 && ((e.maxHp||0)*(((weaponOf(e)||{}).dmg)||5)*tierDmg(e)*(typeof gapIn==='function'?gapIn(e)/gapOut(e):1)*(typeof foeSpell==='function' && foeSpell(e) ? (isMagicWeapon()||hasShield(player) ? 1.3 : 1.8) : 1)) >= 2*player.maxHp*Math.max(8,playerHitDmg());   // far stronger than you: a skull
   const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  Lv '+(typeof foeLevel==='function'?foeLevel(e):e.tier) : ''), tw=g.measureText(label).width;
   g.fillStyle=deadly?'rgba(60,8,6,0.85)':'rgba(12,8,3,0.78)'; g.beginPath(); g.roundRect(s.x-tw/2-7,ty,tw+14,16,4); g.fill();
   if(deadly){ g.strokeStyle='rgba(220,70,50,0.8)'; g.lineWidth=1; g.stroke(); }
@@ -14220,7 +14220,7 @@ const dodgeChance=a=>Math.min(DODGE_CAP,a*AGI_DODGE);
 // (spell power used to be added flat to every hit; it is now a multiplier, see BALANCE at the end)
 // every stat a piece of gear carries, in words
 function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
-  if(typeof itemLevel==='function' && GEAR_LEVEL_SLOTS[ITEMS[id]&&ITEMS[id].slot]) L.push(['Gear level','◆'.repeat(itemLevel(id))]);
+  if(typeof itemLevel==='function' && ITEMS[id] && ITEMS[id].slot && ITEMS[id].slot!=='quest') L.push(['Quality','◆'.repeat(itemLevel(id))+'<span style="opacity:.45">'+'◇'.repeat(5-itemLevel(id))+'</span>']);
   if(id==='fen_boots') L.push(['Walking speed','+15%']);
   if(id==='moon_ribbon' && CHOICE.ithil2) L.push(['Health',CHOICE.ithil3?'+10 <small>(her moonlight, and a strand of her hair)</small>':'+5 <small>(her moonlight)</small>']);
   if(WEAPONS[id] && WEAPONS[id].ember) L.push(['Grows with','Attack + Spell Power <small>(+4% each point); every cut burns</small>']);
@@ -16100,7 +16100,7 @@ function transitArea(prev,id){                 // someone was walking between ar
           if(!en || !ns || ns.area!==id || ns.walk) continue; const m=rtNPC(k,ns,true); if(m.sleepBed){ m.sleepBed=null; m.id=R.ids[ns.area]||k; m.opts={...R.opts}; } m.i=en[0]; m.j=en[1]; m.x=en[0]+0.5; m.y=en[1]+0.5; m.path=[];
           m.goto=ns.at; m.arrive=ns; m.sit=false; m.chop=false; m.wander=null; m.early=true; NPCS.push(m); continue; }
         const ex=exitToward(T.dest); if(!en || !ex) continue;
-        const m=rtNPC(k,T.slot,true); m.i=en[0]; m.j=en[1]; m.x=en[0]+0.5; m.y=en[1]+0.5; m.path=[]; m.sit=false; m.chop=false; m.wander=null;
+        const m=rtNPC(k,T.slot,true); if(m.sleepBed){ m.sleepBed=null; m.id=R.ids[id]||k; m.opts={...R.opts}; } m.i=en[0]; m.j=en[1]; m.x=en[0]+0.5; m.y=en[1]+0.5; m.path=[]; m.sit=false; m.chop=false; m.wander=null;
         m.goto=ex; m.vanish=true; m.transit=true; m._gone=R.gone; m.slot=T.slot; NPCS.push(m); } }catch(e){ console.error(e); } }
 // out in the rain, everyone gets wet, not only you: soaked clothes go dark, a sheen on the skin, drips and a damp patch underfoot
 
@@ -19989,21 +19989,16 @@ JOURNAL.push(['The Last Lamplighter', ()=> !CHOICE.lamp ? null : CHOICE.lamp==='
 // the tally marks tell the rest
 UNDER_LORE.under_sw[2][2]="Somebody slept here for a long time: a bedroll, a cold lamp, tallies on the stone. Hundreds of them, in rows: lamps lit, lamps out. Then they stop.";
 
-// ════════ GEAR LEVEL: what you wear decides where you can go ════════
-// every piece has a level, 1 to 5, from its quality; yours is the weighted mean (weapon and body armour count three times, empty slots count nothing).
-// foes in an area deeper than your gear level plus one hit harder, take less, and swing faster than you can read. Geared right, nothing changes.
-const GEAR_LEVEL_SLOTS={ weapon:3, armor:3, head:1, hands:1, feet:1, offhand:1 };
+// ════════ QUALITY: every piece you can wear is ◆1 (common) to ◆5 (the finest), from its worth ════════
+// it is the only thing the diamonds mean; a weapon's damage grows with it. The one "level" in the game is yours and the foes'.
 const ITEM_LEVEL_FIX={ fire_blade:4, emberbrand:5, barrow_blade:4, grave_blade:3, khopesh:5, wyrm_hauberk:5, wyrm_shield:4, wyrm_helm:4, fen_boots:3, sand_boots:4, elf_blade:3, bog_crown:4, obsidian_helm:3, helm_full:3, helm_black:3, kettle:2, coif:2, shield_iron:3, shield:2, gauntlets:2, plate_boots:2 };
 function itemLevel(id){ if(!id || !ITEMS[id]) return 0; const base=(typeof unWoven==='function'?unWoven(id):id); if(ITEM_LEVEL_FIX[base]!=null) return Math.min(5,ITEM_LEVEL_FIX[base]+(base!==id?1:0));
   const pr=PRICES[id]??PRICES[base]??10; return pr<=20?1:pr<=60?2:pr<=150?3:pr<=280?4:5; }
-function gearLevel(){ const E=(player.opts&&player.opts.equip)||{}; let sum=0, w=0;
-  Object.entries(GEAR_LEVEL_SLOTS).forEach(([k,n])=>{ if(k==='offhand' && !E.offhand) return; sum+=itemLevel(E[k])*n; w+=n; });
-  return Math.max(1,Math.min(5,Math.round(sum/(w||1)))); }
 const gapOf=f=> Math.max(0,(typeof foeLevel==='function'?foeLevel(f)-playerLevel()-2:0));   // how far a foe is beyond you (for the warning and the reward; it changes no numbers)
 const gapIn=f=> (typeof foeDmgMult==='function'?foeDmgMult(f):1), gapOut=f=> (typeof playerOutMult==='function'?playerOutMult(f):1);
 // a word of warning at the edge of somewhere too deep for you
 let gapWarned={};
-{ const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); try{ const t=tierOf(areaId), gl=gearLevel(), al=2*t, pl=playerLevel(); if(al-pl>=3 && !gapWarned[areaId] && mobs.some(m=>m.hostile&&!m.dead)){ gapWarned[areaId]=1;
+{ const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); try{ const t=tierOf(areaId), al=2*t, pl=playerLevel(); if(al-pl>=3 && !gapWarned[areaId] && mobs.some(m=>m.hostile&&!m.dead)){ gapWarned[areaId]=1;
       setTimeout(()=>{ banner('Dangerous for you','#e07050',2200); logMsg('Foes here are around level '+al+'. You are level '+pl+', with '+armourTotal()+' armour. They will hit hard and take a long time to bring down. Go carefully, or come back stronger.','#e07050');
         teach('gearlevel','Stronger foes',["Foes show their <b>level</b> over their heads. Yours is beside your health bar.","Better <b>armour</b> takes a share off every blow, a better <b>weapon</b> hits harder, and every level adds health and damage. Nothing stops you going anywhere: a foe far above you is not impossible, only very likely to kill you."]); },900); } }catch(e){} return r; }; }
 

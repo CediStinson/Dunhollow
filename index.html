@@ -12061,8 +12061,8 @@ function renderMap(cv,V){                             // V: {zoom, px, py, label
     c.fillStyle=cur?tone(MM_COL[A.theme]||'#5a7a3a',0.25):(MM_COL[A.theme]||'#5a7a3a');
     const nk=(i,j)=>notch.find(n=>i>=n.i0&&i<n.i0+(n.w||3)&&j>=n.j0&&j<n.j0+(n.h||3));
     const base=A.under?(cur?'#6a5a4a':'#2a2018'):c.fillStyle;
-    const MZ=A.maze?mazeGrid(id):null, SEEN=A.maze?mazeSeen(id):null;
-    for(let j=0;j<A.h;j++) for(let i=0;i<A.w;i++){ if(MZ && (!MZ[j*A.w+i] || SEEN[j*A.w+i]!=='1')) continue;   // the maze: only the walkways you have seen
+    const MZ=A.maze?mazeGrid(id):null, KNOWN=!A.maze || mazeKnown(id);
+    for(let j=0;j<A.h;j++) for(let i=0;i<A.w;i++){ if(MZ && (!KNOWN || !MZ[j*A.w+i])) continue;   // the maze: blank until you have found your way through it
       const nn=nk(i,j); c.fillStyle = MZ ? (cur?'#b8a888':'#8a7a60') : nn ? (nn.kind==='plough'?'#6a4a2a':'#d8b848') : base;
       const a=P2(o.u+i,o.v+j), b=P2(o.u+i+1,o.v+j), d=P2(o.u+i+1,o.v+j+1), e=P2(o.u+i,o.v+j+1);
       c.beginPath(); c.moveTo(a[0],a[1]); c.lineTo(b[0],b[1]); c.lineTo(d[0],d[1]); c.lineTo(e[0],e[1]); c.closePath(); c.fill(); }
@@ -12072,11 +12072,12 @@ function renderMap(cv,V){                             // V: {zoom, px, py, label
     c.beginPath(); q.forEach((p2,n)=>n?c.lineTo(p2[0],p2[1]):c.moveTo(p2[0],p2[1])); c.closePath(); c.stroke(); c.setLineDash([]);
     A.objects().filter(t=>t.type==='pool').forEach(t=>{ const a=P2(o.u+t.i,o.v+t.j), b=P2(o.u+t.i+t.fp[0],o.v+t.j+t.fp[1]); c.fillStyle=t.kind==='moon'?'#8ab8d0':'#3e6a7a'; c.beginPath(); c.ellipse((a[0]+b[0])/2,(a[1]+b[1])/2,(b[0]-a[0])/2,(b[1]-a[1])/2,0,0,Math.PI*2); c.fill(); });
     // doors
-    A.objects().filter(t=>t.type==='teleporter').forEach(t=>{ const m=P2(o.u+t.i+0.5,o.v+t.j+0.5); c.fillStyle='#8ac8ff'; c.beginPath(); c.arc(m[0],m[1],Math.max(1,Math.min(3,k*0.5)),0,Math.PI*2); c.fill(); });
+    if(A.maze && !mazeKnown(id)){ const m=P2(o.u+A.w/2,o.v+A.h/2+A.h*0.16); c.font='italic '+Math.max(10,Math.min(14,k*1.2))+'px Georgia,serif'; c.textAlign='center'; c.fillStyle='rgba(200,180,140,0.45)'; c.fillText('uncharted',m[0],m[1]); }
+    else A.objects().filter(t=>t.type==='teleporter').forEach(t=>{ const m=P2(o.u+t.i+0.5,o.v+t.j+0.5); c.fillStyle='#8ac8ff'; c.beginPath(); c.arc(m[0],m[1],Math.max(1,Math.min(3,k*0.5)),0,Math.PI*2); c.fill(); });
     c.globalAlpha=1;
   });
   // you are here
-  if(L[areaId]){ const o=L[areaId], m=P2(o.u+player.x,o.v+player.y);
+  if(L[areaId] && (AREAS[areaId].layer||0)===LAY && !(AREAS[areaId].maze && !mazeKnown(areaId))){ const o=L[areaId], m=P2(o.u+player.x,o.v+player.y);
     c.fillStyle='#fff'; c.strokeStyle='#8a1a10'; c.lineWidth=2; c.beginPath(); c.arc(m[0],m[1],Math.max(3.5,Math.min(6,k*0.6)),0,Math.PI*2); c.fill(); c.stroke(); }
   if(V.labels){ c.font=`${Math.max(11,Math.min(18,k*1.4))}px Georgia,serif`; c.textAlign='center'; c.textBaseline='middle';
     ids.forEach(id=>{ const A=AREAS[id], o=L[id], m=P2(o.u+A.w/2,o.v+A.h/2), t=A.under?'':(A.label||id); if(!t) return; const w=c.measureText(t).width+10;
@@ -19785,7 +19786,7 @@ OBJ_DRAW.wormskull=o=>{ const q=P(o.i+1.5,o.j+1.5), B=q.y; g.save();
   g.restore(); };
 
 // ════════ THE UNDERCITY: old Hollowmere, drowned when the river moved; the new city was built on its roofs. Under the streets: four quarters of walkways, ridges and bridges over the black ════════
-//   map layer -1, under Hollowmere. CHOICE.mazeSeen[area]: the walkways you have seen, so the map fills in as you go. CHOICE.deepsLift: the rope lift to the Cinder Deeps is free
+//   map layer -1, under Hollowmere. CHOICE.mazeKnown[area]: you came out of that quarter by another door than you went in, so you can map it; until then it is blank. CHOICE.deepsLift: the rope lift to the Cinder Deeps is free
 const MAP_UNDER={ root:'under_nw', u:13, v:-121 };
 const mapLayerShown=()=> (typeof BIGMAP!=='undefined' && BIGMAP.open && BIGMAP.layer!=null) ? BIGMAP.layer : (AREAS[areaId] && AREAS[areaId].layer) || 0;
 const MZ_N=33;
@@ -19808,15 +19809,19 @@ function mazeGrid(id){ if(MZ_CACHE[id]) return MZ_CACHE[id]; const Q=UNDER_Q[id]
     if(!nb.length){ stack.pop(); continue; } const [nx,ny]=nb[Math.floor(rnd()*nb.length)]; seen[ny*cw+nx]=1; G[(cy+ny+1)*W+(cx+nx+1)]=1; G[(2*ny+1)*W+2*nx+1]=1; stack.push([nx,ny]); }
   for(let y=0;y<ch;y++) for(let x=0;x<cw;x++){ const i=2*x+1, j=2*y+1, walls=[[1,0],[-1,0],[0,1],[0,-1]].filter(([a,b])=>!G[(j+b)*W+i+a]);   // a few dead ends knocked through: more than one way round, but not many
     if(walls.length===3 && rnd()<0.12){ const ok=walls.filter(([a,b])=>i+2*a>0&&i+2*a<W-1&&j+2*b>0&&j+2*b<H-1); if(ok.length){ const [a,b]=ok[Math.floor(rnd()*ok.length)]; G[(j+b)*W+i+a]=1; } } }
-  Q.rooms.forEach(([cx,cy,r])=>{ const i0=2*cx+1, j0=2*cy+1; for(let a=-r;a<=r;a++) for(let b=-r;b<=r;b++){ const i=i0+a, j=j0+b; if(i>0&&j>0&&i<W-1&&j<H-1) G[j*W+i]=1; } });   // the old squares, still standing
+  for(let j=1;j<H-1;j++) for(let i=1;i<W-1;i++){ if(G[j*W+i] || ((i&1)===(j&1))) continue; if(rnd()<0.14) G[j*W+i]=1; }   // a wall between two walkways, gone: another crossing
+  Q.rooms.forEach(([cx,cy,r])=>{ r=Math.min(r,1); const i0=2*cx+1, j0=2*cy+1; for(let a=-r;a<=r;a++) for(let b=-r;b<=r;b++){ const i=i0+a, j=j0+b; if(i>0&&j>0&&i<W-1&&j<H-1) G[j*W+i]=1; } });   // the old squares, still standing
   UNDER_LINKS.filter(l=>l[0]===id).forEach(([,i,j])=>G[j*W+i]=1);
   return MZ_CACHE[id]=G; }
 const mzIn=(i,j)=>[i===0?1:i===MZ_N-1?MZ_N-2:i, j===0?1:j===MZ_N-1?MZ_N-2:j];   // the walkway just inside a door
 function mazeDeadEnds(id){ const G=mazeGrid(id), W=MZ_N, out=[]; for(let j=1;j<W-1;j+=2) for(let i=1;i<W-1;i+=2){ if(!G[j*W+i]) continue; if([[1,0],[-1,0],[0,1],[0,-1]].filter(([a,b])=>G[(j+b)*W+i+a]).length===1) out.push([i,j]); } return out; }
-function mazeSeen(id){ const S=(CHOICE.mazeSeen && typeof CHOICE.mazeSeen==='object') ? CHOICE.mazeSeen : (CHOICE.mazeSeen={}); if(!S[id] || S[id].length!==MZ_N*MZ_N) S[id]='0'.repeat(MZ_N*MZ_N); return S[id]; }
-setInterval(()=>{ try{ if(!UNDER_Q[areaId]) return; const s=mazeSeen(areaId).split(''), G=mazeGrid(areaId); let ch=false;
-    for(let a=-3;a<=3;a++) for(let b=-3;b<=3;b++){ const i=player.i+a, j=player.j+b; if(i<0||j<0||i>=MZ_N||j>=MZ_N || Math.abs(a)+Math.abs(b)>4) continue; const k=j*MZ_N+i; if(G[k] && s[k]!=='1'){ s[k]='1'; ch=true; } }
-    if(ch) CHOICE.mazeSeen[areaId]=s.join(''); }catch(e){} },300);
+const mazeKnown=id=>!!(CHOICE.mazeKnown && CHOICE.mazeKnown[id]);
+let MAZE_IN=null;                                    // which door you came into this quarter by
+{ const _sw0=switchArea; switchArea=function(id,entry,...rest){ try{ if(UNDER_Q[areaId] && MAZE_IN){ const near=t=>Math.max(Math.abs(t.i-player.i),Math.abs(t.j-player.j)), door=OBJECTS.filter(o=>o.type==='teleporter').sort((a,b)=>near(a)-near(b))[0];
+        if(door && near(door)<=1 && (door.i!==MAZE_IN[0] || door.j!==MAZE_IN[1]) && !mazeKnown(areaId)){ (CHOICE.mazeKnown=CHOICE.mazeKnown||{})[areaId]=true; const lb=AREAS[areaId].label.replace('The Undercity · ',''); setTimeout(()=>logMsg('You found your way through '+lb+'. You could draw it from memory now.','#c8a0e0'),700); } } }catch(e){}
+    const r=_sw0.call(this,id,entry,...rest);
+    try{ MAZE_IN=null; if(UNDER_Q[areaId]){ const e=AREAS[areaId].entries[entry]||Object.values(AREAS[areaId].entries)[0], near=t=>Math.max(Math.abs(t.i-e.i),Math.abs(t.j-e.j)), d=OBJECTS.filter(o=>o.type==='teleporter').sort((a,b)=>near(a)-near(b))[0]; if(d) MAZE_IN=[d.i,d.j]; } }catch(e){}
+    return r; }; }
 function mazeBlock(){ if(!UNDER_Q[areaId]) return; const G=mazeGrid(areaId); for(let j=0;j<MZ_N;j++) for(let i=0;i<MZ_N;i++) if(!G[j*MZ_N+i]) blocked.add(i+','+j); }
 { const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); mazeBlock(); if(areaId==='emberpass' && !CHOICE.deepsLift){ CHOICE.deepsLift=true; setTimeout(()=>logMsg('Beside the stair, a rope lift hangs in a shaft, its winch seized with rust. You kick it free. It will carry you up to the Steam Cellar, and back down.','#c8a0e0'),900); } return r; }; }
 { const _pr=pzRebuild; pzRebuild=function(...a){ const r=_pr.apply(this,a); mazeBlock(); return r; }; }
@@ -19829,10 +19834,10 @@ const UNDER_LORE={
   under_sw:[[11,6,"A chapel roof, the bell still in its frame. Scratched beside it: <i>“Fourteen turnings left from the bell, then down. Or was it right.”</i>"],[2,12,"A shrine to a saint nobody remembers, her face worn smooth by hands touching it for luck."],[14,11,"Somebody slept here for a long time: a bedroll, a cold pot, tallies on the stone. Hundreds of them. Then they stop."]],
   under_se:[[8,8,"A great cistern, dry, its roof gone. Walkways cross it on old beams. You can hear water, very far down."],[13,13,"The stair down. The air coming up it is warm, and smells of iron and smoke. The Cinder Deeps are below."]] };
 const UNDER_MOBS={
-  under_nw:[['Undercity Dead','skeleton',[7,6,1,1]],['Cistern Lurker','lurker',[3,12,0,0]],['Undercity Dead ','skeleton',[11,12,0,0]]],
-  under_ne:[['Tunnel Cutthroat','bandit',[5,4,0,0],'C'],['Tunnel Cutthroat ','bandit',[5,4,1,1],'C'],['Rooftop Lurker','lurker',[3,13,0,0]]],
-  under_sw:[['Bell-Ringer','skeleton',[11,6,-2,0],'B'],['Bell-Ringer ','skeleton',[11,6,2,0],'B'],['The Sleeper','ghost',[14,11,0,0]],['Drowned Lurker','lurker',[8,13,0,0]],['Undercity Dead','skeleton',[4,4,0,0]]],
-  under_se:[['Undercity Dead','skeleton',[3,3,0,0]],['Deep Lurker','lurker',[11,2,0,0]],['Cistern Dead','skeleton',[8,8,-2,2]],['Cistern Dead ','skeleton',[8,8,2,-2]],['Stair Warden','warden',[13,13,0,-1]]] };
+  under_nw:[['Undercity Dead','skeleton',[7,6,1,0]],['Cistern Lurker','lurker',[3,12,0,0]],['Undercity Dead ','skeleton',[11,12,0,0]]],
+  under_ne:[['Tunnel Cutthroat','bandit',[5,4,0,0],'C'],['Tunnel Cutthroat ','bandit',[5,4,1,0],'C'],['Rooftop Lurker','lurker',[3,13,0,0]]],
+  under_sw:[['Bell-Ringer','skeleton',[11,6,-1,0],'B'],['Bell-Ringer ','skeleton',[11,6,1,0],'B'],['The Sleeper','ghost',[14,11,0,0]],['Drowned Lurker','lurker',[8,13,0,0]],['Undercity Dead','skeleton',[4,4,0,0]]],
+  under_se:[['Undercity Dead','skeleton',[3,3,0,0]],['Deep Lurker','lurker',[11,2,0,0]],['Cistern Dead','skeleton',[8,8,-1,1]],['Cistern Dead ','skeleton',[8,8,1,-1]],['Stair Warden','warden',[13,13,0,-1]]] };
 Object.entries(UNDER_Q).forEach(([id,Q],qi)=>{ const room=(cx,cy)=>[2*cx+1,2*cy+1];
   const ent={}; UNDER_LINKS.filter(l=>l[3]===id).forEach(([from,,, ,key])=>{ const mine=UNDER_LINKS.find(l=>l[0]===id && l[4]===key); if(mine){ const [ii,jj]=mzIn(mine[1],mine[2]); ent[key]={i:ii,j:jj}; } });
   Object.entries(Q.entries).forEach(([k,[i,j]])=>ent[k]={i,j});
@@ -19840,7 +19845,7 @@ Object.entries(UNDER_Q).forEach(([id,Q],qi)=>{ const room=(cx,cy)=>[2*cx+1,2*cy+
     objects:()=>{ const l=UNDER_LINKS.filter(x=>x[0]===id).map(([,i,j,to,key])=>({type:'teleporter', i, j, to, entry: to==='steamcellar'?'fromUnder': to==='keepward'?'fromWell': to==='emberpass'?'fromUnder': key }));
       (UNDER_LORE[id]||[]).forEach(([cx,cy,t])=>{ const [i,j]=room(cx,cy); l.push({type:'rune', i:i+1, j:j-1, text:t}, {type:'lantern', i:i-1, j:j-1}); });
       Q.rooms.forEach(([cx,cy])=>{ if((UNDER_LORE[id]||[]).some(x=>x[0]===cx&&x[1]===cy)) return; const [i,j]=room(cx,cy); l.push({type:'lantern', i:i-1, j:j+1}); });
-      mazeDeadEnds(id).filter(([i,j])=>i+j>6).filter((_,k)=>(k+qi)%4===1).slice(0,6).forEach(([i,j])=>{ if(!collectedPickups.has(id+':'+i+','+j)) l.push({type:'pickup', i, j, item:UNDER_LOOT[(i*7+j*3+qi)%UNDER_LOOT.length]}); });   // what the drowned left at the ends of things
+      mazeDeadEnds(id).filter(([i,j])=>i+j>6).filter((_,k)=>(k+qi)%2===1).slice(0,6).forEach(([i,j])=>{ if(!collectedPickups.has(id+':'+i+','+j)) l.push({type:'pickup', i, j, item:UNDER_LOOT[(i*7+j*3+qi)%UNDER_LOOT.length]}); });   // what the drowned left at the ends of things
       return l; },
     npcs:()=>[],
     mobs:()=>(UNDER_MOBS[id]||[]).map(([name,type,[cx,cy,a,b],fac],k)=>{ const [i0,j0]=room(cx,cy), i=i0+a, j=j0+b, faction='und_'+id+'_'+(fac||k);

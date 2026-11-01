@@ -211,7 +211,9 @@ function dialogStep(){
         || (healCount()<3 && player.purse>25 ? can.find(c=>{ const id=c.querySelector('.shop-slot').dataset.item; return ITEMS[id] && ITEMS[id].heal && !ITEMS[id].cure; }) : null)
         || (CASTER && player.purse>40 && player.inv.filter(id=>id&&ITEMS[id]&&ITEMS[id].mana).length<2 ? can.find(c=>{ const id=c.querySelector('.shop-slot').dataset.item; return ITEMS[id] && ITEMS[id].mana; }) : null);
       if(pick && player.inv.includes(null)){ const id=pick.querySelector('.shop-slot').dataset.item; pick.click(); S.buys.push({id,t:gt,lvl:lvl()}); note('Buys '+ITEMS[id].name,'gear'); return; } } }
-  const ck=name+'|'+text.slice(0,80); const done=DLG.chosen[ck]||(DLG.chosen[ck]=new Set());
+  if(name==='A Bed' && /How long do you sleep/.test(text)){ const want=(CHOICE.bruised || player.hp<player.maxHp*0.8); const b=btns.find(x=>want?/next morning/.test(x.innerText):/^Not now/.test(x.innerText))||btns[btns.length-1]; if(want) note('Sleeps until morning','move'); b.click(); return; }
+  { const d=btns.find(x=>/^Get dressed/.test(x.innerText)); if(d){ d.click(); note('Gets dressed again','gear'); return; } }
+  const ck=name+'|'+text.slice(0,80); let mem=DLG.chosen[ck]; if(!mem || day()-mem.d>=2) mem=DLG.chosen[ck]={set:new Set(), d:day()}; const done=mem.set;
   let prog=btns.filter(b=>!isExit(b.innerText));
   if(teacherOff(name)) prog=[];
   if(grid && /buy/i.test(hint) && !player.inv.some(isJunk)) prog=prog.filter(b=>!/^Sell/i.test(b.innerText));
@@ -269,6 +271,10 @@ function think(){
   // health first
   const cap=hpCap(); if(player.hp<cap*0.6 && player.hp!==NOEAT){ const k=healK(); if(k>=0){ const id=player.inv[k], h0=player.hp; try{ eatItem(k); }catch(e){} if(player.hp>h0) note('Eats/drinks '+ITEMS[id].name,'gear'); else NOEAT=player.hp; return 1.2; } }
   if(equipBest()) return 1.0;
+  const BC=CHOICE.bathChest;                        // clothes left by the water: go back and get dressed
+  if(BC){ if(BC.area!==areaId){ const r=route(areaId,BC.area,BOLD+1); if(r && r.length){ if(!(GOAL&&GOAL.dress)) note('My clothes are still in the chest by the water. Going back for them.','gear'); GOAL={area:BC.area, dress:true}; if(goToward(r[0])) return 0.5; } }
+    else { const o=OBJECTS.find(x=>x.type==='bathchest'); if(o){ if(cheb([o.i,o.j],[player.i,player.j])<=1){ try{ puzAct(o); }catch(e){} } else clickTile(o.i,o.j); return 1; } } }
+  else if(GOAL && GOAL.dress) GOAL=null;
   const needRest=CHOICE.bruised || (player.hp<player.maxHp*0.45 && (healK()<0 || NOEAT===player.hp));
   if(needRest && !(GOAL&&GOAL.rest)){ let best=null; for(const a of Object.keys(AREAS)){ const g=graph()[a]; if(!g||!g.beds) continue; const r=a===areaId?[]:route(areaId,a,0); if(!r) continue; if(!best||r.length<best.r.length) best={a,r}; }
     if(best){ GOAL={area:best.a, rest:true}; note((CHOICE.bruised?'Bruised from that beating: off to sleep it off in ':'Hurt and nothing to eat: off to find a bed in ')+(AREAS[best.a].label||best.a),'move'); } }

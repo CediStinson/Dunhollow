@@ -20022,7 +20022,7 @@ JOURNAL.push(['Beyond Your Level', ()=> !CHOICE.daring ? null : CHOICE.daring>=5
 // ════════ LEVELS, ARMOUR, AND WEAPONS THAT GET BETTER: real numbers decide where you can go ════════
 //   CHOICE.xp : experience. Level 1-12: each level is +8 health and +5% damage. Foes have a level from where they live (danger ◆ x2).
 //   Armour (from body armour, helms, gauntlets, boots, shields) takes a share off every blow: armour/(armour+40). Better weapons hit harder: +12% per quality level.
-const LV_MAX=12, XP_AT=[0,0,50,130,250,420,640,920,1270,1700,2220,2840,3560];
+const LV_MAX=12, XP_AT=[0,0,120,400,900,1700,2800,4000,5300,6800,8300,10000,12000];   // about level 4 when the valley is done, 6 after the danger-3 lands, 8-9 after the fen and the Undercity, 12 only at the very end
 const playerLevel=()=>{ const x=CHOICE.xp||0; let L=1; for(let k=2;k<=LV_MAX;k++) if(x>=XP_AT[k]) L=k; return L; };
 const xpInto=()=>{ const L=playerLevel(); return (CHOICE.xp||0)-XP_AT[L]; }, xpNeed=()=>{ const L=playerLevel(); return L>=LV_MAX?0:XP_AT[L+1]-XP_AT[L]; };
 const levelHp=()=>(playerLevel()-1)*8, levelDmgMult=()=>1+0.05*(playerLevel()-1);
@@ -20053,9 +20053,11 @@ function giveXp(n,why){ if(!n || n<1) return; const L0=playerLevel(); CHOICE.xp=
   updateHud(); }
 function killXp(f){ const d=foeLevel(f)-playerLevel(), base=6*foeLevel(f); return base*(d>=0 ? Math.min(2,1+0.2*d) : Math.max(0,1+0.25*d)); }
 { const _fd=foeDown; foeDown=function(f){ const xp=(f && f.type!=='dummy' && !combat.practice && !f.dead) ? killXp(f) : 0; const r=_fd.apply(this,arguments); if(xp>=1) setTimeout(()=>giveXp(xp),250); return r; }; }
-setInterval(()=>{ try{ if(!running || CHOICE.xpQuests==null) return; const n=renownDone(); if(n>CHOICE.xpQuests){ const k=n-CHOICE.xpQuests; CHOICE.xpQuests=n; giveXp(80*k,'quest'); } }catch(e){} },2500);
+setInterval(()=>{ try{ if(!running || CHOICE.xpQuests==null) return; const n=renownDone(); if(n>CHOICE.xpQuests){ const k=n-CHOICE.xpQuests; CHOICE.xpQuests=n; giveXp(k*Math.max(20,12*tierOf(areaId)),'quest'); } }catch(e){} },2500);   // a task is worth more the deeper into the world it takes you
 // older saves: a level that fits what you have already done
-setInterval(()=>{ try{ if(!running || CHOICE.xp!=null) return; const n=renownDone(); CHOICE.xp=n*80+Math.min(900,defeatedMobs.size*12); CHOICE.xpQuests=n; refreshPlayerHp(false); updateHud(); }catch(e){} },1000);
+setInterval(()=>{ try{ if(!running || CHOICE.xpVer===2) return; const n=renownDone(), deep=Math.max(1,...Object.keys(visitedAreas).map(a=>tierOf(a)||1));
+    if(CHOICE.xp==null && n===0 && deep<=1){ CHOICE.xp=0; } else { const L=Math.max(1,Math.min(9,2*deep-1)); CHOICE.xp=Math.round(XP_AT[L]+(XP_AT[L+1]-XP_AT[L])*0.4); }
+    CHOICE.xpQuests=n; CHOICE.xpVer=2; refreshPlayerHp(false); updateHud(); }catch(e){} },1000);
 // the HUD
 function hudLevel(){ let b=document.getElementById('lvl-badge'); const hm=document.getElementById('hp-mini'); if(!hm) return;
   if(!b){ b=document.createElement('div'); b.id='lvl-badge'; hm.parentNode.appendChild(b); const x=document.createElement('div'); x.id='hp-mini-xp'; hm.appendChild(x); }

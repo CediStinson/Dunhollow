@@ -9665,9 +9665,7 @@ function eatItem(k){ const id=player.inv[k];
   if(id && ITEMS[id] && ITEMS[id].mana){ player.maxMana=player.maxMana||100; const m=player.mana??player.maxMana;   // a mana draught: power, not health
     if(m>=player.maxMana){ if(typeof flash==='function') flash('Your mana is full.'); return false; }
     const g=Math.min(ITEMS[id].mana,player.maxMana-m); player.mana=m+g; player.inv[k]=null; floatText(tileOf(player),'+'+Math.round(g)+' mana','#8ab0f0'); logMsg('You drink the '+ITEMS[id].name.toLowerCase()+'. (+'+Math.round(g)+' mana)','#8ab0f0');
-    updateHud(); if(invOverlay.classList.contains('open')) refreshInventory(); refreshFoodBar(); return true; }           // only a proper meal or a draught mends a bruise
-  if(id==='cooked_meat'||id==='potion'){ const was=CHOICE.bruised; cureBruise(); const r=eatItemRaw(k); if(!r && was){ refreshPlayerHp(false); updateHud(); } return r; }
-  if(CHOICE.bruised && player.hp>=hpCap()){ if(typeof flash==='function') flash('Bread won\'t mend this. Sleep, a bath, or a proper meal.'); return false; }
+    updateHud(); if(invOverlay.classList.contains('open')) refreshInventory(); refreshFoodBar(); return true; }
   const r=eatItemRaw(k); refreshPlayerHp(false); updateHud(); return r; }
 function eatItemRaw(k){ const id=player.inv[k]; if(!id||!ITEMS[id]||!ITEMS[id].heal) return false; SND.fx(/potion|draught|tonic|water|ale|wine|cider|milk|flask/.test(id)?'gulp':'chew');
   if(player.hp>=player.maxHp){ if(typeof flash==='function') flash('You are not hurt.'); return false; }
@@ -12017,7 +12015,7 @@ function refreshPlayerHp(full){ const rk=renownRank(); if(lastRenown>=0 && rk>la
     if(rk>=5 && !CHOICE.legendGift){ CHOICE.legendGift=true; player.purse+=200; logMsg('Elder Hamond sends a purse from the whole valley: 2 silver, and a note that just says “Thank you.”','#e8c060'); } } lastRenown=rk;
   player.maxHp=maxHpOf(player.opts?player.opts.equip:defaultEquip(),PARRY.hpBase)+rk*4+(CHOICE.moonBless?10:0)+(CHOICE.bless||0)*5+(bathBuffOn()?10:0)+(CHOICE.ithil2 && player.opts && player.opts.equip && player.opts.equip.special==='moon_ribbon'?(CHOICE.ithil3?10:5):0)+(typeof levelHp==='function'?levelHp():0);   // +10 fresh from a bath (counted before clamping, or the buff's top 10 HP never refill)
   if(full||player.hp==null) player.hp=player.maxHp; player.hp=Math.min(player.hp,player.maxHp);
-  if(CHOICE.bruised) player.hp=Math.min(player.hp,hpCap()); }
+}
 
 // ── HUD ──
 const duelHud=document.getElementById('duel-hud'), clog=document.getElementById('combat-log'), cbanner=document.getElementById('combat-banner');
@@ -12177,7 +12175,7 @@ function updateHud(){
   const sn=document.getElementById('p-shield-note'); if(sn) sn.style.display = (player.opts && isShieldId(player.opts.equip.offhand)) ? '' : 'none';
   const hh=Math.max(0,player.hp), pct=100*hh/player.maxHp;
   document.getElementById('hp-mini-fill').style.width=pct+'%';
-  document.getElementById('hp-mini-text').textContent=Math.ceil(hh)+' / '+player.maxHp+(CHOICE.bruised?' · bruised':'');
+  document.getElementById('hp-mini-text').textContent=Math.ceil(hh)+' / '+player.maxHp;
   if(typeof hudLevel==='function') hudLevel();
   document.querySelectorAll('.p-dir').forEach(el=>el.classList.toggle('held', el.dataset.dir===playerGuard));
 }
@@ -16442,33 +16440,30 @@ function paintGbtcBanner(x,y){                             // a gallows-pole wit
   drawGbtcEmblem(g,(L+R)/2,T+H/2,0.9,'#d8b050');
   g.fillStyle='rgba(255,255,255,0.05)'; g.fillRect(L,T,6,H); }
 function drawGbtcBanner(o){ const q=P(o.i+0.5,o.j+0.5); drawCached('gbtcbanner',q.x,q.y,80,140,20,130,paintGbtcBanner); }
-// ════════ losing a fight costs something: half a day, a share of your purse, and you wake bruised in your last bed ════════
-//   CHOICE.bruised : true until you sleep, bathe, or eat a proper meal (roast meat or a healing draught); health stays at half until then
+// ════════ losing a fight costs something: half a day and a share of your purse; you wake in your last bed ════════
 //   CHOICE.lastBed : {a,i,j} where you last slept; you are carried back there (the farm, if you have never slept anywhere)
-const hpCap=()=> CHOICE.bruised ? Math.max(1,Math.ceil(player.maxHp*0.5)) : player.maxHp;
-function cureBruise(){ if(!CHOICE.bruised) return; CHOICE.bruised=false; logMsg('The bruises fade. You feel like yourself again.','#8ad07a'); }
+const hpCap=()=> player.maxHp;
+function cureBruise(){ CHOICE.bruised=false; }                       // (there used to be a bruised state at half health; saves that still carry it are simply let go)
 let QUEST_FIGHT_LOST=false;
 function wakeAfterDefeat(){
   const lost=QUEST_FIGHT_LOST ? 0 : Math.floor(player.purse*0.25); QUEST_FIGHT_LOST=false;
-  player.purse-=lost; dayClock+=DAY_LEN*0.5; CHOICE.bruised=true;
+  player.purse-=lost; dayClock+=DAY_LEN*0.5;
   const B=CHOICE.lastBed && AREAS[CHOICE.lastBed.a] ? CHOICE.lastBed : null;
   if(B){ switchArea(B.a,Object.keys(AREAS[B.a].entries)[0]);
     let best=null, bd=1e9; for(let i=0;i<ROOM.w;i++) for(let j=0;j<ROOM.h;j++){ if(!walkable(i,j)) continue; const d=Math.hypot(i-B.i,j-B.j); if(d<bd){ bd=d; best=[i,j]; } }
     if(best){ player.i=best[0]; player.j=best[1]; player.x=best[0]+0.5; player.y=best[1]+0.5; player.path=[]; centerCam(); } }
   else switchArea('farm','start');
-  refreshPlayerHp(false); player.hp=hpCap(); updateHud();
-  banner('You wake, bruised','#c8a080',1800);
+  refreshPlayerHp(true); updateHud();
+  banner('You wake in your bed','#c8a080',1800);
   logMsg('Someone found you before the crows did and carried you back to your bed. Half a day is gone.','#c8a080');
   if(lost>0) logMsg('Your purse is lighter: '+formatCoin(lost)+' missing.','#c0483a');
-  logMsg('Bruised: your health stays at half until you sleep, bathe, or eat a proper meal.','#c8a080');
   autosaveSoon(200);
   CHOICE.taught=CHOICE.taught||{};
   if(!CHOICE.taught.death){ CHOICE.taught.death=true;           // the first time: what losing costs, in full
       setTimeout(()=>say('What Losing Costs',["You lost the fight. You are not dead, but it cost you:",
         "• <b>You wake in the last bed you slept in</b> (the farm, if you have never slept anywhere else). Sleep somewhere new to change it.",
         "• <b>Half a day has passed.</b> Anything with a deadline kept ticking.",
-        "• <b>A quarter of the coin you carried is gone</b>"+(lost>0?" ("+formatCoin(lost)+" this time)":"")+". Not when a quest fight simply resets itself.",
-        "• <b>You are Bruised:</b> your health stays at <b>half</b> and will not heal past it until you <b>sleep</b> in a bed, take a <b>bath</b>, or eat <b>roast meat</b> or drink a <b>healing draught</b>. Bread and apples will not mend it."],[{label:'Understood.',fn:closeDialog}]),1600); }
+        "• <b>A quarter of the coin you carried is gone</b>"+(lost>0?" ("+formatCoin(lost)+" this time)":"")+". Not when a quest fight simply resets itself."],[{label:'Understood.',fn:closeDialog}]),1600); }
 }
 // ════════ necklaces: cheap trinkets off the dead and out of crates, and Brann's wolf-tooth string ════════
 var NECK_LOOKS={ copper_chain:{cord:'#b8743c',w:0.7,p:'ring',col:'#c8844a'}, bone_charm:{cord:'#5a3a20',w:0.6,p:'bone',col:'#e8e0c8'},
@@ -16954,7 +16949,6 @@ function refreshBelt(){ buildBeltUI(); const B=beltIds();
 
 // ════════ Effects: every blessing, lesson and ailment on you, shown as icons in the inventory (hover for what each does) ════════
 function activeEffects(){ const L=[], hrs=t=>Math.max(0,(t-dayClock)/DAY_LEN*24);
-  if(CHOICE.bruised) L.push({bad:1,ico:'✚',name:'Bruised',kind:'Ailment',rows:[['Health','capped at half']],tip:'You took a beating. It passes when you sleep, bathe, or eat a proper meal (roast meat or a healing draught).'});
   if(bathBuffOn()){ const h=hrs(CHOICE.bathBuff); L.push({ico:'≈',name:'Refreshed',kind:'Bath',rows:[['Max health','+10'],['Time left',h>=1?Math.round(h)+' h':'under an hour']],short:h>=1?Math.round(h)+'h':'<1h',tip:'A hot bath and clean clothes. You feel ready for anything.'}); }
   if(CHOICE.moonBless) L.push({ico:'☾',name:'Moonlit Blessing',kind:'Blessing',rows:[['Max health','+10']],tip:'You sent the moonlight walking to the altar of the Drowned Shrine. It stays with you.'});
   if(CHOICE.bless) L.push({ico:'✝',name:"Mother Hild's Blessing",kind:'Blessing · rank '+CHOICE.bless,rows:[['Max health','+'+CHOICE.bless*5]],short:'×'+CHOICE.bless,tip:'Bought at the chapel, one candle at a time. Lasting.'});

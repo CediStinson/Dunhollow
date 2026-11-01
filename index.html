@@ -20029,11 +20029,11 @@ JOURNAL.push(['Beyond Your Level', ()=> !CHOICE.daring ? null : CHOICE.daring>=5
 // ════════ LEVELS, ARMOUR, AND WEAPONS THAT GET BETTER: real numbers decide where you can go ════════
 //   CHOICE.xp : experience. Level 1-12: each level is +8 health and +5% damage. Foes have a level from where they live (danger ◆ x2).
 //   Armour (from body armour, helms, gauntlets, boots, shields) takes a share off every blow: armour/(armour+40). Better weapons hit harder: +12% per quality level.
-const LV_MAX=12, XP_AT=[0,0,120,400,900,1700,2800,4000,5300,6800,8300,10000,12000];   // about level 4 when the valley is done, 6 after the danger-3 lands, 8-9 after the fen and the Undercity, 12 only at the very end
+const LV_MAX=14, XP_AT=[0,0,120,400,850,1500,2400,3400,4600,6000,7600,9400,11500,14000,17000];   // about level 4 when the valley is done, 6-7 after the danger-3 lands, 9 after the swamp, 11 after the Undercity, 13-14 only deep in the desert
 const playerLevel=()=>{ const x=CHOICE.xp||0; let L=1; for(let k=2;k<=LV_MAX;k++) if(x>=XP_AT[k]) L=k; return L; };
 const xpInto=()=>{ const L=playerLevel(); return (CHOICE.xp||0)-XP_AT[L]; }, xpNeed=()=>{ const L=playerLevel(); return L>=LV_MAX?0:XP_AT[L+1]-XP_AT[L]; };
 const levelHp=()=>(playerLevel()-1)*8, levelDmgMult=()=>1+0.05*(playerLevel()-1);
-const foeLevel=f=>{ if(!f) return 1; const t=f.tier||tierOf(areaId)||1; return Math.min(14, 2*t + ((f.boss||(f.opts&&f.opts.big)||['barrowking','sunqueen','brute','sandworm'].includes(f.type))?1:0) + (/^(Old |Greater |The )/.test(f.name||'')?1:0)); };
+const foeLevel=f=>{ if(!f) return 1; const t=f.tier||tierOf(areaId)||1; return Math.min(15, 2*t + ((f.boss||(f.opts&&f.opts.big)||['barrowking','sunqueen','brute','sandworm'].includes(f.type))?1:0) + (/^(Old |Greater |The )/.test(f.name||'')?1:0)); };
 // what each piece is worth
 const HEAVY=/mail|plate|scale|lamellar|chitin|cuirass|hauberk|helm|kettle|coif|bevor|gauntlet|keffiyeh|crown|obsidian/;
 function armourOf(id){ if(!id || !ITEMS[id]) return 0; const it=ITEMS[id], base=(typeof unWoven==='function'?unWoven(id):id), b=it.base||base, lvl=itemLevel(id), heavy=HEAVY.test(base)||HEAVY.test(b);
@@ -20047,10 +20047,20 @@ const armourTotal=()=>{ const E=(player.opts&&player.opts.equip)||{}; return ['a
 const armourCut=()=>{ const a=armourTotal(); return a/(a+40); };
 function weaponDmg(id){ const W=WEAPONS[id]||WEAPONS.fists||{dmg:4}; if(!id || (ITEMS[id] && /staff/.test(id))) return W.dmg; return Math.round(W.dmg*(1+0.12*(itemLevel(id)-1))); }
 // what you deal, and what you take
-const FOE_DMG_T=[1,1.1,1.45,1.65,2.2,2.6], FOE_HP_T=[1,1,1.25,1.5,1.65,1.8];
+// ── the order of the lands: the valley and the city first (danger 1-3), then the swamp (4), then the Undercity under Hollowmere (5),
+//    and the desert last (5 at its edge, 6 beyond). Everything can be walked into at any time; it is the foes that tell you you are early.
+Object.assign(AREA_TIER,{ reedbank:4, blackwater:4, sunkenwood:4, fen:4, fenpath:4, barrow:5,
+  under_nw:5, under_ne:5, under_sw:5, under_se:5, emberpass:5, emberforge:5,
+  waystation:5, drywash:5, oasis:5, glassdunes:6, singingdunes:6, saltpan:6, redmesa:6, crater:6, bonewaste:6, templeA:6, templeB:6, templeC:6, templeD:6 });
+// and the gear found there follows the same order: the Undercity's ember gear ◆4, what the desert makes and sells ◆3-5
+Object.assign(ITEM_LEVEL_FIX,{ ash_mantle:4, obsidian_helm:4, emberstep_boots:4, cinder_gloves:4,
+  khanjar:3, turban_indigo:3, turban_veil:3, keffiyeh_red:3, desert_boots:3, camel_boots:3, indigo_robe:3, crimson_robe:3, night_robe_d:3,
+  scimitar:4, desert_lance:4, sun_leather:4, sun_shield:4, bronze_bracers:4, scarab_circlet:4, hide_shield:3,
+  shamshir:5, tabar:5, bronze_mace:5, duneglass_glaive:5, lamellar:5, scale_coat:5, chitin_cuirass:5, sun_crown:5, scarab_shield:5, wyrm_shield:5, wyrm_helm:5, sand_boots:5 });
+const FOE_DMG_T=[1,1.1,1.45,1.65,2.2,2.6,3.05], FOE_HP_T=[1,1,1.25,1.5,1.65,1.8,2.0];
 function playerOutMult(f){ let m=levelDmgMult(); const id=player.opts&&player.opts.equip.weapon; if(HIT_SRC==='melee' && id && WEAPONS[id] && !isMagicWeapon()) m*=weaponDmg(id)/(WEAPONS[id].dmg||1); return m; }
-function foeDmgMult(f){ const t=Math.max(1,Math.min(5,(f&&f.tier)||1)); return FOE_DMG_T[t]*(1-armourCut()); }
-{ const _rm=resetMobs; resetMobs=function(...a){ const r=_rm.apply(this,a); mobs.forEach(m=>{ if(m.type==='dummy' || !m.tier) return; const k=FOE_HP_T[Math.max(1,Math.min(5,m.tier))]; m.maxHp=Math.round(m.maxHp*k); if(!m.dead) m.hp=Math.round(m.hp*k); }); return r; }; }
+function foeDmgMult(f){ const t=Math.max(1,Math.min(6,(f&&f.tier)||1)); return FOE_DMG_T[t]*(1-armourCut()); }
+{ const _rm=resetMobs; resetMobs=function(...a){ const r=_rm.apply(this,a); mobs.forEach(m=>{ if(m.type==='dummy' || !m.tier) return; const k=FOE_HP_T[Math.max(1,Math.min(6,m.tier))]; m.maxHp=Math.round(m.maxHp*k); if(!m.dead) m.hp=Math.round(m.hp*k); }); return r; }; }
 // experience: from every foe you fell (less for small fry, more for something beyond you), and a good deal for every task you see through
 function giveXp(n,why){ if(!n || n<1) return; const L0=playerLevel(); CHOICE.xp=(CHOICE.xp||0)+Math.round(n); const L1=playerLevel();
   floatText(tileOf(player),'+'+Math.round(n)+' xp','#e8d070');

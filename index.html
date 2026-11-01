@@ -12681,6 +12681,7 @@ function victory(faction){
       if(R()<0.08) give('rusted_blade'); if(R()<0.04) give('grave_ring'); return; }                                                                 // and now and then something it was buried with
     if(m.type==='lurker'){ if(R()<0.4) coin(2,5); if(R()<0.2){ const pool=LOOT_TIERS[0]; give(pool[Math.floor(R()*pool.length)]); logMsg('…something it swallowed, a while ago.','#a8a080'); } return; }
     if(m.opts && (m.opts.ghost||m.opts.bones)){ if(R()<0.5) coin(4,12); return; }                // the dead carry nothing but old coin
+    if(m.type==='scarab'){ const n=1+(R()<0.5?1:0); for(let k=0;k<n;k++) give('scarab_chitin'); if(R()<0.4) coin(2,8); return; }
     if(m.type==='sandworm'){ const n=2+(R()<0.5?1:0); for(let k=0;k<n;k++) give('worm_scale'); if(R()<0.5) coin(8,20); logMsg('The worm shrinks back into the sand, leaving its shed scales behind. They are warm, and ring like bronze when you knock them together.','#a89878'); return; }
     if(m.type==='ember'){ if(R()<0.6) coin(2,6); if(m.opts.big) give('ember_heart'); return; }                 // a fire-sprite leaves warm coins in the ashes, and the big one its heart
     if(m.type!=='barrowking' && m.type!=='goblin'){ if(R()<0.3) give('old_bone'); if(R()<0.07) give('old_skull'); }   // men who died badly: Vesna has a use for what is left
@@ -13116,6 +13117,7 @@ function drawActorBase(e){
   else if(e.type==='lurker') drawLurker(s.x,B,e,poseFor(e));
   else if(e.type==='scorpion') drawScorpion(s.x,B,e,poseFor(e));
   else if(e.type==='sandworm') drawSandworm(s.x,B,e,poseFor(e));
+  else if(e.type==='scarab') drawScarab(s.x,B,e,poseFor(e));
   else if(e.type==='ember') drawEmber(s.x,B,e,poseFor(e));
   else if(e.type==='skeleton') drawRisen(s.x,B,e,poseFor(e));
   else if(e.opts && e.opts.wrapped && !e.dead){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); drawWraps(s.x,B,e); if(e.warded){ g.save(); g.globalCompositeOperation='lighter'; glow(s.x,B-60,60,90,'255,200,90',0.35+Math.sin(gt*4)*0.08); g.restore(); } }
@@ -13123,7 +13125,7 @@ function drawActorBase(e){
   g.restore();
   if(!isP && e.dead) return;
   if(isP && romHush()) return;
-  const ty=B-(e.type==='wolf'||e.type==='scorpion'?66:e.type==='sandworm'?178:114);
+  const ty=B-(e.type==='wolf'||e.type==='scorpion'?66:e.type==='sandworm'?178:e.type==='scarab'?78:114);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const deadly=!isP && e.type!=='dummy' && e.hostile!==false && player.maxHp>0 && ((e.maxHp||0)*(((weaponOf(e)||{}).dmg)||5)*tierDmg(e)) >= 2*player.maxHp*Math.max(8,playerHitDmg());   // far stronger than you: a skull
   const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  '+'◆'.repeat(e.tier) : ''), tw=g.measureText(label).width;
@@ -18459,7 +18461,7 @@ Object.assign(AREAS,{
   glassdunes:{ fence:{r:false,l:false}, w:16, h:12, theme:'sand', label:'The Glass Dunes', mini:{x:0,y:0},
     notches:()=>[], dummy:null,
     objects:()=>{ const l=[ {type:'teleporter', i:7, j:0, to:'waystation', entry:'fromDunes'},
-        {type:'teleporter', i:8, j:11, to:'glassdunes', entry:'fromWell', locked:()=>true, onLocked:()=>setTimeout(()=>say('The Raiders\' Tracks',"<i>The tracks run on south, toward a red smudge on the horizon: the Red Mesa. Not today. Not alone.</i>",[bye]),60)},
+        {type:'teleporter', i:8, j:11, to:'redmesa', entry:'fromDunes', locked:()=>!(CHOICE.caravan && CHOICE.caravan!=='asked'), onLocked:()=>setTimeout(()=>say('The Raiders\' Tracks',"<i>The tracks run on south, toward a red smudge on the horizon. You don't know yet what you would be walking into.</i>",[bye]),60)},
         {type:'sandrock', i:2, j:3, fp:[2,2], v:6}, {type:'sandrock', i:13, j:2, v:7}, {type:'sandrock', i:1, j:9, v:8}, {type:'sandrock', i:14, j:8, fp:[1,2], v:9},
         {type:'cart', i:10, j:5, nowheel:true, nomule:true}, {type:'crate', i:12, j:6, breakable:true}, {type:'bones', i:9, j:7, noblock:true}, {type:'bones', i:4, j:8, noblock:true} ];
       if(CHOICE.caravan==='asked' && !hasItem('hamid_ring') && !collectedPickups.has('glassdunes:11,7')) l.push({type:'pickup', i:11, j:7, item:'hamid_ring'});
@@ -18469,7 +18471,7 @@ Object.assign(AREAS,{
       { name:'Raider Outrider', type:'bandit', i:12, j:8, faction:'raiders', opts:RAIDER({skin:2,hair:4,beard:1,equip:{head:'keffiyeh',armor:'chitin_cuirass',weapon:'desert_lance',offhand:'hide_shield'}}) },
       { name:'Sand Jackal', type:'wolf', i:4, j:5, faction:'jackals', daily:true, coat:'#b8915a' },
       { name:'Giant Scorpion', type:'scorpion', i:3, j:9, faction:'scorpion', daily:true, opts:SCORP({}) } ],
-    entries:{ fromWell:{i:7,j:1} } } });
+    entries:{ fromWell:{i:7,j:1}, fromMesa:{i:8,j:10} } } });
 AREA_PATHS.drywash=[ [[4.5,-0.5],[4.2,6],[4.8,12],[4.3,18],[4.5,22.5]] ];
 AREA_PATHS.waystation=[ [[7.5,-0.5],[7.4,5.5],[7.6,12.5]], [[7.4,5.5],[10.5,6.5]], [[7.4,6],[3.5,6.5]] ];
 AREA_PATHS.glassdunes=[ [[7.5,-0.5],[8,4],[10,5.5]], [[8,4],[8.5,12.5]] ];
@@ -18480,6 +18482,7 @@ if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
 TALKERS.sefa=()=>{ const S='Sefa of the Well';
   say(S,[CHOICE.sefaMet?"“Back from the sand? Drink. The well never asks who you are.”":"“A northerner! Charcoal on your boots. Welcome to the last sweet water before the Sunscar.”","“The well is free. It has been free for three hundred years, and it will stay free while I keep it.”"],[
     {label:'Drink from the well.', fn:()=>{ CHOICE.sefaMet=true; player.hp=player.maxHp; try{ cureBruise(); }catch(e){} updateHud(); say(S,"“Cold, isn't it? From very deep down. Every ache goes.” <i>You are fully healed.</i>",[bye]); }},
+    ...(CHOICE.sefaMet && typeof sefaAdvice==='function' ? sefaAdvice() : []),
     {label:'“What is the Sunscar?”', fn:()=>{ CHOICE.sefaMet=true; say(S,["“Everything south of here. Dunes that sing at night, glass where lightning hits the sand, and the Red Mesa, where Tarek keeps his raiders.”","“Caravans come through twice a season. Fewer, this year. Ask Kadir why.”"],[bye]); }}, bye]); };
 TALKERS.yusra=()=>shopFrom('Yusra the Trader',['dates','potion','antidote','turban','turban_indigo','scarab_circlet','sun_crown','sand_wrap','night_robe_d','crimson_robe','camel_boots','caravan_robe','indigo_robe','sun_leather','lamellar','desert_shirt','saffron_tunic','sirwal','indigo_trousers','desert_boots','hand_wraps'],1,"“Cloth for the sun, dates from the palms, and draughts for when Tamir's blades fail you. Look, touch, pay.”");
 // ── The Lost Caravan: Kadir's brother never came out of the Glass Dunes ──
@@ -18490,10 +18493,12 @@ TALKERS.kadir=()=>{ const K='Kadir the Caravan Master';
       {label:'Give him the ring.', fn:()=>{ const k=player.inv.indexOf('hamid_ring'); if(k>=0) player.inv[k]=null; remember('caravan','ring',"You found Hamid's signet at the wreck of his caravan in the Glass Dunes. The raiders took him south, to Tarek at the Red Mesa."); player.purse+=30; giveQuestItem('scimitar',true); updateHud();
         say(K,"“Keep the blade sharp. The Red Mesa is no place for a dull one.” <i>You receive a Dune Scimitar and 30 copper.</i>",[bye]); }}]); return; }
   if(CHOICE.caravan==='asked'){ say(K,"“Nothing yet? South, through the dunes. A cart with a running camel on the side.”",[bye]); return; }
+  if(typeof kadirAfter==='function' && kadirAfter()) return;
   say(K,"“I am counting coin for Tarek. It is going slowly. Come back when the road south is open.”",[bye]); };
 JOURNAL.push(['The Lost Caravan', ()=> !CHOICE.caravan ? null : CHOICE.caravan==='asked'
   ? ['active', hasItem('hamid_ring') ? "You found Hamid's signet at the wreck of his caravan. Bring it to Kadir at Sefa's Well." : "Kadir's brother Hamid took a caravan into the Glass Dunes, south of Sefa's Well, and never came out. Look for a cart with a running camel on the side."]
-  : ['active', "Hamid is alive, held by Tarek's raiders at the Red Mesa, south of the Glass Dunes. Kadir is gathering a ransom."]]);
+  : CHOICE.caravan==='freed' ? ['done', MESA_HOW_TXT[CHOICE.hamidHow]||"Hamid is free, and home at Sefa's Well."]
+  : ['active', hasItem('ransom_purse') ? "Kadir gave you the ransom for Hamid. Tarek holds him at the Red Mesa, south of the Glass Dunes. Pay, or find another way: Tarek respects strength, and things that are rare." : "Hamid is alive, held by Tarek's raiders at the Red Mesa, south of the Glass Dunes. Kadir has a ransom ready for you to carry."]]);
 { const prev=npcHasNews; npcHasNews=function(n){ if(n.id==='kadir'){ if(!CHOICE.caravan) return '!'; if(CHOICE.caravan==='asked' && hasItem('hamid_ring')) return '?'; } return prev(n); }; }
 // ════════ more of the south: blades of the caravan roads, and what the folk of the wells wear ════════
 Object.assign(ITEMS,{
@@ -18567,7 +18572,7 @@ Object.assign(PRICES,{ khanjar:40, shamshir:210, tabar:190, desert_lance:150, br
 // Tamir, the bladesmith who works under the palms at Sefa's Well
 wrap('waystation','npcs',l=>[...l,{ id:'tamir', name:'Tamir the Bladesmith', i:12, j:7, dir:1, opts:{gender:'m',skin:4,hair:0,hairColor:0,beard:5,face:1,equip:{head:'keffiyeh_red',torso:'desert_shirt',armor:'sun_leather',hands:'bronze_bracers',legs:'sirwal',feet:'camel_boots',weapon:'shamshir',offhand:null}} }]);
 wrap('waystation','objects',l=>[...l,{type:'anvil', i:12, j:6}]);
-TALKERS.tamir=()=>shopFrom('Tamir the Bladesmith',['khanjar','scimitar','shamshir','tabar','desert_lance','duneglass_glaive','bronze_mace','hide_shield','sun_shield','scarab_shield','scale_coat','chitin_cuirass','sunforged_cuirass','bronze_bracers','keffiyeh','keffiyeh_red'],1,"“Steel from the south, bronze from the temple-towns, glass from the dunes. Feel the balance on that sabre. No, the other way up.”");
+TALKERS.tamir=()=>shopFrom('Tamir the Bladesmith',['khanjar','scimitar','shamshir','tabar','desert_lance','duneglass_glaive','bronze_mace','hide_shield','sun_shield','scale_coat','sunforged_cuirass','bronze_bracers','keffiyeh','keffiyeh_red'],1,"“Steel from the south, bronze from the temple-towns, glass from the dunes. Feel the balance on that sabre. No, the other way up.”");
 // and the people of the sand wear it
 // ════════ THE TEMPLE OF THE HOLLOW SUN: riddles under the Glass Dunes, and the queen who ate the sun ════════
 const TEMPLE=(label,w,h,objs,extra)=>({ ...INSIDE_BASE, w, h, theme:'interior', cave:true, temple:true, label, mini:{x:0,y:0}, objects:objs, npcs:()=>[], ...extra });
@@ -19325,7 +19330,7 @@ function drawSandworm(x,B,e,pose){ const raise=pose&&pose.kind==='raise'?Math.mi
   g.restore(); }
 // where it hides: a spot of slowly turning sand, one of these per area, on some days
 const WORM_SPOTS={ glassdunes:[[6,3],[11,9],[3,10]], drywash:[[4,7],[2,14],[5,19]] };
-const wormHere=a=>{ const S=WORM_SPOTS[a]; if(!S) return null; const day=Math.floor(dayClock/DAY_LEN); if(CHOICE.wormDay!=null && day-CHOICE.wormDay<3) return null;
+let wormHere=a=>{ const S=WORM_SPOTS[a]; if(!S) return null; const day=Math.floor(dayClock/DAY_LEN); if(CHOICE.wormDay!=null && day-CHOICE.wormDay<3) return null;
   let h=11; for(const ch of a+':'+day) h=(h*31+ch.charCodeAt(0))>>>0; return h%3===0 ? S[(h>>3)%S.length] : null; };
 Object.keys(WORM_SPOTS).forEach(a=>wrap(a,'objects',l=>{ const w=wormHere(a); return w ? [...l,{type:'sandstir', i:w[0], j:w[1], noblock:true}] : l; }));
 OBJ_DRAW.sandstir=function(o){ const d=Math.max(Math.abs(player.i-o.i),Math.abs(player.j-o.j)); if(d>1 && !o.woke) return;   // only close up do you notice it
@@ -19350,7 +19355,7 @@ setInterval(()=>{ try{ if(combat.active || CS.on || dlgIsOpen() || !WORM_SPOTS[a
     const dd=o=>Math.max(Math.abs(player.i-o.i),Math.abs(player.j-o.j)), o=OBJECTS.filter(o=>o.type==='sandstir').sort((a,b)=>dd(a)-dd(b))[0]; if(!o){ WORM_NEAR=0; return; }
     const d=dd(o);
     if(d===0) return wormRise(o);                                  // you stepped right on it
-    if(d===1){ WORM_NEAR+=0.2; if(WORM_NEAR>=1.6) return wormRise(o); } else WORM_NEAR=0;   // or stood beside it too long
+    if(d===1 && !(player.opts&&player.opts.equip&&player.opts.equip.feet==='sand_boots')){ WORM_NEAR+=0.2; if(WORM_NEAR>=1.6) return wormRise(o); } else WORM_NEAR=0;   // or stood beside it too long
   }catch(e){} },200);
 setInterval(()=>{ try{ if(combat.active) return; mobs.forEach(m=>{ if(m.type!=='sandworm' || !m.dead || m.counted) return; m.counted=true; CHOICE.wormDay=Math.floor(dayClock/DAY_LEN); CHOICE.wormKills=(CHOICE.wormKills||0)+1; try{ autosaveSoon(300); }catch(e){} }); }catch(e){} },400);
 // what it leaves: scales Tamir can work into armour
@@ -19381,6 +19386,254 @@ const WYRM_RECIPES=[['wyrm_hauberk',5,120],['wyrm_shield',2,40],['wyrm_helm',2,4
 { const oldS=TALKERS.sefa; if(oldS) TALKERS.sefa=(...a)=>{ if(CHOICE.sefaMet && CHOICE.sefaTemple && !CHOICE.wormRumour && !CHOICE.wormSeen){ CHOICE.wormRumour=true;
       say('Sefa of the Well',["“If you go into the dunes, watch the sand at your feet. When it turns round and round, like water going down a drain, walk away. Quickly.”","“Something lives under there. The caravans call it the Mouth. Every few years it takes a camel. Once it took a man.”"],[{label:'Something else.',fn:()=>oldS(...a)},bye]); return; }
     return oldS(...a); }; }
+
+// ════════ THE RED MESA: Tarek's camp under the red rock, and Hamid in a cage ════════
+//   CHOICE.caravan : … 'ring' (Hamid is at the Red Mesa) → 'freed'
+//   CHOICE.hamidHow : 'paid' (Kadir's ransom) · 'scales' (three scales of the worm) · 'duel' (you beat Tarek alone) · 'fought' (you broke the camp) · 'sneaked' (the key, by night)
+const MESA_HOW_TXT={ paid:"You paid Tarek Kadir's ransom. Hamid is home at Sefa's Well, and the raiders keep their word.",
+  scales:"You bought Hamid with three scales of the great worm. Tarek let him go, and the raiders leave you be now.",
+  duel:"You beat Tarek in a duel under the Red Mesa, and he let Hamid go. The raiders keep their word, and leave you be.",
+  fought:"You broke Tarek's camp and freed Hamid. The Red Mesa is quiet now.",
+  sneaked:"You stole the key by night and walked Hamid out of the Red Mesa under the raiders' noses. Tarek will not forget it." };
+const MESA_PEACE=()=>['paid','scales','duel'].includes(CHOICE.hamidHow);
+Object.assign(ITEMS,{ ransom_purse:{ name:"Kadir's Ransom", slot:'misc', title:"A heavy purse of old coin, sewn shut with Kadir's own thread. Everything the caravan had left." } }); QUEST_ITEMS.add('ransom_purse');
+ITEM_ICON.ransom_purse=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.fillStyle='#7a2a24'; g2.beginPath(); g2.moveTo(10,18); g2.quadraticCurveTo(6,34,20,35); g2.quadraticCurveTo(34,34,30,18); g2.quadraticCurveTo(20,13,10,18); g2.fill();
+  g2.strokeStyle='#d8aa48'; g2.lineWidth=2; g2.beginPath(); g2.moveTo(11,19); g2.quadraticCurveTo(20,23,29,19); g2.stroke(); g2.fillStyle='#e8c060'; [[14,13],[20,11],[26,13]].forEach(([x,y])=>{ g2.beginPath(); g2.ellipse(x,y,3,1.6,0,0,Math.PI*2); g2.fill(); }); g2.restore(); };
+const HAMID_OPTS=()=>DESERT({skin:4,hair:2,hairColor:0,beard:3,face:1,equip:{head:null,torso:'desert_shirt',armor:null,legs:'indigo_trousers',feet:null,weapon:null}});
+const TAREK_OPTS=()=>RAIDER({skin:4,hair:2,hairColor:0,beard:4,face:2,equip:{head:'keffiyeh_red',armor:'scale_coat',hands:'bronze_bracers',weapon:'shamshir',offhand:'sun_shield',feet:'camel_boots'}});
+const MESA_GUARDS=[ ['Mesa Raider',4,6,()=>RAIDER({equip:{weapon:'tabar'}})], ['Mesa Outrider',10,5,()=>RAIDER({skin:2,hair:4,beard:1,equip:{head:'keffiyeh',armor:'chitin_cuirass',weapon:'desert_lance',offhand:'hide_shield'}})], ['Cage Guard',9,8,()=>RAIDER({skin:3,hair:1,beard:2,equip:{weapon:'scimitar'}})] ];
+const mesaNight=()=>NIGHT();
+AREAS.redmesa={ fence:{r:false,l:false}, w:14, h:12, theme:'sand', label:'The Red Mesa', mini:{x:0,y:0}, notches:()=>[], dummy:null,
+  objects:()=>{ const l=[ {type:'teleporter', i:7, j:0, to:'glassdunes', entry:'fromMesa'},
+      {type:'sandrock', i:0, j:2, fp:[2,3], v:11, red:true}, {type:'sandrock', i:12, j:1, fp:[2,2], v:12, red:true}, {type:'sandrock', i:0, j:9, fp:[2,2], v:13, red:true}, {type:'sandrock', i:13, j:10, v:14, red:true}, {type:'sandrock', i:5, j:10, v:15, red:true},
+      {type:'tent', i:6, j:2, fp:[2,2]}, {type:'tent', i:2, j:6, fp:[2,2]}, {type:'campfire', i:7, j:6}, {type:'crate', i:9, j:2}, {type:'crate', i:10, j:2}, {type:'barrel', i:4, j:2}, {type:'bones', i:3, j:9, noblock:true} ];
+    if(CHOICE.caravan!=='freed') l.push({type:'cage', i:11, j:8}, {type:'cagefront', i:12, j:9, ci:11, cj:8, noblock:true});
+    else l.push({type:'cage', i:11, j:8, open:true}, {type:'cagefront', i:12, j:9, ci:11, cj:8, open:true, noblock:true});
+    return l; },
+  npcs:()=>{ const L=[];
+    if(CHOICE.caravan!=='freed') L.push({ id:'hamid_cage', name:'Hamid', i:11, j:8, dir:1, opts:HAMID_OPTS() });
+    const tarekUp=!['fought','duel'].includes(CHOICE.hamidHow) || CHOICE.hamidHow==='duel';
+    if(CHOICE.hamidHow!=='fought' && CHOICE.hamidHow!=='sneaked'){
+      if(tarekUp && !CHOICE.tarekDead) L.push({ id:'tarek', name:'Tarek of the Red Mesa', i:7, j:4, dir:1, opts:TAREK_OPTS() });
+      MESA_GUARDS.forEach(([n,i,j,o])=>{ if((CHOICE.mesaDown||[]).includes(n)) return; L.push({ id:'mesa_'+n.replace(/\W/g,''), name:(n==='Cage Guard'&&mesaNight()&&CHOICE.caravan!=='freed')?'Dozing Cage Guard':n, i, j, dir:1, opts:o() }); }); }
+    return L; },
+  mobs:()=> CHOICE.hamidHow==='sneaked' && !CHOICE.tarekDead ? [ { name:'Tarek of the Red Mesa', type:'bandit', i:7, j:4, faction:'mesa', style:'duelist', opts:TAREK_OPTS() }, ...MESA_GUARDS.map(([n,i,j,o])=>({ name:n, type:'bandit', i, j, faction:'mesa', opts:o() })) ] : [],
+  entries:{ fromDunes:{i:7,j:1} } };
+AREA_PATHS.redmesa=[ [[7.5,-0.5],[7.3,3.5],[8,6.5],[10.5,8]] ];
+AREA_TIER.redmesa=3; if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
+// the cage: iron bars, a padlock the size of a fist; drawn in two halves so whoever is inside stands between them
+function drawCageHalf(o,front){ const ci=o.ci??o.i, cj=o.cj??o.j, a=P(ci,cj), b=P(ci+1,cj), c=P(ci+1,cj+1), d=P(ci,cj+1), H=70;
+  const bars=(p,q,n)=>{ for(let k=0;k<=n;k++){ const x=p.x+(q.x-p.x)*k/n, y=p.y+(q.y-p.y)*k/n; g.strokeStyle='#2a2420'; g.lineWidth=2.6; g.beginPath(); g.moveTo(x,y); g.lineTo(x,y-H); g.stroke(); g.strokeStyle='rgba(160,150,140,0.5)'; g.lineWidth=0.8; g.beginPath(); g.moveTo(x-0.8,y); g.lineTo(x-0.8,y-H); g.stroke(); } };
+  const rail=(p,q,h)=>{ g.strokeStyle='#3a322c'; g.lineWidth=3; g.beginPath(); g.moveTo(p.x,p.y-h); g.lineTo(q.x,q.y-h); g.stroke(); };
+  if(!front){ g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c.x,c.y); g.lineTo(d.x,d.y); g.closePath(); g.fill();
+    bars(a,b,5); bars(d,a,5); [0,H*0.55,H].forEach(h=>{ rail(a,b,h); rail(d,a,h); }); return; }
+  if(o.open){ bars(b,c,5); [0,H*0.55,H].forEach(h=>rail(b,c,h)); g.save(); g.translate(d.x,d.y); g.rotate(-0.9); g.translate(-d.x,-d.y); bars(d,c,5); [0,H*0.55,H].forEach(h=>rail(d,c,h)); g.restore(); return; }   // the door hangs open
+  bars(b,c,5); bars(d,c,5); [0,H*0.55,H].forEach(h=>{ rail(b,c,h); rail(d,c,h); });
+  const m={x:(d.x+c.x)/2,y:(d.y+c.y)/2-H*0.5}; g.fillStyle='#5a4a3a'; g.fillRect(m.x-5,m.y-2,10,9); g.strokeStyle='#3a2a1a'; g.lineWidth=2; g.beginPath(); g.arc(m.x,m.y-2,3.6,Math.PI,0); g.stroke(); }
+OBJ_DRAW.cage=o=>drawCageHalf(o,false); OBJ_DRAW.cagefront=o=>drawCageHalf(o,true);
+// red rock for the mesa: the sand rocks, burnt darker
+{ const oldR=OBJ_DRAW.sandrock; if(oldR) OBJ_DRAW.sandrock=o=>{ if(!o.red) return oldR(o); g.save(); g.filter='sepia(0.6) saturate(2.2) hue-rotate(-18deg) brightness(0.8)'; try{ oldR(o); } finally{ g.restore(); } }; }
+// turning the camp into a fight: the men you were talking to draw their blades
+function mesaFight(names,duel){ closeDialog(); const t=tierOf(areaId);
+  NPCS.filter(n=>names.includes(n.name.replace('Dozing ',''))).forEach(n=>{ const name=n.name.replace('Dozing ',''), op=n.opts, base=maxHpOf(op.equip,FOES.bandit.base), hp=Math.round(base*(1+TIER_HP*(t-1)+LATE_HP*lateStep(t))*(name==='Tarek of the Red Mesa'?1.9:1));
+    mobs.push({ id:mobs.length+80, key:name, name, type:'bandit', opts:op, faction:duel?'mesaduel':'mesa', style:name==='Tarek of the Red Mesa'?'duelist':undefined, spawn:[n.i,n.j], i:n.i, j:n.j, x:n.i+0.5, y:n.j+0.5, dir:n.dir||1, hp, maxHp:hp, path:[], moving:false, dead:false, gone:false, fade:1, flash:0, lunge:null,
+      state:'guard', t:0, k:0, wind:1, quick:false, guardDir:'up', ox:0, oy:0, hostile:true, fallT:0, tier:t });
+    blocked.delete(n.i+','+n.j); NPCS.splice(NPCS.indexOf(n),1); try{ FOOLED[areaId+':'+name]=false; }catch(e){} });
+  setTimeout(()=>{ if(!combat.active) startCombat(); },500); }
+setInterval(()=>{ try{ if(combat.active || areaId!=='redmesa') return;
+    const M=mobs.filter(m=>m.faction==='mesa'||m.faction==='mesaduel'); if(!M.length) return;
+    M.filter(m=>m.dead && !m.counted).forEach(m=>{ m.counted=true; if(m.name==='Tarek of the Red Mesa'){ if(m.faction==='mesa') CHOICE.tarekDead=true; } else (CHOICE.mesaDown=CHOICE.mesaDown||[]).includes(m.name)||CHOICE.mesaDown.push(m.name); });
+    if(M.some(m=>!m.dead) || CHOICE.caravan==='freed') return;
+    const duel=M.every(m=>m.faction==='mesaduel');
+    if(duel){ const T='Tarek of the Red Mesa'; setTimeout(()=>{ say(T,["<i>Tarek gets up off the sand slowly, and spits blood, and laughs.</i>","“Kadir's errand-runner. Well. A word is a word, and the Red Mesa keeps its word. Take the merchant. And tell the dunes Tarek was beaten fair.”"],[{label:'Open the cage.', fn:()=>mesaFree('duel')}]); },700);
+      const tm=mobs.find(m=>m.name===T); if(tm){ tm.dead=false; tm.hp=Math.max(1,Math.round(tm.maxHp*0.2)); tm.hostile=false; tm.state='guard'; tm.fallT=0; }   // a duel is to the ground, not the grave
+      return; }
+    mesaFree(CHOICE.hamidHow==='sneaked'?'sneaked':'fought'); }catch(e){} },500);
+function mesaFree(how){ closeDialog(); if(CHOICE.caravan==='freed') return; CHOICE.hamidHow=how; remember('caravan','freed',MESA_HOW_TXT[how]);
+  if(how==='paid'){ const k=player.inv.indexOf('ransom_purse'); if(k>=0) player.inv[k]=null; }
+  if(how==='scales') for(let k=0;k<3;k++){ const q=player.inv.indexOf('worm_scale'); if(q>=0) player.inv[q]=null; }
+  OBJECTS.forEach(o=>{ if(o.type==='cage'||o.type==='cagefront') o.open=true; });
+  const h=NPCS.find(n=>n.id==='hamid_cage');
+  if(h){ h.bark={text:"Free! Thank you. Let's go home.",t:0}; setTimeout(()=>{ const k=NPCS.indexOf(h); if(k>=0){ blocked.delete(h.i+','+h.j); NPCS.splice(k,1); } },2200); }
+  updateHud(); try{ autosaveSoon(400); }catch(e){} }
+TALKERS.hamid_cage=()=>{ const H='Hamid', night=mesaNight();
+  if(!CHOICE.hamidMet){ CHOICE.hamidMet=true;
+    say(H,["“You're not one of Tarek's. Kadir sent you? He found the ring, then. Good. Good.”","“Tarek wants Kadir's last coin for me. He'll take it, too. But Tarek is a strange man: he likes strong people, and he likes rare things more than gold.”",
+      "“And the guard there sleeps at night, with the key on his belt. If you're quiet.”"],[bye]); return; }
+  if(night && NPCS.some(n=>n.name==='Dozing Cage Guard')){
+    say(H,["“He's asleep. The key's on his belt, on the side facing you. Slowly.”"],[
+      {label:'Lift the key from the sleeping guard.', fn:()=>{ const ch=Math.min(0.85,0.4+gearSum('agi')*0.06);
+        if(Math.random()<ch){ say(H,["<i>The key comes off the belt without a sound. The lock is stiff, but it turns.</i>","“Quickly, before the fire burns down and they wake to feed it.”"],[{label:'Walk him out.', fn:()=>mesaFree('sneaked')}]); }
+        else { say('Cage Guard',["“Hey! HEY! Up! Somebody's at the cage!”"],[{label:'Fight.', fn:()=>{ CHOICE.mesaWoke=true; mesaFight(['Tarek of the Red Mesa',...MESA_GUARDS.map(x=>x[0])]); }}]); } }},
+      {label:'Not yet.', fn:closeDialog}]); return; }
+  say(H,[night?"“The guard's awake. Wait for him to nod off, or talk to Tarek.”":"“Talk to Tarek. Or come back after dark, when the guard sleeps. Either way, please hurry. They feed me once a day, and not well.”"],[bye]); };
+TALKERS.tarek=()=>{ const T='Tarek of the Red Mesa', sc=player.inv.filter(x=>x==='worm_scale').length;
+  if(CHOICE.caravan==='freed'){ say(T,[CHOICE.hamidHow==='duel'?"“The one who put me on my back. Sit by the fire, if you like. Nobody here will touch you.”":"“Kadir's friend. The road through the dunes is yours. Mine too, but we'll share it.”"],[bye]); return; }
+  const opts=[];
+  if(hasItem('ransom_purse')) opts.push({label:"Hand over Kadir's ransom.", fn:()=>say(T,["<i>He weighs the purse in one hand and doesn't bother to count it.</i>","“Kadir always pays. That's why I keep taking his brother.” <i>He tosses a key to the cage guard.</i> “Let him go.”"],[{label:'Open the cage.', fn:()=>mesaFree('paid')}])});
+  if(sc>=3) opts.push({label:'Show him three scales of the great worm.', fn:()=>say(T,["<i>He stops smiling. He takes one scale and turns it in the firelight, and knocks it with a knuckle, and listens to it ring.</i>","“The Mouth. You killed the Mouth.” <i>He looks at you differently now.</i>","“Gold I can steal. This I cannot. Keep Kadir's coin. Take the merchant. And nobody on the Red Mesa raises a blade to you again.”"],[{label:'Give him the scales.', fn:()=>mesaFree('scales')}])});
+  opts.push({label:'“I challenge you. You and me, nobody else.”', fn:()=>say(T,["“Ha! In front of my own men?” <i>He stands up, and rolls his shoulders, and draws a sabre with an edge that glows in the sun.</i>","“If you win, the merchant walks. If I win, you're in the cage with him. Agreed? Agreed.”"],[{label:'Fight him.', fn:()=>mesaFight(['Tarek of the Red Mesa'],true)},{label:'Not today.', fn:closeDialog}])});
+  opts.push({label:'“Let him go, or I take him.”', fn:()=>say(T,["“All of us? Well. It's been a dull week.”"],[{label:'Fight them all.', fn:()=>mesaFight(['Tarek of the Red Mesa',...MESA_GUARDS.map(x=>x[0])])},{label:'Not today.', fn:closeDialog}])});
+  say(T,[!CHOICE.tarekMet?"“Look at this. Kadir's sent us a northerner. With a sword and everything.” <i>A man with a red crest and a sabre across his knees, smiling with all his teeth.</i>":"“Back again. Brought anything interesting?”",
+    !CHOICE.tarekMet?"“The merchant's in the cage, alive. He'll stay alive while Kadir pays. What do you have for me?”":"“The merchant's still in the cage. Still alive. Still expensive.”"],[...opts,bye]); CHOICE.tarekMet=true; };
+['Mesa Raider','Mesa Outrider','Cage Guard','Dozing Cage Guard'].forEach(n=>{ const id='mesa_'+n.replace(/\W/g,''); TALKERS[id]=()=>{ const cur=(NPCS.find(x=>x.id===id)||{}).name||n; const nm=cur; const lines={ 'Mesa Raider':["“Talk to Tarek. I just hold the axe.”"], 'Mesa Outrider':["“You're the one who walked in here on purpose? Brave. Stupid. Same thing, out here.”"], 'Cage Guard':["“Don't feed the merchant. He bites.”"], 'Dozing Cage Guard':["<i>He snores, sitting up, a key ring on his belt catching the firelight.</i>"] };
+  say(nm,CHOICE.caravan==='freed'&&MESA_PEACE()?["“No hard feelings. Mostly.”"]:(lines[nm]||lines[n]),[bye]); }; });
+// raiders in the dunes keep the peace once Tarek gives his word
+wrap('glassdunes','mobs',l=> MESA_PEACE() ? l.filter(m=>m.faction!=='raiders') : l);
+// Kadir after: the ransom to carry, and thanks when his brother is home
+function kadirAfter(){ const K='Kadir the Caravan Master';
+  if(CHOICE.caravan==='ring' && !hasItem('ransom_purse') && !CHOICE.ransomGiven){ CHOICE.ransomGiven=true; giveQuestItem('ransom_purse',true);
+    say(K,["“It is ready. Everything we had left, and some we didn't. Take it to Tarek at the Red Mesa, south past the wreck.”","“He keeps his word, when he's paid. If you find a cheaper way to bring my brother home, I won't complain. But bring him home.”"],[bye]); return true; }
+  if(CHOICE.caravan==='ring'){ say(K,["“Hamid is still out there. South, through the dunes, to the Red Mesa.”"],[bye]); return true; }
+  if(CHOICE.caravan==='freed' && !CHOICE.kadirThanks){ CHOICE.kadirThanks=true; const kept=hasItem('ransom_purse'); if(kept){ const k=player.inv.indexOf('ransom_purse'); if(k>=0) player.inv[k]=null; }
+    const coin=kept?160:60; player.purse+=coin; updateHud();
+    say(K,["<i>Kadir holds his brother by both shoulders for a long time and says nothing at all.</i>",kept?"“And you bring the ransom back too. Half of it is yours. No, take it. You'd only steal it from me later.”":"“Tarek has our coin, but I have my brother. I'd pay it twice.”",
+      "“There is always a place for you at our fire. And if you ever need a caravan, you will ride for free.” <i>You receive "+formatCoin(coin)+".</i>"],[bye]); return true; }
+  if(CHOICE.caravan==='freed'){ say(K,["“My brother eats like three men since he came back. It is the best sound I know.”"],[bye]); return true; }
+  return false; }
+{ const prev=npcHasNews; npcHasNews=function(n){ if(n.id==='kadir' && ((CHOICE.caravan==='ring' && !CHOICE.ransomGiven) || (CHOICE.caravan==='freed' && !CHOICE.kadirThanks))) return '?'; if(n.id==='hamid_cage' && !CHOICE.hamidMet) return '!'; return prev(n); }; }
+
+// ════════ THE SUNSCAR'S WEATHER: sandstorms by day, cold by night ════════
+const SAND_OUT=()=>{ const A=AREAS[areaId]; return !!A && A.theme==='sand' && !A.inside && !A.temple; };
+const stormDay=(d=Math.floor(dayClock/DAY_LEN))=> d>=2 && rnd01(d*7+3,d*11+5,991)<0.3;      // about one day in three, never the first days
+const stormU=()=>(DAYF()+0.03)%1, sandstormNow=()=> SAND_OUT() && stormDay() && stormU()<0.17;   // from late morning into the afternoon                // the afternoon, when the wind gets up
+const faceCovered=()=>{ const h=player.opts&&player.opts.equip&&player.opts.equip.head; if(!h) return false; const b=(ITEMS[h]&&ITEMS[h].base)||h;
+  return b==='hood' || ['turban_veil','keffiyeh','keffiyeh_red','sand_wrap','helm_full','wyrm_helm','bandana'].includes(h) || (player.opts.equip.head==='bandana'); };
+const ROBES=new Set(['caravan_robe','indigo_robe','crimson_robe','night_robe_d','robe','robe_blue','ash_mantle','elf_robe']);
+const warmNow=()=>{ const e=player.opts&&player.opts.equip||{}; if(ROBES.has(e.armor) || (ITEMS[e.armor]&&ITEMS[e.armor].base==='robe')) return true;
+  return OBJECTS.some(o=>o.type==='campfire' && Math.max(Math.abs(o.i-player.i),Math.abs(o.j-player.j))<=2); };
+const desertCold=()=> SAND_OUT() && nightAmt()>0.55;
+STATUS_DEF.sandblind={ col:'#d8b070', name:'Sand-blind', tick:0, max:1 };
+STATUS_ON_YOU.sandblind='Sand in your eyes: you see blows late. Cover your face: a hood, a wrap, a mask.';
+{ const _wf=windowFor; windowFor=e=>_wf(e)*(e===player && hasStatus(player,'sandblind')?0.75:1); }
+let SAND_STREAKS=[], stormSaid=-1, coldSaid=-1;
+setInterval(()=>{ try{ if(!running) return; const d=Math.floor(dayClock/DAY_LEN);
+    if(sandstormNow()){ if(stormSaid!==d){ stormSaid=d; logMsg('The wind rises, and a brown wall comes rolling over the dunes. Sandstorm.','#d8b070'); }
+      if(!faceCovered()){ addStatus(player,'sandblind',2.5,0); teach('sandblind','Sand-blind',["In a <b>sandstorm</b>, sand gets in your eyes: you see blows <b>late</b> and your parry window <b>shrinks</b>.","Cover your face: a <b>hood</b>, a <b>sand wrap</b>, a <b>Sandstrider helm</b> with its neck-cloth, or a raider's mask.","And watch your feet. The great worm hunts in storms."]); } }
+    if(desertCold() && !warmNow()){ if(coldSaid!==d){ coldSaid=d; logMsg('The heat goes out of the sand all at once. The desert night is bitter cold.','#8ac8f0'); }
+      addStatus(player,'chill',2.5,0); teach('desertcold','A desert night',["After dark the Sunscar is <b>cold</b>: you are <b>chilled</b>, and stiff hands parry late.","Wear a <b>robe</b> (Yusra sells them), or stay near a <b>fire</b>."]); }
+  }catch(e){} },1000);
+{ const _dsw=drawSkyWeather; drawSkyWeather=function(){ _dsw(); if(!sandstormNow()) return; const W=gc.width, H=gc.height, ramp=Math.max(0,Math.min(1,Math.min(stormU(),0.17-stormU())/0.02));
+    g.save(); g.setTransform(1,0,0,1,0,0);
+    g.globalCompositeOperation='multiply'; g.fillStyle=`rgba(200,150,90,${0.55*ramp})`; g.fillRect(0,0,W,H); g.globalCompositeOperation='source-over';
+    const N=LOW_FX?3:6; for(let q=0;q<N;q++){ const x=((q*397+gt*(140+q*40))%(W+800))-400, y=H*(0.15+0.16*q)%H, gr=g.createRadialGradient(x,y,0,x,y,420);   // clouds of dust
+      gr.addColorStop(0,`rgba(205,165,105,${0.4*ramp})`); gr.addColorStop(1,'rgba(205,165,105,0)'); g.fillStyle=gr; g.fillRect(x-420,y-420,840,840); }
+    const M=LOW_FX?90:240; if(SAND_STREAKS.length!==M){ SAND_STREAKS=[]; for(let k=0;k<M;k++) SAND_STREAKS.push({x:Math.random()*W,y:Math.random()*H,v:900+Math.random()*700,l:8+Math.random()*26}); }
+    g.strokeStyle=`rgba(235,205,150,${0.55*ramp})`; g.lineWidth=1.2; g.beginPath();
+    SAND_STREAKS.forEach(p=>{ p.x+=p.v/60; p.y+=p.v/60*0.12; if(p.x>W+40){ p.x=-40; p.y=Math.random()*H; } g.moveTo(p.x,p.y); g.lineTo(p.x-p.l,p.y-p.l*0.12); }); g.stroke();
+    if(!faceCovered()){ const vg=g.createRadialGradient(W/2,H/2,Math.min(W,H)*0.25,W/2,H/2,Math.max(W,H)*0.7); vg.addColorStop(0,'rgba(90,60,25,0)'); vg.addColorStop(1,`rgba(90,60,25,${0.6*ramp})`); g.fillStyle=vg; g.fillRect(0,0,W,H); }   // and you can hardly see
+    g.restore(); }; }
+// the great worm hunts in storms: on a storm day it is always somewhere in the dunes
+{ const _wh=wormHere; wormHere=a=>{ const r=_wh(a); if(r) return r; const S=WORM_SPOTS[a]; if(!S || a!=='glassdunes' || !stormDay()) return null; const day=Math.floor(dayClock/DAY_LEN); if(CHOICE.wormDay!=null && day-CHOICE.wormDay<3) return null; return S[day%S.length]; }; }
+// at night the scorpions glow, and the dead walk the dunes
+{ const _ds=drawScorpion; drawScorpion=function(x,B,e,pose){ _ds(x,B,e,pose); const n=nightAmt(); if(n<0.4) return; const big=e.opts&&e.opts.big?1.3:1;
+    g.save(); g.globalCompositeOperation='lighter'; glow(x-6*big,B-14*big,44*big,18*big,'110,230,200',0.5*Math.min(1,(n-0.4)*3)); g.restore(); }; }
+wrap('glassdunes','mobs',l=> NIGHT() ? [...l, { name:'Dune-walking Dead', type:'skeleton', i:5, j:6, faction:'sanddead', daily:true, opts:{...RISEN('Dune-walking Dead'), wrapped:true} },
+  { name:'Dune-walking Dead ', type:'skeleton', i:12, j:4, faction:'sanddead', daily:true, opts:{...RISEN('Dune-walking Dead '), wrapped:true} }] : l);
+// Sefa knows the sand
+function sefaAdvice(){ const S='Sefa of the Well', d=Math.floor(dayClock/DAY_LEN);
+  return [{label:'“Any advice for the sand?”', fn:()=>say(S,[
+      stormDay()?"“Today the wind will get up in the afternoon. Wrap your face, or it will fill your eyes with sand, and you'll see a blade coming far too late.”":stormDay(d+1)?"“Tomorrow there will be a storm. The goats know. Look at them, all lying down. Wrap your face if you go out.”":"“The sky is clean today. Enjoy it.”",
+      "“At night the sand gives back all its heat at once. Wear a robe, or sit by a fire. Northerners who don't, we find in the morning.”",
+      CHOICE.wormSeen?"“You've met the Mouth, then. It likes storms. It can hear you walking, when the wind covers everything else.”":"“And if you see the sand turning, round and round, walk away. Don't stand there looking at it.”"],[{label:'Something else.',fn:()=>TALKERS.sefa()},bye])}]; }
+
+// ════════ THE GIANT SCARAB: a beetle the size of a goat, rolling dung-balls of glass in the dunes. Its shell guards one side at a time ════════
+FOES.scarab={ label:'Giant Scarab', base:58, stagger:1.0, pattern:[
+  {wait:1.0, wind:0.5, after:0.3, dir:'left'}, {wait:0.2, wind:0.5, after:0.3, dir:'right'}, {wait:1.1, wind:0.95, after:0.9, dir:'up', charge:true} ]};
+Object.assign(WEAPONS,{ horn:{ wind:0.3, dmg:11, len:18 } });
+const SCARAB=o=>({gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:'horn',offhand:null},...o});
+BEASTS.push({ k:'scarab', is:f=>f.type==='scarab', name:'Giant Scarabs', kind:'Beasts · the Glass Dunes',
+  how:'Two jabs of the horn, left and right, then a charge from high.', res:'Its shell guards one side: strike the other.', aff:'The charge knocks the wind out of you.', ans:'Read its guard like a man\'s. Tamir works its shell into armour.' });
+function drawScarab(x,B,e,pose){ const raise=pose&&pose.kind==='raise'?Math.min(1,pose.t):0, strike=pose&&pose.kind==='strike'?Math.min(1,pose.t):0;
+  const pp=P(player.x??player.i+0.5,player.y??player.j+0.5), face=(combat.active&&combat.foe===e)?(pp.x>=x?1:-1):((e.dir||0)>=2&&(e.dir||0)<=5?-1:1);
+  const C='#2e6a64', D='#14302c', walk=e.moving?gt*14:0, lean=raise*0.35-strike*0.15, cx=x+face*strike*14;
+  g.save(); g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(x,B+1,34,8,0,0,Math.PI*2); g.fill();
+  for(let k=0;k<3;k++) [-1,1].forEach(sd=>{ const lx=cx+face*(-10+k*10), ph=Math.sin(walk+k*1.7+(sd>0?0:Math.PI))*3;   // six legs, spined
+    g.strokeStyle=D; g.lineWidth=2.6; g.beginPath(); g.moveTo(lx,B-14); g.lineTo(lx+sd*8+ph,B-8); g.lineTo(lx+sd*12+ph,B); g.stroke(); });
+  g.translate(cx,B-16); g.rotate(-face*lean);
+  const gr=g.createLinearGradient(-26,-22,20,10); gr.addColorStop(0,'#6ac0a8'); gr.addColorStop(0.45,C); gr.addColorStop(1,'#163a36');
+  g.fillStyle=gr; g.beginPath(); g.ellipse(-face*4,0,26,17,0,0,Math.PI*2); g.fill(); g.strokeStyle=D; g.lineWidth=1.4; g.stroke();   // the wing-cases
+  g.strokeStyle='rgba(10,30,28,0.8)'; g.lineWidth=1.2; g.beginPath(); g.moveTo(-face*4,-17); g.quadraticCurveTo(-face*2,0,-face*4,16); g.stroke();
+  g.fillStyle='rgba(230,200,110,0.35)'; g.beginPath(); g.ellipse(-face*12,-8,9,4,-0.4*face,0,Math.PI*2); g.fill();   // a gold sheen
+  g.fillStyle='rgba(200,255,240,0.5)'; g.beginPath(); g.ellipse(-face*14,-10,4,1.6,-0.4*face,0,Math.PI*2); g.fill();
+  g.fillStyle='#1e4a46'; g.beginPath(); g.ellipse(face*20,-2,11,10,0,0,Math.PI*2); g.fill(); g.strokeStyle=D; g.lineWidth=1.2; g.stroke();   // the head shield
+  g.fillStyle='#d8aa48'; g.beginPath(); g.moveTo(face*21,-9); g.quadraticCurveTo(face*35,-14,face*(34+raise*4),-27-raise*6); g.quadraticCurveTo(face*33,-8,face*28,2); g.closePath(); g.fill(); g.strokeStyle='#7a5418'; g.lineWidth=0.8; g.stroke();   // the horn, gilt by the sand
+  g.fillStyle='#e8f0c0'; g.beginPath(); g.arc(face*24,-4,1.4,0,Math.PI*2); g.fill();
+  g.restore(); }
+wrap('glassdunes','mobs',l=>[...l, { name:'Giant Scarab', type:'scarab', i:6, j:9, faction:'scarab', daily:true, opts:SCARAB({}) }]);
+wrap('drywash','mobs',l=> NIGHT() ? l : [...l, { name:'Giant Scarab', type:'scarab', i:2, j:5, faction:'scarab', daily:true, opts:SCARAB({}) }]);
+Object.assign(ITEMS,{ scarab_chitin:{ name:'Scarab Chitin', slot:'misc', title:"A curved plate of beetle shell, green as a deep pool and hard as horn. Gold shimmers across it when you tilt it." },
+  sand_boots:{ name:'Sandwalker Boots', slot:'feet', base:'boots', col:'#2e6a64', title:"Chitin soles and a worm-scale heel, stitched by Tamir. You walk on top of the sand instead of in it. The great worm cannot hear you coming." } });
+Object.assign(ITEM_STATS,{ sand_boots:{hp:3,agi:2} }); GEAR_HP.sand_boots=3; Object.assign(PRICES,{ scarab_chitin:12, sand_boots:150 }); SELL_MISC.add('scarab_chitin');
+ITEM_ICON.scarab_chitin=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); const gr=g2.createLinearGradient(8,8,32,34); gr.addColorStop(0,'#7ad0b8'); gr.addColorStop(0.5,'#2e6a64'); gr.addColorStop(1,'#123230');
+  g2.fillStyle=gr; g2.beginPath(); g2.moveTo(8,30); g2.quadraticCurveTo(6,10,22,6); g2.quadraticCurveTo(34,10,33,30); g2.quadraticCurveTo(20,24,8,30); g2.fill(); g2.strokeStyle='#0e2624'; g2.lineWidth=1.2; g2.stroke();
+  g2.fillStyle='rgba(230,200,110,0.45)'; g2.beginPath(); g2.ellipse(17,14,5,2.4,-0.6,0,Math.PI*2); g2.fill(); g2.restore(); };
+// Tamir works chitin too, and the two together into boots the worm can't hear
+const CHITIN_RECIPES=[['chitin_cuirass',{scarab_chitin:3},60,'“Three plates for the cuirass.”'],['scarab_shield',{scarab_chitin:2},30,'“Two for a shield.”'],['sand_boots',{scarab_chitin:2,worm_scale:1},50,'“And if you have a worm scale to spare: boots. The Mouth listens for feet. These it won’t hear.”']];
+{ const oldT=TALKERS.tamir; TALKERS.tamir=(...a)=>{ const T='Tamir the Bladesmith', day=Math.floor(dayClock/DAY_LEN), ch=player.inv.filter(x=>x==='scarab_chitin').length;
+    if(!ch || (CHOICE.wyrmWork && typeof CHOICE.wyrmWork.day==='number')) return oldT(...a);
+    const cnt=id=>player.inv.filter(x=>x===id).length, can=need=>Object.entries(need).every(([id,n])=>cnt(id)>=n);
+    const opts=CHITIN_RECIPES.filter(([id,need])=>can(need)).map(([id,need,c])=>({label:'“Make me '+(id==='sand_boots'?'Sandwalker Boots':id==='chitin_cuirass'?'a chitin cuirass':'a scarab shield')+".” ("+Object.entries(need).map(([k,n])=>n+' '+(k==='worm_scale'?'worm scale':'chitin')).join(', ')+', '+formatCoin(c)+')', fn:()=>{
+        if(player.purse<c){ say(T,"“The shell I have. The coin I don't. "+formatCoin(c)+".”",[bye]); return; }
+        Object.entries(need).forEach(([k,n])=>{ for(let q=0;q<n;q++) player.inv[player.inv.indexOf(k)]=null; }); player.purse-=c; CHOICE.wyrmWork={id,day}; updateHud(); logMsg('Tamir will have your '+ITEMS[id].name+' ready tomorrow.','#8ac070');
+        say(T,"“Tomorrow. Chitin's patient. So am I.”",[bye]); }}));
+    say(T,[!CHOICE.chitinTalk?"“Scarab shell! Lighter than bronze and nearly as hard, and it shines like a queen's jewel.” <i>He taps it with a fingernail.</i>":"“More shell? Good.”",
+      CHITIN_RECIPES.filter(([id,need])=>can(need)).map(r=>r[3]).join(' ')||"“Bring me a few more pieces. Two for a shield, three for a cuirass.”"],[...opts,{label:'Something else.', fn:()=>oldT(...a)},bye]); CHOICE.chitinTalk=true; }; }
+
+// ════════ HAMID: home at the well, and willing to walk the sand with you. He knows where the Mouth is ════════
+//   CHOICE.hamidFollow : true while he walks with you (only in the open sand)
+const HAMID_AREAS=new Set(['drywash','waystation','glassdunes','redmesa']);
+const hamidHome=()=> CHOICE.caravan==='freed' && !CHOICE.hamidFollow;
+wrap('waystation','npcs',l=> hamidHome() ? [...l,{ id:'hamid', name:'Hamid', i:6, j:9, dir:1, opts:{...HAMID_OPTS(), equip:{...HAMID_OPTS().equip, head:'turban_indigo', armor:'indigo_robe', feet:'desert_boots', weapon:'scimitar'}} }] : l);
+HAMID_AREAS.forEach(a=>wrap(a,'npcs',l=>{ if(!(CHOICE.caravan==='freed' && CHOICE.hamidFollow)) return l; const e=Object.values(AREAS[a].entries||{})[0]||{i:1,j:1};
+  return [...l,{ id:'hamid', name:'Hamid', i:e.i, j:e.j, x:e.i+0.5, y:e.j+0.5, dir:1, noblock:true, follow:true, opts:{...HAMID_OPTS(), equip:{...HAMID_OPTS().equip, head:'turban_indigo', armor:'indigo_robe', feet:'desert_boots', weapon:'scimitar'}} }]; }));
+const HAMID_SAY={ drywash:"The Dry Wash. When it rains in the mountains, this fills in an hour. It has rained twice in my life.", waystation:"Sefa's well. Drink. Here you always drink, even if you're not thirsty.",
+  glassdunes:"The glass is where the lightning hit. Don't walk on it barefoot. I did, once. Once.", redmesa:"Tarek's rock. I know every stone of it now. I'd rather not." };
+let hamidSaid={}, hamidSpot=null;
+setInterval(()=>{ try{ const h=NPCS.find(n=>n.id==='hamid' && n.follow); if(!h) return; const dt=0.05;
+    if(!(combat.active||CS.on)){ const px=player.x??player.i+0.5, py=player.y??player.j+0.5, dx=px-h.x, dy=py-h.y, d=Math.hypot(dx,dy);
+      if(d>6){ h.x=px-0.8; h.y=py-0.8; }
+      if(d>1.5){ const st=Math.min(d-1.2,3.4*dt); h.x+=dx/d*st; h.y+=dy/d*st; h.moving=true; h.dir=dirFromDelta(dx,dy); } else h.moving=false;
+      h.i=Math.floor(h.x); h.j=Math.floor(h.y); } else h.moving=false;
+    const key=areaId+':'+Math.floor(dayClock/DAY_LEN);
+    if(!hamidSaid[areaId] && HAMID_SAY[areaId]){ hamidSaid[areaId]=1; setTimeout(()=>{ const hh=NPCS.find(n=>n.id==='hamid'); if(hh && !combat.active && !hh.bark) hh.bark={text:HAMID_SAY[areaId],t:0}; },1500); }
+    const o=OBJECTS.find(o=>o.type==='sandstir' && !o.woke && Math.max(Math.abs(o.i-player.i),Math.abs(o.j-player.j))<=4);   // he sees the turning sand long before you do
+    if(o && !combat.active){ o.woke=true; h.bark={text:"Stop. There, the sand is turning. The Mouth. Go round, or get ready.",t:0}; floatText([o.i,o.j],'!','#e8c080',true); }
+    if(sandstormNow() && !faceCovered() && hamidSaid.storm!==key){ hamidSaid.storm=key; h.bark={text:"Wrap your face! You'll be blind in a minute!",t:0}; }
+    if(desertCold() && !warmNow() && hamidSaid.cold!==key){ hamidSaid.cold=key; h.bark={text:"Your teeth are going. Find a fire, or put a robe on, northerner.",t:0}; }
+  }catch(e){} },50);
+{ const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); hamidSaid=Object.fromEntries(Object.entries(hamidSaid).filter(([k])=>k==='storm'||k==='cold')); return r; }; }
+TALKERS.hamid=()=>{ const H='Hamid', follow=!!CHOICE.hamidFollow;
+  const wormNews=()=>{ const w=['glassdunes','drywash'].filter(a=>wormHere(a)); return w.length ? "“The camels won't go near "+w.map(a=>AREAS[a].label).join(' or ')+" today. The Mouth is up, somewhere there.”" : "“The Mouth is sleeping today. The camels are calm.”"; };
+  const opts=[];
+  if(!follow) opts.push({label:'“Walk with me in the sand.”', fn:()=>{ CHOICE.hamidFollow=true; say(H,["“Gladly. I owe you more than a walk. I'll keep to the sand, though. Cities make me itch, and tombs make me worse.”"],[{label:'Go.', fn:()=>{ closeDialog(); const n=NPCS.find(x=>x.id==='hamid'); if(n){ n.follow=true; n.noblock=true; blocked.delete(n.i+','+n.j); n.x=n.i+0.5; n.y=n.j+0.5; } }}]); }});
+  else opts.push({label:'“Wait for me at the well.”', fn:()=>{ CHOICE.hamidFollow=false; const k=NPCS.findIndex(x=>x.id==='hamid'); if(k>=0 && areaId!=='waystation') NPCS.splice(k,1); say(H,"“I'll be at the well, eating. Kadir says I'm making up for lost meals.”",[bye]); }});
+  opts.push({label:'“Where is the Mouth today?”', fn:()=>say(H,[wormNews()],[{label:'Something else.',fn:TALKERS.hamid},bye])});
+  const left=MOUNDS.filter(m=>(AREAS[m[0]]||{}).theme==='sand' || (AREAS[m[0]]||{}).temple).filter(m=>!(CHOICE.dug||{})[moundKey(m)]);
+  if(left.length) opts.push({label:'“Anything buried out here?”', fn:()=>{ const m=left.find(m=>!(CHOICE.moundHints||[]).includes(moundKey(m)))||left[0]; addMoundHint(m); say(H,["“Caravan folk bury things. Money, mostly, when raiders come. Then they die, and it stays buried.”","“"+moundHint(m)+"”"],[{label:'Something else.',fn:TALKERS.hamid},bye]); }});
+  say(H,[!CHOICE.hamidThanks?"“You. You walked into Tarek's camp for a merchant you'd never met. My brother says you're mad. I say I'm buying you dinner for the rest of your life.”":follow?"“Yes? I'm right behind you. I'm always right behind you, it's the safest place.”":"“Sit, eat. Or are we going somewhere?”"],[...opts,bye]); CHOICE.hamidThanks=true; };
+// ════════ DIGGING RUMOURS: Tobb in the valley, Hamid and Kadir in the sand, know where things are buried ════════
+const NEAR_NAME={ tree:'a tree', pine:'a pine', oak:'an oak', deadtree:'a dead tree', palm:'a palm', sandrock:'a big rock', rock:'a rock', crag:'a crag', boulder:'a boulder', fence:'the fence', well:'the well', pool:'the water', stump:'a stump', bush:'a bush', reeds:'the reeds', stone:'a standing stone', grave:'a grave', cart:'a cart', tent:'a tent', crate:'some crates' };
+function moundHint(m){ const A=AREAS[m[0]]; if(!A) return "Somewhere I can't remember."; const u=m[1]/Math.max(1,A.w-1)-0.5, v=m[2]/Math.max(1,A.h-1)-0.5, ns=-(u+v), ew=u-v;
+  const dir=(Math.abs(ns)<0.25 && Math.abs(ew)<0.25) ? 'near the middle' : 'over on the '+(Math.abs(ns)>=Math.abs(ew) ? (ns>0?'north':'south') : (ew>0?'east':'west'))+' side';
+  let best=null, bd=1e9; MAP_ALL=true; let L=[]; try{ L=A.objects(); }catch(e){} finally{ MAP_ALL=false; }
+  L.forEach(o=>{ if(!NEAR_NAME[o.type]) return; const d=Math.max(Math.abs(o.i-m[1]),Math.abs(o.j-m[2])); if(d<bd){ bd=d; best=o; } });
+  return 'In '+A.label.replace(/^The /,'the ')+', '+dir+(best && bd<=3 ? ', close by '+NEAR_NAME[best.type] : '')+'.'; }
+function addMoundHint(m){ const H=CHOICE.moundHints=CHOICE.moundHints||[]; if(!H.includes(moundKey(m))) H.push(moundKey(m)); }
+{ const oldDg=TALKERS.digger; TALKERS.digger=(...a)=>{ if(!ownsSpade() || CHOICE.tobbHintDay===Math.floor(dayClock/DAY_LEN)) return oldDg(...a);
+    const left=MOUNDS.filter(m=>(AREAS[m[0]]||{}).theme!=='sand' && !(AREAS[m[0]]||{}).temple && !(CHOICE.dug||{})[moundKey(m)]); if(!left.length) return oldDg(...a);
+    say('Old Tobb',["“A spade on your shoulder. Digging, are we? Forty years with a shovel, you hear where people put things.”"],[
+      {label:'“Tell me where something is buried.” (5 copper)', fn:()=>{ if(player.purse<5){ say('Old Tobb',"“Five copper. A man has to drink.”",[bye]); return; } player.purse-=5; updateHud(); CHOICE.tobbHintDay=Math.floor(dayClock/DAY_LEN);
+        const m=left.find(m=>!(CHOICE.moundHints||[]).includes(moundKey(m)))||left[0]; addMoundHint(m); say('Old Tobb',["“"+moundHint(m)+" Somebody stamped the earth flat there. I'd dig it myself, but my back.”","<i>One rumour a day: Tobb has to hear things first.</i>"],[bye]); }},
+      {label:'Something else.', fn:()=>oldDg(...a)}, bye]); }; }
+{ const oldK=TALKERS.kadir; TALKERS.kadir=(...a)=>{ if(!ownsSpade() || CHOICE.caravan!=='freed' || !CHOICE.kadirThanks || CHOICE.kadirHintDay===Math.floor(dayClock/DAY_LEN)) return oldK(...a);
+    const left=MOUNDS.filter(m=>((AREAS[m[0]]||{}).theme==='sand' || (AREAS[m[0]]||{}).temple) && !(CHOICE.dug||{})[moundKey(m)]); if(!left.length) return oldK(...a);
+    say('Kadir the Caravan Master',["“A spade? Ha. Every caravan master buries a little coin along the road, against bad days. Some never came back for theirs.”"],[
+      {label:'“Where?”', fn:()=>{ CHOICE.kadirHintDay=Math.floor(dayClock/DAY_LEN); const m=left.find(m=>!(CHOICE.moundHints||[]).includes(moundKey(m)))||left[0]; addMoundHint(m); say('Kadir the Caravan Master',["“"+moundHint(m)+" For you, no charge.”"],[bye]); }},
+      {label:'Something else.', fn:()=>oldK(...a)}, bye]); }; }
+// what you've heard goes in the journal, under Buried Things
+{ const J=JOURNAL.find(j=>j[0]==='Buried Things'); if(J){ const f=J[1]; J[1]=()=>{ const r=f(); if(!r || r[0]==='done') return r; const H=(CHOICE.moundHints||[]).map(k=>MOUNDS.find(m=>moundKey(m)===k)).filter(m=>m && !(CHOICE.dug||{})[moundKey(m)]);
+    return H.length ? [r[0], r[1]+'<br>Rumours: '+H.map(m=>moundHint(m)).join(' ')] : r; }; } }
 </script>
 </body>
 </html>

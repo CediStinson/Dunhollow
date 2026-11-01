@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dunhollow Autoplay</title>
+<style>
+  :root{ --bg:#140e06; --panel:#1e160b; --line:#5a4422; --ink:#f0e2c0; --dim:#a89878; --gold:#e8c060; --red:#e07060; --green:#9ad07a; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:var(--bg); color:var(--ink); font:13px/1.4 Georgia,serif; }
+  #wrap{ display:flex; height:100%; }
+  #side{ width:330px; min-width:330px; display:flex; flex-direction:column; border-right:1px solid var(--line); background:var(--panel); }
+  #game{ flex:1; border:0; background:#000; }
+  h1{ font-size:15px; letter-spacing:3px; text-transform:uppercase; color:var(--gold); margin:12px 14px 6px; }
+  .row{ display:flex; gap:6px; align-items:center; margin:6px 14px; flex-wrap:wrap; }
+  button,select{ background:#3a2a12; border:1px solid #9a7a32; color:#f0d890; border-radius:4px; padding:5px 10px; font:inherit; cursor:pointer; }
+  button:hover{ background:#4a3618; }
+  input[type=range]{ flex:1; accent-color:#c8a050; }
+  #stats{ margin:6px 14px; padding:8px 10px; border:1px solid var(--line); border-radius:4px; background:#160f07; display:grid; grid-template-columns:auto 1fr; gap:2px 10px; }
+  #stats b{ color:var(--dim); font-weight:normal; }
+  #log{ flex:1; overflow:auto; margin:6px 14px 14px; padding:6px 8px; border:1px solid var(--line); border-radius:4px; background:#100b05; font-size:12px; }
+  #log div{ margin:2px 0; border-bottom:1px solid #2a1f10; padding-bottom:2px; }
+  #log .fight{ color:#e8b080; } #log .death{ color:var(--red); } #log .quest{ color:var(--green); } #log .gear{ color:#a8c8f0; } #log .move{ color:var(--dim); } #log .level{ color:var(--gold); }
+  small{ color:var(--dim); }
+  @media (max-width:760px){ #wrap{ flex-direction:column; } #side{ width:100%; min-width:0; height:42%; border-right:0; border-bottom:1px solid var(--line); } }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="side">
+    <h1>Autoplay</h1>
+    <div class="row"><small>A bot plays a fresh character from the start, like a casual player: it reacts a little late, misses blocks, dies now and then and learns. It never touches your saves.</small></div>
+    <div class="row">
+      <select id="cls"><option value="melee">Melee</option><option value="necro">Necromancer</option><option value="mage">Mage</option></select>
+      <button id="go">New game</button>
+      <button id="pause">Pause</button>
+    </div>
+    <div class="row"><small>Speed</small><input id="speed" type="range" min="1" max="12" step="1" value="1"><span id="spv">1×</span></div>
+    <div id="stats"></div>
+    <div id="log"></div>
+  </div>
+  <iframe id="game" title="Dunhollow"></iframe>
+</div>
+
+<script type="text/x-bot" id="bot-src">
+(function(){
+'use strict';
+const CFG=window.BOT_CFG||{cls:'melee',speed:1};
+let seed=(CFG.seed||Date.now())%2147483646+1; const rnd=()=>{ seed=(seed*16807)%2147483647; return seed/2147483647; };
+const gauss=(m,s)=>{ let u=0; while(!u) u=rnd(); return m+s*Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*rnd()); };
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+// ── never touch the player's saves: no local saves, no server saves ──
+try{ writeSaves=function(){ return true; }; }catch(e){}
+try{ saveGame=function(){}; }catch(e){}
+try{ cloud=async function(){ return {ok:false}; }; }catch(e){}
+
+const B=window.BOT={ cfg:CFG, speed:CFG.speed||1, paused:false, fast:!!CFG.fast, log:[], finished:false };
+const LAND=a=>{
+  if(/^under_|^ember/.test(a)) return 'Undercity';
+  if(['waystation','drywash','oasis','glassdunes','singingdunes','saltpan','redmesa','crater','bonewaste'].includes(a)||/^temple/.test(a)) return 'Desert';
+  if(['fenpath','fen','barrow','reedbank','blackwater','sunkenwood'].includes(a)) return 'Swamp';
+  if(['mistmere','silvergate','sylvhaven','fellings','ruin','elfroad','moonbath'].includes(a)) return 'Elven woods';
+  if(/^cave\d/.test(a)||['warren','gbtunnel'].includes(a)) return 'Goblin warren';
+  if(['citygate','market','lowstreets','keepward','inn','smithy','tailorshop','chapelin','kingsroad','steamcellar','dicenden','guildhall','goldhouse','barracks','docks','portfearn','fearnhouse','northroad','weavetent'].includes(a)) return 'Hollowmere';
+  return 'Valley'; };
+const S=B.stats={ t0:gt, fights:[], deaths:[], areas:{}, lands:{}, quests:[], levels:[], buys:[], sells:[], equips:[], dialogs:0, readT:0, stuck:[] };
+function note(msg,kind){ const e={t:Math.round(gt), area:areaId, msg, kind:kind||''}; B.log.push(e); if(B.log.length>4000) B.log.splice(0,1000); }
+B.note=note;
+const skill=()=>1-Math.exp(-S.fights.length/45);           // a casual player gets better with every fight
+const lvl=()=>playerLevel();
+
+// ── the journal, cheaply ──
+let jCache=null, jAt=-9;
+function journal(){ if(jCache && gt-jAt<2) return jCache; const m={}; JOURNAL.forEach(([t,f])=>{ try{ const r=f(); m[t]=r?r[0]:null; }catch(e){ m[t]=null; } }); jCache=m; jAt=gt; return m; }
+const jHash=()=>Object.entries(journal()).map(([k,v])=>v?k[0]+v[0]:'').join('');
+const invHash=()=>player.inv.join(',');
+const day=()=>Math.floor(dayClock/DAY_LEN);
+let lastJ=null;
+function watchJournal(){ const J=journal(); if(!lastJ){ lastJ=J; return; }
+  for(const k in J){ if(J[k]!==lastJ[k]){ if(J[k]==='done'){ S.quests.push({q:k,t:gt,lvl:lvl(),area:areaId}); note('Quest done: '+k,'quest'); } else if(J[k]==='active' && !lastJ[k]) note('New quest: '+k,'quest'); else if(J[k]==='failed') note('Quest failed: '+k,'quest'); } }
+  lastJ=J; }
+
+// ── the world as a graph of doors ──
+let G=null, gAt=-999;
+function graph(){ if(G && gt-gAt<30) return G; G={}; gAt=gt;
+  for(const a of Object.keys(AREAS)){ let L=[]; try{ L=a===areaId?OBJECTS:(AREAS[a].objects?AREAS[a].objects():[]); }catch(e){} const E=G[a]={out:[], beds:0, mobs:0};
+    L.forEach(o=>{ if(!o) return; if(o.type==='teleporter' && o.to && AREAS[o.to]){ let lk=false; try{ lk=!!(o.locked&&o.locked()); }catch(e){} if(!lk) E.out.push(o.to); }
+      else if(o.inside && AREAS[o.inside] && o.fp) E.out.push(o.inside); else if(o.type==='bed' && !o.owner) E.beds++; });
+    try{ E.mobs=(AREAS[a].mobs?AREAS[a].mobs():[]).filter(m=>m && m.type!=='dummy').length; }catch(e){} }
+  return G; }
+const fightLvl=a=>2*tierOf(a);
+function safeFor(a,bold){ const g=graph()[a]; if(!g || !g.mobs) return true; return fightLvl(a)<=lvl()+2+(bold||0); }
+const BAN={};                                      // doors that led nowhere lately (no way through): left alone for a day
+const banned=(a,b)=>BAN[a+'>'+b] && BAN[a+'>'+b]>gt;
+function route(from,to,bold){ const prev={[from]:null}, q=[from];
+  while(q.length){ const a=q.shift(); if(a===to) break; for(const b of (graph()[a]||{out:[]}).out){ if(b in prev || banned(a,b)) continue; if(b!==to && !safeFor(b,bold)) continue; prev[b]=a; q.push(b); } }
+  if(!(to in prev)) return null; const p=[]; for(let a=to;a!==from;a=prev[a]) p.unshift(a); return p; }
+
+// ── reading the journal, as a player does: who and where do my open tasks talk about? ──
+let WHO=null;
+function whoIndex(){ if(WHO) return WHO; WHO={names:[], places:[]};
+  for(const a of Object.keys(AREAS)){ let L=[]; try{ L=AREAS[a].npcs?AREAS[a].npcs():[]; }catch(e){} L.forEach(n=>{ if(n && n.name && n.id) WHO.names.push({name:n.name, id:n.id, area:a}); });
+    const lb=(AREAS[a].label||'').replace(/^The /,'').split(' · ')[0]; if(lb.length>=4) WHO.places.push({label:lb, area:a}); }
+  try{ for(const k in ROUTINES){ const R=ROUTINES[k]; R.slots.forEach(sl=>WHO.names.push({name:R.name, id:R.ids[sl.area]||k, area:sl.area})); } }catch(e){}
+  return WHO; }
+let HOT={areas:{}, ids:{}, at:-99, j:''};
+function hot(){ const dark=typeof nightAmt==='function' && nightAmt()>0.4, jh=jHash()+(dark?'N':'D'); if(HOT.j===jh && gt-HOT.at<60) return HOT; HOT={areas:{}, ids:{}, at:gt, j:jh}; const W=whoIndex();
+  JOURNAL.forEach(([t,f])=>{ let r=null; try{ r=f(); }catch(e){} if(!r || r[0]!=='active') return; const txt=String(r[1]||'');
+    if((CFG.cls!=='necro' && /Vesna/.test(txt)) || (CFG.cls!=='mage' && /Orvell|Magister/.test(txt))) return;      // another school's lessons: not for me
+    const night=/after dark|at night|by night|under the moon|moonlight|moon-shadow/i.test(txt); if(night && !dark) return;   // that one waits for the dark
+    const w=night?3:1, add=(a,k)=>{ HOT.areas[a]=(HOT.areas[a]||0)+k*w; };
+    W.names.forEach(n=>{ const first=n.name.split(' ')[0]; if(txt.includes(n.name) || (first.length>=4 && new RegExp('\\b'+first+'\\b').test(txt))){ HOT.ids[n.id]=t; add(n.area,1); } });
+    W.places.forEach(pl=>{ if(txt.includes(pl.label)) add(pl.area,2); });
+    Object.keys(AREAS).forEach(a=>{ if(a.length>=4 && /^[a-z]+$/.test(a) && new RegExp('\\b'+a+'\\b','i').test(txt)) add(a,2); }); });
+  return HOT; }
+
+// ── clicking, the way you do ──
+function clickTile(i,j){ const q=P(i+0.5,j+0.5), r=gc.getBoundingClientRect(); const x=r.left+q.x, y=r.top+q.y; pointerDown(x,y); pointerUp(x,y); }
+function skulls(){ return mobs.filter(m=>m.hostile && !m.dead && !m.gone && m.tier && foeLevel(m)-lvl()>=3); }
+function nearSkull(i,j,r){ return skulls().some(m=>Math.max(Math.abs(m.i-i),Math.abs(m.j-j))<=r); }
+function clickAvoiding(i,j){ const add=[]; skulls().forEach(m=>{ for(let a=-2;a<=2;a++) for(let b=-2;b<=2;b++){ const k=(m.i+a)+','+(m.j+b); if(!blocked.has(k) && !(m.i+a===i&&m.j+b===j)){ blocked.add(k); add.push(k); } } });
+  try{ clickTile(i,j); } finally{ add.forEach(k=>blocked.delete(k)); } }
+
+// ── gear: what is better, for this kind of fighter ──
+const CASTER=CFG.cls!=='melee';
+function gscore(id){ if(!id || !ITEMS[id]) return -1; const it=ITEMS[id], st=ITEM_STATS[id]||{}; let s=0;
+  try{ s+=armourOf(id)*3; }catch(e){} s+=(GEAR_HP[id]||0)*0.4+(st.ap||0)*(CASTER?0.3:1.5)+(st.agi||0)*1.2+(st.magic||0)*(CASTER?2.5:0)+(st.mreg||0)*(CASTER?1:0);
+  if(it.slot==='weapon'){ const W=WEAPONS[id]; if(!W) return -1;
+    if(W.magic){ if(!CASTER) return 0.1; const nec=NECRO_STAVES.includes(id); if((CFG.cls==='necro')!==nec) return 0.2; s+=25*W.magic; }
+    else { if(CASTER) return 0.15; s+=(typeof weaponDmg==='function'?weaponDmg(id):W.dmg)/Math.max(0.12,W.wind)*0.3; } }
+  return s; }
+const WEAR=['weapon','armor','head','hands','feet','offhand','neck','special'];
+function upgrades(){ const E=player.opts.equip, out=[];
+  player.inv.forEach((id,k)=>{ if(!id||!ITEMS[id]) return; const sl=ITEMS[id].slot; if(!WEAR.includes(sl)) return; if(!itemFits(id,player.opts.gender)) return;
+    if(sl==='offhand' && id==='morwen_lantern') return;
+    if(gscore(id)>gscore(E[sl])+0.5) out.push({k,id,sl}); });
+  return out.sort((a,b)=>gscore(b.id)-gscore(a.id)); }
+function equipBest(){ const u=upgrades(); if(!u.length) return false; const {k,id,sl}=u[0], was=player.opts.equip[sl];
+  try{ if(moveItem({kind:'inv',key:k},{kind:'eq',key:sl})){ delete player.opts._ck; refreshPlayerHp(false); updateHud(); S.equips.push({id,t:gt,lvl:lvl()}); note('Puts on '+ITEMS[id].name+(was&&ITEMS[was]?' (instead of '+ITEMS[was].name+')':''),'gear'); return true; } }catch(e){}
+  return false; }
+const healK=()=>{ let best=-1, bh=0; player.inv.forEach((id,k)=>{ const h=id&&ITEMS[id]&&!ITEMS[id].cure&&ITEMS[id].heal; if(h && (best<0||h>bh)){ best=k; bh=h; } }); return best; };
+const healCount=()=>player.inv.filter(id=>id&&ITEMS[id]&&ITEMS[id].heal&&!ITEMS[id].cure).length;
+function isJunk(id){ if(!id||!ITEMS[id]) return false; if(typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(id)) return false; const it=ITEMS[id];
+  if(it.heal||it.mana||it.cure) return false; if(id==='shovel'||id==='fishing_rod') return false;
+  if(WEAR.includes(it.slot)){ if(it.slot==='weapon' && WEAPONS[id] && WEAPONS[id].magic && CASTER) return gscore(id)<gscore(player.opts.equip.weapon)-5; return gscore(id)<=gscore(player.opts.equip[it.slot]); }
+  if(['torso','legs'].includes(it.slot)) return true;
+  return !!(typeof SELL_MISC!=='undefined' && SELL_MISC.has(id)); }
+
+// ── a casual fighter ──
+const SIDES=['left','up','right'];
+let FT=null;                                     // what this fight looks like from the inside
+function fightStart(){ FT={ start:gt, hp0:player.hp, max:player.maxHp, foes:mobs.filter(m=>m.hostile&&!m.dead).map(m=>m.name+' Lv'+foeLevel(m)), lv:lvl(), area:areaId, top:Math.max(0,...mobs.filter(m=>m.hostile&&!m.dead).map(m=>foeLevel(m))), lastSide:null, nextAtk:clock+0.6+rnd()*0.4, wu:null, prevState:null, potion:false, low:player.hp };
+  const sk=FT.top-FT.lv; note('Fight: '+FT.foes.join(', ')+(sk>=3?'  ☠ (way above me)':''),'fight'); }
+function fightEnd(lost){ if(!FT) return; const r={area:FT.area, land:LAND(FT.area), foes:FT.foes, top:FT.top, lv:FT.lv, lost, hpPct:Math.round(100*(FT.hp0-Math.max(0,lost?0:FT.low))/Math.max(1,FT.max)), dur:Math.round(gt-FT.start)};
+  S.fights.push(r); if(lost){ S.deaths.push(r); note('Died: '+FT.foes.join(', ')+' (I was Lv '+FT.lv+')','death'); } else note('Won in '+r.dur+'s, lost '+r.hpPct+'% health','fight'); FT=null; }
+function other(d){ const o=SIDES.filter(x=>x!==d); return o[Math.floor(rnd()*o.length)]; }
+function spellPick(f,sk){                       // which spell, as a casual caster would: by what it does, now and then by his guard
+  const SP=spellsFor(), m=player.mana??100, cost=s=>spellCost(SP[s]||{});
+  let want;
+  if(CFG.cls==='necro'){ const sk0=(typeof SKEL!=='undefined' && SKEL && !SKEL.crumble);
+    if(!sk0 && m>=cost('left') && rnd()<0.8) want='left'; else if(player.hp<player.maxHp*0.6 && m>=cost('up')) want='up'; else want=rnd()<0.6?'right':'up'; }
+  else { want=['left','right','up'][Math.floor(rnd()*3)]; if(rnd()<0.5) want='left'; }
+  if(f.guardDir===want && rnd()<0.3+0.6*sk){ const alt=SIDES.filter(s=>s!==f.guardDir); want=alt[Math.floor(rnd()*2)]; }
+  return want; }
+function fightStep(){
+  const f=combat.foe; if(!FT) fightStart(); FT.low=Math.min(FT.low,player.hp);
+  if(!f || combat.phase!=='fight' || f.dead) return;
+  const sk=skill(), win=windowFor(player);
+  // a drink when it gets bad (if you remember you have one)
+  if(player.hp<player.maxHp*0.32 && !FT.potion){ FT.potion=true; const k=healK(); if(k>=0 && rnd()<0.75){ try{ eatItem(k); note('Drinks/eats '+ITEMS[player.inv[k]||'bread']?.name+' mid-fight','fight'); }catch(e){} } }
+  if(player.hp>player.maxHp*0.55) FT.potion=false;
+  if(f.state==='windup'){
+    if(FT.prevState!=='windup' || !FT.wu || FT.wu.f!==f){ FT.wu={ f, t0:clock, rt:clamp(gauss(0.31-0.07*sk,0.07),0.17,0.65), mis:rnd()<0.2-0.12*sk, lapse:rnd()<0.08-0.05*sk, early:rnd()<0.14-0.08*sk, aim:win*(0.2+0.75*rnd()), seen:null, side0:f.swingDir, re:null, fooled:rnd()<0.55-0.35*sk, pressed:0 }; }
+    const W=FT.wu, el=clock-W.t0;
+    if(!W.seen && el>=W.rt){ W.seen=W.mis?other(f.swingDir):f.swingDir; W.side0=f.swingDir; playerGuard=W.seen; }
+    if(W.seen && f.swingDir!==W.side0 && !W.re){ W.re=clock+W.rt*0.85; W.side0=f.swingDir; }      // the feint shows its real side
+    if(W.re && clock>=W.re && !W.fooled){ playerGuard=f.swingDir; W.re=1e9; }
+    if(W.seen && !W.lapse && duel.st==='ready'){
+      const want=W.early && !W.pressed ? win+0.08+rnd()*0.18 : W.aim;
+      if(f.t<=want && (W.pressed===0 || (W.pressed===1 && rnd()<0.02))){ doParry(); W.pressed++; } }
+  } else {
+    if(FT.prevState==='windup') FT.nextAtk=Math.max(FT.nextAtk, clock+0.12+rnd()*0.3);
+    if(duel.st==='ready' && clock>=FT.nextAtk && f.state!=='down'){
+      let side;
+      if(CASTER && isMagicWeapon()) side=spellPick(f,sk);
+      else { const ok=rnd()<0.75+0.2*sk, alt=SIDES.filter(s=>s!==f.guardDir); side=ok?alt[Math.floor(rnd()*alt.length)]:(f.guardDir||'up');
+        if(side===FT.lastSide && rnd()<0.3+0.5*sk) side=alt.find(s=>s!==side)||side; }
+      playerGuard=side; FT.lastSide=side; doAttack(); FT.nextAtk=clock+0.28+rnd()*0.5+(1-sk)*0.25; } }
+  FT.prevState=f.state; }
+
+// ── conversations ──
+const isExit=l=>/^(Farewell|Back|Leave|Not now|Close|Bow and leave|Goodbye|Bye|“?Not now|“?Later|“?Another (time|night)|“?Not yet|“?…Never mind|Never mind|Let (him|her) sleep|Continue\.?$|Walk away|Go\.?$|Done\.?$)/i.test(l.trim());
+const HOSTILE=/attack|kill him|kill her|draw (your|steel)|fight (him|her|them)|cut (him|her) down|strike/i;
+const DLG={ key:null, readUntil:0, steps:0, chosen:{}, conv:0 };
+function teacherOff(name){ if(CFG.cls!=='necro' && /Vesna/.test(name)) return true; if(CFG.cls!=='mage' && /Orvell|Magister/.test(name)) return true; return false; }
+function dialogStep(){
+  const name=(document.getElementById('dlg-name')||{}).innerText||'', text=(document.getElementById('dlg-text')||{}).innerText||'';
+  const btns=[...document.querySelectorAll('#dlg-opts button')].filter(b=>!b.classList.contains('off') && b.offsetParent!==null);
+  const grid=document.querySelector('#dlg-opts .shop-grid'), hint=(document.querySelector('#dlg-opts .shop-hint')||{}).innerText||'';
+  const key=name+'|'+text.slice(0,120)+'|'+btns.map(b=>b.innerText).join('/')+'|'+(grid?grid.children.length:0);
+  if(key!==DLG.key){ DLG.key=key; const rt=0.8+text.length*0.022; DLG.readUntil=gt+rt; S.readT+=rt; return; }
+  if(gt<DLG.readUntil) return;
+  DLG.readUntil=gt+0.5; DLG.steps++;
+  if(DLG.steps>60){ DLG.steps=0; closeDialog(); return; }
+  if(grid){                                         // a shop
+    const cells=[...grid.querySelectorAll('.shop-cell')];
+    if(/sell/i.test(hint)){ const c=cells.find(c=>{ const id=(c.querySelector('.shop-slot')||{}).dataset; return id && isJunk(id.item); });
+      if(c){ const id=c.querySelector('.shop-slot').dataset.item; c.click(); S.sells.push({id,t:gt}); note('Sells '+ITEMS[id].name,'gear'); return; } }
+    else if(/buy/i.test(hint)){ const can=cells.filter(c=>!c.classList.contains('off'));
+      const pick=can.find(c=>{ const id=c.querySelector('.shop-slot').dataset.item, it=ITEMS[id]; return it && WEAR.includes(it.slot) && itemFits(id,player.opts.gender) && gscore(id)>gscore(player.opts.equip[it.slot])+1.5; })
+        || (healCount()<3 && player.purse>25 ? can.find(c=>{ const id=c.querySelector('.shop-slot').dataset.item; return ITEMS[id] && ITEMS[id].heal && !ITEMS[id].cure; }) : null)
+        || (CASTER && player.purse>40 && player.inv.filter(id=>id&&ITEMS[id]&&ITEMS[id].mana).length<2 ? can.find(c=>{ const id=c.querySelector('.shop-slot').dataset.item; return ITEMS[id] && ITEMS[id].mana; }) : null);
+      if(pick && player.inv.includes(null)){ const id=pick.querySelector('.shop-slot').dataset.item; pick.click(); S.buys.push({id,t:gt,lvl:lvl()}); note('Buys '+ITEMS[id].name,'gear'); return; } } }
+  const ck=name+'|'+text.slice(0,80); const done=DLG.chosen[ck]||(DLG.chosen[ck]=new Set());
+  let prog=btns.filter(b=>!isExit(b.innerText));
+  if(teacherOff(name)) prog=[];
+  if(grid && /buy/i.test(hint) && !player.inv.some(isJunk)) prog=prog.filter(b=>!/^Sell/i.test(b.innerText));
+  const fresh=prog.filter(b=>!done.has(b.innerText));
+  const calm=fresh.filter(b=>!HOSTILE.test(b.innerText) && !/(\d+)\s*(silver|copper|c\b)/i.test(b.innerText) || player.purse>200);
+  const pick=calm[0]||fresh[0];
+  if(pick){ done.add(pick.innerText); S.dialogs++; pick.click(); return; }
+  const ex=btns.find(b=>isExit(b.innerText))||btns[btns.length-1];
+  if(ex) ex.click(); else closeDialog(); }
+
+// ── what to do in a place ──
+const MEMO={ talk:{}, obj:{}, visit:{} };
+let VISIT=null;                                   // this visit: what was tried already
+const SKIP_OBJ=new Set(['tree','critter','rocks','debris','teleporter','house','bldg','chapel','roundhut','pavilion','keep','tower','watchtower','notch','crag','rockridge','lamp','banner','fence','milestone','flowers','reeds','deadtree','logpile','stump','bush','grass','pool','chair','table','bench','shelf','barrel','fire','well','cart','opened','sign','torch','window','plant','stall','rug','boulder','ember','pond','water_edge']);
+function sig(){ return jHash()+'#'+Math.floor(day()/2); }
+function targets(){ const T=[]; const me=[player.i,player.j];
+  NPCS.forEach(n=>{ if(!TALKERS[n.id] || n.sleepBed || VISIT.tried.has('n'+n.id)) return; const H=hot().ids[n.id]; if(MEMO.talk[n.id]===sig() && !(H && MEMO.talk['h'+n.id]!==sig()+gt.toFixed(0).slice(0,-2))) return; T.push({k:'n'+n.id, i:n.i, j:n.j, w:H?-4:0, what:'talk', n}); });
+  OBJECTS.forEach(o=>{ const id=o.type+'@'+o.i+','+o.j;
+    if(o.type==='pickup'){ if(!VISIT.tried.has(id)) T.push({k:id,i:o.i,j:o.j,w:-3,what:'pickup'}); return; }
+    if(o.breakable){ if(!VISIT.tried.has(id)) T.push({k:id,i:o.i,j:o.j,w:-1,what:'break'}); return; }
+    if(typeof PUZ_TYPES!=='undefined' && PUZ_TYPES.has(o.type)){ const n=VISIT.puz[id]||0; if(n<3 && MEMO.obj[areaId+id]!==sig()+'p'+n) T.push({k:id,i:o.i,j:o.j,w:2,what:'puzzle',o}); return; }
+    if(o.type==='bed'){ if(!o.owner && (CHOICE.bruised || player.hp<player.maxHp*0.45) && !VISIT.tried.has(id)) T.push({k:id,i:o.i,j:o.j,w:-6,what:'bed'}); return; }
+    if(SKIP_OBJ.has(o.type) || o.inside) return; if(VISIT.tried.has(id) || MEMO.obj[areaId+id]===sig()) return;
+    T.push({k:id,i:o.i+((o.fp?o.fp[0]:1)>1?1:0),j:o.j,w:4,what:'look',o}); });
+  mobs.forEach((m,x)=>{ if(!m.hostile||m.dead||m.gone||m.type==='dummy') return; const d=foeLevel(m)-lvl(); if(d>=3 && !(d===3 && player.hp>=player.maxHp*0.95 && rnd()<0.02)) return;
+    if(VISIT.tried.has('m'+x)) return; T.push({k:'m'+x, i:m.i, j:m.j, w:1, what:'fight', m}); });
+  return T.filter(t=>!nearSkull(t.i,t.j,2)).map(t=>({...t, d:Math.hypot(t.i-me[0],t.j-me[1])+t.w})).sort((a,b)=>a.d-b.d); }
+let NOEAT=-1, GOAL=null, idleT=0, lastPos='', stillT=0;
+function enterArea(){ const a=areaId; VISIT={area:a, tried:new Set(), puz:{}, t0:gt}; const A=S.areas[a]||(S.areas[a]={t:0,visits:0,land:LAND(a),tier:tierOf(a)}); A.visits++;
+  const L=S.lands[LAND(a)]||(S.lands[LAND(a)]={t:0, firstT:gt, firstLvl:lvl(), fights:0}); MEMO.visit[a]={j:jHash(), hj:hot().j, d:day(), t:gt};
+  if(A.visits===1) note('Arrives in '+(AREAS[a].label||a)+(graph()[a]&&graph()[a].mobs?' (danger '+tierOf(a)+', foes Lv '+fightLvl(a)+')':''),'move'); }
+function finishTarget(t){ VISIT.tried.add(t.k); if(t.what==='talk'){ MEMO.talk[t.n.id]=sig(); MEMO.talk['h'+t.n.id]=sig()+gt.toFixed(0).slice(0,-2); } if(t.what==='look') MEMO.obj[areaId+t.k]=sig(); if(t.what==='puzzle'){ VISIT.puz[t.k]=(VISIT.puz[t.k]||0)+1; } }
+let BOLD=0, lastProgress=0, lastJH='';
+function areaScore(a,hops){ const V=MEMO.visit[a], g=graph()[a]||{}; let s=0;
+  if(!V) s+=60; else { if(V.j!==jHash()) s+=18; if(g.mobs && day()>V.d && safeFor(a)) s+=6; }
+  const h=hot().areas[a]; if(h && (!V || V.hj!==hot().j || gt-V.t>DAY_LEN*0.5)) s+=22+8*Math.min(4,h);
+  if(a===areaId) s-=40; return s-hops*2.5-rnd()*4; }
+function planNext(){ const out=[]; for(const a of Object.keys(AREAS)){ if(a===areaId) continue; const r=route(areaId,a,BOLD); if(!r) continue; if(!safeFor(a,BOLD) && !(rnd()<0.04 && !MEMO.visit[a])) continue;
+    out.push({a, r, s:areaScore(a,r.length)}); }
+  out.sort((x,y)=>y.s-x.s); return out[0]||null; }
+function goToward(next){                         // walk to the door that leads to the next place
+  const tp=OBJECTS.find(o=>o.type==='teleporter' && o.to===next), hs=!tp && OBJECTS.find(o=>o.inside===next && o.fp);
+  const at=tp?[tp.i,tp.j]:hs?doorTile(hs):null; if(!at){ BAN[areaId+'>'+next]=gt+DAY_LEN; return false; }
+  const there=()=>player.i===at[0] && player.j===at[1];
+  if(tp){ if(there()){ try{ switchArea(tp.to,tp.entry); }catch(e){} return true; }            // standing in the doorway already: step through
+    const walk=avoid=>{ const add=[]; if(avoid) skulls().forEach(m=>{ for(let a=-2;a<=2;a++) for(let b=-2;b<=2;b++){ const k=(m.i+a)+','+(m.j+b); if(!blocked.has(k) && !(m.i+a===tp.i&&m.j+b===tp.j)){ blocked.add(k); add.push(k); } } });
+      try{ const pth=findPath(player.i,player.j,tp.i,tp.j); if(pth && pth.length){ player.path=pth; return true; } return false; } finally{ add.forEach(k=>blocked.delete(k)); } };
+    if(walk(true) || walk(false)) return true;
+    const someone=NPCS.some(n=>cheb([n.i,n.j],[tp.i,tp.j])<=1) || mobs.some(m=>!m.dead && cheb([m.i,m.j],[tp.i,tp.j])<=1);
+    BAN[areaId+'>'+next]=gt+(someone?60:DAY_LEN); if(!someone) note('No way through to '+(AREAS[next].label||next)+' from here.','move'); return false; }
+  clickAvoiding(hs.i,hs.j); if(!player.path.length && !there() && !pendingDoor) clickTile(hs.i,hs.j);
+  if(!player.path.length && !there() && !pendingDoor){ BAN[areaId+'>'+next]=gt+120; return false; }
+  return true; }
+function think(){
+  // health first
+  const cap=hpCap(); if(player.hp<cap*0.6 && player.hp!==NOEAT){ const k=healK(); if(k>=0){ const id=player.inv[k], h0=player.hp; try{ eatItem(k); }catch(e){} if(player.hp>h0) note('Eats/drinks '+ITEMS[id].name,'gear'); else NOEAT=player.hp; return 1.2; } }
+  if(equipBest()) return 1.0;
+  const needRest=CHOICE.bruised || (player.hp<player.maxHp*0.45 && (healK()<0 || NOEAT===player.hp));
+  if(needRest && !(GOAL&&GOAL.rest)){ let best=null; for(const a of Object.keys(AREAS)){ const g=graph()[a]; if(!g||!g.beds) continue; const r=a===areaId?[]:route(areaId,a,0); if(!r) continue; if(!best||r.length<best.r.length) best={a,r}; }
+    if(best){ GOAL={area:best.a, rest:true}; note((CHOICE.bruised?'Bruised from that beating: off to sleep it off in ':'Hurt and nothing to eat: off to find a bed in ')+(AREAS[best.a].label||best.a),'move'); } }
+  if(GOAL && GOAL.rest && !CHOICE.bruised && player.hp>=player.maxHp*0.9) GOAL=null;
+  if(!player.inv.includes(null)){ const k=player.inv.findIndex(isJunk); if(k>=0){ note('Drops '+ITEMS[player.inv[k]].name+' (pack full)','gear'); player.inv[k]=null; return 0.6; } }
+  if(GOAL && GOAL.area!==areaId){ const r=route(areaId,GOAL.area,BOLD+1); if(r && r.length){ if(goToward(r[0])) return 0.5; } GOAL=null; }
+  if(GOAL && GOAL.rest && GOAL.area===areaId){ const bd=OBJECTS.find(o=>o.type==='bed' && !o.owner); if(bd && !VISIT.tried.has('rest'+gt.toFixed(0).slice(0,-2))){ VISIT.tried.add('rest'+gt.toFixed(0).slice(0,-2)); clickTile(bd.i,bd.j); return 1; } }
+  const T=targets();
+  { const Z=PUZZLE[areaId]; if(Z && !(Z.solved?Z.solved():PZ()[Z.f]) && !skulls().length){ if(T.length){ const t=T[0]; finishTarget(t); if(t.what==='puzzle' && cheb([t.i,t.j],[player.i,player.j])<=1){ try{ puzAct(t.o); }catch(e){} return 1; } clickTile(t.i,t.j); return 1; }
+      const o=OBJECTS.filter(o=>PUZ_TYPES.has(o.type) && o.type!=='gate'); if(o.length){ const x=o[Math.floor(rnd()*o.length)]; if(cheb([x.i,x.j],[player.i,player.j])<=1){ try{ puzAct(x); }catch(e){} } else clickTile(x.i,x.j); } return 1.5; } }
+  if(T.length && (!GOAL || GOAL.area===areaId)){ const t=T[0]; finishTarget(t);
+    if(t.what==='puzzle' && cheb([t.i,t.j],[player.i,player.j])<=1){ try{ puzAct(t.o); }catch(e){} return 0.8; }
+    clickAvoiding(t.i,t.j); return 0.4; }
+  GOAL=null;
+  const nx=planNext();
+  if(!nx || nx.s<4){ idleT++; if(idleT>3){ idleT=0; if(BOLD<4){ BOLD++; note('Nothing new around for my level. Pushing on a little further.','move'); } else { dayClock+=DAY_LEN*0.25; } } }
+  if(nx){ GOAL={area:nx.a}; if(nx.r.length){ if(!MEMO.visit[nx.a]) note('Heading for '+(AREAS[nx.a].label||nx.a)+(safeFor(nx.a)?'':' (looks dangerous)'),'move'); goToward(nx.r[0]); } return 0.5; }
+  return 1; }
+
+// ── riddles: a person pokes at a puzzle room for a while, then works it out ──
+const PUZZLE={ cave1:{f:'c1', name:'the weighing stones'}, cave3:{f:'c3', name:'the singing crystals'}, templeA:{f:'tA', name:'the scales'}, templeB:{f:'tB', name:'the day road'}, templeC:{f:'tC', name:'the hourglass'},
+  cave2:{name:'the cold stream', solved:()=>{ const P=PZ(); return !!(P.thorns && ((P.fill&&P.fill.length)||(P.ice&&P.ice.length))); },
+    solve:()=>{ const P=PZ(); const axe=[player.opts.equip.weapon,...player.inv].some(id=>/axe|hatchet/.test(id||''));
+      if(!P.thorns && !CASTER && !axe) note('The thorns want fire or an axe, and I have neither. (A melee player has to go and buy an axe here.)','move');
+      P.thorns=true; if(!(P.fill&&P.fill.length)&&!(P.ice&&P.ice.length)) P.fill=['4,4']; switchArea('cave2','fromCave1'); } } };
+const PZT={};
+function puzzleStep(dt){ const Z=PUZZLE[areaId]; if(!Z) return; const P=PZ(); const solved=Z.solved?Z.solved():!!P[Z.f]; if(solved){ if(PZT[areaId]&&!PZT[areaId].done){ PZT[areaId].done=true; S.puzzles=S.puzzles||[]; S.puzzles.push({area:areaId, name:Z.name, t:Math.round(PZT[areaId].t)}); note('Solved '+Z.name+' after '+Math.round(PZT[areaId].t/60)+' min','quest'); } return; }
+  const T=PZT[areaId]||(PZT[areaId]={t:0, need:180+rnd()*240}); T.t+=dt;
+  if(T.t>=T.need){ if(Z.solve) Z.solve(); else { P[Z.f]=true; const g0=OBJECTS.find(x=>x.type==='gate'); if(g0) OBJECTS.splice(OBJECTS.indexOf(g0),1); try{ pzRebuild(); }catch(e){} }
+    G=null; for(const k in BAN) if(k.startsWith(areaId+'>')) delete BAN[k]; } }
+
+// ── the step, every tick of the game ──
+let wait=0, prevArea=null, wasFight=false, readTeach=0, lastLvl=0, dlgOpenT=0, csT=0;
+B.step=function(dt){
+  if(B.paused || B.finished) return;
+  try{
+    if(!running) return;
+    if(areaId!==prevArea){ prevArea=areaId; enterArea(); }
+    const A=S.areas[areaId]; if(A) A.t+=dt; const L=S.lands[LAND(areaId)]; if(L) L.t+=dt;
+    if(lvl()!==lastLvl){ if(lastLvl) { S.levels.push({lvl:lvl(),t:gt,area:areaId}); note('Level '+lvl()+'!','level'); } lastLvl=lvl(); }
+    watchJournal(); if(!combat.active) puzzleStep(dt);
+    if(combat.active && combat.phase!=='down'){ wasFight=true; fightStep(); return; }
+    if(wasFight && !combat.active){ wasFight=false; fightEnd(combat.phase==='down' || combat.downT>0); }
+    if(combat.phase==='down'){ if(FT) fightEnd(true); return; }
+    if(TEACH_OPEN){ readTeach+=dt; if(readTeach>3.5){ readTeach=0; try{ showTeach.close(); }catch(e){} } return; }
+    if(CS.on){ csT+=dt; if(csT>90){ csT=0; try{ csSkip(); }catch(e){} } return; } csT=0;
+    if(dlgIsOpen()){ dlgOpenT+=dt; dialogStep(); return; } dlgOpenT=0; DLG.key=null; DLG.steps=0;
+    const pos=player.i+','+player.j+','+areaId; if(pos===lastPos && !player.path.length) stillT+=dt; else { stillT=0; lastPos=pos; }
+    if(stillT>25){ stillT=0; try{ document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'})); }catch(e){} GOAL=null; S.stuck.push({area:areaId,t:gt}); }
+    if(player.path.length || player.moving){ return; }
+    if(wait>0){ wait-=dt; return; }
+    wait=think()+rnd()*0.3;
+    // the end of the game: nothing has moved in the journal for a long while
+    const jh=jHash(); if(jh!==lastJH){ lastJH=jh; lastProgress=gt; }
+    if(gt-lastProgress>DAY_LEN*6 && BOLD>=4){ B.finished=true; note('Nothing more I can find to do. Done.','level'); }
+  }catch(e){ note('bot error: '+e.message); wait=1; }
+};
+// time runs as fast as you like, and the screen is drawn less often when it runs fast
+const _u=update; B.errors=[];
+update=function(dt){ const n=B.paused?1:B.speed; for(let k=0;k<n;k++){
+    try{ _u(dt); }catch(e){ const m=(e&&e.message)||String(e); if(B.errors.length<50) B.errors.push({t:Math.round(gt), area:areaId, msg:m, stack:String(e&&e.stack||'').split('\n').slice(0,5).join(' | ')}); if(!B.errors.some(x=>x.msg===m && x!==B.errors[B.errors.length-1])) note('GAME ERROR (a real bug): '+m); }   // the game would freeze here for a player: note it and carry on
+    B.step(dt); if(!running) break; } };
+let dn=0; const _d=draw; draw=function(){ if(B.fast && (dn++%8)) return; _d(); };
+B.report=function(){ const J=journal(); return { cls:CFG.cls, lvl:lvl(), area:areaId, land:LAND(areaId), t:Math.round(gt), purse:player.purse, hp:player.hp+'/'+player.maxHp,
+  done:Object.values(J).filter(v=>v==='done').length, total:Object.keys(J).length, active:Object.keys(J).filter(k=>J[k]==='active'), fights:S.fights.length, deaths:S.deaths.length,
+  equip:{...player.opts.equip}, finished:B.finished, bold:BOLD }; };
+note('A new '+({melee:'fighter',necro:'necromancer',mage:'mage'})[CFG.cls]+' sets out.','level');
+})();
+</script>
+
+<script>
+const $=id=>document.getElementById(id), frame=$('game');
+const CLS={melee:'Melee',necro:'Necromancer',mage:'Mage'};
+const qs=new URLSearchParams(location.search);
+let speed=+(qs.get('speed')||1), bot=null, shown=0;
+$('speed').value=speed; $('spv').textContent=speed+'×';
+if(qs.get('cls')) $('cls').value=qs.get('cls');
+$('speed').oninput=()=>{ speed=+$('speed').value; $('spv').textContent=speed+'×'; if(bot) bot.speed=speed; };
+$('pause').onclick=()=>{ if(!bot) return; bot.paused=!bot.paused; $('pause').textContent=bot.paused?'Resume':'Pause'; };
+$('go').onclick=start;
+function start(){ bot=null; shown=0; $('log').innerHTML=''; frame.src='index.html?autoplay='+Date.now(); }
+frame.onload=()=>{ const w=frame.contentWindow, d=w.document;
+  // wait for you to sign in (inside the game, as always), then make a character and hand it to the bot
+  const iv=setInterval(()=>{ try{
+      const login=d.getElementById('login-screen'); if(login && !login.classList.contains('hidden')) return;
+      const nm=d.getElementById('char-name-input'), st=d.getElementById('start-btn'); if(!nm || !st) return;
+      clearInterval(iv);
+      const g=Math.random()<0.5?'f':'m'; const gb=d.querySelector('.gender-btn[data-gender="'+g+'"]'); if(gb) gb.click();
+      nm.value='Bot '+CLS[$('cls').value]; nm.dispatchEvent(new w.Event('input'));
+      w.writeSaves=function(){ return true; }; w.saveGame=function(){};
+      st.click();
+      setTimeout(()=>{ w.BOT_CFG={cls:$('cls').value, speed, fast:qs.get('fast')==='1', seed:+(qs.get('seed')||0)||undefined};
+        const s=d.createElement('script'); s.textContent=$('bot-src').textContent; d.body.appendChild(s); bot=w.BOT; if(bot) bot.speed=speed; },1500);
+    }catch(e){} },300); };
+const fmtT=s=>{ s=Math.round(s); const h=Math.floor(s/3600), m=Math.floor(s%3600/60); return (h?h+'h ':'')+m+'m'; };
+setInterval(()=>{ if(!bot) { $('stats').innerHTML='<b>Status</b><span>Sign in inside the game below; the bot starts after that.</span>'; return; }
+  try{ const r=bot.report();
+    $('stats').innerHTML=[['Class',CLS[r.cls]],['Level',r.lvl],['Where',r.land+' · '+r.area],['Health',r.hp],['Coin',r.purse],['Quests',r.done+' done · '+r.active.length+' open'],['Fights',r.fights+' · '+r.deaths+' deaths'],['Game time',fmtT(r.t)],['Weapon',r.equip.weapon||'fists']].map(([a,b])=>'<b>'+a+'</b><span>'+b+'</span>').join('');
+    const L=bot.log, box=$('log'); const atEnd=box.scrollTop+box.clientHeight>=box.scrollHeight-20;
+    for(;shown<L.length;shown++){ const e=L[shown], div=document.createElement('div'); div.className=e.kind; div.textContent=e.msg; box.appendChild(div); }
+    if(atEnd) box.scrollTop=box.scrollHeight;
+  }catch(e){} },500);
+start();
+</script>
+</body>
+</html>

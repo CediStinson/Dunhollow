@@ -20003,6 +20003,18 @@ let gapWarned={};
 { const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); try{ const t=tierOf(areaId), gl=gearLevel(); if(t-gl-1>=1 && !gapWarned[areaId] && mobs.some(m=>m.hostile&&!m.dead)){ gapWarned[areaId]=1;
       setTimeout(()=>{ banner('Too dangerous for your gear','#e07050',2200); logMsg('This place is danger '+'◆'.repeat(t)+'. Your gear is only '+'◆'.repeat(gl)+'. Foes here will hit harder, and shrug off your blows. Better armour and a better blade first.','#e07050');
         teach('gearlevel','Gear level',["Every area has a <b>danger level</b> (the ◆ beside a foe's name). Your <b>gear level</b> comes from what you wear: your weapon and body armour count most. See it in your inventory.","Go somewhere <b>two or more</b> levels deeper than your gear and foes <b>hit harder</b>, <b>take less</b> from you, and are <b>harder to parry</b>. Buy, find and earn better gear, and come back."]); },900); } }catch(e){} return r; }; }
+
+// ════════ BEYOND YOUR GEAR: nothing is locked by your gear; beating something you should not have beaten is worth something ════════
+//   CHOICE.daring: how many foes you have felled two or more levels beyond your gear; CHOICE.daringBest: the widest gap
+{ const _fd=foeDown; foeDown=function(f){ let gap=0; try{ gap=(f && f.type!=='dummy' && !combat.practice && !f.dead) ? gapOf(f) : 0; }catch(e){} const r=_fd.apply(this,arguments);
+    if(gap>=1){ try{ CHOICE.daring=(CHOICE.daring||0)+1; CHOICE.daringBest=Math.max(CHOICE.daringBest||0,gap); const coin=4*gap*(f.tier||1)+Math.floor(Math.random()*6); player.purse+=coin; updateHud();
+      slowmo.scale=0.15; slowmo.t=0.9; shake=Math.max(shake,10);
+      setTimeout(()=>{ banner(gap>=2?'Against all odds!':'Beyond your gear!','#ffd070',1800); logMsg('You beat '+f.name+' ('+'◆'.repeat(f.tier||1)+') in '+'◆'.repeat(gearLevel())+' gear. Folk will hear of this. You find '+formatCoin(coin)+' on the body.','#ffd070'); },350);
+      if(CHOICE.daring===1) setTimeout(()=>teach('daring','Beyond your gear',["You beat a foe <b>beyond your gear</b>. That is hard, and it is worth something: <b>extra coin</b> every time, and word of it spreads.","Do it five times and it counts toward your <b>renown</b>."]),1400);
+      autosaveSoon(400); }catch(e){} }
+    return r; }; }
+JOURNAL.push(['Beyond Your Gear', ()=> !CHOICE.daring ? null : CHOICE.daring>=5 ? ['done',"You have beaten "+CHOICE.daring+" foes you had no business beating, in gear that was not up to it."+(CHOICE.daringBest>=2?" Once, against all odds.":"")]
+  : ['active',"Foes far beyond your gear hit harder and take less, but they can be beaten. Each one you fell is worth extra coin, and word gets around. ("+CHOICE.daring+"/5)"]]);
 </script>
 </body>
 </html>

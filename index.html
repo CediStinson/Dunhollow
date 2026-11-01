@@ -8368,6 +8368,17 @@ function paintGroundTexture(){
       let pc=mixC([176,140,96],[204,170,122],n*0.6+n2*0.4); if(((Math.floor(sx)+Math.floor(sy))%2)===0) pc=mixC(pc,[160,124,84],0.25); if(joint) pc=mixC(pc,[96,72,46],0.7);
       if(n2>0.72) pc=mixC(pc,[120,92,60],0.3); const drift=smooth(0.5,0.75,fbm(gx*0.6,gy*0.6,93))*(1-smooth(0,2.2,Math.min(gx,gy,ROOM.w-gx,ROOM.h-gy))); pc=mixC(pc,[226,196,146],drift*0.85);
       const o=(py*TWp+px)*4, k=1-0.3*(1-smooth(0,1.3,Math.min(gx,gy))); D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
+    if(theme==='interior' && AREAS[areaId] && AREAS[areaId].maze){ const MZ=mazeGrid(areaId), ti=Math.floor(gx), tj=Math.floor(gy), at=(i,j)=>i>=0&&j>=0&&i<w&&j<h&&MZ[j*w+i], o=(py*TWp+px)*4;
+      if(!at(ti,tj)){ const fx=gx-ti, fy=gy-tj, n=hsh(Math.floor(gx*3),Math.floor(gy*3))%1000/1000, glint=(hsh(Math.floor(gx*7)+3,Math.floor(gy*7)+5)%997)<4;   // the drop: near black, a glint of the drowned town far below
+        let pc=mixC([0,0,1],[4,5,7],n*0.5); if(glint) pc=[30,42,50];
+        const face=Math.min(at(ti-1,tj)?fx:9, at(ti,tj-1)?fy:9);                     // the side of the walkway you can see: stone, falling away into the dark
+        if(face<0.32){ const t=face/0.32, rough=(hsh(Math.floor(gx*9),Math.floor(gy*9))%100)/100; pc=mixC(mixC([64,56,46],[34,30,25],rough*0.5),pc,Math.sqrt(t)); if(face<0.03) pc=[20,17,14]; }
+        const back=Math.min(at(ti+1,tj)?1-fx:9, at(ti,tj+1)?1-fy:9); if(back<0.08) pc=mixC([30,26,22],pc,back/0.08);
+        D[o]=pc[0]; D[o+1]=pc[1]; D[o+2]=pc[2]; D[o+3]=255; continue; }
+      const fx=gx-ti, fy=gy-tj, n=fbm(gx*3,gy*3,73), grain=fbm(gx*9,gy*1.5,74), slab=((ti*7+tj*13)%5)/5;
+      let pc=mixC([132,122,104],[100,92,78],n*0.6+slab*0.4); if(fx<0.05||fy<0.05) pc=mixC(pc,[34,30,26],0.6); if(grain>0.68) pc=mixC(pc,[110,102,90],0.3);
+      const e=Math.min(at(ti-1,tj)?9:fx,at(ti+1,tj)?9:1-fx,at(ti,tj-1)?9:fy,at(ti,tj+1)?9:1-fy); if(e<0.12) pc=mixC([20,18,16],pc,e/0.12); else if(e<0.2) pc=mixC(pc,[130,120,104],0.35);   // the lip, worn pale by feet
+      D[o]=pc[0]; D[o+1]=pc[1]; D[o+2]=pc[2]; D[o+3]=255; continue; }
     if(theme==='interior' && AREAS[areaId] && AREAS[areaId].cave && !AREAS[areaId].volcanic){                 // rough cave stone, damp, with a faint green glow in the cracks
       const n=fbm(gx*0.9,gy*0.9,41), n2=fbm(gx*4,gy*4,43), n3=fbm(gx*11,gy*11,44), crack=Math.abs(fbm(gx*1.3,gy*1.3,42)-0.5)<0.012, crack2=Math.abs(fbm(gx*2.7,gy*2.7,46)-0.5)<0.008;
       const MINE=AREAS[areaId].mine, CRYS=['cave1','cave2','cave3','cave4'].includes(areaId);
@@ -12017,19 +12028,21 @@ function mapLayout(){
   const out=(A,o)=>{ const d=[[o.i,[-1,0]],[A.w-1-o.i,[1,0]],[o.j,[0,-1]],[A.h-1-o.j,[0,1]]]; let b=d[0]; d.forEach(x=>{ if(x[0]<b[0]) b=x; }); return b[1]; };   // the nearest wall
   const onEdge=(A,o,[du,dv])=>({ i: du>0?A.w-1 : du<0?0 : o.i, j: dv>0?A.h-1 : dv<0?0 : o.j });                // a door set into the wall, moved out onto its edge
   while(queue.length){ const id=queue.shift(), A=AREAS[id];
-    for(const t of tps(id)){ if(pos[t.to] || AREAS[t.to].inside) continue;
+    for(const t of tps(id)){ if(pos[t.to] || !AREAS[t.to] || (AREAS[t.to].layer||0)!==(A.layer||0) || (AREAS[t.to].inside && !AREAS[t.to].layer)) continue;
       const B=AREAS[t.to], Bk0=tps(t.to).find(o=>o.to===id); if(!Bk0) continue;
       const [du,dv]=out(A,t), T=onEdge(A,t,[du,dv]), Bk=onEdge(B,Bk0,[-du,-dv]);
       const cand={u:pos[id].u+T.i+du-Bk.i, v:pos[id].v+T.j+dv-Bk.j};
-      pos[t.to]=cand; queue.push(t.to); } }
+      pos[t.to]=cand; queue.push(t.to); }
+    if(!queue.length && typeof MAP_UNDER!=='undefined' && !pos[MAP_UNDER.root] && AREAS[MAP_UNDER.root]){ pos[MAP_UNDER.root]={u:MAP_UNDER.u,v:MAP_UNDER.v}; queue.push(MAP_UNDER.root); } }   // then the world below, under Hollowmere
   return MAP_LAYOUT=pos;
 }
 const MM_COL={ sand:'#c8a464', ash:'#5a3a30', bog:'#4e5434', farm:'#8a9a4a', road:'#4e6a34', crossroads:'#5a7a3a', village:'#9aa058', wood:'#3a5a2c', fen:'#44583e', elf:'#7a9a5a' };
 function renderMap(cv,V){                             // V: {zoom, px, py, labels} — zoom/pan on top of fitting the whole explored world
   const c=cv.getContext('2d'), L=mapLayout();
   c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,cv.width,cv.height);
-  const ids=Object.keys(AREAS).filter(id=>visitedAreas[id] && L[id]);
+  const LAY=mapLayerShown(), ids=Object.keys(AREAS).filter(id=>visitedAreas[id] && L[id] && (AREAS[id].layer||0)===LAY);
   if(!ids.length) return;
+  const ghost=LAY<0 ? Object.keys(AREAS).filter(id=>visitedAreas[id] && L[id] && !(AREAS[id].layer||0)) : [];   // below ground: the streets above, faintly, to know where you are
   // fit all visited rooms (iso projection, like the game)
   const pj=(u,v)=>[u, v];                                   // straight from above
   let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
@@ -12038,6 +12051,9 @@ function renderMap(cv,V){                             // V: {zoom, px, py, label
   const ox=(cv.width-(x1-x0)*k)/2-x0*k+(V.px||0), oy=(cv.height-(y1-y0)*k)/2-y0*k+(V.py||0);
   V.k=k;
   const P2=(u,v)=>{ const [px,py]=pj(u,v); return [ox+px*k, oy+py*k]; };
+  ghost.forEach(id=>{ const A=AREAS[id], o=L[id], q=[P2(o.u,o.v),P2(o.u+A.w,o.v),P2(o.u+A.w,o.v+A.h),P2(o.u,o.v+A.h)]; c.fillStyle='rgba(120,110,90,0.07)'; c.strokeStyle='rgba(200,180,140,0.22)'; c.lineWidth=1;
+    c.beginPath(); q.forEach((p2,n)=>n?c.lineTo(p2[0],p2[1]):c.moveTo(p2[0],p2[1])); c.closePath(); c.fill(); c.stroke();
+    if(V.labels && /^Hollowmere/.test(A.label||'')){ const m=P2(o.u+A.w/2,o.v+A.h/2); c.font='italic 12px Georgia,serif'; c.textAlign='center'; c.fillStyle='rgba(220,200,160,0.35)'; c.fillText(A.label.replace('Hollowmere · ',''),m[0],m[1]-14); } });
   ids.sort((x,y)=>(AREAS[x].under?1:0)-(AREAS[y].under?1:0));   // tunnels last: a dashed shadow crossing over the road above
   ids.forEach(id=>{ const A=AREAS[id], o=L[id], cur=id===areaId, notch=A.notches();
     c.globalAlpha=A.under&&!cur?0.6:1; if(A.under) c.setLineDash([4,3]);
@@ -12045,11 +12061,13 @@ function renderMap(cv,V){                             // V: {zoom, px, py, label
     c.fillStyle=cur?tone(MM_COL[A.theme]||'#5a7a3a',0.25):(MM_COL[A.theme]||'#5a7a3a');
     const nk=(i,j)=>notch.find(n=>i>=n.i0&&i<n.i0+(n.w||3)&&j>=n.j0&&j<n.j0+(n.h||3));
     const base=A.under?(cur?'#6a5a4a':'#2a2018'):c.fillStyle;
-    for(let j=0;j<A.h;j++) for(let i=0;i<A.w;i++){ const nn=nk(i,j); c.fillStyle = nn ? (nn.kind==='plough'?'#6a4a2a':'#d8b848') : base;
+    const MZ=A.maze?mazeGrid(id):null, SEEN=A.maze?mazeSeen(id):null;
+    for(let j=0;j<A.h;j++) for(let i=0;i<A.w;i++){ if(MZ && (!MZ[j*A.w+i] || SEEN[j*A.w+i]!=='1')) continue;   // the maze: only the walkways you have seen
+      const nn=nk(i,j); c.fillStyle = MZ ? (cur?'#b8a888':'#8a7a60') : nn ? (nn.kind==='plough'?'#6a4a2a':'#d8b848') : base;
       const a=P2(o.u+i,o.v+j), b=P2(o.u+i+1,o.v+j), d=P2(o.u+i+1,o.v+j+1), e=P2(o.u+i,o.v+j+1);
       c.beginPath(); c.moveTo(a[0],a[1]); c.lineTo(b[0],b[1]); c.lineTo(d[0],d[1]); c.lineTo(e[0],e[1]); c.closePath(); c.fill(); }
     // outline of the room
-    c.strokeStyle=cur?'#fff2c0':'rgba(20,12,4,0.8)'; c.lineWidth=cur?2:1.2;
+    c.strokeStyle=cur?'#fff2c0':'rgba(20,12,4,0.8)'; c.lineWidth=cur?2:1.2; if(A.maze){ c.strokeStyle='rgba(200,180,140,0.35)'; c.setLineDash([3,4]); }
     const q=[P2(o.u,o.v),P2(o.u+A.w,o.v),P2(o.u+A.w,o.v+A.h),P2(o.u,o.v+A.h)];
     c.beginPath(); q.forEach((p2,n)=>n?c.lineTo(p2[0],p2[1]):c.moveTo(p2[0],p2[1])); c.closePath(); c.stroke(); c.setLineDash([]);
     A.objects().filter(t=>t.type==='pool').forEach(t=>{ const a=P2(o.u+t.i,o.v+t.j), b=P2(o.u+t.i+t.fp[0],o.v+t.j+t.fp[1]); c.fillStyle=t.kind==='moon'?'#8ab8d0':'#3e6a7a'; c.beginPath(); c.ellipse((a[0]+b[0])/2,(a[1]+b[1])/2,(b[0]-a[0])/2,(b[1]-a[1])/2,0,0,Math.PI*2); c.fill(); });
@@ -12102,11 +12120,12 @@ const BIGMAP={open:false, zoom:1, px:0, py:0};
 function drawBigMap(){ const cv=document.getElementById('bigmap-canvas'); if(!cv) return; const r=cv.getBoundingClientRect(), d=Math.min(2,devicePixelRatio||1);
   if(cv.width!==Math.round(r.width*d)||cv.height!==Math.round(r.height*d)){ cv.width=Math.round(r.width*d); cv.height=Math.round(r.height*d); }
   const c=cv.getContext('2d'); c.setTransform(1,0,0,1,0,0); c.fillStyle='#0e0904'; c.fillRect(0,0,cv.width,cv.height);
-  renderMap(cv,{zoom:BIGMAP.zoom, px:BIGMAP.px*d, py:BIGMAP.py*d, labels:true}); }
+  renderMap(cv,{zoom:BIGMAP.zoom, px:BIGMAP.px*d, py:BIGMAP.py*d, labels:true});
+  const hd=document.querySelector('#bigmap .bm-head span'); if(hd) hd.textContent=mapLayerShown()<0?'Beneath Hollowmere':'Map of the Valley'; }
 function openBigMap(){
   let ov=document.getElementById('bigmap');
   if(!ov){ ov=document.createElement('div'); ov.id='bigmap';
-    ov.innerHTML='<div class="bm-panel"><div class="bm-head"><span>Map of the Valley</span><span class="bm-tools"><button data-z="1.25">+</button><button data-z="0.8">−</button><button data-z="0">⌖</button><button class="bm-x">×</button></span></div><canvas id="bigmap-canvas"></canvas><div class="bm-hint">Drag to move · scroll or pinch to zoom · M or Esc to close</div></div>';
+    ov.innerHTML='<div class="bm-panel"><div class="bm-head"><span>Map of the Valley</span><span class="bm-tools"><button data-z="1.25">+</button><button data-z="0.8">−</button><button data-z="0">⌖</button><button class="bm-layer" title="Surface / underground">⇅</button><button class="bm-x">×</button></span></div><canvas id="bigmap-canvas"></canvas><div class="bm-hint">Drag to move · scroll or pinch to zoom · M or Esc to close</div></div>';
     document.body.appendChild(ov); const cv=ov.querySelector('canvas'), ptrs=new Map(); let pinch=0;
     const zoomAt=(f,cx,cy)=>{ const r=cv.getBoundingClientRect(), mx=cx-r.left-r.width/2, my=cy-r.top-r.height/2, nz=Math.max(0.5,Math.min(12,BIGMAP.zoom*f)), ff=nz/BIGMAP.zoom;
       BIGMAP.px=mx-(mx-BIGMAP.px)*ff; BIGMAP.py=my-(my-BIGMAP.py)*ff; BIGMAP.zoom=nz; drawBigMap(); };
@@ -12121,18 +12140,19 @@ function openBigMap(){
     ov.querySelectorAll('[data-z]').forEach(bt=>bt.addEventListener('click',()=>{ const z=+bt.dataset.z, r=cv.getBoundingClientRect();
       if(!z){ centerBigMap(); drawBigMap(); } else zoomAt(z,r.left+r.width/2,r.top+r.height/2); }));
     ov.querySelector('.bm-x').addEventListener('click',closeBigMap);
+    ov.querySelector('.bm-layer').addEventListener('click',()=>{ const here=(AREAS[areaId].layer||0); BIGMAP.layer = mapLayerShown()===0 ? -1 : 0; if(BIGMAP.layer===here) BIGMAP.layer=null; centerBigMap(); drawBigMap(); });
     addEventListener('resize',()=>{ if(BIGMAP.open) drawBigMap(); }); }
-  BIGMAP.open=true; ov.classList.add('open'); BIGMAP.zoom=1.6; centerBigMap(); drawBigMap();
+  BIGMAP.open=true; BIGMAP.layer=null; ov.classList.add('open'); BIGMAP.zoom=1.6; centerBigMap(); drawBigMap();
 }
 function centerBigMap(){ const cv=document.getElementById('bigmap-canvas'); if(!cv) return; BIGMAP.px=0; BIGMAP.py=0;   // put you in the middle
   const L=mapLayout(), o=L[areaId]; if(!o) return; const d=Math.min(2,devicePixelRatio||1); const tmp={zoom:BIGMAP.zoom,px:0,py:0};
   const r=cv.getBoundingClientRect(); if(cv.width!==Math.round(r.width*d)) { cv.width=Math.round(r.width*d); cv.height=Math.round(r.height*d); }
   // probe where the player lands with no pan, then shift by the difference
   const probe=document.createElement('canvas'); probe.width=cv.width; probe.height=cv.height; renderMap(probe,tmp);
-  const ids=Object.keys(AREAS).filter(id=>visitedAreas[id] && L[id]); let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  const ids=Object.keys(AREAS).filter(id=>visitedAreas[id] && L[id] && (AREAS[id].layer||0)===mapLayerShown()); let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
   ids.forEach(id=>{ const A=AREAS[id], q=L[id]; x0=Math.min(x0,q.u); y0=Math.min(y0,q.v); x1=Math.max(x1,q.u+A.w); y1=Math.max(y1,q.v+A.h); });
   const k=tmp.k, ox=(cv.width-(x1-x0)*k)/2-x0*k, oy=(cv.height-(y1-y0)*k)/2-y0*k, mx=ox+(o.u+player.x)*k, my=oy+(o.v+player.y)*k;
-  BIGMAP.px=(cv.width/2-mx)/d; BIGMAP.py=(cv.height/2-my)/d; }
+  BIGMAP.px=(cv.width/2-mx)/d; BIGMAP.py=(cv.height/2-my)/d; if(mapLayerShown()!==(AREAS[areaId].layer||0)){ BIGMAP.px=0; BIGMAP.py=0; } }
 function closeBigMap(){ BIGMAP.open=false; const ov=document.getElementById('bigmap'); if(ov) ov.classList.remove('open'); }
 addEventListener('keydown',e=>{ if(!running || (e.target&&e.target.tagName==='INPUT')) return;
   if(e.key==='m'||e.key==='M'){ BIGMAP.open?closeBigMap():openBigMap(); }
@@ -15220,7 +15240,7 @@ function drawActor(e){                               // you, a foe, a wolf
 const FLAMESWORN=(o)=>({gender:'m',race:'human',skin:4,hair:2,hairColor:0,beard:0,face:3,marks:{warPaint:2},equip:{head:'obsidian_helm',torso:'shirt',armor:'ash_mantle',hands:'cinder_gloves',legs:'scorched_greaves',feet:'emberstep_boots',weapon:'fire_blade',offhand:null},...o});
 AREAS.emberpass={ fence:{r:false,l:false}, w:16, h:9, theme:'interior', inside:true, cave:true, volcanic:true, label:'The Cinder Deeps', mini:{x:0,y:0}, tier:4,
   notches:()=>[], dummy:null,
-  objects:()=>[ {type:'teleporter', i:15, j:4, to:'steamcellar', entry:'fromDeeps'}, {type:'teleporter', i:0, j:4, to:'emberforge', entry:'fromPass'},
+  objects:()=>[ {type:'teleporter', i:15, j:4, to:'steamcellar', entry:'fromLift'}, {type:'teleporter', i:0, j:4, to:'emberforge', entry:'fromPass'}, {type:'teleporter', i:6, j:0, to:'under_se', entry:'fromDeeps'},
     {type:'lava', i:4, j:6, fp:[3,2]}, {type:'lava', i:9, j:0, fp:[3,2]}, {type:'lava', i:12, j:6, fp:[2,2]}, {type:'lava', i:2, j:0, fp:[2,2]},
     ...rockRow(8,7,10,[]), {type:'boulder', i:14, j:1, v:1}, {type:'boulder', i:7, j:1, v:2}, {type:'bones', i:8, j:6, noblock:true}, {type:'bones', i:3, j:3, noblock:true},
     {type:'rune', i:13, j:2, text:"Scratched into black glass with a knife point: <i>“The Flamesworn burn the weak and keep the strong. Their captain's blade was quenched in the old forge, deeper down. The forge still remembers.”</i>"},
@@ -15233,7 +15253,7 @@ AREAS.emberpass={ fence:{r:false,l:false}, w:16, h:9, theme:'interior', inside:t
     { name:'Flamesworn Shieldbearer', type:'bandit', i:9, j:4, faction:'flamesworn', style:'shield', opts:FLAMESWORN({skin:1,hair:1,beard:2,hairColor:2,equip:{head:'obsidian_helm',torso:'shirt',armor:'ash_mantle',hands:'cinder_gloves',legs:'scorched_greaves',feet:'emberstep_boots',weapon:'sword',offhand:'shield_iron'}}) },
     { name:'Flamesworn Captain', type:'bandit', i:3, j:5, faction:'flamesworn', opts:FLAMESWORN({}) } ],
   npcs:()=>[],
-  entries:{ fromWarren:{i:14,j:4}, fromDeeps:{i:14,j:4}, fromForge:{i:1,j:4} } };
+  entries:{ fromWarren:{i:14,j:4}, fromDeeps:{i:14,j:4}, fromLift:{i:14,j:4}, fromUnder:{i:6,j:1}, fromForge:{i:1,j:4} } };
 AREAS.emberforge={ fence:{r:false,l:false}, w:13, h:11, theme:'interior', inside:true, cave:true, volcanic:true, label:'The Sunken Forge', mini:{x:0,y:0}, tier:5,
   notches:()=>[], dummy:null,
   objects:()=>[ {type:'teleporter', i:12, j:5, to:'emberpass', entry:'fromForge'},
@@ -15250,8 +15270,9 @@ AREA_PATHS.emberpass=[ [[16,4.5],[12,4.6],[8,4.2],[4,4.6],[-0.5,4.5]] ];
 AREA_PATHS.emberforge=[ [[13,5.5],[9,5.6],[7,4],[6,3.4]] ];
 AREAS.warren.entries.fromPass={i:1,j:5};                                                   // (older saves may still name it)
 // the bathhouse boiler is warmed from below: an iron hatch behind it, and a stair down into the deep fire
-wrap('steamcellar','objects',l=>[...l, {type:'trapdoor', i:6, j:0, noblock:true, iron:true}, {type:'teleporter', i:6, j:0, to:'emberpass', entry:'fromWarren'}]);
-AREAS.steamcellar.entries.fromDeeps={i:6,j:1};
+wrap('steamcellar','objects',l=>[...l, {type:'trapdoor', i:6, j:0, noblock:true, iron:true}, {type:'teleporter', i:6, j:0, to:'under_ne', entry:'fromCellar'},
+  {type:'trapdoor', i:1, j:0, noblock:true}, {type:'teleporter', i:1, j:0, to:'emberpass', entry:'fromLift', locked:()=>!(CHOICE.deepsLift||visitedAreas.emberpass), onLocked:()=>setTimeout(()=>say('A Rope Lift',["A wooden cage hangs in a shaft beside the boiler, its winch rusted solid.","<i>Somebody at the bottom would have to free it.</i>"],[bye]),60)}]);
+AREAS.steamcellar.entries.fromDeeps={i:6,j:1}; AREAS.steamcellar.entries.fromUnder={i:6,j:1}; AREAS.steamcellar.entries.fromLift={i:1,j:1};
 AREA_TIER.emberpass=4; AREA_TIER.emberforge=5;
 if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
 
@@ -19762,6 +19783,77 @@ OBJ_DRAW.wormskull=o=>{ const q=P(o.i+1.5,o.j+1.5), B=q.y; g.save();
   g.fillStyle='#ece2c8'; for(let k=0;k<14;k++){ const a=Math.PI+k/13*Math.PI, x=q.x+10+Math.cos(a)*34, y=B-26+Math.sin(a)*24; g.beginPath(); g.moveTo(x-3,y); g.lineTo(q.x+10+Math.cos(a)*24,B-26+Math.sin(a)*16); g.lineTo(x+3,y); g.closePath(); g.fill(); }
   g.strokeStyle='rgba(90,70,40,0.5)'; g.lineWidth=1.2; [-40,-50,40,52].forEach(dx=>{ g.beginPath(); g.moveTo(q.x+dx,B-50); g.quadraticCurveTo(q.x+dx*1.1,B-30,q.x+dx*0.9,B-10); g.stroke(); });
   g.restore(); };
+
+// ════════ THE UNDERCITY: old Hollowmere, drowned when the river moved; the new city was built on its roofs. Under the streets: four quarters of walkways, ridges and bridges over the black ════════
+//   map layer -1, under Hollowmere. CHOICE.mazeSeen[area]: the walkways you have seen, so the map fills in as you go. CHOICE.deepsLift: the rope lift to the Cinder Deeps is free
+const MAP_UNDER={ root:'under_nw', u:13, v:-121 };
+const mapLayerShown=()=> (typeof BIGMAP!=='undefined' && BIGMAP.open && BIGMAP.layer!=null) ? BIGMAP.layer : (AREAS[areaId] && AREAS[areaId].layer) || 0;
+const MZ_N=33;
+// the doors between the quarters (and up, and down): [area, edge tile i, j, to, entry key]
+const UNDER_LINKS=[ ['under_nw',32,5,'under_ne','p1'], ['under_ne',0,5,'under_nw','p1'], ['under_nw',32,27,'under_ne','p2'], ['under_ne',0,27,'under_nw','p2'],
+  ['under_nw',9,32,'under_sw','p3'], ['under_sw',9,0,'under_nw','p3'], ['under_ne',25,32,'under_se','p4'], ['under_se',25,0,'under_ne','p4'],
+  ['under_sw',32,13,'under_se','p5'], ['under_se',0,13,'under_sw','p5'], ['under_sw',32,29,'under_se','p6'], ['under_se',0,29,'under_sw','p6'],
+  ['under_ne',27,0,'steamcellar','fromUnder'], ['under_nw',5,0,'keepward','fromWell'], ['under_se',13,32,'emberpass','fromUnder'] ];
+const UNDER_Q={
+  under_nw:{ seed:0x1a2b3c, label:'The Undercity · Well Bottom', rooms:[[2,1,1],[7,6,2],[12,3,1],[3,12,1],[11,12,1]], entries:{ fromWell:[5,1] } },
+  under_ne:{ seed:0x2b3c4d, label:'The Undercity · Cellar Stair', rooms:[[13,1,1],[5,4,1],[10,9,2],[3,13,1]], entries:{ fromCellar:[27,1] } },
+  under_sw:{ seed:0x3c4d5e, label:'The Undercity · Chapel Roofs', rooms:[[4,4,1],[11,6,2],[2,12,1],[8,13,1],[14,11,1]], entries:{} },
+  under_se:{ seed:0x4d5e6f, label:'The Undercity · The Stair Down', rooms:[[3,3,1],[11,2,1],[8,8,2],[13,13,1],[6,14,1]], entries:{ fromDeeps:[13,31] } } };
+const MZ_CACHE={};
+function mazeGrid(id){ if(MZ_CACHE[id]) return MZ_CACHE[id]; const Q=UNDER_Q[id], W=MZ_N, H=MZ_N, G=new Uint8Array(W*H); let st=Q.seed|0;
+  const rnd=()=>{ st=(st+0x6D2B79F5)|0; let t=Math.imul(st^st>>>15,1|st); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; };
+  const cw=(W-1)/2, ch=(H-1)/2, seen=new Uint8Array(cw*ch);
+  const stack=[[0,0]]; seen[0]=1; G[1*W+1]=1;
+  while(stack.length){ const [cx,cy]=stack[stack.length-1]; const nb=[[1,0],[-1,0],[0,1],[0,-1]].map(([a,b])=>[cx+a,cy+b]).filter(([x,y])=>x>=0&&y>=0&&x<cw&&y<ch&&!seen[y*cw+x]);
+    if(!nb.length){ stack.pop(); continue; } const [nx,ny]=nb[Math.floor(rnd()*nb.length)]; seen[ny*cw+nx]=1; G[(cy+ny+1)*W+(cx+nx+1)]=1; G[(2*ny+1)*W+2*nx+1]=1; stack.push([nx,ny]); }
+  for(let y=0;y<ch;y++) for(let x=0;x<cw;x++){ const i=2*x+1, j=2*y+1, walls=[[1,0],[-1,0],[0,1],[0,-1]].filter(([a,b])=>!G[(j+b)*W+i+a]);   // a few dead ends knocked through: more than one way round, but not many
+    if(walls.length===3 && rnd()<0.12){ const ok=walls.filter(([a,b])=>i+2*a>0&&i+2*a<W-1&&j+2*b>0&&j+2*b<H-1); if(ok.length){ const [a,b]=ok[Math.floor(rnd()*ok.length)]; G[(j+b)*W+i+a]=1; } } }
+  Q.rooms.forEach(([cx,cy,r])=>{ const i0=2*cx+1, j0=2*cy+1; for(let a=-r;a<=r;a++) for(let b=-r;b<=r;b++){ const i=i0+a, j=j0+b; if(i>0&&j>0&&i<W-1&&j<H-1) G[j*W+i]=1; } });   // the old squares, still standing
+  UNDER_LINKS.filter(l=>l[0]===id).forEach(([,i,j])=>G[j*W+i]=1);
+  return MZ_CACHE[id]=G; }
+const mzIn=(i,j)=>[i===0?1:i===MZ_N-1?MZ_N-2:i, j===0?1:j===MZ_N-1?MZ_N-2:j];   // the walkway just inside a door
+function mazeDeadEnds(id){ const G=mazeGrid(id), W=MZ_N, out=[]; for(let j=1;j<W-1;j+=2) for(let i=1;i<W-1;i+=2){ if(!G[j*W+i]) continue; if([[1,0],[-1,0],[0,1],[0,-1]].filter(([a,b])=>G[(j+b)*W+i+a]).length===1) out.push([i,j]); } return out; }
+function mazeSeen(id){ const S=(CHOICE.mazeSeen && typeof CHOICE.mazeSeen==='object') ? CHOICE.mazeSeen : (CHOICE.mazeSeen={}); if(!S[id] || S[id].length!==MZ_N*MZ_N) S[id]='0'.repeat(MZ_N*MZ_N); return S[id]; }
+setInterval(()=>{ try{ if(!UNDER_Q[areaId]) return; const s=mazeSeen(areaId).split(''), G=mazeGrid(areaId); let ch=false;
+    for(let a=-3;a<=3;a++) for(let b=-3;b<=3;b++){ const i=player.i+a, j=player.j+b; if(i<0||j<0||i>=MZ_N||j>=MZ_N || Math.abs(a)+Math.abs(b)>4) continue; const k=j*MZ_N+i; if(G[k] && s[k]!=='1'){ s[k]='1'; ch=true; } }
+    if(ch) CHOICE.mazeSeen[areaId]=s.join(''); }catch(e){} },300);
+function mazeBlock(){ if(!UNDER_Q[areaId]) return; const G=mazeGrid(areaId); for(let j=0;j<MZ_N;j++) for(let i=0;i<MZ_N;i++) if(!G[j*MZ_N+i]) blocked.add(i+','+j); }
+{ const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); mazeBlock(); if(areaId==='emberpass' && !CHOICE.deepsLift){ CHOICE.deepsLift=true; setTimeout(()=>logMsg('Beside the stair, a rope lift hangs in a shaft, its winch seized with rust. You kick it free. It will carry you up to the Steam Cellar, and back down.','#c8a0e0'),900); } return r; }; }
+{ const _pr=pzRebuild; pzRebuild=function(...a){ const r=_pr.apply(this,a); mazeBlock(); return r; }; }
+// what lives down here, and what was left behind
+const UNDER_LOOT=['potion','mana_potion','potion','grave_ring','silver_torc','amber_brooch','glass_beads','tin_medal','copper_chain','cameo','brass_candlestick','bog_coins','potion','mail','longsword','shield_iron','gauntlets','coif'];
+const UNDER_DEAD=(n,o)=>({...RISEN(n),...(o||{})});
+const UNDER_LORE={
+  under_nw:[[7,6,"A square, once: a dry fountain, and roofs all round it at the height of your knees. The city above is built on top of this one. You are walking on its rooftops."],[2,1,"The well-rope ends here, frayed, a long way above the walkway. Somebody climbed down it and cut it behind them."]],
+  under_ne:[[13,1,"An iron stair winds down from the bathhouse boiler. Beside it, painted on the wall in letters a foot high: <i>KEEP TO THE LIGHT. COUNT YOUR TURNINGS.</i>"],[10,9,"The old market cross, still standing, its steps going down into nothing."]],
+  under_sw:[[11,6,"A chapel roof, the bell still in its frame. Scratched beside it: <i>“Fourteen turnings left from the bell, then down. Or was it right.”</i>"],[2,12,"A shrine to a saint nobody remembers, her face worn smooth by hands touching it for luck."],[14,11,"Somebody slept here for a long time: a bedroll, a cold pot, tallies on the stone. Hundreds of them. Then they stop."]],
+  under_se:[[8,8,"A great cistern, dry, its roof gone. Walkways cross it on old beams. You can hear water, very far down."],[13,13,"The stair down. The air coming up it is warm, and smells of iron and smoke. The Cinder Deeps are below."]] };
+const UNDER_MOBS={
+  under_nw:[['Undercity Dead','skeleton',[7,6,1,1]],['Cistern Lurker','lurker',[3,12,0,0]],['Undercity Dead ','skeleton',[11,12,0,0]]],
+  under_ne:[['Tunnel Cutthroat','bandit',[5,4,0,0],'C'],['Tunnel Cutthroat ','bandit',[5,4,1,1],'C'],['Rooftop Lurker','lurker',[3,13,0,0]]],
+  under_sw:[['Bell-Ringer','skeleton',[11,6,-2,0],'B'],['Bell-Ringer ','skeleton',[11,6,2,0],'B'],['The Sleeper','ghost',[14,11,0,0]],['Drowned Lurker','lurker',[8,13,0,0]],['Undercity Dead','skeleton',[4,4,0,0]]],
+  under_se:[['Undercity Dead','skeleton',[3,3,0,0]],['Deep Lurker','lurker',[11,2,0,0]],['Cistern Dead','skeleton',[8,8,-2,2]],['Cistern Dead ','skeleton',[8,8,2,-2]],['Stair Warden','warden',[13,13,0,-1]]] };
+Object.entries(UNDER_Q).forEach(([id,Q],qi)=>{ const room=(cx,cy)=>[2*cx+1,2*cy+1];
+  const ent={}; UNDER_LINKS.filter(l=>l[3]===id).forEach(([from,,, ,key])=>{ const mine=UNDER_LINKS.find(l=>l[0]===id && l[4]===key); if(mine){ const [ii,jj]=mzIn(mine[1],mine[2]); ent[key]={i:ii,j:jj}; } });
+  Object.entries(Q.entries).forEach(([k,[i,j]])=>ent[k]={i,j});
+  AREAS[id]={ ...INSIDE_BASE, w:MZ_N, h:MZ_N, theme:'interior', cave:true, maze:true, layer:-1, label:Q.label, mini:{x:0,y:0}, tier:4,
+    objects:()=>{ const l=UNDER_LINKS.filter(x=>x[0]===id).map(([,i,j,to,key])=>({type:'teleporter', i, j, to, entry: to==='steamcellar'?'fromUnder': to==='keepward'?'fromWell': to==='emberpass'?'fromUnder': key }));
+      (UNDER_LORE[id]||[]).forEach(([cx,cy,t])=>{ const [i,j]=room(cx,cy); l.push({type:'rune', i:i+1, j:j-1, text:t}, {type:'lantern', i:i-1, j:j-1}); });
+      Q.rooms.forEach(([cx,cy])=>{ if((UNDER_LORE[id]||[]).some(x=>x[0]===cx&&x[1]===cy)) return; const [i,j]=room(cx,cy); l.push({type:'lantern', i:i-1, j:j+1}); });
+      mazeDeadEnds(id).filter(([i,j])=>i+j>6).filter((_,k)=>(k+qi)%4===1).slice(0,6).forEach(([i,j])=>{ if(!collectedPickups.has(id+':'+i+','+j)) l.push({type:'pickup', i, j, item:UNDER_LOOT[(i*7+j*3+qi)%UNDER_LOOT.length]}); });   // what the drowned left at the ends of things
+      return l; },
+    npcs:()=>[],
+    mobs:()=>(UNDER_MOBS[id]||[]).map(([name,type,[cx,cy,a,b],fac],k)=>{ const [i0,j0]=room(cx,cy), i=i0+a, j=j0+b, faction='und_'+id+'_'+(fac||k);
+      if(type==='skeleton') return { name, type, i, j, faction, opts:UNDER_DEAD(name) };
+      if(type==='lurker') return { name, type, i, j, faction, opts:LURK({}) };
+      if(type==='bandit') return { name, type, i, j, faction, style:name.endsWith(' ')?undefined:'duelist', opts:BANDIT({skin:name.endsWith(' ')?3:1,hair:2,equip:{head:name.endsWith(' ')?'bandana':'hood',weapon:name.endsWith(' ')?'sword':'dagger',armor:name.endsWith(' ')?'studded':'jerkin'}}) };
+      if(type==='ghost') return { name, type:'bandit', i, j, faction, opts:{gender:'m',skin:0,hair:1,hairColor:13,beard:5,face:1,ghost:true,equip:{head:'hood',torso:'shirt',armor:'robe',hands:null,legs:'trousers',feet:null,weapon:'mace',offhand:null}} };
+      return { name, type:'skeleton', i, j, faction, opts:UNDER_DEAD(name,{equip:{...RISEN(name).equip, weapon:'longsword'}}) }; }),
+    entries:ent }; AREA_TIER[id]=4; });
+AREAS.emberpass.layer=-1; AREAS.emberforge.layer=-1;
+wrap('keepward','objects',l=>[...l, {type:'well', i:13, j:5}, {type:'teleporter', i:14, j:5, to:'under_nw', entry:'fromWell'}]); AREAS.keepward.entries.fromWell={i:14,j:6};
+MM_COL.interior='#5a524a';
+if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
 </script>
 </body>
 </html>

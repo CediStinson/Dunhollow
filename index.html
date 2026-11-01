@@ -20072,9 +20072,16 @@ function killXp(f){ const d=foeLevel(f)-playerLevel(), base=6*foeLevel(f); retur
 { const _fd=foeDown; foeDown=function(f){ const xp=(f && f.type!=='dummy' && !combat.practice && !f.dead) ? killXp(f) : 0; const r=_fd.apply(this,arguments); if(xp>=1) setTimeout(()=>giveXp(xp),250); return r; }; }
 setInterval(()=>{ try{ if(!running || CHOICE.xpQuests==null) return; const n=renownDone(); if(n>CHOICE.xpQuests){ const k=n-CHOICE.xpQuests; CHOICE.xpQuests=n; giveXp(k*Math.max(20,12*tierOf(areaId)),'quest'); } }catch(e){} },2500);   // a task is worth more the deeper into the world it takes you
 // older saves: a level that fits what you have already done
-setInterval(()=>{ try{ if(!running || CHOICE.xpVer===2) return; const n=renownDone(), deep=Math.max(1,...Object.keys(visitedAreas).map(a=>tierOf(a)||1));
-    if(CHOICE.xp==null && n===0 && deep<=1){ CHOICE.xp=0; } else { const L=Math.max(1,Math.min(9,2*deep-1)); CHOICE.xp=Math.round(XP_AT[L]+(XP_AT[L+1]-XP_AT[L])*0.4); }
+setInterval(()=>{ try{ if(!running || CHOICE.xpVer>=2) return; const n=renownDone(), deep=Math.max(1,...Object.keys(visitedAreas).map(a=>tierOf(a)||1));
+    if(CHOICE.xp==null && n===0 && deep<=1){ CHOICE.xp=0; CHOICE.xpVer=3; CHOICE.xpQuests=n; refreshPlayerHp(false); updateHud(); return; } else { const L=Math.max(1,Math.min(9,2*deep-1)); CHOICE.xp=Math.round(XP_AT[L]+(XP_AT[L+1]-XP_AT[L])*0.4); }
     CHOICE.xpQuests=n; CHOICE.xpVer=2; refreshPlayerHp(false); updateHud(); }catch(e){} },1000);
+// saves from before levels were given a level from the deepest place visited, as if everything up to there was done: too generous for someone who only looked in.
+// Once, those are measured again from what was actually done: every foe beaten (at its level) and every task finished, with room to spare for foes fought twice.
+setInterval(()=>{ try{ if(!running || CHOICE.xpVer!==2) return;
+    let est=0; defeatedMobs.forEach(k=>{ const c=k.indexOf(':'); if(c<0) return; const a=k.slice(0,c), nm=k.slice(c+1), L=2*tierOf(a)+(/^(Old |Greater |The )/.test(nm)?1:0); est+=6*L; });
+    est+=renownDone()*30; est=Math.round(est*1.5);
+    const L0=playerLevel(); if((CHOICE.xp||0)>est){ CHOICE.xp=est; refreshPlayerHp(false); updateHud(); if(playerLevel()<L0) logMsg('Your level was measured again from what you have done: Level '+playerLevel()+'.','#e8c060'); }
+    CHOICE.xpVer=3; }catch(e){} },1300);
 // the HUD
 function hudLevel(){ let b=document.getElementById('lvl-badge'); const hm=document.getElementById('hp-mini'); if(!hm) return;
   if(!b){ b=document.createElement('div'); b.id='lvl-badge'; hm.parentNode.appendChild(b); const x=document.createElement('div'); x.id='hp-mini-xp'; hm.appendChild(x); }

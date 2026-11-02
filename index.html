@@ -563,6 +563,8 @@ html,body{touch-action:none;overscroll-behavior:none;-webkit-tap-highlight-color
     <button class="menu-btn" id="voice-toggle">Voices: Off</button>
     <button class="menu-btn" id="voice-engine" style="display:none">Voice engine: Browser</button>
     <div id="voice-status" style="font-size:11px;color:#c8b890;min-height:0;text-align:center"></div>
+    <button class="menu-btn" id="pt-toggle">Record playtest: Off</button>
+    <div class="file-row" id="pt-row" style="display:none"><button class="menu-btn" id="pt-dl">Download playtest</button><button class="menu-btn" id="pt-clear" style="flex:0 0 auto">Clear</button></div>
     <div class="file-row snd-row" style="align-items:center;gap:10px;display:none"><span class="menu-label" style="width:52px">Volume</span><input id="snd-vol" type="range" min="0" max="100" value="70" style="flex:1;accent-color:#c09040"></div>
     <div class="file-row snd-row" style="align-items:center;gap:10px;display:none"><span class="menu-label" style="width:52px">Music</span><input id="mus-vol" type="range" min="0" max="100" value="45" style="flex:1;accent-color:#c09040"></div>
     <div class="menu-label">Promoter's Key</div>
@@ -20074,7 +20076,7 @@ function killXp(f){ const d=foeLevel(f)-playerLevel(), base=6*foeLevel(f); retur
 setInterval(()=>{ try{ if(!running || CHOICE.xpQuests==null) return; const n=renownDone(); if(n>CHOICE.xpQuests){ const k=n-CHOICE.xpQuests; CHOICE.xpQuests=n; giveXp(k*Math.max(20,12*tierOf(areaId)),'quest'); } }catch(e){} },2500);   // a task is worth more the deeper into the world it takes you
 // older saves: a level that fits what you have already done
 setInterval(()=>{ try{ if(!running || CHOICE.xpVer>=2) return; const n=renownDone(), deep=Math.max(1,...Object.keys(visitedAreas).map(a=>tierOf(a)||1));
-    if(CHOICE.xp==null && n===0 && deep<=1){ CHOICE.xp=0; CHOICE.xpVer=3; CHOICE.xpQuests=n; refreshPlayerHp(false); updateHud(); return; } else { const L=Math.max(1,Math.min(9,2*deep-1)); CHOICE.xp=Math.round(XP_AT[L]+(XP_AT[L+1]-XP_AT[L])*0.4); }
+    if(CHOICE.xp==null && n===0){ CHOICE.xp=0; CHOICE.xpVer=3; CHOICE.xpQuests=n; refreshPlayerHp(false); updateHud(); return; } else { const L=Math.max(1,Math.min(9,2*deep-1)); CHOICE.xp=Math.round(XP_AT[L]+(XP_AT[L+1]-XP_AT[L])*0.4); }
     CHOICE.xpQuests=n; CHOICE.xpVer=2; refreshPlayerHp(false); updateHud(); }catch(e){} },1000);
 // saves from before levels were given a level from the deepest place visited, as if everything up to there was done: too generous for someone who only looked in.
 // Once, those are measured again from what was actually done: every foe beaten (at its level) and every task finished, with room to spare for foes fought twice.
@@ -20088,6 +20090,74 @@ function hudLevel(){ let b=document.getElementById('lvl-badge'); const hm=docume
   if(!b){ b=document.createElement('div'); b.id='lvl-badge'; hm.parentNode.appendChild(b); const x=document.createElement('div'); x.id='hp-mini-xp'; hm.appendChild(x); }
   b.style.display = hm.style.display==='none' || getComputedStyle(hm).display==='none' ? 'none' : 'flex'; b.textContent='Lv '+playerLevel();
   const x=document.getElementById('hp-mini-xp'); if(x) x.style.width=(playerLevel()>=LV_MAX?100:100*xpInto()/Math.max(1,xpNeed()))+'%'; }
+
+// ════════ PLAYTEST RECORDER: switch it on in the Menu, play, then download the file and hand it over ════════
+// It notes what happened, not what you pressed: fights and how each blow was met, deaths, places, quests, talk, the journal and map,
+// buying, selling and gear. It stays in this browser (its own storage, never the saves) until you download or clear it.
+const PT=(()=>{ const KEY='dunhollow.playtest', ON='dunhollow.ptOn', MAX=60000;
+  let on=false, data=null, ses=null, t0=0, dirty=false; try{ on=localStorage.getItem(ON)==='1'; }catch(e){}
+  const load=()=>{ if(data) return data; try{ data=JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){} if(!data||!Array.isArray(data.sessions)) data={sessions:[]}; return data; };
+  const save=()=>{ if(!dirty) return; dirty=false; try{ localStorage.setItem(KEY,JSON.stringify(data)); }catch(e){ try{ data.sessions.splice(0,1); localStorage.setItem(KEY,JSON.stringify(data)); }catch(e2){} } };
+  const now=()=>Math.round((performance.now()-t0)/100)/10;
+  function begin(){ if(!on || !running || ses) return; load(); t0=performance.now();
+    ses={ started:new Date().toISOString(), char:player.name, gender:player.opts&&player.opts.gender, race:player.opts&&player.opts.race, build:document.lastModified, events:[] }; data.sessions.push(ses); dirty=true;
+    ev('start',{area:areaId, lvl:typeof playerLevel==='function'?playerLevel():null, quests:typeof renownDone==='function'?renownDone():null, hp:player.hp+'/'+player.maxHp, coin:player.purse}); }
+  function ev(type,d){ if(!on) return; if(!ses){ begin(); if(!ses) return; }
+    ses.events.push({t:now(), g:Math.round(typeof gt==='number'?gt:0), a:typeof areaId!=='undefined'?areaId:null, e:type, ...(d||{})}); dirty=true;
+    let n=0; data.sessions.forEach(s=>n+=s.events.length); while(n>MAX && data.sessions.length>1){ n-=data.sessions[0].events.length; data.sessions.shift(); } }
+  function set(v){ on=!!v; try{ localStorage.setItem(ON,on?'1':'0'); }catch(e){} if(on){ ses=null; begin(); } else { ev('stop'); save(); ses=null; } ui(); }
+  function ui(){ const b=document.getElementById('pt-toggle'); if(b) b.textContent='Record playtest: '+(on?'On':'Off');
+    const r=document.getElementById('pt-row'); if(r) r.style.display=load().sessions.length?'flex':'none';
+    let d=document.getElementById('pt-dot'); if(!d){ d=document.createElement('div'); d.id='pt-dot'; d.textContent='● REC'; d.style.cssText='position:fixed;top:6px;right:10px;z-index:45;font:bold 10px Georgia,serif;letter-spacing:1px;color:#e06050;opacity:.75;pointer-events:none'; document.body.appendChild(d); }
+    d.style.display=on?'block':'none'; }
+  function download(){ save(); const D=load(); const blob=new Blob([JSON.stringify(D)],{type:'application/json'}), a=document.createElement('a');
+    a.href=URL.createObjectURL(blob); a.download='dunhollow-playtest-'+new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')+'.json'; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500); }
+  function clear(){ data={sessions:[]}; ses=null; dirty=true; save(); if(on) begin(); ui(); }
+  setInterval(()=>{ try{ save(); }catch(e){} },15000);
+  window.addEventListener('beforeunload',()=>{ try{ ev('leave'); save(); }catch(e){} });
+  document.addEventListener('visibilitychange',()=>{ try{ ev(document.hidden?'away':'back'); save(); }catch(e){} });
+  return { ev, set, ui, download, clear, get on(){ return on; }, begin };
+})();
+{ const b=document.getElementById('pt-toggle'); if(b) b.addEventListener('click',()=>PT.set(!PT.on));
+  const d=document.getElementById('pt-dl'); if(d) d.addEventListener('click',()=>PT.download());
+  const c=document.getElementById('pt-clear'); if(c) c.addEventListener('click',()=>{ if(confirm('Delete the recorded playtest?')) PT.clear(); });
+  PT.ui(); }
+// what it listens to
+{ const W=(name,before,after)=>{ const f=window[name]; if(typeof f!=='function') return; window[name]=function(...a){ let x; try{ if(PT.on && before) x=before(...a); }catch(e){} const r=f.apply(this,a); try{ if(PT.on && after) after(r,x,...a); }catch(e){} return r; }; };
+  let fight=null;
+  W('switchArea',null,()=>PT.ev('area',{lvl:playerLevel(), hp:player.hp+'/'+player.maxHp, night:+(nightAmt()>0.4)}));
+  W('startCombat',()=>{ const was=combat.active; if(!was) fight={hp0:player.hp, max:player.maxHp, foes:[], t:performance.now(), pending:true}; return was; },(r,was)=>{ if(was) return; if(combat.active){ fight.pending=false; PT.ev('fight',{lvl:playerLevel(), hp:fight.hp0+'/'+fight.max, foes:fight.foes.slice()}); } else fight=null; });
+  W('nextFoe',null,()=>{ const f=combat.foe; if(f && f.type!=='dummy'){ const nm=f.name+' Lv'+(typeof foeLevel==='function'?foeLevel(f):'?'); if(fight) fight.foes.push(nm); PT.ev('foe',{name:nm}); } });
+  W('victory',null,()=>{ if(!fight) return; PT.ev('won',{foes:fight.foes, lost:Math.round(100*(fight.hp0-player.hp)/Math.max(1,fight.max)), secs:Math.round((performance.now()-fight.t)/1000)}); fight=null; });
+  W('defeat',null,()=>{ PT.ev('died',{foes:fight?fight.foes:[], lvl:playerLevel(), coin:player.purse}); fight=null; });
+  // each blow: how you met it
+  W('impact',f=>{ const sideOk=duel.st==='parry' && duel.parryDir===f.swingDir, since=clock-duel.parryAt, win=windowFor(player), perf=perfectFor(player);
+      const how = duel.st==='parry' ? (duel.parryDir!==f.swingDir ? 'wrong side' : since<=perf ? 'perfect' : since<=win ? 'blocked' : 'early')
+                : (since<=win+0.6 ? 'early' : (duel.st==='attack'||duel.st==='atkRecover') ? 'mid-attack' : 'none');
+      return {how, hp:player.hp, foe:f.name, side:f.swingDir}; },
+    (r,x)=>{ if(x) PT.ev('blow',{how:x.how, dmg:Math.max(0,x.hp-player.hp), foe:x.foe}); });
+  W('doParry',()=>{ if(clock-(duel.lastImpact||-9)<0.25 && duel.st!=='parry') PT.ev('late',{}); });
+  W('openJournal',null,()=>PT.ev('journal'));
+  W('openBigMap',null,()=>PT.ev('map'));
+  W('openInventory',null,()=>PT.ev('pack'));
+  W('openBook',null,()=>PT.ev('book'));
+  W('eatItem',k=>player.inv[k],(r,id)=>{ if(r) PT.ev('eat',{item:id, hp:player.hp+'/'+player.maxHp, inFight:+!!combat.active}); });
+  W('logMsg',null,(r,x,t)=>{ const s=String(t||'').replace(/<[^>]+>/g,''); if(/^(Bought|Sold|You learned|Quest|Level|Renown|You have|You receive|Got )/i.test(s) || /level \d+|quest|learned/i.test(s)) PT.ev('log',{text:s.slice(0,160)}); });
+  // talk: who, what you picked, how long you read first
+  let shownAt=performance.now();
+  const tx=document.getElementById('dlg-text'); if(tx && typeof MutationObserver!=='undefined') new MutationObserver(()=>{ shownAt=performance.now(); }).observe(tx,{childList:true,subtree:true,characterData:true});
+  document.addEventListener('click',e=>{ try{ if(!PT.on) return; const b=e.target.closest && e.target.closest('#dlg-opts button'); if(!b) return;
+      PT.ev('say',{who:(document.getElementById('dlg-name')||{}).innerText||'', pick:b.innerText.slice(0,80), read:Math.round((performance.now()-shownAt)/100)/10}); }catch(err){} },true);
+  // the journal, your gear and where you stand, now and then
+  let lastJ=null, lastE='', lastPos='', still=0;
+  setInterval(()=>{ try{ if(!PT.on || !running) return; PT.begin();
+      const J={}; JOURNAL.forEach(([t,f])=>{ try{ const r=f(); J[t]=r?r[0]:null; }catch(e){} });
+      if(lastJ) for(const k in J) if(J[k]!==lastJ[k]) PT.ev('quest',{q:k, from:lastJ[k], to:J[k]}); lastJ=J;
+      const E=JSON.stringify(player.opts.equip); if(E!==lastE){ if(lastE) PT.ev('gear',{equip:player.opts.equip}); lastE=E; }
+      const pos=areaId+':'+player.i+','+player.j; still = (pos===lastPos && !combat.active && !(typeof dlgIsOpen==='function'&&dlgIsOpen())) ? still+5 : 0; lastPos=pos;
+      if(still===60) PT.ev('idle',{secs:60});
+      if(Math.random()<0.2) PT.ev('pos',{i:player.i, j:player.j, lvl:playerLevel(), hp:player.hp+'/'+player.maxHp, coin:player.purse});
+    }catch(e){} },5000); }
 </script>
 </body>
 </html>

@@ -89,7 +89,8 @@ function graph(){ if(G && gt-gAt<30) return G; G={}; gAt=gt;
     try{ E.mobs=(AREAS[a].mobs?AREAS[a].mobs():[]).filter(m=>m && m.type!=='dummy').length; }catch(e){} }
   return G; }
 const fightLvl=a=>2*tierOf(a);
-function safeFor(a,bold){ const g=graph()[a]; if(!g || !g.mobs) return true; return fightLvl(a)<=lvl()+2+(bold||0); }
+const AVOID={};
+function safeFor(a,bold){ if(AVOID[a] && AVOID[a]>gt) return false; const g=graph()[a]; if(!g || !g.mobs) return true; return fightLvl(a)<=lvl()+2+(bold||0); }
 const BAN={};                                      // doors that led nowhere lately (no way through): left alone for a day
 const banned=(a,b)=>BAN[a+'>'+b] && BAN[a+'>'+b]>gt;
 function route(from,to,bold){ const prev={[from]:null}, q=[from];
@@ -100,16 +101,17 @@ function route(from,to,bold){ const prev={[from]:null}, q=[from];
 let WHO=null;
 function whoIndex(){ if(WHO) return WHO; WHO={names:[], places:[]};
   for(const a of Object.keys(AREAS)){ let L=[]; try{ L=AREAS[a].npcs?AREAS[a].npcs():[]; }catch(e){} L.forEach(n=>{ if(n && n.name && n.id) WHO.names.push({name:n.name, id:n.id, area:a}); });
-    const lb=(AREAS[a].label||'').replace(/^The /,'').split(' · ')[0]; if(lb.length>=4) WHO.places.push({label:lb, area:a}); }
+    (AREAS[a].label||'').split(' · ').map(x=>x.replace(/^The /,'').trim()).forEach(lb=>{ if(lb.length>=4) WHO.places.push({label:lb, area:a}); }); }
+  const cnt={}; WHO.places.forEach(p=>cnt[p.label]=(cnt[p.label]||0)+1); WHO.places=WHO.places.filter(p=>cnt[p.label]<=2);
   try{ for(const k in ROUTINES){ const R=ROUTINES[k]; R.slots.forEach(sl=>WHO.names.push({name:R.name, id:R.ids[sl.area]||k, area:sl.area})); } }catch(e){}
   return WHO; }
-let HOT={areas:{}, ids:{}, at:-99, j:''};
+let HOT={areas:{}, ids:{}, at:-99, j:''}; const MISS={};
 function hot(){ const dark=typeof nightAmt==='function' && nightAmt()>0.4, jh=jHash()+(dark?'N':'D'); if(HOT.j===jh && gt-HOT.at<60) return HOT; HOT={areas:{}, ids:{}, at:gt, j:jh}; const W=whoIndex();
   JOURNAL.forEach(([t,f])=>{ let r=null; try{ r=f(); }catch(e){} if(!r || r[0]!=='active') return; const txt=String(r[1]||'');
     if((CFG.cls!=='necro' && /Vesna/.test(txt)) || (CFG.cls!=='mage' && /Orvell|Magister/.test(txt))) return;      // another school's lessons: not for me
-    const night=/after dark|at night|by night|under the moon|moonlight|moon-shadow/i.test(txt); if(night && !dark) return;   // that one waits for the dark
-    const w=night?3:1, add=(a,k)=>{ HOT.areas[a]=(HOT.areas[a]||0)+k*w; };
-    W.names.forEach(n=>{ const first=n.name.split(' ')[0]; if(txt.includes(n.name) || (first.length>=4 && new RegExp('\\b'+first+'\\b').test(txt))){ HOT.ids[n.id]=t; add(n.area,1); } });
+    const night=/after dark|at night|by night|midnight|under the moon|moonlight|moon-shadow|walk only at night/i.test(txt); if(night && !dark) return;   // that one waits for the dark
+    const w=night?3:1, add=(a,k)=>{ HOT.areas[a]=(HOT.areas[a]||0)+k*w; if(night) (HOT.dark=HOT.dark||{})[a]=1; if(/keep still|stand still|keep quiet|wait/i.test(txt)) (HOT.still=HOT.still||{})[a]=1; };
+    W.names.forEach(n=>{ const first=n.name.split(' ')[0]; if(txt.includes(n.name) || (first.length>=4 && new RegExp('\\b'+first+'\\b').test(txt))){ const m=MISS[n.id+'@'+n.area]; if(m && m===(dark?'night':'day') && gt-MISS[n.id+'@'+n.area+'t']<DAY_LEN*1.5) return; HOT.ids[n.id]=t; add(n.area,1); } });
     W.places.forEach(pl=>{ if(txt.includes(pl.label)) add(pl.area,2); });
     Object.keys(AREAS).forEach(a=>{ if(a.length>=4 && /^[a-z]+$/.test(a) && new RegExp('\\b'+a+'\\b','i').test(txt)) add(a,2); }); });
   return HOT; }
@@ -141,7 +143,7 @@ function equipBest(){ const u=upgrades(); if(!u.length) return false; const {k,i
 const healK=()=>{ let best=-1, bh=0; player.inv.forEach((id,k)=>{ const h=id&&ITEMS[id]&&!ITEMS[id].cure&&ITEMS[id].heal; if(h && (best<0||h>bh)){ best=k; bh=h; } }); return best; };
 const healCount=()=>player.inv.filter(id=>id&&ITEMS[id]&&ITEMS[id].heal&&!ITEMS[id].cure).length;
 function isJunk(id){ if(!id||!ITEMS[id]) return false; if(typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(id)) return false; const it=ITEMS[id];
-  if(it.heal||it.mana||it.cure) return false; if(id==='shovel'||id==='fishing_rod') return false;
+  if(it.heal||it.mana||it.cure) return false; if(id==='shovel'||id==='fishing_rod'||id==='bottled_wisp') return false;
   if(WEAR.includes(it.slot)){ if(it.slot==='weapon' && WEAPONS[id] && WEAPONS[id].magic && CASTER) return gscore(id)<gscore(player.opts.equip.weapon)-5; return gscore(id)<=gscore(player.opts.equip[it.slot]); }
   if(['torso','legs'].includes(it.slot)) return true;
   return !!(typeof SELL_MISC!=='undefined' && SELL_MISC.has(id)); }
@@ -152,7 +154,7 @@ let FT=null;                                     // what this fight looks like f
 function fightStart(){ FT={ start:gt, hp0:player.hp, max:player.maxHp, foes:mobs.filter(m=>m.hostile&&!m.dead).map(m=>m.name+' Lv'+foeLevel(m)), lv:lvl(), area:areaId, top:Math.max(0,...mobs.filter(m=>m.hostile&&!m.dead).map(m=>foeLevel(m))), lastSide:null, nextAtk:clock+0.6+rnd()*0.4, wu:null, prevState:null, potion:false, low:player.hp };
   const sk=FT.top-FT.lv; note('Fight: '+FT.foes.join(', ')+(sk>=3?'  ☠ (way above me)':''),'fight'); }
 function fightEnd(lost){ if(!FT) return; const r={area:FT.area, land:LAND(FT.area), foes:FT.foes, top:FT.top, lv:FT.lv, lost, hpPct:Math.round(100*(FT.hp0-Math.max(0,lost?0:FT.low))/Math.max(1,FT.max)), dur:Math.round(gt-FT.start)};
-  S.fights.push(r); if(lost){ S.deaths.push(r); note('Died: '+FT.foes.join(', ')+' (I was Lv '+FT.lv+')','death'); } else note('Won in '+r.dur+'s, lost '+r.hpPct+'% health','fight'); FT=null; }
+  S.fights.push(r); if(lost){ S.deaths.push(r); const recent=S.deaths.filter(x=>x.area===r.area && gt-(x.t||gt)<DAY_LEN).length; r.t=gt; if(recent>=2){ AVOID[r.area]=gt+DAY_LEN*2; note('Beaten here twice now. Leaving '+(AREAS[r.area].label||r.area)+' alone for a couple of days.','death'); } note('Died: '+FT.foes.join(', ')+' (I was Lv '+FT.lv+')','death'); } else note('Won in '+r.dur+'s, lost '+r.hpPct+'% health','fight'); FT=null; }
 function other(d){ const o=SIDES.filter(x=>x!==d); return o[Math.floor(rnd()*o.length)]; }
 function spellPick(f,sk){                       // which spell, as a casual caster would: by what it does, now and then by his guard
   const SP=spellsFor(), m=player.mana??100, cost=s=>spellCost(SP[s]||{});
@@ -209,6 +211,7 @@ function dialogStep(){
     else if(/buy/i.test(hint)){ const can=cells.filter(c=>!c.classList.contains('off'));
       const pick=can.find(c=>{ const id=c.querySelector('.shop-slot').dataset.item, it=ITEMS[id]; return it && WEAR.includes(it.slot) && itemFits(id,player.opts.gender) && gscore(id)>gscore(player.opts.equip[it.slot])+1.5; })
         || (healCount()<3 && player.purse>25 ? can.find(c=>{ const id=c.querySelector('.shop-slot').dataset.item; return ITEMS[id] && ITEMS[id].heal && !ITEMS[id].cure; }) : null)
+        || (!hasSpade() && (CHOICE.moundSeen || journal()['Buried Things']) && player.purse>=12 ? can.find(c=>c.querySelector('.shop-slot').dataset.item==='shovel') : null)
         || (CASTER && player.purse>40 && player.inv.filter(id=>id&&ITEMS[id]&&ITEMS[id].mana).length<2 ? can.find(c=>{ const id=c.querySelector('.shop-slot').dataset.item; return ITEMS[id] && ITEMS[id].mana; }) : null);
       if(pick && player.inv.includes(null)){ const id=pick.querySelector('.shop-slot').dataset.item; pick.click(); S.buys.push({id,t:gt,lvl:lvl()}); note('Buys '+ITEMS[id].name,'gear'); return; } } }
   if(name==='A Bed' && /How long do you sleep/.test(text)){ const want=(CHOICE.bruised || player.hp<player.maxHp*0.8); const b=btns.find(x=>want?/next morning/.test(x.innerText):/^Not now/.test(x.innerText))||btns[btns.length-1]; if(want) note('Sleeps until morning','move'); b.click(); return; }
@@ -234,16 +237,20 @@ function targets(){ const T=[]; const me=[player.i,player.j];
   OBJECTS.forEach(o=>{ const id=o.type+'@'+o.i+','+o.j;
     if(o.type==='pickup'){ if(!VISIT.tried.has(id)) T.push({k:id,i:o.i,j:o.j,w:-3,what:'pickup'}); return; }
     if(o.breakable){ if(!VISIT.tried.has(id)) T.push({k:id,i:o.i,j:o.j,w:-1,what:'break'}); return; }
-    if(typeof PUZ_TYPES!=='undefined' && PUZ_TYPES.has(o.type)){ const n=VISIT.puz[id]||0; if(n<3 && MEMO.obj[areaId+id]!==sig()+'p'+n) T.push({k:id,i:o.i,j:o.j,w:2,what:'puzzle',o}); return; }
+    if(USE_ALSO.has(o.type) || (typeof PUZ_TYPES!=='undefined' && PUZ_TYPES.has(o.type))){
+      if(CHOICE.coldWalk && /campfire|hearth|ashes/.test(o.type)) return;                 // Orvell's cold walk: no warming up
+      if(o.type==='dirtmound' && !hasSpade()) return; if(o.type==='gate' || o.type==='rune' && VISIT.tried.has(id)) return; const n=VISIT.puz[id]||0; if(n<3 && MEMO.obj[areaId+id]!==sig()+'p'+n) T.push({k:id,i:o.i,j:o.j,w:2,what:'puzzle',o}); return; }
     if(o.type==='bed'){ if(!o.owner && (CHOICE.bruised || player.hp<player.maxHp*0.45) && !VISIT.tried.has(id)) T.push({k:id,i:o.i,j:o.j,w:-6,what:'bed'}); return; }
     if(SKIP_OBJ.has(o.type) || o.inside) return; if(VISIT.tried.has(id) || MEMO.obj[areaId+id]===sig()) return;
     T.push({k:id,i:o.i+((o.fp?o.fp[0]:1)>1?1:0),j:o.j,w:4,what:'look',o}); });
   mobs.forEach((m,x)=>{ if(!m.hostile||m.dead||m.gone||m.type==='dummy') return; const d=foeLevel(m)-lvl(); if(d>=3 && !(d===3 && player.hp>=player.maxHp*0.95 && rnd()<0.02)) return;
     if(VISIT.tried.has('m'+x)) return; T.push({k:'m'+x, i:m.i, j:m.j, w:1, what:'fight', m}); });
   return T.filter(t=>!nearSkull(t.i,t.j,2)).map(t=>({...t, d:Math.hypot(t.i-me[0],t.j-me[1])+t.w})).sort((a,b)=>a.d-b.d); }
-let NOEAT=-1, GOAL=null, idleT=0, lastPos='', stillT=0;
+let STILL={}, NOEAT=-1, GOAL=null, idleT=0, lastPos='', stillT=0;
 function enterArea(){ const a=areaId; VISIT={area:a, tried:new Set(), puz:{}, t0:gt}; const A=S.areas[a]||(S.areas[a]={t:0,visits:0,land:LAND(a),tier:tierOf(a)}); A.visits++;
   const L=S.lands[LAND(a)]||(S.lands[LAND(a)]={t:0, firstT:gt, firstLvl:lvl(), fights:0}); MEMO.visit[a]={j:jHash(), hj:hot().j, d:day(), t:gt};
+  setTimeout(()=>{ try{ const H=hot(), dk=nightAmt()>0.4; for(const id in H.ids){ const w=whoIndex().names.find(x=>x.id===id && x.area===a); if(!w) continue;
+      if(!NPCS.some(n=>n.id===id)){ MISS[id+'@'+a]=dk?'night':'day'; MISS[id+'@'+a+'t']=gt; HOT.at=-99; note((w.name||id)+' is not here '+(dk?'tonight':'by day')+'. I will try '+(dk?'by day':'after dark')+'.','move'); } } }catch(e){} },1500);
   if(A.visits===1) note('Arrives in '+(AREAS[a].label||a)+(graph()[a]&&graph()[a].mobs?' (danger '+tierOf(a)+', foes Lv '+fightLvl(a)+')':''),'move'); }
 function finishTarget(t){ VISIT.tried.add(t.k); if(t.what==='talk'){ MEMO.talk[t.n.id]=sig(); MEMO.talk['h'+t.n.id]=sig()+gt.toFixed(0).slice(0,-2); } if(t.what==='look') MEMO.obj[areaId+t.k]=sig(); if(t.what==='puzzle'){ VISIT.puz[t.k]=(VISIT.puz[t.k]||0)+1; } }
 let BOLD=0, lastProgress=0, lastJH='';
@@ -275,7 +282,7 @@ function think(){
   if(BC){ if(BC.area!==areaId){ const r=route(areaId,BC.area,BOLD+1); if(r && r.length){ if(!(GOAL&&GOAL.dress)) note('My clothes are still in the chest by the water. Going back for them.','gear'); GOAL={area:BC.area, dress:true}; if(goToward(r[0])) return 0.5; } }
     else { const o=OBJECTS.find(x=>x.type==='bathchest'); if(o){ if(cheb([o.i,o.j],[player.i,player.j])<=1){ try{ puzAct(o); }catch(e){} } else clickTile(o.i,o.j); return 1; } } }
   else if(GOAL && GOAL.dress) GOAL=null;
-  const needRest=CHOICE.bruised || (player.hp<player.maxHp*0.45 && (healK()<0 || NOEAT===player.hp));
+  const needRest=!CHOICE.coldWalk && (CHOICE.bruised || (player.hp<player.maxHp*0.45 && (healK()<0 || NOEAT===player.hp)));
   if(needRest && !(GOAL&&GOAL.rest)){ let best=null; for(const a of Object.keys(AREAS)){ const g=graph()[a]; if(!g||!g.beds) continue; const r=a===areaId?[]:route(areaId,a,0); if(!r) continue; if(!best||r.length<best.r.length) best={a,r}; }
     if(best){ GOAL={area:best.a, rest:true}; note((CHOICE.bruised?'Bruised from that beating: off to sleep it off in ':'Hurt and nothing to eat: off to find a bed in ')+(AREAS[best.a].label||best.a),'move'); } }
   if(GOAL && GOAL.rest && !CHOICE.bruised && player.hp>=player.maxHp*0.9) GOAL=null;
@@ -286,8 +293,13 @@ function think(){
   { const Z=PUZZLE[areaId]; if(Z && !(Z.solved?Z.solved():PZ()[Z.f]) && !skulls().length){ if(T.length){ const t=T[0]; finishTarget(t); if(t.what==='puzzle' && cheb([t.i,t.j],[player.i,player.j])<=1){ try{ puzAct(t.o); }catch(e){} return 1; } clickTile(t.i,t.j); return 1; }
       const o=OBJECTS.filter(o=>PUZ_TYPES.has(o.type) && o.type!=='gate'); if(o.length){ const x=o[Math.floor(rnd()*o.length)]; if(cheb([x.i,x.j],[player.i,player.j])<=1){ try{ puzAct(x); }catch(e){} } else clickTile(x.i,x.j); } return 1.5; } }
   if(T.length && (!GOAL || GOAL.area===areaId)){ const t=T[0]; finishTarget(t);
-    if(t.what==='puzzle' && cheb([t.i,t.j],[player.i,player.j])<=1){ try{ puzAct(t.o); }catch(e){} return 0.8; }
+    if(t.what==='puzzle' && cheb([t.i,t.j],[player.i,player.j])<=1){ if(t.o.type==='dirtmound' && player.opts.equip.weapon!=='shovel'){ const k=player.inv.indexOf('shovel'); if(k>=0){ try{ moveItem({kind:'inv',key:k},{kind:'eq',key:'weapon'}); delete player.opts._ck; note('Takes the spade in hand to dig','gear'); }catch(e){} } }
+      try{ puzAct(t.o); }catch(e){} return 0.8+(dlgIsOpen()?0:4+rnd()*6); }     // used something: keep still a while and see
+    if(t.what==='puzzle'){ const best=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]].map(([a,b])=>[t.i+a,t.j+b]).filter(([a,b])=>walkable(a,b)).map(([a,b])=>findPath(player.i,player.j,a,b)).filter(Boolean).sort((x,y)=>x.length-y.length)[0];
+      if(best){ player.path=best; VISIT.tried.delete(t.k); VISIT.puz[t.k]=(VISIT.puz[t.k]||0); return 0.3; } }
     clickAvoiding(t.i,t.j); return 0.4; }
+  { const H=hot(), dark=nightAmt()>0.4; if(dark && H.dark && H.dark[areaId] && (STILL[areaId]||0)<6){ STILL[areaId]=(STILL[areaId]||0)+1; if(STILL[areaId]===1) note('Waiting here in the dark, keeping still, as the journal says.','move'); return 12+rnd()*8; }
+    if(!dark) for(const k in STILL) delete STILL[k]; }
   GOAL=null;
   const nx=planNext();
   if(!nx || nx.s<4){ idleT++; if(idleT>3){ idleT=0; if(BOLD<4){ BOLD++; note('Nothing new around for my level. Pushing on a little further.','move'); } else { dayClock+=DAY_LEN*0.25; } } }
@@ -301,10 +313,32 @@ const PUZZLE={ cave1:{f:'c1', name:'the weighing stones'}, cave3:{f:'c3', name:'
       if(!P.thorns && !CASTER && !axe) note('The thorns want fire or an axe, and I have neither. (A melee player has to go and buy an axe here.)','move');
       P.thorns=true; if(!(P.fill&&P.fill.length)&&!(P.ice&&P.ice.length)) P.fill=['4,4']; switchArea('cave2','fromCave1'); } } };
 const PZT={};
+const USE_ALSO=new Set(['dirtmound','bathchest','reedbank','mirror','moonaltar','moonsource','sandmound','mound']);
+const hasSpade=()=>[player.opts.equip.weapon,...player.inv].includes('shovel');
 function puzzleStep(dt){ const Z=PUZZLE[areaId]; if(!Z) return; const P=PZ(); const solved=Z.solved?Z.solved():!!P[Z.f]; if(solved){ if(PZT[areaId]&&!PZT[areaId].done){ PZT[areaId].done=true; S.puzzles=S.puzzles||[]; S.puzzles.push({area:areaId, name:Z.name, t:Math.round(PZT[areaId].t)}); note('Solved '+Z.name+' after '+Math.round(PZT[areaId].t/60)+' min','quest'); } return; }
   const T=PZT[areaId]||(PZT[areaId]={t:0, need:180+rnd()*240}); T.t+=dt;
   if(T.t>=T.need){ if(Z.solve) Z.solve(); else { P[Z.f]=true; const g0=OBJECTS.find(x=>x.type==='gate'); if(g0) OBJECTS.splice(OBJECTS.indexOf(g0),1); try{ pzRebuild(); }catch(e){} }
     G=null; for(const k in BAN) if(k.startsWith(areaId+'>')) delete BAN[k]; } }
+
+// ── the big fights that leave the duel: a person reads the banner and runs ──
+let SP={key:null, at:0};
+function stepTo(i,j){ if(player.i===i && player.j===j) return true; const pth=findPath(player.i,player.j,i,j); if(pth && pth.length){ player.path=pth; return true; } return false; }
+function setPiece(){
+  const ck=(typeof CK!=='undefined')?CK:null, sq=(typeof SQ!=='undefined')?SQ:null, X=ck||sq; if(!X || X.mode==='wait' || X.mode==='adds') return false;
+  const key=(ck?'ck':'sq')+X.mode+(X.src||'')+(X.tiles?X.tiles.length+X.tiles[0]:'')+(X.n||0);
+  if(key!==SP.key){ SP={key, at:gt+clamp(gauss(0.55,0.18),0.25,1.2)+(rnd()<0.12?0.8:0)}; }      // reading the banner, deciding
+  if(gt<SP.at) return true;
+  const me=[player.i,player.j], A=AREAS[areaId], tiles=[]; for(let i=0;i<A.w;i++) for(let j=0;j<A.h;j++) if(walkable(i,j)||(i===me[0]&&j===me[1])) tiles.push([i,j]);
+  const near=L=>L.map(t=>({t,d:Math.hypot(t[0]-me[0],t[1]-me[1])})).sort((a,b)=>a.d-b.d).map(x=>x.t);
+  if(ck && ck.mode==='storm' && ck.src){ if(ckSheltered(ck.src,player.x,player.y)) return true; const ok=near(tiles.filter(([i,j])=>ckSheltered(ck.src,i+0.5,j+0.5))); for(const t of ok.slice(0,6)) if(stepTo(t[0],t[1])) break; return true; }
+  if(ck && ck.mode==='rings'){ if(!ck.tiles) return true; const bad=new Set(ck.tiles); if(!bad.has(me[0]+','+me[1])) return true; const ok=near(tiles.filter(([i,j])=>!bad.has(i+','+j))); for(const t of ok.slice(0,4)) if(stepTo(t[0],t[1])) break; return true; }
+  if(sq && sq.mode==='ray'){ const cr=(PZ().sqCracked)||[], M=SQ_MIRRORS.filter((m,k)=>!cr.includes(k)); if(M.some(([a,b])=>cheb([a,b],me)<=1)) return true;
+    const ok=near(tiles.filter(([i,j])=>M.some(([a,b])=>cheb([a,b],[i,j])<=1))); for(const t of ok.slice(0,6)) if(stepTo(t[0],t[1])) break; return true; }
+  if(sq && sq.mode==='glass'){ const bad=new Set(sq.tiles||[]); if(bad.has(me[0]+','+me[1])){ const ok=near(tiles.filter(([i,j])=>!bad.has(i+','+j))); for(const t of ok.slice(0,4)) if(stepTo(t[0],t[1])) break; return true; }
+    const jars=OBJECTS.filter(o=>o.type==='canopic'); const j0=jars.sort((a,b)=>cheb([a.i,a.j],me)-cheb([b.i,b.j],me))[0]; if(!j0) return true;
+    if(cheb([j0.i,j0.j],me)<=1){ if(!player.path.length){ try{ puzAct(j0); }catch(e){} } return true; }
+    const ok=near(tiles.filter(([i,j])=>cheb([j0.i,j0.j],[i,j])===1 && !bad.has(i+','+j))); for(const t of ok.slice(0,4)) if(stepTo(t[0],t[1])) break; return true; }
+  return false; }
 
 // ── the step, every tick of the game ──
 let wait=0, prevArea=null, wasFight=false, readTeach=0, lastLvl=0, dlgOpenT=0, csT=0;
@@ -317,6 +351,7 @@ B.step=function(dt){
     if(lvl()!==lastLvl){ if(lastLvl) { S.levels.push({lvl:lvl(),t:gt,area:areaId}); note('Level '+lvl()+'!','level'); } lastLvl=lvl(); }
     watchJournal(); if(!combat.active) puzzleStep(dt);
     if(combat.active && combat.phase!=='down'){ wasFight=true; fightStep(); return; }
+    if(!combat.active && setPiece()) return;
     if(wasFight && !combat.active){ wasFight=false; fightEnd(combat.phase==='down' || combat.downT>0); }
     if(combat.phase==='down'){ if(FT) fightEnd(true); return; }
     if(TEACH_OPEN){ readTeach+=dt; if(readTeach>3.5){ readTeach=0; try{ showTeach.close(); }catch(e){} } return; }
@@ -329,7 +364,7 @@ B.step=function(dt){
     wait=think()+rnd()*0.3;
     // the end of the game: nothing has moved in the journal for a long while
     const jh=jHash(); if(jh!==lastJH){ lastJH=jh; lastProgress=gt; }
-    if(gt-lastProgress>DAY_LEN*6 && BOLD>=4){ B.finished=true; note('Nothing more I can find to do. Done.','level'); }
+    if(gt-lastProgress>DAY_LEN*12 && BOLD>=4){ B.finished=true; note('Nothing more I can find to do. Done.','level'); }
   }catch(e){ note('bot error: '+e.message); wait=1; }
 };
 // time runs as fast as you like, and the screen is drawn less often when it runs fast
@@ -340,7 +375,7 @@ update=function(dt){ const n=B.paused?1:B.speed; for(let k=0;k<n;k++){
 let dn=0; const _d=draw; draw=function(){ if(B.fast && (dn++%8)) return; _d(); };
 B.report=function(){ const J=journal(); return { cls:CFG.cls, lvl:lvl(), area:areaId, land:LAND(areaId), t:Math.round(gt), purse:player.purse, hp:player.hp+'/'+player.maxHp,
   done:Object.values(J).filter(v=>v==='done').length, total:Object.keys(J).length, active:Object.keys(J).filter(k=>J[k]==='active'), fights:S.fights.length, deaths:S.deaths.length,
-  equip:{...player.opts.equip}, finished:B.finished, bold:BOLD }; };
+  equip:{...player.opts.equip}, finished:B.finished, bold:BOLD, open:JOURNAL.map(([t,f])=>{ let r=null; try{ r=f(); }catch(e){} return r&&r[0]==='active'?t+': '+String(r[1]).replace(/<[^>]+>/g,'').slice(0,220):null; }).filter(Boolean) }; };
 note('A new '+({melee:'fighter',necro:'necromancer',mage:'mage'})[CFG.cls]+' sets out.','level');
 })();
 </script>

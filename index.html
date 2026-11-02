@@ -11577,6 +11577,8 @@ ITEM_ICON.saelle_note=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.l
   g2.fillStyle='#c0304a'; g2.beginPath(); g2.ellipse(17,23,3.2,1.6,0,0,Math.PI*2); g2.ellipse(23,23,3.2,1.6,0,0,Math.PI*2); g2.fill(); g2.fillStyle='#8a1a30'; g2.fillRect(14,22.8,12,0.7); g2.restore(); };
 Object.assign(TALKERS,{ bertha:berthaTalk, gunnar:gunnarTalk, tobbpub:tobbPubTalk, nimue:nimueTalk, mb1:mbLine, mb2:mbLine, mb3:mbLine, mb4:mbLine });
 TALKERS.gunnar=gunnarMam(TALKERS.gunnar);
+{ const inn=TALKERS.gunnar; TALKERS.gunnar=(...a)=>{ if(areaId!=='lane') return inn(...a);       // out in the field he has no time to sit
+    say('Gunnar the Ploughman',[nightAmt()>0.4?"“Still out here? So am I. The field doesn't know what time it is.”":"“Ho! Mind the furrows.” <i>He leans on the fork and wipes his face.</i>","“Come by the Wheatsheaf when the light goes. I'll be on the bench by the fire, and I'll have my arm back.”"],[bye]); }; }
 
 
 // ════════ Port Fearn Arianhod: the Gold Brothers' home port, across the water ════════
@@ -15103,9 +15105,11 @@ const ROUTINES={
   elder:{ name:'Elder Hamond', ids:{village:'elder', elderhouse:'elder'}, sleepId:'sleep_elder', opts:{gender:'m',skin:1,hair:4,hairColor:13,beard:5,equip:{head:null,torso:'tunic_blue',armor:'jerkin',hands:null,legs:'breeches',feet:'riding_boots',weapon:null,offhand:null}}, slots:[
     { h:[6.5,21.5], area:'village', at:[8,5], dir:7 },                                                    // about the village all day
     { h:[21.5,30.5], area:'elderhouse', at:[2,0], bed:[0,0] } ] },                                        // home, and to bed
-  gunnar:{ name:'Gunnar the Ploughman', ids:{wheatsheaf:'gunnar'}, opts:{gender:'m',skin:2,hair:1,hairColor:3,beard:4,face:1,equip:{head:null,torso:'shirt',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}}, slots:[
-    { h:[12,13.5], area:'wheatsheaf', at:[3,1], dir:1 },
-    { h:[17,25],   area:'wheatsheaf', at:[3,1], dir:1 } ] },                                              // the plough by day, the bench by night
+  gunnar:{ name:'Gunnar the Ploughman', ids:{wheatsheaf:'gunnar', lane:'gunnar'}, opts:{gender:'m',skin:2,hair:1,hairColor:3,beard:4,face:1,equip:{head:null,torso:'shirt',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}}, slots:[
+    { h:[6.5,12],  area:'lane', at:[5,15], dir:3, chop:true, equip:{weapon:'pitchfork'} },               // out at first light to the field on the lane
+    { h:[12,13.5], area:'wheatsheaf', at:[3,1], dir:1 },                                                   // his dinner at the inn
+    { h:[13.5,17], area:'lane', at:[6,15], dir:3, chop:true, equip:{weapon:'pitchfork'} },                // back to the furrows
+    { h:[17,30.5], area:'wheatsheaf', at:[3,1], dir:1 } ] },                                              // the plough by day, the bench by night (and the room upstairs)
 };
 const RT_IDS=new Set(); Object.values(ROUTINES).forEach(R=>Object.values(R.ids).forEach(i=>RT_IDS.add(i)));
 const inSlot=(s,h)=>{ const [a,b]=s.h; return (h>=a && h<b) || (b>24 && h+24>=a && h+24<b); };
@@ -15123,7 +15127,7 @@ function rtLieDown(n,s){ const R=ROUTINES[n.route], bed={i:s.bed[0],j:s.bed[1]};
 function rtGetUp(n,area){ if(!n.sleepBed) return; const R=ROUTINES[n.route], b=n.sleepBed; n.sleepBed=null; n.id=R.ids[area]||n.route; n.i=b.i+2; n.j=b.j; n.x=n.i+0.5; n.y=n.j+0.5; n.opts={...R.opts}; delete n.opts._ck; }
 const rtWrap=a=>wrap(a,'npcs',l=>{ const out=l.filter(n=>!RT_IDS.has(n.id)); const h=HOUR();
   for(const k in ROUTINES){ const s=slotOf(ROUTINES[k],h); if(s && s.area===a) out.push(rtNPC(k,s,true)); } return out; });
-['graveyard','village','wheatsheaf','elderhouse'].forEach(rtWrap);                       // (Marta's hut joins once it is built, below)
+['graveyard','village','wheatsheaf','elderhouse','lane'].forEach(rtWrap);                       // (Marta's hut joins once it is built, below)
 // a doorway out of this room toward another place
 function exitToward(dest){ const t=OBJECTS.find(o=>o.type==='teleporter' && o.to===dest); if(t) return [t.i,t.j];
   const hs=OBJECTS.find(o=>o.inside===dest && o.fp); if(hs) return doorTile(hs);

@@ -5355,9 +5355,9 @@ function drawTileMarker(i,j,fill,stroke){
 const FARM_LOOT = ['apple','bread','apple','dagger','boots','jerkin','pitchfork','smock','hatchet','club','hose_grey'];
 function collectPickup(o){ const had=hasItem(o.item);
   if(o.guarded && areaId===BK_AREA && ckKing()){ say('A Spade',["A spade leans against the throne, its blade still bright. The Barrow-King stands between you and it."],[{label:'Not yet.', fn:closeDialog}]); return; }
-  if(o.bogmound && !hasSpade()){ CHOICE.moundSeen=true;                 // the fen caches are buried: like any mound, they need a spade in your hands
+  if(o.bogmound && !ownsSpade()){ CHOICE.moundSeen=true;                // the fen caches are buried: like any mound, they need a spade
     say('A Mound of Mud',["The mud here has been heaped up and patted down, and the reeds will not grow on it. Something is buried under there.",
-      ownsSpade() ? "<i>You have a spade. Take it in your hands first.</i>" : "<i>You need a spade to dig this up. Maybe find one.</i>"],[{label:'Leave it.', fn:closeDialog}]); return; }
+      "<i>You need a spade to dig this up. Maybe find one.</i>"],[{label:'Leave it.', fn:closeDialog}]); return; }
   if(QUEST_ITEMS.has(o.item) && player.inv.indexOf(null)<0){ for(let k=player.inv.length-1;k>=0;k--){ const it=player.inv[k]; if(it && !QUEST_ITEMS.has(it)){ logMsg('No room: you leave the '+ITEMS[it].name+' behind.','#e0b070'); player.inv[k]=null; break; } } }   // story things always fit
   const idx=OBJECTS.indexOf(o); if(idx<0) return;
   OBJECTS.splice(idx,1); blocked.delete(o.i+','+o.j);
@@ -16786,9 +16786,9 @@ MOUNDS.forEach(m=>wrap(m[0],'objects',l=>[...l, (CHOICE.dug||{})[moundKey(m)] ? 
 PUZ_TYPES.add('dirtmound');
 const sandy=()=>{ const A=AREAS[areaId]||{}; return A.theme==='sand' || !!A.temple; };
 function digMound(o){                               // a mound of earth: needs a spade in your hands
-    if(!hasSpade()){ CHOICE.moundSeen=true;
+    if(!ownsSpade()){ CHOICE.moundSeen=true;
       say(sandy()?'A Mound of Sand':'A Mound of Earth',[sandy()?"The sand is heaped up here, too neat for the wind, with a flat stone set on top so it would not blow away. Something is buried under there.":"Someone has heaped the earth up here and stamped it flat, a while ago. Grass is only just coming through it. Something is buried under there.",
-        ownsSpade() ? "<i>You have a spade. Take it in your hands first.</i>" : "<i>You need a spade to dig this up. Maybe find one.</i>"],[{label:'Leave it.', fn:closeDialog}]); return; }
+        "<i>You need a spade to dig this up. Maybe find one.</i>"],[{label:'Leave it.', fn:closeDialog}]); return; }
     const m=o.mound, R=m[3]; closeDialog(); player.dir=dirTo(tileOf(player),[o.i,o.j]); player.lunge={dx:0,dy:0,t:0};
     (CHOICE.dug=CHOICE.dug||{})[moundKey(m)]=true;
     const idx=OBJECTS.indexOf(o); if(idx>=0){ OBJECTS.splice(idx,1,{type:'dugpit', i:o.i, j:o.j, noblock:true}); blocked.delete(o.i+','+o.j); }
@@ -16828,7 +16828,14 @@ wrap('barrow','objects',l=> (collectedPickups.has('barrow:9,1')||collectedPickup
     return oldDg(); }; }
 // Vesna knows where one lies
 const barrowKnown=()=> NECRO()>=2 || CHOICE.morwen==='done' || !!CHOICE.barrow;
+setInterval(()=>{ try{ if(running && !CHOICE.hadSpade && ownsSpade()) CHOICE.hadSpade=true; }catch(e){} },2000);   // you have held the king's spade once
 { const oldV=TALKERS.vesna; TALKERS.vesna=(...a)=>{
+    if(CHOICE.hadSpade && !ownsSpade()){ say('Vesna the Grave-Speaker',["“You came without the spade.”"],[
+        {label:'“I lost it. Or sold it.”', fn:()=>say('Vesna the Grave-Speaker',["“It came back here. Tools that have been in a barrow always find their way to a graveyard.”","“Eight copper, for the trouble of fetching it out of the yew roots.”"],[
+          {label:'Pay 8 copper.', off:player.purse<8, note:'-8c', fn:()=>{ const f=player.inv.indexOf(null); if(f<0){ say('Vesna the Grave-Speaker',"“Your pack is full. Make room.”",[bye]); return; }
+            player.purse-=8; player.inv[f]='shovel'; updateHud(); logMsg('You have the king\'s spade again.','#e8c060'); say('Vesna the Grave-Speaker',"“Try to keep it this time.” <i>She hands it over, earth still on the blade.</i>",[bye]); }},
+          {label:'Not now.', fn:closeDialog}])},
+        {label:'Something else.', fn:()=>oldV(...a)}, bye]); return; }
     if(CHOICE.spadeQ==='tobb' && !ownsSpade()){ say('Vesna the Grave-Speaker',["“A spade. Tobb sent you. Tobb thinks I dig up the dead.”"],[
         {label:'“Do you know where I could find one?”', fn:()=>{
           if(barrowKnown()){ remember('spadeQ','vesna',"Vesna says the spade that dug the Barrow-King's barrow lies in his hall, under the reeds of the Sunken Hollow.");
@@ -16837,7 +16844,7 @@ const barrowKnown=()=> NECRO()>=2 || CHOICE.morwen==='done' || !!CHOICE.barrow;
         {label:'Something else.', fn:()=>oldV(...a)}, bye]); return; }
     return oldV(...a); }; }
 JOURNAL.push(['Buried Things', ()=> !CHOICE.moundSeen && !ownsSpade() ? null : Object.keys(CHOICE.dug||{}).length>=MOUNDS.length ? ['done',"You dug up every buried thing, from the valley to the sand."] :
-  ownsSpade() ? ['active',"You have a spade. Hold it and dig up the mounds of stamped earth hidden around the valley, behind trees and in quiet corners, and the heaps of sand in the south with a flat stone on top. ("+Object.keys(CHOICE.dug||{}).length+"/"+MOUNDS.length+")"] :
+  ownsSpade() ? ['active',"You have a spade. Dig up the mounds of stamped earth hidden around the valley, behind trees and in quiet corners, and the heaps of sand in the south with a flat stone on top. ("+Object.keys(CHOICE.dug||{}).length+"/"+MOUNDS.length+")"] :
   CHOICE.spadeQ==='vesna' ? ['active',"Vesna says the spade that dug the Barrow-King's barrow lies in his hall, under the reeds of the Sunken Hollow."] :
   CHOICE.spadeQ==='tobb' ? ['active',"Old Tobb will not lend you his spade. He says Vesna, who talks to the dead, might know where one lies."] :
   ['active',"Somebody buried something under a mound of earth. You need a spade to dig it up. Maybe Old Tobb, the gravedigger, can help."]]);

@@ -11514,7 +11514,7 @@ function ithilFirst(I,N){
     {label:'Kiss her.', fn:()=>{ remember('ithil','lover','Ithilwen of the moon pool kept you company until the moon went down.'); NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='moon_nel')); romStart(N(),'moon');
       const n=N(); if(n) gesture(n,'laugh');
       say(I,["“You taste of road-dust. Come here.”"],[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.3); ROM.tint='hearth'; ROM.blackT=0;
-        say(I,["“Morning. You were asleep on my cloak. Hold out your wrist. Keep this ribbon, so the moon knows you are mine when you come back.”"],[{label:'Keep the ribbon.', fn:()=>{ romEnd(); giveQuestItem('moon_ribbon',true); wearSpecial('moon_ribbon'); logMsg('You receive Ithilwen\'s silver ribbon. She tied it round your wrist (the Special slot).','#dfe6ee'); closeDialog(); }}]); }); }}]); }},
+        say(I,["“Morning. You were asleep on my cloak. Hold out your wrist. Keep this ribbon, so the moon knows you are mine when you come back.”"],[{label:'Keep the ribbon.', fn:()=>{ romEnd(); tieOn('moon_ribbon'); logMsg('You receive Ithilwen\'s silver ribbon. She tied it round your wrist (the Special slot).','#dfe6ee'); closeDialog(); }}]); }); }}]); }},
     {label:'“I should go.”', fn:()=>{ const n=N(); if(n) gesture(n,'shrug'); say(I,"“Then go. The moon is patient. I am a little less so.”",[bye]); }}]); }
 function gunnarScene(){ const G='Gunnar the Ploughman', N=()=>NPCS.find(n=>n.id==='gunnar');
   if(CHOICE.gunnarNight && !CHOICE.gunnar2 && !harvestEve()){ const k=daysUntil(HARVEST_EVE), n0=N(); if(n0) gesture(n0,'shrug');
@@ -11540,7 +11540,7 @@ function gunnarMam(prev){ return ()=>{ const G='Gunnar the Ploughman', day=Math.
         const mam={ id:'gunnar_mam', name:"Gunnar's Mam", i:3, j:4, x:3.5, y:5.2, dir:6, opts:{gender:'f',skin:2,hair:4,hairColor:12,face:0,equip:{head:'hood',torso:'smock',armor:null,hands:'gloves',legs:'trousers',feet:'boots',weapon:null,offhand:null}} };
         NPCS.push(mam); const end=()=>{ goOff(mam,3,5,{speed:1.2});
           say(G,["“She pinched you. That's good. She only pinches people she means to feed.”","“I made you this. Horseshoe nail, bent round in the hearth. It doesn't quite close. That's so it can grow.” <i>You receive Gunnar's Horseshoe Ring (Special slot: +1 Attack Power).</i>"],[bye]);
-          giveQuestItem('gunnar_ring',true); wearSpecial('gunnar_ring'); };
+          tieOn('gunnar_ring'); };
         if(!cutscene([csFocus(mam,0.3), csGlide(mam,player.x+0.7,player.y+0.4,1.1), csLook(mam,player), csWait(0.4), csBark(mam,'Too thin.',1.4), csDo(()=>gesture(mam,'nod')),
             csWait(0.5), csDo(()=>{ player.flash=0.25; floatText(tileOf(player),'Pinch!','#ffcf9a'); }), csWait(0.4), csBark(mam,'Feed them, Gunnar.',1.6), csDo(()=>{ if(n) gesture(n,'laugh'); }), csWait(1.0), csFocus(player,0.2)], end)) end(); }},
       {label:'“Another day, Gunnar.”', fn:()=>{ gesture(n,'nod'); say(G,"“Right. I'll tell her you've a cold. She'll send soup.”",[bye]); }}]); }; }
@@ -11570,6 +11570,12 @@ function saelleScene(){ const S='Saelle';
     {label:'Smile, and stay where you are.', fn:()=>{ const n=NPCS.find(x=>x.id==='saelle'||x.id==='bathsaelle'); if(n) gesture(n,'shrug'); say(S,"“Your loss, sweet.”",[bye]); }}]); }
 Object.assign(ITEMS,{ moon_ribbon:{ name:"Ithilwen's Silver Ribbon", slot:'special', title:"A strand of elven ribbon that holds a little moonlight even in daylight. Worn round the wrist, where she tied it." },
   saelle_note:{ name:'A Rosewater Note', slot:'misc', title:"Folded twice, sealed with nothing but a lip-print. It still smells of rosewater and the bathhouse." } });
+// a keepsake tied on by someone's own hand goes straight onto you, full pack or not; whatever you wore there goes into the pack (or waits for room)
+const TIED_ON=new Set(['moon_ribbon','gunnar_ring','tess_ring','saelle_cord']);
+function tieOn(id){ const E=player.opts&&player.opts.equip; if(!E) return giveQuestItem(id,true);
+  const k=player.inv.indexOf(id); if(k>=0) player.inv[k]=null; CHOICE.pendingQ=(CHOICE.pendingQ||[]).filter(x=>x!==id);
+  const old=E.special; E.special=id; if(old && old!==id){ const f=player.inv.indexOf(null); if(f>=0) player.inv[f]=old; else CHOICE.pendingQ=[...(CHOICE.pendingQ||[]),old]; }
+  delete player.opts._ck; try{ refreshPlayerHp(false); }catch(e){} updateHud(); return true; }
 function wearSpecial(id){ const E=player.opts&&player.opts.equip, k=player.inv.indexOf(id); if(!E || E.special || k<0) return; player.inv[k]=null; E.special=id; delete player.opts._ck; try{ refreshPlayerHp(false); }catch(e){} updateHud(); }
 { const prevApply=applySave; applySave=function(...a){ const r=prevApply.apply(this,a); try{ if(player.opts && player.opts.equip && !player.opts.equip.special && player.inv.includes('moon_ribbon')){ wearSpecial('moon_ribbon'); } }catch(e){} return r; }; }
 ITEM_ICON.moon_ribbon=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.lineCap='round'; g2.strokeStyle='rgba(220,230,255,0.35)'; g2.lineWidth=6; const P=()=>{ g2.beginPath(); g2.moveTo(7,30); g2.bezierCurveTo(14,8,22,34,27,16); g2.bezierCurveTo(30,8,35,14,32,22); }; P(); g2.stroke(); g2.strokeStyle='#dfe6f2'; g2.lineWidth=2.6; P(); g2.stroke(); g2.strokeStyle='#8a96b0'; g2.lineWidth=0.8; P(); g2.stroke(); g2.fillStyle='#f4f8ff'; [[12,20],[25,24],[31,12]].forEach(([x,y])=>{ g2.beginPath(); g2.arc(x,y,1,0,Math.PI*2); g2.fill(); }); g2.restore(); };
@@ -14139,6 +14145,11 @@ let FIGHT_UNDO=null;                      // a scripted fight lost is a fight yo
 const QUEST_ITEMS=new Set(['edric_knife','fourage','moonsilver','moonthread','silver_setting','leaf','letter','seal','ledger','journal','trapnote','orrinletters','charter','cartwheel','brooch','strongbox','package','moonbloom','greencrystal']);
 function giveQuestItem(id,keep){                 // story papers always fit: something ordinary is left behind to make room
   const f=player.inv.indexOf(null);
+  if(f<0 && (keep || (typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(id)))){   // a full pack: the story item takes the place of the cheapest ordinary thing, which waits until you have room
+    const qi=x=>(typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(x)) || (typeof TIED_ON!=='undefined' && TIED_ON.has(x)) || x==='shovel';
+    let k=-1, low=1e9; player.inv.forEach((x,i)=>{ if(!x || qi(x) || !ITEMS[x]) return; const v=(PRICES[x]||0)+(ITEMS[x].slot==='misc'?0:5); if(v<low){ low=v; k=i; } });
+    if(k>=0){ const out=player.inv[k]; player.inv[k]=id; CHOICE.pendingQ=[...(CHOICE.pendingQ||[]),out]; updateHud();
+      logMsg('Your pack is full: you set the '+ITEMS[out].name+' aside to make room. You will pick it up again once there is space.','#c8a860'); return true; } }
   if(f<0){ logMsg('Inventory is full.','#e0b070'); if(typeof floatText==='function') floatText([player.i,player.j],'Inventory is full','#e0b070');
     if(keep){ CHOICE.pendingQ=[...(CHOICE.pendingQ||[]).filter(x=>x!==id),id]; logMsg('You will have to come back for the '+ITEMS[id].name+' once you have room.','#c8a860'); }
     return false; } player.inv[f]=id; updateHud(); return true; }
@@ -14321,7 +14332,9 @@ function cookAt(who,back){ const n=player.inv.filter(x=>x==='raw_meat').length; 
 { const oldB=TALKERS.bertha; TALKERS.bertha=()=>{ say('Bertha of the Wheatsheaf',["“What'll it be?”"],[{label:'Buy bread for the road.', fn:()=>shopFrom('Bertha of the Wheatsheaf',['bread','apple'],1,"“Baked this morning. Or yesterday.”",TALKERS.bertha)},{label:'Talk.', fn:oldB},bye]); }; }
 { const oldP=TALKERS.priest; TALKERS.priest=()=>{ say('Mother Hild',["“Bless you, child. Is it the draughts you want?”"],[{label:'Buy healing draughts.', fn:()=>shopFrom('Mother Hild',['potion','mana_potion','rue_water','linen_wrap'],1,"“Thistle, honey and a prayer. Drink it when it hurts, not before.”",TALKERS.priest)},{label:'Talk.', fn:oldP},bye]); }; }
 // story items left behind for lack of room come to hand as soon as there is space
-setInterval(()=>{ try{ if(!running||!CHOICE.pendingQ||!CHOICE.pendingQ.length) return; const f=player.inv.indexOf(null); if(f<0) return;
+setInterval(()=>{ try{ if(!running||!CHOICE.pendingQ||!CHOICE.pendingQ.length) return;
+  { const E=player.opts&&player.opts.equip, t=CHOICE.pendingQ.find(x=>TIED_ON.has(x)); if(E && t && !E.special){ tieOn(t); logMsg('You tie the '+ITEMS[t].name+' on, where it belongs.','#dfe6ee'); return; } }
+  const f=player.inv.indexOf(null); if(f<0) return;
   const id=CHOICE.pendingQ.shift(); player.inv[f]=id; logMsg('You go back for the '+ITEMS[id].name+' and take it.','#e8c060'); updateHud(); if(ITEMS[id].read) setTimeout(()=>openNote(id),400); }catch(e){} },1500);
 // items that left the game: old saves get their nearest kin instead
 { const GONE={ necro_hood:null, trews_black:'hose_grey', elf_leggings_dark:'elf_leggings', fur_boots:'boots', hood_green:'hood', helm_black:'coif', robe_green:'robe', elf_boots_brown:'elf_boots', elegy:null }; const oldA=applySave;
@@ -18400,7 +18413,7 @@ function tessRomance(T,n){ if(!CHOICE.tessLesson) return false; const day=Math.f
       {label:'“Another night.”', fn:()=>say(T,"“The book will keep. So will I.”",[bye])}]); return true; }
   if(CHOICE.tess==='read' && day>(CHOICE.tessDay||0)){ say(T,["“I finished the book. Without you. It was worse.”","“Stay tonight. Not for the book.”"],[
       {label:'Stay.', fn:()=>{ remember('tess','lover','Tessaly asked you to stay, and not for the book.'); CHOICE.tessLoverDay=day; romStart(n,'hearth');
-        say(T,"“Blow out the candle. No, not like that. Whisper it.”",[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.3); romEnd(); giveQuestItem('tess_ring',true); if(typeof wearSpecial==='function') wearSpecial('tess_ring');
+        say(T,"“Blow out the candle. No, not like that. Whisper it.”",[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.3); romEnd(); tieOn('tess_ring');
           say(T,"“I carved it from the offcut of his old staff. Don't tell him that either.” <i>You receive Tessaly's Starwood Ring (Special slot: +1 Spell Power).</i>",[bye]); }); }}]); }},
       {label:'“Not yet.”', fn:()=>say(T,"“Then come back when it is yet.”",[bye])}]); return true; }
   if(CHOICE.tess==='lover' && !CHOICE.tess3 && day>(CHOICE.tessLoverDay||0)){ say(T,["“Come here. Look. In the elves' book there is a star with no name. Faint, low, just over the hills in autumn.”","“The book says whoever finds a nameless star may name it. So I did.”"],[
@@ -18863,7 +18876,7 @@ TALKERS.saelle_l=()=>{ const S='Saelle', robbed=CHOICE.saelle==='robbed';
   if(CHOICE.saelle3 && !CHOICE.saelle4 && Math.floor(dayClock/DAY_LEN)>(CHOICE.saelle3Day||0)){
     say(S,["“Every thief in the Lowstreets has a roof. A place nobody else knows about, where you go when it all gets too loud.”","“I have never shown anyone mine. Come up. Mind the third slate, it's loose.”"],[
       {label:'Climb up after her.', fn:()=>{ remember('saelle4','roof','Saelle showed you her roof above the Lowstreets, and tied a thieves\' knot round your wrist.'); const n=NPCS.find(x=>x.id==='saelle_l'); romStart(n,'moon');
-        say(S,["“There. The whole of Hollowmere, and none of it can see us. That dark gap by the water is the spring ship's berth.”",{yes:"“Empty now. Not for long.”",stay:"“I used to count the days to it. I've stopped.”",spring:"“I still count the days to it. Different reasons.”"}[CHOICE.saelle3]||"“Empty now.”"],[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.25); ROM.blackT=0; giveQuestItem('saelle_cord',true); wearSpecial('saelle_cord'); if(n) n.gest={k:'shrug', t0:performance.now()};
+        say(S,["“There. The whole of Hollowmere, and none of it can see us. That dark gap by the water is the spring ship's berth.”",{yes:"“Empty now. Not for long.”",stay:"“I used to count the days to it. I've stopped.”",spring:"“I still count the days to it. Different reasons.”"}[CHOICE.saelle3]||"“Empty now.”"],[{label:'…', fn:()=>{ closeDialog(); romBlack(()=>{ nightPasses(0.25); ROM.blackT=0; tieOn('saelle_cord'); if(n) n.gest={k:'shrug', t0:performance.now()};
           say(S,["“Give me your wrist. Thieves' knot. It means someone is waiting for you to come home.”","“Don't untie it. It's bad luck. Also I can't tie it again, I made that one up.” <i>You receive Saelle's Knotted Cord (Special slot: +1 Agility).</i>"],[{label:'…', fn:()=>{ romEnd(); closeDialog(); }}]); }); }}]); }},
       {label:'“Not tonight.”', fn:()=>say(S,"“Suit yourself. The roof isn't going anywhere. Neither am I.”",[bye])}]); return; }
   if(CHOICE.saelle2==='helped'){ say(S,[CHOICE.saelleNight?"“Back again? Good. The kettle's on, and the door still locks.”":"“My rooms are just up there. The door locks. I find that I'm in no hurry to be alone.”"],[

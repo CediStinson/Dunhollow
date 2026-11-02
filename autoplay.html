@@ -153,8 +153,8 @@ function isJunk(id){ if(!id||!ITEMS[id]) return false; if(typeof QUEST_ITEMS!=='
 // ── a casual fighter ──
 const SIDES=['left','up','right'];
 let FT=null;                                     // what this fight looks like from the inside
-function fightStart(){ FT={ start:gt, hp0:player.hp, max:player.maxHp, foes:mobs.filter(m=>m.hostile&&!m.dead).map(m=>m.name+' Lv'+foeLevel(m)), lv:lvl(), area:areaId, top:Math.max(0,...mobs.filter(m=>m.hostile&&!m.dead).map(m=>foeLevel(m))), lastSide:null, nextAtk:clock+0.6+rnd()*0.4, wu:null, prevState:null, potion:false, low:player.hp };
-  const sk=FT.top-FT.lv; note('Fight: '+FT.foes.join(', ')+(sk>=3?'  ☠ (way above me)':''),'fight'); }
+function fightStart(){ const f0=combat.foe; FT={ start:gt, hp0:player.hp, max:player.maxHp, foes:f0?[f0.name+' Lv'+foeLevel(f0)]:[], lv:lvl(), area:areaId, top:f0?foeLevel(f0):0, lastSide:null, nextAtk:clock+0.6+rnd()*0.4, wu:null, prevState:null, potion:false, low:player.hp };
+  if(f0) note('Fight: '+FT.foes[0]+(FT.top-FT.lv>=3?'  ☠ (way above me)':''),'fight'); }
 function fightEnd(lost){ if(!FT) return; const r={area:FT.area, land:LAND(FT.area), foes:FT.foes, top:FT.top, lv:FT.lv, lost, hpPct:Math.round(100*(FT.hp0-Math.max(0,lost?0:FT.low))/Math.max(1,FT.max)), dur:Math.round(gt-FT.start)};
   S.fights.push(r); if(lost){ S.deaths.push(r); const recent=S.deaths.filter(x=>x.area===r.area && gt-(x.t||gt)<DAY_LEN).length; r.t=gt; if(recent>=2){ AVOID[r.area]=gt+DAY_LEN*2; note('Beaten here twice now. Leaving '+(AREAS[r.area].label||r.area)+' alone for a couple of days.','death'); } note('Died: '+FT.foes.join(', ')+' (I was Lv '+FT.lv+')','death'); } else note('Won in '+r.dur+'s, lost '+r.hpPct+'% health','fight'); FT=null; }
 function other(d){ const o=SIDES.filter(x=>x!==d); return o[Math.floor(rnd()*o.length)]; }
@@ -168,6 +168,7 @@ function spellPick(f,sk){                       // which spell, as a casual cast
   return want; }
 function fightStep(){
   const f=combat.foe; if(!FT) fightStart(); FT.low=Math.min(FT.low,player.hp);
+  if(f && !f.dead){ const nm=f.name+' Lv'+foeLevel(f); if(!FT.foes.includes(nm)){ FT.foes.push(nm); FT.top=Math.max(FT.top,foeLevel(f)); note(FT.foes.length>1?'  …then '+nm+' steps up':'Fight: '+nm+(foeLevel(f)-FT.lv>=3?'  ☠ (way above me)':''),'fight'); } }      // only the ones who actually fight you
   if(!f || combat.phase!=='fight' || f.dead) return;
   const sk=skill(), win=windowFor(player);
   // a drink when it gets bad (if you remember you have one)

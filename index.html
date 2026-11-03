@@ -675,7 +675,7 @@ const PROP = {
 const CLOTH = { shirt:'#a5906a', pants:'#6b4f33', boot:'#43301c' };
 // Women start in a ragged madder-dyed top and a short torn skirt with a rope belt.
 const HZ_KIND={};
-const ELFC = { hz:'#4e5a34', hzd:'#2e2a20', hzt:'#b89a54', hzs:'#6a3a2a', robe:'#dde3e8', trim:'#cdb46e', tunic:'#56704e', leg:'#b3a283', boot:'#b3a283', cloak:'#6c7866', lining:'#48523f', scale:'#cbb47c', silver:'#dfe6ee', gem:'#9fdcf2', leaf:'#6f9a58' };
+const ELFC = { dl:'#30362f', db:'#262a24', hz:'#4e5a34', hzd:'#2e2a20', hzt:'#b89a54', hzs:'#6a3a2a', robe:'#dde3e8', trim:'#cdb46e', tunic:'#56704e', leg:'#b3a283', boot:'#b3a283', cloak:'#6c7866', lining:'#48523f', scale:'#cbb47c', silver:'#dfe6ee', gem:'#9fdcf2', leaf:'#6f9a58' };
 const CLOTH_F = { top:'#8c4f3c', skirt:'#5c5134', rope:'#9a7a48' };
 const LINGERIE = { base:'#5a3a24' };                    // plain brown
 const GEAR = { robe:'#6a4a3a', linen:'#dccfb2', glove:'#5c3b22', jerkin:'#6e4a2a', mail:'#7f858b', hood:'#56483a', steel:'#8b9096' };
@@ -1053,7 +1053,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   const F=opts.gender==='f';
   const P=F?PROP.f:PROP.m, Y=BODY, C=CLOTH, V=VIEW[view];
   const E=opts.equip||defaultEquip(opts.gender);     // what is worn, slot by slot
-  const ELF_LEG=E.legs==='elf_leggings', PANTS=E.legs==='trousers'||ELF_LEG, ELF_BOOT=E.feet==='elf_boots', BOOTS=E.feet==='boots'||ELF_BOOT;
+  const ELF_LEG=E.legs==='elf_leggings', DUEL_LEG=E.legs==='duel_legs', PANTS=E.legs==='trousers'||ELF_LEG||DUEL_LEG, ELF_BOOT=E.feet==='elf_boots', DUEL_BOOT=E.feet==='duel_boots', BOOTS=E.feet==='boots'||ELF_BOOT||DUEL_BOOT;
   const STOCK=F&&ELF_LEG, LEG_COVER=!!E.legs&&!STOCK;   // on women the elven leggings are thigh-high stockings on a garter belt
   const BUST=E.torso==='elf_bustier', ROBE=E.torso==='elf_robe', ETUN=E.torso==='elf_tunic', CLOAK=E.armor==='elf_cloak';
   // light body hair for men (not elves or goblins): short soft strokes in the hair colour, very low contrast
@@ -1152,10 +1152,10 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
 
   const lw=P.legW, lo=(P.legW/2+(F?0.25:1))*(1-V.prof*0.66);   // her thighs nearly touch  // legs converge when seen edge-on
   const swX=0.4+V.prof*1.5;                          // and stride further along the walk axis
-  const bootTop=BREECH&&BOOTS ? Y.KNEE+6 : ELF_BOOT ? Y.KNEE+0.5 : RIDE ? Y.KNEE-6 : PLATE ? Y.KNEE+2.5 : (F?-13:-16), pantEnd = BREECH ? (BOOTS ? Y.KNEE+7.6 : Y.KNEE+4) :   /* breeches end over the boot tops */ (F && !ELF_LEG && !HOSE && !TREWS) ? -29 : (BOOTS?bootTop+3:-4);   // women: cut-off shorts
+  const bootTop=BREECH&&BOOTS ? Y.KNEE+6 : DUEL_BOOT ? (F?Y.KNEE+2:Y.KNEE+1) : ELF_BOOT ? Y.KNEE+0.5 : RIDE ? Y.KNEE-6 : PLATE ? Y.KNEE+2.5 : (F?-13:-16), pantEnd = DUEL_LEG ? (F ? -36.2 : (BOOTS?bootTop+3:-4)) : BREECH ? (BOOTS ? Y.KNEE+7.6 : Y.KNEE+4) :   /* breeches end over the boot tops */ (F && !ELF_LEG && !HOSE && !TREWS) ? -29 : (BOOTS?bootTop+3:-4);   // women: cut-off shorts
   const STOCK_TOP=-30.5;
   const PA_DARK = ELF_LEG && (()=>{ const [r,g,b]=_rgb(ELFC.leg); return 0.3*r+0.59*g+0.11*b<110; })();   // on a dark pair the elven work is picked out lighter
-  const PA=ELF_LEG ? ELFC.leg : C.pants, BC=ELF_BOOT ? ELFC.boot : C.boot;
+  const PA=DUEL_LEG ? ELFC.dl : ELF_LEG ? ELFC.leg : C.pants, BC=DUEL_BOOT ? ELFC.db : ELF_BOOT ? ELFC.boot : C.boot;
 
   // ── one leg, drawn far-side first so the near leg overlaps it ──
   const drawLeg=(s,depth)=>{
@@ -1266,13 +1266,19 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
           fs(PA); for(let q=0;q<5;q++){ const xx=ox+lw*(0.1+q*0.2); c.beginPath(); c.moveTo(x+xx-0.8,B+pantEnd-2.8); c.lineTo(x+xx,B+pantEnd-1+((q*3)%2)*1.4); c.lineTo(x+xx+0.8,B+pantEnd-2.8); c.fill(); } }   // a frayed, uneven end
         if(STOCK){ fs(tone(PA,-0.12)); c.fillRect(x+ox-2,B+STOCK_TOP-0.2,lw+4,1.9); band(STOCK_TOP+1.6);                // the stocking's welt, edged in gold, a little lace below
           fs(tone(PA,-0.32,0.7)); for(let xx=ox-1.5; xx<ox+lw+1.5; xx+=1.3){ c.beginPath(); c.arc(x+xx+0.65,B+STOCK_TOP+2.4,0.5,0,Math.PI); c.fill(); } }
+      } else if(DUEL_LEG){                                   // the duellist's leathers: close as skin, laced at the outer seam; on a woman, cut very short with a leaf-pointed hem
+        const T0=ELFC.hzt, top=Y.WAIST, lx=cx+s*(h2-1.2);
+        fs(tone(PA,0.2,0.35)); c.beginPath(); c.ellipse(x+cx-h2*0.35,B+(F?-40:Y.KNEE-8),0.9,F?2.4:9,0,0,Math.PI*2); c.fill();          // sheen down the front of the thigh
+        c.strokeStyle=tone(PA,-0.5); c.lineWidth=0.5; c.beginPath(); c.moveTo(x+lx-0.8,B+top+1); c.lineTo(x+lx-0.8,B+pantEnd-2); c.moveTo(x+lx+0.8,B+top+1); c.lineTo(x+lx+0.8,B+pantEnd-2); c.stroke();
+        c.strokeStyle=T0; c.lineWidth=0.4; c.beginPath(); for(let yy=top+1.6; yy<pantEnd-2.6; yy+=(F?1.6:2.2)){ c.moveTo(x+lx-0.8,B+yy); c.lineTo(x+lx+0.8,B+yy+(F?1.4:2)); c.moveTo(x+lx+0.8,B+yy); c.lineTo(x+lx-0.8,B+yy+(F?1.4:2)); } c.stroke();   // cross-laced seam
+        if(!F){ const ty=Y.WAIST+10; fs(tone('#3a2a1a',-0.1*depth)); c.fillRect(x+ox-1.2,B+ty,lw+2.4,1.4); fs(T0); c.fillRect(x+cx+s*(h2-1.6)-0.6,B+ty-0.1,1.2,1.6); }   // a thigh strap
       } else if(!F){
         fs(tone(PA,-0.14-0.1*depth,0.8)); c.beginPath(); c.ellipse(x+cx,B+Y.KNEE,h2+1,0.8,0,0,Math.PI*2); c.fill();
         if(s<0 && vL!=='elf_trousers') patch(ox+1.2,Y.KNEE-6,4.6,4.2,tone(PA,-0.20-0.1*depth));
         else if(vL!=='elf_trousers') hole(ox+lw*0.55,Y.KNEE+5,2,1.5);
         fs(tone(PA,-0.15,0.6)); c.beginPath(); c.ellipse(x+cx,B+pantEnd-3,h2+1,1.4,0,0,Math.PI*2); c.fill(); // bunching at the boot
       } else if(!vL){ if(s<0) patch(ox+0.9,-33.2,3.6,3.0,tone(PA,-0.20-0.1*depth)); }   // her cut-offs are patched too
-      if(front && !ELF_LEG && !BREECH && !DANDY && vL!=='elf_trousers' && !(F && !HOSE) && pantEnd>Y.KNEE+3){              // a stitched leather pad over the knee, riveted or laced on
+      if(front && !ELF_LEG && !DUEL_LEG && !BREECH && !DANDY && vL!=='elf_trousers' && !(F && !HOSE) && pantEnd>Y.KNEE+3){              // a stitched leather pad over the knee, riveted or laced on
         const kc=TREWS?'#3a2a1c':HOSE?'#4a3828':'#6a4a2c', ky=Y.KNEE-1.5, kw=h2-0.2, kh=3.4, kx=x+cx-0.2;
         c.save(); c.beginPath(); c.ellipse(kx,B+ky,kw,kh,0,0,Math.PI*2); const gk=c.createLinearGradient(kx-kw,0,kx+kw,0); gk.addColorStop(0,tone(kc,0.12-0.12*depth)); gk.addColorStop(1,tone(kc,-0.25-0.12*depth)); c.fillStyle=gk; c.fill();
         c.strokeStyle=tone(kc,-0.5); c.lineWidth=0.6; c.stroke();
@@ -1291,6 +1297,13 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
         c.beginPath(); c.moveTo(lx-1.6,ly+0.3); c.quadraticCurveTo(lx,ly-1.1,lx+1.6,ly+0.3); c.moveTo(lx-1.6,ly+0.3); c.quadraticCurveTo(lx,ly+1.2,lx+1.6,ly+0.3); c.moveTo(lx-2.2,ly+0.6); c.lineTo(lx+2.2,ly); c.stroke(); }
       fs(tone(PA,-0.30-0.1*depth)); c.fillRect(x+ox-2,B+pantEnd-1.6,lw+4,1.6);
       c.restore();
+      if(DUEL_LEG){ const T0=ELFC.hzt;
+        if(F){ for(let k=0;k<4;k++){ const lx2=ox-0.6+k*(lw+1.2)/3.4, ly=pantEnd-0.4; c.beginPath(); c.moveTo(x+lx2-1.1,B+ly); c.quadraticCurveTo(x+lx2-0.6,B+ly+2.6,x+lx2+0.2,B+ly+3.2); c.quadraticCurveTo(x+lx2+0.8,B+ly+1.4,x+lx2+1.2,B+ly); c.closePath();   // leaf points along the hem
+            c.fillStyle=tone(PA,(k%2?-0.12:0.05)-0.12*depth); c.fill(); c.strokeStyle=T0; c.lineWidth=0.35; c.stroke(); }
+          const gy=pantEnd+5.5; fs(tone('#3a2a1a',-0.1*depth)); c.fillRect(x+ox-0.6,B+gy,lw+1.2,1.1); fs(T0); c.fillRect(x+cx+s*(h2-1.6)-0.5,B+gy-0.1,1,1.3); }   // a garter strap round the thigh
+        if(s>0 && front){ const kx=x+cx+h2-0.2, ky=B+(F?pantEnd+4:Y.WAIST+8);                                            // a slim knife in a sheath at the outer thigh
+          fs(tone('#2a2018',-0.1*depth)); c.beginPath(); c.moveTo(kx-0.9,ky); c.lineTo(kx+0.9,ky); c.lineTo(kx+0.5,ky+7.5); c.lineTo(kx,ky+8.6); c.lineTo(kx-0.5,ky+7.5); c.closePath(); c.fill();
+          fs(T0); c.fillRect(kx-1.4,ky-0.6,2.8,0.8); fs(tone('#4a3424',-0.1*depth)); c.fillRect(kx-0.5,ky-3.2,1,2.6); fs(T0); c.beginPath(); c.arc(kx,ky-3.4,0.55,0,Math.PI*2); c.fill(); } }
       if(BREECH && !DANDY){ const ky=Y.KNEE+0.5, kx=x+cx-0.2, kw=h2+0.9;                         // an iron knee-cop, domed, strapped on
         if(front){ c.save(); c.beginPath(); c.ellipse(kx,B+ky,kw,4.6,0,0,Math.PI*2); const gm=c.createRadialGradient(kx-kw*0.35,B+ky-1.8,0.3,kx,B+ky,kw*1.2); gm.addColorStop(0,'#b8b8b0'); gm.addColorStop(0.35,tone('#7e7e78',-0.1*depth)); gm.addColorStop(1,tone('#3e3c38',-0.1*depth)); c.fillStyle=gm; c.fill();
           c.save(); c.clip();                                                        // worn: rust blooms, grime in the lower half, scratches
@@ -1312,7 +1325,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
     }
     if(BOOTS){
       // shaft: slight flare at the cuff, hugging the calf, into a shaped foot with the toe forward
-      const SLEEK=RIDE||ELF_BOOT, bw=RIDE?-0.35:ELF_BOOT?-0.15:0.9, bL=cx-h2-bw, bR=cx+h2+bw;               // riding boots hug the leg like a second skin
+      const SLEEK=RIDE||ELF_BOOT||DUEL_BOOT, bw=RIDE?-0.35:(ELF_BOOT||DUEL_BOOT)?-0.15:0.9, bL=cx-h2-bw, bR=cx+h2+bw;               // riding boots hug the leg like a second skin
       const fl=SLEEK?0.1:0.4, boot = SLEEK                                  // sleek: in at the knee, the calf's swell, a slim ankle
         ? [[bL-fl,bootTop],[bR+fl,bootTop],...(bootTop<Y.KNEE?[[bR-0.7,Y.KNEE+1]]:[]),[bR,-14],[bR-1.4,-9],[bR-0.8+toe*0.5,-5],[bR+toe,-3],[bR+toe+0.3,0],[bL-0.6+toe*0.2,0],[bL-0.4,-3],[bL+1.4,-9],[bL,-14],...(bootTop<Y.KNEE?[[bL+0.7,Y.KNEE+1]]:[])]
         : [[bL-fl,bootTop],[bR+fl,bootTop],[bR-0.3,-8],[bR-0.2+toe*0.5,-5],[bR+toe,-3],[bR+toe+0.3,0],[bL-0.8+toe*0.2,0],[bL-0.9,-3],[bL+0.2,-7]];
@@ -1347,6 +1360,17 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
           fs(tone('#d6c6a4',-0.12*depth-(k>3?0.12:0))); c.beginPath(); c.arc(x+fx,B+fy,1.9,0,Math.PI*2); c.fill(); }
         fs(tone('#f0e4c8',-0.1*depth,0.8)); for(let k=0;k<4;k++){ c.beginPath(); c.arc(x+cx-h2+k*h2*0.6,B+bootTop-0.3,0.9,0,Math.PI*2); c.fill(); }
         c.strokeStyle=tone(BC,-0.55); c.lineWidth=0.5; for(let yy=bootTop+4; yy<-5; yy+=1.8){ c.beginPath(); c.moveTo(x+cx-1.2+toe*0.3,B+yy); c.lineTo(x+cx+1.2+toe*0.3,B+yy+1); c.stroke(); }
+      } else if(DUEL_BOOT){                                   // duellist's boots: bound in crossed straps, a leaf guard rising over the knee, a steel toe-cap
+        const T0=ELFC.hzt, tx=cx+toe*0.4;
+        c.strokeStyle=tone(BC,0.25-0.12*depth,0.9); c.lineWidth=0.9;
+        for(let yy=bootTop+(F?3:2.5); yy<-9; yy+=(F?3.4:3)){ c.beginPath(); c.moveTo(x+cx-h2+0.4,B+yy); c.lineTo(x+cx+h2-0.4,B+yy+2.2); c.moveTo(x+cx+h2-0.4,B+yy); c.lineTo(x+cx-h2+0.4,B+yy+2.2); c.stroke(); }
+        fs(T0); for(let yy=bootTop+(F?4.1:3.6); yy<-9; yy+=(F?3.4:3)){ c.beginPath(); c.arc(x+cx,B+yy,0.38,0,Math.PI*2); c.fill(); }
+        c.beginPath(); c.moveTo(x+tx-h2+0.2,B+bootTop+0.6); c.quadraticCurveTo(x+tx-h2*0.6,B+bootTop-4.2,x+tx,B+bootTop-(F?5.2:6.4)); c.quadraticCurveTo(x+tx+h2*0.6,B+bootTop-4.2,x+tx+h2-0.2,B+bootTop+0.6); c.closePath();   // the leaf guard
+        const lg=c.createLinearGradient(x+tx-h2,0,x+tx+h2,0); lg.addColorStop(0,tone(BC,0.28-0.12*depth)); lg.addColorStop(1,tone(BC,-0.2-0.12*depth)); c.fillStyle=lg; c.fill(); c.strokeStyle=T0; c.lineWidth=0.5; c.stroke();
+        c.strokeStyle=tone(BC,-0.5,0.8); c.lineWidth=0.4; c.beginPath(); c.moveTo(x+tx,B+bootTop-(F?4.4:5.6)); c.lineTo(x+tx,B+bootTop+0.4); c.stroke();
+        fs(tone(BC,-0.45)); c.fillRect(x+cx-h2+0.4,B-8.4,lw-0.8,1.1); fs(T0); c.fillRect(x+cx+h2-1.8,B-8.6,1.2,1.4);   // ankle strap and buckle
+        c.save(); c.beginPath(); c.moveTo(x+cx+h2-0.6+toe*0.6,B-4.2); c.quadraticCurveTo(x+cx+h2+toe+1.2,B-2.4,x+cx+h2+toe+0.6,B-0.8); c.lineTo(x+cx+h2-0.6+toe*0.4,B-0.8); c.closePath();
+          const tg=c.createLinearGradient(0,B-4.2,0,B-0.8); tg.addColorStop(0,'#c8ccd0'); tg.addColorStop(1,'#6a7076'); c.fillStyle=tg; c.fill(); c.restore();   // steel toe-cap
       } else if(ELF_BOOT){                                   // a pointed cuff falling over the knee, and leaf stitching
         fs(tone(BC,0.12*dim)); c.beginPath(); c.moveTo(x+cx-h2-0.1,B+bootTop-0.3); c.lineTo(x+cx+h2+0.1,B+bootTop-0.3); c.lineTo(x+cx+toe*0.4,B+bootTop+4.6); c.closePath(); c.fill();
         c.strokeStyle=tone(BC,-0.45); c.lineWidth=0.6; c.stroke();
@@ -2387,19 +2411,19 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       c.fillStyle=tone(L0,0.08); c.beginPath(); c.moveTo(x+LN+1+po*0.3,B+Y.SHOULDER-0.5); c.lineTo(x+LN+P.neckW/2+3+po*0.3,B+Y.SHOULDER-0.5); c.lineTo(x+LN+P.neckW/2+2+po*0.3,B+Y.SHOULDER-5.2); c.quadraticCurveTo(x+LN+2+po*0.3,B+Y.SHOULDER-4.4,x+LN+1+po*0.3,B+Y.SHOULDER-0.5); c.fill();   // the high collar, one side
       c.strokeStyle=tone(L0,-0.55); c.lineWidth=0.6; c.stroke(); }
     else {                                               // DUELLIST: a short fitted vest to a point, laced at the sides, a leaf collar behind the neck, one long tasset to the knee
-      const tip=Y.WAIST+2.5, sideH=Y.WAIST-2.5, vW=F?4.4:3.2, vD=F?13:9;
+      const tip=F?Y.SHOULDER+14.5:Y.WAIST+2.5, sideH=F?Y.SHOULDER+12.2:Y.WAIST-2.5, vW=F?4.4:3.2, vD=F?12:9;
       const pts=FR ? [[LN-CH-0.2,Y.SHOULDER-0.6],[LN-vW+po,Y.SHOULDER-0.6],[LN+po,Y.SHOULDER+vD],[LN+vW+po,Y.SHOULDER-0.6],[LN+CH+0.2,Y.SHOULDER-0.6],[LN+CH+bR+0.2,Y.SHOULDER+6],[LN+CH+bR-0.4,Y.SHOULDER+11],[LN+WA+1,sideH],[LN+po,tip],[LN-WA-1,sideH],[LN-CH-bL+0.4,Y.SHOULDER+11],[LN-CH-bL-0.2,Y.SHOULDER+6]]
                    : torsoPts(0.6,sideH,WA+1);
-      const tz=[[LN-3.4+po*0.5,Y.WAIST-1],[LN+3.4+po*0.5,Y.WAIST-1],[LN+2.6+po*0.5,Y.KNEE+2],[LN+po*0.5,Y.KNEE+4.5],[LN-2.6+po*0.5,Y.KNEE+2]];
+      const tz=[[LN-3.4+po*0.5,Y.WAIST-1],[LN+3.4+po*0.5,Y.WAIST-1],[LN+2.6+po*0.5,F?-31:Y.KNEE+2],[LN+po*0.5,F?-28.5:Y.KNEE+4.5],[LN-2.6+po*0.5,F?-31:Y.KNEE+2]];
       if(front){ path(tz,1.2); const tg=c.createLinearGradient(x+LN-3.4,0,x+LN+3.4,0); tg.addColorStop(0,tone(L0,0.15)); tg.addColorStop(1,tone(L0,-0.3)); c.fillStyle=tg; c.fill(); c.strokeStyle=T0; c.lineWidth=0.7; c.stroke();
-        leafAt(LN+po*0.5,Y.WAIST+9,9,2.6,0,tone(L0,-0.08),T0); }
+        leafAt(LN+po*0.5,F?Y.WAIST+6.5:Y.WAIST+9,F?6:9,2.2,0,tone(L0,-0.08),T0); }
       mass(pts,L0,tone(L0,-0.55)); grain(pts,L0,Y.SHOULDER,tip);
       if(FR){ [-1,1].forEach(sd=>{ const lx=LN+sd*(WA-0.6)+po*0.4; c.strokeStyle=T0; c.lineWidth=0.45;   // side lacing
-          for(let yy=Y.SHOULDER+12; yy<sideH-1; yy+=1.8){ c.beginPath(); c.moveTo(x+lx-1,B+yy); c.lineTo(x+lx+1,B+yy+1.4); c.moveTo(x+lx+1,B+yy); c.lineTo(x+lx-1,B+yy+1.4); c.stroke(); } });
+          for(let yy=F?Y.SHOULDER+6:Y.SHOULDER+12; yy<sideH-1; yy+=1.8){ c.beginPath(); c.moveTo(x+lx-1,B+yy); c.lineTo(x+lx+1,B+yy+1.4); c.moveTo(x+lx+1,B+yy); c.lineTo(x+lx-1,B+yy+1.4); c.stroke(); } });
         c.strokeStyle=T0; c.lineWidth=0.7; c.beginPath(); c.moveTo(x+LN-vW+po,B+Y.SHOULDER-0.6); c.lineTo(x+LN+po,B+Y.SHOULDER+vD); c.lineTo(x+LN+vW+po,B+Y.SHOULDER-0.6); c.stroke(); }
       [-1,1].forEach(sd=>{ c.save(); c.translate(x+LN+sd*(P.neckW/2+1.6)+po*0.3,B+Y.SHOULDER-1); c.rotate(sd*0.45);   // the leaf collar, rising behind the neck
         c.beginPath(); c.moveTo(0,0); c.quadraticCurveTo(sd*4.2,-3.4,sd*1.2,-8); c.quadraticCurveTo(-sd*0.6,-3.6,0,0); c.closePath(); c.fillStyle=tone(L0,0.1); c.fill(); c.strokeStyle=T0; c.lineWidth=0.5; c.stroke(); c.restore(); });
-      belt(Y.WAIST-1.4,WA+1.2,D0,true); }
+      belt(F?Y.WAIST+1:Y.WAIST-1.4,F?HI+0.6:WA+1.2,D0,true); }
   }
   function drawElfScale(){
     const Sc=ELFC.scale, hem=F?-40:-37, hw=F?WA+2:HI+1.8;
@@ -2807,7 +2831,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   drawBareTorso();
   // with nothing on at all, no underwear either: a smooth, doll-like body with no anatomical detail
   const bare = true;                         // underwear is never drawn
-  if(E.legs==='trousers'){ if(F) drawShortsSeat(); else drawPantSeat(); }
+  if(E.legs==='trousers'||DUEL_LEG){ if(F) drawShortsSeat(); else drawPantSeat(); }
   else if(bare){ drawHips(); if(ELF_LEG && !F) drawTightsSeat(); }
   else drawBraies();
   if(F) drawBreastBand(bare);

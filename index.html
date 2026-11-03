@@ -228,6 +228,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0e0b06;color:#e8d5a
 .bslot.valid{border-color:#c8a050;box-shadow:0 0 8px rgba(220,170,70,.45);}
 .bslot.over{border-color:#f0d080;background:radial-gradient(circle at 50% 40%,#3a2a10,#1a1206);}
 .bslot.none canvas{opacity:.35;filter:grayscale(.7);}
+.slot .stk{position:absolute;right:3px;bottom:1px;font:bold 11px Georgia,serif;color:#f0dca0;text-shadow:0 1px 2px #000,0 0 3px #000;pointer-events:none;}
 .bslot .bn{position:absolute;right:4px;bottom:2px;font:bold 11px Georgia,serif;color:#f0dca0;text-shadow:0 1px 2px #000;}
 .bslot .bk{position:absolute;left:4px;top:2px;font:10px Georgia,serif;color:#7a6034;}
 .bslot .bplus{color:#5a4424;font:20px Georgia,serif;}
@@ -5371,7 +5372,7 @@ function collectPickup(o){ const had=hasItem(o.item);
     floatText([o.i,o.j],'Equipped: '+name,'#8ac070',true);
     logMsg('You take up the '+name+'. It will have to do.','#8ac070');
   } else {
-    const free=player.inv.indexOf(null);
+    const free=slotFor(o.item);
     if(free>=0){ player.inv[free]=o.item; floatText([o.i,o.j],'Picked up: '+name,'#8ac070',true); logMsg('You pick up '+name+'.','#8ac070'); }
     else { OBJECTS.splice(idx,0,o); blocked.add(o.i+','+o.j); collectedPickups.delete(areaId+':'+o.i+','+o.j); floatText([o.i,o.j],'Inventory is full','#e0b070'); logMsg('Inventory is full.','#e0b070'); }
   }
@@ -8012,7 +8013,8 @@ function drawNPCBody(n){
     g.fillStyle='rgba(12,8,3,0.78)'; g.beginPath(); g.roundRect(x-tw/2-7,ty,tw+14,16,4); g.fill(); g.fillStyle='#f0dca0'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(n.name,x,ty+8);
     const q=npcHasNews(n); if(q){ const by=ty-12+Math.sin(gt*3)*2; g.fillStyle='#1a1006'; g.font='bold 15px Georgia, serif'; g.fillText(q,x+1,by+1); g.fillStyle='#f0c040'; g.fillText(q,x,by); }
     return; }
-  if(n.sit) drawCachedFigure(x,y,()=>drawSitting(g,x,y,n.opts,n.dir||0,n.sit),'s:'+n.id,(n.dir||0)+'|'+n.sit+'|'+litSig(n.opts));
+  if(n.dryad) drawDryad(n,x,y,sw);
+  else if(n.sit) drawCachedFigure(x,y,()=>drawSitting(g,x,y,n.opts,n.dir||0,n.sit),'s:'+n.id,(n.dir||0)+'|'+n.sit+'|'+litSig(n.opts));
   else if(n.opts.ghost){ g.save(); g.globalAlpha=0.5+Math.sin(gt*2.2)*0.08; glow(x,y-50,40,70,'170,210,255',0.25); drawChar(g,x,y-2+Math.sin(gt*1.5)*2,n.opts,0,n.dir||0); g.restore(); }
   else if(!LOW_FX && !n.wander && typeof drawLitSprite==='function'){ const ps=n.moving?NPC_POSE(n):litPose(NPC_POSE(n)); drawLitSprite(x,y,()=>drawChar(g,x,y,n.opts,sw,n.dir||0,ps),1,n.moving?null:'n:'+n.id,(n.dir||0)+'|'+Math.round(sw*4)+'|'+litSig(ps)+'|'+litSig(n.opts)); }
   else if(n.moving) drawChar(g,x,y,n.opts,sw,n.dir||0,NPC_POSE(n));                // walking: a new frame every time anyway
@@ -9614,6 +9616,31 @@ let dollDir=0, invBuilt=false, msgTimer=null;
 
 function getAt(loc){ return loc.kind==='eq' ? player.opts.equip[loc.key] : loc.kind==='stash' ? stashArr()[loc.key] : player.inv[loc.key]; }
 function setAt(loc,id){ if(player.opts) delete player.opts._ck; if(loc.kind==='eq') player.opts.equip[loc.key]=id||null; else if(loc.kind==='stash') stashArr()[loc.key]=id||null; else player.inv[loc.key]=id||null; }
+// ── stacks: food, draughts and remedies pile up in one pack space, up to ten. The pack stays an array of
+// ids; how many more sit under each id lives in CHOICE.invN. A pack space of bread that is "emptied" by any
+// code just loses one loaf, and a loaf put into a free space joins a pile that has room.
+const STACK_MAX=10, NO_STACK=new Set(['raw_meat','fish_perch','fish_trout','fish_carp','fish_eel','fish_herring']);   // raw things stay apart: cooks count them
+const stackable=id=>!!(id && ITEMS[id] && ITEMS[id].slot==='food' && !NO_STACK.has(id));
+let INV_RAW=false;
+function invN(){ if(!Array.isArray(CHOICE.invN)) CHOICE.invN=[]; return CHOICE.invN; }
+function stackAt(k){ const t=player.inv[k]; if(!stackable(t)) return t?1:0; return 1+Math.max(0,invN()[k]|0); }
+function invCount(id){ let n=0; const A=player.inv; for(let k=0;k<A.length;k++) if(A[k]===id) n+=stackable(id)?1+Math.max(0,invN()[k]|0):1; return n; }
+function invFlat(){ const out=[]; player.inv.forEach((id,k)=>{ if(id) for(let q=stackAt(k);q>0;q--) out.push(id); }); return out; }
+function slotFor(id){ if(stackable(id)){ const A=player.inv; for(let k=0;k<A.length;k++) if(A[k]===id && stackAt(k)<STACK_MAX) return k; } return player.inv.indexOf(null); }
+function packStacks(){ const A=player.inv, N=invN(); INV_RAW=true; try{       // piles that sit apart (older saves, things back from the crate) come together
+    for(let k=0;k<A.length;k++){ if(!stackable(A[k])) continue; for(let j=k+1;j<A.length;j++){ if(A[j]!==A[k]) continue;
+      const room=STACK_MAX-stackAt(k); if(room<=0) break; const mv=Math.min(room,stackAt(j)); N[k]=(N[k]|0)+mv; const left=stackAt(j)-mv; if(left>0) N[j]=left-1; else { A[j]=null; N[j]=0; } } } }
+  finally{ INV_RAW=false; } }
+setInterval(()=>{ try{ if(player.opts && !invOverlay.classList.contains('open')) packStacks(); }catch(e){} },2000);
+(()=>{ let raw=player.inv, P=null;
+  const wrapInv=a=>new Proxy(a,{ set(t,key,v){ const k=+key; if(INV_RAW || !Number.isInteger(k) || String(k)!==key){ t[key]=v; if(Number.isInteger(k) && String(k)===key && typeof CHOICE!=='undefined') invN()[k]=0; return true; }
+      const N=invN(), old=t[k]; v=v||null;
+      if(v && v===old && stackable(v)){ if(stackAt(k)<STACK_MAX){ N[k]=(N[k]|0)+1; return true; } const f=t.indexOf(null); if(f>=0){ t[f]=v; N[f]=0; } return true; }   // more onto a pile
+      if(old && stackable(old) && (N[k]|0)>0 && v!==old){ N[k]--; if(!v) return true;                                                         // one off the pile
+        const f=t.indexOf(null); if(f>=0){ t[f]=v; N[f]=0; return true; } N[k]=0; t[k]=v; return true; }
+      if(v && !old && stackable(v)){ for(let j=0;j<t.length;j++) if(j!==k && t[j]===v && stackAt(j)<STACK_MAX){ N[j]=(N[j]|0)+1; return true; } }   // a loaf finds the bread
+      t[k]=v; N[k]=0; return true; } });
+  Object.defineProperty(player,'inv',{ enumerable:true, configurable:true, get(){ if(!P) P=wrapInv(raw); return P; }, set(v){ raw=Array.isArray(v)?v:[]; P=null; } }); })();
 // ── the crate at the Wheatsheaf: things you want to keep but not carry. It is saved with the game.
 const STASH_SIZE=30; let STASH_OPEN=false;
 var SELL_RATE=0.25;                      // traders pay a quarter of their own price (the fence a third)
@@ -9643,7 +9670,12 @@ function moveItemRaw(from,to){
   const a=getAt(from), b=getAt(to);
   const e1=placeError(a,to);   if(e1){ flash(e1); return false; }
   const e2=placeError(b,from); if(e2){ flash(`Can't swap: ${e2}`); return false; }
-  setAt(to,a); setAt(from,b);
+  if(from.kind==='inv' && to.kind==='inv'){ const N=invN();
+    if(a && a===b && stackable(a)){ const mv=Math.min(STACK_MAX-stackAt(to.key),stackAt(from.key)); if(mv<=0){ flash('That pile is full.'); return false; }
+      const left=stackAt(from.key)-mv; INV_RAW=true; try{ const nt=(N[to.key]|0)+mv; if(left>0){ player.inv[to.key]=a; N[to.key]=nt; N[from.key]=left-1; } else { player.inv[from.key]=null; player.inv[to.key]=a; N[to.key]=nt; } } finally{ INV_RAW=false; } }
+    else { const na=N[from.key]|0, nb=N[to.key]|0; INV_RAW=true; try{ player.inv[to.key]=a; player.inv[from.key]=b; N[to.key]=na; N[from.key]=nb; } finally{ INV_RAW=false; } } }
+  else if(a && a===b && stackable(a)){ if(to.kind!=='inv'){ flash('The crate keeps one of each in a space.'); return false; } setAt(to,a); setAt(from,null); }
+  else { setAt(to,a); setAt(from,b); }
   invMsg.textContent='';
   refreshInventory();
   updateHud();                                   // armour changes your hearts
@@ -9678,7 +9710,7 @@ let foodCD=0;
 function refreshFoodBar(){
   let bar=document.getElementById('food-bar'); if(!bar){ bar=document.createElement('div'); bar.id='food-bar'; const hud=document.getElementById('duel-hud'); hud.insertBefore(bar,hud.firstChild); }
   bar.style.display=combat.active && !combat.practice ? 'flex' : 'none'; bar.innerHTML='';
-  beltIds().filter(Boolean).forEach(id=>{ const n=player.inv.filter(x=>x===id).length; const b=document.createElement('button'); b.className='fb'+(n?'':' empty'); b.title=ITEMS[id].name+(ITEMS[id].cure?' (cures '+STATUS_DEF[ITEMS[id].cure].name.toLowerCase()+')':ITEMS[id].mana?' (+'+ITEMS[id].mana+' mana)':' (+'+ITEMS[id].heal+' HP)');
+  beltIds().filter(Boolean).forEach(id=>{ const n=invCount(id); const b=document.createElement('button'); b.className='fb'+(n?'':' empty'); b.title=ITEMS[id].name+(ITEMS[id].cure?' (cures '+STATUS_DEF[ITEMS[id].cure].name.toLowerCase()+')':ITEMS[id].mana?' (+'+ITEMS[id].mana+' mana)':' (+'+ITEMS[id].heal+' HP)');
     const cv=document.createElement('canvas'); cv.width=cv.height=120; cv.style.width=cv.style.height='56px'; drawItemIcon(cv.getContext('2d'),id,120); b.appendChild(cv);
     const c2=document.createElement('span'); c2.textContent=n; b.appendChild(c2);
     b.addEventListener('pointerdown',e=>{ e.stopPropagation(); e.preventDefault(); if(!n || performance.now()<foodCD) return; const k=player.inv.indexOf(id); if(eatItem(k)) foodCD=performance.now()+1500; });
@@ -9774,6 +9806,7 @@ function refreshInventory(){
     const id=getAt(slotLoc(el));
     const icv=el.querySelector('canvas'), ik=(id||'')+'|'+iconMale(); if(icv._ik!==ik){ icv._ik=ik; drawItemIcon(icv.getContext('2d'),id,icv.width); }   // only slots that changed
     el.classList.toggle('filled',!!id);
+    { let c=el.querySelector('.stk'); const n=el.dataset.kind==='inv'&&id?stackAt(+el.dataset.key):0; if(n>1){ if(!c){ c=document.createElement('span'); c.className='stk'; el.appendChild(c); } c.textContent=n; } else if(c) c.remove(); }
     el.title = id ? `${ITEMS[id].name}  (${SLOT_NAMES[ITEMS[id].slot]})${(itemStat(id)&&itemStat(id).short) ? ' — '+itemStat(id).short : ''}` : (el.dataset.kind==='eq' ? SLOT_NAMES[el.dataset.key] : '');
     const lbl=el.querySelector('.lbl'); if(lbl) lbl.style.display = id ? 'none' : '';
   });
@@ -9861,7 +9894,7 @@ function npcHasNews(n){                                // '!' new business, '?' 
   if(n.id==='ada' && ((!CHOICE.ada && !CHOICE.edric) || (CHOICE.adaHow==='asked' && TRAIL_DEAD()))) return CHOICE.adaHow==='asked'?'?':'!';
   if(n.id==='magistrate' && BARON_DOWN() && !CHOICE.ruler && Math.floor(dayClock/DAY_LEN)>(CHOICE.baronDay??-1)) return '!';
   if(n.id==='harl' && !CHOICE.unpaid) return '!';
-  if(n.id==='craban'){ const d=Math.floor(dayClock/DAY_LEN); if(!CHOICE.gb1 || (CHOICE.gb1==='asked' && player.inv.filter(x=>x==='fourage').length>=2) || (CHOICE.gb1==='done' && !CHOICE.gb2) || (CHOICE.gb2==='asked' && hasItem('strongbox')) || (CHOICE.gb2==='elvesDone'||CHOICE.gb2==='sold') && !CHOICE.gb3 || (CHOICE.gb3==='invested' && d-(CHOICE.gbDay||0)>=3)) return CHOICE.gb1?'?':'!'; }
+  if(n.id==='craban'){ const d=Math.floor(dayClock/DAY_LEN); if(!CHOICE.gb1 || (CHOICE.gb1==='asked' && invCount('fourage')>=2) || (CHOICE.gb1==='done' && !CHOICE.gb2) || (CHOICE.gb2==='asked' && hasItem('strongbox')) || (CHOICE.gb2==='elvesDone'||CHOICE.gb2==='sold') && !CHOICE.gb3 || (CHOICE.gb3==='invested' && d-(CHOICE.gbDay||0)>=3)) return CHOICE.gb1?'?':'!'; }
   if(n.id==='craban' && GB_RANK() && !CHOICE.livery) return '!';
   if(n.id==='orvell' && !CHOICE.appr) return '!';
   if(n.id==='tessaly') return '!';
@@ -9900,12 +9933,12 @@ function npcHasNews(n){                                // '!' new business, '?' 
   if(n.id==='vesna'){ const N=NECRO(), r=(()=>{
       const Q=CHOICE.necroQ;
       if(Q==='listen') return (CHOICE.listened||[]).length>=3 ? '?' : null;
-      if(Q==='hanged') return hasItem('hanged_bones') && player.inv.filter(x=>x==='old_bone').length>=3 ? '?' : null;
+      if(Q==='hanged') return hasItem('hanged_bones') && invCount('old_bone')>=3 ? '?' : null;
       if(Q==='crypt') return CHOICE.cryptDone ? '?' : null;
       if(!Q && (CHOICE.necro==='met' || N===1 || N===2)) return '!'; })();
     if(r) return r; }
   if(n.id==='orvell' && CHOICE.appr!=='taken'){ const K=(CHOICE.mageKnown||[]).length, Q=CHOICE.mageQ;     // the magister's lessons
-    if(Q==='light' && player.inv.filter(x=>x==='bottled_wisp').length>=3) return '?'; if(Q==='cold' && (CHOICE.baths||0)>=2) return '?'; if(Q==='ember' && (CHOICE.embers||[]).length>=3) return '?';
+    if(Q==='light' && invCount('bottled_wisp')>=3) return '?'; if(Q==='cold' && (CHOICE.baths||0)>=2) return '?'; if(Q==='ember' && (CHOICE.embers||[]).length>=3) return '?';
     if(!Q && K>0 && K<3) return '!'; }
   if((n.id==='tessaly_k'||n.id==='tessaly_s') && (CHOICE.mageKnown||[]).length>=3 && !CHOICE.tessLesson) return '!';
   if(n.id==='saelle_l' && !CHOICE.saelle2) return '!';
@@ -10571,7 +10604,7 @@ function sellTo(who,back,o){                     // o (optional): only these ite
   if(!goods.length) return;
   const box=document.getElementById('dlg-opts'), grid=document.createElement('div'); grid.className='shop-grid';
   goods.forEach(({id,k})=>{ const pr=o&&o.price?o.price(id):Math.max(1,Math.round(PRICES[id]*sellRate())); const cell=document.createElement('div'); cell.className='shop-cell';
-    const sl=document.createElement('div'); sl.className='slot filled shop-slot'; sl.dataset.item=id; const cv=document.createElement('canvas'); cv.width=cv.height=104; cv.style.width=cv.style.height='52px'; drawItemIcon(cv.getContext('2d'),id,104); sl.appendChild(cv);
+    const sl=document.createElement('div'); sl.className='slot filled shop-slot'; sl.dataset.item=id; const cv=document.createElement('canvas'); cv.width=cv.height=104; cv.style.width=cv.style.height='52px'; drawItemIcon(cv.getContext('2d'),id,104); sl.appendChild(cv); if(stackAt(k)>1) sl.insertAdjacentHTML('beforeend','<span class="stk">'+stackAt(k)+'</span>');
     const pl=document.createElement('div'); pl.className='shop-price'; pl.textContent='+'+formatCoin(pr); cell.appendChild(sl); cell.appendChild(pl);
     cell.addEventListener('pointerdown',e=>{ cell._touch=e.pointerType==='touch'; });
     cell.addEventListener('click',()=>{ if(cell._touch && !cell.classList.contains('armed')){ grid.querySelectorAll('.armed').forEach(x=>x.classList.remove('armed')); cell.classList.add('armed'); return; }
@@ -10585,7 +10618,7 @@ function shopFrom(who,stock,disc,greet,back){
   if(Array.isArray(stock) && stock.key!=='gratis'){ const key=stock.key; stock=stock.filter(id=>unWoven(id)!=='bandana'); if(key!==undefined) stock.key=key; }   // only Gratis deals in purple bandanas
   const day=Math.floor(dayClock/DAY_LEN), sk=stock.key||who;
   const FREE=disc===0, wares=stock.filter(id=>ITEMS[id]&&(PRICES[id]||FREE)).map(id=>({id, pr:FREE?0:Math.max(1,Math.round(PRICES[id]*disc*PRICE_MUL()))}));
-  const buy=({id,pr})=>{ if(player.purse<pr) return; const free=player.inv.indexOf(null);
+  const buy=({id,pr})=>{ if(player.purse<pr) return; const free=slotFor(id);
     if(free<0){ say(who,"“Your pack is full.”",[{label:'Back.',fn:()=>shopFrom(who,stock,disc,greet,back)},bye],true); return; }
     player.purse-=pr; player.inv[free]=id; const STAPLE=ITEMS[id].slot==='food'; if(!FREE&&!STAPLE){ if(sk==='peddler') (CHOICE.peddSold=CHOICE.peddSold||[]).push(id); else SOLD_TODAY.add(sk+day+id); } updateHud(); logMsg(FREE?'Got '+ITEMS[id].name+' for free.':'Bought '+ITEMS[id].name+' for '+formatCoin(pr)+'.','#e8c060');
     const rest=(FREE||STAPLE)?stock.slice():stock.filter(x=>x!==id); rest.key=sk; shopFrom(who,rest,disc,greet,back); };
@@ -11314,9 +11347,9 @@ wrap('kingsroad','objects',l=> (!CHOICE.gb2||CHOICE.gb2==='asked') && !collected
 const GB_RANK=()=> CHOICE.gb3==='paid' ? 'Partner' : CHOICE.gb1==='done' ? 'Associate' : null;
 function crabanTalk(){
   const day=Math.floor(dayClock/DAY_LEN), take=id=>{ player.inv[player.inv.indexOf(id)]=null; };
-  const fourN=player.inv.filter(x=>x==='fourage').length;
+  const fourN=invCount('fourage');
   if(!CHOICE.gb1){ say('Alaric Craban',["“Alaric Craban, Ratsherr of the Gold Brothers Trading Company. We buy, we sell, we ship out of Port Fearn Arianhod, and we never forget a debt, in either direction.”","“Every great house starts the same way: two sacks of fourage and twenty gold. We've got the gold. Bring me two sacks of fourage and you've got work.”"],[
-      ...(player.inv.filter(x=>x==='fourage').length>=2?[{label:'“I brought two sacks of fourage.”', fn:()=>{ CHOICE.gb1='asked'; crabanTalk(); }}]:[]),
+      ...(invCount('fourage')>=2?[{label:'“I brought two sacks of fourage.”', fn:()=>{ CHOICE.gb1='asked'; crabanTalk(); }}]:[]),
       {label:'“Where do I find fourage?”', fn:()=>{ remember('gb1','asked','The Gold Brothers want two sacks of fourage. A Company cart broke its axle in the Gate Ward, by the inn yard.'); say('Alaric Craban',"“Our carter broke an axle in the Gate Ward this morning, by the inn yard, and ran off to find a wheelwright. Two sacks are still on the cart. Fetch them before the gate guards find them first. Mira will write you into the book.”",[bye]); }}, bye]); return; }
   if(CHOICE.gb1==='asked'){ if(fourN>=2){ say('Alaric Craban',["<i>You drop two sacks at his feet. Craban opens one, sniffs it, and actually smiles.</i>"],[
       {label:'Hand them over.', fn:()=>{ take('fourage'); take('fourage'); player.purse+=10; updateHud(); remember('gb1','done','You are an Associate of the Gold Brothers Trading Company.');
@@ -12724,7 +12757,7 @@ function victory(faction){
   logMsg(faction==='wild'||faction==='wild2' ? 'The wolf is dealt with.' : faction==='grey' ? 'The man in grey will not trouble anyone again.' : faction==='guard' ? 'The stones are Dunhollow\'s again.' : faction==='shade' ? 'The shade comes apart like smoke.' : faction==='trapper' ? 'The trappers will set no more nets.' : faction==='unpaid' ? 'The deserters lie in the road.' : faction==='camp' ? 'The bandit camp falls silent.' : faction==='loggers' ? 'The axes fall silent.' : faction==='thieves' ? 'The alley is quiet again.' : faction==='highway' ? 'The road is safe again, for tonight.' : faction==='lanewolf'||faction==='nightwolf' ? 'The wolf is dealt with.' : faction==='goblins'||faction==='gobwarren' ? 'The goblins stop giggling.' : faction==='cavequeen' ? 'Mother Mogg falls, and the crystal hum grows softer.' : faction==='acolyte' ? 'The acolytes\' fires go out.' : faction==='mist'||faction==='ruin' ? 'The wolves are dealt with.' : faction==='risen' ? 'The bones lie still again. For now.' : 'The farm is yours again, for now.','#d8b24a');
   mobs.filter(m=>m.hostile && (!faction || m.faction===faction)).forEach(m=>{       // what a foe drops depends on what it was, and how dangerous
     const tier=lootTier(m), free=()=>player.inv.indexOf(null), R=Math.random;
-    const give=id=>{ const f=free(); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } else logMsg('Inventory is full.','#e0b070'); };
+    const give=id=>{ const f=slotFor(id); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } else logMsg('Inventory is full.','#e0b070'); };
     const coin=(a,b)=>{ const c=a+Math.floor(R()*(b-a+1)); player.purse+=c; updateHud(); logMsg('Loot: '+formatCoin(c),'#e8c060'); };
     if(m.type==='wolf'){ if(R()<0.5) give('raw_meat'); if(m.maxHp>=60 && R()<0.3) give('raw_meat'); if(R()<0.3) give('wolf_fang'); return; }           // meat and teeth, not trousers
     if(m.type==='skeleton'){ if(R()<0.35) coin(1,5); if(R()<0.5) give('old_bone'); if(R()<0.15) give('old_skull'); if(R()<0.15) give(m.opts.equip.weapon);   // bones, a skull, the blade it held
@@ -14327,7 +14360,7 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
 // food and draughts: the grocer, the innkeeper and the priestess sell them
 { const oldG=TALKERS.grocer; TALKERS.grocer=()=>{ if(!CHOICE.nim){ oldG(); return; }
     say('Gerd the Grocer',["“Fresh today. Mostly.”"],[{label:'Buy food.', fn:()=>shopFrom('Gerd the Grocer',['apple','bread'],1,"“Apples a copper, bread two. Don't squeeze them.”",TALKERS.grocer)},{label:'Chat.', fn:oldG},bye]); }; }
-function cookAt(who,back){ const n=player.inv.filter(x=>x==='raw_meat').length; if(!n){ say(who,"“Cook what? Bring me meat, I'll put it on the spit.”",[{label:'Back.',fn:back},bye]); return; }
+function cookAt(who,back){ const n=invCount('raw_meat'); if(!n){ say(who,"“Cook what? Bring me meat, I'll put it on the spit.”",[{label:'Back.',fn:back},bye]); return; }
   const cost=n; say(who,[`You hand over ${n} piece${n>1?'s':''} of raw meat.`,`“Spit-roast, salt, a bit of thyme. ${cost} copper for the fire.”`],[
     {label:`Have it cooked. (${cost} copper)`, off:player.purse<cost, note:'-'+cost+'c', fn:()=>{ player.purse-=cost; player.inv=player.inv.map(x=>x==='raw_meat'?'cooked_meat':x); updateHud(); refreshFoodBar(); logMsg(`${who} roasts your meat. (${n}× Roast Meat, +28 HP each)`,'#8ad07a'); say(who,"The smell fills the room. Someone at a table looks up hopefully.",[{label:'Back.',fn:back},bye]); }},
     {label:'Back.', fn:back}]); }
@@ -15056,7 +15089,7 @@ function vesnaTalk(){ const n=NECRO(), V='Vesna the Grave-Speaker';
   if(n===1){
     if(!CHOICE.necroQ){ say(V,["“The second word is ugly, so it is taught by an ugly teacher. There is a gallows on the King's Road. The man on it has been dead nine years and is still complaining about it.”","“Go at night and cut him down. Bring me his bones, and three more from men who died badly: there are plenty of those on the roads, and they do not need them. We will put him somewhere better.”"],[
         {label:'“I will cut him down.”', fn:()=>{ remember('necroQ','hanged',"Vesna wants the hanged man cut down from the King's Road gallows at night, and his bones brought to her with three old bones from men who died badly."); closeDialog(); }}, bye]); return; }
-    const nb=player.inv.filter(x=>x==='old_bone').length;
+    const nb=invCount('old_bone');
     if(!hasItem('hanged_bones')){ say(V,"“The gallows on the King's Road. At night, when he is talkative. Cut him down.”"+(nb<3?` And bones: ${nb} of three.`:''),[bye]); return; }
     if(nb<3){ say(V,`“His bones, good. And three more from men who died badly. You have ${nb}. Bandits, cutthroats, the Baron's hired knives: they all carry bones, whether they like it or not.”`,[bye]); return; }
     const done=kept=>{ player.inv[player.inv.indexOf('hanged_bones')]=null; for(let q=0;q<3;q++) player.inv[player.inv.indexOf('old_bone')]=null;
@@ -15077,7 +15110,7 @@ TALKERS.vesna=vesnaTalk;
 JOURNAL.push(["The Grave-Speaker", ()=> !CHOICE.necro ? null : NECRO()>=3 ? ['done',"Vesna taught you the dead's own words: Grave Grasp, Bone Spear and Bone Shield."]
   : (CHOICE.necroQ==='listen'||CHOICE.necroQ==='motes') ? ['active',"Sit by three graves in the Dunhollow graveyard at night and keep still until each has spoken. Maren by the east wall wants her blue spool (Bertha at the Wheatsheaf)"+(hasItem('blue_spool')?' ✓':'')+"; Gerrit the miller wants a loaf"+(hasItem('bread')?' ✓':'')+"; the nameless one by the west wall wants her name (Old Wenna)"+(CHOICE.ilseName?' ✓':'')+". ("+(CHOICE.listened||[]).length+"/3)"]
   : NECRO()===0 ? ['active',"Vesna the Grave-Speaker walks the Dunhollow graveyard at night. She offered to teach you words no staff knows by itself."]
-  : NECRO()===1 ? ['active', CHOICE.necroQ==='hanged' ? (hasItem('hanged_bones')?"Bring the hanged man's bones to Vesna, with three old bones from men who died badly. ("+player.inv.filter(x=>x==='old_bone').length+"/3)":"Cut the hanged man down from the gallows on the King's Road at night, for Vesna.") : "You know Grave Grasp. Vesna has the next lesson for you in the graveyard."]
+  : NECRO()===1 ? ['active', CHOICE.necroQ==='hanged' ? (hasItem('hanged_bones')?"Bring the hanged man's bones to Vesna, with three old bones from men who died badly. ("+invCount('old_bone')+"/3)":"Cut the hanged man down from the gallows on the King's Road at night, for Vesna.") : "You know Grave Grasp. Vesna has the next lesson for you in the graveyard."]
   : ['active', CHOICE.necroQ==='crypt' ? (CHOICE.cryptDone?"Corran lies at rest. Tell Vesna.":"Lead Corran's bones down through the bone-gates of the old crypt under the graveyard.") : "You know Grave Grasp and Bone Spear. Vesna has the last lesson for you in the graveyard."]]);
 
 // the grave-speaker's clothes: dark, worn, laced with bone
@@ -15324,7 +15357,7 @@ AREA_TIER.emberpass=4; AREA_TIER.emberforge=5;
 if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
 
 // ── the story: the captain's blade, three ember cores, and the forge spirit who wakes the steel ──
-const coreCount=()=>player.inv.filter(x=>x==='ember_core').length;
+const coreCount=()=>invCount('ember_core');
 let ILKA_SKIP=false;
 function ilkaTalk(){
   if(!ILKA_SKIP && CHOICE.reforge==='asked' && hasItem('rusted_blade') && CHOICE.warden){ say('Ilka, Spirit of the Forge',["“Grave-iron. Someone buried that in water and expected it to stay there.”","“Give it here. Fire does in a breath what a grindstone does in a day.”"],[
@@ -15909,7 +15942,7 @@ function pupStatus(){
 const PUP_RAW_FISH=['fish_perch','fish_trout','fish_carp','fish_eel','fish_herring'], PUP_FOODS=['cooked_meat','raw_meat','grilled_fish',...PUP_RAW_FISH];   // wolves eat fish too, raw or off the fire
 function pupFeedMenu(){
   if(CHOICE.pupLast===pupDayNo()){ say('Marta the Trader',["“No. Look at them: three bellies like drums, flat on their sides.”","“They have had theirs today. Any more and they will burst. Come back tomorrow.”"],[{label:'Back.',fn:traderTalk},bye]); return; }
-  const nc=player.inv.filter(x=>x==='cooked_meat').length, nr=player.inv.filter(x=>x==='raw_meat').length, ng=player.inv.filter(x=>x==='grilled_fish').length, rf=player.inv.find(x=>PUP_RAW_FISH.includes(x)), nf=player.inv.filter(x=>PUP_RAW_FISH.includes(x)).length;
+  const nc=invCount('cooked_meat'), nr=invCount('raw_meat'), ng=invCount('grilled_fish'), rf=player.inv.find(x=>PUP_RAW_FISH.includes(x)), nf=player.inv.filter(x=>PUP_RAW_FISH.includes(x)).length;
   say('Marta the Trader',"“Meat or fish, roasted or raw, they will not care. They will care very much about how much of it there is.”",[
     {label:'Give a piece of roast meat.', off:!nc, note:'×'+nc, fn:()=>pupFeed('cooked_meat')},
     {label:'Give a piece of raw meat.', off:!nr, note:'×'+nr, fn:()=>pupFeed('raw_meat')},
@@ -16547,7 +16580,7 @@ function paintNecklaceIcon(g2,L,size){
         g2.fillStyle=L.col; g2.beginPath(); g2.moveTo(q.x-1.6,q.y); g2.quadraticCurveTo(q.x+lean*0.3-0.6,q.y+l*0.7,q.x+lean,q.y+l); g2.quadraticCurveTo(q.x+0.6,q.y+l*0.4,q.x+1.6,q.y); g2.closePath(); g2.fill(); g2.strokeStyle='#8a7a58'; g2.lineWidth=0.7; g2.stroke(); }); }
     g2.restore(); }
 // Brann strings wolf teeth into a necklace: three fangs and a day's patience
-{ const oldBr=TALKERS.hunter; TALKERS.hunter=()=>{ const day=Math.floor(dayClock/DAY_LEN), fangs=player.inv.filter(x=>x==='wolf_fang').length, W=CHOICE.wolfNeck;
+{ const oldBr=TALKERS.hunter; TALKERS.hunter=()=>{ const day=Math.floor(dayClock/DAY_LEN), fangs=invCount('wolf_fang'), W=CHOICE.wolfNeck;
     if(typeof W==='number'){ if(day<=W){ say('Brann the Hunter',["“Tomorrow. A tooth splits if you rush it.”"],[{label:'Something else.',fn:oldBr},bye]); return; }
       if(player.inv.indexOf(null)<0){ say('Brann the Hunter',"“Your necklace is done, but your pack's full. Make room.”",[bye]); return; }
       say('Brann the Hunter',["<i>Brann tosses you a leather thong strung with wolf teeth, the biggest in the middle, each one drilled and lashed tight.</i>","“Greymaw's cousins. Wear it and you'll move like them. Lighter on your feet.”"],[{label:'Put it on.', fn:()=>{ CHOICE.wolfNeck='done'; giveQuestItem('wolf_necklace'); logMsg('Brann made you a Wolf-Tooth Necklace. (Neck: +3 agility, +1 health)','#8ac070'); closeDialog(); }}]); return; }
@@ -16956,7 +16989,7 @@ function beltPick(i,el){ let m=document.getElementById('belt-pick');
   m.innerHTML=''; const add=(id,label,note)=>{ const b=document.createElement('button'); b.type='button';
     if(id){ const cv=document.createElement('canvas'); cv.width=cv.height=40; cv.style.width=cv.style.height='20px'; drawItemIcon(cv.getContext('2d'),id,40); b.appendChild(cv); }
     b.insertAdjacentHTML('beforeend',label+(note?'<small>'+note+'</small>':'')); b.addEventListener('click',()=>{ m.style.display='none'; setBelt(i,id); }); m.appendChild(b); };
-  foods.forEach(id=>{ const n=player.inv.filter(x=>x===id).length; add(id,ITEMS[id].name+(id===cur?' ✓':''),(ITEMS[id].mana?'+'+ITEMS[id].mana+' mana':'+'+ITEMS[id].heal+' HP')+' · '+n); });
+  foods.forEach(id=>{ const n=invCount(id); add(id,ITEMS[id].name+(id===cur?' ✓':''),(ITEMS[id].mana?'+'+ITEMS[id].mana+' mana':'+'+ITEMS[id].heal+' HP')+' · '+n); });
   if(cur) add(null,'Leave this slot empty','');
   const r=el.getBoundingClientRect(); m.style.display='flex'; m.style.left=Math.min(innerWidth-m.offsetWidth-8,r.left)+'px'; m.style.top=Math.max(8,Math.min(innerHeight-m.offsetHeight-8,r.bottom+4))+'px'; }
 function buildBeltUI(){ if(document.getElementById('belt-box')) return;
@@ -16968,7 +17001,7 @@ function buildBeltUI(){ if(document.getElementById('belt-box')) return;
   for(let i=0;i<BELT_N;i++){ const el=document.createElement('div'); el.className='bslot'; el.dataset.kind='belt'; el.dataset.key=i;
     el.addEventListener('click',()=>beltPick(i,el)); grid.appendChild(el); } }
 function refreshBelt(){ buildBeltUI(); const B=beltIds();
-  document.querySelectorAll('#belt-grid .bslot').forEach((el,i)=>{ const id=B[i], n=id?player.inv.filter(x=>x===id).length:0, k=(id||'')+'|'+n;
+  document.querySelectorAll('#belt-grid .bslot').forEach((el,i)=>{ const id=B[i], n=id?invCount(id):0, k=(id||'')+'|'+n;
     if(el._k===k) return; el._k=k; el.innerHTML=''; el.classList.toggle('none',!!id && !n);
     if(id){ const cv=document.createElement('canvas'); cv.width=cv.height=96; cv.style.width=cv.style.height='44px'; drawItemIcon(cv.getContext('2d'),id,96); el.appendChild(cv);
       el.insertAdjacentHTML('beforeend','<span class="bn">'+n+'</span>'); el.title=ITEMS[id].name+' ('+(ITEMS[id].mana?'+'+ITEMS[id].mana+' mana':'+'+ITEMS[id].heal+' HP')+'), you carry '+n+'. Click to change.'; }
@@ -17328,12 +17361,12 @@ WEAPON_ART.grave_blade=(c,hx,hy,ang,id,s)=>drawGraveBlade(c,hx,hy,ang,s);
 ITEM_ICON.grave_blade=ITEM_ICON.clean_blade=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); if(id==='grave_blade') drawGraveBlade(g2,8,32,-Math.PI/4,1.25); else drawWeapon(g2,8,32,-Math.PI/4,'sword',1.25); g2.restore(); };
 const REFORGE_BONES=5, REFORGE_SKULLS=1;
 const rfDay=()=>Math.floor(dayClock/DAY_LEN);
-const rfHave=()=>player.inv.filter(x=>x==='old_bone').length>=REFORGE_BONES && player.inv.filter(x=>x==='old_skull').length>=REFORGE_SKULLS;
+const rfHave=()=>invCount('old_bone')>=REFORGE_BONES && invCount('old_skull')>=REFORGE_SKULLS;
 JOURNAL.push(['The Grave-Blade Reforged', ()=> !CHOICE.reforge ? null
   : CHOICE.reforge==='done' ? ['done',"Vesna bound the dead into the grave-blade Oswin cleaned for you: the Bone-Bound Blade."]
   : CHOICE.reforge==='asked' ? ['active',"Vesna will wake the rusted grave-blade, but the steel is rotten. Take it to Oswin the Armourer in Hollowmere's market to have it cleaned and given a new edge"+(CHOICE.warden?", or to Ilka in the Sunken Forge, whose fire does it at once.":".")]
   : CHOICE.reforge==='smith' ? ['active',"Oswin is grinding the rust off the grave-blade. Come back to him "+(rfDay()>CHOICE.reforgeDay?'now: it should be ready.':'tomorrow.')]
-  : ['active',"Bring the cleaned blade back to Vesna, with "+REFORGE_BONES+" old bones and "+REFORGE_SKULLS+" skull for her to bind into it. (You have "+player.inv.filter(x=>x==='old_bone').length+" bones and "+player.inv.filter(x=>x==='old_skull').length+" skull.)"]]);
+  : ['active',"Bring the cleaned blade back to Vesna, with "+REFORGE_BONES+" old bones and "+REFORGE_SKULLS+" skull for her to bind into it. (You have "+invCount('old_bone')+" bones and "+invCount('old_skull')+" skull.)"]]);
 { const oV=TALKERS.vesna; TALKERS.vesna=(...a)=>{ const V='Vesna the Grave-Speaker';
     if(!CHOICE.reforge && hasItem('rusted_blade')){ say(V,["“Someone was buried with that, and they have not finished with it. I can wake what is left in it. But not in this. The steel is rotten through: wake it like this and it will snap in your first fight.”"],[
         {label:'“Then what do I do?”', fn:()=>{ remember('reforge','asked',"Vesna will wake the rusted grave-blade once a smith has made the steel sound. Oswin the Armourer, in Hollowmere's market."); updateHud();
@@ -17798,7 +17831,7 @@ ITEM_ICON.glass_jar=ITEM_ICON.bottled_wisp=ITEM_ICON.ember_heart=(g2,id,size)=>{
 // ── what he says ──
 function mageAskLabel(){ const n=(CHOICE.mageKnown||[]).length; return CHOICE.mageQ ? 'About the lesson.' : (n && n<3) ? 'Ask for the next lesson.' : 'Ask about magic.'; }
 function mageTalk(){ const O='Magister Orvell', K=CHOICE.mageKnown=Array.isArray(CHOICE.mageKnown)?CHOICE.mageKnown:[], back={label:'Back.', fn:()=>TALKERS.orvell()};
-  const cnt=id=>player.inv.filter(x=>x===id).length, take=(id,n)=>{ for(let q=0;q<n;q++){ const k=player.inv.indexOf(id); if(k>=0) player.inv[k]=null; } };
+  const cnt=id=>invCount(id), take=(id,n)=>{ for(let q=0;q<n;q++){ const k=player.inv.indexOf(id); if(k>=0) player.inv[k]=null; } };
   const learn=(dir,name)=>{ if(!K.includes(dir)) K.push(dir); CHOICE.mageQ=null; updateHud(); logMsg('You learned '+name+'. Open your spellbook (B) to give it a direction.','#9adcf0'); try{ autosaveSoon(300); }catch(e){} };
   const jars=()=>{ for(let q=cnt('glass_jar')+cnt('bottled_wisp');q<3;q++) giveQuestItem('glass_jar',true); };
   if(!CHOICE.mageQ && !K.length && CHOICE.mageZ!=='done'){                       // quest zero: a staff you fetched the wood for yourself
@@ -17832,7 +17865,7 @@ function mageTalk(){ const O='Magister Orvell', K=CHOICE.mageKnown=Array.isArray
 JOURNAL.push(["The Magister's Lessons", ()=>{ const K=CHOICE.mageKnown||[]; if(!K.length && !CHOICE.mageQ) return null;
   if(K.length>=3) return ['done',"Magister Orvell taught you what no staff knows by itself: Doppelganger, Ice Ward and Kindle."+(CHOICE.tessLesson?" Tessaly taught you to whisper them.":"")];
   if(CHOICE.appr==='taken') return ['failed',"Orvell will not teach you any more, after what you did to Tessaly."];
-  if(CHOICE.mageQ==='light') return ['active',"Catch three wisps in Orvell's jars in the Mistmere at night. Walk at them and they run; stand still and they come close. ("+player.inv.filter(x=>x==='bottled_wisp').length+"/3)"];
+  if(CHOICE.mageQ==='light') return ['active',"Catch three wisps in Orvell's jars in the Mistmere at night. Walk at them and they run; stand still and they come close. ("+invCount('bottled_wisp')+"/3)"];
   if(CHOICE.mageQ==='cold') return ['active',"Bathe in the Willow Pool at midnight, then walk home to Dunhollow without warming yourself at a fire, a hearth or a bed. ("+(CHOICE.baths||0)+"/2 nights)"+(CHOICE.coldWalk?" You are cold to the bone: walk.":"")];
   if(CHOICE.mageQ==='ember') return ['active',"Speak the kindling word over three old fires (the Bandit Camp, Hunter's Clearing, the Fellings) and put out the ember-sprites. ("+(CHOICE.embers||[]).length+"/3)"];
   return ['active',"Magister Orvell has another lesson for you, "+(ORVELL_AT_INN()?"in the Wheatsheaf in Dunhollow.":"in the Castle Ward of Hollowmere.")]; }]);
@@ -17846,7 +17879,7 @@ OBJ_DRAW.mwisp=o=>{ const n=Math.max(0.5,nightAmt()), q=P(o.x,o.y), t=gt*1.3+o.s
 { let MW=[], still=0, last=null, noJar=0; const HOMES=[[2,2],[11,2],[12,8],[8,4]];
   setInterval(()=>{ try{ const dt=0.05, want=running && areaId==='mistmere' && CHOICE.mageQ==='light' && nightAmt()>0.5 && !combat.active;
       if(!want || MW.some(o=>!OBJECTS.includes(o))){ MW.forEach(o=>{ const q=OBJECTS.indexOf(o); if(q>=0) OBJECTS.splice(q,1); }); MW=[]; if(!want) return; }
-      const left=3-player.inv.filter(x=>x==='bottled_wisp').length;
+      const left=3-invCount('bottled_wisp');
       if(!MW.length && left>0){ for(let k=0;k<Math.min(left+1,4);k++){ const [hi,hj]=HOMES[k]; const o={type:'mwisp', i:hi, j:hj, x:hi+0.5, y:hj+0.5, hx:hi+0.5, hy:hj+0.5, vx:0, vy:0, flee:0, seed:k*1.7, noblock:true}; MW.push(o); OBJECTS.push(o); } }
       const mv=last?Math.hypot(player.x-last.x,player.y-last.y):0; last={x:player.x,y:player.y}; still= (mv<0.002 && !dlgIsOpen()) ? still+dt : 0;
       MW.slice().forEach(o=>{ const dx=o.x-player.x, dy=o.y-player.y, d=Math.hypot(dx,dy)||0.01; let tx=0, ty=0, sp=0;
@@ -17860,7 +17893,7 @@ OBJ_DRAW.mwisp=o=>{ const n=Math.max(0.5,nightAmt()), q=P(o.x,o.y), t=gt*1.3+o.s
         if(d<0.6 && still>2.5){ const k=player.inv.indexOf('glass_jar');
           if(k<0){ if(gt-noJar>6){ noJar=gt; logMsg('The wisp hangs in front of your face. You have no jar to put it in.','#a8c8e8'); } return; }
           player.inv[k]='bottled_wisp'; const q=OBJECTS.indexOf(o); if(q>=0) OBJECTS.splice(q,1); MW.splice(MW.indexOf(o),1);
-          const n=player.inv.filter(x=>x==='bottled_wisp').length; banner('A wisp in a jar ('+n+'/3)','#bfe0ff',1500); floatText(tileOf(player),'✦','#d8ecff');
+          const n=invCount('bottled_wisp'); banner('A wisp in a jar ('+n+'/3)','#bfe0ff',1500); floatText(tileOf(player),'✦','#d8ecff');
           logMsg(n<3?'It drifts right into the jar, as if it wanted to see inside. You cork it.':'The third light bumps against the glass. Take them to Orvell.','#bfe0ff'); } });
     }catch(e){} },50); }
 
@@ -18327,11 +18360,11 @@ JOURNAL.push(["A Staff of Blackthorn", ()=> !CHOICE.necroZ ? null : CHOICE.necro
     if(!CHOICE.necroZ && (CHOICE.necroQ || NECRO()>=1)) CHOICE.necroZ='done'; }catch(e){} return r; }; }
 // ════════ GESTURES: people move as they speak, and what changes hands is seen changing hands ════════
 let GEST_INV=null, GEST_WHO=null, GEST_SHOP=false; const FLIES=[];
-const gestSnap=()=>({inv:player.inv.slice(), purse:player.purse});
+const gestSnap=()=>({inv:invFlat(), purse:player.purse});
 function dlgWho(name){ const t=TALK_NPC; if(t && NPCS.includes(t) && (!name || t.name===name || String(name).startsWith(String(t.name).split(',')[0]))) return t;
   return (typeof npcByName==='function' && name && npcByName(name)) || null; }
 function gestHandover(){ const prev=GEST_INV, n=GEST_WHO, shop=GEST_SHOP; GEST_SHOP=false; if(!prev || !n || !NPCS.includes(n)) return; GEST_INV=gestSnap(); if(shop) return;
-  const cnt=a=>{ const m={}; a.forEach(x=>{ if(x) m[x]=(m[x]||0)+1; }); return m; }, A=cnt(prev.inv), B=cnt(player.inv); let k=0;
+  const cnt=a=>{ const m={}; a.forEach(x=>{ if(x) m[x]=(m[x]||0)+1; }); return m; }, A=cnt(prev.inv), B=cnt(invFlat()); let k=0;
   for(const id in B) for(let q=(A[id]||0); q<B[id] && k<6; q++) fly(id,n,player,k++);
   for(const id in A) for(let q=(B[id]||0); q<A[id] && k<6; q++) fly(id,player,n,k++);
   const dp=player.purse-prev.purse; if(dp>0) fly('$',n,player,k); else if(dp<0) fly('$',player,n,k); }
@@ -18959,7 +18992,7 @@ setInterval(()=>{ try{ const b=document.getElementById('p-tech'); if(!b) return;
     b.classList.toggle('busy', duel.st!=='ready' || !ok || (player.mom||0)<T.cost); }catch(e){} },120);
 // ── the teachers ──
 { const prevBrann=TALKERS.hunter; TALKERS.hunter=()=>{ if(techKnown('lunge') || !(QUEST.wolves>=2)) return prevBrann();
-    const meat=player.inv.filter(x=>x==='raw_meat').length;
+    const meat=invCount('raw_meat');
     say('Brann the Hunter',["“You killed the wolves. Badly. You stand there and trade blows like a man splitting logs. A wolf doesn't. It waits, and then it's at your throat in one motion.”","“Two cuts of raw meat for my dogs, and I'll show you the <b>lunge</b>.”"],[
       {label:meat>=2?'Give him two cuts of meat.':'(You need two cuts of raw meat.)', off:meat<2, fn:()=>{ for(let k=0;k<2;k++) player.inv[player.inv.indexOf('raw_meat')]=null; updateHud();
         say('Brann the Hunter',["“Hide on a stump, stick for you.”","“Weight on the back foot. Wait for his arm to go up. Then everything at once: foot, hip, point. Again. Again. …There. Through the hide.”","“That. Through his guard, or into his swing before it lands. It costs you breath, so earn it first: block, parry, hit clean.”"],[{label:'Learn the Lunge.', fn:()=>{ learnTech('lunge'); closeDialog(); }}]); }},
@@ -19453,7 +19486,7 @@ ITEM_ICON.worm_scale=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); const
   g2.strokeStyle='rgba(90,60,20,0.6)'; g2.lineWidth=0.8; [14,20,26].forEach(y=>{ g2.beginPath(); g2.moveTo(11,y+2); g2.quadraticCurveTo(20,y-3,29,y+2); g2.stroke(); }); g2.fillStyle='rgba(255,250,220,0.6)'; g2.beginPath(); g2.ellipse(15,13,3,1.6,-0.6,0,Math.PI*2); g2.fill(); g2.restore(); };
 // Tamir works the scales: a day at the anvil for each piece
 const WYRM_RECIPES=[['wyrm_hauberk',5,120],['wyrm_shield',2,40],['wyrm_helm',2,40]];
-{ const oldT=TALKERS.tamir; TALKERS.tamir=(...a)=>{ const T='Tamir the Bladesmith', day=Math.floor(dayClock/DAY_LEN), sc=player.inv.filter(x=>x==='worm_scale').length, W=CHOICE.wyrmWork;
+{ const oldT=TALKERS.tamir; TALKERS.tamir=(...a)=>{ const T='Tamir the Bladesmith', day=Math.floor(dayClock/DAY_LEN), sc=invCount('worm_scale'), W=CHOICE.wyrmWork;
     if(W && typeof W.day==='number'){ if(day<=W.day){ say(T,["“Not yet. Scale cracks if you rivet it cold. Tomorrow.”"],[{label:'Something else.',fn:()=>oldT(...a)},bye]); return; }
       if(player.inv.indexOf(null)<0){ say(T,"“It is done, but you have nowhere to put it. Make room.”",[bye]); return; }
       say(T,["<i>Tamir lifts it off the anvil, still warm, and knocks a knuckle against it. It rings.</i>","“There. Nothing in the Sunscar will bite through that. I know. I tried.”"],[{label:'Take it.', fn:()=>{ const id=W.id; CHOICE.wyrmWork=null; giveQuestItem(id,true); logMsg('Tamir made you a '+ITEMS[id].name+'.','#8ac070'); closeDialog(); }}]); return; }
@@ -19550,7 +19583,7 @@ TALKERS.hamid_cage=()=>{ const H='Hamid', night=mesaNight();
         else { say('Cage Guard',["“Hey! HEY! Up! Somebody's at the cage!”"],[{label:'Fight.', fn:()=>{ CHOICE.mesaWoke=true; mesaFight(['Tarek of the Red Mesa',...MESA_GUARDS.map(x=>x[0])]); }}]); } }},
       {label:'Not yet.', fn:closeDialog}]); return; }
   say(H,[night?"“The guard's awake. Wait for him to nod off, or talk to Tarek.”":"“Talk to Tarek. Or come back after dark, when the guard sleeps. Either way, please hurry. They feed me once a day, and not well.”"],[bye]); };
-TALKERS.tarek=()=>{ const T='Tarek of the Red Mesa', sc=player.inv.filter(x=>x==='worm_scale').length;
+TALKERS.tarek=()=>{ const T='Tarek of the Red Mesa', sc=invCount('worm_scale');
   if(CHOICE.caravan==='freed'){ say(T,[CHOICE.hamidHow==='duel'?"“The one who put me on my back. Sit by the fire, if you like. Nobody here will touch you.”":"“Kadir's friend. The road through the dunes is yours. Mine too, but we'll share it.”"],[bye]); return; }
   const opts=[];
   if(hasItem('ransom_purse')) opts.push({label:"Hand over Kadir's ransom.", fn:()=>say(T,["<i>He weighs the purse in one hand and doesn't bother to count it.</i>","“Kadir always pays. That's why I keep taking his brother.” <i>He tosses a key to the cage guard.</i> “Let him go.”"],[{label:'Open the cage.', fn:()=>mesaFree('paid')}])});
@@ -19653,9 +19686,9 @@ ITEM_ICON.scarab_chitin=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); co
   g2.fillStyle='rgba(230,200,110,0.45)'; g2.beginPath(); g2.ellipse(17,14,5,2.4,-0.6,0,Math.PI*2); g2.fill(); g2.restore(); };
 // Tamir works chitin too, and the two together into boots the worm can't hear
 const CHITIN_RECIPES=[['chitin_cuirass',{scarab_chitin:3},60,'“Three plates for the cuirass.”'],['scarab_shield',{scarab_chitin:2},30,'“Two for a shield.”'],['sand_boots',{scarab_chitin:2,worm_scale:1},50,'“And if you have a worm scale to spare: boots. The Mouth listens for feet. These it won’t hear.”']];
-{ const oldT=TALKERS.tamir; TALKERS.tamir=(...a)=>{ const T='Tamir the Bladesmith', day=Math.floor(dayClock/DAY_LEN), ch=player.inv.filter(x=>x==='scarab_chitin').length;
+{ const oldT=TALKERS.tamir; TALKERS.tamir=(...a)=>{ const T='Tamir the Bladesmith', day=Math.floor(dayClock/DAY_LEN), ch=invCount('scarab_chitin');
     if(!ch || (CHOICE.wyrmWork && typeof CHOICE.wyrmWork.day==='number')) return oldT(...a);
-    const cnt=id=>player.inv.filter(x=>x===id).length, can=need=>Object.entries(need).every(([id,n])=>cnt(id)>=n);
+    const cnt=id=>invCount(id), can=need=>Object.entries(need).every(([id,n])=>cnt(id)>=n);
     const opts=CHITIN_RECIPES.filter(([id,need])=>can(need)).map(([id,need,c])=>({label:'“Make me '+(id==='sand_boots'?'Sandwalker Boots':id==='chitin_cuirass'?'a chitin cuirass':'a scarab shield')+".” ("+Object.entries(need).map(([k,n])=>n+' '+(k==='worm_scale'?'worm scale':'chitin')).join(', ')+', '+formatCoin(c)+')', fn:()=>{
         if(player.purse<c){ say(T,"“The shell I have. The coin I don't. "+formatCoin(c)+".”",[bye]); return; }
         Object.entries(need).forEach(([k,n])=>{ for(let q=0;q<n;q++) player.inv[player.inv.indexOf(k)]=null; }); player.purse-=c; CHOICE.wyrmWork={id,day}; updateHud(); logMsg('Tamir will have your '+ITEMS[id].name+' ready tomorrow.','#8ac070');
@@ -20178,10 +20211,10 @@ ITEM_ICON.moonbell=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.stro
 const BELL_AREAS=['mistmere','elfroad','silvergate','sylvhaven','heartwood'];
 function bellSpots(){ const d=Math.floor(dayClock/DAY_LEN), out=[]; for(let k=0;k<4;k++){ const a=BELL_AREAS[Math.floor(rnd01(d,k,611)*BELL_AREAS.length)]; out.push({a, k, d}); } return out; }
 
-{ const _cp=collectPickup; collectPickup=function(o){ const had=player.inv.filter(x=>x==='moonbell').length; const r=_cp.apply(this,arguments);
-    try{ if(o && o.item==='moonbell' && player.inv.filter(x=>x==='moonbell').length>had){ const d=Math.floor(dayClock/DAY_LEN); if(!CHOICE.bells||CHOICE.bells.d!==d) CHOICE.bells={d,got:[]}; CHOICE.bells.got.push(o.bell); collectedPickups.delete(areaId+':'+o.i+','+o.j); } }catch(e){}
+{ const _cp=collectPickup; collectPickup=function(o){ const had=invCount('moonbell'); const r=_cp.apply(this,arguments);
+    try{ if(o && o.item==='moonbell' && invCount('moonbell')>had){ const d=Math.floor(dayClock/DAY_LEN); if(!CHOICE.bells||CHOICE.bells.d!==d) CHOICE.bells={d,got:[]}; CHOICE.bells.got.push(o.bell); collectedPickups.delete(areaId+':'+o.i+','+o.j); } }catch(e){}
     return r; }; }
-{ const oldL=TALKERS.lirael; TALKERS.lirael=(...a)=>{ if(havenBurnt()) return oldL(...a); const n=player.inv.filter(x=>x==='moonbell').length, d=Math.floor(dayClock/DAY_LEN);
+{ const oldL=TALKERS.lirael; TALKERS.lirael=(...a)=>{ if(havenBurnt()) return oldL(...a); const n=invCount('moonbell'), d=Math.floor(dayClock/DAY_LEN);
     if(CHOICE.liraelBell===d) return say('Sentinel Lirael',["“Four thousand and twelve, four thousand and thirteen… You brought me bells today already. Come back tomorrow.”"],[bye]);
     say('Sentinel Lirael',["“Four thousand and twelve, four thousand and thirteen… leaves. I count them every spring. You made me lose my place.”", n>=4?"“Moonbells! Four of them. Those I do not have to count, they count themselves.”":"“If you find moonbells in the woods, bring me four. They grow somewhere new each day, white, like little bells. I will pay you in leaves; I have a great many.”"],[
       ...(n>=4?[{label:'Give her four moonbells.', fn:()=>{ for(let k=0;k<4;k++){ const q=player.inv.indexOf('moonbell'); if(q>=0) player.inv[q]=null; } CHOICE.liraelBell=d; addLeaves(1,'moonbells for Lirael'); say('Sentinel Lirael',"“One leaf. Do not tell me you would rather have coin.”",[bye]); }}]:[]), bye]); }; }
@@ -20234,6 +20267,56 @@ function elowenTalk(){ const d=Math.floor(dayClock/DAY_LEN), done=CHOICE.hwDay==
 TALKERS.elowen=elowenTalk;
 // Marta no longer sells elven boots: the elves trade their weaving for favour, not coin
 
+// ════════ DRYADS: the tree-folk of the elven woods. Half elf, half tree, bare as a sapling, and in no hurry ════════
+SKINS[24]='#c4b690'; SKINS[25]='#9c8460'; SKINS[26]='#a9b07c';          // birch, oak, willow bark
+HAIR_COLORS[20]='#56802f'; HAIR_COLORS[21]='#86a23c'; HAIR_COLORS[22]='#b0642a';   // leaf greens, and one in autumn
+const DRY_BARE={head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:null,offhand:null};
+const DRYADS=[   // where they walk, and what they are
+  { id:'dry_birch', name:'Birch', area:'heartwood', i:8, j:8, g:'f', skin:24, hair:3, hc:21, leaf:['#7aa844','#a8c860'], spots:true,
+    lines:["“You walk loud. Like rain on a roof.” <i>She tilts her head, and the leaves in her hair turn with it.</i>","“The big tree is my mother. Or my grandmother. We stopped counting rings.”","“The bright motes are shy. Stand still and they come. Run and they go. Like everything.”"] },
+  { id:'dry_oak', name:'Old Oak', area:'heartwood', i:3, j:5, g:'m', skin:25, hair:0, hc:20, leaf:['#4f7a2a','#6d9a38'],
+    lines:["“Hm.” <i>A long pause. A beetle walks across his shoulder and he lets it.</i> “Hm.”","“Men came with axes, once. They went away without them.”","“Sit a hundred years and you learn the trick of it. Then stand up again.”"] },
+  { id:'dry_willow', name:'Willow', area:'sylvhaven', i:9, j:8, g:'f', skin:26, hair:3, hc:20, leaf:['#8ab050','#b8d070'],
+    lines:["“The elves wear clothes. We tried it. It itched.”","“Bring water to the roots by the pool, someday. Not today. Today is for standing.”","“Lirael sings to us when she thinks nobody hears.”"] },
+  { id:'dry_rowan', name:'Rowan', area:'silvergate', i:5, j:5, g:'f', skin:25, hair:0, hc:22, leaf:['#c0702a','#e0a040'], berries:true,
+    lines:["“Rowan keeps bad things out. That is what my berries are for. Not for eating. Well. Not for you.”","“The gate is silver. I am wood. I was here first.”","“You smell of iron and smoke. Go and wash in the moon pool, little one.”"] },
+  { id:'dry_hazel', name:'Hazel', area:'elfroad', i:3, j:14, g:'f', skin:24, hair:3, hc:20, leaf:['#6a9a3a','#9ac050'], day:true,
+    lines:["“The road was ours before it was a road. The stones came later. They are very rude.”","“If you see Ithilwen, tell her the nuts are nearly ripe.”","<i>She laughs, a dry rustling sound, and does not answer at all.</i>"] } ];
+function drawDryad(n,x,y,sw){ const D=n.dryad, S=2;
+  if(!n._dc){ n._dc=document.createElement('canvas'); n._dc.width=260; n._dc.height=330; n._dat=-9; }
+  if(gt-n._dat>0.07 || gt<n._dat || n._ddir!==n.dir || n._dmv!==n.moving){ n._dat=gt; n._ddir=n.dir; n._dmv=n.moving;
+    const c=n._dc.getContext('2d'); c.setTransform(1,0,0,1,0,0); c.globalCompositeOperation='source-over'; c.clearRect(0,0,260,330); c.setTransform(S,0,0,S,130,292);
+    const sg=g; g=c; try{ drawChar(c,0,0,n.opts,sw,n.dir||0,n.moving?NPC_POSE(n):null); } finally{ g=sg; }
+    const side=(n.dir===2||n.dir===6), W=side?0.7:1, t=gt+n.i;
+    c.globalCompositeOperation='source-atop';                                          // bark grain over the skin, but not the face
+    c.strokeStyle='rgba(58,38,18,0.30)'; c.lineWidth=0.7;
+    for(let k=-17;k<=17;k+=2.4){ c.beginPath(); for(let yy=-73;yy<=4;yy+=3){ const xx=k*W+Math.sin(yy*0.17+k)*0.8; yy===-73?c.moveTo(xx,yy):c.lineTo(xx,yy); } c.stroke(); }
+    if(D.spots){ c.fillStyle='rgba(40,30,20,0.55)'; for(let q=0;q<16;q++){ const yy=-70+((q*37)%72), xx=(((q*53)%30)-15)*W; c.fillRect(xx,yy,2.4,0.7); } }   // birch marks
+    const mg=c.createLinearGradient(0,-16,0,5); mg.addColorStop(0,'rgba(70,100,35,0)'); mg.addColorStop(1,'rgba(70,100,35,0.55)'); c.fillStyle=mg; c.fillRect(-25,-16,50,22);   // moss at the shins
+    c.strokeStyle='#3c5620'; c.lineWidth=1.1; c.beginPath(); c.moveTo(-9*W,-71); c.bezierCurveTo(11*W,-62,-11*W,-50,8*W,-34); c.stroke();          // ivy, shoulder to hip
+    const ivy=[[0.12,-6,-67],[0.3,3,-61],[0.5,-1,-53],[0.7,-3,-45],[0.88,4,-38],[0.97,7,-35]];
+    ivy.forEach(([u,lx,ly],q)=>{ c.fillStyle=D.leaf[q%2]; c.save(); c.translate(lx*W,ly); c.rotate((q%2?0.7:-0.6)+Math.sin(t*1.3+q)*0.12); c.beginPath(); c.ellipse(0,0,3.2,1.8,0,0,Math.PI*2); c.fill(); c.restore(); });
+    c.globalCompositeOperation='source-over';
+    c.strokeStyle='#5a4028'; c.lineWidth=1.4; c.lineCap='round';                            // a crown of twigs, and leaves in the hair
+    const tw=[[-4,-92,-10,-106,-15,-103],[4,-92,10,-107,15,-100],[0,-95,1,-108,-3,-111]];
+    tw.forEach(([a,b,cx2,cy2,ex,ey])=>{ c.beginPath(); c.moveTo(a*W,b); c.quadraticCurveTo(cx2*W,cy2,ex*W,ey+Math.sin(t*0.9)*0.6); c.stroke(); });
+    for(let q=0;q<14;q++){ const ang=-Math.PI+q*(Math.PI/13), r=10+(q%3)*1.5, lx=Math.cos(ang)*r*W, ly=-86+Math.sin(ang)*r*0.95;
+      c.fillStyle=D.leaf[q%2]; c.save(); c.translate(lx,ly); c.rotate(ang+Math.PI/2+Math.sin(t*1.1+q)*0.15); c.beginPath(); c.ellipse(0,0,1.9,3.6,0,0,Math.PI*2); c.fill(); c.restore(); }
+    tw.forEach(([,, ,, ex,ey],q)=>{ c.fillStyle=D.leaf[(q+1)%2]; c.beginPath(); c.ellipse(ex*W,ey,2.2,3.4,0.5,0,Math.PI*2); c.fill(); });
+    if(D.berries){ c.fillStyle='#d03a20'; [[-7,-98],[-5,-97],[8,-99],[10,-97],[9,-95]].forEach(([bx,by])=>{ c.beginPath(); c.arc(bx*W,by,1.2,0,Math.PI*2); c.fill(); }); }
+    if(!n.moving){ c.strokeStyle='rgba(84,60,34,0.85)'; c.lineWidth=1; [[-4,-13,4],[-3,-9,5],[4,13,4],[3,9,5]].forEach(([fx,ex,ey])=>{ c.beginPath(); c.moveTo(fx*W,1); c.quadraticCurveTo((fx+ex)/2*W,4,ex*W,ey); c.stroke(); }); }   // standing still, she roots
+  }
+  if(nightAmt()>0.3) glow(x,y-50,26,46,'150,220,120',0.12*nightAmt());              // a faint green light about them after dark
+  g.drawImage(n._dc,x-65,y-146,130,165); }
+function dryadNPCs(area){ const out=[]; const A=AREAS[area];
+  for(const D of DRYADS){ if(D.area!==area) continue; if((area==='sylvhaven'||area==='heartwood') && havenBurnt()) continue; if(D.day && nightAmt()>0.5) continue;
+    const pts=[]; for(let q=0;q<7;q++) pts.push([Math.max(1,Math.min(A.w-2,D.i+((q*5)%7)-3)),Math.max(1,Math.min(A.h-2,D.j+((q*3)%7)-3))]);
+    out.push({ id:D.id, name:D.name, named:true, i:D.i, j:D.j, dir:0, path:[], wait:Math.random()*3, wander:pts, speed:0.7, dryad:D,
+      opts:{gender:D.g, race:'elf', skin:D.skin, hair:D.hair, hairColor:D.hc, face:D.g==='f'?1:2, beard:0, eyeColor:3, equip:{...DRY_BARE}} });
+    TALKERS[D.id]=()=>{ const k=(Math.floor(dayClock/DAY_LEN)+(CHOICE['dry_'+D.id]||0))%D.lines.length; CHOICE['dry_'+D.id]=(CHOICE['dry_'+D.id]||0)+1;
+      say(D.name,[D.lines[k]],[bye]); }; }
+  return out; }
+['heartwood','sylvhaven','silvergate','elfroad'].forEach(a=>wrap(a,'npcs',l=>[...l,...dryadNPCs(a)]));
 // ════════ PLAYTEST RECORDER: switch it on in the Menu, play, then download the file and hand it over ════════
 // It notes what happened, not what you pressed: fights and how each blow was met, deaths, places, quests, talk, the journal and map,
 // buying, selling and gear. It stays in this browser (its own storage, never the saves) until you download or clear it.

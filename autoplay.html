@@ -143,7 +143,7 @@ function equipBest(){ const u=upgrades(); if(!u.length) return false; const {k,i
   try{ if(moveItem({kind:'inv',key:k},{kind:'eq',key:sl})){ delete player.opts._ck; refreshPlayerHp(false); updateHud(); S.equips.push({id,t:gt,lvl:lvl()}); note('Puts on '+ITEMS[id].name+(was&&ITEMS[was]?' (instead of '+ITEMS[was].name+')':''),'gear'); return true; } }catch(e){}
   return false; }
 const healK=()=>{ let best=-1, bh=0; player.inv.forEach((id,k)=>{ const h=id&&ITEMS[id]&&!ITEMS[id].cure&&ITEMS[id].heal; if(h && (best<0||h>bh)){ best=k; bh=h; } }); return best; };
-const healCount=()=>player.inv.filter(id=>id&&ITEMS[id]&&ITEMS[id].heal&&!ITEMS[id].cure).length;
+const healCount=()=>(typeof invFlat==='function'?invFlat():player.inv).filter(id=>id&&ITEMS[id]&&ITEMS[id].heal&&!ITEMS[id].cure).length;
 function isJunk(id){ if(!id||!ITEMS[id]) return false; if(typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(id)) return false; const it=ITEMS[id];
   if(it.heal||it.mana||it.cure) return false; if(id==='shovel'||id==='fishing_rod'||id==='bottled_wisp') return false;
   if(WEAR.includes(it.slot)){ if(it.slot==='weapon' && WEAPONS[id] && WEAPONS[id].magic && CASTER) return gscore(id)<gscore(player.opts.equip.weapon)-5; return gscore(id)<=gscore(player.opts.equip[it.slot]); }
@@ -215,8 +215,8 @@ function dialogStep(){
       const pick=can.find(c=>{ const id=c.querySelector('.shop-slot').dataset.item, it=ITEMS[id]; return it && WEAR.includes(it.slot) && itemFits(id,player.opts.gender) && gscore(id)>gscore(player.opts.equip[it.slot])+1.5; })
         || (healCount()<3 && player.purse>25 ? can.find(c=>{ const id=c.querySelector('.shop-slot').dataset.item; return ITEMS[id] && ITEMS[id].heal && !ITEMS[id].cure; }) : null)
         || (!hasSpade() && (CHOICE.moundSeen || journal()['Buried Things']) && player.purse>=12 ? can.find(c=>c.querySelector('.shop-slot').dataset.item==='shovel') : null)
-        || (CASTER && player.purse>40 && player.inv.filter(id=>id&&ITEMS[id]&&ITEMS[id].mana).length<2 ? can.find(c=>{ const id=c.querySelector('.shop-slot').dataset.item; return ITEMS[id] && ITEMS[id].mana; }) : null);
-      if(pick && player.inv.includes(null)){ const id=pick.querySelector('.shop-slot').dataset.item; pick.click(); S.buys.push({id,t:gt,lvl:lvl()}); note('Buys '+ITEMS[id].name,'gear'); return; } } }
+        || (CASTER && player.purse>40 && (typeof invFlat==='function'?invFlat():player.inv).filter(id=>id&&ITEMS[id]&&ITEMS[id].mana).length<2 ? can.find(c=>{ const id=c.querySelector('.shop-slot').dataset.item; return ITEMS[id] && ITEMS[id].mana; }) : null);
+      if(pick && (player.inv.includes(null) || (typeof slotFor==='function' && slotFor(pick.querySelector('.shop-slot').dataset.item)>=0))){ const id=pick.querySelector('.shop-slot').dataset.item; pick.click(); S.buys.push({id,t:gt,lvl:lvl()}); note('Buys '+ITEMS[id].name,'gear'); return; } } }
   if(name==='A Bed' && /How long do you sleep/.test(text)){ const want=(CHOICE.bruised || player.hp<player.maxHp*0.8); const b=btns.find(x=>want?/next morning/.test(x.innerText):/^Not now/.test(x.innerText))||btns[btns.length-1]; if(want) note('Sleeps until morning','move'); b.click(); return; }
   { const d=btns.find(x=>/^Get dressed/.test(x.innerText)); if(d){ d.click(); note('Gets dressed again','gear'); return; } }
   const ck=name+'|'+text.slice(0,80); let mem=DLG.chosen[ck]; if(!mem || day()-mem.d>=2) mem=DLG.chosen[ck]={set:new Set(), d:day()}; const done=mem.set;

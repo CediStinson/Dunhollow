@@ -10037,7 +10037,7 @@ function wennaTalk(){
 function diggerTalk(){
   if(CHOICE.grave && (CHOICE.ada || TRAIL_DEAD()) && !CHOICE.shade){ say('Old Tobb',["“Something weeps in the yard at night. At Edric's grave. I've buried folk sixty years and never heard the dead complain.”","“The elder says it's owls. The elder doesn't sleep next to a graveyard. Come after dark, would you? See what it wants. I'll pay what I can.”"],[
     {label:'“I will come after dark.”', fn:()=>{ remember('shade','asked','Something weeps at Edric\'s grave after dark. Tobb wants to know what it is.'); say('Old Tobb',"“Bless you. Bring a light. And maybe don't bring the ring, if you've got it.”",[bye]); }}, bye]); return; }
-  if(CHOICE.shade==='rest' && !CHOICE.shadePaid){ CHOICE.shadePaid=true; player.purse+=10; updateHud(); giveQuestItem('necro_bustier',true); say('Old Tobb',["“Quiet as a church, last night. Here. Ten coppers, and I'll dig your grave for free when it's time. Not soon, I hope.”","“Found this in the old crypt when I dug for Edric. A fen-woman's bodice, black and frayed, smelling of peat. Whoever she was, she was buried proud. Didn't feel right selling it. Feels right giving it to you.” <i>You receive 10 copper and a Fen-Witch's Bodice.</i>"],[bye]); return; }
+  if(CHOICE.shade==='rest' && !CHOICE.shadePaid){ CHOICE.shadePaid=true; player.purse+=10; updateHud(); say('Old Tobb',["“Quiet as a church, last night. Here. Ten coppers, and I'll dig your grave for free when it's time. Not soon, I hope.” <i>You receive 10 copper.</i>"],[bye]); return; }
   if(CHOICE.shadePaid && NECRO()>=1 && !CHOICE.tobbStaff && !hasItem('staff_bone')){ say('Old Tobb',["“So you're learning from her. Hm.” <i>He fetches something long wrapped in sacking.</i> “Dug it out of the old ossuary, under the chapel. Bones bound to a yew pole. I've not slept right since it came in the house. Sixty coppers and it's yours, and good riddance.”"],[
       {label:'Buy the Ossuary Staff.', off:player.purse<60, note:'-60c', fn:()=>{ player.purse-=60; updateHud(); CHOICE.tobbStaff=true; giveQuestItem('staff_bone'); say('Old Tobb',"“Don't bring it back. Ever.”",[bye]); }},
       {label:'“Not now.”', fn:closeDialog}]); return; }
@@ -10347,10 +10347,13 @@ function aerwenTalk(){
   opts.push(bye);
   say('Lady Aerwen',[greet],opts);
 }
-function maelisTalk(){
+function maelisTalk(){                            // she weaves for Silver Leaves (see SILVER LEAVES below); coin buys only worn things
   const disc = player.opts.race==='elf' || CHOICE.pact || hasItem('leaf') ? 0.8 : 1;   // the leaf speaks for you
-  const stock=todaysStock('maelis',['elf_tunic','elf_robe','robe_elf','elf_bustier','elf_leggings','elf_boots','elf_cloak','elf_circlet'],4);
-  shopFrom('Maelis the Weaver',stock,disc,[disc<1 ? "“For a friend of Sylvhaven, a friend's price.”" : "“Human coin. How charming. It will do.”","Only a few pieces hang from the pavilion poles today. Elven weaving takes its time."]);
+  const back=()=>TALKERS.maelis();
+  say('Maelis the Weaver',["“Good, you came. The loom has been asking.”"],[
+    {label:'“What will you weave for leaves?”', fn:()=>leafTrade(back)},
+    {label:'Worn things, for coin.', fn:()=>shopFrom('Maelis the Weaver',todaysStock('maelisworn',['elf_boots_worn','elf_tunic_worn','elf_leggings_worn','elf_shirt','elf_trousers'].filter(id=>ITEMS[id]&&PRICES[id]),3),disc,[disc<1 ? "“For a friend of Sylvhaven, a friend's price.”" : "“Human coin. For worn things, it will do.”"],back)},
+    bye]);
 }
 function tirnelTalk(){
   if(CHOICE.tirnel){ const t={goat:"“Eleven verses and the goat NEVER COMES DOWN. It is the saddest thing I have ever heard.”",cheese:"“Cheese, on bread.”",sad:"“Mostly terrible,” he repeats, and writes it down. “Mostly. That leaves room.”"}[CHOICE.tirnel]; say('Tirnel the Poet',t,[bye]); return; }
@@ -11762,7 +11765,6 @@ function shopBuy(){
   const MARTA_POOL=['potion','mana_potion','warm_tonic','linen_wrap','tunic_blue','tunic_green','tunic_red','tunic_linen','smock','breeches','hose_grey','hood','hood_red','straw_hat','gambeson','jerkin','studded','gloves','boots','riding_boots','kettle','coif','mail','shield','shield_red','shield_iron','dagger','hatchet','club','spear','sword','axe','mace','robe'];
   const day=Math.floor(dayClock/DAY_LEN), n=3+(rnd01(day,5,412)<0.5?1:0);                                   // three or four things a day, food included
   const stock=todaysStock('marta',['apple','bread',...MARTA_POOL].filter(id=>ITEMS[id]),n); stock.key='marta';
-  if(CHOICE.pact==='trade' && !havenBurnt() && !SOLD_TODAY.has('marta'+Math.floor(dayClock/DAY_LEN)+'elf_boots')) stock.push('elf_boots');   // only once the elves trade with the valley
   shopFrom('Marta the Trader',stock,disc,"“Take your time. The rest comes on tomorrow's cart.”",traderTalk);
 }
 function shopSell(){ const had=hasItem('moonbloom'); sellTo('Marta the Trader',traderTalk);
@@ -15058,8 +15060,8 @@ function vesnaTalk(){ const n=NECRO(), V='Vesna the Grave-Speaker';
     if(!hasItem('hanged_bones')){ say(V,"“The gallows on the King's Road. At night, when he is talkative. Cut him down.”"+(nb<3?` And bones: ${nb} of three.`:''),[bye]); return; }
     if(nb<3){ say(V,`“His bones, good. And three more from men who died badly. You have ${nb}. Bandits, cutthroats, the Baron's hired knives: they all carry bones, whether they like it or not.”`,[bye]); return; }
     const done=kept=>{ player.inv[player.inv.indexOf('hanged_bones')]=null; for(let q=0;q<3;q++) player.inv[player.inv.indexOf('old_bone')]=null;
-      CHOICE.necro=2; CHOICE.necroQ=null; CHOICE.hanged=kept?'kept':'buried'; if(kept) giveQuestItem('hanged_skull',true); giveQuestItem('necro_leggings',true); updateHud();
-      logMsg('You learned Bone Spear. Open your spellbook (B) to give it a direction. Vesna gives you a pair of frayed fen stockings.','#b8a8e8'); };
+      CHOICE.necro=2; CHOICE.necroQ=null; CHOICE.hanged=kept?'kept':'buried'; if(kept) giveQuestItem('hanged_skull',true); updateHud();
+      logMsg('You learned Bone Spear. Open your spellbook (B) to give it a direction.','#b8a8e8'); };
     say(V,["“The bones on the grass: the hanged man's in the middle, the other three round him like a fence. Now watch. Snap the thigh-bone, so, and— there. Straight through the fence post. <b>Bone Spear</b>. Old bone is the hardest thing there is: shields and wards do not stop it. Put it in your spellbook.”","“Now. Tobb has a hole ready. Or you can keep his skull. Some of us like a keepsake.”"],[
       {label:'Bury him. Let Tobb say the words.', fn:()=>{ done(false); say(V,"“Tobb filled the hole himself, and muttered something I think was a prayer. Listen. On the King's Road, the rope has stopped creaking.”",[bye]); }},
       {label:'Keep his skull.', fn:()=>{ done(true); say(V,["<i>Vesna hands you the skull without comment. It is surprisingly light.</i>","“He will not like that. You may hear about it, on the road, at night.”"],[bye]); }}]); return; }
@@ -15068,7 +15070,7 @@ function vesnaTalk(){ const n=NECRO(), V='Vesna the Grave-Speaker';
         {label:'“Open the crypt.”', fn:()=>{ remember('necroQ','crypt',"Vesna has opened the old crypt under the graveyard. Lead Corran's bones down through the bone-gates to his rest."); logMsg('The crypt gate stands open. Go down.','#b8a8e8'); closeDialog(); }}, bye]); return; }
     if(!CHOICE.cryptDone){ say(V,"“The crypt, at the back of the yard. Corran is waiting for you just inside. Walk slowly: he is old.”",[bye]); return; }
     say(V,["“You felt him stand, didn't you, when you came near him? And lie down again when you brought him home.”","“He knelt for you. Bones remember who they stood for. Now, when your risen one stands beside you, call it again, and it will throw itself between you and the blow. <b>Bone Shield</b>. It costs you the skeleton. It is worth it.”"],[
-      {label:'Learn Bone Shield.', fn:()=>{ CHOICE.necro=3; CHOICE.necroQ=null; giveQuestItem('necro_robe',true); updateHud(); logMsg('You learned Bone Shield: while your skeleton stands, cast Raise Dead again. Vesna gives you her old robe.','#b8a8e8');
+      {label:'Learn Bone Shield.', fn:()=>{ CHOICE.necro=3; CHOICE.necroQ=null; updateHud(); logMsg('You learned Bone Shield: while your skeleton stands, cast Raise Dead again.','#b8a8e8');
         say(V,"“That is all I have. The fen has older dead than these, if you want to see what the words can do: a hag who stole my lantern, and a drowned king under the reeds. Use it kindly. Or at least on people who deserve it.”",[bye]); }}]); return; }
   say(V,[FEN_OPEN()?"“The fen is quieter since you came. I don't know if that is good.”":"“The dead are quieter since you came. They have someone to talk to.”"],[bye]); }
 TALKERS.vesna=vesnaTalk;
@@ -20118,6 +20120,115 @@ function hudLevel(){ let b=document.getElementById('lvl-badge'); const hm=docume
   if(!b){ b=document.createElement('div'); b.id='lvl-badge'; hm.parentNode.appendChild(b); const x=document.createElement('div'); x.id='hp-mini-xp'; hm.appendChild(x); }
   b.style.display = hm.style.display==='none' || getComputedStyle(hm).display==='none' ? 'none' : 'flex'; b.textContent='Lv '+playerLevel();
   const x=document.getElementById('hp-mini-xp'); if(x) x.style.width=(playerLevel()>=LV_MAX?100:100*xpInto()/Math.max(1,xpNeed()))+'%'; }
+
+// ════════ SILVER LEAVES and GRAVE TALLIES: the elven and the necromancer's things are earned, not bought ════════
+//  Silver Leaves: for helping Sylvhaven (each elven task once), the Heartwood's light once a day, Lirael's moonbells once a day. Maelis weaves for leaves.
+//  Grave Tallies: for Vesna's lessons and the dead you lay to rest for her (once a night). Vesna trades her things for tallies.
+const LEAF_QUESTS={ 'The Trapped Scout':2, 'The Silver Gate':3, 'The Axes in the Fellings':3, 'The Moon Pool':2, 'The Moonlit Mirrors':2, 'A Flower for Maren':2, "Lady Aerwen's Gift":3, 'The Moonsilver Focus':2 };
+const TALLY_QUESTS={ 'A Staff of Blackthorn':2, 'The Grave-Speaker':3, 'The Drowned Barrow':3, "Vesna's Lantern":2, 'The Grave-Blade Reforged':2, 'Contract: The Weeping Grave':2 };
+const LEAF_WARES=[['elf_boots',3],['elf_leggings',3],['elf_tunic',4],['elf_circlet',5],['elf_bustier',5],['elf_robe',6],['elf_cloak',6],['robe_elf',8],['elf_scale',12]];
+const TALLY_WARES=[['necro_leggings',3],['necro_bustier',4],['grave_salt',4],['necro_robe',6],['staff_bone',8]];
+const leaves=()=>CHOICE.leaves||0, tallies=()=>CHOICE.tallies||0;
+function addLeaves(n,why){ CHOICE.leaves=leaves()+n; floatText(tileOf(player),'+'+n+' Silver Lea'+(n>1?'ves':'f'),'#cfe8d8',true); logMsg('+'+n+' Silver Lea'+(n>1?'ves':'f')+(why?' ('+why+')':'')+'. You hold '+CHOICE.leaves+'.','#cfe8d8'); updateHud(); }
+function addTallies(n,why){ CHOICE.tallies=tallies()+n; floatText(tileOf(player),'+'+n+' Grave Tall'+(n>1?'ies':'y'),'#c8b8e0',true); logMsg('+'+n+' Grave Tall'+(n>1?'ies':'y')+(why?' ('+why+')':'')+'. You hold '+CHOICE.tallies+'.','#c8b8e0'); updateHud(); }
+// tasks done: credit them once (a save from before tokens gets its leaves and tallies for what it already did, quietly, in one line)
+setInterval(()=>{ try{ if(!running || combat.active) return; const st=t=>{ const e=JOURNAL.find(x=>x[0]===t); try{ const r=e&&e[1](); return r?r[0]:null; }catch(err){ return null; } };
+    const first=CHOICE.tokenVer!==1; CHOICE.leafQ=CHOICE.leafQ||{}; CHOICE.tallyQ=CHOICE.tallyQ||{}; let lsum=0, tsum=0;
+    for(const t in LEAF_QUESTS) if(!CHOICE.leafQ[t] && st(t)==='done'){ CHOICE.leafQ[t]=1; if(first) lsum+=LEAF_QUESTS[t]; else addLeaves(LEAF_QUESTS[t],'Sylvhaven remembers: '+t); }
+    for(const t in TALLY_QUESTS) if(!CHOICE.tallyQ[t] && st(t)==='done'){ CHOICE.tallyQ[t]=1; if(first) tsum+=TALLY_QUESTS[t]; else addTallies(TALLY_QUESTS[t],'Vesna marks it: '+t); }
+    const nl=NECRO(); if((CHOICE.tallyN||0)<nl){ const d=nl-(CHOICE.tallyN||0); CHOICE.tallyN=nl; if(first) tsum+=2*d; else addTallies(2*d,'a lesson learned'); }
+    if(first){ CHOICE.tokenVer=1; if(lsum){ CHOICE.leaves=leaves()+lsum; logMsg('For what you have already done for Sylvhaven: '+lsum+' Silver Leaves. Maelis weaves for leaves now.','#cfe8d8'); }
+      if(tsum){ CHOICE.tallies=tallies()+tsum; logMsg('For what you have already done for Vesna: '+tsum+' Grave Tallies.','#c8b8e0'); } }
+  }catch(e){} },3000);
+// what you hold, in the journal
+JOURNAL.push(['The Favour of Sylvhaven', ()=> !(CHOICE.leaves!=null || CHOICE.hwDay!=null) ? null : ['active',"You hold <b>"+leaves()+" Silver Lea"+(leaves()===1?'f':'ves')+"</b>. Maelis in Sylvhaven weaves for leaves, not coin. Every elven task brings a few; once a day the Heartwood east of Sylvhaven lets you gather its light, and Sentinel Lirael takes four moonbells from the elven woods."]]);
+JOURNAL.push(["Vesna's Tallies", ()=> !(CHOICE.tallies!=null) ? null : ['active',"You hold <b>"+tallies()+" Grave Tall"+(tallies()===1?'y':'ies')+"</b>. Vesna trades her things for tallies: her lessons bring some, and once a night she has work for you, laying three of the restless dead to rest."]]);
+// ── Maelis weaves for leaves; only the plain worn things are still for coin ──
+function leafTrade(back){ const opts=LEAF_WARES.filter(([id])=>ITEMS[id] && itemFits(id,player.opts.gender)).map(([id,c])=>({ label:ITEMS[id].name+' ('+c+' leaves)', off:leaves()<c, note:c+' lv', fn:()=>{
+      if(player.inv.indexOf(null)<0){ say('Maelis the Weaver',"“Your pack is full. I will keep it until you have room.”",[{label:'Back.',fn:()=>leafTrade(back)},bye]); return; }
+      CHOICE.leaves=leaves()-c; giveQuestItem(id); updateHud(); logMsg('Maelis weaves you '+ITEMS[id].name+' for '+c+' Silver Leaves.','#cfe8d8');
+      say('Maelis the Weaver',["“There. It will remember you.”","<i>She folds it once, the way elves fold things, and hands it over.</i>"],[{label:'Back.',fn:()=>leafTrade(back)},bye]); } }));
+  say('Maelis the Weaver',["“I do not weave for coin. Coin is only metal. Leaves are what Sylvhaven owes you.”","<i>You hold "+leaves()+" Silver Lea"+(leaves()===1?'f':'ves')+".</i>"],[...opts, {label:'Back.',fn:back}, bye]); }
+// (Maelis's own talk, further up, now offers the leaf trade and only the worn things for coin)
+// ── Vesna trades her things for tallies, and at night she has work ──
+function tallyTrade(back){ const V='Vesna the Grave-Speaker';
+  const opts=TALLY_WARES.filter(([id])=>ITEMS[id] && itemFits(id,player.opts.gender)).map(([id,c])=>({ label:ITEMS[id].name+' ('+c+' tallies)', off:tallies()<c, note:c+' t', fn:()=>{
+      if(player.inv.indexOf(null)<0){ say(V,"“Your pack is full.”",[{label:'Back.',fn:()=>tallyTrade(back)},bye]); return; }
+      CHOICE.tallies=tallies()-c; giveQuestItem(id); updateHud(); logMsg('Vesna gives you '+ITEMS[id].name+' for '+c+' Grave Tallies.','#c8b8e0');
+      say(V,"“Take care of it. The last one who wore it did not.”",[{label:'Back.',fn:()=>tallyTrade(back)},bye]); } }));
+  say(V,["“The dead pay their debts. So do I.”","<i>You hold "+tallies()+" Grave Tall"+(tallies()===1?'y':'ies')+".</i>"],[...opts,{label:'Back.',fn:back},bye]); }
+const VN=()=>{ const d=Math.floor((dayClock+DAY_LEN*0.25)/DAY_LEN); if(!CHOICE.vnight || CHOICE.vnight.d!==d) CHOICE.vnight={d, n:0, on:false, paid:false}; return CHOICE.vnight; };   // a night counts from dusk to dawn
+{ const oldV=TALKERS.vesna; TALKERS.vesna=(...a)=>{ if(NECRO()<1 && !CHOICE.tallies) return oldV(...a); const V='Vesna the Grave-Speaker', N=VN(), back=()=>TALKERS.vesna();
+    const work = N.paid ? [] : N.on ? (N.n>=3 ? [{label:'“Three of them lie still.”', fn:()=>{ N.paid=true; addTallies(2,'a night’s work'); say(V,"“Good. They were tired of walking.”",[{label:'Back.',fn:back},bye]); }}] : [])
+      : nightAmt()>0.4 ? [{label:'“Any work tonight?”', fn:()=>{ N.on=true; N.n=0; say(V,["“Always. Three of the restless dead are up tonight somewhere: the fen, the crypt, the barrow-road. Lay three to rest and come back before the light.”"],[{label:'Back.',fn:back},bye]); }}] : [];
+    say(V,[N.on && !N.paid ? (N.n>=3 ? "“Three. I felt them go quiet.”" : "“"+N.n+" of three. The night is not over.”") : "“Speak.”"],[...work, {label:'“What will you trade for tallies?”', fn:()=>tallyTrade(back)}, {label:'Something else.', fn:()=>oldV(...a)}, bye]); }; }
+{ const _fd=foeDown; foeDown=function(f){ const r=_fd.apply(this,arguments);
+    try{ const N=CHOICE.vnight; if(N && N.on && !N.paid && N.d===Math.floor((dayClock+DAY_LEN*0.25)/DAY_LEN) && f && (f.type==='skeleton' || /Dead|Bones|Drowned|Risen|Bell-Ringer/.test(f.name||''))){ N.n++; floatText(tileOf(player),'Laid to rest ('+Math.min(3,N.n)+'/3)','#c8b8e0'); } }catch(e){}
+    return r; }; }
+// ── Lirael counts leaves, and takes moonbells: four grow somewhere in the elven woods each day ──
+Object.assign(ITEMS,{ moonbell:{ name:'Moonbell', slot:'misc', title:'A small white bell-flower that opens at dusk and smells faintly of rain.' } });
+QUEST_ITEMS.add('moonbell');
+ITEM_ICON.moonbell=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.strokeStyle='#5a8a5a'; g2.lineWidth=1.6; g2.beginPath(); g2.moveTo(20,36); g2.quadraticCurveTo(18,22,24,12); g2.stroke();
+  [[24,12],[15,18],[27,22]].forEach(([x,y],k)=>{ g2.fillStyle=k?'#e8eef8':'#ffffff'; g2.beginPath(); g2.moveTo(x-4,y); g2.quadraticCurveTo(x,y-7,x+4,y); g2.quadraticCurveTo(x+3,y+3,x,y+2); g2.quadraticCurveTo(x-3,y+3,x-4,y); g2.fill(); g2.strokeStyle='#9ab0c8'; g2.lineWidth=0.6; g2.stroke(); });
+  g2.restore(); };
+const BELL_AREAS=['mistmere','elfroad','silvergate','sylvhaven','heartwood'];
+function bellSpots(){ const d=Math.floor(dayClock/DAY_LEN), out=[]; for(let k=0;k<4;k++){ const a=BELL_AREAS[Math.floor(rnd01(d,k,611)*BELL_AREAS.length)]; out.push({a, k, d}); } return out; }
+
+{ const _cp=collectPickup; collectPickup=function(o){ const had=player.inv.filter(x=>x==='moonbell').length; const r=_cp.apply(this,arguments);
+    try{ if(o && o.item==='moonbell' && player.inv.filter(x=>x==='moonbell').length>had){ const d=Math.floor(dayClock/DAY_LEN); if(!CHOICE.bells||CHOICE.bells.d!==d) CHOICE.bells={d,got:[]}; CHOICE.bells.got.push(o.bell); collectedPickups.delete(areaId+':'+o.i+','+o.j); } }catch(e){}
+    return r; }; }
+{ const oldL=TALKERS.lirael; TALKERS.lirael=(...a)=>{ if(havenBurnt()) return oldL(...a); const n=player.inv.filter(x=>x==='moonbell').length, d=Math.floor(dayClock/DAY_LEN);
+    if(CHOICE.liraelBell===d) return say('Sentinel Lirael',["“Four thousand and twelve, four thousand and thirteen… You brought me bells today already. Come back tomorrow.”"],[bye]);
+    say('Sentinel Lirael',["“Four thousand and twelve, four thousand and thirteen… leaves. I count them every spring. You made me lose my place.”", n>=4?"“Moonbells! Four of them. Those I do not have to count, they count themselves.”":"“If you find moonbells in the woods, bring me four. They grow somewhere new each day, white, like little bells. I will pay you in leaves; I have a great many.”"],[
+      ...(n>=4?[{label:'Give her four moonbells.', fn:()=>{ for(let k=0;k<4;k++){ const q=player.inv.indexOf('moonbell'); if(q>=0) player.inv[q]=null; } CHOICE.liraelBell=d; addLeaves(1,'moonbells for Lirael'); say('Sentinel Lirael',"“One leaf. Do not tell me you would rather have coin.”",[bye]); }}]:[]), bye]); }; }
+// ── the Heartwood: a glade east of Sylvhaven around the oldest tree, where its light drifts loose once a day ──
+AREAS.heartwood={ fence:{r:false,l:false}, w:12, h:12, theme:'elf', dens:0.08, label:'The Heartwood', mini:{x:0,y:0}, notches:()=>[], dummy:null,   // an open glade: trees only at the rim
+  objects:()=>[ {type:'teleporter', i:0, j:6, to:'sylvhaven', entry:'fromHeart'},
+    {type:'tree', i:6, j:5, sp:'silver', v:1, s:3.8, ox:0, oy:0},
+    {type:'lantern', i:3, j:3, off:havenBurnt()}, {type:'lantern', i:9, j:3, off:havenBurnt()}, {type:'lantern', i:3, j:9, off:havenBurnt()}, {type:'lantern', i:9, j:9, off:havenBurnt()},
+    {type:'critter', kind:'flowers', i:2, j:8, noblock:true}, {type:'critter', kind:'flowers', i:10, j:6, noblock:true}, {type:'critter', kind:'flowers', i:7, j:10, noblock:true} ],
+  npcs:()=> havenBurnt() ? [] : [{ id:'elowen', name:'Elowen of the Heartwood', i:4, j:7, dir:1, opts:ELFO({gender:'f',skin:0,hair:3,hairColor:11,face:1,equip:{head:'elf_circlet',torso:'elf_robe',armor:'elf_cloak',hands:null,legs:'elf_leggings',feet:'elf_boots',weapon:null,offhand:null}}) }],
+  mobs:()=>[], entries:{ fromHaven:{i:1,j:6} } };
+AREA_TIER.heartwood=2;
+wrap('sylvhaven','objects',l=>[...l,{type:'teleporter', i:13, j:6, to:'heartwood', entry:'fromHaven'}]);
+AREAS.sylvhaven.entries.fromHeart={i:12,j:6};
+BELL_AREAS.forEach(area=>wrap(area,'objects',l=>{ if(typeof havenBurnt==='function' && havenBurnt()) return l; const d=Math.floor(dayClock/DAY_LEN), got=(CHOICE.bells&&CHOICE.bells.d===d)?CHOICE.bells.got:[];
+  const A=AREAS[area], busy=new Set(l.map(o=>o.i+','+o.j)); const add=[];
+  bellSpots().forEach(s=>{ if(s.a!==area || got.includes(s.k)) return; for(let tries=0;tries<30;tries++){ const i=1+Math.floor(rnd01(d*7+tries,s.k,613)*(A.w-2)), j=1+Math.floor(rnd01(d*5+tries,s.k,617)*(A.h-2));
+      if(busy.has(i+','+j) || l.some(o=>o.fp && i>=o.i && i<o.i+o.fp[0] && j>=o.j && j<o.j+o.fp[1])) continue; busy.add(i+','+j); add.push({type:'pickup', i, j, item:'moonbell', bell:s.k, day:d}); break; } });
+  return [...l, ...add]; }));
+// the light: motes drift round the tree; walk into them. Rush at one and it shies away, so do not run straight at the gold ones.
+OBJ_DRAW.hmote=o=>{ const q=P(o.x,o.y), t=gt*1.6+o.seed, x=q.x+Math.sin(t)*3, y=q.y-34-o.h+Math.sin(t*1.4)*5, gold=o.gold, a=Math.min(1,o.life/1.2);
+  g.save(); g.globalCompositeOperation='lighter'; glow(x,y,gold?26:20,gold?26:20,gold?'255,215,120':'180,240,210',0.55*a); glow(x,y,8,8,'255,255,240',0.6*a);
+  g.fillStyle=gold?`rgba(255,240,190,${a})`:`rgba(235,255,245,${a})`; g.beginPath(); g.arc(x,y,gold?3.2:2.4,0,Math.PI*2); g.fill(); g.restore(); };
+let HW=null;                                  // the gathering in progress: {t, score, motes:[]}
+function hwHud(){ let el=document.getElementById('hw-hud'); if(!el){ el=document.createElement('div'); el.id='hw-hud'; el.style.cssText='position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:44;font:bold 14px Georgia,serif;color:#e8f4e0;text-shadow:0 1px 3px #000;letter-spacing:1px;pointer-events:none'; document.body.appendChild(el); }
+  el.style.display=HW?'block':'none'; if(HW) el.textContent='Light gathered: '+HW.score+'   ·   '+Math.ceil(HW.t)+'s'; }
+function hwStart(){ HW={t:45, score:0, motes:[], spawn:0}; hwHud(); banner('Gather the light','#e8f4e0',1600); }
+function hwEnd(){ const s=HW.score; HW.motes.forEach(o=>{ const q=OBJECTS.indexOf(o); if(q>=0) OBJECTS.splice(q,1); }); HW=null; hwHud();
+  const n= s>=40?3 : s>=25?2 : s>=12?1 : 0; CHOICE.hwDay=Math.floor(dayClock/DAY_LEN); CHOICE.hwBest=Math.max(CHOICE.hwBest||0,s);
+  const E=NPCS.find(x=>x.id==='elowen');
+  if(n) addLeaves(n,'the Heartwood’s light'); say('Elowen of the Heartwood',[n>=3?"“The tree has not been this glad in a long while.”":n?"“It gave you something. It does not give to everyone.”":"“It hid from you today. Walk softer tomorrow.”","<i>You gathered "+s+" light"+(n?' and she presses '+n+' silver lea'+(n>1?'ves':'f')+' into your hand.':'.')+"</i>"],[bye]); }
+setInterval(()=>{ try{ if(!HW) return; if(!running || areaId!=='heartwood' || combat.active){ HW.motes.forEach(o=>{ const q=OBJECTS.indexOf(o); if(q>=0) OBJECTS.splice(q,1); }); HW=null; hwHud(); return; }
+    const dt=0.05; HW.t-=dt; HW.spawn-=dt;
+    if(HW.spawn<=0 && HW.motes.length<9){ HW.spawn=0.45+Math.random()*0.5; const a=Math.random()*Math.PI*2, r=1.6+Math.random()*3.2, gold=Math.random()<0.18;
+      const o={type:'hmote', x:6.5+Math.cos(a)*r, y:5.5+Math.sin(a)*r, a, r, sp:(Math.random()<0.5?-1:1)*(0.25+Math.random()*0.35), h:Math.random()*20, gold, life:gold?5:7+Math.random()*3, seed:Math.random()*6, noblock:true};
+      o.i=Math.floor(o.x); o.j=Math.floor(o.y); HW.motes.push(o); OBJECTS.push(o); }
+    const mv=HW.last?Math.hypot(player.x-HW.last.x,player.y-HW.last.y)/dt:0; HW.last={x:player.x,y:player.y};
+    HW.motes.slice().forEach(o=>{ o.life-=dt; o.a+=o.sp*dt; let tx=6.5+Math.cos(o.a)*o.r, ty=5.5+Math.sin(o.a)*o.r;
+      const dx=o.x-player.x, dy=o.y-player.y, d=Math.hypot(dx,dy)||0.01;
+      if(d<1.6 && mv>2.6){ tx=o.x+dx/d*0.9; ty=o.y+dy/d*0.9; }                                   // you came at it fast: it shies
+      o.x+=(tx-o.x)*Math.min(1,dt*(o.gold?3:2)); o.y+=(ty-o.y)*Math.min(1,dt*(o.gold?3:2)); o.x=Math.max(0.7,Math.min(11.3,o.x)); o.y=Math.max(0.7,Math.min(11.3,o.y)); o.i=Math.floor(o.x); o.j=Math.floor(o.y);
+      const gone=()=>{ const q=OBJECTS.indexOf(o); if(q>=0) OBJECTS.splice(q,1); HW.motes.splice(HW.motes.indexOf(o),1); };
+      if(d<0.62){ HW.score+=o.gold?3:1; floatText([o.x-0.5,o.y-0.5],o.gold?'+3':'+1',o.gold?'#ffe0a0':'#d8f8e8'); try{ SND.fx('coin'); }catch(e){} gone(); return; }
+      if(o.life<=0) gone(); });
+    hwHud(); if(HW.t<=0) hwEnd(); }catch(e){} },50);
+function elowenTalk(){ const d=Math.floor(dayClock/DAY_LEN), done=CHOICE.hwDay===d;
+  say('Elowen of the Heartwood',[CHOICE.hwDay==null?"“This is the oldest tree in the wood. Older than Sylvhaven; we built the town to keep it company.”":"“You came back. The tree noticed.”",
+    done?"“It has given its light for today. Come tomorrow.”":"“Once a day its light comes loose and drifts. Walk into it and it is yours, but do not rush at it, it is shy. The gold is shyest.”"],[
+    ...(done?[]:[{label:'Gather the light.', fn:()=>{ closeDialog(); setTimeout(hwStart,300); }}]), bye]); }
+TALKERS.elowen=elowenTalk;
+// Marta no longer sells elven boots: the elves trade their weaving for favour, not coin
 
 // ════════ PLAYTEST RECORDER: switch it on in the Menu, play, then download the file and hand it over ════════
 // It notes what happened, not what you pressed: fights and how each blow was met, deaths, places, quests, talk, the journal and map,

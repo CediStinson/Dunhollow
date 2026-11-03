@@ -18965,9 +18965,10 @@ setInterval(()=>{ try{ const b=document.getElementById('p-tech'); if(!b) return;
         say('Brann the Hunter',["“Hide on a stump, stick for you.”","“Weight on the back foot. Wait for his arm to go up. Then everything at once: foot, hip, point. Again. Again. …There. Through the hide.”","“That. Through his guard, or into his swing before it lands. It costs you breath, so earn it first: block, parry, hit clean.”"],[{label:'Learn the Lunge.', fn:()=>{ learnTech('lunge'); closeDialog(); }}]); }},
       {label:'Something else.', fn:prevBrann}, bye]); }; }
 { const prevSmith=TALKERS.smith; TALKERS.smith=()=>{ if(techKnown('bash')) return prevSmith();
+    if((CHOICE.reforge==='asked' && hasItem('rusted_blade')) || CHOICE.reforge==='smith' || (CHOICE.focus==='asked' && !hasItem('silver_setting') && !CHOICE.focusSetting)) return prevSmith();   // a job of yours on his bench comes first
     const shield=/shield/.test(player.opts.equip.offhand||'') || player.inv.some(x=>x && /shield/.test(x));
     say('Oswin the Armourer',["“Buying, or bleeding? You carry a sword like a farm tool. A shield isn't a door to hide behind, you know. It's a hammer with a handle.”"],[
-      {label:'Trade.', fn:prevSmith},
+      {label:'Something else.', fn:prevSmith},
       {label:shield?'“Show me.” (40 copper)':'“Show me.” (bring a shield, and 40 copper)', off:!shield||player.purse<40, note:'-40c', fn:()=>{ player.purse-=40; updateHud();
         say('Oswin the Armourer',["“Out to the yard. Stand there, in front of the padded post.”","“Rim first. Not the face of it, the rim. Step in as he winds up, and put your whole weight behind it. …Hear the post rock? Your shoulder will tell you about it tomorrow.”","“Good. He'll stagger, and he'll be wide open. Use it.”"],[{label:'Learn the Shield Bash.', fn:()=>{ learnTech('bash'); closeDialog(); }}]); }},
       bye]); }; }
@@ -20158,10 +20159,13 @@ function tallyTrade(back){ const V='Vesna the Grave-Speaker';
       say(V,"“Take care of it. The last one who wore it did not.”",[{label:'Back.',fn:()=>tallyTrade(back)},bye]); } }));
   say(V,["“The dead pay their debts. So do I.”","<i>You hold "+tallies()+" Grave Tall"+(tallies()===1?'y':'ies')+".</i>"],[...opts,{label:'Back.',fn:back},bye]); }
 const VN=()=>{ const d=Math.floor((dayClock+DAY_LEN*0.25)/DAY_LEN); if(!CHOICE.vnight || CHOICE.vnight.d!==d) CHOICE.vnight={d, n:0, on:false, paid:false}; return CHOICE.vnight; };   // a night counts from dusk to dawn
-{ const oldV=TALKERS.vesna; TALKERS.vesna=(...a)=>{ if(NECRO()<1 && !CHOICE.tallies) return oldV(...a); const V='Vesna the Grave-Speaker', N=VN(), back=()=>TALKERS.vesna();
-    const work = N.paid ? [] : N.on ? (N.n>=3 ? [{label:'“Three of them lie still.”', fn:()=>{ N.paid=true; addTallies(2,'a night’s work'); say(V,"“Good. They were tired of walking.”",[{label:'Back.',fn:back},bye]); }}] : [])
-      : nightAmt()>0.4 ? [{label:'“Any work tonight?”', fn:()=>{ N.on=true; N.n=0; say(V,["“Always. Three of the restless dead are up tonight somewhere: the fen, the crypt, the barrow-road. Lay three to rest and come back before the light.”"],[{label:'Back.',fn:back},bye]); }}] : [];
-    say(V,[N.on && !N.paid ? (N.n>=3 ? "“Three. I felt them go quiet.”" : "“"+N.n+" of three. The night is not over.”") : "“Speak.”"],[...work, {label:'“What will you trade for tallies?”', fn:()=>tallyTrade(back)}, {label:'Something else.', fn:()=>oldV(...a)}, bye]); }; }
+{ const oldV=TALKERS.vesna; TALKERS.vesna=(...a)=>{ const r=oldV(...a); if(NECRO()<1 && !CHOICE.tallies) return r;
+    const box=document.getElementById('dlg-opts'); if(!dlgOverlay.classList.contains('open') || !box || box.querySelector('.dlg-opt.tally')) return r;
+    const V='Vesna the Grave-Speaker', N=VN(), add=(label,fn)=>{ const b=document.createElement('button'); b.className='dlg-opt tally'; b.innerHTML='<span>'+label+'</span>'; b.addEventListener('click',fn); box.insertBefore(b,box.lastElementChild); };
+    if(!N.paid && N.on && N.n>=3) add('“Three of them lie still.”',()=>{ N.paid=true; addTallies(2,'a night’s work'); say(V,"“Good. They were tired of walking.”",[bye]); });
+    else if(!N.paid && !N.on && nightAmt()>0.4) add('“Any work tonight?”',()=>{ N.on=true; N.n=0; say(V,["“Always. Three of the restless dead are up tonight somewhere: the fen, the crypt, the barrow-road. Lay three to rest and come back before the light.”"],[bye]); });
+    add('“What will you trade for tallies?”',()=>tallyTrade(()=>TALKERS.vesna()));
+    return r; }; }
 { const _fd=foeDown; foeDown=function(f){ const r=_fd.apply(this,arguments);
     try{ const N=CHOICE.vnight; if(N && N.on && !N.paid && N.d===Math.floor((dayClock+DAY_LEN*0.25)/DAY_LEN) && f && (f.type==='skeleton' || /Dead|Bones|Drowned|Risen|Bell-Ringer/.test(f.name||''))){ N.n++; floatText(tileOf(player),'Laid to rest ('+Math.min(3,N.n)+'/3)','#c8b8e0'); } }catch(e){}
     return r; }; }

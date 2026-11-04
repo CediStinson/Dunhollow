@@ -668,7 +668,9 @@ const BODY = {
   EAR_TOP:-80.5, EAR_H:7.5, NOSE:-77, MOUTH:-72.5, CHIN:-68, NECK:-66,
   SHOULDER:-63, WAIST:-46, KNEE:-20, ANKLE:-8,
 };
-const DWARF={ wide:1.13, seam:-37, leg:0.6 };
+const DWARF={ wide:1.06, seam:-37, leg:0.6,
+  m:{ headHW:12.2, jawHW:11.8, chestHW:15.2, waistHW:14.2, hipHW:12.6, limbW:7.6, legW:10.2, neckW:9.8 },     // a barrel of a man
+  f:{ headHW:10.8, jawHW:9.8,  chestHW:12.0, waistHW:10.2, hipHW:12.6, limbW:6.3, legW:9.2,  neckW:8.8 } };   // a woman of the mountain: broad-shouldered, solid, strong-armed
 const dwarfDrop=o=>o&&o.race==='dwarf'?Math.round(-DWARF.seam*(1-DWARF.leg)):0;   // how much lower a dwarf's head sits (name tags follow it)          // dwarves: everything a little wider, and below the hip only 60% as long
 const PROP = {
   m:{ headHW:11.5, jawHW:10.5, chestHW:13.5, waistHW:12, hipHW:11, limbW:6.5, legW:9, neckW:8 },
@@ -1040,10 +1042,13 @@ function drawCharInner(c,x,B,opts,swing=0,dir=0,pose=null){
   if(opts.race==='goblin'){ c.save(); c.translate(x,B); c.scale(0.94,0.76); c.translate(-x,-B);
     try{ drawCharInner(c,x,B,{...opts,race:'goblin_'},swing,dir,pose); } finally{ c.restore(); } return; }
   if(opts.race==='dwarf'){ const o2={...opts,race:'dwarf_'}, W=DWARF.wide, seam=DWARF.seam, k=DWARF.leg, dy=-seam*(1-k);   // short in the leg, broad all over
+    const sv={m:{...PROP.m}, f:{...PROP.f}}; Object.assign(PROP.m,DWARF.m); Object.assign(PROP.f,DWARF.f);
+    try{
     c.save(); c.beginPath(); c.rect(x-300,B+seam*k-0.4,600,300); c.clip(); c.translate(x,B); c.scale(W,k); c.translate(-x,-B);
     try{ drawCharInner(c,x,B,o2,swing,dir,pose); } finally{ c.restore(); }
     c.save(); c.beginPath(); c.rect(x-300,B+seam*k-600,600,600); c.clip(); c.translate(x,B+dy); c.scale(W,1); c.translate(-x,-B);
-    try{ drawCharInner(c,x,B,o2,swing,dir,pose); } finally{ c.restore(); } return; }
+    try{ drawCharInner(c,x,B,o2,swing,dir,pose); } finally{ c.restore(); }
+    } finally{ Object.assign(PROP.m,sv.m); Object.assign(PROP.f,sv.f); } return; }
   if(opts.race==='elf'){ c.save(); c.translate(x,B); c.scale(0.93,1.055); c.translate(-x,-B);
     try{ drawCharInner(c,x,B,{...opts,race:'elf_'},swing,dir,pose); } finally{ c.restore(); } return; }
   const flip=dirMirrored(dir), view=dirView(dir);
@@ -3502,7 +3507,8 @@ function drawShieldOnArm(c,x,y,prof,back){        // back: seen from behind, you
 }
 
 function drawHead(c, x, B, opts, view=0){
-  const GOB=String(opts.race||'').startsWith('goblin'), skin=SKINS[opts.skin], hair=HAIR_COLORS[opts.hairColor], FC=GOB?{...faceOf(opts),eye:'#d8b020',brow:1.5}:faceOf(opts);
+  const GOB=String(opts.race||'').startsWith('goblin'), DWF=String(opts.race||'').startsWith('dwarf'), skin=SKINS[opts.skin], hair=HAIR_COLORS[opts.hairColor];
+  const FC=GOB?{...faceOf(opts),eye:'#d8b020',brow:1.5}:DWF?(f=>({...f, brow:Math.max(1.3,(f.brow||1)*1.35), eh:(f.eh||1)*0.86, arch:Math.min(0.75,f.arch??1), cheek:true}))(faceOf(opts)):faceOf(opts);
   const F=opts.gender==='f';
   const P=F?PROP.f:PROP.m, Y=BODY, V=VIEW[view];
   const HW=P.headHW, JW=P.jawHW;
@@ -3738,7 +3744,17 @@ function drawHead(c, x, B, opts, view=0){
         for(let k=1;k<5;k++){ const u=k/5, hx=iX+(oX-iX)*u; c.beginPath(); c.moveTo(x+hx,B+iY+bh*0.8+(oY-iY)*u); c.lineTo(x+hx+(oX-iX)*0.06,B+iY+(oY-iY)*u-0.2); c.stroke(); }
         c.restore(); }
     });
-    if(pr<=0.55 && F){
+    if(pr<=0.55 && DWF){                                     // dwarves: a broad nose with a round, heavy tip
+      fs(tone(skin,-0.1)); r(off-1.6,Y.NOSE-2.2,3.2,4.6);
+      fs(tone(skin,0.12)); r(off-1.5,Y.NOSE-2.2,1.1,3.8);
+      fs(tone(skin,-0.16)); c.beginPath(); c.ellipse(x+off+0.1,B+Y.NOSE+2.3,F?2.4:2.9,F?1.5:1.8,0,0,Math.PI*2); c.fill();
+      fs(tone(skin,0.16,0.8)); c.beginPath(); c.ellipse(x+off-0.5,B+Y.NOSE+1.7,0.8,0.6,0,0,Math.PI*2); c.fill();
+      fs(tone(skin,-0.42)); r(off-2.4,Y.NOSE+3.1,1.2,0.9); r(off+1.3,Y.NOSE+3.1,1.2,0.9);
+      c.fillStyle='rgba(200,70,50,0.16)'; [-1,1].forEach(sd=>{ c.beginPath(); c.ellipse(x+off+sd*(HW*0.55),B+Y.NOSE+1.5,2.6,1.6,0,0,Math.PI*2); c.fill(); });   // ruddy cheeks
+    } else if(pr>0.55 && DWF){ fs(tone(skin,-0.05)); c.beginPath(); c.ellipse(x+LN+HW-1.3,B+Y.NOSE+1.3,1.5,1.9,0,0,Math.PI*2); c.fill();
+      fs(tone(skin,-0.3)); r(LN+HW-2.2,Y.NOSE+2.6,1.3,0.7);
+      c.fillStyle='rgba(200,70,50,0.12)'; c.beginPath(); c.ellipse(x+LN+HW-6.5,B+Y.NOSE+1.6,2.2,1.4,0,0,Math.PI*2); c.fill();
+    } else if(pr<=0.55 && F){
       const ny=Y.NOSE+0.2;                      // small, short, slightly upturned
       fs(tone(skin,-0.20,0.5)); c.beginPath(); c.ellipse(x+off+0.2,B+ny+1.1,1.2,0.5,0,0,Math.PI*2); c.fill();
       fs(tone(skin,-0.30,0.75)); c.beginPath(); c.ellipse(x+off-0.6,B+ny+1.1,0.35,0.25,0,0,Math.PI*2); c.ellipse(x+off+0.9,B+ny+1.1,0.35,0.25,0,0,Math.PI*2); c.fill();
@@ -4854,6 +4870,7 @@ function randomizeLook(){ const R=n=>Math.floor(Math.random()*n), elf=charOpts.r
   charOpts.eyeColor=R(EYE_COLORS.length); charOpts.hairColor=R(HAIR_COLORS.length);
   charOpts.face=R(FACES[male?'m':'f'].length); charOpts.hair=R(8);
   if(male && !elf){ const b=charOpts.race==='dwarf'?[5,5,6,6,6,4]:[0,0,2,3,4,4,5,5]; charOpts.beard=b[R(b.length)]; charOpts.stubble=Math.random()<0.3; } else { charOpts.beard=0; charOpts.stubble=false; }
+  if(charOpts.race==='dwarf' && !male){ const hs=[2,3,3,7,7,4]; charOpts.hair=hs[R(hs.length)]; }
   if(charOpts.race==='dwarf'){ const hc=[0,1,2,3,6,7,8,12,13]; charOpts.hairColor=hc[R(hc.length)]; }
   const M=charOpts.marks={};
   MARKS.forEach(([k,,isElf,val])=>{ if(isElf && !elf) return; const p=k==='eyePatch'?0.04:isElf?0.25:k==='earrings'?0.2:0.08; if(Math.random()>=p) return;   // a few details, seldom a crowd of them
@@ -21143,7 +21160,7 @@ const DWARVES=[
     ask:[["Where are you from?",["“Varrowdeep. North, where the hills stop pretending and turn into mountains. We have been under that stone longer than your Baron’s family has had a name.”","“I came down for charcoal and stayed for the bread. Do not tell my wife.”"]],
          ["What do you think of Oswin’s work?",["“Honest. Honest work is worth more than clever work, and he knows the difference.” <i>He sets the shoe down, gently.</i> “He let me show his boy how to fold steel. The boy burnt a thumb. He will remember it longer than any lesson.”"]],
          ["Have you met the elves?",["“I have met their arrows. Long ago, at the edge of their wood, when my grandfather’s people came down to cut timber for the deep halls.” <i>He shrugs.</i> “We needed the wood. They needed the trees. Both of us were right, and that is the worst sort of quarrel.”"]]] },
-  { id:'dagna', name:'Dagna Copperbraid', area:'kingsroad', i:4, j:12, dir:2, opts:DWARFO({gender:'f', skin:1, hair:6, hairColor:8, face:1, equip:{armor:'gambeson', head:'hood', feet:'boots'}}),
+  { id:'dagna', name:'Dagna Copperbraid', area:'kingsroad', i:4, j:12, dir:2, opts:DWARFO({gender:'f', skin:1, hair:3, hairColor:8, face:5, equip:{armor:'gambeson', head:'hood', feet:'boots'}}),
     hello:["<i>A broad dwarf woman sits on a milestone with her boots off, rubbing her feet and glaring down the road as if it had done it on purpose.</i> “Three days from the Deep and the road still has not ended. Who builds a road this long? Men. Only men.”"],
     ask:[["What brings you down from the mountains?",["“Trade. We have iron and silver and good stone, and no wool, no grain, no apples worth the name.” <i>She sniffs.</i> “Your apples are the only thing down here I would carry home on my back.”"]],
          ["Is the road safe for you?",["“Safe enough. Bandits see a dwarf and count our axes before our purses.” <i>She pats the hatchet on her pack.</i> “And the Baron’s men think we are a story for children. Let them.”"]],
@@ -21153,7 +21170,7 @@ const DWARVES=[
     ask:[["Why are you so far from home?",["“I walked out of Varrowdeep forty years ago and never found a good reason to walk back in.” <i>He drinks.</i> “The deep halls are very grand. They are also very dark, and very full of my cousins.”"]],
          ["Tell me about the dwarves and the elves.",["“Ha. Sit down; it is a long grudge.” <i>He wipes his beard.</i> “We dig. Roots get in the way. They grow. Our tunnels get in the way. Once, a long time ago, a king of ours cut a road through their old wood to reach the silver in the hills behind it, and the trees he felled are still being mourned.”","“They say we have stone for hearts. We say they have sap. Both of us are a little bit right.”"]],
          ["Any stories from the mountains?",["“The deepest mines in Varrowdeep go quiet, some nights. Not the good quiet. My father said that is when you put down your pick and walk back up, and you do not ask why.” <i>He looks into his mug.</i> “He was a wise man. He asked why.”"]]] },
-  { id:'bodil', name:'Envoy Bodil Granitebrow', area:'silvergate', i:3, j:7, dir:1, opts:DWARFO({gender:'f', skin:2, hair:4, hairColor:1, face:3, equip:{armor:'mail', head:null, hands:'gloves', feet:'boots'}}),
+  { id:'bodil', name:'Envoy Bodil Granitebrow', area:'silvergate', i:3, j:7, dir:1, opts:DWARFO({gender:'f', skin:2, hair:7, hairColor:1, face:3, equip:{armor:'mail', head:null, hands:'gloves', feet:'boots'}}),
     hello:["<i>A dwarf in polished mail stands well back from the silver gate, very straight, very patient, looking at nothing.</i> “I have been waiting since the morning. The Warden says the Lady will see me ‘in good time’. Elves measure good time in seasons.”"],
     ask:[["Why are you here?",["“Varrowdeep sends its greetings and a cart of silver, and asks to buy timber. Deadfall only: we have promised. Every king for three hundred years has promised.”","“They do not believe the promise. I do not blame them. I would not believe it either, from what our great-grandfathers did.”"]],
          ["Why do the elves not trust you?",["“An old king of ours wanted the silver under the hills behind their wood. He cut a road through the trees to reach it. Their oldest trees.” <i>Her jaw tightens.</i> “We teach it to our children as a great deed. They teach it to theirs as a murder. I was sent because I learned both.”"]],

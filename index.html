@@ -20683,10 +20683,11 @@ function drawHunger(x,B,e,pose){ const fade=e.dead?Math.max(0,1-(e.fallT||0)/1.1
 const hhK=()=>areaId==='treeheart' && mobs.find(m=>m.type==='hunger' && !m.dead);
 function hhSealed(){ return !CHOICE.hwSpirit; }   // once you are in, there is no going back up until it is gone
 const hhTh=K=>{ const ph=K.hphase||1; return ph>=3?0:Math.floor(K.maxHp*(ph===1?0.66:0.33)); };
+const hhTime=(k,n)=>{ const [i,j]=HH_SAP[k], d=Math.hypot(i+0.5-player.x,j+0.5-player.y); return Math.max(2.4, 2.6+d*0.62-n*0.35); };   // enough time to run there, a little less each round
 function hhPick(){ const pt=tileOf(player); let best=-1, bd=-1; HH_SAP.forEach(([i,j],k)=>{ if(HHS[k]<1 || (HH&&HH.k===k)) return; const d=cheb([i,j],pt)+(HHS[k]===1?10:0); if(d>bd){ bd=d; best=k; } }); return best; }   // the faint ones first, far from you; one you saved only when nothing else is left
 function hhDrain(K){ ckBreakDuel(K); ckPlace(K,HH_HOME[0],HH_HOME[1]); K.warded=true; HH={mode:'drain', k:-1, n:0};
   const k=hhPick(); if(k<0){ HH={mode:'wait'}; setTimeout(()=>{ if(areaId==='treeheart' && !K.dead){ HH=null; ckResume(K,'The Hunger comes back out of the roots!'); } },900); return; }
-  HH.k=k; HH.t=HH.len=4.8; banner('Guard the sapling!','#d8f0a0',2200);
+  HH.k=k; HH.t=HH.len=hhTime(k,0); banner('Guard the sapling!','#d8f0a0',2200);
   logMsg('The Hunger sinks into the floor, and a black root goes snaking towards one of the saplings. Get beside it before it drinks!','#d8f0a0'); }
 function hhGloam(K){ ckBreakDuel(K); ckPlace(K,HH_HOME[0],HH_HOME[1]); K.warded=true; HHS=HHS.map(()=>0); HH={mode:'gloam', lit:0, spike:1.4, tiles:null};
   banner('Rekindle three saplings!','#e8f4c0',2400); logMsg('It wraps itself in roots and swallows every light in the hollow. Find the dark saplings and rekindle three of them; the floor will not stay still.','#e8f4c0'); }
@@ -20704,7 +20705,7 @@ function hhTick(dt){ const K=hhK(); if(!K){ HH=null; return; }
       logMsg('The root closes round the sapling and drinks. Its light goes out, and the Hunger grows.','#c8a0f0'); next=true; }
     if(next){ HH.n++; const k=HH.n<3?hhPick():-1;
       if(k<0){ const k0=K; HH={mode:'wait'}; FOES.hunger.pattern=HH_P2; setTimeout(()=>{ if(areaId==='treeheart' && !k0.dead){ HH=null; ckResume(k0,'The Hunger comes up out of the roots!'); } },900); return; }
-      HH.k=k; HH.t=HH.len=Math.max(3.2,4.8-HH.n*0.7); banner('It reaches for another!','#d8f0a0',1300); }
+      HH.k=k; HH.t=HH.len=hhTime(k,HH.n); banner('It reaches for another!','#d8f0a0',1300); }
     return; }
   if(HH.mode==='gloam'){
     if(HH.lit>=3){ K.warded=false; FOES.hunger.pattern=HH_P3; const k0=K; HH={mode:'wait'}; logMsg('Light floods back into the hollow. The cocoon splits, and the Hunger comes for you, thin and furious.','#e8f4c0');

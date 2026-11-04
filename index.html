@@ -1179,6 +1179,14 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       const R=ys.map(y=>[cx+at(y)[1]+pad,y]), L=ys.map(y=>[cx-at(y)[0]-pad,y]).reverse();
       blob([...R,...L]);
     };
+    // a strap or band round this one leg: kept to the leg's own outline and curved round it, so two thighs that touch never share one band
+    const legBand=(y,h,col,trim,buckle)=>{ c.save(); legSil(0.25,y-2,y+h+2); c.clip();
+      c.beginPath(); c.moveTo(x+cx-h2-2,B+y-0.3); c.quadraticCurveTo(x+cx,B+y+0.9,x+cx+h2+2,B+y-0.3); c.lineTo(x+cx+h2+2,B+y+h-0.3); c.quadraticCurveTo(x+cx,B+y+h+0.9,x+cx-h2-2,B+y+h-0.3); c.closePath();
+      const bg=c.createLinearGradient(x+cx-h2,0,x+cx+h2,0); bg.addColorStop(0,tone(col,0.15-0.1*depth)); bg.addColorStop(1,tone(col,-0.3-0.1*depth)); c.fillStyle=bg; c.fill();
+      if(trim){ c.strokeStyle=trim; c.lineWidth=0.4; c.beginPath(); c.moveTo(x+cx-h2-2,B+y-0.1); c.quadraticCurveTo(x+cx,B+y+1.1,x+cx+h2+2,B+y-0.1); c.stroke(); }
+      c.restore();
+      c.save(); c.beginPath(); c.rect(x+cx-h2-3,B+y-1,lw+6,h+2.2); c.clip(); legSil(0.25,y-3,y+h+3); c.strokeStyle=tone(col,-0.6); c.lineWidth=0.5; c.stroke(); c.restore();   // the leg's edge shows where the bands meet
+      if(buckle){ fs(buckle); c.fillRect(x+cx+s*(h2-1.6)-0.5,B+y-0.1,1,h+0.3); } };
     const shade=(col,d0)=>{ const gr=c.createLinearGradient(x+cx-h2-1,0,x+cx+h2+1,0);
       gr.addColorStop(0,tone(col,0.12*dim-d0)); gr.addColorStop(0.35,tone(col,-d0));
       gr.addColorStop(0.8,tone(col,-0.16-d0)); gr.addColorStop(1,tone(col,-0.32-d0)); return gr; };
@@ -1271,7 +1279,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
         fs(tone(PA,0.2,0.35)); c.beginPath(); c.ellipse(x+cx-h2*0.35,B+(F?-40:Y.KNEE-8),0.9,F?2.4:9,0,0,Math.PI*2); c.fill();          // sheen down the front of the thigh
         c.strokeStyle=tone(PA,-0.5); c.lineWidth=0.5; c.beginPath(); c.moveTo(x+lx-0.8,B+top+1); c.lineTo(x+lx-0.8,B+pantEnd-2); c.moveTo(x+lx+0.8,B+top+1); c.lineTo(x+lx+0.8,B+pantEnd-2); c.stroke();
         c.strokeStyle=T0; c.lineWidth=0.4; c.beginPath(); for(let yy=top+1.6; yy<pantEnd-2.6; yy+=(F?1.6:2.2)){ c.moveTo(x+lx-0.8,B+yy); c.lineTo(x+lx+0.8,B+yy+(F?1.4:2)); c.moveTo(x+lx+0.8,B+yy); c.lineTo(x+lx-0.8,B+yy+(F?1.4:2)); } c.stroke();   // cross-laced seam
-        if(!F){ const ty=Y.WAIST+10; fs(tone('#3a2a1a',-0.1*depth)); c.fillRect(x+ox-1.2,B+ty,lw+2.4,1.4); fs(T0); c.fillRect(x+cx+s*(h2-1.6)-0.6,B+ty-0.1,1.2,1.6); }   // a thigh strap
+        if(!F) legBand(Y.WAIST+10,1.4,'#3a2a1a',null,T0);   // a thigh strap
       } else if(!F){
         fs(tone(PA,-0.14-0.1*depth,0.8)); c.beginPath(); c.ellipse(x+cx,B+Y.KNEE,h2+1,0.8,0,0,Math.PI*2); c.fill();
         if(s<0 && vL!=='elf_trousers') patch(ox+1.2,Y.KNEE-6,4.6,4.2,tone(PA,-0.20-0.1*depth));
@@ -1300,7 +1308,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       if(DUEL_LEG){ const T0=ELFC.hzt;
         if(F){ for(let k=0;k<4;k++){ const lx2=ox-0.6+k*(lw+1.2)/3.4, ly=pantEnd-0.4; c.beginPath(); c.moveTo(x+lx2-1.1,B+ly); c.quadraticCurveTo(x+lx2-0.6,B+ly+2.6,x+lx2+0.2,B+ly+3.2); c.quadraticCurveTo(x+lx2+0.8,B+ly+1.4,x+lx2+1.2,B+ly); c.closePath();   // leaf points along the hem
             c.fillStyle=tone(PA,(k%2?-0.12:0.05)-0.12*depth); c.fill(); c.strokeStyle=T0; c.lineWidth=0.35; c.stroke(); }
-          const gy=pantEnd+5.5; fs(tone('#3a2a1a',-0.1*depth)); c.fillRect(x+ox-0.6,B+gy,lw+1.2,1.1); fs(T0); c.fillRect(x+cx+s*(h2-1.6)-0.5,B+gy-0.1,1,1.3); }   // a garter strap round the thigh
+          legBand(pantEnd+5.5,1.1,'#3a2a1a',null,T0); }   // a garter strap round the thigh
         if(s>0 && front){ const kx=x+cx+h2-0.2, ky=B+(F?pantEnd+4:Y.WAIST+8);                                            // a slim knife in a sheath at the outer thigh
           fs(tone('#2a2018',-0.1*depth)); c.beginPath(); c.moveTo(kx-0.9,ky); c.lineTo(kx+0.9,ky); c.lineTo(kx+0.5,ky+7.5); c.lineTo(kx,ky+8.6); c.lineTo(kx-0.5,ky+7.5); c.closePath(); c.fill();
           fs(T0); c.fillRect(kx-1.4,ky-0.6,2.8,0.8); fs(tone('#4a3424',-0.1*depth)); c.fillRect(kx-0.5,ky-3.2,1,2.6); fs(T0); c.beginPath(); c.arc(kx,ky-3.4,0.55,0,Math.PI*2); c.fill(); } }
@@ -1328,9 +1336,9 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       if(withFoot){ const fL=cx-h2+0.6, fR=cx+h2-0.6; blob([[fL+0.3,-6.6],[fR-0.1,-6.6],[fR+toe*0.55,-3.6],[fR+toe+0.9,-1.5],[fR+toe+0.7,0.1],[fL-0.9+toe*0.2,0.1],[fL-1.2,-1.6],[fL-0.7,-4]],1.5); c.fill(); }
       c.restore();
       c.save(); legSil(0.18,top,0); c.clip(); fs(tone(SC,0.35,0.35)); c.beginPath(); c.ellipse(x+cx-h2*0.4,B+Y.KNEE+6,0.7,9,0,0,Math.PI*2); c.fill(); c.restore();   // a sheen down the shin
-      fs(tone(SC,-0.15)); c.fillRect(x+ox-0.4,B+top-0.3,lw+0.8,1.8); fs(ELFC.hzt); c.fillRect(x+ox-0.4,B+top-0.3,lw+0.8,0.45); c.fillRect(x+ox-0.4,B+top+1.3,lw+0.8,0.3); };
+      legBand(top-0.3,1.8,tone(SC,-0.15),ELFC.hzt,null); };
     if(DUEL_F && BOOTS) duelStock(false);
-    if(DUEL_F){ const T0=ELFC.hzt, gy=-31; fs(tone('#3a2a1a',-0.1*depth)); c.fillRect(x+ox-0.6,B+gy,lw+1.2,1.1); fs(T0); c.fillRect(x+cx+s*(h2-1.6)-0.5,B+gy-0.1,1,1.3);
+    if(DUEL_F){ const T0=ELFC.hzt, gy=-31; legBand(gy,1.1,'#3a2a1a',null,T0);
       if(s>0 && front){ const kx=x+cx+h2-0.2, ky=B+gy+1.2; fs(tone('#2a2018',-0.1*depth)); c.beginPath(); c.moveTo(kx-0.9,ky); c.lineTo(kx+0.9,ky); c.lineTo(kx+0.5,ky+7.5); c.lineTo(kx,ky+8.6); c.lineTo(kx-0.5,ky+7.5); c.closePath(); c.fill();
         fs(T0); c.fillRect(kx-1.4,ky-0.6,2.8,0.8); fs(tone('#4a3424',-0.1*depth)); c.fillRect(kx-0.5,ky-3.2,1,2.6); fs(T0); c.beginPath(); c.arc(kx,ky-3.4,0.55,0,Math.PI*2); c.fill(); } }
     if(BOOTS){
@@ -2469,9 +2477,10 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       const tip=F?Y.SHOULDER+14.5:Y.WAIST+2.5, sideH=F?Y.SHOULDER+12.2:Y.WAIST-2.5, vW=F?5.6:5.4, vD=F?12.8:15.5;   // a deep, open V
       const pts=FR ? [[LN-CH-0.2,Y.SHOULDER-0.6],[LN-vW+po,Y.SHOULDER-0.6],[LN+po,Y.SHOULDER+vD],[LN+vW+po,Y.SHOULDER-0.6],[LN+CH+0.2,Y.SHOULDER-0.6],[LN+CH+bR+0.2,Y.SHOULDER+6],[LN+CH+bR-0.4,Y.SHOULDER+11],[LN+WA+1,sideH],[LN+po,tip],[LN-WA-1,sideH],[LN-CH-bL+0.4,Y.SHOULDER+11],[LN-CH-bL-0.2,Y.SHOULDER+6]]
                    : torsoPts(0.6,sideH,WA+1).filter((q,i)=>i===7||i===8||q[1]<sideH-1);   // a cropped hem: drop the waist points below it, or the outline folds back on itself
-      const tz=[[LN-3.4+po*0.5,Y.WAIST-1],[LN+3.4+po*0.5,Y.WAIST-1],[LN+2.6+po*0.5,Y.KNEE+2],[LN+po*0.5,Y.KNEE+4.5],[LN-2.6+po*0.5,Y.KNEE+2]];
-      if(front){ path(tz,1.2); const tg=c.createLinearGradient(x+LN-3.4,0,x+LN+3.4,0); tg.addColorStop(0,tone(L0,0.15)); tg.addColorStop(1,tone(L0,-0.3)); c.fillStyle=tg; c.fill(); c.strokeStyle=T0; c.lineWidth=0.7; c.stroke();
-        leafAt(LN+po*0.5,Y.WAIST+9,9,2.4,0,tone(L0,-0.08),T0); }
+      const tk=Math.max(0,Math.min(1,(pr-0.25)/0.7)), tcx=LN+po*0.5+tk*(HI+0.2), tw=1-tk*0.62;   // turned, the flap hangs at the front of the hips, seen edge-on
+      const tz=[[tcx-3.4*tw,Y.WAIST-1],[tcx+3.4*tw,Y.WAIST-1],[tcx+2.6*tw+tk*0.8,Y.KNEE+2],[tcx+tk*1.1,Y.KNEE+4.5],[tcx-2.6*tw+tk*0.8,Y.KNEE+2]];
+      if(front){ path(tz,1.2); const tg=c.createLinearGradient(x+tcx-3.4*tw,0,x+tcx+3.4*tw,0); tg.addColorStop(0,tone(L0,0.15)); tg.addColorStop(1,tone(L0,-0.3)); c.fillStyle=tg; c.fill(); c.strokeStyle=T0; c.lineWidth=0.7; c.stroke();
+        leafAt(tcx+tk*0.4,Y.WAIST+9,9,2.4*tw,0,tone(L0,-0.08),T0); }
       path(pts,1.1); c.fillStyle=L0; c.fill(); c.strokeStyle=tone(L0,-0.55); c.lineWidth=1; c.stroke(); grain(pts,L0,Y.SHOULDER,tip,1.1);   // tight corners: a round one would fill the V back in
       if(FR){ [-1,1].forEach(sd=>{ const lx=LN+sd*(WA-0.6)+po*0.4; c.strokeStyle=T0; c.lineWidth=0.45;   // side lacing
           for(let yy=F?Y.SHOULDER+6:Y.SHOULDER+12; yy<sideH-1; yy+=1.8){ c.beginPath(); c.moveTo(x+lx-1,B+yy); c.lineTo(x+lx+1,B+yy+1.4); c.moveTo(x+lx+1,B+yy); c.lineTo(x+lx-1,B+yy+1.4); c.stroke(); } });

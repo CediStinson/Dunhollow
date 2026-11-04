@@ -21178,6 +21178,206 @@ const DWARVES=[
 function dwarfTalk(D){ const root=()=>say(D.name,D.hello,[...D.ask.map(([q,a])=>({label:q, fn:()=>say(D.name,a,[{label:'Back.', fn:root}, bye])})), bye]); root(); }
 DWARVES.forEach(D=>{ TALKERS[D.id]=()=>dwarfTalk(D);
   wrap(D.area,'npcs',l=>[...l, ...(D.area==='silvergate' && havenBurnt() ? [] : [{ id:D.id, name:D.name, named:true, i:D.i, j:D.j, dir:D.dir, opts:D.opts }])]); });
+// ════════ VARROWDEEP: the dwarf hold in the mountains north of the fen, its pass, its halls, and the quiet in its deepest mine ════════
+// The way up leaves the Logging Road. The Varrow Pass climbs to the great door; inside are the Gate Hall, the Great Hall
+// (forges, market, the Thane's seat) and the Deep Mines, where the oldest seam has gone quiet over the tomb of Durnhal the Roadcutter.
+Object.assign(ITEMS,{
+  roadcutter_axe:{ name:"The Roadcutter's Axe", slot:'weapon', base:'axe', col:'#6a7480' },
+  varrow_axe:{ name:'Varrow Axe', slot:'weapon', base:'axe', col:'#8a9098' },
+  varrow_helm:{ name:'Varrow-Forged Helm', slot:'head', base:'kettle', col:'#727780' },
+  varrow_mail:{ name:'Varrow-Forged Mail', slot:'armor', base:'mail', col:'#5e636c' },
+  varrow_gauntlets:{ name:'Varrow-Forged Gauntlets', slot:'hands', base:'gloves', col:'#6a6f78' } });
+Object.assign(WEAPONS,{ roadcutter_axe:{ wind:0.27, dmg:16, len:21, recoverExtra:0.1 }, varrow_axe:{ wind:0.24, dmg:15, len:20, recoverExtra:0.1 } });
+Object.assign(PRICES,{ varrow_axe:230, varrow_helm:150, varrow_mail:330, varrow_gauntlets:130 });
+Object.assign(ITEM_STATS,{ roadcutter_axe:{ap:3}, varrow_axe:{ap:2}, varrow_helm:{hp:5,ap:1}, varrow_mail:{hp:10,ap:2}, varrow_gauntlets:{hp:3,ap:2} });
+Object.assign(GEAR_HP,{ varrow_helm:5, varrow_mail:10, varrow_gauntlets:3 });
+['roadcutter_axe','varrow_axe','varrow_helm','varrow_mail','varrow_gauntlets'].forEach(id=>{ ITEM_LEVEL_FIX[id]=9; });
+QUEST_ITEMS.add('roadcutter_axe');
+Object.assign(ITEM_LORE,{ roadcutter_axe:"A dwarf king’s axe, black with age, the haft bound in silver wire. Every notch in the blade is an old tree in the elves’ wood.",
+  varrow_axe:"Folded steel from the forges of Varrowdeep, bearded and heavy at the head. It bites and does not let go.",
+  varrow_helm:"A round dwarf helm with a nasal and cheek-plates, made to take a falling stone as well as a sword.",
+  varrow_mail:"Dwarf mail: the rings so small and so close that the shirt drapes like heavy cloth.",
+  varrow_gauntlets:"Plated dwarf gauntlets, the knuckles ridged for a grip on a pick or an axe-haft." });
+AREA_TIER.varrowpass=4; AREA_TIER.varrowgate=0; AREA_TIER.varrowhall=0; AREA_TIER.varrowmine=5; AREA_TIER.varrowtomb=5;
+const vq=()=>CHOICE.vq||null;                 // the quest: asked → axe → (elves → atoned) → done
+// the road up leaves the Logging Road
+wrap('northroad','objects',l=>[...l, {type:'teleporter', i:26, j:0, to:'varrowpass', entry:'fromRoad'},
+  {type:'rune', i:27, j:1, text:"A stone post, square and very old, cut with angular letters that are not the Baron’s. Under them someone has scratched the meaning: <i>“VARROWDEEP. Up. Keep climbing.”</i>"}]);
+AREAS.northroad.entries.fromPass={i:26,j:1};
+AREA_PATHS.northroad.push([[26,4],[26.5,1.5],[26.5,0.4]]);
+// the great door, cut in the cliff at the head of the pass
+OBJ_DRAW.dwarfcliff=o=>{ const a=P(0,0), b=P(ROOM.w,0), H=200, d0=P(4,0), d1=P(7,0);
+  const gr=g.createLinearGradient(0,a.y-H,0,a.y); gr.addColorStop(0,'#2a2826'); gr.addColorStop(1,'#6a645c');
+  g.fillStyle=gr; g.beginPath(); g.moveTo(a.x,a.y); for(let k=0;k<=20;k++){ const t=k/20, x=a.x+(b.x-a.x)*t, y=a.y+(b.y-a.y)*t; g.lineTo(x,y-H-Math.sin(k*1.7)*18-(k%3)*10); } g.lineTo(b.x,b.y); g.closePath(); g.fill();
+  g.strokeStyle='rgba(20,18,16,0.45)'; g.lineWidth=1.4; for(let k=1;k<12;k++){ const t=k/12, x=a.x+(b.x-a.x)*t, y=a.y+(b.y-a.y)*t; g.beginPath(); g.moveTo(x,y); g.lineTo(x+Math.sin(k)*10,y-H*0.7); g.stroke(); }
+  // the portal: a squared frame, a lintel cut with runes, the door standing open on firelight
+  const L=t=>({x:d0.x+(d1.x-d0.x)*t, y:d0.y+(d1.y-d0.y)*t}), up=(p,h)=>({x:p.x,y:p.y-h}), quad=(p0,p1,h0,h1,col)=>{ g.fillStyle=col; g.beginPath(); g.moveTo(p0.x,p0.y-h0); g.lineTo(p1.x,p1.y-h0); g.lineTo(p1.x,p1.y-h1); g.lineTo(p0.x,p0.y-h1); g.closePath(); g.fill(); };
+  quad(L(0),L(1),0,150,'#8a847a'); quad(L(0.12),L(0.88),0,124,'#5a554e');
+  const glowG=g.createLinearGradient(0,L(0.5).y-110,0,L(0.5).y); glowG.addColorStop(0,'#3a2410'); glowG.addColorStop(1,'#d08a3a');
+  quad(L(0.26),L(0.74),0,108,glowG);
+  quad(L(0.05),L(0.95),124,142,'#a49c90');
+  g.save(); g.globalCompositeOperation='lighter'; const m=L(0.5); glow(m.x,m.y-40,60,50,'240,160,70',0.35+0.08*Math.sin(gt*2)); g.restore();
+  g.fillStyle='rgba(255,200,120,'+(0.5+0.2*Math.sin(gt*1.4))+')'; for(let k=0;k<9;k++){ const p=L(0.12+k*0.095); g.fillRect(p.x-2,p.y-136,4,7); }
+  [0.04,0.96].forEach(t=>{ const p=L(t); g.fillStyle='#6e685f'; g.fillRect(p.x-9,p.y-150,18,150); g.fillStyle='#4a453f'; g.fillRect(p.x-9,p.y-150,4,150); }); };
+AREAS.varrowpass={ fence:{r:false,l:false}, w:10, h:24, theme:'road', label:'The Varrow Pass', mini:{x:0,y:0}, notches:()=>[], dummy:null,
+  objects:()=>{ const l=[{type:'dwarfcliff', i:0, j:0, noblock:true}, {type:'teleporter', i:5, j:0, to:'varrowgate', entry:'fromPass'}, {type:'teleporter', i:5, j:23, to:'northroad', entry:'fromPass'}];
+    l.push({type:'crag', i:0, j:0, fp:[4,1], v:1}, {type:'crag', i:7, j:0, fp:[3,1], v:2});
+    for(let j=2;j<22;j+=3){ l.push({type:'crag', i:0, j, fp:[1,2], v:j%4}); l.push({type:'crag', i:9, j:j+1, fp:[1,2], v:(j+1)%4}); }
+    [[2,5],[7,8],[1,12],[8,14],[3,19],[7,20]].forEach(([i,j])=>l.push({type:'boulder', i, j}));
+    [[3,3],[6,11],[2,16],[7,4]].forEach(([i,j])=>l.push({type:'rocks', i, j, noblock:true}));
+    l.push({type:'milestone', i:6, j:21, t:'DEEP 1'}, {type:'bones', i:3, j:9, noblock:true}, {type:'campfire', i:7, j:17});
+    l.push({type:'rune', i:4, j:2, text:"Cut deep into the rock beside the door, in angular letters, and again below in the common tongue: <i>“Varrow found the silver. Durnhal cut the road. Hargrim held the gate. Walk in with open hands.”</i>"});
+    return l; },
+  npcs:()=>[], mobs:()=>[
+    { name:'Mountain Wolf', type:'wolf', i:4, j:17, faction:'mtnwolf', coat:'#8a8a86' }, { name:'Mountain Wolf', type:'wolf', i:6, j:15, faction:'mtnwolf', coat:'#9a948a' },
+    { name:'Pass Brigand', type:'bandit', i:6, j:9, faction:'passbrig', opts:BANDIT({skin:2,hair:3,hairColor:4,beard:4,equip:{head:'hood',torso:'tunic_linen',armor:'studded',hands:'gloves',legs:'breeches',feet:'boots',weapon:'spear',offhand:null}}) },
+    { name:'Brigand Chief Ulrik', type:'brute', i:4, j:7, faction:'passbrig', opts:BANDIT({skin:1,hair:2,hairColor:1,beard:5,equip:{head:'kettle',torso:'tunic_red',armor:'mail',hands:'gauntlets',legs:'breeches',feet:'boots',weapon:'axe',offhand:null}}) } ],
+  entries:{ fromRoad:{i:5,j:22}, fromGate:{i:5,j:1} } };
+AREA_PATHS.varrowpass=[ [[5.5,23.5],[5,20],[6,16],[4.5,12],[5.5,8],[4.8,4],[5.5,0.5]] ];
+// inside the mountain
+const VCAVE=(label,w,h,objs,npcs,extra)=>({ ...INSIDE_BASE, w, h, theme:'interior', cave:true, dwarf:true, label, mini:{x:0,y:0}, objects:objs, npcs, ...extra });
+const DGUARD=(name,o)=>DWARFO({gender:'m', skin:1, hair:2, hairColor:2, beard:6, face:1, ...o, equip:{head:'varrow_helm', armor:'varrow_mail', hands:'varrow_gauntlets', weapon:'varrow_axe', offhand:'shield', ...(o.equip||{})}});
+Object.assign(AREAS,{
+  varrowgate: VCAVE('Varrowdeep · The Gate Hall',12,12, ()=>[ {type:'teleporter', i:6, j:11, to:'varrowpass', entry:'fromGate'}, {type:'teleporter', i:6, j:0, to:'varrowhall', entry:'fromGate'},
+      {type:'dpillar', i:2, j:3}, {type:'dpillar', i:9, j:3}, {type:'dpillar', i:2, j:7}, {type:'dpillar', i:9, j:7}, {type:'dkstatue', i:3, j:1, name:'Varrow', look:{equip:{weapon:'mace'}}}, {type:'dkstatue', i:9, j:1, name:'Hargrim', look:{beard:5, equip:{offhand:'shield', head:'helm_full'}}},
+      {type:'brazier', i:1, j:5}, {type:'brazier', i:10, j:5}, {type:'brazier', i:1, j:10}, {type:'brazier', i:10, j:10}, {type:'banner', i:4, j:1}, {type:'banner', i:8, j:1},
+      {type:'rune', i:0, j:8, text:"The wall is carved with kings, life-sized, each with his name: Varrow with his pick, Hargrim with his shield. One king’s face has been chiselled away, and someone has kept the stone around it polished: <i>Durnhal.</i>"} ],
+    ()=>[ { id:'vguard1', name:'Gate Guard Orm', i:5, j:2, dir:2, opts:DGUARD('Orm',{hairColor:7}) }, { id:'vguard2', name:'Gate Guard Sigrun', i:7, j:2, dir:2, opts:DGUARD('Sigrun',{gender:'f', beard:0, hair:3, hairColor:1}) } ],
+    { entries:{ fromPass:{i:6,j:10}, fromHall:{i:6,j:1} } }),
+  varrowhall: VCAVE('Varrowdeep · The Great Hall',18,16, ()=>[ {type:'teleporter', i:9, j:15, to:'varrowgate', entry:'fromHall'}, {type:'teleporter', i:17, j:7, to:'varrowmine', entry:'fromHall'},
+      {type:'forge', i:2, j:1}, {type:'anvil', i:2, j:3}, {type:'forge', i:5, j:1}, {type:'anvil', i:5, j:3}, {type:'rack', i:0, j:2}, {type:'rack', i:7, j:1},
+      {type:'hearth', i:14, j:0}, {type:'table', i:11, j:4}, {type:'table', i:13, j:4}, {type:'bench', i:11, j:3}, {type:'bench', i:13, j:3}, {type:'barrel', i:16, j:1}, {type:'barrel', i:16, j:2},
+      {type:'dkstatue', i:9, j:8, name:'Varrow', look:{equip:{weapon:'mace'}}}, {type:'dpillar', i:5, j:6}, {type:'dpillar', i:13, j:6}, {type:'dpillar', i:5, j:11}, {type:'dpillar', i:13, j:11}, {type:'dthrone', i:9, j:2},
+      {type:'cstall', i:2, j:10, v:1}, {type:'cstall', i:2, j:13, v:4}, {type:'crates', i:0, j:12}, {type:'barrels', i:0, j:14},
+      {type:'mineframe', i:16, j:6}, {type:'brazier', i:8, j:1}, {type:'brazier', i:11, j:1}, {type:'brazier', i:16, j:10}, {type:'brazier', i:7, j:14}, {type:'brazier', i:11, j:14},
+      {type:'bed', i:16, j:4}, {type:'banner', i:9, j:0} ],
+    ()=>VARROW_FOLK.filter(n=>!n.when || n.when()).map(n=>({ id:n.id, name:n.name, named:true, i:n.i, j:n.j, dir:n.dir, opts:n.opts })),
+    { entries:{ fromGate:{i:9,j:14}, fromMine:{i:16,j:7} } }),
+  varrowmine: VCAVE('Varrowdeep · The Deep Mines',14,14, ()=>[ {type:'teleporter', i:0, j:7, to:'varrowhall', entry:'fromMine'},
+      {type:'teleporter', i:7, j:13, to:'varrowtomb', entry:'fromMine', locked:()=>!vq(), onLocked:()=>pzSay('A chain as thick as your arm is padlocked across the lowest gallery. Foreman Halvard has the key.','#c8c0a8')},
+      {type:'mineframe', i:3, j:2}, {type:'mineframe', i:10, j:3}, {type:'mineframe', i:5, j:10}, {type:'mineframe', i:11, j:10},
+      ...rockRow(4,5,9,[7]), {type:'boulder', i:2, j:9}, {type:'boulder', i:12, j:6}, {type:'rubble', i:8, j:11}, {type:'rubble', i:2, j:4},
+      {type:'boulder', i:12, j:1, v:2}, {type:'boulder', i:1, j:12, v:1}, {type:'orecart', i:9, j:7}, {type:'brazier', i:1, j:6}, {type:'brazier', i:6, j:12},
+      {type:'rune', i:13, j:12, text:"Chalked on the rock by a shaking hand: <i>“Nine days. The picks have stopped. The lamps go out by themselves. We hear walking below, and nobody below to walk. — Kari”</i>"} ],
+    ()=>[], { mobs:()=> CHOICE.vqQuiet ? [] : [
+      { name:'Quiet Miner', type:'bandit', i:6, j:3, faction:'quiet', opts:DWARFO({gender:'m', skin:1, hair:2, hairColor:3, beard:5, ghost:true, equip:{armor:'jerkin', weapon:'hatchet'}}) },
+      { name:'Quiet Miner', type:'bandit', i:10, j:6, faction:'quiet', opts:DWARFO({gender:'f', skin:2, hair:3, hairColor:6, ghost:true, equip:{armor:'jerkin', weapon:'mace'}}) },
+      { name:'Quiet Foreman', type:'brute', i:4, j:11, faction:'quiet', opts:DWARFO({gender:'m', skin:1, hair:1, hairColor:12, beard:6, ghost:true, equip:{armor:'mail', head:'kettle', weapon:'axe'}}) },
+      { name:'Quiet Miner', type:'bandit', i:11, j:11, faction:'quiet', opts:DWARFO({gender:'m', skin:3, hair:2, hairColor:1, beard:4, ghost:true, equip:{armor:'jerkin', weapon:'hatchet'}}) } ],
+      entries:{ fromHall:{i:1,j:7}, fromTomb:{i:7,j:12} } }),
+  varrowtomb: VCAVE("Varrowdeep · The Roadcutter's Tomb",11,11, ()=>[ {type:'teleporter', i:5, j:0, to:'varrowmine', entry:'fromTomb', locked:()=>!!roadcutterUp(), onLocked:()=>pzSay('The way up is black and still. Something here will not let you turn your back on it.','#c8b8a8')},
+      {type:'bonebier', i:5, j:7}, {type:'dkstatue', i:2, j:8, name:'Durnhal', look:{equip:{weapon:'axe'}}}, {type:'dkstatue', i:8, j:8, name:'Durnhal', look:{beard:5, equip:{weapon:'axe', head:'helm_full'}}, dir:3}, {type:'rubble', i:1, j:2}, {type:'rubble', i:9, j:3}, {type:'kneelslab', i:5, j:9},
+      {type:'brazier', i:2, j:5}, {type:'brazier', i:8, j:5},
+      {type:'rune', i:10, j:6, text:"The lid of the tomb is cut with a road running through a forest, and every tree along it lying felled. Beneath: <i>“DURNHAL, WHO OPENED THE WAY. What was taken, was taken for the hold.”</i>"} ],
+    ()=>[], { mobs:()=> roadcutterUp() ? [ { name:'Durnhal the Roadcutter', type:'roadcutter', i:5, j:5, faction:'roadcutter',
+        opts:DWARFO({gender:'m', skin:0, hair:1, hairColor:13, beard:6, face:5, ghost:true, equip:{head:'bog_crown', armor:'mail', hands:'gauntlets', weapon:'roadcutter_axe', offhand:null}}) } ] : [],
+      entries:{ fromMine:{i:5,j:1} } }) });
+const roadcutterUp=()=>vq()==='asked' && !CHOICE.vqKing;
+FOES.roadcutter={ label:'Roadcutter', base:72, stagger:0.8, pattern:[
+  {wait:1.4, wind:1.20, after:0.75, dir:'left'}, {wait:0.7, wind:0.80, after:0.45, dir:'right'}, {wait:0.1, wind:0.70, after:0.80, dir:'up', feint:'left'},
+  {wait:1.5, wind:1.30, after:0.85, dir:'right'}, {wait:0.6, wind:0.72, after:0.45, dir:'left'}, {wait:0.1, wind:0.68, after:0.85, dir:'left'} ] };
+// ── dwarven stonework: squat carved columns, kings in stone, braziers, an ore cart, the Thane's seat ──
+function isoBox(x0,y0,w,d,h,top,lf,rt){ const A=P(x0,y0+d), B2=P(x0+w,y0+d), C=P(x0+w,y0), D=P(x0,y0);   // a block standing on the floor, lit from the upper left
+  g.fillStyle=lf; g.beginPath(); g.moveTo(A.x,A.y); g.lineTo(B2.x,B2.y); g.lineTo(B2.x,B2.y-h); g.lineTo(A.x,A.y-h); g.closePath(); g.fill();
+  g.fillStyle=rt; g.beginPath(); g.moveTo(B2.x,B2.y); g.lineTo(C.x,C.y); g.lineTo(C.x,C.y-h); g.lineTo(B2.x,B2.y-h); g.closePath(); g.fill();
+  g.fillStyle=top; g.beginPath(); g.moveTo(D.x,D.y-h); g.lineTo(A.x,A.y-h); g.lineTo(B2.x,B2.y-h); g.lineTo(C.x,C.y-h); g.closePath(); g.fill(); }
+OBJ_DRAW.dpillar=o=>{ const i=o.i, j=o.j, S=['#8a8378','#6a645b','#504b44'];
+  isoBox(i+0.12,j+0.12,0.76,0.76,14,S[0],S[1],S[2]);                                        // the plinth
+  isoBox(i+0.24,j+0.24,0.52,0.52,150,S[0],S[1],S[2]);                                        // the shaft
+  const q=P(i+0.24,j+0.76), r=P(i+0.76,j+0.76); g.strokeStyle='rgba(30,26,22,0.4)'; g.lineWidth=1.2;
+  [38,76,114].forEach(h=>{ g.beginPath(); g.moveTo(q.x,q.y-h); g.lineTo(r.x,r.y-h); g.stroke(); });
+  g.fillStyle='rgba(200,160,90,0.55)'; [52,96].forEach(h=>{ for(let k=0;k<3;k++){ const t=0.2+k*0.3, p={x:q.x+(r.x-q.x)*t, y:q.y+(r.y-q.y)*t}; g.fillRect(p.x-2,p.y-h-5,4,7); } });   // gilt runes
+  g.save(); g.translate(0,-150); isoBox(i+0.14,j+0.14,0.72,0.72,16,'#9a9286','#746d63','#57524a'); g.restore(); };   // the capital
+const DKING=(o)=>DWARFO({gender:'m', skin:0, hair:1, hairColor:0, beard:6, face:5, ...o});
+OBJ_DRAW.dkstatue=o=>{ isoBox(o.i+0.1,o.j+0.1,0.8,0.8,30,'#8a8378','#6a645b','#504b44'); const q=P(o.i+0.5,o.j+0.5);
+  if(o.name){ g.fillStyle='rgba(230,200,140,0.75)'; g.font='bold 8px Georgia, serif'; g.textAlign='center'; g.fillText(o.name.toUpperCase(),q.x-14,q.y-6); g.textAlign='left'; }
+  g.save(); try{ g.filter='grayscale(1) sepia(0.25) brightness(1.35) contrast(0.85)'; }catch(e){}
+  try{ drawChar(g,q.x,q.y-30,DKING(o.look||{}),0,o.dir??1); }catch(e){} g.restore(); };
+OBJ_DRAW.brazier=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y; g.strokeStyle='#2a2622'; g.lineWidth=3;
+  [[-12,4],[12,4],[0,8]].forEach(([dx,dy])=>{ g.beginPath(); g.moveTo(x+dx,y+dy-2); g.lineTo(x,y-34); g.stroke(); });
+  g.fillStyle='#3a342e'; g.beginPath(); g.ellipse(x,y-36,16,7,0,0,Math.PI); g.fill(); g.fillStyle='#4e4740'; g.beginPath(); g.ellipse(x,y-38,16,6,0,0,Math.PI*2); g.fill();
+  g.fillStyle='#2a1408'; g.beginPath(); g.ellipse(x,y-38,13,4.5,0,0,Math.PI*2); g.fill();
+  for(let k=0;k<5;k++){ const t=gt*3+k*1.3, h=14+6*Math.sin(t), fx=x+(k-2)*4.5; const fg=g.createLinearGradient(0,y-38-h,0,y-38); fg.addColorStop(0,'rgba(255,220,120,0)'); fg.addColorStop(0.4,'rgba(255,170,60,0.9)'); fg.addColorStop(1,'rgba(220,80,20,0.95)');
+    g.fillStyle=fg; g.beginPath(); g.moveTo(fx-4,y-38); g.quadraticCurveTo(fx-3+Math.sin(t)*2,y-38-h*0.6,fx+Math.sin(t*1.3)*2,y-38-h); g.quadraticCurveTo(fx+3,y-38-h*0.5,fx+4,y-38); g.closePath(); g.fill(); }
+  g.save(); g.globalCompositeOperation='lighter'; glow(x,y-44,30,22,'255,150,60',0.3+0.05*Math.sin(gt*5)); g.restore(); };
+LIGHT_TYPES.brazier=[0,-40,120,'255,160,70'];
+OBJ_DRAW.orecart=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y;
+  g.strokeStyle='#4a4038'; g.lineWidth=2; [[-30,10],[-30,-4]].forEach(([a,b])=>{ g.beginPath(); g.moveTo(x+a,y+b); g.lineTo(x-a,y+b-14); g.stroke(); });   // a short run of rail
+  g.fillStyle='#2a2622'; [[-12,4],[12,-2]].forEach(([dx,dy])=>{ g.beginPath(); g.arc(x+dx,y+dy,5,0,Math.PI*2); g.fill(); });
+  g.fillStyle='#5a5048'; g.beginPath(); g.moveTo(x-18,y-4); g.lineTo(x+16,y-12); g.lineTo(x+20,y-28); g.lineTo(x-20,y-20); g.closePath(); g.fill();
+  g.fillStyle='#46403a'; g.beginPath(); g.moveTo(x-20,y-20); g.lineTo(x+20,y-28); g.lineTo(x+14,y-32); g.lineTo(x-14,y-24); g.closePath(); g.fill();
+  [[-8,-27,'#8a8a92'],[2,-30,'#c8b070'],[9,-29,'#7a7a80'],[-3,-25,'#d8c080']].forEach(([dx,dy,c])=>{ g.fillStyle=c; g.beginPath(); g.ellipse(x+dx,y+dy,4.5,3,0.3,0,Math.PI*2); g.fill(); });
+  g.strokeStyle='#2e2a26'; g.lineWidth=1; g.strokeRect(x-17,y-20,1,1); };
+OBJ_DRAW.dthrone=o=>{ isoBox(o.i+0.1,o.j+0.15,0.8,0.7,16,'#8a8378','#6a645b','#504b44');   // the seat
+  const a=P(o.i+0.1,o.j+0.15), b=P(o.i+0.9,o.j+0.15); g.fillStyle='#6a645b'; g.beginPath(); g.moveTo(a.x,a.y-16); g.lineTo(b.x,b.y-16); g.lineTo(b.x,b.y-96); g.lineTo((a.x+b.x)/2,(a.y+b.y)/2-112); g.lineTo(a.x,a.y-96); g.closePath(); g.fill();   // the high back
+  g.fillStyle='rgba(210,170,90,0.6)'; const m={x:(a.x+b.x)/2,y:(a.y+b.y)/2}; g.beginPath(); g.moveTo(m.x,m.y-92); g.lineTo(m.x+8,m.y-70); g.lineTo(m.x,m.y-50); g.lineTo(m.x-8,m.y-70); g.closePath(); g.fill(); };
+// the people of the Great Hall
+const VARROW_FOLK=[
+  { id:'thane', name:'Thane Sigrid Varrowborn', i:9, j:3, dir:2, opts:DWARFO({gender:'f', skin:1, hair:7, hairColor:12, face:2, equip:{head:null, armor:'varrow_mail', hands:null, legs:'trousers', feet:'boots'}}) },
+  { id:'gorm', name:'Master Smith Gorm', i:3, j:3, dir:1, opts:DWARFO({gender:'m', skin:2, hair:2, hairColor:6, beard:6, face:5, equip:{armor:'jerkin', hands:'varrow_gauntlets', weapon:'mace'}}) },
+  { id:'ulla', name:'Ulla the Trader', i:3, j:11, dir:1, opts:DWARFO({gender:'f', skin:2, hair:3, hairColor:3, face:4, equip:{armor:'gambeson'}}) },
+  { id:'brakka', name:'Old Mother Brakka', i:13, j:2, dir:2, opts:DWARFO({gender:'f', skin:1, hair:4, hairColor:13, face:5, equip:{armor:'jerkin'}}) },
+  { id:'halvard', name:'Foreman Halvard', i:15, j:8, dir:3, opts:DWARFO({gender:'m', skin:1, hair:2, hairColor:3, beard:5, face:1, equip:{head:'kettle', armor:'jerkin', weapon:'hatchet'}}) },
+  { id:'bodil_h', name:'Envoy Bodil Granitebrow', i:11, j:6, dir:1, when:()=>CHOICE.vqEnd==='atoned', opts:DWARVES.find(d=>d.id==='bodil').opts } ];
+{ const B0=DWARVES.find(d=>d.id==='bodil'); wrap('silvergate','npcs',l=>CHOICE.vq==='atoned'||CHOICE.vqEnd==='atoned' ? l.filter(n=>n.id!=='bodil') : l); }
+const VARROW_GEAR=()=>['varrow_axe','varrow_helm','varrow_gauntlets',...(vq()==='done'?['varrow_mail']:[]),'axe','mace','mail','helm_full','gauntlets','shield_iron','plate_boots'].filter(id=>ITEMS[id]&&PRICES[id]);
+function thaneTalk(){ const T='Thane Sigrid Varrowborn', Q=vq();
+  if(!Q) return say(T,["<i>The Thane of Varrowdeep sits on a plain stone chair under the banners of nine kings. She is grey-braided and broad as a door, and she does not get up.</i> “A surface-walker in my hall. The guards say your hands were open. Good. Keep them that way.”",
+      "“You come at a poor time. Nine days ago the oldest seam in the deep mines went quiet. Not the picks: the whole of it. Six of my miners went down to see why, and none of them came back up.”"],
+    [{label:'“What do you mean, quiet?”', fn:()=>say(T,["“Rock is never silent, not to us. It creaks and settles and talks. That seam has stopped talking. The lamps go out down there by themselves, and the miners who went to look have not come home.”",
+        "“That seam runs under the tomb of Durnhal. One of our kings. We do not speak of him much.” <i>She looks at you for a long moment.</i> “My people are afraid to go down. You are not my people, so you have less to lose. Will you look?”"],
+      [{label:'“I will go down.”', fn:()=>{ CHOICE.vq='asked'; say(T,["“Foreman Halvard keeps the key to the lowest gallery. Tell him I sent you.” <i>She leans back.</i> “And if it is what I fear it is, do not let it talk to you for long.”"],[bye]); }}, {label:'“Not yet.”', fn:closeDialog}])},
+     {label:'“Who was Durnhal?”', fn:()=>say(T,["“The king who opened the road to the silver under the western hills. The road ran through the elves’ oldest wood. He cut it down, tree by tree, and when the elves came to stop him he cut through them too.”","“We carved his face on the gate wall. Then my grandmother had it chiselled off.”"],[{label:'Back.', fn:thaneTalk}, bye])}, bye]);
+  if(Q==='asked') return say(T,[CHOICE.vqQuiet?"“Halvard says the upper galleries are clear. The quiet is still there below them. Go on.”":"“The lowest gallery, under the old seam. Halvard has the key.”"],[bye]);
+  if(Q==='axe') return say(T,["<i>She sees the axe in your hands and stands up, which she has not done before.</i> “Durnhal’s axe. Then it was him.”",
+      "<i>You tell her what the shade said: that his road is not finished, that he cannot lie down while the debt stands open.</i> She is quiet for a while. “Our songs say he paid for the silver with sweat. The elves say he paid with their trees and their dead. I always knew which one was true.”",
+      "“It is your hand that took it from him. You choose what becomes of it.”"],
+    [{label:'“Take it to the elves, as an apology from the Deep.”', fn:()=>{ CHOICE.vq='elves'; say(T,["<i>For a long moment she says nothing.</i> “Three hundred years, and no Thane has dared. Very well. Take it to the Lady of Sylvhaven. If she takes it, I will believe the old wound can close.”","“Bodil has been standing at their gate since spring. Tell her she may stop waiting, one way or the other.”"],[bye]); }},
+     {label:'“I will keep it. It is a good axe.”', fn:()=>{ CHOICE.vq='done'; CHOICE.vqEnd='kept'; player.purse+=300; updateHud(); giveXp(150,'The Quiet in the Deep');
+        say(T,["“It is a very good axe. It is also a very heavy one.” <i>She sits down again.</i> “The seam is singing again; that is what I asked of you. Varrowdeep pays its debts.” <i>She has a purse brought: three gold.</i>","“Gorm will sell to you now as he sells to us. Use the axe well. Try not to use it on trees.”"],[bye]); }}]);
+  if(Q==='elves') return say(T,["“Has the Lady of Sylvhaven seen it yet? Then you have somewhere to be.”"],[bye]);
+  if(Q==='atoned') return say(T,["<i>Bodil is already here, talking fast, waving her hands.</i> The Thane hears you out, and then for the first time you see her smile. “Deadfall timber for our silver, and Bodil inside their gate. My grandmother would have spat. I think she would have been wrong.”",
+      "“Varrowdeep pays its debts, and it pays them twice for this one.” <i>Three gold, and a shirt of dwarf mail folded small.</i> “Gorm made it for a prince. You will do.”"],
+    [{label:'Thank her.', fn:()=>{ CHOICE.vq='done'; CHOICE.vqEnd='atoned'; player.purse+=300; giveQuestItem('varrow_mail',true); updateHud(); giveXp(200,'The Quiet in the Deep'); thaneTalk(); }}]);
+  return say(T,[CHOICE.vqEnd==='atoned'?"“The seam sings, the timber carts go west, and an elf came to my hall last week and complained about the beer. Things are as they should be.”":"“The seam sings again. Mind the axe on the stairs.”"],[bye]); }
+function halvardTalk(){ const H='Foreman Halvard', Q=vq();
+  if(!Q) return say(H,["<i>A dwarf with a lamp on his helmet and a key on a chain round his neck stands by the shaft-head, staring down it.</i> “Nobody goes down. Thane’s orders. Not past the upper galleries, not for silver, not for anything.”","“Six of my lads went. Kari wrote me a note on the rock. Then nothing.”"],[bye]);
+  if(Q==='asked') return say(H,["“The Thane sent you? Then you are braver than me, or know less.” <i>He takes the chain off his neck and unlocks a padlock the size of a loaf.</i> “The lowest gallery is open. Whatever you meet in the upper galleries, it used to be my people. Be kind if you can, and quick if you can’t.”"],[bye]);
+  return say(H,[vq()==='done'?"“Listen.” <i>From the shaft comes the far-off tick of picks, and someone singing badly.</i> “That is the sound of a mine that is alive.”":"“The deep is quiet in the good way now. Thank you. I will carve the lads’ names by the shaft-head.”"],[bye]); }
+function gormTalk(){ const G='Master Smith Gorm'; say(G,["<i>He does not look up from the anvil. Sparks fly off every blow and he does not blink.</i> “Surface-folk want our steel. Everyone wants our steel. The question is whether our steel wants you.”",
+    vq()==='done'?"“The Thane says you are owed. Here is what I have.”":"“For coin I will sell you a little. The best I keep for those the hold owes.”"],
+  [{label:'“Show me your work.”', fn:()=>shopFrom(G,VARROW_GEAR(),vq()==='done'?0.85:1.15,["“Folded nine times, quenched in snow-water. Do not bring it back bent.”"],gormTalk)}, bye]); }
+function ullaTalk(){ const U='Ulla the Trader'; say(U,["“Bread from the valley, draughts from Hollowmere, antidote from somewhere nobody should go.” <i>She grins.</i> “Everything comes up the pass, and everything costs more for the climb.”"],
+  [{label:'“What have you got?”', fn:()=>shopFrom(U,['potion','mana_potion','antidote','bread','cooked_meat','apple'].filter(id=>ITEMS[id]&&PRICES[id]),1.1,["“Coin first, then goods. A mountain custom.”"],ullaTalk)}, bye]); }
+function brakkaTalk(){ const M='Old Mother Brakka'; say(M,["<i>An old dwarf woman stirs a pot as big as a barrel by the hearth. She has seen you come in and has already filled a bowl.</i> “Eat. Nobody talks in my hall on an empty stomach.”",
+    ["“Durnhal? My grandmother’s grandmother saw him crowned. She said he laughed like a rockfall and wept like a child when his wife died, and that he never once said sorry to anybody.”","“You young ones think the elves are proud. Try being three hundred years in the wrong and too stubborn to say it.”","“The quiet below? Hm. Things that are buried want to be finished with. Same as people.”"][Math.floor(dayClock/DAY_LEN)%3]],
+  [{label:'Eat the stew. (Rest a little)', fn:()=>{ player.hp=Math.min(player.maxHp,player.hp+Math.round(player.maxHp*0.3)); updateHud(); say(M,"“There. Now you have colour in your face.”",[bye]); }}, bye]); }
+function guardTalk(n){ say(n,[["“Surface-folk. Wipe your boots.”","“Keep your hands where I can see them, and you can see the hall.”","“The Thane is in the Great Hall. Don’t make her stand up.”"][(n.length+Math.floor(dayClock/DAY_LEN))%3]],[bye]); }
+Object.assign(TALKERS,{ thane:thaneTalk, halvard:halvardTalk, gorm:gormTalk, ulla:ullaTalk, brakka:brakkaTalk, vguard1:()=>guardTalk('Gate Guard Orm'), vguard2:()=>guardTalk('Gate Guard Sigrun'),
+  bodil_h:()=>say('Envoy Bodil Granitebrow',["“They let me in. I walked under their trees and nobody shot at me, and their Lady gave me tea that tasted of grass.” <i>She shakes her head, smiling.</i> “Deadfall timber, west by cart, every spring. You did that.”","“I said Varrowdeep pays its debts. I am still working out how to pay this one.”"],[bye]) });
+{ const prev=npcHasNews; npcHasNews=function(n){ if(n.id==='thane' && (!vq() || vq()==='axe' || vq()==='atoned')) return vq()?'?':'!'; if(n.id==='halvard' && vq()==='asked' && !CHOICE.vqKey) return '!'; return prev(n); }; }
+{ const _h=TALKERS.halvard; TALKERS.halvard=()=>{ if(vq()==='asked') CHOICE.vqKey=1; _h(); }; }
+// the Lady of Sylvhaven, and the axe
+{ const prevA=TALKERS.aerwen; TALKERS.aerwen=(...a)=>{ if(vq()!=='elves' || !hasItem('roadcutter_axe')) return prevA(...a); const A='Lady Aerwen';
+    say(A,["<i>You hold out the axe. Aerwen does not take it. She looks at it for a long time, and every elf within sight of you has stopped moving.</i>","“I know this axe. My mother’s mother stood in front of it.” <i>Her voice is very even.</i> “Why do you bring it to me, and not the dwarf at my gate?”"],
+      [{label:'“The Thane of Varrowdeep sends it. As an apology.”', fn:()=>{ const k=player.inv.indexOf('roadcutter_axe'); if(k>=0) player.inv[k]=null; CHOICE.vq='atoned'; addLeaves(10,'the Roadcutter’s axe');
+          say(A,["<i>Now she takes it, in both hands, the way you would lift something that might break.</i> “Three hundred years. The trees he cut have grown again, and none of them are the same trees.”",
+            "“Tell their Thane that the deadfall is theirs, west by cart, every spring. And tell Bodil Granitebrow she may stop standing at my gate. She can come in and drink tea and complain about it, like everyone else.”","“The axe stays with us. We will bury it under the first tree that grew back on his road.”"],[bye]); }},
+       {label:'“Forgive me. Not yet.”', fn:closeDialog}]); }; }
+{ const prev=npcHasNews; npcHasNews=function(n){ if(n.id==='aerwen' && vq()==='elves' && hasItem('roadcutter_axe')) return '?'; return prev(n); }; }
+// the quiet lifts; the king rises, falls, and speaks
+{ const _v=victory; victory=function(faction){ const r=_v.apply(this,arguments);
+    if(faction==='quiet' && !CHOICE.vqQuiet){ CHOICE.vqQuiet=1; logMsg('The last of the quiet miners lowers its axe and fades like breath on cold stone. Somewhere far below, something heavy turns over in its sleep.','#c8c8d8'); }
+    if(faction==='roadcutter' && !CHOICE.vqKing){ CHOICE.vqKing=1; CHOICE.vq='axe'; giveQuestItem('roadcutter_axe',true);
+      setTimeout(()=>say('Durnhal the Roadcutter',["<i>The old king kneels in the dust of his own tomb. He is very thin now, a shape of grey light in a crown of rust.</i>","“The road. Is it finished? I cannot lie down. Every tree I cut is a stone on my chest. They dug down to me and I woke, and the debt woke with me.”",
+          "“Take the axe. Take it where it is owed. Tell them... no. I never said it in life. You say it.” <i>He holds out the axe, and when you take it, there is nobody there.</i>"],[{label:'Take the axe.', fn:closeDialog}]),900); }
+    return r; }; }
+JOURNAL.push(['The Quiet in the Deep', ()=>{ const Q=vq(); if(!Q) return visitedAreas.varrowhall ? ['active',"The deepest mine of Varrowdeep has gone quiet. Thane Sigrid in the Great Hall may want help."] : null;
+  if(Q==='done') return ['done', CHOICE.vqEnd==='atoned' ? "You went down into the deep mines of Varrowdeep and laid Durnhal the Roadcutter to rest. His axe went west to Sylvhaven as an apology, and the elves took it. Timber goes west now, and Bodil drinks tea in Sylvhaven." : "You went down into the deep mines of Varrowdeep and laid Durnhal the Roadcutter to rest. You kept his axe."];
+  if(Q==='asked') return ['active', CHOICE.vqQuiet ? "The upper galleries are clear. Go down to the lowest gallery, under the old seam, and find what made the quiet." : "Go down into the deep mines of Varrowdeep and find what has made the oldest seam go quiet. Foreman Halvard has the key to the lowest gallery."];
+  if(Q==='axe') return ['active',"Durnhal the Roadcutter's shade gave you his axe, and asked that it go where it is owed. Bring it to Thane Sigrid in the Great Hall."];
+  if(Q==='elves') return ['active',"Take the Roadcutter's Axe to Lady Aerwen in Sylvhaven, as an apology from Varrowdeep."];
+  if(Q==='atoned') return ['active',"Lady Aerwen accepted the axe. Tell Thane Sigrid in Varrowdeep."]; }]);
 // ════════ A TRAVELLERS' TENT IN SYLVHAVEN: three bedrolls, free to anyone the elves let in. Sleep here and you wake here ════════
 function drawBedroll(o){ const k=(o.i*7+o.j*3)%3, cols=[['#5a6a48','#8a9a6a'],['#6a5a48','#a08a64'],['#4a5a6a','#7a8aa0']][k], q=P(o.i+1,o.j+0.5);
   drawCached('roll'+k,q.x,q.y,220,110,110,70,(X,Y)=>{ g.fillStyle='rgba(20,14,8,0.3)'; g.beginPath(); g.ellipse(X+4,Y+6,86,26,0,0,Math.PI*2); g.fill();

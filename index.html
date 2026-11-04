@@ -20443,7 +20443,7 @@ function bellSpots(){ const d=Math.floor(dayClock/DAY_LEN), out=[]; for(let k=0;
 // ── the Heartwood: a glade east of Sylvhaven around the oldest tree, where its light drifts loose once a day ──
 AREAS.heartwood={ fence:{r:false,l:false}, w:18, h:18, theme:'elf', dens:0.06, label:'The Heartwood', mini:{x:0,y:0}, notches:()=>[], dummy:null,   // an open glade round the oldest tree: only the rim is wood
   objects:()=>[ {type:'teleporter', i:0, j:9, to:'sylvhaven', entry:'fromHeart'},
-    {type:'worldtree', i:7, j:6, fp:[4,4], tall:1400},
+    {type:'worldtree', i:7, j:6, fp:[4,4], tall:980},
     {type:'teleporter', i:11, j:10, to:'treeheart', entry:'fromWood', treedoor:true},
     {type:'lantern', i:4, j:4, off:havenBurnt()}, {type:'lantern', i:15, j:4, off:havenBurnt()}, {type:'lantern', i:4, j:15, off:havenBurnt()}, {type:'lantern', i:15, j:15, off:havenBurnt()},
     {type:'critter', kind:'flowers', i:3, j:12, noblock:true}, {type:'critter', kind:'flowers', i:14, j:8, noblock:true}, {type:'critter', kind:'flowers', i:9, j:15, noblock:true}, {type:'critter', kind:'flowers', i:15, j:12, noblock:true} ],
@@ -20549,20 +20549,21 @@ function wtPaint(layer,healed){ const W=2200, H=1900, BX=1100, BY=1640, cv=docum
       c.strokeStyle=healed?'rgba(230,234,210,0.5)':'rgba(170,170,150,0.4)'; c.lineWidth=1.6; c.beginPath(); c.moveTo(BX+x,BY+y); c.quadraticCurveTo(BX+x+10,BY+y+len*0.5,BX+x-4,BY+y+len); c.stroke();
       c.fillStyle=L[3]; for(let q=1;q<6;q++){ c.beginPath(); c.ellipse(BX+x+3*Math.sin(q),BY+y+len*q/6,3,6,0.4,0,Math.PI*2); c.fill(); } } }
   return cv; }
-OBJ_DRAW.worldtree=o=>{ const healed=!!CHOICE.hwSpirit, q=P(o.i+o.fp[0]/2,o.j+o.fp[1]/2), pp=P(player.x,player.y);
+const WT_K=0.68;                                   // how big the great tree is drawn (1 = its full painting)
+OBJ_DRAW.worldtree=o=>{ const healed=!!CHOICE.hwSpirit, K=WT_K, q=P(o.i+o.fp[0]/2,o.j+o.fp[1]/2), pp=P(player.x,player.y);
   ['trunk','crown'].forEach(L=>{ const key=L+healed; if(!WT[key]) WT[key]=wtPaint(L,healed); });
   const behind=!(player.x>=o.i+o.fp[0]-0.05 || player.y>=o.j+o.fp[1]-0.05);
-  const inT=behind && Math.abs(pp.x-q.x)<320 && pp.y<q.y+140 && pp.y>q.y-820, inC=pp.y<q.y-650 || (behind && Math.abs(pp.x-q.x)<950 && pp.y<q.y-150);
+  const inT=behind && Math.abs(pp.x-q.x)<320*K && pp.y<q.y+140*K && pp.y>q.y-820*K, inC=pp.y<q.y-650*K || (behind && Math.abs(pp.x-q.x)<950*K && pp.y<q.y-150*K);
   o.fT=lerpN(o.fT??1, inT?0.32:1, 0.12); o.fC=lerpN(o.fC??1, inC?0.4:1, 0.12);
   const ga=g.globalAlpha;
-  g.globalAlpha=ga*o.fT; g.drawImage(WT['trunk'+healed],q.x-1100,q.y-1640);
+  g.globalAlpha=ga*o.fT; g.drawImage(WT['trunk'+healed],q.x-1100*K,q.y-1640*K,2200*K,1900*K);
   { const dx=q.x, dy=q.y; g.save(); g.globalCompositeOperation='lighter';                                                        // the door's light, and the sap in the bark
-    const pulse=0.7+0.3*Math.sin(gt*1.7); glow(dx,dy+40,70,100,healed?'255,220,140':'150,90,200',(healed?0.45:0.35)*pulse*o.fT);
+    const pulse=0.7+0.3*Math.sin(gt*1.7); glow(dx,dy+40*K,70*K,100*K,healed?'255,220,140':'150,90,200',(healed?0.45:0.35)*pulse*o.fT);
     g.strokeStyle=healed?`rgba(250,230,150,${0.35*pulse*o.fT})`:`rgba(140,80,190,${0.3*pulse*o.fT})`; g.lineWidth=3;
-    [[-120,0.2],[-40,1.1],[60,2.3],[140,3.1]].forEach(([vx,ph])=>{ g.beginPath(); for(let k=0;k<=24;k++){ const yy=dy-60-k*38, xx=dx+vx*(1-k/40)+Math.sin(k*0.7+ph)*12; k?g.lineTo(xx,yy):g.moveTo(xx,yy); } g.stroke(); });
+    [[-120,0.2],[-40,1.1],[60,2.3],[140,3.1]].forEach(([vx,ph])=>{ g.beginPath(); for(let k=0;k<=24;k++){ const yy=dy-(60+k*38)*K, xx=dx+(vx*(1-k/40)+Math.sin(k*0.7+ph)*12)*K; k?g.lineTo(xx,yy):g.moveTo(xx,yy); } g.stroke(); });
     g.restore(); }
-  g.globalAlpha=ga*o.fC; g.drawImage(WT['crown'+healed],q.x-1100,q.y-1640);
-  if(healed){ g.save(); g.globalCompositeOperation='lighter'; for(let k=0;k<14;k++){ const t=(gt*0.05+k*0.071)%1, x=q.x+Math.sin(k*2.7+gt*0.3)*700*(0.4+k%3*0.2), y=q.y-1150+t*1000;   // the light drifting down out of the crown
+  g.globalAlpha=ga*o.fC; g.drawImage(WT['crown'+healed],q.x-1100*K,q.y-1640*K,2200*K,1900*K);
+  if(healed){ g.save(); g.globalCompositeOperation='lighter'; for(let k=0;k<14;k++){ const t=(gt*0.05+k*0.071)%1, x=q.x+Math.sin(k*2.7+gt*0.3)*700*K*(0.4+k%3*0.2), y=q.y-(1150-t*1000)*K;   // the light drifting down out of the crown
       glow(x,y,10,10,'230,250,210',0.5*Math.sin(t*Math.PI)*o.fC); } g.restore(); }
   g.globalAlpha=ga; };
 // inside the trunk: walls of living wood climbing into the dark

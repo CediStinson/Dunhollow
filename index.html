@@ -2501,6 +2501,12 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
           else { fs(T0); [-1,1].forEach(sd=>{ [3,7,10.5].forEach(dy=>{ const t=dy/vD; c.beginPath(); c.arc(x+LN+po+sd*(vW*(1-t)+1.5),B+Y.SHOULDER+dy,0.38,0,Math.PI*2); c.fill(); }); }); }   // little rivets down her V
         c.restore();
         c.strokeStyle=T0; c.lineWidth=0.7; c.beginPath(); c.moveTo(x+LN-vW+po,B+Y.SHOULDER-0.6); c.lineTo(x+LN+po,B+Y.SHOULDER+vD); c.lineTo(x+LN+vW+po,B+Y.SHOULDER-0.6); c.stroke(); }
+      if(!front){ c.save(); path(pts,1.1); c.clip(); const bx=LN, y0=Y.SHOULDER+2.5, y1=sideH-1.2;                       // from behind: a laced seam down the spine, a leaf between the shoulder blades
+          c.strokeStyle=tone(L0,-0.55); c.lineWidth=0.6; [-0.9,0.9].forEach(d=>{ c.beginPath(); c.moveTo(x+bx+d,B+y0+5); c.lineTo(x+bx+d,B+y1); c.stroke(); });
+          c.strokeStyle=T0; c.lineWidth=0.4; for(let yy=y0+5.6; yy<y1-1; yy+=1.9){ c.beginPath(); c.moveTo(x+bx-0.9,B+yy); c.lineTo(x+bx+0.9,B+yy+1.5); c.moveTo(x+bx+0.9,B+yy); c.lineTo(x+bx-0.9,B+yy+1.5); c.stroke(); }
+          leafAt(bx,y0+2.2,F?4.6:5.6,1.8,0,tone(L0,0.1),tone(L0,-0.5));
+          c.strokeStyle=tone(L0,0.3,0.6); c.lineWidth=0.3; c.setLineDash([0.6,0.5]); [-1,1].forEach(sd=>{ c.beginPath(); c.moveTo(x+LN+sd*(CH-1.4),B+Y.SHOULDER+1); c.quadraticCurveTo(x+LN+sd*(WA-0.2),B+(Y.SHOULDER+sideH)/2,x+LN+sd*(WA-0.6),B+sideH-1); c.stroke(); }); c.setLineDash([]);
+        c.restore(); }
       if(front && pr<0.5) [-1,1].forEach(sd=>{ c.save(); c.translate(x+LN+sd*(P.neckW/2+1.6)+po*0.3,B+Y.SHOULDER-1); c.rotate(sd*0.45);   // the leaf collar, rising behind the neck
         c.beginPath(); c.moveTo(0,0); c.quadraticCurveTo(sd*4.2,-3.4,sd*1.2,-8); c.quadraticCurveTo(-sd*0.6,-3.6,0,0); c.closePath(); c.fillStyle=tone(L0,0.1); c.fill(); c.strokeStyle=T0; c.lineWidth=0.5; c.stroke(); c.restore(); });
       belt(F?Y.WAIST+1:Y.WAIST-1.4,F?HI+0.6:WA+1.2,D0,true); }
@@ -2854,7 +2860,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   seatFill(sp,Y.WAIST-3,-34);
   if(Math.abs(swing)<1){ fs('rgba(22,13,5,0.28)'); r(LN-1.4,Y.KNEE+2,2.8,-Y.KNEE-8); }
   c.save(); path(sp); c.clip(); seatSeams(); c.restore();
-  drawBelt(Y.WAIST-1.8,Math.max(WA,HI)+0.6,beltStyle(2.2));
+  if(!DUEL_LEG) drawBelt(Y.WAIST-1.8,Math.max(WA,HI)+0.6,beltStyle(2.2));   // the duellist's leggings wear the vest's belt, not their own
   }
 
   function drawShirt(){
@@ -10030,7 +10036,7 @@ function refreshStatPanel(){
   ];
   panel.innerHTML = rows.map(([k,v])=>`<div class="stat-row"><b>${k}</b><span>${v}</span></div>`).join('');
   const a=gearSum('agi'), m=gearSum('magic');
-  panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Swing Time</b><span>${W.wind.toFixed(2)}s</span></div><div class="stat-row"><b>Agility</b><span>${a}${a?` (${Math.round(dodgeChance(a)*100)}% dodge)`:''}</span></div><div class="stat-row"><b>Attack Power</b><span>${gearSum('ap')} (×${APM().toFixed(2)} weapon)</span></div><div class="stat-row"><b>Spell Power</b><span>${m}${isMagicWeapon()?' (×'+SPM().toFixed(2)+' spells)':''}</span></div>`);
+  panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Swing Time</b><span>${(W.wind*(1-Math.min(0.3,gearSum('aspd')/100))).toFixed(2)}s</span></div><div class="stat-row"><b>Agility</b><span>${a}${a?` (${Math.round(dodgeChance(a)*100)}% dodge)`:''}</span></div><div class="stat-row"><b>Attack Power</b><span>${gearSum('ap')} (×${APM().toFixed(2)} weapon)</span></div><div class="stat-row"><b>Spell Power</b><span>${m}${isMagicWeapon()?' (×'+SPM().toFixed(2)+' spells)':''}</span></div>`);
   const t=[SLOTS.some(sl=>isWoven(player.opts.equip[sl]))&&('Woven pieces worn '+SLOTS.filter(sl=>isWoven(player.opts.equip[sl])).length),SLOTS.some(sl=>isTempered(player.opts.equip[sl]))&&('Tempered pieces worn '+SLOTS.filter(sl=>isTempered(player.opts.equip[sl])).length)].filter(Boolean);
   if(t.length) panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Special gear</b><span>${t.join(' · ')}</span></div>`);
 }
@@ -10460,8 +10466,8 @@ Object.assign(AREAS,{
       {type:'lantern', i:3, j:3, off:havenBurnt()}, {type:'lantern', i:7, j:3, off:havenBurnt()}, {type:'lantern', i:3, j:6, off:havenBurnt()}, {type:'lantern', i:7, j:6, off:havenBurnt()},
       {type:'ruin', i:1, j:1, v:2}, {type:'pillar', i:8, j:2, broken:true} ],
     npcs:()=>{ if(havenBurnt()) return [];
-      const l=[{ id:'warden', name:'Warden Ithrel', i:4, j:2, dir:1, opts:ELFO({gender:'m',skin:0,hair:4,hairColor:13,face:0,equip:{head:'elf_circlet',torso:'elf_tunic',armor:'elf_scale',hands:null,legs:'elf_leggings',feet:'elf_boots',weapon:'elf_blade',offhand:null}}) },
-               { id:'lirael', name:'Sentinel Lirael', i:6, j:2, dir:0, opts:ELFO({gender:'f',skin:0,hair:5,hairColor:11,face:2,equip:{head:null,torso:'elf_tunic',armor:'elf_cloak',hands:null,legs:'elf_leggings',feet:'elf_boots',weapon:'elf_blade',offhand:null}}) }];
+      const l=[{ id:'warden', name:'Warden Ithrel', i:4, j:2, dir:1, opts:ELFO({gender:'m',skin:0,hair:4,hairColor:13,face:0,equip:{head:'elf_circlet',torso:'elf_tunic',armor:'elf_scale',hands:'duel_bracers',legs:'elf_leggings',feet:'duel_boots',weapon:'elf_blade',offhand:null}}) },
+               { id:'lirael', name:'Sentinel Lirael', i:6, j:2, dir:0, opts:ELFO({gender:'f',skin:0,hair:5,hairColor:11,face:2,equip:{head:'duel_band',torso:'elf_tunic',armor:'duel_vest',hands:'duel_bracers',legs:'elf_leggings',feet:'duel_boots',weapon:'elf_blade',offhand:null}}) }];
       if(CHOICE.faelan==='freed') l.push({ id:'faelan2', name:'Faelan', i:7, j:5, dir:6, opts:ELFO({gender:'m',skin:0,hair:4,hairColor:10,equip:{head:null,torso:'elf_tunic',armor:'elf_cloak',hands:null,legs:'elf_leggings',feet:'elf_boots',weapon:'elf_blade',offhand:null}}) });
       return l; },
     mobs:()=>[], entries:{ fromMere:{i:5,j:7}, fromHaven:{i:5,j:1} } },
@@ -12509,7 +12515,7 @@ function doAttack(){
   duel.chain = (clock-duel.lastAtk < PARRY.chainWindow) ? Math.min(duel.chain+1, PARRY.chainMax/PARRY.chainPenalty) : 0;
   duel.lastAtk = clock;
   const W=weaponOf(player);
-  duel.st='attack'; duel.atkWind=Math.max(0.1, W.wind-(['gloves','gauntlets'].includes(player.opts.equip.hands)?0.05:0))*(hasStatus(player,'chill')?1.4:1); duel.t=duel.atkWind;   // chilled: a slower swing
+  duel.st='attack'; duel.atkWind=Math.max(0.1, W.wind-(['gloves','gauntlets'].includes(player.opts.equip.hands)?0.05:0))*(1-Math.min(0.3,gearSum('aspd')/100))*(hasStatus(player,'chill')?1.4:1); duel.t=duel.atkWind;   // chilled: a slower swing
   { const f=combat.foe, S=f&&STYLES[styleOf(f)];
     if(S && S.reads && !combat.practice && f.state==='guard' && duel.lastSide===playerGuard && f.guardDir!==playerGuard){ f.guardDir=playerGuard; floatText(tileOf(f),'Read you!','#ffb070');
       teach('read','He read you',["You struck the <b>same side twice</b>, and he saw it coming.","Veterans read a fighter who repeats himself. Vary your sides."]); }
@@ -12766,7 +12772,7 @@ function hurtPlayer(n,label){
   if(n>0 && f && f.tier) n=Math.round(n*tierDmg(f));                    // tougher kin of the same foe hit harder
   if(n>0 && f && typeof gapIn==='function') n=Math.round(n*gapIn(f));     // and harder still if your gear is not up to where you are
   const agi=gearSum('agi');
-  if(n>0 && agi>0 && !combat.practice && Math.random()<dodgeChance(agi)){ floatText(tileOf(player),'Dodge!','#a8e0ff',true); player.flash=0.15; SND.dodge(); }
+  if(n>0 && agi>0 && !combat.practice && Math.random()<dodgeChance(agi)){ floatText(tileOf(player),'Dodge!','#a8e0ff',true); player.flash=0.15; SND.dodge(); if(player.opts && player.opts.equip.feet==='duel_boots') RIPOSTE_UNTIL=performance.now()+2000; }
   else {
     if(n>0 && f && hasStatus(f,'weak')) n=Math.max(1,Math.ceil(n*0.5));  // a withered foe hits soft
     if(combat.practice) n=0;
@@ -12845,6 +12851,7 @@ function wound(f,n,label,col){                       // a blow lands on a foe
 function woundRaw(f,n,label,col){
   const W=WEAPONS[player.opts&&player.opts.equip.weapon]||{};
   if(f!==player && HIT_SRC==='melee' && n>0) n=Math.round(W.ember ? n*emberMult() : n*APM());     // attack power; an ember blade scales with spell power instead
+  if(f!==player && HIT_SRC==='melee' && n>0 && RIPOSTE_UNTIL>performance.now()){ RIPOSTE_UNTIL=0; n=Math.round(n*1.4); floatText(tileOf(player),'Riposte!','#f0d080',true); }   // the duellist's boots: a dodge sets up the answer
   if(f.type==='barrowking' && HIT_SRC==='melee' && !isMagicWeapon() && n>0) n=Math.max(1,Math.round(n*BK_STEEL));   // his bog-iron mail turns plain steel
   if(f!==player && hasStatus(player,'weak') && n>0) n=Math.max(1,Math.ceil(n*0.5));   // withered: half, as a withered foe
   const crit = Math.random()<PARRY.critChance;
@@ -14489,6 +14496,8 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
   const hp=GEAR_HP[id]||0; if(hp) L.push(['Health',(hp>0?'+':'')+hp]);
   if(st.agi) L.push(['Agility','+'+st.agi+' <small>('+Math.round(st.agi*AGI_DODGE*100)+'% dodge)</small>']);
   if(st.ap) L.push(['Attack power','+'+st.ap+' <small>(+'+st.ap*3+'% weapon damage)</small>']);
+  if(st.aspd) L.push(['Swing speed','+'+st.aspd+'% <small>(your weapon swings that much faster)</small>']);
+  if(id==='duel_boots') L.push(['Riposte Step','after you dodge a blow, your next strike within 2 seconds lands 40% harder']);
   if(st.magic) L.push(['Spell power','+'+st.magic+' <small>(+'+st.magic*4+'% spell damage)</small>']);
   if(st.mreg) L.push(['Mana regeneration','+'+st.mreg+' <small>per second in a fight (base 7)</small>']);
   if(typeof isWoven==='function' && isWoven(id)) L.push(['Woven by Maelis','one of a kind <small>(+1 spell power included)</small>']);
@@ -20302,6 +20311,7 @@ const foeLevel=f=>{ if(!f) return 1; const t=f.tier||tierOf(areaId)||1; return M
 // what each piece is worth
 const HEAVY=/mail|plate|scale|lamellar|chitin|cuirass|hauberk|helm|kettle|coif|bevor|gauntlet|keffiyeh|crown|obsidian/;
 function armourOf(id){ if(!id || !ITEMS[id]) return 0; const it=ITEMS[id], base=(typeof unWoven==='function'?unWoven(id):id), b=it.base||base, lvl=itemLevel(id), heavy=HEAVY.test(base)||HEAVY.test(b);
+  if(/^duel_/.test(base)) return ({armor:6, head:2, hands:2, feet:2})[it.slot]||0;
   if(it.slot==='armor') return heavy ? 2+2*lvl : /jerkin|studded|gambeson|leather|sun_|mantle/.test(base+b) ? Math.round(1+1.2*lvl) : Math.round(lvl*0.5);
   if(it.slot==='head') return heavy ? lvl+1 : Math.round(lvl*0.4);
   if(it.slot==='hands') return heavy ? lvl : Math.round(lvl*0.5);
@@ -20465,6 +20475,61 @@ function elowenTalk(){ const d=Math.floor(dayClock/DAY_LEN), done=CHOICE.hwDay==
 TALKERS.elowen=elowenTalk;
 // Marta no longer sells elven boots: the elves trade their weaving for favour, not coin
 
+// ════════ THE DUELLIST'S LEATHERS: an elven melee set bought with Silver Leaves. Quick, light, hits a little harder; not for standing in the way of things ════════
+Object.assign(ITEMS,{
+  duel_band:   { name:'Leaf-brow Band',      slot:'head' },
+  duel_vest:   { name:"Duellist's Vest",     slot:'armor', base:'elf_harness' },
+  duel_bracers:{ name:"Duellist's Bracers",  slot:'hands' },
+  duel_legs:   { name:"Duellist's Legwear",  slot:'legs', col:'#30362f' },   // (col: what a seated figure shows)
+  duel_boots:  { name:"Duellist's Boots",    slot:'feet', col:'#262a24' } });
+HZ_KIND.duel_vest='vest'; OWN_ART.add('duel_vest');
+Object.assign(ITEM_STATS,{ duel_band:{hp:2,agi:1,ap:1}, duel_vest:{hp:6,agi:2,ap:3}, duel_bracers:{hp:2,agi:1,ap:1,aspd:8}, duel_legs:{hp:3,agi:2,ap:1}, duel_boots:{hp:3,agi:1,ap:1} });
+['duel_band','duel_vest','duel_bracers','duel_legs','duel_boots'].forEach(id=>{ GEAR_HP[id]=ITEM_STATS[id].hp; ITEM_LEVEL_FIX[id]=4; });
+Object.assign(PRICES,{ duel_band:120, duel_vest:240, duel_bracers:140, duel_legs:140, duel_boots:190 });
+var RIPOSTE_UNTIL=0;
+LEAF_WARES.push(['duel_band',5],['duel_bracers',6],['duel_legs',6],['duel_boots',8],['duel_vest',10]);
+Object.assign(ITEM_LORE,{
+  duel_band:"A band of dark leather across the brow, a leaf of gilded metal standing over it. The ends are knotted behind and hang down the back of the neck.",
+  duel_vest:"A short vest of hardened leather, cut deep at the neck and laced at the sides. Elven duellists wear nothing that slows the arm.",
+  duel_bracers:"Leaf-pointed guards from wrist to mid-forearm, bound in crossed straps; the fingers left bare to feel the hilt. The swing comes quicker in them.",
+  duel_legs:"Fitted leather, laced up the outer seam, with a slim knife at the thigh. On a woman, a high-cut leather brief, a garter, and knee stockings.",
+  duel_boots:"Knee boots bound in crossed straps, a leaf guard rising over the knee, a steel cap at the toe. Step aside from a blow in these, and the answer comes harder." });
+// their icons
+{ const D=(fn)=>(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.lineJoin='round'; g2.lineCap='round'; try{ fn(g2); } finally{ g2.restore(); } };
+  const L0=()=>ELFC.hz, BR=()=>ELFC.br, T0=()=>ELFC.hzt, LG=()=>ELFC.dl, BT=()=>ELFC.db;
+  const poly=(g2,pts,fill,edge,lw=1)=>{ g2.beginPath(); pts.forEach(([a,b],k)=>k?g2.lineTo(a,b):g2.moveTo(a,b)); g2.closePath(); g2.fillStyle=fill; g2.fill(); if(edge){ g2.strokeStyle=edge; g2.lineWidth=lw; g2.stroke(); } };
+  const leaf=(g2,cx,cy,len,wid,ang,fill,edge)=>{ g2.save(); g2.translate(cx,cy); g2.rotate(ang); g2.beginPath(); g2.moveTo(0,-len/2); g2.quadraticCurveTo(wid,-len*0.1,0,len/2); g2.quadraticCurveTo(-wid,-len*0.1,0,-len/2); g2.closePath();
+    g2.fillStyle=fill; g2.fill(); g2.strokeStyle=edge; g2.lineWidth=0.7; g2.stroke(); g2.beginPath(); g2.moveTo(0,-len/2+1); g2.lineTo(0,len/2-1); g2.stroke(); g2.restore(); };
+  ITEM_ICON.duel_band=D(g2=>{ g2.strokeStyle=tone(BR(),-0.5); g2.lineWidth=5; g2.beginPath(); g2.ellipse(20,22,15,7,0,0,Math.PI*2); g2.stroke(); g2.strokeStyle=BR(); g2.lineWidth=3.4; g2.stroke();
+    g2.strokeStyle=tone(BR(),0.3,0.7); g2.lineWidth=0.7; g2.beginPath(); g2.ellipse(20,21,15,7,0,Math.PI*0.1,Math.PI*0.9); g2.stroke();
+    leaf(g2,20,24,13,4.4,0,T0(),tone(T0(),-0.5));
+    g2.fillStyle=tone(BR(),-0.1); g2.beginPath(); g2.moveTo(31,17); g2.quadraticCurveTo(37,22,35,33); g2.lineTo(33,32); g2.quadraticCurveTo(34,24,30,19); g2.closePath(); g2.fill(); });
+  ITEM_ICON.duel_vest=D(g2=>{ const l=L0(), t=T0();
+    poly(g2,[[9,6],[16,5],[20,22],[24,5],[31,6],[33,10],[32,28],[20,33],[8,28],[7,10]],l,tone(l,-0.55),1.1);
+    g2.strokeStyle=t; g2.lineWidth=1; g2.beginPath(); g2.moveTo(16,5); g2.lineTo(20,22); g2.lineTo(24,5); g2.stroke();
+    [[-1],[1]].forEach(([sd])=>{ poly(g2,[[20+sd*5,7],[20+sd*12,7.5],[20+sd*12,15],[20+sd*7,17]],tone(l,0.2),tone(l,-0.5),0.7); leaf(g2,20+sd*9,11.5,6,2,sd*0.5,tone(l,0.05),tone(l,-0.5));
+      g2.fillStyle=t; [[20+sd*6,8.4],[20+sd*11,8.8]].forEach(([a,b])=>{ g2.beginPath(); g2.arc(a,b,0.7,0,Math.PI*2); g2.fill(); }); });
+    g2.fillStyle=ELFC.hzd; g2.fillRect(8,26,24,3); g2.fillStyle=t; g2.fillRect(18.6,25.8,2.8,3.4); g2.fillStyle=ELFC.hzd; g2.fillRect(19.6,26.8,0.8,1.4);
+    poly(g2,[[17.5,29],[22.5,29],[21.6,38],[20,39.4],[18.4,38]],tone(l,0.05),t,0.8); });
+  ITEM_ICON.duel_bracers=D(g2=>{ const b=BR(), t=T0();
+    [[11,4],[25,7]].forEach(([ox,oy])=>{ poly(g2,[[ox+3,oy],[ox+6.5,oy+3.5],[ox+7,oy+22],[ox-1,oy+22],[ox-0.5,oy+3.5]],b,tone(b,-0.55),0.9);
+      g2.strokeStyle=t; g2.lineWidth=0.9; g2.beginPath(); g2.moveTo(ox-0.5,oy+3.5); g2.lineTo(ox+3,oy); g2.lineTo(ox+6.5,oy+3.5); g2.stroke();
+      g2.strokeStyle=tone(b,-0.4); g2.lineWidth=1.4; for(let y=oy+6;y<oy+20;y+=4.5){ g2.beginPath(); g2.moveTo(ox-0.5,y); g2.lineTo(ox+6.5,y+3); g2.moveTo(ox+6.5,y); g2.lineTo(ox-0.5,y+3); g2.stroke(); }
+      g2.fillStyle=t; for(let y=oy+7.5;y<oy+20;y+=4.5){ g2.beginPath(); g2.arc(ox+3,y,0.7,0,Math.PI*2); g2.fill(); }
+      poly(g2,[[ox-1,oy+22],[ox+7,oy+22],[ox+7.5,oy+27],[ox-1.5,oy+27]],tone(b,0.1),tone(b,-0.5),0.7); g2.fillStyle=t; [ox+1,ox+3,ox+5].forEach(a=>{ g2.beginPath(); g2.arc(a,oy+25.4,0.6,0,Math.PI*2); g2.fill(); }); }); });
+  ITEM_ICON.duel_legs=D(g2=>{ const l=LG(), t=T0();
+    if(iconMale()){ poly(g2,[[11,4],[29,4],[28,36],[22.5,36],[20,13],[17.5,36],[12,36]],l,tone(l,-0.55),1);
+      g2.strokeStyle=t; g2.lineWidth=0.6; [[12.5,1],[27.5,-1]].forEach(([a,sd])=>{ for(let y=7;y<34;y+=2.4){ g2.beginPath(); g2.moveTo(a-0.9,y); g2.lineTo(a+0.9,y+1.8); g2.moveTo(a+0.9,y); g2.lineTo(a-0.9,y+1.8); g2.stroke(); } });
+      g2.fillStyle='#3a2a1a'; g2.fillRect(11.5,15,8,1.6); g2.fillStyle=t; g2.fillRect(12.2,14.8,1.4,2); g2.fillStyle='#2a2018'; g2.beginPath(); g2.moveTo(27,13); g2.lineTo(29.5,13); g2.lineTo(28.4,24); g2.closePath(); g2.fill(); }
+    else { g2.fillStyle=tone(l,0.05); g2.strokeStyle=tone(l,-0.5); g2.lineWidth=0.8;
+      [[12],[23]].forEach(([ox])=>{ g2.beginPath(); g2.roundRect(ox,19,6,19,2.5); g2.globalAlpha=0.85; g2.fill(); g2.globalAlpha=1; g2.stroke(); g2.fillStyle=tone(l,-0.15); g2.fillRect(ox-0.3,19,6.6,2.6); g2.fillStyle=t; g2.fillRect(ox-0.3,19,6.6,0.7); g2.fillStyle=tone(l,0.05); });
+      g2.beginPath(); g2.moveTo(8,5); g2.quadraticCurveTo(20,9.5,32,5); g2.lineTo(31.5,7); g2.bezierCurveTo(26,8,22,13,21.2,16.5); g2.lineTo(18.8,16.5); g2.bezierCurveTo(18,13,14,8,8.5,7); g2.closePath(); g2.fillStyle=l; g2.fill(); g2.strokeStyle=t; g2.lineWidth=0.8; g2.stroke(); } });
+  ITEM_ICON.duel_boots=D(g2=>{ const b=BT(), t=T0();
+    [[7,1],[20,3]].forEach(([ox,oy])=>{ poly(g2,[[ox+1.5,7+oy],[ox+10.5,7+oy],[ox+10,28+oy],[ox+15.5,31+oy],[ox+15,35+oy],[ox+1,35+oy]],b,tone(b,-0.55),1);
+      g2.beginPath(); g2.moveTo(ox+1.5,8+oy); g2.quadraticCurveTo(ox+3,2+oy,ox+6,0+oy); g2.quadraticCurveTo(ox+9,2+oy,ox+10.5,8+oy); g2.closePath(); g2.fillStyle=tone(b,0.25); g2.fill(); g2.strokeStyle=t; g2.lineWidth=0.8; g2.stroke();
+      g2.strokeStyle=tone(b,0.3); g2.lineWidth=1.2; for(let y=11+oy;y<27+oy;y+=4){ g2.beginPath(); g2.moveTo(ox+1.6,y); g2.lineTo(ox+10.2,y+2.6); g2.moveTo(ox+10.2,y); g2.lineTo(ox+1.6,y+2.6); g2.stroke(); }
+      g2.fillStyle=t; for(let y=12.3+oy;y<27+oy;y+=4){ g2.beginPath(); g2.arc(ox+5.9,y,0.7,0,Math.PI*2); g2.fill(); }
+      g2.fillStyle='#b8bec6'; g2.beginPath(); g2.moveTo(ox+10.5,31+oy); g2.quadraticCurveTo(ox+16,31.5+oy,ox+15.4,35+oy); g2.lineTo(ox+10.5,35+oy); g2.closePath(); g2.fill(); }); }); }
 // ════════ DRYADS: the tree-folk of the elven woods. Half elf, half tree, bare as a sapling, and in no hurry ════════
 SKINS[24]='#c4b690'; SKINS[25]='#9c8460'; SKINS[26]='#a9b07c';          // birch, oak, willow bark
 HAIR_COLORS[20]='#56802f'; HAIR_COLORS[21]='#86a23c'; HAIR_COLORS[22]='#b0642a';   // leaf greens, and one in autumn

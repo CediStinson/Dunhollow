@@ -20945,6 +20945,95 @@ function dryadNPCs(area){ const out=[]; const A=AREAS[area];
       say(D.name,[D.lines[k]],[bye]); }; }
   return out; }
 ['heartwood','sylvhaven','silvergate','elfroad'].forEach(a=>wrap(a,'npcs',l=>[...l,...dryadNPCs(a)]));
+// ════════ THE BLIGHT AT THE GREAT TREE'S FOOT: the Hunger's rot spreads out through the ground, and the dryads keep it from spreading ════════
+const BL_C=[9,8], BL_R=[2.3,1.4,0.7,0];                 // the trunk's middle, and how far the rot reaches at each stage of the regrowth
+const BL_TEND=[[5.5,6.5],[6.5,10.5],[12.5,6.5]];          // where the dryads kneel and work: Old Oak west, Willow south, Osier east
+const BL_WHO={dry_oak:0, dry_willow:1, dry_osier:2};
+const blStage=()=>areaId==='sylvhaven' && !havenBurnt() ? wtStage() : 3;
+// how rotten the ground is at a spot (0 clean … 1 black); the dryads' patches hold it back
+function blAt(x,y,st){ const R=BL_R[st]; if(!R) return 0; const d=Math.hypot(x-BL_C[0],y-BL_C[1])-1.6;
+  let s=Math.max(0,Math.min(1,(R-d)/1.6)); if(!s) return 0;
+  if(st<3) BL_TEND.forEach(([a,b])=>{ s*=Math.max(0.12,Math.min(1,(Math.hypot(x-a,y-b)-0.4)/1.5)); });
+  return s; }
+const blDryadAt=k=>NPCS.find(n=>n.dryad && BL_WHO[n.id]===k && Math.hypot((n.x??n.i+0.5)-BL_TEND[k][0],(n.y??n.j+0.5)-BL_TEND[k][1])<1.6 && !n.moving);
+const BL_POOLS=[[11.3,9.1,0.8],[6.7,7.4,0.6]];
+const BL_CACHE={};
+function blPaint(st){ const R=BL_R[st]+2, i0=Math.floor(BL_C[0]-R), i1=Math.ceil(BL_C[0]+R), j0=Math.floor(BL_C[1]-R), j1=Math.ceil(BL_C[1]+R);
+  const minX=(i0-j1)*TW/2-TW, maxX=(i1-j0)*TW/2+TW, minY=(i0+j0)*TH/2-TH, maxY=(i1+j1)*TH/2+TH;
+  const mk=()=>{ const cv=document.createElement('canvas'); cv.width=Math.ceil(maxX-minX); cv.height=Math.ceil(maxY-minY); return cv; };
+  const base=mk(), vein=mk(), c=base.getContext('2d'), v=vein.getContext('2d'), L=(x,y)=>({x:(x-y)*TW/2-minX, y:(x+y)*TH/2-minY});
+  const inRoom=(x,y)=>x>0.2 && y>0.2 && x<AREAS.sylvhaven.w-0.2 && y<AREAS.sylvhaven.h-0.2;
+  // the stain, painted soft: overlapping blots, then blurred so it soaks into the grass
+  { const st0=mk(), s0=st0.getContext('2d');
+    for(let i=i0;i<=i1;i++) for(let j=j0;j<=j1;j++) for(let q=0;q<3;q++){ const x=i+rnd01(i,j,700+q), y=j+rnd01(i,j,710+q), s=blAt(x,y,st); if(s<0.04 || !inRoom(x,y)) continue;
+      const p=L(x,y), r=TW*(0.3+rnd01(i,j,720+q)*0.22);
+      s0.fillStyle=`rgba(${22+s*8|0},${14-s*6|0},${24+s*6|0},${Math.min(0.85,0.3+0.5*s)})`; s0.beginPath(); s0.ellipse(p.x,p.y,r,r*0.5,0,0,Math.PI*2); s0.fill(); }
+    c.filter='blur(12px)'; c.globalAlpha=0.5; c.drawImage(st0,0,0); c.filter='none'; c.globalAlpha=1; }
+  // cracks in the ground, purple-black, a little glossy
+  for(let i=i0;i<=i1;i++) for(let j=j0;j<=j1;j++){ if(rnd01(i,j,760)>0.25) continue; const x=i+rnd01(i,j,761), y=j+rnd01(i,j,762), s=blAt(x,y,st); if(s<0.45 || !inRoom(x,y)) continue;
+    const p=L(x,y); c.strokeStyle=`rgba(10,4,12,${0.45*s})`; c.lineWidth=1.2; c.beginPath(); c.moveTo(p.x,p.y); let px=p.x, py=p.y;
+    for(let k=0;k<4;k++){ px+=(rnd01(i,j,763+k)-0.5)*22; py+=(rnd01(i,j,767+k)-0.5)*10; c.lineTo(px,py); } c.stroke(); }
+  // roots of rot crawling out of the trunk
+  c.lineCap=v.lineCap='round'; c.lineJoin=v.lineJoin='round';
+  for(let k=0;k<8;k++){ const a=k*0.785+rnd01(k,3,730)*0.4, Lg=(BL_R[st]+0.6)*(0.55+rnd01(k,4,731)*0.5), pts=[];
+    for(let t=0;t<=1.0001;t+=0.06){ const rr=1.5+t*Lg, w=Math.sin(t*9+k)*0.2*t, x=BL_C[0]+Math.cos(a+w)*rr, y=BL_C[1]+Math.sin(a+w)*rr; if(blAt(x,y,st)<0.1 || !inRoom(x,y)) break; pts.push(L(x,y)); }
+    if(pts.length<2) continue; const path=X=>{ X.beginPath(); pts.forEach((p,n)=>n?X.lineTo(p.x,p.y):X.moveTo(p.x,p.y)); };
+    c.strokeStyle='rgba(14,6,16,0.5)'; c.lineWidth=5; path(c); c.stroke(); c.strokeStyle='rgba(60,30,60,0.5)'; c.lineWidth=2; path(c); c.stroke();
+    v.strokeStyle='rgba(160,90,210,0.9)'; v.lineWidth=1.6; path(v); v.stroke(); }
+  // pools of black sap
+  BL_POOLS.forEach(([x,y,z])=>{ const s=blAt(x,y,st); if(s<0.35) return; const p=L(x,y), r=TW*0.3*z*s;
+    c.fillStyle='rgba(8,4,10,0.92)'; c.beginPath(); c.ellipse(p.x,p.y,r,r*0.45,0,0,Math.PI*2); c.fill();
+    c.strokeStyle='rgba(160,110,200,0.4)'; c.lineWidth=1.2; c.beginPath(); c.ellipse(p.x-r*0.2,p.y-r*0.1,r*0.5,r*0.16,0,Math.PI*1.1,Math.PI*1.8); c.stroke(); });
+  // dead grass, bleached and bent, and a few bones of leaves
+  c.lineWidth=1.3;
+  for(let i=i0;i<=i1;i++) for(let j=j0;j<=j1;j++) for(let q=0;q<2;q++){ if(rnd01(i,j,740+q*20)>0.35) continue; const x=i+rnd01(i,j,741+q*20), y=j+rnd01(i,j,742+q*20), s=blAt(x,y,st); if(s<0.25 || !inRoom(x,y)) continue; const p=L(x,y);
+    c.strokeStyle=`rgba(128,114,96,${0.6*s})`; for(let b=0;b<4;b++){ const dx=(b-1.5)*2.5, h=6+rnd01(i,j,743+b)*7; c.beginPath(); c.moveTo(p.x+dx,p.y); c.quadraticCurveTo(p.x+dx+2,p.y-h*0.7,p.x+dx+(b%2?6:-6),p.y-h*0.4); c.stroke(); }
+    if(rnd01(i,j,749+q)<0.3){ c.fillStyle=`rgba(70,48,36,${0.8*s})`; c.save(); c.translate(p.x+8,p.y+3); c.rotate(rnd01(i,j,748)*6); c.beginPath(); c.ellipse(0,0,5,2.2,0,0,Math.PI*2); c.fill(); c.restore(); } }
+  // where the dryads work: a ring of new green, sprouts, a few white flowers
+  BL_TEND.forEach(([x,y],k)=>{ const p=L(x,y), gr=c.createRadialGradient(p.x,p.y,4,p.x,p.y,TW*0.9);
+    gr.addColorStop(0,'rgba(110,170,70,0.3)'); gr.addColorStop(0.7,'rgba(90,150,60,0.12)'); gr.addColorStop(1,'rgba(90,150,60,0)');
+    c.save(); c.translate(p.x,p.y); c.scale(1,0.5); c.translate(-p.x,-p.y); c.fillStyle=gr; c.beginPath(); c.arc(p.x,p.y,TW*0.9,0,Math.PI*2); c.fill(); c.restore();
+    for(let n=0;n<16;n++){ const a=n*2.4+k, r=(0.25+rnd01(n,k,750)*0.7), sx=p.x+Math.cos(a)*r*TW*0.6, sy=p.y+Math.sin(a)*r*TW*0.3, h=5+rnd01(n,k,751)*6;
+      c.strokeStyle=n%3?'#6fae3e':'#8cc850'; c.lineWidth=1.5; c.beginPath(); c.moveTo(sx,sy); c.quadraticCurveTo(sx-2,sy-h*0.6,sx+(n%2?3:-3),sy-h); c.stroke();
+      if(n%5===0){ c.fillStyle='#f4f0dc'; c.beginPath(); c.arc(sx+(n%2?3:-3),sy-h,1.8,0,Math.PI*2); c.fill(); } } });
+  return {base, vein, minX, minY}; }
+function drawBlight(){ const st=blStage(); if(st>=3) return; const C=BL_CACHE[st]||(BL_CACHE[st]=blPaint(st)), o=P(0,0), x=o.x+C.minX, y=o.y+C.minY;
+  g.drawImage(C.base,x,y);
+  g.save(); g.globalAlpha=0.15+0.2*(0.5+0.5*Math.sin(gt*1.3)); g.globalCompositeOperation='lighter'; g.drawImage(C.vein,x,y); g.restore();
+  BL_POOLS.forEach(([px,py,z],k)=>{ const s=blAt(px,py,st); if(s<0.35) return; const b=(gt*0.5+k*0.37)%1; if(b>=0.25) return; const p=P(px,py), r=TW*0.3*z*s;
+    g.strokeStyle=`rgba(170,130,200,${0.6*(1-b*4)})`; g.lineWidth=1.2; g.beginPath(); g.arc(p.x+r*0.3*Math.sin(k),p.y,2+b*14,Math.PI,0); g.stroke(); });
+  BL_TEND.forEach(([tx,ty],k)=>{ if(!blDryadAt(k)) return; const p=P(tx,ty); g.save(); g.globalCompositeOperation='lighter'; glow(p.x,p.y,TW*0.6,TW*0.3,'150,230,120',0.2+0.08*Math.sin(gt*2+k)); g.restore(); }); }
+// sick motes rising off the rot, and green light rising from the dryads' hands where they work
+function drawBlightAir(){ const st=blStage(); if(st>=3) return; g.save(); g.globalCompositeOperation='lighter';
+  const n=st===0?7:st===1?4:2;
+  for(let k=0;k<n;k++){ const t=(gt*0.12+k*0.137)%1, a=k*2.1, rr=1.8+(k%5)*0.9, x=BL_C[0]+Math.cos(a)*rr, y=BL_C[1]+Math.sin(a)*rr; if(blAt(x,y,st)<0.2) continue;
+    const p=P(x,y); glow(p.x+Math.sin(gt+k)*8,p.y-t*70,6,6,'150,80,190',0.35*Math.sin(t*Math.PI)); }
+  BL_TEND.forEach((s,k)=>{ const d=blDryadAt(k); if(!d) return; const p=P(d.x??d.i+0.5,d.y??d.j+0.5);
+    for(let m=0;m<6;m++){ const t=(gt*0.45+m/6)%1, ang=m*1.05+gt*0.6, x=p.x+Math.cos(ang)*(14+t*10), y=p.y-4-t*46;
+      glow(x,y,4,4,'190,255,150',0.6*Math.sin(t*Math.PI)); } });
+  g.restore(); }
+{ const _w=drawWorldCache; drawWorldCache=function(){ const r=_w.apply(this,arguments); try{ drawBlight(); }catch(e){} return r; };
+  const _l=drawLightFX; drawLightFX=function(){ const r=_l.apply(this,arguments); try{ drawBlightAir(); }catch(e){} return r; }; }
+// while the tree is sick, the three dryads of the glade keep to their patches at its foot, and talk of little else
+wrap('sylvhaven','npcs',l=>{ const st=blStage(); if(st>=3) return l;
+  return l.map(n=>{ const k=BL_WHO[n.id]; if(k==null) return n; const [x,y]=BL_TEND[k], pts=[];
+    for(const [a,b] of [[0,0],[1,0],[0,1],[-1,0],[0,-1],[0,0]]){ const i=Math.floor(x)+a, j=Math.floor(y)+b; pts.push([i,j]); }
+    return {...n, i:Math.floor(x), j:Math.floor(y), wander:pts, speed:0.45}; }); });
+const BL_LINES={
+  dry_oak:[["<i>She kneels in the black earth with both palms flat on it, and does not look up.</i> “Hm. It pushes. I push back. It is a slow sort of argument.”"],
+    ["“A hundred years I sat still. Now I must hurry.” <i>Green creeps out from under her hands, a finger’s width, and the black creeps in at the edge to meet it.</i>"]],
+  dry_willow:[["“Don’t step on my patch.” <i>She is pressing seedlings into the ground one by one, singing to each under her breath.</i> “The rot takes them by morning. So I plant them again.”"],
+    ["“She is very ill, our mother. We give her what green we have. It is not enough. Something down in her roots is eating faster than we can grow.”"]],
+  dry_osier:[["<i>Her leaf-hair has gone yellow at the tips.</i> “I put my hands in the soil and it is cold. Soil should never be cold.”","“We heal what we can reach. We cannot reach where it lives.”"],
+    ["“If you go down into her, little loud one, come back up. We cannot heal you too.”"]] };
+{ const _dn=dryadNPCs; dryadNPCs=function(area){ const out=_dn.apply(this,arguments);
+    if(area==='sylvhaven') out.forEach(n=>{ const L=BL_LINES[n.id], base=TALKERS[n.id]; if(!L) return;
+      TALKERS[n.id]=()=>{ const st=blStage(); if(st>=3) return base();
+        if(st>0) return say(n.name,[{dry_oak:"“Hm.” <i>She lifts one hand from the soil, and the soil under it stays green.</i> “It listens now. Since you went down. Good.”",
+          dry_willow:"“Look! They stayed!” <i>Yesterday’s seedlings are still standing, and the black has drawn back from them.</i> “The rot is going home. Wherever home is for a thing like that.”",
+          dry_osier:"“The soil is warm again.” <i>The yellow is going out of her leaves.</i> “Not finished. But warm.”"}[n.id]],[bye]);
+        const k=(CHOICE['bl_'+n.id]=(CHOICE['bl_'+n.id]||0)+1)%L.length; say(n.name,L[k],[bye]); }; });
+    return out; }; }
 // ════════ A TRAVELLERS' TENT IN SYLVHAVEN: three bedrolls, free to anyone the elves let in. Sleep here and you wake here ════════
 function drawBedroll(o){ const k=(o.i*7+o.j*3)%3, cols=[['#5a6a48','#8a9a6a'],['#6a5a48','#a08a64'],['#4a5a6a','#7a8aa0']][k], q=P(o.i+1,o.j+0.5);
   drawCached('roll'+k,q.x,q.y,220,110,110,70,(X,Y)=>{ g.fillStyle='rgba(20,14,8,0.3)'; g.beginPath(); g.ellipse(X+4,Y+6,86,26,0,0,Math.PI*2); g.fill();

@@ -59,7 +59,7 @@ const LAND=a=>{
   if(/^under_|^ember/.test(a)) return 'Undercity';
   if(['waystation','drywash','oasis','glassdunes','singingdunes','saltpan','redmesa','crater','bonewaste'].includes(a)||/^temple/.test(a)) return 'Desert';
   if(['fenpath','fen','barrow','reedbank','blackwater','sunkenwood'].includes(a)) return 'Swamp';
-  if(['mistmere','silvergate','sylvhaven','fellings','ruin','elfroad','moonbath'].includes(a)) return 'Elven woods';
+  if(['mistmere','silvergate','sylvhaven','fellings','ruin','elfroad','moonbath','guesttent','tree1','tree2','treeheart'].includes(a)) return 'Elven woods';
   if(/^cave\d/.test(a)||['warren','gbtunnel'].includes(a)) return 'Goblin warren';
   if(['citygate','market','lowstreets','keepward','inn','smithy','tailorshop','chapelin','kingsroad','steamcellar','dicenden','guildhall','goldhouse','barracks','docks','portfearn','fearnhouse','northroad','weavetent'].includes(a)) return 'Hollowmere';
   return 'Valley'; };
@@ -84,7 +84,7 @@ function watchJournal(){ const J=journal(); if(!lastJ){ lastJ=J; return; }
 let G=null, gAt=-999;
 function graph(){ if(G && gt-gAt<30) return G; G={}; gAt=gt;
   for(const a of Object.keys(AREAS)){ let L=[]; try{ L=a===areaId?OBJECTS:(AREAS[a].objects?AREAS[a].objects():[]); }catch(e){} const E=G[a]={out:[], beds:0, mobs:0};
-    L.forEach(o=>{ if(!o) return; if(o.type==='teleporter' && o.to && AREAS[o.to]){ let lk=false; try{ lk=!!(o.locked&&o.locked()); }catch(e){} if(!lk) E.out.push(o.to); }
+    L.forEach(o=>{ if(!o) return; if(o.type==='teleporter' && o.to && AREAS[o.to]){ let lk=false; try{ lk=!!(o.locked&&o.locked()) && !(o.treedoor && hasItem('moon_lantern')); }catch(e){} if(!lk) E.out.push(o.to); }
       else if(o.inside && AREAS[o.inside] && o.fp) E.out.push(o.inside); else if(o.type==='bed' && !o.owner) E.beds++; });
     try{ E.mobs=(AREAS[a].mobs?AREAS[a].mobs():[]).filter(m=>m && m.type!=='dummy').length; }catch(e){} }
   return G; }
@@ -260,6 +260,7 @@ let BOLD=0, lastProgress=0, lastJH='';
 function areaScore(a,hops){ const V=MEMO.visit[a], g=graph()[a]||{}; let s=0;
   if(!V) s+=60; else { if(V.j!==jHash()) s+=18; if(g.mobs && day()>V.d && safeFor(a)) s+=6; }
   const h=hot().areas[a]; if(h && (!V || V.hj!==hot().j || gt-V.t>DAY_LEN*0.5)) s+=22+8*Math.min(4,h);
+  if(a==='tree1' && !CHOICE.hwSpirit && hasItem('moon_lantern') && lvl()>=6) s+=50;           // the lantern is made: the great tree is the thing to do
   if(a===areaId) s-=40; return s-hops*2.5-rnd()*4; }
 function planNext(){ const out=[]; for(const a of Object.keys(AREAS)){ if(a===areaId) continue; const r=route(areaId,a,BOLD); if(!r) continue; if(!safeFor(a,BOLD) && !(rnd()<0.04 && !MEMO.visit[a])) continue;
     out.push({a, r, s:areaScore(a,r.length)}); }
@@ -268,7 +269,7 @@ function goToward(next){                         // walk to the door that leads 
   const tp=OBJECTS.find(o=>o.type==='teleporter' && o.to===next), hs=!tp && OBJECTS.find(o=>o.inside===next && o.fp);
   const at=tp?[tp.i,tp.j]:hs?doorTile(hs):null; if(!at){ BAN[areaId+'>'+next]=gt+DAY_LEN; return false; }
   const there=()=>player.i===at[0] && player.j===at[1];
-  if(tp){ if(there()){ try{ switchArea(tp.to,tp.entry); }catch(e){} return true; }            // standing in the doorway already: step through
+  if(tp){ if(there()){ try{ if(tp.treedoor && tp.locked && tp.locked()) treeAsk(); else switchArea(tp.to,tp.entry); }catch(e){} return true; }   // the great tree's door asks first            // standing in the doorway already: step through
     const walk=avoid=>{ const add=[]; if(avoid) skulls().forEach(m=>{ for(let a=-2;a<=2;a++) for(let b=-2;b<=2;b++){ const k=(m.i+a)+','+(m.j+b); if(!blocked.has(k) && !(m.i+a===tp.i&&m.j+b===tp.j)){ blocked.add(k); add.push(k); } } });
       try{ const pth=findPath(player.i,player.j,tp.i,tp.j); if(pth && pth.length){ player.path=pth; return true; } return false; } finally{ add.forEach(k=>blocked.delete(k)); } };
     if(walk(true) || walk(false)) return true;
@@ -325,7 +326,23 @@ function puzzleStep(dt){ const Z=PUZZLE[areaId]; if(!Z) return; const P=PZ(); co
 // ── the big fights that leave the duel: a person reads the banner and runs ──
 let SP={key:null, at:0};
 function stepTo(i,j){ if(player.i===i && player.j===j) return true; const pth=findPath(player.i,player.j,i,j); if(pth && pth.length){ player.path=pth; return true; } return false; }
+function hungerStep(){                          // the Hollow Hunger: run to the sapling it drinks from; in the dark, keep off the roots and relight three
+  const hh=(typeof HH!=='undefined')?HH:null; if(!hh || areaId!=='treeheart' || !/drain|gloam/.test(hh.mode)) return false;
+  const key='hh'+hh.mode+(hh.k??'')+(hh.n||0)+(hh.lit||0); if(key!==SP.key){ SP={key, at:gt+clamp(gauss(0.5,0.15),0.25,1.1)}; if(hh.mode==='gloam' && !hh.lit) note('The dark comes down. Find the dead saplings and wake them.','fight'); }
+  if(gt<SP.at) return true;
+  const me=[player.i,player.j], A=AREAS[areaId], tiles=[]; for(let i=0;i<A.w;i++) for(let j=0;j<A.h;j++) if(walkable(i,j)||(i===me[0]&&j===me[1])) tiles.push([i,j]);
+  const near=(L,bad)=>L.filter(([i,j])=>!(bad&&bad.has(i+','+j))).map(t=>({t,d:Math.hypot(t[0]-me[0],t[1]-me[1])})).sort((a,b)=>a.d-b.d).map(x=>x.t);
+  if(hh.mode==='drain' && SP.noted!==key){ SP.noted=key; note('It reaches for a sapling! Running to it.','fight'); }
+  if(hh.mode==='drain'){ if(hh.k<0) return true; const [si,sj]=HH_SAP[hh.k]; if(cheb([si,sj],me)<=1 || player.path.length) return true;
+    for(const t of near(tiles.filter(t=>cheb([si,sj],t)===1)).slice(0,6)) if(stepTo(t[0],t[1])) break; return true; }
+  const bad=new Set(hh.tiles||[]);
+  if(bad.has(me[0]+','+me[1])){ for(const t of near(tiles,bad).slice(0,4)) if(stepTo(t[0],t[1])) break; return true; }
+  if(player.path.length) return true;
+  const dark=OBJECTS.filter(o=>o.type==='sapling' && HHS[o.k]===0).sort((a,b)=>cheb([a.i,a.j],me)-cheb([b.i,b.j],me))[0]; if(!dark) return true;
+  if(cheb([dark.i,dark.j],me)<=1){ try{ puzAct(dark); }catch(e){} return true; }
+  for(const t of near(tiles.filter(t=>cheb([dark.i,dark.j],t)===1),bad).slice(0,6)) if(stepTo(t[0],t[1])) break; return true; }
 function setPiece(){
+  if(hungerStep()) return true;
   const ck=(typeof CK!=='undefined')?CK:null, sq=(typeof SQ!=='undefined')?SQ:null, X=ck||sq; if(!X || X.mode==='wait' || X.mode==='adds') return false;
   const key=(ck?'ck':'sq')+X.mode+(X.src||'')+(X.tiles?X.tiles.length+X.tiles[0]:'')+(X.n||0);
   if(key!==SP.key){ SP={key, at:gt+clamp(gauss(0.55,0.18),0.25,1.2)+(rnd()<0.12?0.8:0)}; }      // reading the banner, deciding

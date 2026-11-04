@@ -9834,25 +9834,26 @@ function setAt(loc,id){ if(player.opts) delete player.opts._ck; if(loc.kind==='e
 // ids; how many more sit under each id lives in CHOICE.invN. A pack space of bread that is "emptied" by any
 // code just loses one loaf, and a loaf put into a free space joins a pile that has room.
 const STACK_MAX=10, NO_STACK=new Set(['raw_meat','fish_perch','fish_trout','fish_carp','fish_eel','fish_herring']);   // raw things stay apart: cooks count them
-const stackable=id=>!!(id && ITEMS[id] && ITEMS[id].slot==='food' && !NO_STACK.has(id));
+const stackable=id=>!!(id && ITEMS[id] && (ITEMS[id].slot==='food' && !NO_STACK.has(id) || ITEMS[id].currency));
+const stackMax=id=>ITEMS[id] && ITEMS[id].currency ? 1e9 : STACK_MAX;          // Silver Leaves and Grave Tallies: one pile, as big as it likes
 let INV_RAW=false;
 function invN(){ if(!Array.isArray(CHOICE.invN)) CHOICE.invN=[]; return CHOICE.invN; }
 function stackAt(k){ const t=player.inv[k]; if(!stackable(t)) return t?1:0; return 1+Math.max(0,invN()[k]|0); }
 function invCount(id){ let n=0; const A=player.inv; for(let k=0;k<A.length;k++) if(A[k]===id) n+=stackable(id)?1+Math.max(0,invN()[k]|0):1; return n; }
 function invFlat(){ const out=[]; player.inv.forEach((id,k)=>{ if(id) for(let q=stackAt(k);q>0;q--) out.push(id); }); return out; }
-function slotFor(id){ if(stackable(id)){ const A=player.inv; for(let k=0;k<A.length;k++) if(A[k]===id && stackAt(k)<STACK_MAX) return k; } return player.inv.indexOf(null); }
+function slotFor(id){ if(stackable(id)){ const A=player.inv; for(let k=0;k<A.length;k++) if(A[k]===id && stackAt(k)<stackMax(id)) return k; } return player.inv.indexOf(null); }
 function packStacks(){ const A=player.inv, N=invN(); INV_RAW=true; try{       // piles that sit apart (older saves, things back from the crate) come together
     for(let k=0;k<A.length;k++){ if(!stackable(A[k])) continue; for(let j=k+1;j<A.length;j++){ if(A[j]!==A[k]) continue;
-      const room=STACK_MAX-stackAt(k); if(room<=0) break; const mv=Math.min(room,stackAt(j)); N[k]=(N[k]|0)+mv; const left=stackAt(j)-mv; if(left>0) N[j]=left-1; else { A[j]=null; N[j]=0; } } } }
+      const room=stackMax(A[k])-stackAt(k); if(room<=0) break; const mv=Math.min(room,stackAt(j)); N[k]=(N[k]|0)+mv; const left=stackAt(j)-mv; if(left>0) N[j]=left-1; else { A[j]=null; N[j]=0; } } } }
   finally{ INV_RAW=false; } }
 setInterval(()=>{ try{ if(player.opts && !invOverlay.classList.contains('open')) packStacks(); }catch(e){} },2000);
 (()=>{ let raw=player.inv, P=null;
   const wrapInv=a=>new Proxy(a,{ set(t,key,v){ const k=+key; if(INV_RAW || !Number.isInteger(k) || String(k)!==key){ t[key]=v; if(Number.isInteger(k) && String(k)===key && typeof CHOICE!=='undefined') invN()[k]=0; return true; }
       const N=invN(), old=t[k]; v=v||null;
-      if(v && v===old && stackable(v)){ if(stackAt(k)<STACK_MAX){ N[k]=(N[k]|0)+1; return true; } const f=t.indexOf(null); if(f>=0){ t[f]=v; N[f]=0; } return true; }   // more onto a pile
+      if(v && v===old && stackable(v)){ if(stackAt(k)<stackMax(v)){ N[k]=(N[k]|0)+1; return true; } const f=t.indexOf(null); if(f>=0){ t[f]=v; N[f]=0; } return true; }   // more onto a pile
       if(old && stackable(old) && (N[k]|0)>0 && v!==old){ N[k]--; if(!v) return true;                                                         // one off the pile
         const f=t.indexOf(null); if(f>=0){ t[f]=v; N[f]=0; return true; } N[k]=0; t[k]=v; return true; }
-      if(v && !old && stackable(v)){ for(let j=0;j<t.length;j++) if(j!==k && t[j]===v && stackAt(j)<STACK_MAX){ N[j]=(N[j]|0)+1; return true; } }   // a loaf finds the bread
+      if(v && !old && stackable(v)){ for(let j=0;j<t.length;j++) if(j!==k && t[j]===v && stackAt(j)<stackMax(v)){ N[j]=(N[j]|0)+1; return true; } }   // a loaf finds the bread
       t[k]=v; N[k]=0; return true; } });
   Object.defineProperty(player,'inv',{ enumerable:true, configurable:true, get(){ if(!P) P=wrapInv(raw); return P; }, set(v){ raw=Array.isArray(v)?v:[]; P=null; } }); })();
 // ── the crate at the Wheatsheaf: things you want to keep but not carry. It is saved with the game.
@@ -9865,6 +9866,7 @@ function flash(t){ invMsg.textContent=t; clearTimeout(msgTimer); msgTimer=setTim
 // Can `id` go into `loc`? Returns an error message, or '' when it can.
 function placeError(id,loc){
   if(loc.kind==='stash' && loc.key>=stashCap()) return 'That part of the crate is not yours yet.';
+  if(loc.kind==='stash' && id && ITEMS[id] && ITEMS[id].currency) return 'You keep your '+ITEMS[id].name+' on you.';
   if(!id || loc.kind==='inv' || loc.kind==='stash') return '';
   const it=ITEMS[id];
   if(it.slot!==loc.key) return `${it.name} goes in the ${SLOT_NAMES[it.slot]} slot.`;
@@ -9885,7 +9887,7 @@ function moveItemRaw(from,to){
   const e1=placeError(a,to);   if(e1){ flash(e1); return false; }
   const e2=placeError(b,from); if(e2){ flash(`Can't swap: ${e2}`); return false; }
   if(from.kind==='inv' && to.kind==='inv'){ const N=invN();
-    if(a && a===b && stackable(a)){ const mv=Math.min(STACK_MAX-stackAt(to.key),stackAt(from.key)); if(mv<=0){ flash('That pile is full.'); return false; }
+    if(a && a===b && stackable(a)){ const mv=Math.min(stackMax(a)-stackAt(to.key),stackAt(from.key)); if(mv<=0){ flash('That pile is full.'); return false; }
       const left=stackAt(from.key)-mv; INV_RAW=true; try{ const nt=(N[to.key]|0)+mv; if(left>0){ player.inv[to.key]=a; N[to.key]=nt; N[from.key]=left-1; } else { player.inv[from.key]=null; player.inv[to.key]=a; N[to.key]=nt; } } finally{ INV_RAW=false; } }
     else { const na=N[from.key]|0, nb=N[to.key]|0; INV_RAW=true; try{ player.inv[to.key]=a; player.inv[from.key]=b; N[to.key]=na; N[from.key]=nb; } finally{ INV_RAW=false; } } }
   else if(a && a===b && stackable(a)){ if(to.kind!=='inv'){ flash('The crate keeps one of each in a space.'); return false; } setAt(to,a); setAt(from,null); }
@@ -14559,7 +14561,7 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
     greencrystal:'It hums faintly whenever there is gold nearby.',
     cartwheel:"Hobb's spare cart wheel. He will want it back.",
     brooch:'A silver brooch, worn smooth by some thumb that is not yours.' };
-  const misc=id=>{ const it=ITEMS[id]; return `<b>${it.name}</b><i>${it.junk?'Junk · worth a few coppers':it.tool?'Tool':QUEST_ITEMS.has(id)?'Quest item':(typeof SELL_MISC!=='undefined'&&SELL_MISC.has(id))?'Valuable':'Keepsake'}</i><div class="fl lore">${flavorOf(id)}</div>`+(it.read?'<small>Double-click to read.</small>':''); };
+  const misc=id=>{ const it=ITEMS[id]; return `<b>${it.name}</b><i>${it.junk?'Junk · worth a few coppers':it.tool?'Tool':it.currency?'Currency · '+it.currency:QUEST_ITEMS.has(id)?'Quest item':(typeof SELL_MISC!=='undefined'&&SELL_MISC.has(id))?'Valuable':'Keepsake'}</i><div class="fl lore">${flavorOf(id)}</div>`+(it.read?'<small>Double-click to read.</small>':''); };
   const idOf=el=> el.classList.contains('shop-slot') ? el.dataset.item : getAt(slotLoc(el));
   const isEq=el=>{ const l=!el.classList.contains('shop-slot') && slotLoc(el); return !!(l && l.kind==='eq'); };
   const hide=()=>{ tip.style.display='none'; tip2.style.display='none'; };
@@ -20389,17 +20391,44 @@ const LEAF_QUESTS={ 'The Trapped Scout':2, 'The Silver Gate':3, 'The Axes in the
 const TALLY_QUESTS={ 'A Staff of Blackthorn':2, 'The Grave-Speaker':3, 'The Drowned Barrow':3, "Vesna's Lantern":2, 'The Grave-Blade Reforged':2, 'Contract: The Weeping Grave':2 };
 const LEAF_WARES=[['elf_boots',3],['elf_leggings',3],['elf_tunic',4],['elf_circlet',5],['elf_bustier',5],['elf_robe',6],['elf_cloak',6],['robe_elf',8],['elf_scale',12]];
 const TALLY_WARES=[['necro_leggings',3],['necro_bustier',4],['grave_salt',4],['necro_robe',6],['staff_bone',8]];
-const leaves=()=>CHOICE.leaves||0, tallies=()=>CHOICE.tallies||0;
-function addLeaves(n,why){ CHOICE.leaves=leaves()+n; floatText(tileOf(player),'+'+n+' Silver Lea'+(n>1?'ves':'f'),'#cfe8d8',true); logMsg('+'+n+' Silver Lea'+(n>1?'ves':'f')+(why?' ('+why+')':'')+'. You hold '+CHOICE.leaves+'.','#cfe8d8'); updateHud(); }
-function addTallies(n,why){ CHOICE.tallies=tallies()+n; floatText(tileOf(player),'+'+n+' Grave Tall'+(n>1?'ies':'y'),'#c8b8e0',true); logMsg('+'+n+' Grave Tall'+(n>1?'ies':'y')+(why?' ('+why+')':'')+'. You hold '+CHOICE.tallies+'.','#c8b8e0'); updateHud(); }
+// Silver Leaves and Grave Tallies are carried in the bag, one pile each with no limit. CHOICE.leaves / CHOICE.tallies hold only
+// what has not found room yet (a full bag): it goes in by itself as soon as there is space
+Object.assign(ITEMS,{ silver_leaf:{ name:'Silver Leaves', slot:'misc', currency:'Maelis in Sylvhaven weaves for them' },
+  grave_tally:{ name:'Grave Tallies', slot:'misc', currency:'Vesna the Grave-Speaker trades for them' } });
+ITEM_LORE.silver_leaf='Leaves from the great tree, gone to silver and never wilting. In Sylvhaven a favour is paid in these, and remembered.';
+ITEM_LORE.grave_tally='Little slips of bone, each scratched with a mark by Vesna. Every one is a debt the dead owe you, or you them.';
+QUEST_ITEMS.add('silver_leaf'); QUEST_ITEMS.add('grave_tally');
+ITEM_ICON.silver_leaf=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40);
+  [[-0.5,13,24,'#9fb8ac'],[0.35,22,22,'#cfe8d8']].forEach(([a,x,y,c])=>{ g2.save(); g2.translate(x,y); g2.rotate(a); const gr=g2.createLinearGradient(-6,-12,6,12); gr.addColorStop(0,'#f4fff8'); gr.addColorStop(1,c);
+    g2.fillStyle=gr; g2.beginPath(); g2.moveTo(0,-13); g2.quadraticCurveTo(9,-3,0,13); g2.quadraticCurveTo(-9,-3,0,-13); g2.fill();
+    g2.strokeStyle='rgba(70,100,90,0.7)'; g2.lineWidth=1; g2.beginPath(); g2.moveTo(0,-11); g2.lineTo(0,15); for(let k=-6;k<9;k+=4){ g2.moveTo(0,k); g2.lineTo(4,k-3); g2.moveTo(0,k); g2.lineTo(-4,k-3); } g2.stroke(); g2.restore(); });
+  g2.restore(); };
+ITEM_ICON.grave_tally=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40);
+  [[-0.25,15,20],[0.15,25,21]].forEach(([a,x,y])=>{ g2.save(); g2.translate(x,y); g2.rotate(a); g2.fillStyle='#e6dcc4'; g2.strokeStyle='#8a7a60'; g2.lineWidth=1.2;
+    g2.beginPath(); g2.roundRect?g2.roundRect(-4.5,-14,9,28,3):g2.rect(-4.5,-14,9,28); g2.fill(); g2.stroke();
+    g2.strokeStyle='#5a4a6a'; g2.lineWidth=1.4; g2.beginPath(); for(let k=-9;k<=9;k+=4.5){ g2.moveTo(-3,k); g2.lineTo(3,k); } g2.moveTo(-3,10); g2.lineTo(3,-10); g2.stroke(); g2.restore(); });
+  g2.restore(); };
+const leaves=()=>invCount('silver_leaf')+(CHOICE.leaves||0), tallies=()=>invCount('grave_tally')+(CHOICE.tallies||0);
+// into the bag, one at a time onto the pile; whatever finds no room waits in CHOICE
+function tokenStow(id,key){ let n=CHOICE[key]||0; if(n<=0) return; let k=slotFor(id); if(k<0) return;
+  if(player.inv[k]!==id){ player.inv[k]=id; n--; }
+  if(n>0){ INV_RAW=true; try{ invN()[k]=(invN()[k]|0)+n; } finally{ INV_RAW=false; } n=0; }
+  CHOICE[key]=n; try{ if(invOverlay.classList.contains('open')) refreshInventory(); }catch(e){} }
+function tokenSpend(id,key,c){ const N=invN(); for(let k=0;k<player.inv.length && c>0;k++){ if(player.inv[k]!==id) continue;
+    const have=stackAt(k), take=Math.min(have,c); c-=take; INV_RAW=true; try{ if(take>=have){ player.inv[k]=null; N[k]=0; } else N[k]=(N[k]|0)-take; } finally{ INV_RAW=false; } }
+  if(c>0) CHOICE[key]=Math.max(0,(CHOICE[key]||0)-c); try{ if(invOverlay.classList.contains('open')) refreshInventory(); }catch(e){} }
+const stowTokens=()=>{ tokenStow('silver_leaf','leaves'); tokenStow('grave_tally','tallies'); };
+setInterval(()=>{ try{ if(player.opts && running) stowTokens(); }catch(e){} },1500);
+function addLeaves(n,why){ CHOICE.leaves=(CHOICE.leaves||0)+n; stowTokens(); floatText(tileOf(player),'+'+n+' Silver Lea'+(n>1?'ves':'f'),'#cfe8d8',true); logMsg('+'+n+' Silver Lea'+(n>1?'ves':'f')+(why?' ('+why+')':'')+'. You hold '+leaves()+'.'+(CHOICE.leaves>0?' Your bag is full: they go in when you make room.':''),'#cfe8d8'); updateHud(); }
+function addTallies(n,why){ CHOICE.tallies=(CHOICE.tallies||0)+n; stowTokens(); floatText(tileOf(player),'+'+n+' Grave Tall'+(n>1?'ies':'y'),'#c8b8e0',true); logMsg('+'+n+' Grave Tall'+(n>1?'ies':'y')+(why?' ('+why+')':'')+'. You hold '+tallies()+'.'+(CHOICE.tallies>0?' Your bag is full: they go in when you make room.':''),'#c8b8e0'); updateHud(); }
 // tasks done: credit them once (a save from before tokens gets its leaves and tallies for what it already did, quietly, in one line)
 setInterval(()=>{ try{ if(!running || combat.active) return; const st=t=>{ const e=JOURNAL.find(x=>x[0]===t); try{ const r=e&&e[1](); return r?r[0]:null; }catch(err){ return null; } };
     const first=CHOICE.tokenVer!==1; CHOICE.leafQ=CHOICE.leafQ||{}; CHOICE.tallyQ=CHOICE.tallyQ||{}; let lsum=0, tsum=0;
     for(const t in LEAF_QUESTS) if(!CHOICE.leafQ[t] && st(t)==='done'){ CHOICE.leafQ[t]=1; if(first) lsum+=LEAF_QUESTS[t]; else addLeaves(LEAF_QUESTS[t],'Sylvhaven remembers: '+t); }
     for(const t in TALLY_QUESTS) if(!CHOICE.tallyQ[t] && st(t)==='done'){ CHOICE.tallyQ[t]=1; if(first) tsum+=TALLY_QUESTS[t]; else addTallies(TALLY_QUESTS[t],'Vesna marks it: '+t); }
     const nl=NECRO(); if((CHOICE.tallyN||0)<nl){ const d=nl-(CHOICE.tallyN||0); CHOICE.tallyN=nl; if(first) tsum+=2*d; else addTallies(2*d,'a lesson learned'); }
-    if(first){ CHOICE.tokenVer=1; if(lsum){ CHOICE.leaves=leaves()+lsum; logMsg('For what you have already done for Sylvhaven: '+lsum+' Silver Leaves. Maelis weaves for leaves now.','#cfe8d8'); }
-      if(tsum){ CHOICE.tallies=tallies()+tsum; logMsg('For what you have already done for Vesna: '+tsum+' Grave Tallies.','#c8b8e0'); } }
+    if(first){ CHOICE.tokenVer=1; if(lsum){ CHOICE.leaves=(CHOICE.leaves||0)+lsum; logMsg('For what you have already done for Sylvhaven: '+lsum+' Silver Leaves. Maelis weaves for leaves now.','#cfe8d8'); }
+      if(tsum){ CHOICE.tallies=(CHOICE.tallies||0)+tsum; logMsg('For what you have already done for Vesna: '+tsum+' Grave Tallies.','#c8b8e0'); } }
   }catch(e){} },3000);
 // what you hold, in the journal
 JOURNAL.push(['The Hunger in the Heartwood', ()=>{ if(CHOICE.hwSpirit) return ['done',"Something had crept up into the great tree of Sylvhaven and was eating the saplings that make its light. With Maelis's moonbell lantern you went in at the door at its foot, down through the hollow and the rootways, and drove the Hollow Hunger out of the Root-Heart. The tree is growing back, and Elowen lets you gather its light again."];
@@ -20432,16 +20461,16 @@ function tokenShop(T){ const n=T.count(), wares=T.wares.filter(([id])=>ITEMS[id]
   const intro=document.querySelector('#dlg-text p:nth-child(2)'); if(intro && /You hold/.test(intro.textContent)) intro.remove(); }
 const LEAF_ICON='<span style="display:inline-block;width:9px;height:12px;background:#cfe8d8;border-radius:0 80% 0 80%;transform:rotate(45deg);vertical-align:-1px;margin-left:2px"></span>';
 const TALLY_ICON='<span style="display:inline-block;font-weight:bold;letter-spacing:-1px">𝍸</span>';
-function leafTrade(back){ tokenShop({ who:'Maelis the Weaver', wares:LEAF_WARES, count:leaves, pay:c=>{ CHOICE.leaves=leaves()-c; }, unit:n=>'Silver Lea'+(n===1?'f':'ves'), icon:LEAF_ICON, col:'#cfe8d8', back,
+function leafTrade(back){ tokenShop({ who:'Maelis the Weaver', wares:LEAF_WARES, count:leaves, pay:c=>tokenSpend('silver_leaf','leaves',c), unit:n=>'Silver Lea'+(n===1?'f':'ves'), icon:LEAF_ICON, col:'#cfe8d8', back,
   greet:"“I do not weave for coin. Coin is only metal. Leaves are what Sylvhaven owes you.”", poor:"“Not yet. Sylvhaven has not owed you that much, yet.”", full:"“Your pack is full. I will keep it until you have room.”",
   bought:(nm,c)=>'Maelis weaves you '+nm+' for '+c+' Silver Leaves.' }); }
 // (Maelis's own talk, further up, now offers the leaf trade and only the worn things for coin)
 // ── Vesna trades her things for tallies, and at night she has work ──
-function tallyTrade(back){ tokenShop({ who:'Vesna the Grave-Speaker', wares:TALLY_WARES, count:tallies, pay:c=>{ CHOICE.tallies=tallies()-c; }, unit:n=>'Grave Tall'+(n===1?'y':'ies'), icon:TALLY_ICON, col:'#c8b8e0', back,
+function tallyTrade(back){ tokenShop({ who:'Vesna the Grave-Speaker', wares:TALLY_WARES, count:tallies, pay:c=>tokenSpend('grave_tally','tallies',c), unit:n=>'Grave Tall'+(n===1?'y':'ies'), icon:TALLY_ICON, col:'#c8b8e0', back,
   greet:"“The dead pay their debts. So do I.”", poor:"“You have not earned that. Not yet.”", full:"“Your pack is full.”",
   bought:(nm,c)=>'Vesna gives you '+nm+' for '+c+' Grave Tallies.' }); }
 const VN=()=>{ const d=Math.floor((dayClock+DAY_LEN*0.25)/DAY_LEN); if(!CHOICE.vnight || CHOICE.vnight.d!==d) CHOICE.vnight={d, n:0, on:false, paid:false}; return CHOICE.vnight; };   // a night counts from dusk to dawn
-{ const oldV=TALKERS.vesna; TALKERS.vesna=(...a)=>{ const r=oldV(...a); if(NECRO()<1 && !CHOICE.tallies) return r;
+{ const oldV=TALKERS.vesna; TALKERS.vesna=(...a)=>{ const r=oldV(...a); if(NECRO()<1 && !tallies() && CHOICE.tallies==null) return r;
     const box=document.getElementById('dlg-opts'); if(!dlgOverlay.classList.contains('open') || !box || box.querySelector('.dlg-opt.tally')) return r;
     const V='Vesna the Grave-Speaker', N=VN(), add=(label,fn)=>{ const b=document.createElement('button'); b.className='dlg-opt tally'; b.innerHTML='<span>'+label+'</span>'; b.addEventListener('click',fn); box.insertBefore(b,box.lastElementChild); };
     if(!N.paid && N.on && N.n>=3) add('“Three of them lie still.”',()=>{ N.paid=true; addTallies(2,'a night’s work'); say(V,"“Good. They were tired of walking.”",[bye]); });

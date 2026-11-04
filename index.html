@@ -5951,6 +5951,7 @@ function paintInteriorWalls(){
         g.save(); g.globalCompositeOperation='lighter'; glow(mt.x,(mt.y+m0.y)/2+10,70,46,n>0.5?'120,140,200':'255,240,200',n>0.5?0.12:0.3); g.restore(); }
       else { const dk=g.createLinearGradient(0,mt.y,0,m0.y); dk.addColorStop(0,'#030202'); dk.addColorStop(1,'#14110d'); g.fillStyle=dk; arch(0,0); g.fill(); } });
     return; }
+  if(AREAS[areaId] && AREAS[areaId].hollow) return paintHollowWalls();
   if(AREAS[areaId] && AREAS[areaId].tent) return paintTentWalls();
   if(AREAS[areaId] && AREAS[areaId].elfhall) return paintElfHallWalls();
   const {w,h}=ROOM, H=118, o=P(0,0), rEnd=P(w,0), lEnd=P(0,h);
@@ -7672,6 +7673,7 @@ function drawObject(o){
     if (!o.bogmound){g.fillStyle='rgba(255,220,120,0.16)';
     g.beginPath(); g.arc(x,y-24,26,0,Math.PI*2); g.fill();}
   } else if(o.type==='teleporter'){
+    if(o.treedoor) return;                              // the great tree's door is drawn with the tree
     const pulse=0.75+0.25*Math.sin(gt*2.4);
     g.save(); g.globalCompositeOperation='lighter';
     glow(x,y,42,21,'110,190,255',0.6*pulse);
@@ -8573,6 +8575,14 @@ function paintGroundTexture(){
   for(let py=0;py<THp;py++) for(let px=0;px<TWp;px++){
     const gx=(px+0.5)/S, gy=(py+0.5)/S;
     const G=groundAt(gx,gy);
+    if(theme==='interior' && AREAS[areaId] && AREAS[areaId].hollow){            // inside the great tree: its rings underfoot, cracks running out from the heart, roots at the rim
+      const cx=w/2, cy=h/2, dx=gx-cx, dy=gy-cy, r=Math.hypot(dx,dy), an=Math.atan2(dy,dx), n=fbm(gx*0.8,gy*0.8,131), n2=fbm(gx*6,gy*6,132);
+      const ring=0.5+0.5*Math.sin(r*7.5+n*4.5), late=Math.pow(Math.abs(Math.sin(r*7.5+n*4.5)),14);
+      let pc=mixC([132,94,58],[168,126,80],ring*0.7+n2*0.3); pc=mixC(pc,[92,62,36],late*0.6);
+      const crack=Math.abs(Math.sin(an*7+fbm(gx*0.5,gy*0.5,133)*3))<0.03*(1+r*0.2) && r>0.8; if(crack) pc=mixC(pc,[52,34,20],0.7);
+      const heart=1-smooth(0,1.8,r); pc=mixC(pc,[196,160,104],heart*0.5);
+      const rim=1-smooth(0,1.6,Math.min(gx,gy,w-gx,h-gy)); pc=mixC(pc,[60,40,24],rim*0.75);
+      const o=(py*TWp+px)*4; D[o]=pc[0]; D[o+1]=pc[1]; D[o+2]=pc[2]; D[o+3]=255; continue; }
     if(theme==='interior' && AREAS[areaId] && AREAS[areaId].temple){            // the temple: big sandstone slabs, worn joints, sand blown in at the edges
       const sx=gx*1.0, sy=gy*1.0, fx=sx-Math.floor(sx), fy=sy-Math.floor(sy), joint=fx<0.04||fx>0.96||fy<0.04||fy>0.96, n=fbm(gx*1.2,gy*1.2,91), n2=fbm(gx*5,gy*5,92);
       let pc=mixC([176,140,96],[204,170,122],n*0.6+n2*0.4); if(((Math.floor(sx)+Math.floor(sy))%2)===0) pc=mixC(pc,[160,124,84],0.25); if(joint) pc=mixC(pc,[96,72,46],0.7);
@@ -12971,6 +12981,7 @@ function victory(faction){
     if(m.opts && (m.opts.ghost||m.opts.bones)){ if(R()<0.5) coin(4,12); return; }                // the dead carry nothing but old coin
     if(m.type==='scarab'){ const n=1+(R()<0.5?1:0); for(let k=0;k<n;k++) give('scarab_chitin'); if(R()<0.4) coin(2,8); return; }
     if(m.type==='sandworm'){ const n=2+(R()<0.5?1:0); for(let k=0;k<n;k++) give('worm_scale'); if(R()<0.5) coin(8,20); logMsg('The worm shrinks back into the sand, leaving its shed scales behind. They are warm, and ring like bronze when you knock them together.','#a89878'); return; }
+    if(m.type==='hunger') return;                                                      // a spirit leaves nothing behind
     if(m.type==='ember'){ if(R()<0.6) coin(2,6); if(m.opts.big) give('ember_heart'); return; }                 // a fire-sprite leaves warm coins in the ashes, and the big one its heart
     if(m.type!=='barrowking' && m.type!=='goblin'){ if(R()<0.3) give('old_bone'); if(R()<0.07) give('old_skull'); }   // men who died badly: Vesna has a use for what is left
     if(m.type==='goblin'){ if(R()<0.35) coin(1,3); if(R()<0.15) give(['apple','apple','bread','raw_meat'][Math.floor(R()*4)]); if(R()<0.2) give(['dagger','hood','shirt','club'][Math.floor(R()*4)]); return; }
@@ -13410,13 +13421,14 @@ function drawActorBase(e){
   else if(e.type==='sandworm') drawSandworm(s.x,B,e,poseFor(e));
   else if(e.type==='scarab') drawScarab(s.x,B,e,poseFor(e));
   else if(e.type==='ember') drawEmber(s.x,B,e,poseFor(e));
+  else if(e.type==='hunger') drawHunger(s.x,B,e,poseFor(e));
   else if(e.type==='skeleton') drawRisen(s.x,B,e,poseFor(e));
   else if(e.opts && e.opts.wrapped && !e.dead){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); drawWraps(s.x,B,e); if(e.warded){ g.save(); g.globalCompositeOperation='lighter'; glow(s.x,B-60,60,90,'255,200,90',0.35+Math.sin(gt*4)*0.08); g.restore(); } }
   else { const live=(combat.active && (e===combat.foe||isP)) || e.moving, ps=live?poseFor(e):litPose(poseFor(e)), sw=e.moving?Math.sin(gt*10)*5:0; drawLitSprite(s.x,B,()=>drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps),1,live?null:isP?'p':'a:'+(e.id??e.name),(e.dir||0)+'|'+Math.round(sw*4)+'|'+litSig(ps)+'|'+litSig(e.opts)+'|'+(isP?Math.round((player.wet||0)*10):'')); }
   g.restore();
   if(!isP && e.dead) return;
   if(isP && romHush()) return;
-  const ty=B-(e.type==='wolf'||e.type==='scorpion'?66:e.type==='sandworm'?178:e.type==='scarab'?78:114);
+  const ty=B-(e.type==='wolf'||e.type==='scorpion'?66:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:114);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const deadly=!isP && e.type!=='dummy' && e.hostile!==false && e.tier && typeof foeLevel==='function' && foeLevel(e)-playerLevel()>=3;   // far stronger than you: a skull
   const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  Lv '+(typeof foeLevel==='function'?foeLevel(e):e.tier) : ''), tw=g.measureText(label).width;
@@ -16856,7 +16868,7 @@ function ckBreakDuel(K){ combat.active=false; combat.phase='idle'; combat.foe=nu
   K.hostile=false; K.state='guard'; K.path=[]; K.moving=false; }
 function ckPlace(K,i,j){ for(let n=0;n<10;n++) sparks.push({wx:K.x,wy:K.y,vx:(Math.random()-0.5)*160,vy:-40-Math.random()*90,t:0,col:'#8ab8c8'});
   K.i=i; K.j=j; K.x=i+0.5; K.y=j+0.5; K.dir=dirTo([i,j],tileOf(player)); for(let n=0;n<14;n++) sparks.push({wx:K.x,wy:K.y,vx:(Math.random()-0.5)*160,vy:-40-Math.random()*90,t:0,col:'#b8e0f0'}); }
-function ckResume(K,msg){ CK=null; K.hostile=true; K.warded=false; if(msg) banner(msg,'#c8e0f0',1600); const at=areaId; setTimeout(()=>{ if(areaId===at && (at===BK_AREA||at==='templeD') && !K.dead && player.hp>0 && !combat.active) startCombat(); },700); }   // the Barrow-King and Ankhet both come straight back at you
+function ckResume(K,msg){ CK=null; K.hostile=true; K.warded=false; if(msg) banner(msg,'#c8e0f0',1600); const at=areaId; setTimeout(()=>{ if(areaId===at && (at===BK_AREA||at==='templeD'||at==='treeheart') && !K.dead && player.hp>0 && !combat.active) startCombat(); },700); }   // the Barrow-King and Ankhet both come straight back at you
 function ckStorm(K){ ckBreakDuel(K); ckPlace(K,BK_HOME[0],BK_HOME[1]);
   banner('The Drowning Wail! Hide behind a standing stone!','#9ad0e8',2200); logMsg('The Barrow-King opens his mouth, and the roar of black water fills the barrow. Get a standing stone between you and him!','#9ad0e8');
   CK={mode:'storm', src:[BK_HOME[0]+0.5,BK_HOME[1]+0.5], t:5, blasts:0}; }
@@ -20383,6 +20395,8 @@ setInterval(()=>{ try{ if(!running || combat.active) return; const st=t=>{ const
       if(tsum){ CHOICE.tallies=tallies()+tsum; logMsg('For what you have already done for Vesna: '+tsum+' Grave Tallies.','#c8b8e0'); } }
   }catch(e){} },3000);
 // what you hold, in the journal
+JOURNAL.push(['The Hunger in the Heartwood', ()=> !CHOICE.hwAsked && !CHOICE.hwSpirit ? null : CHOICE.hwSpirit ? ['done',"Something had crept into the oldest tree east of Sylvhaven and was eating the saplings that make its light. You went in at the door at its foot and drove the Hollow Hunger out. The light drifts round the trunk again, and Elowen lets you gather it."]
+  : ['active',"Something has crept into the great tree in the Heartwood, east of Sylvhaven, and is eating the saplings that make its light. Go in at the door at its foot and drive it out. Elowen says: when it tries to feed, stand beside the sapling it reaches for."]]);
 JOURNAL.push(['The Favour of Sylvhaven', ()=> !(CHOICE.leaves!=null || CHOICE.hwDay!=null) ? null : ['active',"You hold <b>"+leaves()+" Silver Lea"+(leaves()===1?'f':'ves')+"</b>. Maelis in Sylvhaven weaves for leaves, not coin. Every elven task brings a few; once a day the Heartwood east of Sylvhaven lets you gather its light, and Sentinel Lirael takes four moonbells from the elven woods."]]);
 JOURNAL.push(["Vesna's Tallies", ()=> !(CHOICE.tallies!=null) ? null : ['active',"You hold <b>"+tallies()+" Grave Tall"+(tallies()===1?'y':'ies')+"</b>. Vesna trades her things for tallies: her lessons bring some, and once a night she has work for you, laying three of the restless dead to rest."]]);
 // ── Maelis weaves for leaves; only the plain worn things are still for coin ──
@@ -20427,13 +20441,14 @@ function bellSpots(){ const d=Math.floor(dayClock/DAY_LEN), out=[]; for(let k=0;
     say('Sentinel Lirael',["“Four thousand and twelve, four thousand and thirteen… leaves. I count them every spring. You made me lose my place.”", n>=4?"“Moonbells! Four of them. Those I do not have to count, they count themselves.”":"“If you find moonbells in the woods, bring me four. They grow somewhere new each day, white, like little bells. I will pay you in leaves; I have a great many.”"],[
       ...(n>=4?[{label:'Give her four moonbells.', fn:()=>{ for(let k=0;k<4;k++){ const q=player.inv.indexOf('moonbell'); if(q>=0) player.inv[q]=null; } CHOICE.liraelBell=d; addLeaves(1,'moonbells for Lirael'); say('Sentinel Lirael',"“One leaf. Do not tell me you would rather have coin.”",[bye]); }}]:[]), bye]); }; }
 // ── the Heartwood: a glade east of Sylvhaven around the oldest tree, where its light drifts loose once a day ──
-AREAS.heartwood={ fence:{r:false,l:false}, w:12, h:12, theme:'elf', dens:0.08, label:'The Heartwood', mini:{x:0,y:0}, notches:()=>[], dummy:null,   // an open glade: trees only at the rim
-  objects:()=>[ {type:'teleporter', i:0, j:6, to:'sylvhaven', entry:'fromHeart'},
-    {type:'tree', i:6, j:5, sp:'silver', v:1, s:3.8, ox:0, oy:0},
-    {type:'lantern', i:3, j:3, off:havenBurnt()}, {type:'lantern', i:9, j:3, off:havenBurnt()}, {type:'lantern', i:3, j:9, off:havenBurnt()}, {type:'lantern', i:9, j:9, off:havenBurnt()},
-    {type:'critter', kind:'flowers', i:2, j:8, noblock:true}, {type:'critter', kind:'flowers', i:10, j:6, noblock:true}, {type:'critter', kind:'flowers', i:7, j:10, noblock:true} ],
-  npcs:()=> havenBurnt() ? [] : [{ id:'elowen', name:'Elowen of the Heartwood', i:4, j:7, dir:1, opts:ELFO({gender:'f',skin:0,hair:3,hairColor:11,face:1,equip:{head:'elf_circlet',torso:'elf_robe',armor:'elf_cloak',hands:null,legs:'elf_leggings',feet:'elf_boots',weapon:null,offhand:null}}) }],
-  mobs:()=>[], entries:{ fromHaven:{i:1,j:6} } };
+AREAS.heartwood={ fence:{r:false,l:false}, w:18, h:18, theme:'elf', dens:0.06, label:'The Heartwood', mini:{x:0,y:0}, notches:()=>[], dummy:null,   // an open glade round the oldest tree: only the rim is wood
+  objects:()=>[ {type:'teleporter', i:0, j:9, to:'sylvhaven', entry:'fromHeart'},
+    {type:'worldtree', i:7, j:6, fp:[4,4], tall:1400},
+    {type:'teleporter', i:11, j:10, to:'treeheart', entry:'fromWood', treedoor:true},
+    {type:'lantern', i:4, j:4, off:havenBurnt()}, {type:'lantern', i:15, j:4, off:havenBurnt()}, {type:'lantern', i:4, j:15, off:havenBurnt()}, {type:'lantern', i:15, j:15, off:havenBurnt()},
+    {type:'critter', kind:'flowers', i:3, j:12, noblock:true}, {type:'critter', kind:'flowers', i:14, j:8, noblock:true}, {type:'critter', kind:'flowers', i:9, j:15, noblock:true}, {type:'critter', kind:'flowers', i:15, j:12, noblock:true} ],
+  npcs:()=> havenBurnt() ? [] : [{ id:'elowen', name:'Elowen of the Heartwood', i:6, j:12, dir:1, opts:ELFO({gender:'f',skin:0,hair:3,hairColor:11,face:1,equip:{head:'elf_circlet',torso:'elf_robe',armor:'elf_cloak',hands:null,legs:'elf_leggings',feet:'elf_boots',weapon:null,offhand:null}}) }],
+  mobs:()=>[], entries:{ fromHaven:{i:1,j:9}, fromTree:{i:12,j:11} } };
 AREA_TIER.heartwood=2;
 wrap('sylvhaven','objects',l=>[...l,{type:'teleporter', i:13, j:6, to:'heartwood', entry:'fromHaven'}]);
 AREAS.sylvhaven.entries.fromHeart={i:12,j:6};
@@ -20446,7 +20461,7 @@ BELL_AREAS.forEach(area=>wrap(area,'objects',l=>{ if(typeof havenBurnt==='functi
 OBJ_DRAW.hmote=o=>{ const q=P(o.x,o.y), t=gt*1.6+o.seed, x=q.x+Math.sin(t)*3, y=q.y-34-o.h+Math.sin(t*1.4)*5, gold=o.gold, a=Math.min(1,o.life/1.2);
   g.save(); g.globalCompositeOperation='lighter'; glow(x,y,gold?26:20,gold?26:20,gold?'255,215,120':'180,240,210',0.55*a); glow(x,y,8,8,'255,255,240',0.6*a);
   g.fillStyle=gold?`rgba(255,240,190,${a})`:`rgba(235,255,245,${a})`; g.beginPath(); g.arc(x,y,gold?3.2:2.4,0,Math.PI*2); g.fill(); g.restore(); };
-let HW=null;                                  // the gathering in progress: {t, score, motes:[]}
+let HW=null; const HW_C=[9,8];               // the gathering in progress: {t, score, motes:[]}; the trunk's middle
 function hwHud(){ let el=document.getElementById('hw-hud'); if(!el){ el=document.createElement('div'); el.id='hw-hud'; el.style.cssText='position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:44;font:bold 14px Georgia,serif;color:#e8f4e0;text-shadow:0 1px 3px #000;letter-spacing:1px;pointer-events:none'; document.body.appendChild(el); }
   el.style.display=HW?'block':'none'; if(HW) el.textContent='Light gathered: '+HW.score+'   ·   '+Math.ceil(HW.t)+'s'; }
 function hwStart(){ HW={t:45, score:0, motes:[], spawn:0}; hwHud(); banner('Gather the light','#e8f4e0',1600); }
@@ -20456,25 +20471,239 @@ function hwEnd(){ const s=HW.score; HW.motes.forEach(o=>{ const q=OBJECTS.indexO
   if(n) addLeaves(n,'the Heartwood’s light'); say('Elowen of the Heartwood',[n>=3?"“The tree has not been this glad in a long while.”":n?"“It gave you something. It does not give to everyone.”":"“It hid from you today. Walk softer tomorrow.”","<i>You gathered "+s+" light"+(n?' and she presses '+n+' silver lea'+(n>1?'ves':'f')+' into your hand.':'.')+"</i>"],[bye]); }
 setInterval(()=>{ try{ if(!HW) return; if(!running || areaId!=='heartwood' || combat.active){ HW.motes.forEach(o=>{ const q=OBJECTS.indexOf(o); if(q>=0) OBJECTS.splice(q,1); }); HW=null; hwHud(); return; }
     const dt=0.05; HW.t-=dt; HW.spawn-=dt;
-    if(HW.spawn<=0 && HW.motes.length<9){ HW.spawn=0.45+Math.random()*0.5; const a=Math.random()*Math.PI*2, r=1.6+Math.random()*3.2, gold=Math.random()<0.18;
-      const o={type:'hmote', x:6.5+Math.cos(a)*r, y:5.5+Math.sin(a)*r, a, r, sp:(Math.random()<0.5?-1:1)*(0.25+Math.random()*0.35), h:Math.random()*20, gold, life:gold?5:7+Math.random()*3, seed:Math.random()*6, noblock:true};
+    if(HW.spawn<=0 && HW.motes.length<9){ HW.spawn=0.45+Math.random()*0.5; const a=Math.random()*Math.PI*2, r=3.4+Math.random()*3.6, gold=Math.random()<0.18;
+      const o={type:'hmote', x:HW_C[0]+Math.cos(a)*r, y:HW_C[1]+Math.sin(a)*r, a, r, sp:(Math.random()<0.5?-1:1)*(0.25+Math.random()*0.35), h:Math.random()*20, gold, life:gold?5:7+Math.random()*3, seed:Math.random()*6, noblock:true};
       o.i=Math.floor(o.x); o.j=Math.floor(o.y); HW.motes.push(o); OBJECTS.push(o); }
     const mv=HW.last?Math.hypot(player.x-HW.last.x,player.y-HW.last.y)/dt:0; HW.last={x:player.x,y:player.y};
-    HW.motes.slice().forEach(o=>{ o.life-=dt; o.a+=o.sp*dt; let tx=6.5+Math.cos(o.a)*o.r, ty=5.5+Math.sin(o.a)*o.r;
+    HW.motes.slice().forEach(o=>{ o.life-=dt; o.a+=o.sp*dt; let tx=HW_C[0]+Math.cos(o.a)*o.r, ty=HW_C[1]+Math.sin(o.a)*o.r;
       const dx=o.x-player.x, dy=o.y-player.y, d=Math.hypot(dx,dy)||0.01;
       if(d<1.6 && mv>2.6){ tx=o.x+dx/d*0.9; ty=o.y+dy/d*0.9; }                                   // you came at it fast: it shies
-      o.x+=(tx-o.x)*Math.min(1,dt*(o.gold?3:2)); o.y+=(ty-o.y)*Math.min(1,dt*(o.gold?3:2)); o.x=Math.max(0.7,Math.min(11.3,o.x)); o.y=Math.max(0.7,Math.min(11.3,o.y)); o.i=Math.floor(o.x); o.j=Math.floor(o.y);
+      o.x+=(tx-o.x)*Math.min(1,dt*(o.gold?3:2)); o.y+=(ty-o.y)*Math.min(1,dt*(o.gold?3:2)); o.x=Math.max(0.7,Math.min(17.3,o.x)); o.y=Math.max(0.7,Math.min(17.3,o.y)); o.i=Math.floor(o.x); o.j=Math.floor(o.y);
       const gone=()=>{ const q=OBJECTS.indexOf(o); if(q>=0) OBJECTS.splice(q,1); HW.motes.splice(HW.motes.indexOf(o),1); };
       if(d<0.62){ HW.score+=o.gold?3:1; floatText([o.x-0.5,o.y-0.5],o.gold?'+3':'+1',o.gold?'#ffe0a0':'#d8f8e8'); try{ SND.fx('coin'); }catch(e){} gone(); return; }
       if(o.life<=0) gone(); });
     hwHud(); if(HW.t<=0) hwEnd(); }catch(e){} },50);
 function elowenTalk(){ const d=Math.floor(dayClock/DAY_LEN), done=CHOICE.hwDay===d;
+  if(!CHOICE.hwSpirit){ const first=!CHOICE.hwAsked; CHOICE.hwAsked=CHOICE.hwAsked||1;
+    return say('Elowen of the Heartwood',first?["“This is the oldest tree in the wood. Older than Sylvhaven; we built the town to keep it company.”",
+      "“Once a day its light comes loose and drifts round the trunk like snow that falls upward. Not any more. Not for a month.”",
+      "“Something went in through the door at its foot. A hunger, with no shape of its own. In the heart of the tree are the saplings that make the light, and it is eating them, one by one. At night I hear it chewing.”",
+      "“We do not kill, in Sylvhaven. But that is not a living thing. Go in, and drive it out of her, before there is nothing left to make light.”"]
+      :["“It is still in there. I hear it.” <i>She lays her palm flat on the bark, as if feeling for a pulse.</i>","“The door is at her foot, facing the morning. Mind the saplings: whatever it is, it feeds on them.”"],
+      [{label:'“I will go in.”', fn:()=>{ CHOICE.hwAsked=2; say('Elowen of the Heartwood',"“Then the tree goes with you. When it tries to feed, stand beside the sapling it reaches for. It cannot eat what you are guarding.”",[bye]); }}, bye]); }
   say('Elowen of the Heartwood',[CHOICE.hwDay==null?"“This is the oldest tree in the wood. Older than Sylvhaven; we built the town to keep it company.”":"“You came back. The tree noticed.”",
     done?"“It has given its light for today. Come tomorrow.”":"“Once a day its light comes loose and drifts. Walk into it and it is yours, but do not rush at it, it is shy. The gold is shyest.”"],[
     ...(done?[]:[{label:'Gather the light.', fn:()=>{ closeDialog(); setTimeout(hwStart,300); }}]), bye]); }
 TALKERS.elowen=elowenTalk;
 // Marta no longer sells elven boots: the elves trade their weaving for favour, not coin
 
+// ════════ THE GREAT TREE OF THE HEARTWOOD, AND THE HUNGER IN ITS HEART ════════
+// the tree: drawn once into two big layers (roots and trunk; limbs and crown), faded where you stand behind it
+const WT={};
+function wtPaint(layer,healed){ const W=2200, H=1900, BX=1100, BY=1640, cv=document.createElement('canvas'); cv.width=W; cv.height=H; const c=cv.getContext('2d');
+  const R=(k,s)=>rnd01(k,s,707), bark=(x0,x1,y0,y1)=>{ const gr=c.createLinearGradient(BX+x0,0,BX+x1,0); gr.addColorStop(0,healed?'#f2efe2':'#d6d2c6'); gr.addColorStop(0.35,healed?'#cfccbe':'#b2aea2'); gr.addColorStop(0.7,'#8e8b7e'); gr.addColorStop(1,'#55534a'); return gr; };
+  if(layer==='trunk'){
+    c.fillStyle='rgba(18,26,10,0.32)'; c.beginPath(); c.ellipse(BX+40,BY+20,430,190,0,0,Math.PI*2); c.fill();                       // its shade on the ground
+    const roots=[[-2.6,330],[-2.1,300],[-1.5,250],[-0.6,280],[-0.1,360],[0.45,330],[1.05,300],[1.6,260],[2.2,340],[2.75,300]];      // buttress roots spread over the glade
+    roots.forEach(([a,L],k)=>{ const ex=Math.cos(a)*L*1.3, ey=Math.sin(a)*L*0.55+18, sx=Math.cos(a)*170, sy=Math.sin(a)*70;
+      const nx=-Math.sin(a), ny=Math.cos(a)*0.5, w0=92, w1=16;
+      c.beginPath(); c.moveTo(BX+sx+nx*w0,BY+sy+ny*w0-20); c.quadraticCurveTo(BX+(sx+ex)/2+nx*w0*0.6,BY+(sy+ey)/2-70,BX+ex+nx*w1,BY+ey); c.lineTo(BX+ex-nx*w1,BY+ey+4);
+      c.quadraticCurveTo(BX+(sx+ex)/2-nx*w0*0.5,BY+(sy+ey)/2+10,BX+sx-nx*w0,BY+sy-ny*w0+16); c.closePath();
+      const rg=c.createLinearGradient(0,BY+Math.min(sy,ey)-60,0,BY+Math.max(sy,ey)+10); rg.addColorStop(0,'#d8d4c4'); rg.addColorStop(1,'#6a675c'); c.fillStyle=rg; c.fill(); c.strokeStyle='rgba(40,38,30,0.6)'; c.lineWidth=2; c.stroke();
+      c.strokeStyle='rgba(255,255,245,0.25)'; c.lineWidth=3; c.beginPath(); c.moveTo(BX+sx,BY+sy-24); c.quadraticCurveTo(BX+(sx+ex)/2,BY+(sy+ey)/2-36,BX+ex,BY+ey-4); c.stroke();
+      c.fillStyle='rgba(96,128,60,0.45)'; for(let m=0;m<5;m++){ const u=0.2+m*0.15; c.beginPath(); c.ellipse(BX+sx+(ex-sx)*u,BY+sy+(ey-sy)*u+2,16-m*2,6,a,0,Math.PI*2); c.fill(); } });   // moss in the crooks
+    const L0=x=>x, trunk=()=>{ c.beginPath(); c.moveTo(BX-290,BY+30);                                                              // the trunk: flared at the foot, tall as a tower
+      c.bezierCurveTo(BX-200,BY-80,BX-185,BY-380,BX-160,BY-600); c.bezierCurveTo(BX-150,BY-690,BX-120,BY-750,BX-95,BY-800);
+      c.lineTo(BX+105,BY-800); c.bezierCurveTo(BX+135,BY-750,BX+170,BY-690,BX+178,BY-600); c.bezierCurveTo(BX+200,BY-380,BX+215,BY-90,BX+300,BY+34);
+      c.quadraticCurveTo(BX,BY+150,BX-290,BY+30); c.closePath(); };
+    trunk(); c.fillStyle=bark(-300,300); c.fill(); c.strokeStyle='#3e3c34'; c.lineWidth=3; c.stroke();
+    c.save(); trunk(); c.clip();
+      for(let k=0;k<64;k++){ const u=(k+0.5)/64, wob=R(k,1)*6.28;                                                                 // deep fissures in the bark, running up
+        c.strokeStyle=`rgba(50,48,40,${0.25+R(k,2)*0.35})`; c.lineWidth=2+R(k,3)*4; c.beginPath();
+        for(let yy=BY+120; yy>BY-810; yy-=16){ const t=(BY+120-yy)/930, half=290-t*170-(t>0.7?(t-0.7)*90:0), xx=BX-half+u*half*2+Math.sin(yy*0.012+wob)*10*(1-t*0.5); yy===BY+120?c.moveTo(xx,yy):c.lineTo(xx,yy); } c.stroke();
+        if(k%3===0){ c.strokeStyle='rgba(255,255,245,0.16)'; c.lineWidth=1.5; c.stroke(); } }
+      for(let k=0;k<5;k++){ const mx=BX-200+R(k,41)*380, my=BY-60-R(k,42)*520; c.fillStyle='rgba(98,132,62,0.4)'; for(let m=0;m<8;m++){ c.beginPath(); c.ellipse(mx+R(k*9+m,43)*40-20,my+R(k*9+m,44)*30,9,5,0,0,Math.PI*2); c.fill(); } }   // moss in the fissures
+      const sh=c.createLinearGradient(0,BY-800,0,BY-560); sh.addColorStop(0,'rgba(20,24,12,0.55)'); sh.addColorStop(1,'rgba(20,24,12,0)'); c.fillStyle=sh; c.fillRect(BX-320,BY-810,640,260);   // the crown's shadow on the trunk
+      const mo=c.createLinearGradient(0,BY-160,0,BY+80); mo.addColorStop(0,'rgba(96,130,58,0)'); mo.addColorStop(1,'rgba(96,130,58,0.55)'); c.fillStyle=mo; c.fillRect(BX-320,BY-170,640,260);   // moss at the foot
+    c.restore();
+    c.fillStyle='#2a2218'; c.beginPath(); c.moveTo(BX-62,BY+118); c.lineTo(BX-60,BY-60); c.quadraticCurveTo(BX,BY-170,BX+60,BY-60); c.lineTo(BX+62,BY+118); c.quadraticCurveTo(BX,BY+132,BX-62,BY+118); c.fill();   // the door: a hollow at her foot
+    c.strokeStyle='#cfcabb'; c.lineWidth=12; c.beginPath(); c.moveTo(BX-70,BY+118); c.lineTo(BX-68,BY-58); c.quadraticCurveTo(BX,BY-184,BX+68,BY-58); c.lineTo(BX+70,BY+118); c.stroke();
+    c.strokeStyle='rgba(60,56,46,0.8)'; c.lineWidth=3; c.stroke();
+  } else {
+    const limbs=[[-700,-990,-60],[-420,-1200,-40],[-60,-1320,0],[320,-1230,30],[690,-1010,60],[-230,-930,-20],[200,-940,20]];   // great limbs into the crown
+    limbs.forEach(([ex,ey,lean],k)=>{ const sx=BX+lean, sy=BY-770, w0=k<5?72:48, cx1=BX+ex*0.25, cy1=BY+(ey+(-770))/2-90;
+      c.beginPath(); c.moveTo(sx-w0,sy); c.quadraticCurveTo(cx1-w0*0.5,cy1,BX+ex-10,BY+ey); c.lineTo(BX+ex+10,BY+ey+8); c.quadraticCurveTo(cx1+w0*0.5,cy1+20,sx+w0,sy); c.closePath();
+      c.fillStyle=bark(ex-80,ex+80); c.fill(); c.strokeStyle='rgba(50,48,40,0.7)'; c.lineWidth=2.5; c.stroke(); });
+    const L=healed?['#5a6a48','#94a872','#c4d29a','#eef0c8','#f4e6a0']:['#4e5640','#7e8866','#a4aa86','#c8caa8','#c8b888'];       // silver-green, gold-lit; duller while it starves
+    const blob=(x,y,r,col)=>{ c.fillStyle=col; c.beginPath(); const N=14, pt=q=>{ const a=q/N*Math.PI*2, rr=r*(0.84+0.16*Math.sin(q*2.3+x*0.013)); return [BX+x+Math.cos(a)*rr, BY+y+Math.sin(a)*rr*0.78]; };   // a soft, lumpy clump of leaves
+      let p0=pt(0), p1=pt(1); c.moveTo((p0[0]+p1[0])/2,(p0[1]+p1[1])/2); for(let q=1;q<=N;q++){ const a1=pt(q), a2=pt(q+1); c.quadraticCurveTo(a1[0],a1[1],(a1[0]+a2[0])/2,(a1[1]+a2[1])/2); } c.closePath(); c.fill(); };
+    const cl=[]; for(let k=0;k<70;k++){ const a=R(k,11)*Math.PI*2, d=Math.sqrt(R(k,12)); cl.push([Math.cos(a)*d*880, -1090+Math.sin(a)*d*360, 120+R(k,13)*120]); }
+    cl.sort((p,q)=>p[1]-q[1]);
+    const puff=(x,y,r,col,n,seed,sh)=>{ c.fillStyle=col; for(let q=0;q<n;q++){ const a=R(seed*31+q,51)*Math.PI*2, d=Math.sqrt(R(seed*31+q,52))*r*0.62, rr=r*(0.26+R(seed*31+q,53)*0.22);   // a clump of leaves is many small rounded puffs
+        c.beginPath(); c.ellipse(BX+x+Math.cos(a)*d-sh,BY+y+Math.sin(a)*d*0.78-sh,rr,rr*0.8,0,0,Math.PI*2); c.fill(); } };
+    cl.forEach(([x,y,r],k)=>puff(x+18,y+28,r*1.08,'rgba(30,40,22,0.45)',14,k,0));                                         // the dark of the crown underneath
+    cl.forEach(([x,y,r],k)=>{ puff(x,y,r,L[0],16,k,0); puff(x,y,r*0.86,L[1],12,k+500,r*0.1); puff(x,y,r*0.62,L[2],9,k+900,r*0.24); if(y<-1050 || x<-200) puff(x,y,r*0.4,L[3],6,k+1300,r*0.34); });
+    for(let k=0;k<1600;k++){ const a=R(k,21)*Math.PI*2, d=Math.sqrt(R(k,22)), x=Math.cos(a)*d*940, y=-1090+Math.sin(a)*d*400, lit=(x+y*1.4)<-1440+R(k,23)*600;   // single leaves catching the light
+      c.fillStyle=lit?(R(k,24)<0.3?L[4]:L[3]):(R(k,24)<0.5?L[1]:L[2]); c.globalAlpha=0.75; c.beginPath(); c.ellipse(BX+x,BY+y,7,3.5,R(k,25)*3,0,Math.PI*2); c.fill(); } c.globalAlpha=1;
+    for(let k=0;k<26;k++){ const x=-760+R(k,31)*1520, y=-760-R(k,32)*120, len=120+R(k,33)*240;                               // silver strands hanging from the crown
+      c.strokeStyle=healed?'rgba(230,234,210,0.5)':'rgba(170,170,150,0.4)'; c.lineWidth=1.6; c.beginPath(); c.moveTo(BX+x,BY+y); c.quadraticCurveTo(BX+x+10,BY+y+len*0.5,BX+x-4,BY+y+len); c.stroke();
+      c.fillStyle=L[3]; for(let q=1;q<6;q++){ c.beginPath(); c.ellipse(BX+x+3*Math.sin(q),BY+y+len*q/6,3,6,0.4,0,Math.PI*2); c.fill(); } } }
+  return cv; }
+OBJ_DRAW.worldtree=o=>{ const healed=!!CHOICE.hwSpirit, q=P(o.i+o.fp[0]/2,o.j+o.fp[1]/2), pp=P(player.x,player.y);
+  ['trunk','crown'].forEach(L=>{ const key=L+healed; if(!WT[key]) WT[key]=wtPaint(L,healed); });
+  const behind=!(player.x>=o.i+o.fp[0]-0.05 || player.y>=o.j+o.fp[1]-0.05);
+  const inT=behind && Math.abs(pp.x-q.x)<320 && pp.y<q.y+140 && pp.y>q.y-820, inC=pp.y<q.y-650 || (behind && Math.abs(pp.x-q.x)<950 && pp.y<q.y-150);
+  o.fT=lerpN(o.fT??1, inT?0.32:1, 0.12); o.fC=lerpN(o.fC??1, inC?0.4:1, 0.12);
+  const ga=g.globalAlpha;
+  g.globalAlpha=ga*o.fT; g.drawImage(WT['trunk'+healed],q.x-1100,q.y-1640);
+  { const dx=q.x, dy=q.y; g.save(); g.globalCompositeOperation='lighter';                                                        // the door's light, and the sap in the bark
+    const pulse=0.7+0.3*Math.sin(gt*1.7); glow(dx,dy+40,70,100,healed?'255,220,140':'150,90,200',(healed?0.45:0.35)*pulse*o.fT);
+    g.strokeStyle=healed?`rgba(250,230,150,${0.35*pulse*o.fT})`:`rgba(140,80,190,${0.3*pulse*o.fT})`; g.lineWidth=3;
+    [[-120,0.2],[-40,1.1],[60,2.3],[140,3.1]].forEach(([vx,ph])=>{ g.beginPath(); for(let k=0;k<=24;k++){ const yy=dy-60-k*38, xx=dx+vx*(1-k/40)+Math.sin(k*0.7+ph)*12; k?g.lineTo(xx,yy):g.moveTo(xx,yy); } g.stroke(); });
+    g.restore(); }
+  g.globalAlpha=ga*o.fC; g.drawImage(WT['crown'+healed],q.x-1100,q.y-1640);
+  if(healed){ g.save(); g.globalCompositeOperation='lighter'; for(let k=0;k<14;k++){ const t=(gt*0.05+k*0.071)%1, x=q.x+Math.sin(k*2.7+gt*0.3)*700*(0.4+k%3*0.2), y=q.y-1150+t*1000;   // the light drifting down out of the crown
+      glow(x,y,10,10,'230,250,210',0.5*Math.sin(t*Math.PI)*o.fC); } g.restore(); }
+  g.globalAlpha=ga; };
+// inside the trunk: walls of living wood climbing into the dark
+function paintHollowWalls(){ const {w,h}=ROOM, H=230, o=P(0,0), rEnd=P(w,0), lEnd=P(0,h);
+  [[o,rEnd,'#7a5636','#5a3e26'],[lEnd,o,'#62442a','#46301c']].forEach(([a,b,c1,c2],side)=>{
+    const gr=g.createLinearGradient(0,Math.max(a.y,b.y),0,Math.min(a.y,b.y)-H); gr.addColorStop(0,c1); gr.addColorStop(0.55,c2); gr.addColorStop(1,'#120c06');
+    g.fillStyle=gr; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(b.x,b.y-H); g.lineTo(a.x,a.y-H); g.closePath(); g.fill();
+    const at=(t,hh)=>({x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t-hh});
+    for(let k=0;k<70;k++){ const t=(k+0.5)/70, ph=rnd01(k,side,811)*6.3; g.strokeStyle=`rgba(30,18,8,${0.25+rnd01(k,side,812)*0.3})`; g.lineWidth=1+rnd01(k,side,813)*2.4; g.beginPath();   // the grain, rising
+      for(let hh=0;hh<H*0.95;hh+=10){ const q=at(t+Math.sin(hh*0.03+ph)*0.006,hh); hh?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y); } g.stroke(); }
+    for(let k=0;k<6;k++){ const t=0.08+k*0.16+rnd01(k,side,814)*0.05, q=at(t,40+rnd01(k,side,815)*120);                         // knot-holes with a glow of fungus in them
+      g.fillStyle='#1a1008'; g.beginPath(); g.ellipse(q.x,q.y,9,13,0,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(190,150,100,0.4)'; g.lineWidth=2; g.beginPath(); g.ellipse(q.x,q.y,13,18,0,0,Math.PI*2); g.stroke();
+      g.save(); g.globalCompositeOperation='lighter'; glow(q.x,q.y+4,14,10,'140,230,190',0.35); g.restore(); }
+    for(let k=0;k<3;k++){ const t0=0.1+k*0.3, p0=at(t0,0), p1=at(t0+0.12,H*0.7);                                               // old roots across the wall
+      g.strokeStyle='#3a2616'; g.lineWidth=10-k*2; g.beginPath(); g.moveTo(p0.x,p0.y); g.quadraticCurveTo((p0.x+p1.x)/2+20,(p0.y+p1.y)/2+30,p1.x,p1.y); g.stroke();
+      g.strokeStyle='rgba(200,160,110,0.25)'; g.lineWidth=2; g.stroke(); } }); }
+AREAS.treeheart={ ...INSIDE_BASE, w:13, h:13, theme:'interior', hollow:true, label:'Inside the Heartwood', mini:{x:0,y:0},
+  objects:()=>[ {type:'teleporter', i:6, j:12, to:'heartwood', entry:'fromTree', locked:()=>hhSealed(), onLocked:()=>pzSay('Roots have grown across the way out. Not while it lives.','#c8b0e8')},
+    ...HH_SAP.map(([i,j],k)=>({type:'sapling', i, j, k})),
+    {type:'hfungus', i:1, j:2, noblock:true}, {type:'hfungus', i:5, j:1, noblock:true}, {type:'hfungus', i:11, j:1, noblock:true}, {type:'hfungus', i:1, j:9, noblock:true}, {type:'hfungus', i:11, j:11, noblock:true} ],
+  npcs:()=>[], mobs:()=> CHOICE.hwSpirit ? [] : [{ name:'The Hollow Hunger', type:'hunger', i:HH_HOME[0], j:HH_HOME[1], faction:'hunger',
+    opts:{ spirit:true, equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:'hunger_claw',offhand:null} } }],
+  entries:{ fromWood:{i:6,j:11} } };
+AREA_TIER.treeheart=3;
+const HH_SAP=[[3,3],[9,3],[2,7],[10,7],[4,10],[8,10]], HH_HOME=[6,5];
+let HH=null, HHS=[1,1,1,1,1,1];                               // the fight's set pieces; each sapling: 0 dark, 1 faint, 2 bright
+{ const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); try{ if(areaId==='treeheart'){ HH=null; HHS=HH_SAP.map(()=>CHOICE.hwSpirit?2:1); } }catch(e){} return r; }; }
+OBJ_DRAW.hfungus=o=>{ const q=P(o.i+0.5,o.j+0.5); g.save(); g.globalCompositeOperation='lighter'; glow(q.x,q.y-6,26,14,'140,230,190',0.35+Math.sin(gt*1.3+o.i)*0.08); g.restore();
+  [[-8,-2,5],[-1,-6,7],[7,-1,4],[2,2,3]].forEach(([dx,dy,r])=>{ g.fillStyle='#d8ecd8'; g.fillRect(q.x+dx-0.8,q.y+dy,1.6,r); g.fillStyle='#a8e8c8'; g.beginPath(); g.ellipse(q.x+dx,q.y+dy,r*0.9,r*0.45,0,Math.PI,Math.PI*2); g.fill(); }); };
+OBJ_DRAW.sapling=o=>{ const q=P(o.i+0.5,o.j+0.5), st=CHOICE.hwSpirit?2:HHS[o.k], x=q.x, y=q.y, sw=Math.sin(gt*1.2+o.k)*1.5, drained=HH&&HH.mode==='drain'&&HH.k===o.k;
+  const lit=st===2?1:st===1?0.35:0, flick=drained?0.5+0.5*Math.sin(gt*20):1;
+  if(lit){ g.save(); g.globalCompositeOperation='lighter'; glow(x,y-40,46,52,st===2?'240,240,170':'190,210,150',0.45*lit*flick); g.restore(); }
+  g.fillStyle='rgba(20,12,6,0.35)'; g.beginPath(); g.ellipse(x,y+2,18,6,0,0,Math.PI*2); g.fill();
+  g.strokeStyle=st?'#b89a6a':'#5a4a38'; g.lineWidth=4; g.lineCap='round'; g.beginPath(); g.moveTo(x,y); g.quadraticCurveTo(x-3,y-24,x+sw,y-44); g.stroke();       // a slender trunk
+  [[-1,-20,-16,-34],[1,-28,15,-44],[-1,-36,-12,-56],[1,-40,10,-60]].forEach(([sd,y0,dx,dy])=>{ g.lineWidth=2; g.beginPath(); g.moveTo(x+sw*0.5,y+y0); g.quadraticCurveTo(x+dx*0.5+sw,y+y0-8,x+dx+sw,y+(st?dy:dy+14)); g.stroke(); });
+  const lc=st===2?['#eef4c0','#c8e090','#ffffff']:st===1?['#a8b888','#7e9064','#d8e0c0']:['#6a5a44','#4e4232','#7a6a50'];
+  for(let k=0;k<16;k++){ const a=k*0.9+o.k, r=10+(k%4)*4, lx=x+Math.cos(a)*r*1.1+sw, ly=y-50+Math.sin(a)*r*0.7+(st?0:10+(k%3)*3);
+    g.fillStyle=lc[k%2]; g.beginPath(); g.ellipse(lx,ly,4.2,2.2,a+(st?0:1.2),0,Math.PI*2); g.fill(); }
+  if(st===2){ g.save(); g.globalCompositeOperation='lighter'; for(let k=0;k<3;k++){ const t=(gt*0.4+k*0.33+o.k*0.1)%1; glow(x+Math.sin(k*2+gt)*10,y-60-t*50,5,5,'250,255,220',0.7*(1-t)); } g.restore(); } };
+onUse(['sapling'],o=>{ const st=CHOICE.hwSpirit?2:HHS[o.k];
+  if(HH && HH.mode==='gloam' && st===0){ HHS[o.k]=2; HH.lit++; floatText([o.i,o.j],'Rekindled','#f0f8c0',true); try{ SND.fx('coin'); }catch(e){} shake=3;
+    logMsg(HH.lit<3?'You cup your hands round the sapling and it remembers its light. ('+HH.lit+'/3)':'The third sapling flares, and the dark in the hollow tears like wet paper.','#e8f4c0'); return; }
+  pzSay(st===2?'A sapling no taller than you, pale as moonlight, its leaves trembling with light.':st===1?'A sapling no taller than you. Its light is thin and grey, as if something has been drinking it.':'A sapling, dark and curled in on itself. Whatever light it had is gone.','#e0e8c8'); });
+// the Hollow Hunger: smoke wearing the shape of hunger, root-antlered, with the stolen light glowing in its open chest
+FOES.hunger={ label:'Hollow Hunger', base:270, stagger:0.65, pattern:[] };
+Object.assign(WEAPONS,{ hunger_claw:{ wind:0.3, dmg:18, len:26 } });
+const HH_P1=[{wait:1.1,wind:0.95,after:0.5,dir:'left'},{wait:0.4,wind:0.7,after:0.4,dir:'right'},{wait:1.2,wind:1.1,after:0.7,dir:'up',feint:'right'},{wait:0.8,wind:0.8,after:0.5,dir:'right'}];
+const HH_P2=[{wait:0.9,wind:0.8,after:0.4,dir:'up'},{wait:0.2,wind:0.6,after:0.35,dir:'left'},{wait:0.0,wind:0.55,after:0.5,dir:'right'},{wait:1.0,wind:0.9,after:0.5,dir:'left',feint:'up'}];
+const HH_P3=[{wait:0.7,wind:0.7,after:0.35,dir:'right',feint:'left'},{wait:0.15,wind:0.5,after:0.3,dir:'up'},{wait:0.0,wind:0.5,after:0.45,dir:'left'},{wait:0.6,wind:0.6,after:0.4,dir:'right'},{wait:0.1,wind:0.5,after:0.6,dir:'up',feint:'left'}];
+FOES.hunger.pattern=HH_P1;
+BEASTS.unshift({ k:'hunger', is:f=>f.type==='hunger', name:'The Hollow Hunger', kind:'A spirit that eats light · inside the Heartwood',
+  how:'Long root-claws from either side, and a great two-handed rake from above; it feints the overhead. Twice it slips back into the roots to feed.', res:'It has no flesh to bleed and nothing to poison.',
+  aff:'None, but it heals itself on every sapling it is allowed to drain.', ans:'Guard the sapling it reaches for: stand beside it and the tendril is cut. In the dark, rekindle three saplings and its cocoon breaks.' });
+function drawHunger(x,B,e,pose){ const fade=e.dead?Math.max(0,1-(e.fallT||0)/1.1):1; if(fade<=0) return;
+  const k=pose&&pose.kind==='raise'?Math.min(1,pose.t):0, sk=pose&&pose.kind==='strike'?Math.min(1,pose.t):0, dir=pose&&pose.dir, t=gt*2+(e.id||0);
+  const y=B-12-Math.sin(gt*1.6)*4;
+  g.save(); g.globalAlpha*=fade;
+  g.fillStyle='rgba(10,4,16,0.45)'; g.beginPath(); g.ellipse(x,B+2,46,13,0,0,Math.PI*2); g.fill();
+  g.save(); g.globalCompositeOperation='lighter'; glow(x,y-110,90,140,'110,60,170',0.28); g.restore();
+  for(let r=0;r<7;r++){ const a=-1.3+r*0.43, ex=x+Math.sin(a)*58, ey=B+Math.cos(a)*6;                                             // it trails into the floor as roots and smoke
+    g.strokeStyle=r%2?'#1a0e1e':'#2a1a14'; g.lineWidth=7-Math.abs(r-3); g.beginPath(); g.moveTo(x+(r-3)*5,y-60); g.bezierCurveTo(x+(r-3)*9,y-30,ex-(r-3)*4+Math.sin(t+r)*4,ey-16,ex,ey); g.stroke(); }
+  const body=()=>{ g.beginPath(); g.moveTo(x-30,y-156); g.bezierCurveTo(x-44,y-120,x-22,y-96,x-16,y-62); g.quadraticCurveTo(x,y-40,x+16,y-62); g.bezierCurveTo(x+22,y-96,x+44,y-120,x+30,y-156); g.quadraticCurveTo(x,y-176,x-30,y-156); g.closePath(); };
+  body(); const bg=g.createLinearGradient(x-40,0,x+40,0); bg.addColorStop(0,'#2a1a34'); bg.addColorStop(0.5,'#140a1c'); bg.addColorStop(1,'#06030a'); g.fillStyle=bg; g.fill();
+  g.strokeStyle='rgba(150,100,200,0.35)'; g.lineWidth=1.5; g.stroke();
+  for(let w=0;w<8;w++){ const a=t*0.8+w, wx=x+Math.cos(a*1.3)*32, wy=y-70-((t*20+w*25)%100); g.fillStyle=`rgba(40,20,60,${0.35})`; g.beginPath(); g.arc(wx,wy,5+w%3*2,0,Math.PI*2); g.fill(); }   // smoke coming off it
+  { const mw=5+Math.sin(t*3)*1.5+k*3; g.save(); g.globalCompositeOperation='lighter'; glow(x,y-116,24,30,'250,220,120',0.55); g.restore();       // the open chest, full of stolen light
+    g.fillStyle='#f6dc8a'; g.beginPath(); g.moveTo(x,y-140); g.quadraticCurveTo(x+mw,y-118,x,y-94); g.quadraticCurveTo(x-mw,y-118,x,y-140); g.fill();
+    g.strokeStyle='#120818'; g.lineWidth=1.4; for(let q=0;q<5;q++){ const ty=y-134+q*9; g.beginPath(); g.moveTo(x-mw-1,ty); g.lineTo(x-1.5,ty+3); g.moveTo(x+mw+1,ty+4); g.lineTo(x+1.5,ty+7); g.stroke(); } }
+  const arm=sd=>{ const sx=x+sd*28, sy=y-150; let hx=x+sd*48, hy=y-66;                                                         // long arms, root-claws for hands
+    const up=dir==='up'||(dir==='left'&&sd<0)||(dir==='right'&&sd>0); if(k && up){ hx=x+sd*(dir==='up'?24:56)*(1-k*0.2); hy=y-66-k*186; }
+    if(sk && up){ hx=x-sd*14+sd*(1-sk)*40; hy=y-250+sk*170; }
+    const mx=(sx+hx)/2+sd*22, my=(sy+hy)/2+10;
+    g.strokeStyle='#120a18'; g.lineWidth=9; g.lineCap='round'; g.beginPath(); g.moveTo(sx,sy); g.quadraticCurveTo(mx,my,hx,hy); g.stroke();
+    g.strokeStyle='rgba(120,80,160,0.35)'; g.lineWidth=2; g.stroke();
+    g.strokeStyle='#2e1e16'; g.lineWidth=3; for(let f=-1;f<=1;f++){ const fa=Math.atan2(hy-my,hx-mx)+f*0.45; g.beginPath(); g.moveTo(hx,hy); g.quadraticCurveTo(hx+Math.cos(fa)*12,hy+Math.sin(fa)*12,hx+Math.cos(fa+sd*0.4)*24,hy+Math.sin(fa+sd*0.4)*24); g.stroke(); } };
+  arm(-1); arm(1);
+  { const hx=x, hy=y-176; g.fillStyle='#0c0610'; g.beginPath(); g.ellipse(hx,hy,15,21,0,0,Math.PI*2); g.fill();                  // a long mask of a face, and antlers of root
+    g.strokeStyle='#2e2016'; g.lineCap='round'; [[-1],[1]].forEach(([sd])=>{ g.lineWidth=5; g.beginPath(); g.moveTo(hx+sd*8,hy-14); g.quadraticCurveTo(hx+sd*26,hy-40,hx+sd*22,hy-70); g.stroke();
+      g.lineWidth=3; g.beginPath(); g.moveTo(hx+sd*18,hy-34); g.quadraticCurveTo(hx+sd*36,hy-44,hx+sd*44,hy-38); g.moveTo(hx+sd*22,hy-52); g.quadraticCurveTo(hx+sd*12,hy-66,hx+sd*8,hy-80); g.stroke();
+      g.fillStyle='#4a3a26'; [[hx+sd*44,hy-38],[hx+sd*8,hy-80],[hx+sd*22,hy-70]].forEach(([lx,ly])=>{ g.beginPath(); g.ellipse(lx,ly,4,2,sd,0,Math.PI*2); g.fill(); }); });
+    g.save(); g.globalCompositeOperation='lighter'; glow(hx-6,hy-2,9,7,'190,255,220',0.8); glow(hx+6,hy-2,9,7,'190,255,220',0.8); g.restore();
+    g.fillStyle='#e8fff0'; g.beginPath(); g.ellipse(hx-6,hy-2,3,1.8,0.3,0,Math.PI*2); g.ellipse(hx+6,hy-2,3,1.8,-0.3,0,Math.PI*2); g.fill(); }
+  if(e.warded){ g.save(); g.strokeStyle='#3a2616'; g.lineCap='round'; for(let r=0;r<9;r++){ const a0=r*0.7+gt*0.2; g.lineWidth=6; g.beginPath();   // a cocoon of roots
+      for(let s2=0;s2<=20;s2++){ const u=s2/20, rx=Math.cos(a0+u*5)*(42-u*14), ry=B-6-u*200; s2?g.lineTo(x+rx,ry):g.moveTo(x+rx,ry); } g.stroke(); }
+    g.globalCompositeOperation='lighter'; glow(x,y-100,70,120,'160,90,220',0.2+Math.sin(gt*4)*0.06); g.restore(); }
+  g.restore(); }
+const hhK=()=>areaId==='treeheart' && mobs.find(m=>m.type==='hunger' && !m.dead);
+function hhSealed(){ const K=hhK(); return !!K && (!!HH || combat.active || K.hp<K.maxHp); }
+const hhTh=K=>{ const ph=K.hphase||1; return ph>=3?0:Math.floor(K.maxHp*(ph===1?0.66:0.33)); };
+function hhPick(){ const pt=tileOf(player); let best=-1, bd=-1; HH_SAP.forEach(([i,j],k)=>{ if(HHS[k]<1 || (HH&&HH.k===k)) return; const d=cheb([i,j],pt)+(HHS[k]===1?10:0); if(d>bd){ bd=d; best=k; } }); return best; }   // the faint ones first, far from you; one you saved only when nothing else is left
+function hhDrain(K){ ckBreakDuel(K); ckPlace(K,HH_HOME[0],HH_HOME[1]); K.warded=true; HH={mode:'drain', k:-1, n:0};
+  const k=hhPick(); if(k<0){ HH={mode:'wait'}; setTimeout(()=>{ if(areaId==='treeheart' && !K.dead){ HH=null; ckResume(K,'The Hunger comes back out of the roots!'); } },900); return; }
+  HH.k=k; HH.t=HH.len=4.8; banner('Guard the sapling!','#d8f0a0',2200);
+  logMsg('The Hunger sinks into the floor, and a black root goes snaking towards one of the saplings. Get beside it before it drinks!','#d8f0a0'); }
+function hhGloam(K){ ckBreakDuel(K); ckPlace(K,HH_HOME[0],HH_HOME[1]); K.warded=true; HHS=HHS.map(()=>0); HH={mode:'gloam', lit:0, spike:1.4, tiles:null};
+  banner('Rekindle three saplings!','#e8f4c0',2400); logMsg('It wraps itself in roots and swallows every light in the hollow. Find the dark saplings and rekindle three of them; the floor will not stay still.','#e8f4c0'); }
+function hhHurt(n,label){ ckHurt(n,label); if(player.hp<=0) HH=null; }
+function hhTick(dt){ const K=hhK(); if(!K){ HH=null; return; }
+  if(!HH){ if(K.hphase===undefined){ K.hphase=1; FOES.hunger.pattern=HH_P1; }
+    const th=hhTh(K); if(th && K.hp<=th && combat.phase!=='down'){ K.hp=th; K.hphase++; if(K.hphase===2) hhDrain(K); else hhGloam(K); } return; }
+  if(combat.phase==='down'){ HH=null; return; }
+  K.dir=dirTo(tileOf(K),tileOf(player));
+  if(HH.mode==='drain'){ HH.t-=dt; const [si,sj]=HH_SAP[HH.k];
+    let next=false;
+    if(cheb([si,sj],tileOf(player))<=1){ HHS[HH.k]=2; K.hp=Math.max(1,K.hp-Math.round(K.maxHp*0.06)); K.flash=0.5; floatText(tileOf(K),'Severed!','#e8ffc0',true); shake=6; try{ SND.clang(1); }catch(e){}
+      logMsg('You stand over the sapling and the black root recoils from you, torn. The sapling brightens.','#e8ffc0'); next=true; }
+    else if(HH.t<=0){ HHS[HH.k]=0; K.hp=Math.min(Math.floor(K.maxHp*0.66),K.hp+Math.round(K.maxHp*0.12)); floatText(tileOf(K),'It feeds!','#c8a0f0',true); shake=4;
+      logMsg('The root closes round the sapling and drinks. Its light goes out, and the Hunger grows.','#c8a0f0'); next=true; }
+    if(next){ HH.n++; const k=HH.n<3?hhPick():-1;
+      if(k<0){ const k0=K; HH={mode:'wait'}; FOES.hunger.pattern=HH_P2; setTimeout(()=>{ if(areaId==='treeheart' && !k0.dead){ HH=null; ckResume(k0,'The Hunger comes up out of the roots!'); } },900); return; }
+      HH.k=k; HH.t=HH.len=Math.max(3.2,4.8-HH.n*0.7); banner('It reaches for another!','#d8f0a0',1300); }
+    return; }
+  if(HH.mode==='gloam'){
+    if(HH.lit>=3){ K.warded=false; FOES.hunger.pattern=HH_P3; const k0=K; HH={mode:'wait'}; logMsg('Light floods back into the hollow. The cocoon splits, and the Hunger comes for you, thin and furious.','#e8f4c0');
+      setTimeout(()=>{ if(areaId==='treeheart' && !k0.dead){ HH=null; ckResume(k0,'Its cocoon splits!'); } },900); return; }
+    HH.spike-=dt;
+    if(HH.spike<=0 && !HH.tiles){ const A=AREAS[areaId], t=[]; for(let n=0;n<7;n++){ const i=1+Math.floor(Math.random()*(A.w-2)), j=1+Math.floor(Math.random()*(A.h-2)); if(!blocked.has(i+','+j)) t.push(i+','+j); } t.push(Math.floor(player.x)+','+Math.floor(player.y)); HH.tiles=t; HH.spike=1.05; }
+    else if(HH.spike<=0 && HH.tiles){ const here=Math.floor(player.x)+','+Math.floor(player.y); HH.burstTiles=HH.tiles; HH.burst=0.6; if(HH.tiles.includes(here)) hhHurt(Math.max(9,Math.round(player.maxHp*0.13)),'Roots burst up!'); if(!HH) return; HH.tiles=null; HH.spike=0.9; }
+    if(HH.burst) HH.burst=Math.max(0,HH.burst-dt);
+    return; } }
+{ const prev=ckTick; ckTick=function(dt){ prev(dt); try{ hhTick(dt); }catch(e){ console.error(e); } }; }
+{ const oSDI=skelDrawItems; skelDrawItems=function(items){ oSDI(items); if(areaId!=='treeheart') return; const K=hhK();
+    items.push({d:1e6, fn:()=>{ if(!HH || !K) return; const kq=P(K.x,K.y), pp=P(player.x,player.y);
+      if(HH.mode==='drain' && HH.k>=0){ const [si,sj]=HH_SAP[HH.k], sq=P(si+0.5,sj+0.5), a=1-HH.t/HH.len;
+        for(let di=-1;di<=1;di++) for(let dj=-1;dj<=1;dj++){ if(!di&&!dj) continue; fillQuad(tileQuad(si+di,sj+dj,0.08),`rgba(200,240,150,${0.12+Math.sin(gt*6)*0.05})`); }   // where to stand
+        g.save(); g.lineCap='round'; g.strokeStyle='#1a0e1e'; g.lineWidth=9; g.beginPath(); g.moveTo(kq.x,kq.y); const mx=(kq.x+sq.x)/2+Math.sin(gt*3)*30, my=(kq.y+sq.y)/2+20;
+        const ex=kq.x+(sq.x-kq.x)*Math.min(1,a*1.6), ey=kq.y+(sq.y-kq.y)*Math.min(1,a*1.6); g.quadraticCurveTo(mx,my,ex,ey); g.stroke();
+        g.globalCompositeOperation='lighter'; g.strokeStyle=`rgba(170,100,230,${0.35+a*0.4})`; g.lineWidth=3; g.stroke(); glow(ex,ey,18,12,'170,100,230',0.5); g.restore();
+        g.save(); g.font='bold 16px Georgia'; g.textAlign='center'; g.fillStyle='#f0ffd0'; g.strokeStyle='rgba(0,0,0,0.7)'; g.lineWidth=3; const t2=Math.ceil(HH.t)+''; g.strokeText(t2,sq.x,sq.y-90); g.fillText(t2,sq.x,sq.y-90); g.restore(); }
+      if(HH.mode==='gloam'){ g.save(); g.fillStyle='rgba(6,3,12,0.62)'; g.setTransform(1,0,0,1,0,0); g.fillRect(0,0,gc.width,gc.height); g.restore();
+        g.save(); g.globalCompositeOperation='lighter'; glow(pp.x,pp.y-40,110,90,'200,190,160',0.22);
+        HH_SAP.forEach(([i,j],k)=>{ const q=P(i+0.5,j+0.5); glow(q.x,q.y-40,40,46,HHS[k]===2?'240,240,170':'120,150,110',HHS[k]===2?0.6:0.18+Math.sin(gt*3+k)*0.08); }); g.restore();
+        (HH.tiles||[]).forEach(k=>{ const [i,j]=k.split(',').map(Number); fillQuad(tileQuad(i,j,0.1),`rgba(150,80,190,${0.3+Math.sin(gt*12)*0.12})`); });
+        if(HH.burst && HH.burstTiles) HH.burstTiles.forEach(k=>{ const [i,j]=k.split(',').map(Number), c=P(i+0.5,j+0.5), h=60*Math.sin(Math.min(1,HH.burst/0.6)*Math.PI);
+          g.fillStyle='#3a2616'; for(let n=-1;n<=1;n++){ g.beginPath(); g.moveTo(c.x+n*14-6,c.y); g.lineTo(c.x+n*14,c.y-h*(n?0.7:1)); g.lineTo(c.x+n*14+6,c.y); g.closePath(); g.fill(); } }); } } }); }; }
+// a phase cannot be skipped by one big blow
+{ const prev=wound; wound=function(f,n,label,col){ if(f && f.type==='hunger' && !f.warded && (f.hphase||1)<3 && n>0){ const th=hhTh(f), pre=f.hp; f.hp+=1000; const r=prev(f,n,label,col); const dealt=pre+1000-f.hp; f.hp=Math.max(th,pre-dealt); return r; } return prev(f,n,label,col); }; }
+{ const prev=foeDown; foeDown=function(f){ const r=prev(f); if(f && f.type==='hunger' && !CHOICE.hwSpirit){ CHOICE.hwSpirit=true; HH=null; HHS=HH_SAP.map(()=>2); FOES.hunger.pattern=HH_P1;
+      setTimeout(()=>{ try{ banner('The Heartwood breathes again','#f0f8c8',2600); shake=6;
+        logMsg('The Hunger comes apart like smoke in a draught, and all its stolen light pours out of it at once. Every sapling in the hollow blazes up, and far above you the old tree creaks, the way a sleeper sighs.','#f0f8c8');
+        addLeaves(5,'the Hollow Hunger driven out'); try{ autosaveSoon(400); }catch(e){} }catch(e){} },1400); } return r; }; }
 // ════════ THE DUELLIST'S LEATHERS: an elven melee set bought with Silver Leaves. Quick, light, hits a little harder; not for standing in the way of things ════════
 Object.assign(ITEMS,{
   duel_band:   { name:'Leaf-brow Band',      slot:'head' },
@@ -20535,9 +20764,9 @@ SKINS[24]='#c4b690'; SKINS[25]='#9c8460'; SKINS[26]='#a9b07c';          // birch
 HAIR_COLORS[20]='#56802f'; HAIR_COLORS[21]='#86a23c'; HAIR_COLORS[22]='#b0642a';   // leaf greens, and one in autumn
 const DRY_BARE={head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:null,offhand:null};
 const DRYADS=[   // where they walk, and what they are
-  { id:'dry_osier', name:'Osier', area:'heartwood', i:8, j:8, g:'f', skin:26, hair:3, hc:21, leaf:['#7aa844','#a8c860'],
+  { id:'dry_osier', name:'Osier', area:'heartwood', i:14, j:12, g:'f', skin:26, hair:3, hc:21, leaf:['#7aa844','#a8c860'],
     lines:["“You walk loud. Like rain on a roof.” <i>She tilts her head, and the leaves in her hair turn with it.</i>","“The big tree is my mother. Or my grandmother. We stopped counting rings. Willow in Sylvhaven is my sister. She says she is older. She is not.”","“The bright motes are shy. Stand still and they come. Run and they go. Like everything.”"] },
-  { id:'dry_oak', name:'Old Oak', area:'heartwood', i:3, j:5, g:'f', skin:25, hair:3, hc:20, leaf:['#4f7a2a','#6d9a38'],
+  { id:'dry_oak', name:'Old Oak', area:'heartwood', i:4, j:6, g:'f', skin:25, hair:3, hc:20, leaf:['#4f7a2a','#6d9a38'],
     lines:["“Hm.” <i>A long pause. A beetle walks across her shoulder and she lets it.</i> “Hm.”","“Men came with axes, once. They went away without them.”","“Sit a hundred years and you learn the trick of it. Then stand up again.”"] },
   { id:'dry_willow', name:'Willow', area:'sylvhaven', i:9, j:8, g:'f', skin:26, hair:3, hc:20, leaf:['#8ab050','#b8d070'],
     lines:["“The elves wear clothes. We tried it. It itched.”","“Bring water to the roots by the pool, someday. Not today. Today is for standing.”","“Lirael sings to us when she thinks nobody hears.”"] },

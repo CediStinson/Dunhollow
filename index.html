@@ -20410,19 +20410,36 @@ JOURNAL.push(['The Hunger in the Heartwood', ()=>{ if(CHOICE.hwSpirit) return ['
 JOURNAL.push(['The Favour of Sylvhaven', ()=> !(CHOICE.leaves!=null || CHOICE.hwDay!=null) ? null : ['active',"You hold <b>"+leaves()+" Silver Lea"+(leaves()===1?'f':'ves')+"</b>. Maelis in Sylvhaven weaves for leaves, not coin. Every elven task brings a few; once a day the great tree in Sylvhaven lets you gather its light, and Sentinel Lirael takes four moonbells from the elven woods."]]);
 JOURNAL.push(["Vesna's Tallies", ()=> !(CHOICE.tallies!=null) ? null : ['active',"You hold <b>"+tallies()+" Grave Tall"+(tallies()===1?'y':'ies')+"</b>. Vesna trades her things for tallies: her lessons bring some, and once a night she has work for you, laying three of the restless dead to rest."]]);
 // ── Maelis weaves for leaves; only the plain worn things are still for coin ──
-function leafTrade(back){ const opts=LEAF_WARES.filter(([id])=>ITEMS[id] && itemFits(id,player.opts.gender)).map(([id,c])=>({ label:ITEMS[id].name+' ('+c+' leaves)', off:leaves()<c, note:c+' lv', fn:()=>{
-      if(player.inv.indexOf(null)<0){ say('Maelis the Weaver',"“Your pack is full. I will keep it until you have room.”",[{label:'Back.',fn:()=>leafTrade(back)},bye]); return; }
-      CHOICE.leaves=leaves()-c; giveQuestItem(id); updateHud(); logMsg('Maelis weaves you '+ITEMS[id].name+' for '+c+' Silver Leaves.','#cfe8d8');
-      say('Maelis the Weaver',["“There. It will remember you.”","<i>She folds it once, the way elves fold things, and hands it over.</i>"],[{label:'Back.',fn:()=>leafTrade(back)},bye]); } }));
-  say('Maelis the Weaver',["“I do not weave for coin. Coin is only metal. Leaves are what Sylvhaven owes you.”","<i>You hold "+leaves()+" Silver Lea"+(leaves()===1?'f':'ves')+".</i>"],[...opts, {label:'Back.',fn:back}, bye]); }
+// a vendor's grid of wares, priced in tokens instead of coin (Maelis's Silver Leaves, Vesna's Grave Tallies)
+function tokenShop(T){ const n=T.count(), wares=T.wares.filter(([id])=>ITEMS[id] && itemFits(id,player.opts.gender));
+  say(T.who,[...[].concat(T.greet), "<i>You hold <b>"+n+"</b> "+T.unit(n)+".</i>"],[{label:'Back.',fn:T.back},bye],true);
+  const box=document.getElementById('dlg-opts'), grid=document.createElement('div'); grid.className='shop-grid';
+  wares.forEach(([id,c])=>{ const cell=document.createElement('div'); cell.className='shop-cell'+(n<c?' off':'');
+    const sl=document.createElement('div'); sl.className='slot filled shop-slot'; sl.dataset.item=id;
+    const cv=document.createElement('canvas'); cv.width=cv.height=104; cv.style.width=cv.style.height='52px'; drawItemIcon(cv.getContext('2d'),id,104); sl.appendChild(cv);
+    const pl=document.createElement('div'); pl.className='shop-price'; pl.innerHTML=c+' '+T.icon; pl.style.color=T.col;
+    cell.appendChild(sl); cell.appendChild(pl);
+    cell.addEventListener('pointerdown',e=>{ cell._touch=e.pointerType==='touch'; });
+    cell.addEventListener('click',()=>{ if(cell._touch && !cell.classList.contains('armed')){ grid.querySelectorAll('.armed').forEach(x=>x.classList.remove('armed')); cell.classList.add('armed'); return; }
+      const t=document.getElementById('item-tip'), t2=document.getElementById('item-tip2'); if(t) t.style.display='none'; if(t2) t2.style.display='none';
+      if(T.count()<c){ say(T.who,T.poor,[{label:'Back.',fn:()=>tokenShop(T)},bye],true); return; }
+      if(player.inv.indexOf(null)<0){ say(T.who,T.full,[{label:'Back.',fn:()=>tokenShop(T)},bye],true); return; }
+      T.pay(c); giveQuestItem(id); updateHud(); logMsg(T.bought(ITEMS[id].name,c),T.col); try{ SND.fx('coin'); }catch(e){} tokenShop(T); });
+    grid.appendChild(cell); });
+  const hint=document.createElement('div'); hint.className='shop-hint'; hint.textContent=matchMedia('(hover:none)').matches?'Tap to inspect, tap again to take it.':'Hover to inspect, click to take it.';
+  box.prepend(hint); box.prepend(grid); GEST_SHOP=true;
+  const pu=document.querySelector('#dlg-text .dlg-purse'); if(pu) pu.innerHTML='Yours: <b>'+n+'</b> '+T.icon;   // tokens, not coin
+  const intro=document.querySelector('#dlg-text p:nth-child(2)'); if(intro && /You hold/.test(intro.textContent)) intro.remove(); }
+const LEAF_ICON='<span style="display:inline-block;width:9px;height:12px;background:#cfe8d8;border-radius:0 80% 0 80%;transform:rotate(45deg);vertical-align:-1px;margin-left:2px"></span>';
+const TALLY_ICON='<span style="display:inline-block;font-weight:bold;letter-spacing:-1px">𝍸</span>';
+function leafTrade(back){ tokenShop({ who:'Maelis the Weaver', wares:LEAF_WARES, count:leaves, pay:c=>{ CHOICE.leaves=leaves()-c; }, unit:n=>'Silver Lea'+(n===1?'f':'ves'), icon:LEAF_ICON, col:'#cfe8d8', back,
+  greet:"“I do not weave for coin. Coin is only metal. Leaves are what Sylvhaven owes you.”", poor:"“Not yet. Sylvhaven has not owed you that much, yet.”", full:"“Your pack is full. I will keep it until you have room.”",
+  bought:(nm,c)=>'Maelis weaves you '+nm+' for '+c+' Silver Leaves.' }); }
 // (Maelis's own talk, further up, now offers the leaf trade and only the worn things for coin)
 // ── Vesna trades her things for tallies, and at night she has work ──
-function tallyTrade(back){ const V='Vesna the Grave-Speaker';
-  const opts=TALLY_WARES.filter(([id])=>ITEMS[id] && itemFits(id,player.opts.gender)).map(([id,c])=>({ label:ITEMS[id].name+' ('+c+' tallies)', off:tallies()<c, note:c+' t', fn:()=>{
-      if(player.inv.indexOf(null)<0){ say(V,"“Your pack is full.”",[{label:'Back.',fn:()=>tallyTrade(back)},bye]); return; }
-      CHOICE.tallies=tallies()-c; giveQuestItem(id); updateHud(); logMsg('Vesna gives you '+ITEMS[id].name+' for '+c+' Grave Tallies.','#c8b8e0');
-      say(V,"“Take care of it. The last one who wore it did not.”",[{label:'Back.',fn:()=>tallyTrade(back)},bye]); } }));
-  say(V,["“The dead pay their debts. So do I.”","<i>You hold "+tallies()+" Grave Tall"+(tallies()===1?'y':'ies')+".</i>"],[...opts,{label:'Back.',fn:back},bye]); }
+function tallyTrade(back){ tokenShop({ who:'Vesna the Grave-Speaker', wares:TALLY_WARES, count:tallies, pay:c=>{ CHOICE.tallies=tallies()-c; }, unit:n=>'Grave Tall'+(n===1?'y':'ies'), icon:TALLY_ICON, col:'#c8b8e0', back,
+  greet:"“The dead pay their debts. So do I.”", poor:"“You have not earned that. Not yet.”", full:"“Your pack is full.”",
+  bought:(nm,c)=>'Vesna gives you '+nm+' for '+c+' Grave Tallies.' }); }
 const VN=()=>{ const d=Math.floor((dayClock+DAY_LEN*0.25)/DAY_LEN); if(!CHOICE.vnight || CHOICE.vnight.d!==d) CHOICE.vnight={d, n:0, on:false, paid:false}; return CHOICE.vnight; };   // a night counts from dusk to dawn
 { const oldV=TALKERS.vesna; TALKERS.vesna=(...a)=>{ const r=oldV(...a); if(NECRO()<1 && !CHOICE.tallies) return r;
     const box=document.getElementById('dlg-opts'); if(!dlgOverlay.classList.contains('open') || !box || box.querySelector('.dlg-opt.tally')) return r;

@@ -639,7 +639,8 @@ SKINS[20]='#8aa050'; SKINS[21]='#6f8a3e'; SKINS[22]='#9aa85a'; SKINS[30]='#d8cdb
 // natural shades only: blacks, browns, reds, blondes, greys
 const HAIR_COLORS = ['#0f0a07','#241710','#3b2417','#5a3a24','#7a5132','#9a6b43','#7d3a1f',
                      '#a8522a','#c98a4e','#b08a58','#d8b56e','#e6d3a3','#8a8580','#d6d2c9'];
-const BEARD_NAMES  = ['None','Stubble','Moustache','Goatee','Short Beard','Full Beard','Braided Beard'];
+const BEARD_NAMES  = ['None','Stubble','Moustache','Goatee','Short Beard','Full Beard','Braided Beard','Forked Beard','Great Beard'];
+const DWARF_BEARDS=6;   // from here on the beards are for dwarves only
 const EYE_COLORS = ['#4a7ac0','#3d5f9c','#6aa0d8','#4f8a5a','#5f857a','#7a6a3a','#7a5230','#5a3a20','#8a9aa2','#6a7a7a','#a07a30','#2a4a6a'];
 const charOpts = { gender:'m', race:'human', skin:1, hair:0, hairColor:2, beard:0, face:0, eyeColor:0, marks:{} };
 // six faces per gender; the first is the original. Same proportions, different features.
@@ -2980,8 +2981,9 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   }
   // ── your own body details go in drawCustomBodyDetails() (defined right after drawCharBody).
   //    It runs on bare skin, before any clothing, so clothes always cover it.
-  if(opts.marks && (opts.marks.elfBody && String(opts.race||'').startsWith('elf') || opts.marks.neckTat || opts.marks.chestTat)){ c.save(); path(torsoPts(0.2,Y.WAIST+4,HI+0.4)); c.clip();   // on the bare skin, under any clothes, never past the body's edge
+  if(opts.marks && (opts.marks.elfBody && String(opts.race||'').startsWith('elf') || opts.marks.dwBody && String(opts.race||'').startsWith('dwarf') || opts.marks.neckTat || opts.marks.chestTat)){ c.save(); path(torsoPts(0.2,Y.WAIST+4,HI+0.4)); c.clip();   // on the bare skin, under any clothes, never past the body's edge
     if(String(opts.race||'').startsWith('elf')) marksOf(opts.marks,'elfBody').forEach(v=>drawElfBodyMarks(c,x,B,LN,CH,WA,HI,front,pr,po,F,v));
+    if(String(opts.race||'').startsWith('dwarf')) marksOf(opts.marks,'dwBody').forEach(v=>drawDwarfBodyMarks(c,x,B,LN,CH,WA,front,pr,po,v));
     if(opts.marks.chestTat) drawChestTat(c,x,B,LN,CH,WA,front,pr,po,F,markVal(opts.marks,'chestTat'));
     c.restore(); }
   if(typeof drawCustomBodyDetails==='function'){
@@ -4257,6 +4259,13 @@ function drawBeardProfile(c,x,B,style,hair,hairDark,P,pr,LN){
       c.fillStyle=hair; jawMass(12); c.fill(); shade(12);
       lip(); moustache(mx-1.4,mx+mw+0.7,0); beardBraid(c,X(jw-3),Yb(Y.CHIN+9),14,hair);
       break;
+    case 7: case 8: // Forked / Great Beard from the side: one long mass hanging forward of the chest
+      { const L=style===8?26:20; c.fillStyle=hair; jawMass(12); c.fill(); shade(12);
+        c.beginPath(); c.moveTo(X(2),Yb(Y.CHIN+4)); c.lineTo(X(jw+0.5),Yb(Y.CHIN+3)); c.quadraticCurveTo(X(jw+1.5),Yb(Y.CHIN+L*0.6),X(jw-2),Yb(Y.CHIN+L)); c.quadraticCurveTo(X(3),Yb(Y.CHIN+L*0.6),X(2),Yb(Y.CHIN+4)); c.closePath(); c.fillStyle=tone(hair,-0.06); c.fill();
+        c.strokeStyle=tone(hair,-0.45,0.55); c.lineWidth=0.4; for(let k=0;k<3;k++){ c.beginPath(); c.moveTo(X(3+k*2.5),Yb(Y.CHIN+4)); c.quadraticCurveTo(X(4+k*2.4),Yb(Y.CHIN+L*0.6),X(jw-2.5+k*0.3),Yb(Y.CHIN+L-1)); c.stroke(); }
+        if(style===8) [0.4,0.72].forEach(t=>{ c.fillStyle='#c8a040'; c.fillRect(X(3.5),Yb(Y.CHIN+L*t),jw-4,1.5); });
+        lip(); moustache(mx-1.4,mx+mw+0.7,0); }
+      break;
   }
 }
 
@@ -4330,6 +4339,22 @@ function drawBeard(c,x,B,style,hair,hairDark,P,pr,LN,earBack){
     case 6: // Braided Beard: a full, long beard, worked into two braids with metal rings
       c.fillStyle=hair; jaw(11); c.fill(); shadeMass(); moustache(mw,0);
       [-3.6,3.6].forEach(d=>beardBraid(c,x+off+d*(1-pr*0.3),B+Y.CHIN+8,15,hair));
+      break;
+    case 7: // Forked Beard: long, combed down and split into two points
+      c.fillStyle=hair; jaw(9); c.fill(); shadeMass(); moustache(mw,0);
+      [-1,1].forEach(sd=>{ const bx=x+off+sd*2.6*(1-pr*0.3), y0=B+Y.CHIN+6;
+        c.fillStyle=sd<0?hair:tone(hair,-0.12); c.beginPath(); c.moveTo(bx-3.2,y0); c.lineTo(bx+3.2,y0); c.quadraticCurveTo(bx+2.2,y0+9,bx+sd*1.4,y0+15); c.quadraticCurveTo(bx-2.4,y0+8,bx-3.2,y0); c.closePath(); c.fill();
+        c.strokeStyle=tone(hair,-0.45,0.6); c.lineWidth=0.4; for(let k=-1;k<=1;k++){ c.beginPath(); c.moveTo(bx+k*1.4,y0+1); c.quadraticCurveTo(bx+k*1.1,y0+8,bx+sd*0.9+k*0.4,y0+13); c.stroke(); } });
+      break;
+    case 8: // Great Beard: a spade of beard down to the belt, banded with gold rings
+      { c.fillStyle=hair; jaw(12); c.fill(); shadeMass(); const w0=(bwL+bwR)/2, y0=B+Y.CHIN+5, L=24;
+        const spade=()=>{ c.beginPath(); c.moveTo(x+off-w0+0.5,y0-3); c.quadraticCurveTo(x+off-w0-1.6,y0+L*0.5,x+off-w0*0.45,y0+L); c.quadraticCurveTo(x+off,y0+L+3,x+off+w0*0.45,y0+L); c.quadraticCurveTo(x+off+w0+1.6,y0+L*0.5,x+off+w0-0.5,y0-3); c.closePath(); };
+        spade(); c.fill(); c.save(); spade(); c.clip();
+          const gs=c.createLinearGradient(x+off-w0,0,x+off+w0,0); gs.addColorStop(0,'rgba(255,240,210,0.14)'); gs.addColorStop(0.5,'rgba(0,0,0,0)'); gs.addColorStop(1,'rgba(26,16,32,0.3)'); c.fillStyle=gs; c.fillRect(x+off-w0-3,y0-4,w0*2+6,L+8);
+          c.strokeStyle=tone(hair,-0.45,0.55); c.lineWidth=0.45; for(let k=-4;k<=4;k++){ c.beginPath(); c.moveTo(x+off+k*w0*0.22,y0-2); c.quadraticCurveTo(x+off+k*w0*0.24,y0+L*0.6,x+off+k*w0*0.12,y0+L+2); c.stroke(); }
+        c.restore();
+        [0.38,0.72].forEach(t=>{ const yy=y0+L*t, hw=w0*(1-t*0.45); c.fillStyle='#c8a040'; c.fillRect(x+off-hw*0.55,yy,hw*1.1,1.6); c.fillStyle='rgba(255,240,180,0.6)'; c.fillRect(x+off-hw*0.5,yy+0.2,hw*1.0,0.45); });
+        moustache(mw,1); }
       break;
   }
   c.restore();
@@ -4733,12 +4758,14 @@ const MARKS=[ ['scarBrow','Brow Scar',0,undefined,'face'], ['scarCheek','Cheek S
   ['neckTat','Neck Runes'],
   ['faceTat','Eye Line',0,1], ['faceTat','Chin Lines',0,2], ['faceTat','Cheek Runes',0,3],
   ['elfFace','Leaf Marks',1,1], ['elfFace','Moon Brow',1,2], ['elfFace','Tear Vines',1,3], ['elfBody','Body Vines',1,1], ['elfBody','Starlines',1,2],
+  ['dwFace','Rune Brow','dwarf',1], ['dwFace','Clan Bars','dwarf',2], ['dwFace','Forge Brand','dwarf',3], ['dwBody','Knotwork','dwarf',1], ['dwBody','Rune Chest','dwarf',2],
   ['earrings','Hoops',0,'hoop','face'], ['earrings','Studs',0,'stud','face'], ['earrings','Drops',0,'drop','face'], ['earrings','Ear Cuffs',0,'cuff','face'],
   ['freckles','Freckles',0,undefined,'face'], ['mole','Mole',0,undefined,'face'],
   ['noseRing','Nose Ring',0,1,'face'], ['noseRing','Septum Ring',0,2,'face'], ['browRing','Brow Piercing',0,undefined,'face'],
   ['warPaint','Woad Band',0,1], ['warPaint','Red Stripes',0,2,'face'], ['eyePatch','Eye Patch',0,undefined,'face'] ];
 // tattoos stack: these keys hold a list of every design picked (older saves held a single number)
-const STACK_MARKS=new Set(['armTat','faceTat','elfFace','elfBody']);
+const STACK_MARKS=new Set(['armTat','faceTat','elfFace','elfBody','dwFace','dwBody']);
+const markRace=f=>f===1?'elf':f||null;   // a marking only one race wears
 const marksOf=(M,k)=>{ const v=M&&M[k]; if(Array.isArray(v)) return v; if(v===true) return [1]; return v ? [v] : []; };
 const markVal=(M,k)=>{ const v=M&&M[k]; if(v===true) return k==='earrings'?'hoop':1; if(k==='chestTat' && v!==3) return null; return v||null; };   // heart sigil and serpent were removed    // older saves stored plain on/off
 function buildMarkChips(){ const row=document.getElementById('mark-styles'), row2=document.getElementById('face-details'); if(!row || row.childElementCount) return;
@@ -4751,8 +4778,8 @@ function buildMarkChips(){ const row=document.getElementById('mark-styles'), row
       if(k==='chestTat' && M[k]===3) creatorDir=4; else if(k==='chestTat' && creatorDir===4) creatorDir=0;   // wings are on the back: turn round to show them
       refreshCreator(); }); (grp==='face' && row2 ? row2 : row).appendChild(b); }); }
 function refreshMarkChips(){ buildMarkChips(); const elf=charOpts.race==='elf'; const M=charOpts.marks=charOpts.marks||{};
-  document.querySelectorAll('.chip[data-mark]').forEach(b=>{ const [k,,isElf,val]=MARKS[+b.dataset.i], off=isElf && !elf; if(off) M[k]=null;
-    b.classList.toggle('active', val===undefined ? !!M[k] : STACK_MARKS.has(k) ? marksOf(M,k).includes(val) : markVal(M,k)===val); b.disabled=!!off; b.style.opacity=off?0.35:1; b.title=off?'Only for elves':''; }); }
+  document.querySelectorAll('.chip[data-mark]').forEach(b=>{ const [k,,isElf,val]=MARKS[+b.dataset.i], need=markRace(isElf), off=!!need && charOpts.race!==need; if(off) M[k]=null;
+    b.classList.toggle('active', val===undefined ? !!M[k] : STACK_MARKS.has(k) ? marksOf(M,k).includes(val) : markVal(M,k)===val); b.disabled=!!off; b.style.opacity=off?0.35:1; b.title=off?(need==='elf'?'Only for elves':'Only for dwarves'):''; }); }
 function refreshCreator(){
   refreshMarkChips();
   const male = charOpts.gender!=='f';
@@ -4770,8 +4797,10 @@ function refreshCreator(){
     btn.textContent = names[i] || btn.textContent;
     btn.classList.toggle('active', i===charOpts.hair);
   });
+  if(charOpts.race!=='dwarf' && (charOpts.beard|0)>=DWARF_BEARDS) charOpts.beard=5;
   beardGrid.querySelectorAll('.chip').forEach((btn,i)=>{
     btn.textContent = BEARD_NAMES[i] || btn.textContent;
+    { const off=i>=DWARF_BEARDS && charOpts.race!=='dwarf'; btn.disabled=off; btn.style.opacity=off?0.35:1; btn.title=off?'Only for dwarves':''; }
     btn.classList.toggle('active', i===1 ? !!(charOpts.stubble || charOpts.beard===1) : i===charOpts.beard || (i===0 && charOpts.beard===1));
   });
   drawCreator();
@@ -4869,11 +4898,11 @@ function randomizeLook(){ const R=n=>Math.floor(Math.random()*n), elf=charOpts.r
   const skins=SKINS.map((c,i)=>c&&i<20?i:-1).filter(i=>i>=0); charOpts.skin=skins[R(skins.length)];   // the creator's own tones, never the goblin greens
   charOpts.eyeColor=R(EYE_COLORS.length); charOpts.hairColor=R(HAIR_COLORS.length);
   charOpts.face=R(FACES[male?'m':'f'].length); charOpts.hair=R(8);
-  if(male && !elf){ const b=charOpts.race==='dwarf'?[5,5,6,6,6,4]:[0,0,2,3,4,4,5,5]; charOpts.beard=b[R(b.length)]; charOpts.stubble=Math.random()<0.3; } else { charOpts.beard=0; charOpts.stubble=false; }
+  if(male && !elf){ const b=charOpts.race==='dwarf'?[5,6,6,7,7,8,8,4]:[0,0,2,3,4,4,5,5]; charOpts.beard=b[R(b.length)]; charOpts.stubble=Math.random()<0.3; } else { charOpts.beard=0; charOpts.stubble=false; }
   if(charOpts.race==='dwarf' && !male){ const hs=[2,3,3,7,7,4]; charOpts.hair=hs[R(hs.length)]; }
   if(charOpts.race==='dwarf'){ const hc=[0,1,2,3,6,7,8,12,13]; charOpts.hairColor=hc[R(hc.length)]; }
   const M=charOpts.marks={};
-  MARKS.forEach(([k,,isElf,val])=>{ if(isElf && !elf) return; const p=k==='eyePatch'?0.04:isElf?0.25:k==='earrings'?0.2:0.08; if(Math.random()>=p) return;   // a few details, seldom a crowd of them
+  MARKS.forEach(([k,,isElf,val])=>{ const need=markRace(isElf); if(need && charOpts.race!==need) return; const p=k==='eyePatch'?0.04:isElf?0.25:k==='earrings'?0.2:0.08; if(Math.random()>=p) return;   // a few details, seldom a crowd of them
     if(val===undefined) M[k]=true; else if(STACK_MARKS.has(k)){ const L=marksOf(M,k); if(!L.includes(val)) M[k]=[...L,val]; } else if(!M[k]) M[k]=val; });
   [['skin-swatches',skins.indexOf(charOpts.skin)],['eye-colors',charOpts.eyeColor],['hair-colors',charOpts.hairColor]].forEach(([id,v])=>document.querySelectorAll('#'+id+' .swatch').forEach((x,k)=>x.classList.toggle('active',k===v)));
   creatorClothed=true; refreshCreator(); }
@@ -6447,6 +6476,31 @@ function drawFireplace(o){
 }
 // ── markings: scars and elven face lines, drawn on the face before the hair ──
 const ELF_INK='rgba(70,150,150,0.85)', ELF_INK2='rgba(150,210,200,0.55)';
+// dwarf ink: blue-black, cut in straight lines and angles, the way runes are cut in stone; the forge brand is a burn, not ink
+const DW_INK='rgba(34,44,72,0.85)', DW_BURN='rgba(130,52,30,0.75)';
+function drawDwarfFaceMark(c,x,B,v,off,pr,LN,HW,near){ const Y=BODY; c.save(); c.lineCap='square'; c.lineJoin='miter';
+  if(v===1 && pr<0.85){ c.strokeStyle=DW_INK; c.lineWidth=0.6; const y=B+Y.BROW-3.4, w=pr>0.3?3.6:4.8;      // rune brow: a band of angular runes across the forehead
+    c.beginPath(); c.moveTo(x+off-w,y+1.6); c.lineTo(x+off+w,y+1.6); c.stroke();
+    for(let k=0;k<5;k++){ const rx=x+off-w+0.9+k*(2*w-1.8)/4; c.beginPath();
+      if(k%3===0){ c.moveTo(rx,y+1.6); c.lineTo(rx,y-1); c.lineTo(rx+0.9,y-0.2); }
+      else if(k%3===1){ c.moveTo(rx-0.8,y+1.6); c.lineTo(rx,y-1); c.lineTo(rx+0.8,y+1.6); }
+      else { c.moveTo(rx,y+1.6); c.lineTo(rx,y-1); c.moveTo(rx-0.8,y-0.2); c.lineTo(rx+0.8,y+0.6); } c.stroke(); } }
+  if(v===2) [-1,1].forEach(sd0=>{ if(!near(sd0) || (pr>0.8 && sd0<0)) return; const sd=pr>0.8?-1:sd0, cx=pr>0.8 ? LN+HW*0.36 : off+sd*4.6;   // clan bars: three short straight bars under each eye
+    c.fillStyle=DW_INK; for(let k=0;k<3;k++) c.fillRect(x+cx-1.6,B+Y.EYE_TOP+4.6+k*1.6,3.2,0.75); });
+  if(v===3){ const sd=pr>0.8?-1:-1, cx=pr>0.8 ? LN+HW*0.25 : off+sd*5.2, cy=B+Y.EYE_TOP+0.5;                // forge brand: a small hammer burnt high on the cheek, by the temple
+    if(pr<=0.3 || pr>0.8 || near(sd)){ c.fillStyle=DW_BURN; c.save(); c.translate(x+cx,cy); c.rotate(-0.5); c.fillRect(-0.35,-0.5,0.7,4); c.fillRect(-1.6,-1.4,3.2,1.3); c.restore();
+      c.strokeStyle='rgba(200,120,90,0.35)'; c.lineWidth=0.4; c.beginPath(); c.arc(x+cx,cy+1.3,2.9,0,Math.PI*2); c.stroke(); } }
+  c.restore(); }
+function drawDwarfBodyMarks(c,x,B,LN,CH,WA,front,pr,po,kind){ const Y=BODY; c.save(); c.strokeStyle=DW_INK; c.fillStyle=DW_INK; c.lineCap='square'; c.lineWidth=0.7;
+  if(kind===1){                                                                                    // knotwork: an angular interlaced band over the shoulders and across the collarbones
+    const y0=Y.SHOULDER+2.2, x0=LN+po-CH+2, x1=LN+po+CH-2, n=8;
+    if(front){ for(let k=0;k<n;k++){ const a=x0+(x1-x0)*k/n, b=x0+(x1-x0)*(k+1)/n, m=(a+b)/2; c.beginPath(); c.moveTo(x+a,B+y0); c.lineTo(x+m,B+y0+2.2); c.lineTo(x+b,B+y0); c.moveTo(x+a,B+y0+2.2); c.lineTo(x+m,B+y0); c.lineTo(x+b,B+y0+2.2); c.stroke(); }
+      c.beginPath(); c.moveTo(x+x0,B+y0-0.6); c.lineTo(x+x1,B+y0-0.6); c.moveTo(x+x0,B+y0+2.8); c.lineTo(x+x1,B+y0+2.8); c.stroke(); }
+    else { for(let k=0;k<6;k++){ const yy=Y.SHOULDER+3+k*3; c.beginPath(); c.moveTo(x+LN+po-2,B+yy); c.lineTo(x+LN+po,B+yy+1.5); c.lineTo(x+LN+po+2,B+yy); c.stroke(); } } }
+  if(kind===2 && front){                                                                          // rune chest: a column of runes down the breastbone, between two lines
+    const cx=LN+po*0.9, y0=Y.SHOULDER+6, y1=Y.WAIST-4; c.beginPath(); c.moveTo(x+cx-2.4,B+y0); c.lineTo(x+cx-2.4,B+y1); c.moveTo(x+cx+2.4,B+y0); c.lineTo(x+cx+2.4,B+y1); c.stroke();
+    for(let k=0;k<4;k++){ const yy=y0+2+k*(y1-y0-4)/3; c.beginPath(); if(k%2){ c.moveTo(x+cx-1.2,B+yy-1.2); c.lineTo(x+cx+1.2,B+yy+1.2); c.moveTo(x+cx+1.2,B+yy-1.2); c.lineTo(x+cx-1.2,B+yy+1.2); } else { c.moveTo(x+cx,B+yy-1.4); c.lineTo(x+cx,B+yy+1.4); c.moveTo(x+cx,B+yy-1.4); c.lineTo(x+cx+1.2,B+yy-0.4); } c.stroke(); } }
+  c.restore(); }
 // a band of small dark runes on the side of the neck (and the nape, from behind)
 function drawNeckTat(c,x,B,P,pr,LN,front){ const Y=BODY, nw=P.neckW/2; c.save(); c.beginPath(); c.rect(x+LN-nw+0.3,B+Y.CHIN-1,nw*2-0.6,Y.SHOULDER-Y.CHIN+1.2); c.clip();
   c.strokeStyle='rgba(28,34,52,0.72)'; c.lineWidth=0.45; c.lineCap='round';
@@ -6537,6 +6591,7 @@ function drawFaceMarks(c,x,B,opts,P,pr,LN,skin){ const Y=BODY, M=opts.marks, HW=
     c.strokeStyle=tone(skin,-0.3,0.85); c.lineWidth=0.7; pth(0); c.stroke();
     c.strokeStyle=tone(skin,0.2,0.6); c.lineWidth=0.3; pth(0.35); c.stroke();
     c.strokeStyle=tone(skin,-0.28,0.65); c.lineWidth=0.35; [0.35,0.65].forEach(t=>{ const yy=y0+(y1-y0)*t, xx=sx+0.8-1.4*t; c.beginPath(); c.moveTo(x+xx-0.8,B+yy-0.2); c.lineTo(x+xx+0.8,B+yy+0.2); c.stroke(); }); }   // stitch marks
+  if(String(opts.race||'').startsWith('dwarf')) marksOf(M,'dwFace').forEach(v=>drawDwarfFaceMark(c,x,B,v,off,pr,LN,HW,near));
   const EF=marksOf(M,'elfFace');
   if(EF.includes(2) && String(opts.race||'').startsWith('elf')){ c.lineCap='round';                      // moon brow: a crescent on the forehead, a dotted line under each eye
     if(pr<0.85){ const fx=x+off, fy=B+Y.BROW-2.2; c.strokeStyle=ELF_INK; c.lineWidth=0.6; c.beginPath(); c.arc(fx,fy,2,Math.PI*0.15,Math.PI*0.85); c.stroke(); c.fillStyle=ELF_INK2; c.beginPath(); c.arc(fx,fy-1.4,0.5,0,Math.PI*2); c.fill(); }

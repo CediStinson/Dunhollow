@@ -9817,7 +9817,7 @@ function itemStat(id){
   if(id==='shield') return { text:'S', short:'shield: much easier perfect parries', col:'#2a4a7a' };
   if(id==='shield_red') return { text:'S', short:'shield: wider block and perfect windows', col:'#2a4a7a' };
   if(id==='shield_iron') return { text:'S', short:'shield: very wide safe block, tight perfect', col:'#2a4a7a' };
-  if(id==='gloves'||id==='gauntlets') return { text:'+'+GEAR_HP[id], short:'+'+GEAR_HP[id]+' HP, faster swing', col:'#2a6a34' };
+  if(id==='gloves'||id==='gauntlets') return { text:'+'+GEAR_HP[id], short:'+'+GEAR_HP[id]+' HP', col:'#2a6a34' };
   return null;
 }
 
@@ -10803,7 +10803,7 @@ function itemCompare(id){
   if(slot==='misc') return 'Keepsake';
   if(slot==='torso') return `${SN} · cosmetic`;
   const hp=GEAR_HP[id]||0, ch=GEAR_HP[cur]||0, d=hp-ch;
-  return `${SN} · ${hp?'+'+hp+' HP':'no bonus'} ${df(d,' HP',d>0)}`+((slot==='hands')?' · faster swing':'');
+  return `${SN} · ${hp?'+'+hp+' HP':'no bonus'} ${df(d,' HP',d>0)}`+((ITEM_STATS[id]&&ITEM_STATS[id].aspd)?' · '+ITEM_STATS[id].aspd+'% faster swing':'');
 }
 const itemLabel = id => `${ITEMS[id].name}<em class="dsub">${itemCompare(id)}</em>`;
 // traders carry a few things at a time; the stock turns over each day, and what you buy is gone until tomorrow
@@ -12527,7 +12527,7 @@ function doAttack(){
   duel.chain = (clock-duel.lastAtk < PARRY.chainWindow) ? Math.min(duel.chain+1, PARRY.chainMax/PARRY.chainPenalty) : 0;
   duel.lastAtk = clock;
   const W=weaponOf(player);
-  duel.st='attack'; duel.atkWind=Math.max(0.1, W.wind-(['gloves','gauntlets'].includes(player.opts.equip.hands)?0.05:0))*(1-Math.min(0.3,gearSum('aspd')/100))*(hasStatus(player,'chill')?1.4:1); duel.t=duel.atkWind;   // chilled: a slower swing
+  duel.st='attack'; duel.atkWind=Math.max(0.1, W.wind)*(1-Math.min(0.3,gearSum('aspd')/100))*(hasStatus(player,'chill')?1.4:1); duel.t=duel.atkWind;   // chilled: a slower swing
   { const f=combat.foe, S=f&&STYLES[styleOf(f)];
     if(S && S.reads && !combat.practice && f.state==='guard' && duel.lastSide===playerGuard && f.guardDir!==playerGuard){ f.guardDir=playerGuard; floatText(tileOf(f),'Read you!','#ffb070');
       teach('read','He read you',["You struck the <b>same side twice</b>, and he saw it coming.","Veterans read a fighter who repeats himself. Vary your sides."]); }
@@ -18487,7 +18487,7 @@ var ITEM_LORE={
   robe_elf:"Spun from moonlight caught in the pool on the Old Elven Road. It weighs nothing and is never quite cold.",
   hood:"Thick grey wool, warm in the rain. It keeps the wind out and a little of the world, too.",
   kettle:"A wide iron brim, beaten from a single sheet. Footsoldiers love it: arrows and rain both run off it.",
-  gloves:"Supple leather, the palms worn smooth by a sword grip. Your hand is a little quicker in them.",
+  gloves:"Supple leather, the palms worn smooth by a sword grip. Your grip is surer in them.",
   dagger:"More rust than steel, and the grip is wrapped in old twine. Short and quick, and better than bare hands. Barely.",
   sword:"A plain arming sword, straight and honest, the kind every lord's man carries. Good balance, a good edge, nothing to boast about.",
   morningstar:"A ball of iron spikes on an ash haft. Slow to swing, and nobody wants to be there when it lands.",
@@ -21069,6 +21069,47 @@ const BL_LINES={
           dry_osier:"“The soil is warm again.” <i>The yellow is going out of her leaves.</i> “Not finished. But warm.”"}[n.id]],[bye]);
         const k=(CHOICE['bl_'+n.id]=(CHOICE['bl_'+n.id]||0)+1)%L.length; say(n.name,L[k],[bye]); }; });
     return out; }; }
+// ════════ SEEDS OF THE HEARTWOOD: once the great tree is whole again, Elowen sends her first seedlings to the stumps in the Fellings ════════
+Object.assign(ITEMS,{ heart_seeds:{ name:'Heartwood Seedlings', slot:'misc', read:true, title:'Three seedlings, wrapped in moss',
+  body:["Three silver seedlings no longer than your finger, their roots wrapped in wet moss. They are warm, and very faintly bright.","Elowen asked you to plant them in the old stumps in the Fellings. A seedling takes root best in what is left of a tree."] } });
+QUEST_ITEMS.add('heart_seeds');
+ITEM_ICON.heart_seeds=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.fillStyle='#4a6a38'; g2.beginPath(); g2.ellipse(20,31,13,6,0,0,Math.PI*2); g2.fill();
+  [[13,-0.3],[20,0],[27,0.3]].forEach(([x,a])=>{ g2.save(); g2.translate(x,30); g2.rotate(a); g2.strokeStyle='#cfe0c8'; g2.lineWidth=1.6; g2.beginPath(); g2.moveTo(0,0); g2.lineTo(0,-16); g2.stroke();
+    g2.fillStyle='#e6f4e8'; [[-1,-14],[1,-10]].forEach(([s,y])=>{ g2.beginPath(); g2.ellipse(s*3,y,3.5,1.6,s*0.6,0,Math.PI*2); g2.fill(); }); g2.restore(); }); g2.restore(); };
+ITEM_LORE.heart_seeds='The great tree’s first seedlings since the Hunger. Elowen wants them in the Fellings, in the stumps the loggers left.';
+const SEED_STUMPS=[[3,1],[10,3],[9,6]];                    // stumps that stand whatever became of the loggers
+const seedsQ=()=>CHOICE.seedQ||null, seedsIn=()=>SEED_STUMPS.filter((s,k)=>(CHOICE.seeded||{})[k]!=null).length;
+wrap('fellings','objects',l=>{ if(!seedsQ()) return l; return l.map(o=>{ if(o.type!=='stump') return o; const k=SEED_STUMPS.findIndex(([i,j])=>i===o.i&&j===o.j); return k<0?o:{...o, type:'seedstump', k}; }); });
+OBJ_DRAW.seedstump=o=>{ drawObject({...o, type:'stump'}); const at=(CHOICE.seeded||{})[o.k], q=P(o.i+0.5,o.j+0.5);
+  if(at==null){ if(seedsQ()!=='given') return; g.save(); g.globalCompositeOperation='lighter'; glow(q.x,q.y-8,16,9,'200,240,200',0.18+0.1*Math.sin(gt*2+o.k)); g.restore(); return; }   // a stump waiting for one
+  const days=Math.floor(dayClock/DAY_LEN)-at, s=Math.min(1,0.35+days*0.22), x=q.x, y=q.y-12, sw=Math.sin(gt*1.3+o.k)*1.2*s;
+  g.save(); g.lineCap='round'; g.strokeStyle='#d8e2d0'; g.lineWidth=2+3*s; g.beginPath(); g.moveTo(x,y); g.quadraticCurveTo(x+2,y-20*s,x+sw,y-38*s); g.stroke();
+  [[-1,0.55],[1,0.7],[-1,0.85],[1,1]].forEach(([d,t],n)=>{ const bx=x+sw*t, by=y-38*s*t; g.strokeStyle='#c8d4c0'; g.lineWidth=1.2+s; g.beginPath(); g.moveTo(bx,by); g.lineTo(bx+d*12*s,by-8*s); g.stroke(); });
+  for(let n=0;n<10;n++){ const a=n*0.63+o.k, r=(5+(n%3)*3)*s*1.6, lx=x+sw+Math.cos(a)*r*1.3, ly=y-38*s-6*s+Math.sin(a)*r*0.7; g.fillStyle=n%2?'#e8f6ec':'#bcd8c4'; g.beginPath(); g.ellipse(lx,ly,3.6*s+1,1.8*s+0.6,a,0,Math.PI*2); g.fill(); }
+  g.save(); g.globalCompositeOperation='lighter'; glow(x,y-40*s,14*s+6,12*s+5,'230,255,220',0.25+0.1*Math.sin(gt*1.5+o.k)); g.restore(); g.restore(); };
+onUse(['seedstump'],o=>{ const S=CHOICE.seeded||(CHOICE.seeded={});
+  if(S[o.k]!=null) return pzSay(['A silver seedling grows out of the old stump, its roots down through the dead wood. Somebody’s great-grandchildren will sit in its shade.','The seedling has already put out another leaf. It leans a little toward you, as if it knows you.'][(S[o.k]+Math.floor(dayClock/DAY_LEN))%2],'#d8ecd8');
+  if(seedsQ()!=='given' || !hasItem('heart_seeds')) return pzSay('An old stump, cut clean and grey. The rings are too many to count.','#c8c0a8');
+  S[o.k]=Math.floor(dayClock/DAY_LEN); const n=seedsIn(); floatText([o.i,o.j],'Planted '+n+'/3','#d8f0d0',true); try{ SND.fx('coin'); }catch(e){} shake=1.5;
+  pzSay(n<3?'You push the seedling into the soft heart of the stump and press the moss down round it. It brightens a little, as if it had been holding its breath. ('+n+'/3)'
+    :'The last seedling goes in. For a moment all three of them shine together across the clearing, faint as starlight, and then settle. Elowen will want to know.','#d8f0d0');
+  if(n>=3){ const k=player.inv.indexOf('heart_seeds'); if(k>=0) player.inv[k]=null; CHOICE.seedQ='planted'; } try{ autosaveSoon(400); }catch(e){} });
+{ const prevE=TALKERS.elowen; TALKERS.elowen=(...a)=>{ if(havenBurnt() || !CHOICE.hwSpirit || wtStage()<3) return prevE(...a); const E='Elowen of the Heartwood', Q=seedsQ();
+    if(!Q) return say(E,["<i>She is standing with her palm flat against the bark, the way you would rest a hand on a sleeping horse.</i> “Listen. No, really: put your ear to her. She is humming.”",
+        "“And look what she dropped this morning.” <i>She opens a fold of moss. Three silver seedlings lie in it, no longer than your finger.</i> “Her first children since the Hunger.”",
+        "“The loggers cut her daughters down in the Fellings, past the Mistmere. The stumps are still there. A seedling takes root best in what is left of a tree. Will you carry them? You have earned the right to plant them.”"],
+      [{label:'“I will plant them.”', fn:()=>{ CHOICE.seedQ='given'; giveQuestItem('heart_seeds',true); say(E,["“One in each of three stumps. Any three; they will choose.” <i>She folds the moss shut over them.</i> “Keep them out of the frost, and away from your sword hand.”"],[bye]); }},
+       {label:'“Not now.”', fn:closeDialog}]);
+    if(Q==='planted') return say(E,["<i>She is already smiling before you say anything.</i> “I know. She told me. Last night three new voices joined her humming, very small, very far off. Out in the Fellings.”",
+        "“In three hundred years the Fellings will be a wood again, and nobody there will remember the axes. That is the best kind of mending: the kind nobody remembers.”",
+        "<i>She presses something into your hand: a fistful of silver leaves, still cool from the crown.</i> “From her. She does not have hands, so I am hers today.”"],
+      [{label:'Thank her.', fn:()=>{ CHOICE.seedQ='done'; addLeaves(8,'the great tree'); giveXp(60,'Seeds of the Heartwood'); prevE(...a); }}]);
+    return prevE(...a); }; }
+{ const prev=npcHasNews; npcHasNews=function(n){ if(n.id==='elowen' && CHOICE.hwSpirit && !havenBurnt() && wtStage()>=3){ if(!seedsQ()) return '!'; if(seedsQ()==='planted') return '?'; } return prev(n); }; }
+JOURNAL.push(['Seeds of the Heartwood', ()=>{ const Q=seedsQ(); if(!Q) return null;
+  if(Q==='done') return ['done',"Elowen gave you the great tree's first seedlings after the Hunger, and you planted them in the old stumps in the Fellings. They are growing."];
+  if(Q==='planted') return ['active',"All three seedlings are in the stumps in the Fellings. Tell Elowen, by the great tree in Sylvhaven."];
+  return ['active',"Plant the great tree's three seedlings in old stumps in the Fellings, past the Mistmere ("+seedsIn()+"/3 planted)."]; }]);
 // ════════ A TRAVELLERS' TENT IN SYLVHAVEN: three bedrolls, free to anyone the elves let in. Sleep here and you wake here ════════
 function drawBedroll(o){ const k=(o.i*7+o.j*3)%3, cols=[['#5a6a48','#8a9a6a'],['#6a5a48','#a08a64'],['#4a5a6a','#7a8aa0']][k], q=P(o.i+1,o.j+0.5);
   drawCached('roll'+k,q.x,q.y,220,110,110,70,(X,Y)=>{ g.fillStyle='rgba(20,14,8,0.3)'; g.beginPath(); g.ellipse(X+4,Y+6,86,26,0,0,Math.PI*2); g.fill();

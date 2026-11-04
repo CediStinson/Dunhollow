@@ -16352,6 +16352,7 @@ Object.keys(AREAS).forEach(a=>{ if(typeof AREAS[a].objects!=='function') return;
 // every bed its own blanket: red, blue, green, ochre, brown or grey, the same one each time you look
 const BED_BLANKETS=['#8a3a2a','#34507a','#4a6a34','#a8803a','#6a4a30','#5e6066'];
 function drawBed3(o){
+    if(o.roll) return drawBedroll(o);
     const k=o.col!=null ? o.col : ([...areaId].reduce((h,ch)=>h*31+ch.charCodeAt(0)|0,7)+o.i*13+o.j*7)>>>0, bl=BED_BLANKETS[k%BED_BLANKETS.length], q=P(o.i+0.5,o.j+0.5);
     drawCached('bed3_'+bl,q.x,q.y,280,170,110,100,(X,Y)=>paintBed(X,Y,bl)); }
 // the Baron's banner, hung on the face of a wall: red cloth, a gold B, a fringe gone ragged
@@ -20890,6 +20891,27 @@ function dryadNPCs(area){ const out=[]; const A=AREAS[area];
       say(D.name,[D.lines[k]],[bye]); }; }
   return out; }
 ['heartwood','sylvhaven','silvergate','elfroad'].forEach(a=>wrap(a,'npcs',l=>[...l,...dryadNPCs(a)]));
+// ════════ A TRAVELLERS' TENT IN SYLVHAVEN: three bedrolls, free to anyone the elves let in. Sleep here and you wake here ════════
+function drawBedroll(o){ const k=(o.i*7+o.j*3)%3, cols=[['#5a6a48','#8a9a6a'],['#6a5a48','#a08a64'],['#4a5a6a','#7a8aa0']][k], q=P(o.i+1,o.j+0.5);
+  drawCached('roll'+k,q.x,q.y,220,110,110,70,(X,Y)=>{ g.fillStyle='rgba(20,14,8,0.3)'; g.beginPath(); g.ellipse(X+4,Y+6,86,26,0,0,Math.PI*2); g.fill();
+    const pad=[[X-80,Y+2],[X-6,Y-36],[X+82,Y+4],[X+8,Y+42]]; g.fillStyle='#7a6448'; g.beginPath(); pad.forEach(([a,b],n)=>n?g.lineTo(a,b):g.moveTo(a,b)); g.closePath(); g.fill();   // a fur under it
+    g.strokeStyle='rgba(60,44,28,0.6)'; g.lineWidth=1; for(let n=0;n<14;n++){ const u=n/14; g.beginPath(); g.moveTo(X-80+u*74,Y+2-u*38); g.lineTo(X-74+u*74+4,Y+8-u*38); g.stroke(); }
+    const bag=[[X-58,Y+4],[X-2,Y-24],[X+58,Y+4],[X+4,Y+30]]; const bg=g.createLinearGradient(X-50,Y-20,X+50,Y+26); bg.addColorStop(0,cols[1]); bg.addColorStop(1,cols[0]);
+    g.fillStyle=bg; g.beginPath(); g.moveTo(bag[0][0],bag[0][1]); g.quadraticCurveTo(X-30,Y-16,bag[1][0],bag[1][1]); g.lineTo(bag[2][0],bag[2][1]); g.quadraticCurveTo(X+30,Y+22,bag[3][0],bag[3][1]); g.closePath(); g.fill();
+    g.strokeStyle='rgba(30,24,16,0.6)'; g.lineWidth=1.2; g.stroke();
+    g.strokeStyle='rgba(255,255,240,0.35)'; g.lineWidth=1; g.setLineDash([3,3]); g.beginPath(); g.moveTo(X-48,Y+2); g.lineTo(X+2,Y-20); g.stroke(); g.setLineDash([]);   // a seam with leaves stitched on
+    g.fillStyle='#e8e2d0'; g.beginPath(); g.ellipse(X+38,Y+2,16,9,-0.45,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(120,110,90,0.6)'; g.stroke();             // the pillow
+    g.fillStyle=cols[0]; g.beginPath(); g.moveTo(X-58,Y+4); g.quadraticCurveTo(X-40,Y+12,X-18,Y+2); g.lineTo(X-24,Y-6); g.quadraticCurveTo(X-44,Y-2,X-58,Y+4); g.fill();   // the top folded back
+    g.fillStyle='#c8b070'; [[-30,-2],[-14,-10]].forEach(([dx,dy])=>{ g.beginPath(); g.ellipse(X+dx,Y+dy,4,2,0.5,0,Math.PI*2); g.fill(); }); }); }
+AREAS.guesttent={ ...CROOM("The Travellers' Tent",6,6,'sylvhaven','fromGuest', ()=>[
+    {type:'bed', i:0, j:0, fp:[2,1], roll:true}, {type:'bed', i:0, j:2, fp:[2,1], roll:true}, {type:'bed', i:4, j:0, fp:[2,1], roll:true},
+    {type:'lantern', i:5, j:3}, {type:'clothtable', i:3, j:0} ], ()=>[]) };
+AREAS.guesttent.entries.fromCity={i:2,j:4};
+{ const prev=wakeAfterDefeat; wakeAfterDefeat=function(...a){ const r=prev.apply(this,a); if(areaId==='guesttent'){ banner("You wake in the Travellers' Tent",'#c8d8b0',1800);
+    logMsg("Elves found you, and carried you back to the travellers' tent in Sylvhaven without a word. Someone has left water by your head.",'#c8d8b0'); } return r; }; }
+wrap('sylvhaven','objects',l=>l.map(o=>o.type==='pavilion'&&o.i===11&&o.j===7&&!o.burnt ? {...o, door:'l', dt:0, inside:'guesttent', back:'fromCity'} : o));
+AREAS.sylvhaven.entries.fromGuest={i:11,j:9};
+{ const prev=bedChoice; bedChoice=function(){ const r=prev(); if(areaId==='guesttent'){ const t=document.getElementById('dlg-text'); if(t) t.innerHTML="<p>A bedroll on a fur, smelling of cedar and clean wool. The elves keep it for travellers, and ask nothing for it. Sleep here, and here is where you wake if a fight goes against you.</p>"; } return r; }; }
 // ════════ THE WAY DOWN: the hollow and the rootways above the Root-Heart, the things the Hunger made, and the lantern that opens the door ════════
 Object.assign(ITEMS,{ black_sap:{ name:'Phial of Black Sap', slot:'misc', read:true, title:'A phial of the great tree\'s sap', body:["Thick, black and cold, like a grave is cold. When you hold the phial up to the light, the light seems to go into it and not come out."] },
   moon_lantern:{ name:'Moonbell Lantern', slot:'misc', read:true, title:'Three moonbells woven into a lantern', body:["Maelis wove three moonbells into a cage of silver thread. They glow, steady and white, and the dark seems to step back from them a little."] },

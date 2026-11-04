@@ -12981,7 +12981,7 @@ function victory(faction){
     if(m.opts && (m.opts.ghost||m.opts.bones)){ if(R()<0.5) coin(4,12); return; }                // the dead carry nothing but old coin
     if(m.type==='scarab'){ const n=1+(R()<0.5?1:0); for(let k=0;k<n;k++) give('scarab_chitin'); if(R()<0.4) coin(2,8); return; }
     if(m.type==='sandworm'){ const n=2+(R()<0.5?1:0); for(let k=0;k<n;k++) give('worm_scale'); if(R()<0.5) coin(8,20); logMsg('The worm shrinks back into the sand, leaving its shed scales behind. They are warm, and ring like bronze when you knock them together.','#a89878'); return; }
-    if(m.type==='hunger') return;                                                      // a spirit leaves nothing behind
+    if(typeof SPIRIT_TYPES!=='undefined' && SPIRIT_TYPES.has(m.type)) return;          // the Hunger's things leave nothing behind
     if(m.type==='ember'){ if(R()<0.6) coin(2,6); if(m.opts.big) give('ember_heart'); return; }                 // a fire-sprite leaves warm coins in the ashes, and the big one its heart
     if(m.type!=='barrowking' && m.type!=='goblin'){ if(R()<0.3) give('old_bone'); if(R()<0.07) give('old_skull'); }   // men who died badly: Vesna has a use for what is left
     if(m.type==='goblin'){ if(R()<0.35) coin(1,3); if(R()<0.15) give(['apple','apple','bread','raw_meat'][Math.floor(R()*4)]); if(R()<0.2) give(['dagger','hood','shirt','club'][Math.floor(R()*4)]); return; }
@@ -13422,13 +13422,16 @@ function drawActorBase(e){
   else if(e.type==='scarab') drawScarab(s.x,B,e,poseFor(e));
   else if(e.type==='ember') drawEmber(s.x,B,e,poseFor(e));
   else if(e.type==='hunger') drawHunger(s.x,B,e,poseFor(e));
+  else if(e.type==='gnawer') drawGnawer(s.x,B,e,poseFor(e));
+  else if(e.type==='gloomcaller'||e.type==='thornwitch'){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawShadeUnder(s.x,B,e); g.globalAlpha*=0.82; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); g.globalAlpha/=0.82; drawShadeOver(s.x,B,e); }
+  else if(e.type==='husk'){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); drawHuskBits(s.x,B,e); }
   else if(e.type==='skeleton') drawRisen(s.x,B,e,poseFor(e));
   else if(e.opts && e.opts.wrapped && !e.dead){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); drawWraps(s.x,B,e); if(e.warded){ g.save(); g.globalCompositeOperation='lighter'; glow(s.x,B-60,60,90,'255,200,90',0.35+Math.sin(gt*4)*0.08); g.restore(); } }
   else { const live=(combat.active && (e===combat.foe||isP)) || e.moving, ps=live?poseFor(e):litPose(poseFor(e)), sw=e.moving?Math.sin(gt*10)*5:0; drawLitSprite(s.x,B,()=>drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps),1,live?null:isP?'p':'a:'+(e.id??e.name),(e.dir||0)+'|'+Math.round(sw*4)+'|'+litSig(ps)+'|'+litSig(e.opts)+'|'+(isP?Math.round((player.wet||0)*10):'')); }
   g.restore();
   if(!isP && e.dead) return;
   if(isP && romHush()) return;
-  const ty=B-(e.type==='wolf'||e.type==='scorpion'?66:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:114);
+  const ty=B-(e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'?66:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:114);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const deadly=!isP && e.type!=='dummy' && e.hostile!==false && e.tier && typeof foeLevel==='function' && foeLevel(e)-playerLevel()>=3;   // far stronger than you: a skull
   const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  Lv '+(typeof foeLevel==='function'?foeLevel(e):e.tier) : ''), tw=g.measureText(label).width;
@@ -20395,8 +20398,11 @@ setInterval(()=>{ try{ if(!running || combat.active) return; const st=t=>{ const
       if(tsum){ CHOICE.tallies=tallies()+tsum; logMsg('For what you have already done for Vesna: '+tsum+' Grave Tallies.','#c8b8e0'); } }
   }catch(e){} },3000);
 // what you hold, in the journal
-JOURNAL.push(['The Hunger in the Heartwood', ()=> !CHOICE.hwAsked && !CHOICE.hwSpirit ? null : CHOICE.hwSpirit ? ['done',"Something had crept into the oldest tree east of Sylvhaven and was eating the saplings that make its light. You went in at the door at its foot and drove the Hollow Hunger out. The light drifts round the trunk again, and Elowen lets you gather it."]
-  : ['active',"Something has crept into the great tree in the Heartwood, east of Sylvhaven, and is eating the saplings that make its light. Go in at the door at its foot and drive it out. Elowen says: when it tries to feed, stand beside the sapling it reaches for."]]);
+JOURNAL.push(['The Hunger in the Heartwood', ()=>{ if(CHOICE.hwSpirit) return ['done',"Something had crept up into the oldest tree east of Sylvhaven and was eating the saplings that make its light. With Maelis's moonbell lantern you went in at the door at its foot, down through the hollow and the rootways, and drove the Hollow Hunger out of the Root-Heart. The tree is growing back, and Elowen lets you gather its light again."];
+  const Q=CHOICE.hwQ; if(!Q) return CHOICE.hwAsked||visitedAreas.heartwood ? ['active',"The great tree in the Heartwood, east of Sylvhaven, is sickening. Elowen, who keeps it, will tell you more."] : null;
+  if(Q==='sap') return ['active', hasItem('black_sap') ? "You scraped the black sap from the tree's roots. Take it to Maelis the Weaver in Sylvhaven." : "Scrape some of the black sap weeping at the foot of the great tree (on its morning side), and take it to Maelis the Weaver in Sylvhaven."];
+  if(Q==='maelis') return ['active',"Maelis says a Hunger, a thing that eats light, has come up into the tree from below. Only moonlight will not feed it. Bring her three moonbells ("+invCount('moonbell')+"/3) and she will weave a lantern; they grow somewhere new each day in the elven woods."];
+  return ['active',"You carry Maelis's moonbell lantern. Go in at the door at the foot of the great tree and down to the roots, where the Hunger feeds. Once you are in, there is no way back up until it is gone. Elowen says: when it tries to feed, stand beside the sapling it reaches for."]; }]);
 JOURNAL.push(['The Favour of Sylvhaven', ()=> !(CHOICE.leaves!=null || CHOICE.hwDay!=null) ? null : ['active',"You hold <b>"+leaves()+" Silver Lea"+(leaves()===1?'f':'ves')+"</b>. Maelis in Sylvhaven weaves for leaves, not coin. Every elven task brings a few; once a day the Heartwood east of Sylvhaven lets you gather its light, and Sentinel Lirael takes four moonbells from the elven woods."]]);
 JOURNAL.push(["Vesna's Tallies", ()=> !(CHOICE.tallies!=null) ? null : ['active',"You hold <b>"+tallies()+" Grave Tall"+(tallies()===1?'y':'ies')+"</b>. Vesna trades her things for tallies: her lessons bring some, and once a night she has work for you, laying three of the restless dead to rest."]]);
 // ── Maelis weaves for leaves; only the plain worn things are still for coin ──
@@ -20444,7 +20450,8 @@ function bellSpots(){ const d=Math.floor(dayClock/DAY_LEN), out=[]; for(let k=0;
 AREAS.heartwood={ fence:{r:false,l:false}, w:18, h:18, theme:'elf', dens:0.06, label:'The Heartwood', mini:{x:0,y:0}, notches:()=>[], dummy:null,   // an open glade round the oldest tree: only the rim is wood
   objects:()=>[ {type:'teleporter', i:0, j:9, to:'sylvhaven', entry:'fromHeart'},
     {type:'worldtree', i:7, j:6, fp:[4,4], tall:980},
-    {type:'teleporter', i:11, j:10, to:'treeheart', entry:'fromWood', treedoor:true},
+    {type:'teleporter', i:11, j:10, to:'tree1', entry:'fromWood', treedoor:true, locked:()=>!CHOICE.hwSpirit && !hasItem('moon_lantern'), onLocked:()=>setTimeout(()=>say('The Door at Her Foot',CHOICE.hwQ?["The hollow at the tree's foot is dark as a well, and cold breathes out of it. When you step in, the dark presses you back out like a hand.","<i>Elowen said: you need light the thing inside cannot eat.</i>"]:["A hollow at the foot of the great tree, dark as a well. Something inside it is chewing, slowly.","<i>Elowen of the Heartwood, by the old tree, would know more.</i>"],[bye]),60)},
+    ...(!CHOICE.hwSpirit?[{type:'blacksap', i:11, j:8, noblock:true}]:[]),
     {type:'lantern', i:4, j:4, off:havenBurnt()}, {type:'lantern', i:15, j:4, off:havenBurnt()}, {type:'lantern', i:4, j:15, off:havenBurnt()}, {type:'lantern', i:15, j:15, off:havenBurnt()},
     {type:'critter', kind:'flowers', i:3, j:12, noblock:true}, {type:'critter', kind:'flowers', i:14, j:8, noblock:true}, {type:'critter', kind:'flowers', i:9, j:15, noblock:true}, {type:'critter', kind:'flowers', i:15, j:12, noblock:true} ],
   npcs:()=> havenBurnt() ? [] : [{ id:'elowen', name:'Elowen of the Heartwood', i:6, j:12, dir:1, opts:ELFO({gender:'f',skin:0,hair:3,hairColor:11,face:1,equip:{head:'elf_circlet',torso:'elf_robe',armor:'elf_cloak',hands:null,legs:'elf_leggings',feet:'elf_boots',weapon:null,offhand:null}}) }],
@@ -20484,13 +20491,14 @@ setInterval(()=>{ try{ if(!HW) return; if(!running || areaId!=='heartwood' || co
       if(o.life<=0) gone(); });
     hwHud(); if(HW.t<=0) hwEnd(); }catch(e){} },50);
 function elowenTalk(){ const d=Math.floor(dayClock/DAY_LEN), done=CHOICE.hwDay===d;
-  if(!CHOICE.hwSpirit){ const first=!CHOICE.hwAsked; CHOICE.hwAsked=CHOICE.hwAsked||1;
-    return say('Elowen of the Heartwood',first?["“This is the oldest tree in the wood. Older than Sylvhaven; we built the town to keep it company.”",
-      "“Once a day its light comes loose and drifts round the trunk like snow that falls upward. Not any more. Not for a month.”",
-      "“Something went in through the door at its foot. A hunger, with no shape of its own. In the heart of the tree are the saplings that make the light, and it is eating them, one by one. At night I hear it chewing.”",
-      "“We do not kill, in Sylvhaven. But that is not a living thing. Go in, and drive it out of her, before there is nothing left to make light.”"]
-      :["“It is still in there. I hear it.” <i>She lays her palm flat on the bark, as if feeling for a pulse.</i>","“The door is at her foot, facing the morning. Mind the saplings: whatever it is, it feeds on them.”"],
-      [{label:'“I will go in.”', fn:()=>{ CHOICE.hwAsked=2; say('Elowen of the Heartwood',"“Then the tree goes with you. When it tries to feed, stand beside the sapling it reaches for. It cannot eat what you are guarding.”",[bye]); }}, bye]); }
+  if(!CHOICE.hwSpirit){ CHOICE.hwAsked=CHOICE.hwAsked||1; const Q=CHOICE.hwQ;
+    if(!Q) return say('Elowen of the Heartwood',["“This is the oldest tree in the wood. Older than Sylvhaven; we built the town to keep it company.” <i>She does not look up at it. She looks at the ground, at its roots.</i>",
+        "“Look at her. A month ago she was silver from root to crown. Now the leaves come down brown, and the bark weeps something black at her foot. At night I hear chewing inside her.”",
+        "“I am a keeper of trees, not of whatever this is. Scrape a little of the black sap from her roots, on the morning side, and take it to Maelis the Weaver in Sylvhaven. She knows more of the things that eat light than any of us would like.”"],
+      [{label:'“I will take it to Maelis.”', fn:()=>{ CHOICE.hwQ='sap'; say('Elowen of the Heartwood',"“Mind it does not touch your skin. It is cold the way a grave is cold.”",[bye]); }}, bye]);
+    if(Q==='sap') return say('Elowen of the Heartwood',[hasItem('black_sap')?"“You have it. Go to Maelis, in Sylvhaven. Quickly; it is worse every night.”":"“The black sap, at her foot on the morning side. Then Maelis, in Sylvhaven.”"],[bye]);
+    if(Q==='maelis') return say('Elowen of the Heartwood',["“A Hunger,” <i>she repeats, when you tell her.</i> “Then Maelis is right: it will eat any light you carry in, except moonlight. Moonbells grow somewhere new each day in our woods, white, like little bells. Bring her three.”"],[bye]);
+    return say('Elowen of the Heartwood',["<i>She looks at the lantern in your hand, and for a moment she cannot speak.</i>","“The door will know that light. But hear me: once you go in, she will close behind you. Roots grow fast in her when she is afraid. There is no coming back up until the thing is gone, or until you are carried out.”","“It came up from the bottom, where her roots drink. That is where it will be. What it has made of the things it ate on the way, I do not know.”"],[bye]); }
   const grow=typeof wtStage==='function'?wtStage():3;
   say('Elowen of the Heartwood',[grow===1?"“Look up. The rot has stopped spreading, and there are buds on the bare branches, already. Give her a few days, and you will not know her.”":grow===2?"“Half her crown is back. Another day or two.” <i>She has not stopped smiling since you came out of the door.</i>":CHOICE.hwDay==null?"“This is the oldest tree in the wood. Older than Sylvhaven; we built the town to keep it company.”":"“You came back. The tree noticed.”",
     done?"“It has given its light for today. Come tomorrow.”":"“Once a day its light comes loose and drifts. Walk into it and it is yours, but do not rush at it, it is shy. The gold is shyest.”"],[
@@ -20597,13 +20605,14 @@ function paintHollowWalls(){ const {w,h}=ROOM, H=230, o=P(0,0), rEnd=P(w,0), lEn
     for(let k=0;k<3;k++){ const t0=0.1+k*0.3, p0=at(t0,0), p1=at(t0+0.12,H*0.7);                                               // old roots across the wall
       g.strokeStyle='#3a2616'; g.lineWidth=10-k*2; g.beginPath(); g.moveTo(p0.x,p0.y); g.quadraticCurveTo((p0.x+p1.x)/2+20,(p0.y+p1.y)/2+30,p1.x,p1.y); g.stroke();
       g.strokeStyle='rgba(200,160,110,0.25)'; g.lineWidth=2; g.stroke(); } }); }
-AREAS.treeheart={ ...INSIDE_BASE, w:13, h:13, theme:'interior', hollow:true, label:'Inside the Heartwood', mini:{x:0,y:0},
-  objects:()=>[ {type:'teleporter', i:6, j:12, to:'heartwood', entry:'fromTree', locked:()=>hhSealed(), onLocked:()=>pzSay('Roots have grown across the way out. Not while it lives.','#c8b0e8')},
+AREAS.treeheart={ ...INSIDE_BASE, w:13, h:13, theme:'interior', hollow:true, label:'The Root-Heart', mini:{x:0,y:0},
+  objects:()=>[ {type:'teleporter', i:6, j:12, to:'tree2', entry:'fromDown', locked:()=>hhSealed(), onLocked:()=>pzSay('Roots have grown across the way up. Not while it lives.','#c8b0e8')},
+    ...(CHOICE.hwSpirit && !collectedPickups.has('treeheart:6,5') ? [{type:'pickup', i:6, j:5, item:'heartseed'}] : []),
     ...HH_SAP.map(([i,j],k)=>({type:'sapling', i, j, k})),
     {type:'hfungus', i:1, j:2, noblock:true}, {type:'hfungus', i:5, j:1, noblock:true}, {type:'hfungus', i:11, j:1, noblock:true}, {type:'hfungus', i:1, j:9, noblock:true}, {type:'hfungus', i:11, j:11, noblock:true} ],
   npcs:()=>[], mobs:()=> CHOICE.hwSpirit ? [] : [{ name:'The Hollow Hunger', type:'hunger', i:HH_HOME[0], j:HH_HOME[1], faction:'hunger',
     opts:{ spirit:true, equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:'hunger_claw',offhand:null} } }],
-  entries:{ fromWood:{i:6,j:11} } };
+  entries:{ fromUp:{i:6,j:11} } };
 AREA_TIER.treeheart=3;
 const HH_SAP=[[3,3],[9,3],[2,7],[10,7],[4,10],[8,10]], HH_HOME=[6,5];
 let HH=null, HHS=[1,1,1,1,1,1];                               // the fight's set pieces; each sapling: 0 dark, 1 faint, 2 bright
@@ -20668,7 +20677,7 @@ function drawHunger(x,B,e,pose){ const fade=e.dead?Math.max(0,1-(e.fallT||0)/1.1
     g.globalCompositeOperation='lighter'; glow(x,y-100,70,120,'160,90,220',0.2+Math.sin(gt*4)*0.06); g.restore(); }
   g.restore(); }
 const hhK=()=>areaId==='treeheart' && mobs.find(m=>m.type==='hunger' && !m.dead);
-function hhSealed(){ const K=hhK(); return !!K && (!!HH || combat.active || K.hp<K.maxHp); }
+function hhSealed(){ return !CHOICE.hwSpirit; }   // once you are in, there is no going back up until it is gone
 const hhTh=K=>{ const ph=K.hphase||1; return ph>=3?0:Math.floor(K.maxHp*(ph===1?0.66:0.33)); };
 function hhPick(){ const pt=tileOf(player); let best=-1, bd=-1; HH_SAP.forEach(([i,j],k)=>{ if(HHS[k]<1 || (HH&&HH.k===k)) return; const d=cheb([i,j],pt)+(HHS[k]===1?10:0); if(d>bd){ bd=d; best=k; } }); return best; }   // the faint ones first, far from you; one you saved only when nothing else is left
 function hhDrain(K){ ckBreakDuel(K); ckPlace(K,HH_HOME[0],HH_HOME[1]); K.warded=true; HH={mode:'drain', k:-1, n:0};
@@ -20721,7 +20730,7 @@ function hhTick(dt){ const K=hhK(); if(!K){ HH=null; return; }
 { const prev=foeDown; foeDown=function(f){ const r=prev(f); if(f && f.type==='hunger' && !CHOICE.hwSpirit){ CHOICE.hwSpirit=true; CHOICE.hwSpiritDay=Math.floor(dayClock/DAY_LEN); HH=null; HHS=HH_SAP.map(()=>2); FOES.hunger.pattern=HH_P1;
       setTimeout(()=>{ try{ banner('The Heartwood breathes again','#f0f8c8',2600); shake=6;
         logMsg('The Hunger comes apart like smoke in a draught, and all its stolen light pours out of it at once. Every sapling in the hollow blazes up, and far above you the old tree creaks, the way a sleeper sighs.','#f0f8c8');
-        addLeaves(5,'the Hollow Hunger driven out'); try{ autosaveSoon(400); }catch(e){} }catch(e){} },1400); } return r; }; }
+        addLeaves(5,'the Hollow Hunger driven out'); if(areaId==='treeheart' && !collectedPickups.has('treeheart:6,5')){ OBJECTS.push({type:'pickup', i:6, j:5, item:'heartseed'}); pzRebuild(); logMsg('Where it stood, something small glows on the floor: a seed of the old tree, still warm.','#e8f4c0'); } try{ autosaveSoon(400); }catch(e){} }catch(e){} },1400); } return r; }; }
 // ════════ THE DUELLIST'S LEATHERS: an elven melee set bought with Silver Leaves. Quick, light, hits a little harder; not for standing in the way of things ════════
 Object.assign(ITEMS,{
   duel_band:   { name:'Leaf-brow Band',      slot:'head' },
@@ -20881,6 +20890,117 @@ function dryadNPCs(area){ const out=[]; const A=AREAS[area];
       say(D.name,[D.lines[k]],[bye]); }; }
   return out; }
 ['heartwood','sylvhaven','silvergate','elfroad'].forEach(a=>wrap(a,'npcs',l=>[...l,...dryadNPCs(a)]));
+// ════════ THE WAY DOWN: the hollow and the rootways above the Root-Heart, the things the Hunger made, and the lantern that opens the door ════════
+Object.assign(ITEMS,{ black_sap:{ name:'Phial of Black Sap', slot:'misc', read:true, title:'A phial of the great tree\'s sap', body:["Thick, black and cold, like a grave is cold. When you hold the phial up to the light, the light seems to go into it and not come out."] },
+  moon_lantern:{ name:'Moonbell Lantern', slot:'misc', read:true, title:'Three moonbells woven into a lantern', body:["Maelis wove three moonbells into a cage of silver thread. They glow, steady and white, and the dark seems to step back from them a little."] },
+  heartseed:{ name:'Heartseed Pendant', slot:'neck' } });
+['black_sap','moon_lantern'].forEach(id=>QUEST_ITEMS.add(id));
+NECK_LOOKS.heartseed={cord:'#c8ccd0', w:0.5, p:'disc', col:'#cfe8a0'};
+Object.assign(ITEM_STATS,{ heartseed:{hp:6, agi:1, ap:1, magic:1} }); GEAR_HP.heartseed=6; ITEM_LEVEL_FIX.heartseed=4; PRICES.heartseed=220;
+ITEM_LORE.heartseed="A seed of the oldest tree in the wood, as big as a thumb, wound in silver wire on a fine chain. It is warm, and if you hold it to your ear it creaks, very softly, the way the tree does in the wind.";
+{ const prev=itemStatLines; itemStatLines=function(id){ const L=prev(id); if(id==='heartseed') L.push(['Living Wood','in a fight, you heal 1 health every 2 seconds']); return L; }; }
+setInterval(()=>{ try{ if(!running || !combat.active || combat.phase!=='fight' || !player.opts || player.opts.equip.neck!=='heartseed' || player.hp<=0) return;
+    if(player.hp<player.maxHp){ player.hp=Math.min(player.maxHp,player.hp+1); updateHud(); } }catch(e){} },2000);
+ITEM_ICON.black_sap=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.fillStyle='#3a3440'; g2.fillRect(17,5,6,4); g2.fillStyle='#a8a090'; g2.fillRect(16.5,3.5,7,2.4);
+  g2.beginPath(); g2.moveTo(17,9); g2.lineTo(23,9); g2.quadraticCurveTo(31,18,29,29); g2.quadraticCurveTo(20,37,11,29); g2.quadraticCurveTo(9,18,17,9); g2.closePath(); g2.fillStyle='rgba(200,210,220,0.45)'; g2.fill(); g2.strokeStyle='#8a8a90'; g2.lineWidth=1; g2.stroke();
+  g2.beginPath(); g2.moveTo(12,24); g2.quadraticCurveTo(20,21,28,24); g2.quadraticCurveTo(28,33,20,34); g2.quadraticCurveTo(12,33,12,24); g2.fillStyle='#120a16'; g2.fill(); g2.strokeStyle='rgba(160,90,210,0.7)'; g2.lineWidth=0.8; g2.beginPath(); g2.moveTo(14,26); g2.lineTo(18,29); g2.lineTo(22,26); g2.stroke(); g2.restore(); };
+ITEM_ICON.moon_lantern=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.globalCompositeOperation='lighter'; const gl=g2.createRadialGradient(20,23,1,20,23,16); gl.addColorStop(0,'rgba(230,240,255,0.8)'); gl.addColorStop(1,'rgba(230,240,255,0)'); g2.fillStyle=gl; g2.fillRect(2,5,36,36); g2.globalCompositeOperation='source-over';
+  g2.strokeStyle='#c8ccd8'; g2.lineWidth=1.2; g2.beginPath(); g2.arc(20,8,4,Math.PI,0); g2.stroke(); g2.beginPath(); g2.moveTo(13,13); g2.lineTo(27,13); g2.lineTo(25,33); g2.lineTo(15,33); g2.closePath(); g2.stroke();
+  [[17,20],[23,21],[20,27]].forEach(([x,y])=>{ g2.fillStyle='#f4f6ff'; g2.beginPath(); g2.moveTo(x-3,y-1); g2.quadraticCurveTo(x,y-5,x+3,y-1); g2.lineTo(x+2,y+2); g2.lineTo(x-2,y+2); g2.closePath(); g2.fill(); });
+  g2.strokeStyle='rgba(200,210,230,0.7)'; g2.lineWidth=0.5; for(let k=0;k<4;k++){ g2.beginPath(); g2.moveTo(14+k*4,13); g2.lineTo(15.5+k*3,33); g2.stroke(); } g2.restore(); };
+// the black sap at the tree's foot
+OBJ_DRAW.blacksap=o=>{ const q=P(o.i+0.5,o.j+0.5); g.fillStyle='#120a14'; g.beginPath(); g.ellipse(q.x,q.y,34,13,0,0,Math.PI*2); g.fill();
+  g.save(); g.globalCompositeOperation='lighter'; glow(q.x,q.y,40,16,'130,70,180',0.25+Math.sin(gt*2)*0.06); g.restore();
+  g.strokeStyle='rgba(160,100,210,0.5)'; g.lineWidth=1; g.beginPath(); g.ellipse(q.x-6,q.y-2,14,4,0,Math.PI*1.1,Math.PI*1.8); g.stroke(); g.fillStyle='rgba(255,255,255,0.25)'; g.beginPath(); g.ellipse(q.x-10,q.y-4,5,1.5,0,0,Math.PI*2); g.fill(); };
+onUse(['blacksap'],o=>{ if(CHOICE.hwQ==='sap' && !hasItem('black_sap')){ giveQuestItem('black_sap',true); pzSay('You scrape the black sap into a phial. It is so cold it hurts your fingers through the glass.','#c8b0e8'); updateHud(); return; }
+  pzSay(hasItem('black_sap')?'A pool of black sap, weeping out of the roots. You have a phial of it already.':'A pool of black sap, weeping out of the roots. It is cold, and the light seems to sink into it.','#c8b0e8'); });
+// Maelis reads the sap, and weaves the lantern
+{ const prevM=TALKERS.maelis; TALKERS.maelis=(...a)=>{ const r=prevM(...a); const box=document.getElementById('dlg-opts'); if(CHOICE.hwSpirit || !box || !dlgIsOpen() || box.querySelector('.dlg-opt.hwq')) return r;
+    const add=(label,fn)=>{ const b=document.createElement('button'); b.className='dlg-opt hwq'; b.innerHTML='<span>'+label+'</span>'; b.addEventListener('click',fn); box.insertBefore(b,box.lastElementChild); };
+    if(CHOICE.hwQ==='sap' && hasItem('black_sap')) add('Show her the black sap.',()=>{ const k=player.inv.indexOf('black_sap'); if(k>=0) player.inv[k]=null;
+      say('Maelis the Weaver',["<i>She holds the phial to the window. The light goes into it and does not come out. She puts it down very carefully, as if it might wake.</i>","“That is not rot. Rot is a living thing. This is… emptiness, that has learned to be hungry. My grandmother called them Hungers. They live deep, under everything, where no light has ever been, and now and then one comes up the roots of something old, looking for light to eat.”",
+        "“It will eat any light you carry in: torch, lamp, the light in your eyes, given time. Except moonlight. That it cannot swallow. Bring me three moonbells, and I will weave them into a lantern for you.”","“And it will not be alone down there. A Hunger makes things out of what it eats. Go armed.”"],[{label:'“Three moonbells.”', fn:()=>{ CHOICE.hwQ='maelis'; closeDialog(); updateHud(); }}]); });
+    else if(CHOICE.hwQ==='maelis' && invCount('moonbell')>=3) add('Give her three moonbells.',()=>{ for(let k=0;k<3;k++){ const q=player.inv.indexOf('moonbell'); if(q>=0) player.inv[q]=null; }
+      say('Maelis the Weaver',["<i>Her fingers move faster than you can follow: silver thread round the stems, bell to bell, a little cage, a ring to hold it by. When she ties it off, the three bells light together, white and steady.</i>","“There. Hold it up when the dark comes for you. It will not go out while you live.”"],[{label:'Take the lantern.', fn:()=>{ giveQuestItem('moon_lantern',true); CHOICE.hwQ='lantern'; closeDialog(); updateHud(); }}]); });
+    else if(CHOICE.hwQ==='maelis') add('“About the lantern…”',()=>say('Maelis the Weaver',"“Three moonbells. They grow somewhere new each day in our woods; Lirael will tell you she counts them. I have the thread ready.” ("+invCount('moonbell')+"/3)",[{label:'Back.',fn:()=>TALKERS.maelis()},bye]));
+    return r; }; }
+{ const prev=npcHasNews; npcHasNews=function(n){ if(!CHOICE.hwSpirit){ if(n.id==='elowen' && !CHOICE.hwQ) return '!'; if(n.id==='maelis' && ((CHOICE.hwQ==='sap'&&hasItem('black_sap')) || (CHOICE.hwQ==='maelis'&&invCount('moonbell')>=3))) return '?'; } return prev(n); }; }
+// the things the Hunger made: rotgnawers (their bite poisons), hollow husks (their blows wither), gloomcallers (drain, wither, raise the dead) and thorn-witches (fire, frost, arcane)
+SKINS[46]='#4a3a2c'; SKINS[47]='#6a5a7a'; SKINS[48]='#5a6a4c';
+Object.assign(WEAPONS,{ gnaw_jaw:{ wind:0.3, dmg:8, len:22 } });
+FOES.gnawer={ label:'Rotgnawer', base:46, stagger:1.0, pattern:[{wait:0.9,wind:0.7,after:0.5,dir:'left'},{wait:0.3,wind:0.55,after:0.4,dir:'right'},{wait:1.2,wind:0.95,after:0.7,dir:'up'}] };
+FOES.husk={ label:'Hollow Husk', base:60, stagger:0.9, pattern:[{wait:1.2,wind:1.05,after:0.6,dir:'right'},{wait:0.6,wind:0.8,after:0.5,dir:'left'},{wait:1.4,wind:1.2,after:0.8,dir:'up',feint:'left'}] };
+FOES.gloomcaller={ label:'Gloomcaller', base:44, stagger:1.0, pattern:[{wait:1.4,wind:1.1,after:0.7,dir:'up'},{wait:1.0,wind:1.0,after:0.6,dir:'right'},{wait:1.6,wind:1.3,after:0.8,dir:'left'}] };
+FOES.thornwitch={ label:'Thorn-Witch', base:44, stagger:1.0, pattern:[{wait:1.3,wind:1.0,after:0.6,dir:'left'},{wait:0.9,wind:0.9,after:0.6,dir:'up'},{wait:1.5,wind:1.2,after:0.8,dir:'right'}] };
+const SPIRIT_TYPES=new Set(['hunger','gnawer','husk','gloomcaller','thornwitch']);
+const NOEQ={head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:null,offhand:null};
+const GNAWER=()=>({spirit:true, equip:{...NOEQ, weapon:'gnaw_jaw'}});
+const HUSK=()=>({gender:'m', race:'elf', skin:46, hair:2, hairColor:0, face:0, beard:0, eyeColor:3, husk:true, equip:{...NOEQ, legs:'elf_trousers', weapon:'club'}});
+const CALLER=()=>({gender:'f', race:'elf', skin:47, hair:0, hairColor:0, face:1, beard:0, eyeColor:3, shade:'gloom', equip:{...NOEQ, armor:'robe_black', weapon:'staff_hex'}});
+const WITCH=()=>({gender:'f', race:'elf', skin:48, hair:6, hairColor:12, face:2, beard:0, eyeColor:3, shade:'thorn', equip:{...NOEQ, armor:'robe', weapon:'staff_oak'}});
+BEASTS.unshift({ k:'gnawer', is:f=>f.type==='gnawer', name:'Rotgnawers', kind:'Made by the Hunger · inside the great tree', how:'Low and quick: a snap from either side, and a leap from above.', res:'No blood to bleed.', aff:'Their bite is rotten: often it poisons you.', ans:'An antidote takes the poison out. Keep them off you with clean parries.' },
+  { k:'husk', is:f=>f.type==='husk', name:'Hollow Husks', kind:'Made by the Hunger · inside the great tree', how:'Slow, heavy blows with a club of dead wood; one feints high.', res:'Dead wood: no bleeding.', aff:'Their blows wither you: your own land weaker for a while.', ans:'Rue water lifts the withering. Parry, do not trade blows.' },
+  { k:'gloomcaller', is:f=>f.type==='gloomcaller', name:'Gloomcallers', kind:'Made by the Hunger · inside the great tree', how:'A necromancer\'s three spells: Drain, Raise Dead, Wither.', res:'Half a spirit: your own spells land softer on it.', aff:'Withering, and a skeleton clawing at your side.', ans:'Spells land like blows: parry them on the right side.' },
+  { k:'thornwitch', is:f=>f.type==='thornwitch', name:'Thorn-Witches', kind:'Made by the Hunger · inside the great tree', how:'A mage\'s three spells: Fire, Frost and a bolt of raw light.', res:'Half a spirit: your own spells land softer on it.', aff:'Burning, and a chill that slows your swing.', ans:'Spells land like blows: parry them on the right side.' });
+{ const prev=impact; impact=function(f){ const hp0=player.hp; const r=prev(f); try{ const hurt=player.hp<hp0 && player.hp>0 && !combat.practice;
+      if(hurt && f.type==='gnawer' && Math.random()<0.45){ addStatus(player,'venom',6,2); }
+      if(hurt && f.type==='husk' && Math.random()<0.45){ addStatus(player,'weak',4,0); } }catch(e){} return r; }; }
+function drawGnawer(x,B,e,pose){ const fade=e.dead?Math.max(0,1-(e.fallT||0)/0.8):1; if(fade<=0) return;
+  const k=pose&&pose.kind==='raise'?Math.min(1,pose.t):0, lu=pose&&pose.kind==='strike'?Math.min(1,pose.t):0, fl=(e.dir===5||e.dir===6||e.dir===7)?-1:1, t=gt*6+(e.id||0), mv=e.moving?Math.sin(gt*14):0;
+  g.save(); g.globalAlpha*=fade; if(fl<0){ g.translate(x,0); g.scale(-1,1); g.translate(-x,0); }
+  g.fillStyle='rgba(10,4,14,0.45)'; g.beginPath(); g.ellipse(x,B+2,30,9,0,0,Math.PI*2); g.fill();
+  const bx=x-4+lu*10, by=B-26-k*4;
+  [[-14,1],[-6,-1],[8,1],[16,-1]].forEach(([lx,ph],q)=>{ g.strokeStyle='#22161c'; g.lineWidth=4; g.lineCap='round'; g.beginPath(); g.moveTo(bx+lx,by+6); g.quadraticCurveTo(bx+lx+3*ph+mv*3*ph,by+16,bx+lx+6*ph+mv*4*ph,B); g.stroke(); });   // root-legs
+  g.fillStyle='#1c1220'; g.beginPath(); g.ellipse(bx,by,24,12,-0.1-k*0.2,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(150,90,200,0.4)'; g.lineWidth=1.2; g.stroke();
+  g.strokeStyle='#3a2a1e'; g.lineWidth=2; for(let q=0;q<5;q++){ g.beginPath(); g.moveTo(bx-14+q*6,by-8); g.lineTo(bx-17+q*6,by-18-(q%2)*5); g.stroke(); }   // thorns on its back
+  const hx=bx+22+lu*8, hy=by-4-k*10; g.fillStyle='#24161e'; g.beginPath(); g.ellipse(hx,hy,11,8,0.2,0,Math.PI*2); g.fill();
+  g.fillStyle='#0a0408'; g.beginPath(); g.moveTo(hx+4,hy+1); g.lineTo(hx+16+lu*4,hy-2-k*6); g.lineTo(hx+15+lu*4,hy+6+k*6); g.closePath(); g.fill();          // the maw, opening as it winds up
+  g.fillStyle='#d8d0c0'; for(let q=0;q<3;q++){ g.beginPath(); g.moveTo(hx+7+q*3,hy-0.5); g.lineTo(hx+8+q*3,hy+2.5); g.lineTo(hx+9+q*3,hy-0.5); g.fill(); }
+  g.save(); g.globalCompositeOperation='lighter'; glow(hx-1,hy-3,7,5,'190,255,170',0.8); g.restore(); g.fillStyle='#e8ffd8'; g.beginPath(); g.arc(hx-1,hy-3,1.6,0,Math.PI*2); g.fill();
+  g.restore(); }
+function drawShadeUnder(x,B,e){ if(e.dead) return; const th=e.type==='thornwitch', col=th?'140,220,110':'170,100,230', t=gt+(e.id||0);   // a spirit's own light, and the smoke or thorns it trails
+  g.save(); g.globalCompositeOperation='lighter'; glow(x,B-56,46,80,col,0.32+Math.sin(t*2)*0.06); g.restore();
+  for(let q=0;q<6;q++){ const a=q*1.05+t*0.4, rx=Math.cos(a)*22, ry=Math.sin(a)*7;
+    if(th){ g.strokeStyle='#2e3a1e'; g.lineWidth=2.4; g.lineCap='round'; g.beginPath(); g.moveTo(x+rx,B+ry); g.quadraticCurveTo(x+rx*0.6,B-18+ry,x+rx*0.4+Math.sin(t+q)*4,B-30-q*3); g.stroke();
+      g.fillStyle='#7aa050'; g.beginPath(); g.ellipse(x+rx*0.4+Math.sin(t+q)*4,B-30-q*3,3,1.6,a,0,Math.PI*2); g.fill(); }
+    else { g.fillStyle=`rgba(40,16,60,${0.45-q*0.05})`; g.beginPath(); g.arc(x+rx,B-4-((t*14+q*9)%30),8-q*0.6,0,Math.PI*2); g.fill(); } } }
+function drawShadeOver(x,B,e){ if(e.dead) return; const th=e.type==='thornwitch', t=gt+(e.id||0);
+  g.save(); g.globalCompositeOperation='lighter'; glow(x+1,B-84,13,7,th?'190,255,150':'210,150,255',0.65+Math.sin(t*3)*0.1); g.restore();
+  g.strokeStyle=th?'#3a4a22':'#24182e'; g.lineWidth=2; g.lineCap='round';                                           // a crown of thorn, or of black root
+  for(let q=-2;q<=2;q++){ g.beginPath(); g.moveTo(x+q*3.4,B-92); g.quadraticCurveTo(x+q*5,B-100,x+q*6.5+(th?0:Math.sin(t+q)*1.5),B-106-(2-Math.abs(q))*3); g.stroke(); } }
+function drawHuskBits(x,B,e){ if(e.dead) return; const t=gt+(e.id||0), fl=(e.dir===5||e.dir===6||e.dir===7)?-1:1;        // dead wood where its face was, roots out of its back, eyes of the Hunger's light
+  g.save(); g.globalCompositeOperation='lighter'; glow(x+fl*2,B-82,14,8,'200,140,255',0.5+Math.sin(t*3)*0.1); g.restore();
+  g.strokeStyle='#2a1c14'; g.lineWidth=2.4; g.lineCap='round'; for(let q=0;q<4;q++){ g.beginPath(); g.moveTo(x-fl*3,B-70+q*6); g.quadraticCurveTo(x-fl*(14+q*3),B-82+q*5+Math.sin(t*1.5+q)*3,x-fl*(20+q*4),B-96+q*8); g.stroke(); } }
+OBJ_DRAW.roothole=o=>{ const q=P(o.i+0.5,o.j+0.5); g.fillStyle='#050208'; g.beginPath(); g.ellipse(q.x,q.y,44,20,0,0,Math.PI*2); g.fill();
+  g.strokeStyle='#3a2616'; g.lineWidth=5; g.lineCap='round'; for(let r=0;r<7;r++){ const a=r*0.9; g.beginPath(); g.moveTo(q.x+Math.cos(a)*50,q.y+Math.sin(a)*24); g.quadraticCurveTo(q.x+Math.cos(a+0.4)*30,q.y+Math.sin(a+0.4)*12,q.x+Math.cos(a+0.8)*14,q.y+Math.sin(a+0.8)*5+4); g.stroke(); }
+  g.save(); g.globalCompositeOperation='lighter'; glow(q.x,q.y+4,30,12,'150,80,200',0.18+Math.sin(gt*1.5)*0.05); g.restore(); };
+const TREE_LEVELS=['tree1','tree2','treeheart'];
+const treeClear=()=>!mobs.some(m=>!m.dead && m.hostile!==false && m.type!=='dummy');
+const rootsUp=()=>pzSay('Roots have grown across the way up, thick as your arm. Elowen said: no coming back up until it is gone.','#c8b0e8');
+const rootsDown=()=>pzSay('Something is still moving up here. The roots will not let you pass while it does.','#c8b0e8');
+AREAS.tree1={ ...INSIDE_BASE, w:10, h:10, theme:'interior', hollow:true, label:'The Hollow', mini:{x:0,y:0},
+  objects:()=>[ {type:'teleporter', i:4, j:9, to:'heartwood', entry:'fromTree', locked:()=>!CHOICE.hwSpirit, onLocked:rootsUp},
+    {type:'teleporter', i:5, j:1, to:'tree2', entry:'fromUp', treedoor:true, locked:()=>!CHOICE.hwSpirit && !treeClear(), onLocked:rootsDown}, {type:'roothole', i:5, j:1, noblock:true},
+    {type:'hfungus', i:1, j:2, noblock:true}, {type:'hfungus', i:8, j:6, noblock:true}, {type:'hfungus', i:2, j:7, noblock:true} ],
+  npcs:()=>[], mobs:()=> CHOICE.hwSpirit ? [] : [
+    { name:'Rotgnawer', type:'gnawer', i:3, j:3, faction:'hunger', opts:GNAWER() }, { name:'Hungry Rotgnawer', type:'gnawer', i:7, j:4, faction:'hunger', opts:GNAWER() },
+    { name:'Hollow Husk', type:'husk', i:5, j:4, faction:'hunger', opts:HUSK() } ],
+  entries:{ fromWood:{i:4,j:8}, fromDown:{i:5,j:2} } };
+AREAS.tree2={ ...INSIDE_BASE, w:12, h:12, theme:'interior', hollow:true, label:'The Rootways', mini:{x:0,y:0},
+  objects:()=>[ {type:'teleporter', i:6, j:11, to:'tree1', entry:'fromDown', locked:()=>!CHOICE.hwSpirit, onLocked:rootsUp},
+    {type:'teleporter', i:6, j:1, to:'treeheart', entry:'fromUp', treedoor:true, locked:()=>!CHOICE.hwSpirit && !treeClear(), onLocked:rootsDown}, {type:'roothole', i:6, j:1, noblock:true},
+    {type:'hfungus', i:1, j:1, noblock:true}, {type:'hfungus', i:10, j:3, noblock:true}, {type:'hfungus', i:2, j:9, noblock:true}, {type:'hfungus', i:9, j:9, noblock:true} ],
+  npcs:()=>[], mobs:()=> CHOICE.hwSpirit ? [] : [
+    { name:'Gloomcaller', type:'gloomcaller', i:3, j:3, faction:'hunger', opts:CALLER() }, { name:'Thorn-Witch', type:'thornwitch', i:9, j:3, faction:'hunger', opts:WITCH() },
+    { name:'Old Hollow Husk', type:'husk', i:6, j:4, faction:'hunger', opts:HUSK() }, { name:'Gnawing Rotgnawer', type:'gnawer', i:4, j:7, faction:'hunger', opts:GNAWER() } ],
+  entries:{ fromUp:{i:6,j:10}, fromDown:{i:6,j:2} } };
+Object.assign(AREA_TIER,{ tree1:3, tree2:3 });
+// a new descent: whatever you cut down last time, the Hunger has made again
+{ const _sw=switchArea; switchArea=function(id,entry,...r){ try{ if(id==='treeheart' && entry==='fromUp' && !CHOICE.hwSpirit){ setTimeout(()=>{ if(areaId!=='treeheart' || player.hp<=0) return; player.hp=player.maxHp; player.st=[]; updateHud(); refreshPlayerHp&&refreshPlayerHp(false);   // at the bottom the moonbells flare: one breath of clean light before the end
+        banner('The moonbells flare','#e8f0ff',1800); logMsg('At the bottom of the roots the lantern blazes up, white and cold and clean. For one breath you feel no hurt at all. Then, in the dark ahead, something turns towards the light.','#e8f0ff'); },400); }
+    if(id==='tree1' && entry==='fromWood' && !CHOICE.hwSpirit){ const D=CHOICE.deadAt||{};
+      [...defeatedMobs].forEach(k=>{ if(TREE_LEVELS.some(a=>k.startsWith(a+':'))){ defeatedMobs.delete(k); delete D[k]; } });
+      if(!CHOICE.hwIn) logMsg('The door closes behind you. Not with a sound: the roots simply grow across it, and the light of the glade is gone. The lantern shines a little brighter.','#e8f0f8'); CHOICE.hwIn=(CHOICE.hwIn||0)+1; } }catch(e){} return _sw.call(this,id,entry,...r); }; }
 // ════════ PLAYTEST RECORDER: switch it on in the Menu, play, then download the file and hand it over ════════
 // It notes what happened, not what you pressed: fights and how each blow was met, deaths, places, quests, talk, the journal and map,
 // buying, selling and gear. It stays in this browser (its own storage, never the saves) until you download or clear it.

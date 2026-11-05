@@ -5702,7 +5702,7 @@ function collectPickup(o){ const had=hasItem(o.item);
   if(o.bogmound && !ownsSpade()){ CHOICE.moundSeen=true;                // the fen caches are buried: like any mound, they need a spade
     say('A Mound of Mud',["The mud here has been heaped up and patted down, and the reeds will not grow on it. Something is buried under there.",
       "<i>You need a spade to dig this up. Maybe find one.</i>"],[{label:'Leave it.', fn:closeDialog}]); return; }
-  if(QUEST_ITEMS.has(o.item) && player.inv.indexOf(null)<0){ for(let k=player.inv.length-1;k>=0;k--){ const it=player.inv[k]; if(it && !QUEST_ITEMS.has(it)){ logMsg('No room: you leave the '+ITEMS[it].name+' behind.','#e0b070'); player.inv[k]=null; break; } } }   // story things always fit
+  if(QUEST_ITEMS.has(o.item) && player.inv.indexOf(null)<0 && slotFor(o.item)<0){ for(let k=player.inv.length-1;k>=0;k--){ const it=player.inv[k]; if(it && !QUEST_ITEMS.has(it)){ logMsg('No room: you leave the '+ITEMS[it].name+' behind.','#e0b070'); player.inv[k]=null; break; } } }   // story things always fit
   const idx=OBJECTS.indexOf(o); if(idx<0) return;
   OBJECTS.splice(idx,1); blocked.delete(o.i+','+o.j);
   collectedPickups.add(areaId+':'+o.i+','+o.j);
@@ -9997,7 +9997,7 @@ function setAt(loc,id){ if(player.opts) delete player.opts._ck; if(loc.kind==='e
 // ids; how many more sit under each id lives in CHOICE.invN. A pack space of bread that is "emptied" by any
 // code just loses one loaf, and a loaf put into a free space joins a pile that has room.
 const STACK_MAX=10, NO_STACK=new Set(['raw_meat','fish_perch','fish_trout','fish_carp','fish_eel','fish_herring']);   // raw things stay apart: cooks count them
-const stackable=id=>!!(id && ITEMS[id] && (ITEMS[id].slot==='food' && !NO_STACK.has(id) || ITEMS[id].currency));
+const stackable=id=>!!(id && ITEMS[id] && (ITEMS[id].slot==='food' && !NO_STACK.has(id) || ITEMS[id].currency || ITEMS[id].stack));   // food, currency, and a few gathered things (moonbells)
 const stackMax=id=>ITEMS[id] && ITEMS[id].currency ? 1e9 : STACK_MAX;          // Silver Leaves and Grave Tallies: one pile, as big as it likes
 let INV_RAW=false;
 function invN(){ if(!Array.isArray(CHOICE.invN)) CHOICE.invN=[]; return CHOICE.invN; }
@@ -20662,7 +20662,7 @@ const VN=()=>{ const d=Math.floor((dayClock+DAY_LEN*0.25)/DAY_LEN); if(!CHOICE.v
     try{ const N=CHOICE.vnight; if(N && N.on && !N.paid && N.d===Math.floor((dayClock+DAY_LEN*0.25)/DAY_LEN) && f && (f.type==='skeleton' || /Dead|Bones|Drowned|Risen|Bell-Ringer/.test(f.name||''))){ N.n++; floatText(tileOf(player),'Laid to rest ('+Math.min(3,N.n)+'/3)','#c8b8e0'); } }catch(e){}
     return r; }; }
 // ── Lirael counts leaves, and takes moonbells: four grow somewhere in the elven woods each day ──
-Object.assign(ITEMS,{ moonbell:{ name:'Moonbell', slot:'misc', title:'A small white bell-flower that opens at dusk and smells faintly of rain.' } });
+Object.assign(ITEMS,{ moonbell:{ name:'Moonbell', slot:'misc', stack:true, title:'A small white bell-flower that opens at dusk and smells faintly of rain.' } });
 QUEST_ITEMS.add('moonbell');
 ITEM_ICON.moonbell=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.strokeStyle='#5a8a5a'; g2.lineWidth=1.6; g2.beginPath(); g2.moveTo(20,36); g2.quadraticCurveTo(18,22,24,12); g2.stroke();
   [[24,12],[15,18],[27,22]].forEach(([x,y],k)=>{ g2.fillStyle=k?'#e8eef8':'#ffffff'; g2.beginPath(); g2.moveTo(x-4,y); g2.quadraticCurveTo(x,y-7,x+4,y); g2.quadraticCurveTo(x+3,y+3,x,y+2); g2.quadraticCurveTo(x-3,y+3,x-4,y); g2.fill(); g2.strokeStyle='#9ab0c8'; g2.lineWidth=0.6; g2.stroke(); });

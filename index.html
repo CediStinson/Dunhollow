@@ -1088,7 +1088,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       c.beginPath(); c.moveTo(px,py); c.lineTo(px+Math.cos(a)*L,py+Math.sin(a)*L); c.stroke(); }
     c.restore(); };
   const VR=opts.vari||{}, vT=VR.torso||'', vL=VR.legs||'', vF=VR.feet||'', vA=VR.armor||'', vH=VR.hands||'';
-  const TUN=vT.startsWith('tunic_')||vT==='shirt_white', SMOCK=vT==='smock', HOSE=vL==='hose_grey', BREECH=vL==='breeches'||vL==='breeches_cream', DANDY=vL==='breeches_cream'||vL==='trousers_black', TREWS=false, RIDE=vF==='riding_boots', FUR=false, PLATE=vF==='plate_boots'||/^(anvil|delver|rune)_boots$/.test(vF);
+  const TUN=vT.startsWith('tunic_')||vT==='shirt_white', SMOCK=vT==='smock', HOSE=vL==='hose_grey', BREECH=vL==='breeches'||vL==='breeches_cream', DANDY=vL==='breeches_cream'||vL==='trousers_black', TREWS=false, RIDE=vF==='riding_boots', FUR=false, PLATE=vF==='plate_boots'||/^(anvil|delver)_boots$/.test(vF), RUNE_BOOT=vF==='rune_boots', RUNE_LEG=vL==='rune_greaves';
   const TUNTRIM = vT==='shirt_white' ? '#d8d4ca' : vT==='tunic_linen' ? '#8e3a30' : vT==='tunic_red' ? '#d8b860' : vT==='tunic_blue' ? '#d8c8a0' : '#c8a850';
   let handAt=null, offHandAt=null, CHEEK=null;   // CHEEK: the round seat from behind, when bare                   // where each hand ended up
   // idle: standing with the weight on one leg (hips shift over it, the other foot eases out) and breathing
@@ -1175,7 +1175,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
 
   const lw=P.legW, lo=(P.legW/2+(F?0.25:1))*(1-V.prof*0.66);   // her thighs nearly touch  // legs converge when seen edge-on
   const swX=0.4+V.prof*1.5;                          // and stride further along the walk axis
-  const bootTop=BREECH&&BOOTS ? Y.KNEE+6 : DUEL_BOOT ? (F?Y.KNEE+2:Y.KNEE+1) : ELF_BOOT ? Y.KNEE+0.5 : RIDE ? Y.KNEE-6 : PLATE ? Y.KNEE+2.5 : (F?-13:-16), pantEnd = DUEL_LEG ? (F ? -36.2 : (BOOTS?bootTop+3:-4)) : BREECH ? (BOOTS ? Y.KNEE+7.6 : Y.KNEE+4) :   /* breeches end over the boot tops */ (F && !ELF_LEG && !HOSE && !TREWS) ? -29 : (BOOTS?bootTop+3:-4);   // women: cut-off shorts
+  const bootTop=RUNE_BOOT ? -11 : BREECH&&BOOTS ? Y.KNEE+6 : DUEL_BOOT ? (F?Y.KNEE+2:Y.KNEE+1) : ELF_BOOT ? Y.KNEE+0.5 : RIDE ? Y.KNEE-6 : PLATE ? Y.KNEE+2.5 : (F?-13:-16), pantEnd = DUEL_LEG ? (F ? -36.2 : (BOOTS?bootTop+3:-4)) : BREECH ? (BOOTS ? Y.KNEE+7.6 : Y.KNEE+4) :   /* breeches end over the boot tops */ (F && !ELF_LEG && !HOSE && !TREWS) ? -29 : (BOOTS?bootTop+3:-4);   // women: cut-off shorts
   const STOCK_TOP=-30.5;
   const PA_DARK = ELF_LEG && (()=>{ const [r,g,b]=_rgb(ELFC.leg); return 0.3*r+0.59*g+0.11*b<110; })();   // on a dark pair the elven work is picked out lighter
   const PA=DUEL_LEG ? ELFC.dl : ELF_LEG ? ELFC.leg : C.pants, BC=DUEL_BOOT ? ELFC.db : ELF_BOOT ? ELFC.boot : C.boot;
@@ -1445,8 +1445,43 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       fs(tone(skin,0.12,0.5)); c.beginPath(); c.ellipse(x+cx+(s<0?-1:1)*(h2-1.4),B-6.6,0.7,0.9,0,0,Math.PI*2); c.fill();              // ankle bone
       if(DUEL_F) duelStock(true);
     }
+    if(RUNE_LEG || RUNE_BOOT) runeLegPlates(s,depth,cx,h2,lw,toe,dim);
     c.restore();
   };
+  // ── Runeforged greaves and sabatons: blackened plate over the leg, each piece with its own forge-lit rune ──
+  const runeLegPlates=(s,depth,cx,h2,lw,toe,dim)=>{ const S='#2c2e33', GL='rgba(255,150,60,0.9)', w=h2+1.1;
+    const plate=(pts,lit)=>{ blob(pts,1.1); const g2=c.createLinearGradient(x+cx-w,0,x+cx+w,0); g2.addColorStop(0,tone(S,0.32*dim+lit)); g2.addColorStop(0.45,tone(S,0.06+lit-0.1*depth)); g2.addColorStop(1,tone(S,-0.32-0.1*depth)); c.fillStyle=g2; c.fill(); c.strokeStyle='#121316'; c.lineWidth=0.6; c.stroke(); };
+    const rune=(rx,ry,sz)=>{ if(!front) return; c.save(); c.globalCompositeOperation='lighter'; c.strokeStyle=GL; c.lineWidth=0.5; c.lineCap='square'; c.beginPath(); c.moveTo(x+rx,B+ry-sz); c.lineTo(x+rx,B+ry+sz); c.moveTo(x+rx-sz*0.8,B+ry-sz*0.3); c.lineTo(x+rx,B+ry+sz*0.4); c.lineTo(x+rx+sz*0.8,B+ry-sz*0.3); c.stroke(); c.restore(); };
+    const trim=(y0,ww)=>{ c.strokeStyle='#ffb050'; c.globalAlpha=0.75; c.lineWidth=0.45; c.beginPath(); c.moveTo(x+cx-ww,B+y0); c.quadraticCurveTo(x+cx,B+y0+0.8,x+cx+ww,B+y0); c.stroke(); c.globalAlpha=1; };
+    if(RUNE_LEG){
+      const tTop=Y.WAIST+(F?7:3), kY=Y.KNEE;
+      // the cuisse: over the front of the thigh (on a woman, shorter, the outer thigh left bare above the knee)
+      const cw=F?w-0.6:w;
+      plate([[cx-cw+0.4,tTop],[cx+cw-0.4,tTop],[cx+cw,kY-4],[cx+cw-0.6,kY-1.6],[cx-cw+0.6,kY-1.6],[cx-cw,kY-4]],0);
+      trim(tTop+0.8,cw-0.8); for(let yy=tTop+4.5; yy<kY-3; yy+=4.2){ c.strokeStyle='#121316'; c.lineWidth=0.4; c.beginPath(); c.moveTo(x+cx-cw+0.4,B+yy); c.quadraticCurveTo(x+cx,B+yy+0.9,x+cx+cw-0.4,B+yy); c.stroke(); }
+      // the knee-cop: a domed plate with a fan to the outside, the rune in its middle
+      c.save(); blob([[cx-w-0.2,kY-2.6],[cx+w+0.2,kY-2.6],[cx+w+0.6,kY+1.2],[cx,kY+3.4],[cx-w-0.6,kY+1.2]],1.4); const kg=c.createRadialGradient(x+cx-1,B+kY-1,0.4,x+cx,B+kY,w+1); kg.addColorStop(0,tone(S,0.42)); kg.addColorStop(1,tone(S,-0.25-0.1*depth)); c.fillStyle=kg; c.fill(); c.strokeStyle='#121316'; c.lineWidth=0.6; c.stroke(); c.restore();
+      if(front){ const fx=cx+s*(w+0.2); c.fillStyle=tone(S,0.1-0.1*depth); c.beginPath(); c.moveTo(x+fx-s*0.6,B+kY-2); c.quadraticCurveTo(x+fx+s*2.4,B+kY,x+fx-s*0.6,B+kY+2.2); c.closePath(); c.fill(); c.strokeStyle='#121316'; c.lineWidth=0.4; c.stroke(); }
+      rune(cx,kY+0.2,1.3);
+      // the greave on the shin, down to the boot
+      const shinEnd=BOOTS ? Math.min(-9,bootTop) : -8;
+      if(shinEnd>kY+5){ plate([[cx-w+0.6,kY+3],[cx+w-0.6,kY+3],[cx+w-0.2,kY+9],[cx+w-1.2,shinEnd],[cx-w+1.2,shinEnd],[cx-w+0.2,kY+9]],-0.04);
+        c.fillStyle='rgba(255,255,255,0.22)'; c.fillRect(x+cx-w*0.45,B+kY+4,0.8,shinEnd-kY-6); trim(shinEnd-0.8,w-1.4);
+        fs('#8a8e96'); [kY+5,shinEnd-2.4].forEach(yy=>{ [-1,1].forEach(d=>{ c.beginPath(); c.arc(x+cx+d*(w-1.6),B+yy,0.4,0,Math.PI*2); c.fill(); }); }); } }
+    if(RUNE_BOOT){                                       // the sabaton: a riveted cuff round the ankle, a shoe of plate over the foot with two lames over the instep, a pointed toe
+      const bw=h2+1.2, y0=-11, side=V.prof>=0.35, tx=side?toe:0;
+      plate([[cx-bw,y0],[cx+bw,y0],[cx+bw+0.3,-6.2],[cx-bw-0.3,-6.2]],0.05); trim(y0+0.6,bw-0.6);
+      const shoe = side ? [[cx-bw-0.3,-6.4],[cx+bw*0.4,-6.4],[cx+bw+tx*0.8,-3.4],[cx+bw+tx+2.4,-0.6],[cx+bw+tx+1.8,0.2],[cx-bw-0.6,0.2],[cx-bw-0.8,-2.6]]
+                        : [[cx-bw-0.4,-6.4],[cx+bw+0.4,-6.4],[cx+bw+1.1,-2.4],[cx+bw+0.8,0.2],[cx-bw-0.8,0.2],[cx-bw-1.1,-2.4]];
+      plate(shoe,0.02);
+      c.save(); blob(shoe,1.1); c.clip(); c.strokeStyle='#121316'; c.lineWidth=0.45;
+        [-4.6,-2.6].forEach(yy=>{ c.beginPath(); c.moveTo(x+cx-bw-1.2,B+yy-0.6); c.quadraticCurveTo(x+cx+tx*0.4,B+yy+1.1,x+cx+bw+1.2+tx,B+yy-0.6+(side?0.8:0)); c.stroke(); });
+        c.strokeStyle='rgba(255,176,80,0.55)'; c.lineWidth=0.35; c.beginPath(); c.moveTo(x+cx-bw-1.2,B-4.3); c.quadraticCurveTo(x+cx+tx*0.4,B-2.6,x+cx+bw+1.2+tx,B-4.3+(side?0.8:0)); c.stroke();
+        c.fillStyle='rgba(255,255,255,0.18)'; c.beginPath(); c.ellipse(x+cx-bw*0.35+tx*0.3,B-4.6,bw*0.35,0.7,0,0,Math.PI*2); c.fill();
+      c.restore();
+      fs('#121316'); c.fillRect(x+cx-bw-1.2+(side?0:0),B-0.5,bw*2+2.4+tx+(side?1.6:0),0.8);
+      rune(cx,y0+2.4,1.1);
+      fs('#8a8e96'); [-1,1].forEach(d=>{ c.beginPath(); c.arc(x+cx+d*(bw-0.8),B+y0+2.4,0.4,0,Math.PI*2); c.fill(); }); } };
 
   // ── one arm; `depth` pushes the far arm back behind the torso ──
   const armIn=CH-(F?1.9:2.0), al=Math.abs(Y.SHOULDER-Y.WAIST)+6.3, aw=P.limbW;
@@ -1595,7 +1630,17 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       c.stroke();
       c.strokeStyle=tone(hc,-0.34,0.6); c.lineWidth=0.5;                 // finger lines
       for(let f=1;f<3;f++){ c.beginPath(); c.moveTo(x+hx+hw*f/3,B+hy+4.2); c.lineTo(x+hx+hw*f/3,B+hy+6); c.stroke(); } }
-    if(E.hands==='gloves' && vH==='gauntlets'){        // steel gauntlet: a flared plate cuff, knuckle plate and rivets
+    if(E.hands==='gloves' && vH==='rune_gauntlets'){   // runeforged gauntlet: a long flared cuff to mid-forearm, a rune in it, lamed fingers, knuckle spikes
+      const S='#2c2e33', c0=hy-8.6, c1=hy+0.2;
+      const cuff=()=>{ c.beginPath(); c.moveTo(x+x0-1.5,B+c0); c.lineTo(x+x0+hw+1.5,B+c0); c.lineTo(x+x0+hw+0.9,B+c1); c.lineTo(x+x0-0.9,B+c1); c.closePath(); };
+      cuff(); const gg=c.createLinearGradient(x+x0-2.4,0,x+x0+hw+2.4,0); gg.addColorStop(0,tone(S,0.36-0.2*depth)); gg.addColorStop(0.5,tone(S,0.06-0.2*depth)); gg.addColorStop(1,tone(S,-0.3-0.1*depth));
+      c.fillStyle=gg; c.fill(); c.strokeStyle='#121316'; c.lineWidth=0.6; c.stroke();
+      c.strokeStyle='rgba(255,176,80,0.75)'; c.lineWidth=0.45; c.beginPath(); c.moveTo(x+x0-1.2,B+c0+0.7); c.lineTo(x+x0+hw+1.2,B+c0+0.7); c.stroke();
+      fs('#8a8e96'); [0.15,0.85].forEach(t=>{ c.beginPath(); c.arc(x+x0-0.8+(hw+1.6)*t,B+c0+1.8,0.4,0,Math.PI*2); c.fill(); });
+      if(!depth){ c.save(); c.globalCompositeOperation='lighter'; c.strokeStyle='rgba(255,150,60,0.9)'; c.lineWidth=0.5; const rx=x+x0+hw/2, ry=B+(c0+c1)/2; c.beginPath(); c.moveTo(rx,ry-2.2); c.lineTo(rx,ry+2.2); c.moveTo(rx-1.2,ry-0.8); c.lineTo(rx,ry+0.4); c.lineTo(rx+1.2,ry-0.8); c.stroke(); c.restore(); }
+      c.fillStyle=tone(S,0.08-0.2*depth); [0,1].forEach(k=>{ c.fillRect(x+x0-0.4,B+hy+1.2+k*1.8,hw+0.8,1.5); c.strokeStyle='#121316'; c.lineWidth=0.4; c.strokeRect(x+x0-0.4,B+hy+1.2+k*1.8,hw+0.8,1.5); });
+      fs(tone(S,0.4)); for(let k=0;k<3;k++){ c.beginPath(); c.arc(x+x0+hw*(0.2+k*0.3),B+hy+1.3,0.5,0,Math.PI*2); c.fill(); }
+    } else if(E.hands==='gloves' && vH==='gauntlets'){        // steel gauntlet: a flared plate cuff, knuckle plate and rivets
       const G2=GEAR.glove; c.beginPath(); c.moveTo(x+x0-2.2,B+hy-6); c.lineTo(x+x0+hw+2.2,B+hy-6); c.lineTo(x+x0+hw+0.8,B+hy+0.4); c.lineTo(x+x0-0.8,B+hy+0.4); c.closePath();
       const gg=c.createLinearGradient(x+x0-2,0,x+x0+hw+2,0); gg.addColorStop(0,tone(G2,0.35-0.2*depth)); gg.addColorStop(0.5,tone(G2,0.05-0.2*depth)); gg.addColorStop(1,tone(G2,-0.35-0.1*depth));
       c.fillStyle=gg; c.fill(); c.strokeStyle=tone(G2,-0.6); c.lineWidth=0.6; c.stroke();
@@ -2723,19 +2768,31 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       drawBelt(Y.WAIST-3.4,Math.max(WA,HI)+1.6,{col:'#3a2414',h:4.2,metal:TR,studs:true}); }
     else {                                                                    // plate: a breastplate with a ridge, a fauld of lames below the waist
       const top=Y.SHOULDER+(F?3:1.5), wst=Y.WAIST-1.5;
-      const bp=side ? [[LN+CH*0.1,top],[LN+CH+bR+0.6,top+1],[LN+CH+bR+1.2,top+8],[LN+WA+1.4,wst],[LN-WA*0.2,wst+0.5],[LN-CH*0.3,top+6]]
+      const bp = F ? (side ? [[LN+CH*0.1,Y.SHOULDER+0.8],[LN+CH*0.6,Y.SHOULDER+1.2],[LN+CH+bR+0.8,Y.SHOULDER+7.5],[LN+CH+bR+0.6,Y.SHOULDER+12],[LN+WA+0.6,wst],[LN-WA*0.2,wst+0.5],[LN-CH*0.3,Y.SHOULDER+6]]
+                          : [[LN-CH+0.6,Y.SHOULDER+0.4],[LN-CH+3.6,Y.SHOULDER+0.4],[LN-4.6+po,Y.SHOULDER+5.4],[LN+po,Y.SHOULDER+8.6],[LN+4.6+po,Y.SHOULDER+5.4],[LN+CH-3.6,Y.SHOULDER+0.4],[LN+CH-0.6,Y.SHOULDER+0.4],   // a sweetheart neckline between two shoulder plates
+                             [LN+CH+bR+0.6,Y.SHOULDER+7],[LN+CH+bR,Y.SHOULDER+12],[LN+WA+0.5,wst],[LN+po,wst+2.4],[LN-WA-0.5,wst],[LN-CH-bL,Y.SHOULDER+12],[LN-CH-bL-0.6,Y.SHOULDER+7]])
+               : side ? [[LN+CH*0.1,top],[LN+CH+bR+0.6,top+1],[LN+CH+bR+1.2,top+8],[LN+WA+1.4,wst],[LN-WA*0.2,wst+0.5],[LN-CH*0.3,top+6]]
                     : [[LN-CH+0.4,top],[LN+CH+bR-0.4,top],[LN+CH+bR+0.6,top+7],[LN+WA+1.2,wst],[LN+po,wst+2.6],[LN-WA-1.2,wst],[LN-CH-bL-0.6,top+7]];
-      for(let k=0;k<3;k++){ const yy=wst+0.5+k*3.4, w=(HI+2.2+k*0.5)*(side?0.9:1);                      // the fauld
+      if(F){ for(let k=0;k<2;k++){ const yy=wst+0.5+k*3.2, w=(HI+1.6+k*0.8)*(side?0.9:1), gap=side?0:2.2+k*1.4;   // her fauld: two lames, flared at the hip and cut open at the front
+          [-1,1].forEach(sd=>{ if(side && sd<0) return; c.fillStyle=lit(S,0.06-k*0.08); c.beginPath(); c.moveTo(x+LN+po*0.5+sd*gap,B+yy); c.lineTo(x+LN+sd*w,B+yy); c.lineTo(x+LN+sd*(w+0.8),B+yy+3.2); c.lineTo(x+LN+po*0.5+sd*(gap+1.4),B+yy+3.2); c.closePath(); c.fill();
+            c.strokeStyle=lit(S,-0.6); c.lineWidth=0.5; c.stroke(); c.fillStyle=TR; c.fillRect(x+LN+Math.min(sd*w,sd*gap),B+yy+2.7,Math.abs(w-gap),0.55); }); } }
+      else for(let k=0;k<3;k++){ const yy=wst+0.5+k*3.4, w=(HI+2.2+k*0.5)*(side?0.9:1);                      // the fauld
         c.fillStyle=lit(S,0.06-k*0.08); c.beginPath(); c.moveTo(x+LN-w,B+yy); c.lineTo(x+LN+w,B+yy); c.lineTo(x+LN+w+0.4,B+yy+3.4); c.lineTo(x+LN-w-0.4,B+yy+3.4); c.closePath(); c.fill();
         c.strokeStyle=lit(S,-0.6); c.lineWidth=0.5; c.stroke(); c.fillStyle=TR; c.fillRect(x+LN-w,B+yy+2.9,w*2,0.6); }
       path(bp,1.4); const gb=c.createLinearGradient(x+LN-CH-2,0,x+LN+CH+bR+2,0); gb.addColorStop(0,lit(S,A?0.42:0.18)); gb.addColorStop(0.45,lit(S,A?0.08:0)); gb.addColorStop(1,lit(S,A?-0.35:-0.3)); c.fillStyle=gb; c.fill();
       c.strokeStyle=lit(S,-0.65); c.lineWidth=0.8; c.stroke();
-      if(front && !side){ c.strokeStyle=lit(S,A?0.5:0.2); c.lineWidth=0.6; c.beginPath(); c.moveTo(x+LN+po,B+top+1); c.lineTo(x+LN+po,B+wst+1.6); c.stroke(); }   // the ridge
+      if(front && !side && !F){ c.strokeStyle=lit(S,A?0.5:0.2); c.lineWidth=0.6; c.beginPath(); c.moveTo(x+LN+po,B+top+1); c.lineTo(x+LN+po,B+wst+1.6); c.stroke(); }   // the ridge
+      if(F && front){ c.save(); path(bp,1.4); c.clip();                                                    // her breastplate is shaped: a cup over each breast, a line of shadow beneath, a cinched waist
+        [-1,1].forEach(sd=>{ if(side && sd<0) return; const bx=side ? LN+CH+bR-3.2 : LN+po*0.9+sd*5.2, by=Y.SHOULDER+9.6;
+          const hg=c.createRadialGradient(x+bx-1.4,B+by-1.8,0.3,x+bx,B+by,6); hg.addColorStop(0,'rgba(255,255,255,0.3)'); hg.addColorStop(0.5,'rgba(255,255,255,0.05)'); hg.addColorStop(1,'rgba(0,0,0,0)'); c.fillStyle=hg; c.beginPath(); c.arc(x+bx,B+by,6,0,Math.PI*2); c.fill();
+          c.strokeStyle='rgba(8,8,10,0.55)'; c.lineWidth=0.7; c.beginPath(); c.ellipse(x+bx,B+by+0.4,4.6*(side?0.7:1),4.2,0,0.15*Math.PI,0.85*Math.PI); c.stroke(); });
+        c.strokeStyle='rgba(255,176,80,0.5)'; c.lineWidth=0.4; [-1,1].forEach(sd=>{ c.beginPath(); c.moveTo(x+LN+sd*(WA+0.4),B+wst-1); c.quadraticCurveTo(x+LN+sd*(WA-1.2),B+Y.SHOULDER+15,x+LN+sd*(CH-0.6),B+Y.SHOULDER+12.6); c.stroke(); });
+        c.restore(); }
       c.strokeStyle=TR; c.lineWidth=Cr?0.7:1.0; path(bp,1.4); c.stroke();                                // brass rim, or the rune channel round the edge
       if(A && front){ c.fillStyle='rgba(255,255,255,0.32)'; c.beginPath(); c.ellipse(x+LN+po-CH*0.4,B+top+5,CH*0.25,3,-0.3,0,Math.PI*2); c.fill();
         fs(TR); [[-0.55,top+2],[0.55,top+2],[-0.5,wst-2],[0.5,wst-2]].forEach(([u,yy])=>{ c.beginPath(); c.arc(x+LN+po+u*CH,B+yy,0.6,0,Math.PI*2); c.fill(); }); }
       if(Cr && front){ c.save(); c.globalCompositeOperation='lighter'; c.strokeStyle='rgba(255,150,60,0.85)'; c.lineWidth=0.6; c.lineCap='square';   // runes, glowing like the inside of a forge
-        const cx=LN+po*(side?0.4:1)+(side?CH*0.5:0); for(let k=0;k<4;k++){ const yy=top+4+k*((wst-top-6)/3); c.beginPath(); if(k%2){ c.moveTo(x+cx-1.4,B+yy-1.4); c.lineTo(x+cx,B+yy+1.4); c.lineTo(x+cx+1.4,B+yy-1.4); } else { c.moveTo(x+cx,B+yy-1.6); c.lineTo(x+cx,B+yy+1.6); c.moveTo(x+cx-1.3,B+yy); c.lineTo(x+cx+1.3,B+yy); } c.stroke(); }
+        const cx=LN+po*(side?0.4:1)+(side?CH*0.5:0), r0=F?Y.SHOULDER+14:top+4, nR=F?2:4; for(let k=0;k<nR;k++){ const yy=r0+k*((wst-r0-2)/Math.max(1,nR-1)); c.beginPath(); if(k%2){ c.moveTo(x+cx-1.4,B+yy-1.4); c.lineTo(x+cx,B+yy+1.4); c.lineTo(x+cx+1.4,B+yy-1.4); } else { c.moveTo(x+cx,B+yy-1.6); c.lineTo(x+cx,B+yy+1.6); c.moveTo(x+cx-1.3,B+yy); c.lineTo(x+cx+1.3,B+yy); } c.stroke(); }
         const gg=c.createRadialGradient(x+cx,B+(top+wst)/2,0,x+cx,B+(top+wst)/2,9); gg.addColorStop(0,'rgba(255,140,40,0.25)'); gg.addColorStop(1,'rgba(255,140,40,0)'); c.fillStyle=gg; c.fillRect(x+cx-10,B+top,20,wst-top+4); c.restore(); } }
   }
   // pauldrons for the heavy sets: a domed cap over each shoulder with two lames beneath, drawn after the arms so they sit on top of them
@@ -2745,7 +2802,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       if(which==='near' && !near) return; if(which==='far' && near) return; if(side && sd<0) return;
       const sx=side ? LN+CH*0.1 : LN+sd*(CH+(sd>0?bR:bL)+(q3?-1.0:0.4))*(q3&&!near?0.86:1),   /* facing you they sit out on the shoulders; half-turned, closer in */ sy=Y.SHOULDER+0.8, k3=q3&&!near?0.75:1, tilt=side?0.12:sd*0.3;
       c.save(); c.translate(x+sx,B+sy); c.rotate(tilt);                                                        // tilted out and down over the upper arm
-      for(let k=0;k<3;k++){ const rx=(7.2-k*0.7)*k3*(side?0.85:1), ry=3.8-k*0.2, yy=(2-k)*2.6;               // two lames, then the domed cap on top
+      for(let k=0;k<3;k++){ const fs2=F?0.8:1, rx=(7.2-k*0.7)*k3*(side?0.85:1)*fs2, ry=(3.8-k*0.2)*fs2, yy=(2-k)*2.6;               // two lames, then the domed cap on top
         const gp=c.createLinearGradient(-rx,0,rx,0); gp.addColorStop(0,tone(S,0.32)); gp.addColorStop(0.5,tone(S,0.08)); gp.addColorStop(1,tone(S,-0.25));
         c.fillStyle=gp; c.beginPath(); c.ellipse(0,yy,rx,ry*(k===2?1.25:1),0,Math.PI,0); c.lineTo(rx,yy+0.9); c.lineTo(-rx,yy+0.9); c.closePath(); c.fill();
         c.strokeStyle=tone(S,-0.65); c.lineWidth=0.6; c.stroke();

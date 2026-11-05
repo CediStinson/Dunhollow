@@ -2067,6 +2067,23 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   }
 
   // ── armour ──
+  function drawApron(){                                  // a smith's apron: a heavy leather bib on a neck strap, tied at the waist, falling to the knee
+    const J=GEAR.jerkin, top=Y.SHOULDER+(F?7:4), knee=Y.KNEE+1.5;
+    if(!front){ c.strokeStyle=tone(J,-0.3); c.lineWidth=1.6; c.lineCap='round';                       // from behind: the waist strap and its knot, and the neck strap
+      c.beginPath(); c.moveTo(x+LN-WA-1,B+Y.WAIST-2); c.quadraticCurveTo(x+LN,B+Y.WAIST-1,x+LN+WA+1,B+Y.WAIST-2); c.stroke();
+      c.beginPath(); c.moveTo(x+LN-2.5,B+Y.WAIST-1.5); c.lineTo(x+LN-4,B+Y.WAIST+5); c.moveTo(x+LN+2.5,B+Y.WAIST-1.5); c.lineTo(x+LN+4,B+Y.WAIST+5); c.stroke();
+      c.lineWidth=1.2; c.beginPath(); c.moveTo(x+LN-3,B+Y.SHOULDER-2.5); c.quadraticCurveTo(x+LN,B+Y.SHOULDER-1.5,x+LN+3,B+Y.SHOULDER-2.5); c.stroke(); return; }
+    const side=pr>0.75, cx=side?LN+CH*0.6:LN+po*0.9, tw=side?2.6:CH*0.62*(1-pr*0.3), ww=side?3.2:(WA+0.8)*(1-pr*0.25), kw=side?3.6:(HI+2)*(1-pr*0.25);
+    const pts=[[cx-tw,top],[cx+tw,top],[cx+ww,Y.WAIST-1],[cx+kw,knee-2],[cx+kw*0.7,knee+0.6],[cx,knee+1.2],[cx-kw*0.7,knee+0.6],[cx-kw,knee-2],[cx-ww,Y.WAIST-1]];
+    c.strokeStyle=tone(J,-0.35); c.lineWidth=1.1; c.beginPath(); c.moveTo(x+cx-tw+0.5,B+top); c.lineTo(x+LN-(side?1:3.2),B+Y.SHOULDER-2.6); c.moveTo(x+cx+tw-0.5,B+top); c.lineTo(x+LN+(side?2:3.2),B+Y.SHOULDER-2.6); c.stroke();   // the neck strap
+    mass(pts,J,tone(J,-0.55));
+    c.save(); path(pts); c.clip();
+      const ga=c.createLinearGradient(x+cx-kw,0,x+cx+kw,0); ga.addColorStop(0,tone(J,0.18)); ga.addColorStop(0.5,tone(J,0)); ga.addColorStop(1,tone(J,-0.28)); c.fillStyle=ga; c.fillRect(x+cx-kw-2,B+top-1,kw*2+4,knee-top+4);
+      for(let i=0;i<9;i++){ const gx=cx-ww+((i*37)%100)/100*ww*2, gy=Y.WAIST+((i*53)%100)/100*(knee-Y.WAIST-3); c.fillStyle='rgba(20,10,4,0.16)'; c.beginPath(); c.ellipse(x+gx,B+gy,1.6,0.8,0.4,0,Math.PI*2); c.fill(); }   // scorch marks
+      if(!side){ c.strokeStyle=tone(J,-0.45); c.lineWidth=0.6; c.strokeRect(x+cx-3.2,B+Y.WAIST+3,6.4,5); c.strokeStyle=tone(J,0.3,0.6); c.lineWidth=0.35; c.setLineDash([0.6,0.6]); c.strokeRect(x+cx-2.8,B+Y.WAIST+3.4,5.6,4.2); c.setLineDash([]); }   // a pocket for the tongs
+    c.restore();
+    fs('#a4a8ae'); [[cx-tw+0.9,top+1],[cx+tw-0.9,top+1]].forEach(([a,b])=>{ c.beginPath(); c.arc(x+a,B+b,0.6,0,Math.PI*2); c.fill(); });
+    c.strokeStyle=tone(J,-0.3); c.lineWidth=1.3; c.beginPath(); c.moveTo(x+cx-ww,B+Y.WAIST-1); c.lineTo(x+LN-WA-1.2,B+Y.WAIST-1.6); c.moveTo(x+cx+ww,B+Y.WAIST-1); c.lineTo(x+LN+WA+1.2,B+Y.WAIST-1.6); c.stroke(); }   // the waist ties
   function drawJerkin(){
     const J=GEAR.jerkin, hem=F?-42.5:-37, hemW=F?WA+1.6:HI+1.8;
     const vW=F?4.6:3.2, vD=F?12.8:7.5;              // neckline opening: wider and deeper on a woman
@@ -3023,7 +3040,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   else if(ROBE) sheerLayer(0.58,drawElfRobe);
   else if(BUST) drawElfBustier();
   if(vA==='gambeson') drawGambeson();
-  else if(E.armor==='jerkin'){ drawJerkin(); if(vA==='studded') drawStuds(); }
+  else if(E.armor==='jerkin'){ if(vA==='smith_apron') drawApron(); else { drawJerkin(); if(vA==='studded'||vA==='dwarf_harness') drawStuds(); if(vA==='dwarf_harness') drawBelt(Y.WAIST-3.6,Math.max(WA,HI)+1.4,{col:'#3a2414',h:4.4,metal:'#a4a8ae',studs:true}); } }
   else if(E.armor==='mail'){ drawMail(vA==='brightmail' ? (F?-29:-27) : 0); if(vA==='blackmail') drawBrigandine(); if(vA==='brightmail') drawSurcoat(); }
   else if(E.armor==='elf_scale') drawElfScale();
   else if(E.armor==='elf_harness') drawElfHarness(HZ_KIND[vA]||'leaf');
@@ -4788,7 +4805,8 @@ const CREATOR_FIG={};
 const ELF_START={ torso:'elf_shirt', legs:'elf_trousers', feet:null };   // barefoot, in plain elvish homespun
 const NUDE_EQUIP={ head:null, torso:null, armor:null, hands:null, legs:null, feet:null, weapon:null, offhand:null };
 let creatorDir=0, creatorClothed=true;
-function dressedEquip(){ return charOpts.race==='elf' ? {...NUDE_EQUIP, ...ELF_START} : defaultEquip(); }
+const DWARF_START={ torso:'tunic_deep', feet:'hobnail_boots' };   // dwarves start in deepwool and hobnails
+function dressedEquip(){ return charOpts.race==='elf' ? {...NUDE_EQUIP, ...ELF_START} : charOpts.race==='dwarf' ? {...defaultEquip(), ...DWARF_START} : defaultEquip(); }
 function creatorEquip(){ return creatorClothed ? dressedEquip() : {...NUDE_EQUIP}; }
 function drawCreator(){ drawLitFigure(cc, {...charOpts, equip:creatorEquip()}, creatorDir,44,5.0,CREATOR_FIG); }
 
@@ -21289,17 +21307,17 @@ JOURNAL.push(['Seeds of the Heartwood', ()=>{ const Q=seedsQ(); if(!Q) return nu
 // Their hold lies north, where the mountains begin. Elves and dwarves remember old wrongs (axes and forests, roots in the stone) and trade anyway.
 const DWARFO=o=>({race:'dwarf', face:0, eyeColor:0, ...o, equip:{head:null,torso:'shirt',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null,...(o.equip||{})}});
 const DWARVES=[
-  { id:'hrolf', name:'Hrolf Stonevein', area:'smithy', i:2, j:3, dir:2, opts:DWARFO({gender:'m', skin:2, hair:2, hairColor:6, beard:6, face:1, equip:{armor:'jerkin', hands:'gloves', weapon:'mace'}}),
+  { id:'hrolf', name:'Hrolf Stonevein', area:'smithy', i:2, j:3, dir:2, opts:DWARFO({gender:'m', skin:2, hair:2, hairColor:6, beard:6, face:1, equip:{torso:'tunic_deep', armor:'smith_apron', hands:'iron_bracers', feet:'hobnail_boots', weapon:'mace'}}),
     hello:["<i>A dwarf stands at Oswin’s anvil with his sleeves rolled, turning a horseshoe in his fingers and frowning at it.</i> “Soft. Soft iron, soft fire, soft hands. No offence to the man; he does well with what the valley gives him.”"],
     ask:[["Where are you from?",["“Varrowdeep. North, where the hills stop pretending and turn into mountains. We have been under that stone longer than your Baron’s family has had a name.”","“I came down for charcoal and stayed for the bread. Do not tell my wife.”"]],
          ["What do you think of Oswin’s work?",["“Honest. Honest work is worth more than clever work, and he knows the difference.” <i>He sets the shoe down, gently.</i> “He let me show his boy how to fold steel. The boy burnt a thumb. He will remember it longer than any lesson.”"]],
          ["Have you met the elves?",["“I have met their arrows. Long ago, at the edge of their wood, when my grandfather’s people came down to cut timber for the deep halls.” <i>He shrugs.</i> “We needed the wood. They needed the trees. Both of us were right, and that is the worst sort of quarrel.”"]]] },
-  { id:'dagna', name:'Dagna Copperbraid', area:'kingsroad', i:4, j:12, dir:2, opts:DWARFO({gender:'f', skin:1, hair:3, hairColor:8, face:5, equip:{armor:'gambeson', head:'hood', feet:'boots'}}),
+  { id:'dagna', name:'Dagna Copperbraid', area:'kingsroad', i:4, j:12, dir:2, opts:DWARFO({gender:'f', skin:1, hair:3, hairColor:8, face:5, equip:{torso:'tunic_deep', armor:'gambeson', head:'hood', feet:'hobnail_boots'}}),
     hello:["<i>A broad dwarf woman sits on a milestone with her boots off, rubbing her feet and glaring down the road as if it had done it on purpose.</i> “Three days from the Deep and the road still has not ended. Who builds a road this long? Men. Only men.”"],
     ask:[["What brings you down from the mountains?",["“Trade. We have iron and silver and good stone, and no wool, no grain, no apples worth the name.” <i>She sniffs.</i> “Your apples are the only thing down here I would carry home on my back.”"]],
          ["Is the road safe for you?",["“Safe enough. Bandits see a dwarf and count our axes before our purses.” <i>She pats the hatchet on her pack.</i> “And the Baron’s men think we are a story for children. Let them.”"]],
          ["Do you trade with the elves?",["“When they let us. A cart goes to the Silver Gate twice a year: our silver for their thread. They count every coin twice, and we count every leaf thrice, and nobody smiles.”","“But the thread is very good.” <i>She says it as if it costs her something.</i>"]]] },
-  { id:'kettil', name:'Old Kettil', area:'wheatsheaf', i:4, j:5, dir:3, opts:DWARFO({gender:'m', skin:1, hair:1, hairColor:13, beard:6, face:5, equip:{armor:'jerkin', legs:'breeches'}}),
+  { id:'kettil', name:'Old Kettil', area:'wheatsheaf', i:4, j:5, dir:3, opts:DWARFO({gender:'m', skin:1, hair:1, hairColor:13, beard:6, face:5, equip:{torso:'tunic_deep', armor:'dwarf_harness', legs:'breeches', feet:'hobnail_boots'}}),
     hello:["<i>An old dwarf sits with his beard tucked into his belt and both hands round a mug, as if it might try to leave.</i> “Bertha’s ale. Thin as a sermon, but it is wet, and she does not water it when I am watching.”"],
     ask:[["Why are you so far from home?",["“I walked out of Varrowdeep forty years ago and never found a good reason to walk back in.” <i>He drinks.</i> “The deep halls are very grand. They are also very dark, and very full of my cousins.”"]],
          ["Tell me about the dwarves and the elves.",["“Ha. Sit down; it is a long grudge.” <i>He wipes his beard.</i> “We dig. Roots get in the way. They grow. Our tunnels get in the way. Once, a long time ago, a king of ours cut a road through their old wood to reach the silver in the hills behind it, and the trees he felled are still being mourned.”","“They say we have stone for hearts. We say they have sap. Both of us are a little bit right.”"]],
@@ -21445,13 +21463,29 @@ OBJ_DRAW.orecart=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y;
 OBJ_DRAW.dthrone=o=>{ isoBox(o.i+0.1,o.j+0.15,0.8,0.7,16,'#8a8378','#6a645b','#504b44');   // the seat
   const a=P(o.i+0.1,o.j+0.15), b=P(o.i+0.9,o.j+0.15); g.fillStyle='#6a645b'; g.beginPath(); g.moveTo(a.x,a.y-16); g.lineTo(b.x,b.y-16); g.lineTo(b.x,b.y-96); g.lineTo((a.x+b.x)/2,(a.y+b.y)/2-112); g.lineTo(a.x,a.y-96); g.closePath(); g.fill();   // the high back
   g.fillStyle='rgba(210,170,90,0.6)'; const m={x:(a.x+b.x)/2,y:(a.y+b.y)/2}; g.beginPath(); g.moveTo(m.x,m.y-92); g.lineTo(m.x+8,m.y-70); g.lineTo(m.x,m.y-50); g.lineTo(m.x-8,m.y-70); g.closePath(); g.fill(); };
+// ── dwarven clothes: made under the mountain, worn by anyone who can afford the weight ──
+Object.assign(ITEMS,{
+  tunic_deep:{ name:'Deepwool Tunic', slot:'torso', base:'shirt', col:'#6e4426' },
+  dwarf_harness:{ name:"Delver's Harness", slot:'armor', base:'jerkin', col:'#3e2a18' },
+  smith_apron:{ name:"Smith's Apron", slot:'armor', base:'jerkin', col:'#5e3c22' },
+  hobnail_boots:{ name:'Hobnail Boots', slot:'feet', base:'boots', col:'#33241a' },
+  iron_bracers:{ name:'Iron Bracers', slot:'hands', base:'gloves', col:'#6a6e74' } });
+Object.assign(ITEM_STATS,{ tunic_deep:{hp:2}, dwarf_harness:{hp:6,ap:1}, smith_apron:{hp:4}, hobnail_boots:{hp:3}, iron_bracers:{hp:2,ap:1} });
+Object.assign(GEAR_HP,{ tunic_deep:2, dwarf_harness:6, smith_apron:4, hobnail_boots:3, iron_bracers:2 });
+Object.assign(PRICES,{ tunic_deep:30, dwarf_harness:120, smith_apron:45, hobnail_boots:40, iron_bracers:55 });
+['tunic_deep','dwarf_harness','smith_apron','hobnail_boots','iron_bracers'].forEach(id=>{ ITEM_LEVEL_FIX[id]=id==='dwarf_harness'?6:3; });
+Object.assign(ITEM_LORE,{ tunic_deep:"Thick, felted wool the colour of rust, made to keep out the cold of the deep galleries. It itches, and it will outlast you.",
+  dwarf_harness:"A miner's jerkin, studded, with a belt as broad as your hand. Every ring and buckle on it is there to hang a tool from.",
+  smith_apron:"Leather two fingers thick, scorched brown and black. Sparks bounce off it. So, Gorm says, does most other trouble.",
+  hobnail_boots:"Heavy boots with iron nails in the soles, for wet stone and steep stairs. They ring on a floor like a little bell.",
+  iron_bracers:"Riveted iron cuffs from wrist to elbow, the kind the hold's guards wear under their gauntlets." });
 // the people of the Great Hall
 const VARROW_FOLK=[
   { id:'thane', name:'Thane Sigrid Varrowborn', i:9, j:3, dir:2, opts:DWARFO({gender:'f', skin:1, hair:7, hairColor:12, face:2, equip:{head:null, armor:'varrow_mail', hands:null, legs:'trousers', feet:'boots'}}) },
-  { id:'gorm', name:'Master Smith Gorm', i:3, j:3, dir:1, opts:DWARFO({gender:'m', skin:2, hair:2, hairColor:6, beard:6, face:5, equip:{armor:'jerkin', hands:'varrow_gauntlets', weapon:'mace'}}) },
-  { id:'ulla', name:'Ulla the Trader', i:3, j:11, dir:1, opts:DWARFO({gender:'f', skin:2, hair:3, hairColor:3, face:4, equip:{armor:'gambeson'}}) },
-  { id:'brakka', name:'Old Mother Brakka', i:13, j:2, dir:2, opts:DWARFO({gender:'f', skin:1, hair:4, hairColor:13, face:5, equip:{armor:'jerkin'}}) },
-  { id:'halvard', name:'Foreman Halvard', i:15, j:8, dir:3, opts:DWARFO({gender:'m', skin:1, hair:2, hairColor:3, beard:5, face:1, equip:{head:'kettle', armor:'jerkin', weapon:'hatchet'}}) },
+  { id:'gorm', name:'Master Smith Gorm', i:3, j:3, dir:1, opts:DWARFO({gender:'m', skin:2, hair:2, hairColor:6, beard:8, face:5, equip:{torso:'tunic_deep', armor:'smith_apron', hands:'iron_bracers', feet:'hobnail_boots', weapon:'mace'}}) },
+  { id:'ulla', name:'Ulla the Trader', i:3, j:11, dir:1, opts:DWARFO({gender:'f', skin:2, hair:3, hairColor:3, face:4, equip:{torso:'tunic_deep', feet:'hobnail_boots'}}) },
+  { id:'brakka', name:'Old Mother Brakka', i:13, j:2, dir:2, opts:DWARFO({gender:'f', skin:1, hair:4, hairColor:13, face:5, equip:{torso:'tunic_deep', armor:'smith_apron'}}) },
+  { id:'halvard', name:'Foreman Halvard', i:15, j:8, dir:3, opts:DWARFO({gender:'m', skin:1, hair:2, hairColor:3, beard:7, face:1, equip:{head:'kettle', torso:'tunic_deep', armor:'dwarf_harness', hands:'iron_bracers', feet:'hobnail_boots', weapon:'hatchet'}}) },
   { id:'bodil_h', name:'Envoy Bodil Granitebrow', i:11, j:6, dir:1, when:()=>CHOICE.vqEnd==='atoned', opts:DWARVES.find(d=>d.id==='bodil').opts } ];
 { const B0=DWARVES.find(d=>d.id==='bodil'); wrap('silvergate','npcs',l=>CHOICE.vq==='atoned'||CHOICE.vqEnd==='atoned' ? l.filter(n=>n.id!=='bodil') : l); }
 const VARROW_GEAR=()=>['varrow_axe','varrow_helm','varrow_gauntlets',...(vq()==='done'?['varrow_mail']:[]),'axe','mace','mail','helm_full','gauntlets','shield_iron','plate_boots'].filter(id=>ITEMS[id]&&PRICES[id]);
@@ -21482,7 +21516,7 @@ function gormTalk(){ const G='Master Smith Gorm'; say(G,["<i>He does not look up
     vq()==='done'?"“The Thane says you are owed. Here is what I have.”":"“For coin I will sell you a little. The best I keep for those the hold owes.”"],
   [{label:'“Show me your work.”', fn:()=>shopFrom(G,VARROW_GEAR(),vq()==='done'?0.85:1.15,["“Folded nine times, quenched in snow-water. Do not bring it back bent.”"],gormTalk)}, bye]); }
 function ullaTalk(){ const U='Ulla the Trader'; say(U,["“Bread from the valley, draughts from Hollowmere, antidote from somewhere nobody should go.” <i>She grins.</i> “Everything comes up the pass, and everything costs more for the climb.”"],
-  [{label:'“What have you got?”', fn:()=>shopFrom(U,['potion','mana_potion','antidote','bread','cooked_meat','apple'].filter(id=>ITEMS[id]&&PRICES[id]),1.1,["“Coin first, then goods. A mountain custom.”"],ullaTalk)}, bye]); }
+  [{label:'“What have you got?”', fn:()=>shopFrom(U,['tunic_deep','smith_apron','hobnail_boots','iron_bracers','dwarf_harness','potion','mana_potion','antidote','bread','cooked_meat','apple'].filter(id=>ITEMS[id]&&PRICES[id]),1.1,["“Coin first, then goods. A mountain custom.”"],ullaTalk)}, bye]); }
 function brakkaTalk(){ const M='Old Mother Brakka'; say(M,["<i>An old dwarf woman stirs a pot as big as a barrel by the hearth. She has seen you come in and has already filled a bowl.</i> “Eat. Nobody talks in my hall on an empty stomach.”",
     ["“Durnhal? My grandmother’s grandmother saw him crowned. She said he laughed like a rockfall and wept like a child when his wife died, and that he never once said sorry to anybody.”","“You young ones think the elves are proud. Try being three hundred years in the wrong and too stubborn to say it.”","“The quiet below? Hm. Things that are buried want to be finished with. Same as people.”"][Math.floor(dayClock/DAY_LEN)%3]],
   [{label:'Eat the stew. (Rest a little)', fn:()=>{ player.hp=Math.min(player.maxHp,player.hp+Math.round(player.maxHp*0.3)); updateHud(); say(M,"“There. Now you have colour in your face.”",[bye]); }}, bye]); }

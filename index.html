@@ -9311,7 +9311,7 @@ function draw(){
   const onScr=(gi,gj,mx,up)=>{ const q=P(gi,gj); return q.x>-mx && q.x<W+mx && q.y>-60 && q.y<H+up; };
   OBJECTS.forEach(o=>{ const fw=o.fp?o.fp[0]:1, fh=o.fp?o.fp[1]:1;
     if(!onScr(o.i+fw/2,o.j+fh/2,120+(fw+fh)*70,260+(o.tall||(o.type==='tree'?200:o.fp?420:120)))) return;
-    items.push({d:o.fp?o.i+o.j+o.fp[0]+o.fp[1]-1.2:(o.type==='debris'?o.i+o.j+0.2:o.i+o.j+1), fn:()=>drawObject(o)}); });
+    items.push({d:o.dz!=null?o.dz:o.fp?o.i+o.j+o.fp[0]+o.fp[1]-1.2:(o.type==='debris'?o.i+o.j+0.2:o.i+o.j+1), fn:()=>drawObject(o)}); });
   NPCS.forEach(n=>{ const nx=n.x??n.i+0.5, ny=n.y??n.j+0.5; if(!onScr(nx,ny,80,200)) return; items.push({d:nx+ny+0.01, fn:()=>drawNPC(n), ax:nx, ay:ny}); });
   mobs.forEach(m=>{ if(!m.gone) items.push({d:m.x+m.y+0.01, fn:()=>drawActor(m), ax:m.x, ay:m.y}); });
   items.push({d:player.x+player.y+0.01, fn:()=>drawActor(player), ax:player.x, ay:player.y});
@@ -9376,6 +9376,7 @@ function pointerUp(px,py){
     }
     if(m && calmThug(m) && cheb([m.i,m.j],[player.i,player.j])<=6){ thugTalk(m); return; }
     if(m && cheb([m.i,m.j],[player.i,player.j])<=6){ startCombat(); return; }
+    { const st=typeof stairsAt==='function' && stairsAt(ti,tj); if(st){ goStairs(st); return; } }
     const pz = (typeof PUZ_TYPES!=='undefined') && OBJECTS.find(o=>PUZ_TYPES.has(o.type) && o.i===ti && o.j===tj);
     if(pz){ if(cheb([pz.i,pz.j],[player.i,player.j])<=1){ puzAct(pz); return; }
       let best=null; for(const [di,dj] of DIR_DELTA){ const p=findPath(player.i,player.j,pz.i+di,pz.j+dj); if(p && (!best||p.length<best.length)) best=p; }
@@ -13760,9 +13761,9 @@ function drawActorBase(e){
   if(isP && !e.opts) return;
   let wx=e.x+(e.ox||0), wy=e.y+(e.oy||0);
   if(e.lunge){ const k=Math.sin(Math.PI*Math.min(1,e.lunge.t/0.3)); wx+=e.lunge.dx*0.36*k; wy+=e.lunge.dy*0.36*k; }
-  const s=P(wx,wy), bob=e.moving?-Math.abs(Math.sin(gt*10))*2.5:0, B=s.y+bob;
+  const s=P(wx,wy), bob=e.moving?-Math.abs(Math.sin(gt*10))*2.5:0, B=s.y+bob-(e.climb?e.climb.lift:0);
   const open = !isP && e===combat.foe && (e.state==='recover'||e.state==='stagger') && combat.phase==='fight';
-  g.save();
+  g.save(); if(e.climb && e.fade!=null) g.globalAlpha*=e.fade;    // fading as you go round the turn of the stair
   if(!isP && e.dead && e.type!=='skeleton'){      // topple over and stay down, instead of fading away
     const fallP=Math.min(1,(e.fallT||0)/0.55), ease=1-(1-fallP)*(1-fallP);
     const dir2=(e.id%2===0)?1:-1;
@@ -21811,6 +21812,64 @@ function paintMineTimbers(){ const {w,h}=ROOM, H=120;
     for(let k=0;k<26;k++){ const u=rnd01(k,side==='r'?1:2,901)*len, hh=20+rnd01(k,3,902)*70, p=WPT(side,u,hh); g.fillStyle=k%3?'rgba(200,170,90,0.75)':'rgba(170,190,210,0.7)'; g.beginPath(); g.arc(p.x,p.y,1.4+rnd01(k,4,903)*1.6,0,Math.PI*2); g.fill(); } });   // flecks of ore
 }
 { const _p=paintInteriorWalls; paintInteriorWalls=function(){ const A=AREAS[areaId]; if(A && A.dwarf && !A.mine) return paintDwarfWalls(); const r=_p.apply(this,arguments); if(A && A.dwarf && A.mine) paintMineTimbers(); return r; }; }
+// ════════ STAIRS: a flight of steps against the back wall, and a stairwell going down on the floor above.
+// Click them: you walk to the foot, climb (or go down) step by step, and the room changes like at any door. ════════
+// {type:'stairs', i, j, fp:[1,L], to, entry}       rises toward j (the back wall); the foot is the tile in front, (i, j+L)
+// {type:'stairs', i, j, fp:[L,1], dir:'i', ...}   rises toward i (the left wall); the foot is (i+L, j)
+// {type:'stairsdown', ...}                         the same shapes, an opening in the floor going down
+const STAIR_RISE=78;
+const stairFoot=o=>o.dir==='i' ? [o.i+o.fp[0], o.j] : [o.i, o.j+o.fp[1]];
+function drawStairs(o){ const L=o.dir==='i'?o.fp[0]:o.fp[1], N=L*4, ST=o.stone, top=ST?'#9a9288':'#8a6440', lf=ST?'#6e675e':'#6a4a2c', rt=ST?'#4e4942':'#4a3220';
+  const box=(k,h)=>{ const a=L-(k+1)*L/N; if(o.dir==='i') isoBox(o.i+a,o.j+0.06,L/N,0.88,h,top,lf,rt); else isoBox(o.i+0.06,o.j+a,0.88,L/N,h,top,lf,rt); };
+  for(let k=N-1;k>=0;k--) box(k,(k+1)*STAIR_RISE/N);
+  const p0=o.dir==='i'?P(o.i+L,o.j+0.97):P(o.i+0.97,o.j+L), p1=o.dir==='i'?P(o.i+0.1,o.j+0.97):P(o.i+0.97,o.j+0.1);   // the banister on the open side
+  g.strokeStyle=ST?'#5e5850':'#3a2414'; g.lineWidth=3; g.beginPath(); g.moveTo(p0.x,p0.y-30); g.lineTo(p1.x,p1.y-30-STAIR_RISE*0.95); g.stroke();
+  g.lineWidth=1.6; for(let k=0;k<=L*2;k++){ const t=k/(L*2), x=p0.x+(p1.x-p0.x)*t, y=p0.y+(p1.y-p0.y)*t, hh=STAIR_RISE*0.95*t; g.beginPath(); g.moveTo(x,y-hh); g.lineTo(x,y-hh-30); g.stroke(); }
+  g.fillStyle=ST?'#7e766c':'#5a3a20'; g.fillRect(p0.x-2.5,p0.y-34,5,34); }
+function drawStairsDown(o){ const L=o.dir==='i'?o.fp[0]:o.fp[1], a=P(o.i,o.j), b=P(o.i+(o.dir==='i'?L:1),o.j), c2=P(o.i+(o.dir==='i'?L:1),o.j+(o.dir==='i'?1:L)), d=P(o.i,o.j+(o.dir==='i'?1:L));
+  g.fillStyle='#120c06'; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c2.x,c2.y); g.lineTo(d.x,d.y); g.closePath(); g.fill();     // the stairwell
+  g.save(); g.clip(); const N=L*4; for(let k=0;k<N;k++){ const t=(k+0.5)/N, dark=0.15+0.85*(1-t);                                           // steps going down into the dark
+    const q0=o.dir==='i'?P(o.i+L-k*L/N,o.j):P(o.i,o.j+L-k*L/N), q1=o.dir==='i'?P(o.i+L-k*L/N,o.j+1):P(o.i+1,o.j+L-k*L/N), dy=k*STAIR_RISE/N*0.5;
+    g.strokeStyle=`rgba(150,110,70,${0.9*dark})`; g.lineWidth=3; g.beginPath(); g.moveTo(q0.x,q0.y+dy); g.lineTo(q1.x,q1.y+dy); g.stroke(); } g.restore();
+  g.strokeStyle='#3a2414'; g.lineWidth=3; [[a,b],[b,c2]].forEach(([p,q])=>{ g.beginPath(); g.moveTo(p.x,p.y-26); g.lineTo(q.x,q.y-26); g.stroke(); g.lineWidth=1.6; for(let t=0;t<=1.001;t+=0.25){ const x=p.x+(q.x-p.x)*t, y=p.y+(q.y-p.y)*t; g.beginPath(); g.moveTo(x,y); g.lineTo(x,y-26); g.stroke(); } g.lineWidth=3; }); }
+OBJ_DRAW.stairs=drawStairs; OBJ_DRAW.stairsdown=drawStairsDown;
+// clicking a flight: walk to its foot, then climb
+let pendingStairs=null;
+function stairsAt(ti,tj){ return OBJECTS.find(o=>(o.type==='stairs'||o.type==='stairsdown') && ti>=o.i && tj>=o.j && ti<o.i+o.fp[0] && tj<o.j+o.fp[1]) || OBJECTS.find(o=>(o.type==='stairs'||o.type==='stairsdown') && stairFoot(o)[0]===ti && stairFoot(o)[1]===tj); }
+function goStairs(o){ const [fi,fj]=stairFoot(o); if(player.i===fi && player.j===fj && !player.path.length) return climbStairs(o);
+  const p=findPath(player.i,player.j,fi,fj); if(p && p.length){ player.path=p; pendingStairs=o; } }
+function climbStairs(o){ if(player.climb) return; if(o.locked && o.locked()){ o.onLocked && o.onLocked(); return; }
+  const L=o.dir==='i'?o.fp[0]:o.fp[1], [fi,fj]=stairFoot(o), up=o.type==='stairs';
+  const x1=o.dir==='i'?o.i+0.35:o.i+0.5, y1=o.dir==='i'?o.j+0.5:o.j+0.35;
+  player.path=[]; player.dir=o.dir==='i'?dirTo([fi,fj],[fi-1,fj]):dirTo([fi,fj],[fi,fj-1]);
+  player.climb={o, t:0, dur:0.5+L*0.45, x0:fi+0.5, y0:fj+0.5, x1, y1, h:up?STAIR_RISE*(1-0.35/L):-STAIR_RISE*0.9, lift:0};
+  try{ SND.fx('step'); }catch(e){} }
+{ const _u=update; update=function(dt){ const C=player.climb;
+    if(C){ C.t+=dt; const k=Math.min(1,C.t/C.dur), e=k<0.5?2*k*k:1-Math.pow(-2*k+2,2)/2;   // walking up the steps: along the flight, rising (or sinking) as you go
+      player.x=C.x0+(C.x1-C.x0)*e; player.y=C.y0+(C.y1-C.y0)*e; player.moving=true; C.lift=C.h*e; player.fade=k>0.75?1-(k-0.75)/0.25*0.85:1;
+      if(k>=1){ const o=C.o; player.climb=null; player.fade=1; player.moving=false; try{ switchArea(o.to,o.entry); }catch(err){ console.warn(err); } } }
+    const r=_u.apply(this,arguments);
+    if(pendingStairs && !player.path.length && !player.climb){ const o=pendingStairs; pendingStairs=null; const [fi,fj]=stairFoot(o); if(OBJECTS.includes(o) && player.i===fi && player.j===fj) climbStairs(o); }
+    return r; }; }
+// ── the upper floors: guest rooms over the inns, the Guild's archive, the Gold Brothers' counting room, the soldiers' bunks ──
+const UPROOM=(label,w,h,objs,entry,extra)=>({ ...INSIDE_BASE, w, h, theme:'interior', label, mini:{x:0,y:0}, objects:objs, npcs:()=>[], entries:{ fromDown:entry }, ...(extra||{}) });
+const STAIRS_UP=[ ['inn',1,0,'inn_up','fromDown'], ['wheatsheaf',0,5,'wheatsheaf_up','fromDown','i'], ['guildhall',1,0,'guildhall_up','fromDown'], ['goldhouse',4,0,'goldhouse_up','fromDown'], ['barracks',3,0,'barracks_up','fromDown'] ];
+STAIRS_UP.forEach(([area,i,j,to,entry,dir])=>{ wrap(area,'objects',l=>[...l.filter(o=>!(o.i>=i&&o.i<i+(dir==='i'?2:1)&&o.j>=j&&o.j<j+(dir==='i'?1:2)&&o.type!=='teleporter')),
+    {type:'stairs', i, j, fp:dir==='i'?[2,1]:[1,2], dir, to, entry, dz:i+j}]);
+  AREAS[area].entries.fromUp = dir==='i' ? {i:i+2,j} : {i,j:j+2}; });
+Object.assign(AREAS,{
+  inn_up: UPROOM('The Crooked Lantern · Guest Rooms',7,5, ()=>[ {type:'stairsdown', i:1, j:0, fp:[1,2], to:'inn', entry:'fromUp', dz:1},
+      {type:'bed', i:3, j:0, fp:[2,1]}, {type:'bed', i:5, j:2, fp:[2,1]}, {type:'bed', i:3, j:3, fp:[2,1]}, {type:'crate', i:6, j:0}, {type:'chair', i:0, j:3}, {type:'table', i:0, j:4}, {type:'barrel', i:6, j:4} ], {i:1,j:2}),
+  wheatsheaf_up: UPROOM('The Wheatsheaf · Upstairs',6,5, ()=>[ {type:'stairsdown', i:0, j:3, fp:[2,1], dir:'i', to:'wheatsheaf', entry:'fromUp', dz:3},
+      {type:'bed', i:2, j:0, fp:[2,1]}, {type:'bed', i:4, j:2, fp:[2,1]}, {type:'crate', i:0, j:0}, {type:'chair', i:4, j:0}, {type:'barrel', i:5, j:4}, {type:'table', i:3, j:4} ], {i:2,j:3}),
+  guildhall_up: UPROOM('The Guildhall · Archive',7,5, ()=>[ {type:'stairsdown', i:1, j:0, fp:[1,2], to:'guildhall', entry:'fromUp', dz:1},
+      {type:'shelf', i:3, j:0}, {type:'shelf', i:4, j:0}, {type:'shelf', i:5, j:0}, {type:'table', i:4, j:2}, {type:'chair', i:4, j:3}, {type:'crate', i:6, j:3}, {type:'crates', i:6, j:4},
+      {type:'rune', i:0, j:4, text:"Ledgers to the ceiling: the dues of every guild in Hollowmere for eighty years. One shelf is labelled <i>“Baron, debts of”</i>. It is the fullest."} ], {i:1,j:2}),
+  goldhouse_up: UPROOM('Gold Brothers · Counting Room',7,5, ()=>[ {type:'stairsdown', i:4, j:0, fp:[1,2], to:'goldhouse', entry:'fromUp', dz:4},
+      {type:'counter', i:0, j:1, fp:[1,3]}, {type:'hoard', i:1, j:0}, {type:'crate', i:6, j:0}, {type:'crate', i:6, j:1}, {type:'table', i:2, j:3}, {type:'chair', i:3, j:3}, {type:'shelf', i:5, j:0},
+      {type:'rune', i:6, j:4, text:"A ledger left open: <i>“Bertram, Baron: owed 14,000 gold. Interest: compounding. Collateral: the valley.”</i> Someone has underlined <i>the valley</i> twice."} ], {i:4,j:2}),
+  barracks_up: UPROOM('The Barracks · Bunk Room',7,5, ()=>[ {type:'stairsdown', i:3, j:0, fp:[1,2], to:'barracks', entry:'fromUp', dz:3},
+      {type:'bed', i:0, j:0, fp:[2,1]}, {type:'bed', i:0, j:2, fp:[2,1]}, {type:'bed', i:5, j:0, fp:[2,1]}, {type:'bed', i:5, j:2, fp:[2,1]}, {type:'rack', i:0, j:4}, {type:'rack', i:6, j:4}, {type:'barrel', i:3, j:4} ], {i:3,j:2}) });
 // the people of the Great Hall
 const VARROW_FOLK=[
   { id:'thane', name:'Thane Sigrid Varrowborn', i:9, j:3, dir:2, opts:DWARFO({gender:'f', skin:1, hair:7, hairColor:12, face:2, equip:{head:null, armor:'varrow_mail', hands:null, legs:'trousers', feet:'boots'}}) },

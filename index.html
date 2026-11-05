@@ -9019,8 +9019,9 @@ function paintGroundTexture(){
       let pc=MINE ? mixC([86,70,52],[52,42,32],n*0.6+n2*0.4) : mixC([62,58,52],[34,32,29],n*0.65+n2*0.35);                     // rough stone; packed dirt in the mine
       if(n3>0.70) pc=mixC(pc,[112,106,96],0.55); else if(n3<0.28) pc=mixC(pc,[18,16,14],0.45);                                  // gravel and pits
       if(crack||crack2) pc=CRYS&&crack ? mixC(pc,[70,130,90],0.35) : mixC(pc,[14,12,10],0.6);                                     // cracks (glowing only where the crystal grows)
-      if(MINE && gy>1.12 && gy<1.88){ const pl=gx*3.2, seam=Math.abs(pl-Math.round(pl))<0.06, gr2=fbm(gx*2,gy*24,47);              // a makeshift walkway of old planks
-        pc=mixC([112,84,52],[78,56,34],gr2); if(seam) pc=[36,26,16]; if(gy<1.17||gy>1.83) pc=mixC(pc,[30,22,14],0.6); if(((Math.floor(pl)*37)%13)===3) pc=mixC(pc,[40,30,20],0.5); }
+      const AL=w>=h, ac=AL?gy:gx, al=AL?gx:gy, mid=(AL?h:w)/2;                                                                       // the walkway runs the long way down the tunnel
+      if(MINE && ac>mid-0.38 && ac<mid+0.38){ const pl=al*3.2, seam=Math.abs(pl-Math.round(pl))<0.06, gr2=AL?fbm(gx*2,gy*24,47):fbm(gx*24,gy*2,47);   // a makeshift walkway of old planks
+        pc=mixC([112,84,52],[78,56,34],gr2); if(seam) pc=[36,26,16]; if(ac<mid-0.33||ac>mid+0.33) pc=mixC(pc,[30,22,14],0.6); if(((Math.floor(pl)*37)%13)===3) pc=mixC(pc,[40,30,20],0.5); }
       const o=(py*TWp+px)*4, k=1-0.3*(1-smooth(0,1.3,Math.min(gx,gy)));
       D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
     if(theme==='interior' && AREAS[areaId] && AREAS[areaId].tent){            // woven mats in the octagon, a round rug in the middle, nothing outside
@@ -12676,7 +12677,7 @@ function resetMobs(){
     const isWolf=s.type==='wolf';
     const hp=isWolf?WOLF.base:maxHpOf(s.opts.equip,FOES[s.type].base);
     const key=s.daily ? s.name+'@'+Math.floor(dayClock/DAY_LEN) : s.name, dead=defeatedMobs.has(areaId+':'+key);
-    return { id:k, key, name:s.name, type:s.type, opts:s.opts, coat:s.coat, faction:s.faction, style:s.style, spawn:[s.i,s.j], i:s.i, j:s.j, x:s.i+0.5, y:s.j+0.5,
+    return { id:k, key, name:s.name, type:s.type, opts:s.opts, coat:s.coat, cat:s.cat, faction:s.faction, style:s.style, spawn:[s.i,s.j], i:s.i, j:s.j, x:s.i+0.5, y:s.j+0.5,
              dir:k?7:1, hp:dead?0:hp, maxHp:hp, path:[], moving:false, dead, gone:false, fade:1, flash:0, lunge:null,
              state:dead?'down':'guard', t:0, k:0, wind:1, quick:false, guardDir:isWolf?null:'up', ox:0, oy:0, hostile:!dead, fallT:dead?999:0 }; });
   if(DUMMY_SPAWN) mobs.push(makeDummy());
@@ -13701,7 +13702,8 @@ function drawWolf(x,B,e,dir,pose){
   const flip=dirMirrored(dir), view=dirView(dir), V=VIEW[view], prof=V.prof;
   g.save(); g.translate(x,B); g.scale(1.45,1.45); g.translate(-x,-B);   // wolf-sized next to a person
   if(flip){ g.save(); g.translate(x,0); g.scale(-1,1); g.translate(-x,0); }
-  const coat=e.coat||'#6a5a48', coatD=tone(coat,-0.30), coatL=tone(coat,0.18), belly='#c8b89a';
+  const CAT=!!e.cat;                                                    // a mountain lion: longer and lower, a small round head, a long heavy tail
+  const coat=e.coat||(CAT?'#b08852':'#6a5a48'), coatD=tone(coat,-0.30), coatL=tone(coat,0.18), belly=CAT?'#eadcc0':'#c8b89a';
   let lungeK=0, openJaw=0;
   if(pose){
     if(pose.kind==='raise'){ lungeK=-0.35*Math.min(1,pose.t); openJaw=0.5*Math.min(1,pose.t); }
@@ -13711,7 +13713,7 @@ function drawWolf(x,B,e,dir,pose){
   const ls = 0.78+0.22*prof;                 // wolves always read side-on (a squashed front view looked broken)
   const trot = e.moving ? Math.sin((typeof gt!=='undefined'?gt:0)*13) : 0;
   const lie=!!(pose&&pose.kind==='lie'), sleepy=!!(pose&&pose.sleep);
-  const by = lie ? B-5.5 : B-9-Math.abs(lungeK)*1.5;
+  const by = lie ? B-5.5 : B-(CAT?8:9)-Math.abs(lungeK)*1.5;
   // Legs are solid tapered shapes, positioned by pre-multiplying only their X offset
   // by `ls` — never by scaling the drawing context, so line widths and joints never distort.
   const lx = ox => x + ox*ls*(1+lungeK*0.12);
@@ -13719,7 +13721,7 @@ function drawWolf(x,B,e,dir,pose){
 
   // a single straight tapered leg from a hip/shoulder point down to a paw, `k` leans it fore/aft
   const leg=(ox,topY,k,len,front)=>{
-    const topX=lx(ox), topW=front?3.6:3.2, botW=1.8;
+    const topX=lx(ox), topW=(front?3.6:3.2)*(CAT?1.2:1), botW=CAT?2.3:1.8;
     const botX=topX+k*4*Math.sqrt(ls), botY=topY+len;
     const nx=-(botY-topY), ny=(botX-topX), nl=Math.hypot(nx,ny)||1;   // side normal, for taper
     const ux=nx/nl, uy=ny/nl;
@@ -13735,19 +13737,41 @@ function drawWolf(x,B,e,dir,pose){
   };
   if(!lie){ leg(-11,by+2, -1+trot*1.1, 12);  leg(-5,by+3, -0.4-trot*1.1, 13); }          // hind legs (far, then near)
   g.save(); g.translate(x,by); g.scale(ls*(1+lungeK*0.12),1);
+  if(CAT){ g.strokeStyle=coat; g.lineWidth=3.6; g.lineCap='round';                         // the long tail, hanging low and curling up, a dark tip
+    const tl=[[-14,0],[-24,5-lungeK*3],[-29,6-lungeK*5],[-31,1-lungeK*7]]; g.beginPath(); g.moveTo(...tl[0]); g.bezierCurveTo(...tl[1],...tl[2],...tl[3]); g.stroke();
+    g.strokeStyle='#3a2616'; g.lineWidth=3.8; g.beginPath(); g.moveTo(-30.4,3.2-lungeK*6); g.lineTo(-31,1-lungeK*7); g.stroke();
+    g.fillStyle=coat; g.beginPath(); g.ellipse(0,0,16.5,6.6,0,0,Math.PI*2); g.fill();
+    g.beginPath(); g.ellipse(9,-1.5,6.5,6,0,0,Math.PI*2); g.fill(); g.beginPath(); g.ellipse(-10,-0.5,6.5,6.4,0,0,Math.PI*2); g.fill();   // the deep chest and shoulders, the heavy haunch
+    g.fillStyle=coatL; g.beginPath(); g.ellipse(-1,-3.2,11,2.8,0,0,Math.PI*2); g.fill();
+    g.fillStyle=belly; g.beginPath(); g.ellipse(1,3.6,12,2.6,0,0,Math.PI*2); g.fill(); }
+  else {
   g.fillStyle=coat; g.beginPath(); g.ellipse(0,0,15,7.2,0,0,Math.PI*2); g.fill();
   g.fillStyle=coatL; g.beginPath(); g.ellipse(-2,-3,9,3.6,0,0,Math.PI*2); g.fill();
-  g.fillStyle=belly; g.beginPath(); g.ellipse(0,3.8,11,3,0,0,Math.PI*2); g.fill();
-  g.strokeStyle=coatD; g.lineWidth=3.2; g.lineCap='round';        // tail
+  g.fillStyle=belly; g.beginPath(); g.ellipse(0,3.8,11,3,0,0,Math.PI*2); g.fill(); }
+  if(!CAT){ g.strokeStyle=coatD; g.lineWidth=3.2; g.lineCap='round';        // tail
   g.beginPath(); g.moveTo(-13,-1); g.quadraticCurveTo(-20,-3-lungeK*4,-22,2-lungeK*6); g.stroke();
   g.strokeStyle=coat; g.lineWidth=2.2;
-  g.beginPath(); g.moveTo(-13,-1.5); g.quadraticCurveTo(-19,-3.5-lungeK*4,-21,1.5-lungeK*6); g.stroke();
+  g.beginPath(); g.moveTo(-13,-1.5); g.quadraticCurveTo(-19,-3.5-lungeK*4,-21,1.5-lungeK*6); g.stroke(); }
   g.restore();
   if(!lie){ leg(4+lungeK*3,by+1, 1-trot*1.1, 12, true); leg(9+lungeK*5,by+2, 1.3+trot*1.1, 13, true); }
   else { g.fillStyle=tone(coat,-0.12); g.beginPath(); g.ellipse(lx(-8),B-4.2,8,4,0,0,Math.PI*2); g.fill();
     g.fillStyle=coatD; g.beginPath(); g.ellipse(lx(11),B-2.4,6,2.3,0,0,Math.PI*2); g.fill(); g.beginPath(); g.ellipse(lx(16),B-1.7,5,2,0,0,Math.PI*2); g.fill(); }   // front legs, reach forward on the lunge
 
   // head: at the front of the body; its own group keeps proportions un-squished
+  if(CAT){ g.save(); g.translate(x+(15+lungeK*9)*ls*(1+lungeK*0.12), by-5-lungeK*2); g.scale(1/ls,1); g.rotate(lungeK*0.25);
+    [[-3.4,-4],[-0.6,-4.8]].forEach(([ex,ey],k)=>{ g.fillStyle=k?'#4a3220':'#3a2616'; g.beginPath(); g.moveTo(ex-1.6,ey+1.4); g.quadraticCurveTo(ex-1.2,ey-2.4,ex+0.4,ey-2.2); g.quadraticCurveTo(ex+1.6,ey-1,ex+1.4,ey+1.4); g.closePath(); g.fill(); });   // small rounded ears, set back
+    g.fillStyle=coat; g.beginPath(); g.ellipse(0,0,6.4,5.2,0,0,Math.PI*2); g.fill();
+    g.fillStyle=coatL; g.beginPath(); g.ellipse(-0.6,-2.4,4.4,2,0,0,Math.PI*2); g.fill();
+    g.fillStyle=coat; g.beginPath(); g.ellipse(4.6,1,3.6,3,0,0,Math.PI*2); g.fill();                         // the short muzzle
+    g.fillStyle='#e4d4b4'; g.beginPath(); g.ellipse(5.2,2,2.8,1.8,0,0,Math.PI*2); g.fill(); g.beginPath(); g.ellipse(3.4,3.6,2.6,1.4,0,0,Math.PI*2); g.fill();   // pale lips and chin
+    g.fillStyle='#8a5444'; g.beginPath(); g.ellipse(7.6,0.4,1.1,0.85,0,0,Math.PI*2); g.fill();
+    g.strokeStyle='rgba(60,36,20,0.75)'; g.lineWidth=0.8; g.beginPath(); g.moveTo(3,-0.6); g.quadraticCurveTo(3.4,0.6,3.2,1.8); g.stroke();   // the dark tear-line
+    if(openJaw>0.05){ g.fillStyle='#3a1410'; g.beginPath(); g.ellipse(5.4,3+openJaw*2,3,1.6+openJaw*1.8,0,0,Math.PI*2); g.fill();
+      g.fillStyle='#f4f0e4'; [[3.6,2.4],[6.6,2.4]].forEach(([fx,fy])=>{ g.beginPath(); g.moveTo(fx-0.6,fy); g.lineTo(fx,fy+1.6+openJaw); g.lineTo(fx+0.6,fy); g.closePath(); g.fill(); }); }
+    const ec = lungeK>0.3 ? '#e8e070' : '#b8c050';
+    g.fillStyle=ec; g.beginPath(); g.ellipse(2,-1.4,1.2,sleepy?0.2:0.9,0,0,Math.PI*2); g.fill(); g.fillStyle='#1a1408'; if(!sleepy) g.fillRect(1.8,-2.1,0.5,1.4);
+    if(prof<0.9){ g.fillStyle=ec; g.beginPath(); g.ellipse(2.4,-3,1,sleepy?0.2:0.75,0,0,Math.PI*2); g.fill(); }
+    g.restore(); if(flip) g.restore(); g.restore(); return; }
   g.save(); g.translate(x+(13+lungeK*9)*ls*(1+lungeK*0.12), by-4-lungeK*2); g.scale(1/ls,1); g.rotate(lungeK*0.25);
   g.fillStyle=coat; g.beginPath(); g.ellipse(0,0,7,5.4,0,0,Math.PI*2); g.fill();
   g.fillStyle=coatD;
@@ -14616,7 +14640,7 @@ function drawRubble(o){ const c=P(o.i+0.5,o.j+0.5), sd=o.i*11+o.j*5;
     g.fillStyle=tone('#55504a',-0.3*rnd01(k,sd,764)); g.beginPath(); g.moveTo(x-r,y); g.quadraticCurveTo(x-r*0.9,y-hh,x,y-hh-2); g.quadraticCurveTo(x+r*0.9,y-hh,x+r,y); g.closePath(); g.fill();
     g.strokeStyle='rgba(10,8,6,0.6)'; g.lineWidth=0.9; g.stroke(); } }
 // a mine's timber frame: two props and a cap-piece, a lantern hanging from it
-function drawMineFrame(o){ const A=P(o.i+0.5,o.j+0.08), Bp=P(o.i+0.5,o.j+0.92), Hh=86;
+function drawMineFrame(o){ const X=o.across||0, A=X?P(o.i+0.08,o.j+0.5):P(o.i+0.5,o.j+0.08), Bp=X?P(o.i+X-0.08,o.j+0.5):P(o.i+0.5,o.j+0.92), Hh=86;   // across: a frame spanning that many tiles in i
   const post=(p,w,col)=>{ g.fillStyle=col; g.fillRect(p.x-w/2,p.y-Hh,w,Hh); g.fillStyle='rgba(0,0,0,0.3)'; g.fillRect(p.x+w/2-2,p.y-Hh,2,Hh); };
   post(A,6,'#5a3e22');
   g.strokeStyle='#4a321c'; g.lineWidth=6; g.beginPath(); g.moveTo(A.x-4,A.y-Hh+2); g.lineTo(Bp.x+4,Bp.y-Hh+2); g.stroke();      // the cap-piece
@@ -17647,7 +17671,7 @@ wrap('willowpool','objects',l=> CHOICE.secretWay ? [...l, {type:'teleporter', i:
 AREAS.willowpool.entries.fromTunnel={i:9,j:4};
 // the tunnel itself: one body wide, shored with Company timber, wet underfoot
 AREAS.gbtunnel=CAVE("The Company Tunnel",2,8,()=>[{type:'teleporter', i:0, j:0, to:'goldhouse', entry:'fromHatch'}, {type:'teleporter', i:1, j:7, to:'willowpool', entry:'fromTunnel'},
-    ...[1,3,5].map(j=>({type:'mineframe', i:0, j, noblock:true})), {type:'rune', i:1, j:0, text:"Scratched into a prop, in a clerk's neat hand: <i>“G·T·B. Dug in the year of the double toll. Mind the water.”</i>"}],
+    ...[1,3,5].map(j=>({type:'mineframe', i:0, j, across:2, fp:[2,1], noblock:true})), {type:'rune', i:1, j:0, text:"Scratched into a prop, in a clerk's neat hand: <i>“G·T·B. Dug in the year of the double toll. Mind the water.”</i>"}],
   { inside:false, under:true, mine:true, entries:{ fromHatch:{i:0,j:1}, fromPool:{i:1,j:6} },
     onEnter:()=>logMsg('Water runs off you in sheets. A narrow tunnel, shored with timber stamped with the Company cross, just wide enough for one.','#9ad0e8') });
 AREA_TIER.gbtunnel=3;
@@ -17802,6 +17826,8 @@ const BEASTS=[
     how:'No guard, fast lunges, smoke in their fur.', res:'Nothing in particular.', aff:'Burning, often; the bite bleeds too.', ans:'Strike any side, parry the lunge. Cooling Salve and wraps on the belt.' },
   { k:'flamesworn', is:f=>f.type!=='wolf'&&f.type!=='mage'&&FIRE_FOE(f), name:'The Flamesworn', kind:'Fire cultists · the Ember Pass and the forge',
     how:'Burning blades and forge hammers; the Slag Warden sets you alight with every blow.', res:'Nothing in particular.', aff:'Burning.', ans:'Parry clean and carry Cooling Salve.' },
+  { k:'lion', is:f=>f.type==='wolf'&&f.cat, name:'Mountain Lions', kind:'Beasts · the Varrow Pass',
+    how:'No guard at all, like a wolf, but they come in a low pounce from the rocks and hit as hard as one.', res:'Nothing in particular.', aff:'Bleeding: claws and teeth both.', ans:'Attack any side; when it crouches, parry the pounce. A Linen Wrap stops the bleeding.' },
   { k:'wolf', is:f=>f.type==='wolf', name:'Wolves', kind:'Beasts · every road and wood',
     how:'No guard at all: every side is open. They lunge fast and with little warning.', res:'Nothing in particular.', aff:'Bleeding from every bite that lands.', ans:'Just attack; watch for the ring and parry the lunge. A Linen Wrap stops the bleeding.' },
   { k:'lurker', is:f=>f.type==='lurker', name:'Fen Lurkers', kind:'Bog-things · the Drowning Fen',
@@ -21696,7 +21722,7 @@ AREAS.varrowpass={ fence:{r:false,l:false}, w:10, h:24, theme:'road', mountain:t
     l.push({type:'rune', i:4, j:2, text:"Cut deep into the rock beside the door, in angular letters, and again below in the common tongue: <i>“Varrow found the silver. Durnhal cut the road. Hargrim held the gate. Walk in with open hands.”</i>"});
     return l; },
   npcs:()=>[], mobs:()=>[
-    { name:'Mountain Wolf', type:'wolf', i:4, j:17, faction:'mtnwolf', coat:'#8a8a86' }, { name:'Mountain Wolf', type:'wolf', i:6, j:15, faction:'mtnwolf', coat:'#9a948a' },
+    { name:'Mountain Lion', type:'wolf', cat:true, i:4, j:17, faction:'mtnlion', coat:'#b08852' }, { name:'Mountain Lioness', type:'wolf', cat:true, i:6, j:15, faction:'mtnlion', coat:'#c09a64' },
     { name:'Pass Brigand', type:'bandit', i:6, j:9, faction:'passbrig', opts:BANDIT({skin:2,hair:3,hairColor:4,beard:4,equip:{head:'hood',torso:'tunic_linen',armor:'studded',hands:'gloves',legs:'breeches',feet:'boots',weapon:'spear',offhand:null}}) },
     { name:'Brigand Chief Ulrik', type:'brute', i:4, j:7, faction:'passbrig', opts:BANDIT({skin:1,hair:2,hairColor:1,beard:5,equip:{head:'kettle',torso:'tunic_red',armor:'mail',hands:'gauntlets',legs:'breeches',feet:'boots',weapon:'axe',offhand:null}}) } ],
   entries:{ fromRoad:{i:5,j:22}, fromGate:{i:5,j:1} } };

@@ -669,14 +669,14 @@ const BODY = {
   EAR_TOP:-80.5, EAR_H:7.5, NOSE:-77, MOUTH:-72.5, CHIN:-68, NECK:-66,
   SHOULDER:-63, WAIST:-46, KNEE:-20, ANKLE:-8,
 };
-const DWARF={ wide:1.06, seam:-37, leg:0.6,
+const DWARF={ wide:1.06, seam:-31, leg:0.68, lx:0.86, lw:1.25, all:0.94,   // legs: ordinary legs, only shorter and stouter (no flattening), the whole dwarf a touch smaller
   m:{ headHW:12.2, jawHW:12.4, chestHW:15.2, waistHW:14.2, hipHW:12.6, limbW:7.6, legW:10.2, neckW:9.8 },     // a barrel of a man
   f:{ headHW:11.3, jawHW:11.0, chestHW:12.0, waistHW:10.2, hipHW:12.6, limbW:6.3, legW:9.2,  neckW:8.8 } };   // a woman of the mountain: broad-shouldered, solid, strong-armed
 let HAIR_DWARF=false; DWARF.head=1.06;                                           // a dwarf's head is big for the body
 { const _dh=drawHead; drawHead=function(c,x,B,opts,view){ if(!String(opts&&opts.race||'').startsWith('dwarf')) return _dh.apply(this,arguments);
     const k=DWARF.head, py=B+BODY.CHIN+3; c.save(); c.translate(x,py); c.scale(k,k); c.translate(-x,-py);       // grown about the top of the neck
     HAIR_DWARF=true; try{ return _dh.apply(this,arguments); } finally{ HAIR_DWARF=false; c.restore(); } }; }
-const dwarfDrop=o=>o&&o.race==='dwarf'?Math.round(-DWARF.seam*(1-DWARF.leg)-26*(DWARF.head-1)):0;   // how much lower a dwarf's head sits (name tags follow it)          // dwarves: everything a little wider, and below the hip only 60% as long
+const dwarfDrop=o=>o&&o.race==='dwarf'?Math.round(-96*((DWARF.all||1)-1)+(DWARF.all||1)*(-DWARF.seam*(1-DWARF.leg))-26*(DWARF.head-1)):0;   // how much lower a dwarf's head sits (name tags follow it)          // dwarves: everything a little wider, and below the hip only 60% as long
 const PROP = {
   m:{ headHW:11.5, jawHW:10.5, chestHW:13.5, waistHW:12, hipHW:11, limbW:6.5, legW:9, neckW:8 },
   f:{ headHW:10,   jawHW:8.8,  chestHW:9.6, waistHW:6.9,  hipHW:11.2, limbW:5.1, legW:7.8, neckW:7.6 },
@@ -1049,10 +1049,14 @@ function drawCharInner(c,x,B,opts,swing=0,dir=0,pose=null){
   if(opts.race==='dwarf'){ const o2={...opts,race:'dwarf_'}, W=DWARF.wide, seam=DWARF.seam, k=DWARF.leg, dy=-seam*(1-k);   // short in the leg, broad all over
     const sv={m:{...PROP.m}, f:{...PROP.f}}; Object.assign(PROP.m,DWARF.m); Object.assign(PROP.f,DWARF.f);
     try{
-    c.save(); c.beginPath(); c.rect(x-300,B+seam*k-0.4,600,300); c.clip(); c.translate(x,B); c.scale(W,k); c.translate(-x,-B);
-    try{ drawCharInner(c,x,B,o2,swing,dir,pose); } finally{ c.restore(); }
+    const AL=DWARF.all||1, LX=DWARF.lx||W; c.save(); c.translate(x,B); c.scale(AL,AL); c.translate(-x,-B);   // the whole dwarf a touch smaller, so longer legs do not make him tall
+    try{
+    { const pv={m:{...PROP.m}, f:{...PROP.f}}; ['m','f'].forEach(g=>{ const P2=PROP[g], r=W/LX; P2.hipHW*=r; P2.waistHW*=r; P2.legW*=(DWARF.lw||1); });   // the legs: drawn as ordinary legs, only smaller and stouter, so boots and knees keep their shape
+      c.save(); c.beginPath(); c.rect(x-300,B+seam*k-0.4,600,300); c.clip(); c.translate(x,B); c.scale(LX,k); c.translate(-x,-B);
+      try{ drawCharInner(c,x,B,o2,swing,dir,pose); } finally{ c.restore(); Object.assign(PROP.m,pv.m); Object.assign(PROP.f,pv.f); } }
     c.save(); c.beginPath(); c.rect(x-300,B+seam*k-600,600,600); c.clip(); c.translate(x,B+dy); c.scale(W,1); c.translate(-x,-B);
     try{ drawCharInner(c,x,B,o2,swing,dir,pose); } finally{ c.restore(); }
+    } finally{ c.restore(); }
     } finally{ Object.assign(PROP.m,sv.m); Object.assign(PROP.f,sv.f); } return; }
   if(opts.race==='elf'){ c.save(); c.translate(x,B); c.scale(0.93,1.055); c.translate(-x,-B);
     try{ drawCharInner(c,x,B,{...opts,race:'elf_'},swing,dir,pose); } finally{ c.restore(); } return; }

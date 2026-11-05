@@ -671,8 +671,12 @@ const BODY = {
 };
 const DWARF={ wide:1.06, seam:-37, leg:0.6,
   m:{ headHW:12.2, jawHW:12.4, chestHW:15.2, waistHW:14.2, hipHW:12.6, limbW:7.6, legW:10.2, neckW:9.8 },     // a barrel of a man
-  f:{ headHW:10.9, jawHW:10.5, chestHW:12.0, waistHW:10.2, hipHW:12.6, limbW:6.3, legW:9.2,  neckW:8.8 } };   // a woman of the mountain: broad-shouldered, solid, strong-armed
-const dwarfDrop=o=>o&&o.race==='dwarf'?Math.round(-DWARF.seam*(1-DWARF.leg)):0;   // how much lower a dwarf's head sits (name tags follow it)          // dwarves: everything a little wider, and below the hip only 60% as long
+  f:{ headHW:11.3, jawHW:11.0, chestHW:12.0, waistHW:10.2, hipHW:12.6, limbW:6.3, legW:9.2,  neckW:8.8 } };   // a woman of the mountain: broad-shouldered, solid, strong-armed
+let HAIR_DWARF=false; DWARF.head=1.14;                                           // a dwarf's head is big for the body
+{ const _dh=drawHead; drawHead=function(c,x,B,opts,view){ if(!String(opts&&opts.race||'').startsWith('dwarf')) return _dh.apply(this,arguments);
+    const k=DWARF.head, py=B+BODY.CHIN+3; c.save(); c.translate(x,py); c.scale(k,k); c.translate(-x,-py);       // grown about the top of the neck
+    HAIR_DWARF=true; try{ return _dh.apply(this,arguments); } finally{ HAIR_DWARF=false; c.restore(); } }; }
+const dwarfDrop=o=>o&&o.race==='dwarf'?Math.round(-DWARF.seam*(1-DWARF.leg)-26*(DWARF.head-1)):0;   // how much lower a dwarf's head sits (name tags follow it)          // dwarves: everything a little wider, and below the hip only 60% as long
 const PROP = {
   m:{ headHW:11.5, jawHW:10.5, chestHW:13.5, waistHW:12, hipHW:11, limbW:6.5, legW:9, neckW:8 },
   f:{ headHW:10,   jawHW:8.8,  chestHW:9.6, waistHW:6.9,  hipHW:11.2, limbW:5.1, legW:7.8, neckW:7.6 },
@@ -4291,7 +4295,7 @@ function drawBeard(c,x,B,style,hair,hairDark,P,pr,LN,earBack){
   c.save();                                 // a beard never grows behind the ear
   c.beginPath(); c.rect(x+LN+earBack,B-200,400,400); c.clip();
   const Y=BODY, off=LN+faceOff(pr), bw=P.jawHW*(1-pr*0.10);
-  const q=pr>0.3, bwL=bw+(q?2.2:0), bwR=q?Math.max(3.5,P.jawHW-faceOff(pr)+0.8):bw;
+  const q=pr>0.3, DWB=style>=DWARF_BEARDS, bwL=bw+(q?2.2:0)+(DWB?1.8:0), bwR=(q?Math.max(3.5,P.jawHW-faceOff(pr)+0.8):bw)+(DWB?1.8:0);   // dwarf beards bush out wide at the jaw
   const mw=12*(1-pr*0.4);
   const jaw=(len)=>{                       // jaw-hugging mass, open around the mouth
     c.beginPath();
@@ -4313,7 +4317,7 @@ function drawBeard(c,x,B,style,hair,hairDark,P,pr,LN,earBack){
   };
   const moustache=(w,droop)=>{
     // a full, even chevron moustache: thick across, ends stop at the corners of the mouth
-    const y=Y.MOUTH, h=w/2*0.92, d=Math.min(1.2,(droop||0)*0.35);
+    const y=Y.MOUTH, h=w/2*0.92, d=Math.min(DWB?3.4:1.2,(droop||0)*(DWB?0.9:0.35));   // a dwarf's moustache hangs down past the mouth
     const pth=()=>{ c.beginPath();
       c.moveTo(x+off-h,B+y+d);
       c.quadraticCurveTo(x+off-h*0.95,B+y-2.6,x+off-h*0.35,B+y-3.1);
@@ -4332,6 +4336,11 @@ function drawBeard(c,x,B,style,hair,hairDark,P,pr,LN,earBack){
     c.strokeStyle=tone(hair,-0.5,0.6); c.lineWidth=0.4; pth(); c.stroke();
   };
   if(pr>0.8){ drawBeardProfile(c,x,B,style,hair,hairDark,P,pr,LN); c.restore(); return; }
+  if(DWB){                                  // heavy sideburns, grown down from the hair into the beard
+    const HWh=P.headHW;
+    [-1,1].forEach(sd=>{ if(q && sd<0) return; const ox=x+off+sd*(sd<0?bwL:bwR)-sd*0.6, top=B+Y.EAR_TOP-2;
+      c.fillStyle=hair; c.beginPath(); c.moveTo(ox-sd*0.2,top); c.lineTo(ox-sd*3.4,top+1); c.quadraticCurveTo(ox-sd*3.8,B+Y.NOSE,ox-sd*2.2,B+Y.NOSE+3); c.lineTo(ox+sd*1.2,B+Y.NOSE+3); c.quadraticCurveTo(ox+sd*1.6,B+Y.EYE_TOP+4,ox-sd*0.2,top); c.closePath(); c.fill();
+      c.strokeStyle='rgba(20,10,4,0.25)'; c.lineWidth=0.4; for(let k=0;k<3;k++){ c.beginPath(); c.moveTo(ox-sd*(0.8+k*0.9),top+1); c.quadraticCurveTo(ox-sd*(1+k),B+Y.EYE_TOP+5,ox-sd*(0.4+k*0.8),B+Y.NOSE+2.5); c.stroke(); } }); }
   switch(style){
     case 2: // Moustache
       moustache(mw*1.05,3.2);
@@ -4354,7 +4363,7 @@ function drawBeard(c,x,B,style,hair,hairDark,P,pr,LN,earBack){
       break;
     case 6: // Braided Beard: a full, long beard, worked into two braids with metal rings
       c.fillStyle=hair; jaw(11); c.fill(); shadeMass();
-      [-2.6,2.6].forEach(d=>beardBraid(c,x+off+d*(1-pr*0.3),B+Y.CHIN+7,14,hair)); moustache(mw,1);
+      [-2.6,2.6].forEach(d=>beardBraid(c,x+off+d*(1-pr*0.3),B+Y.CHIN+7,14,hair)); moustache(mw*1.3,3.5);
       break;
     case 7: // Forked Beard: long and full, parted at the chin into two soft points that curl apart
       c.fillStyle=hair; jaw(9); c.fill(); shadeMass();
@@ -4362,7 +4371,7 @@ function drawBeard(c,x,B,style,hair,hairDark,P,pr,LN,earBack){
         const fork=()=>{ c.beginPath(); c.moveTo(bx-3.4,y0-1); c.lineTo(bx+3.4,y0-1); c.bezierCurveTo(bx+3.6+sd*0.6,y0+6,bx+sd*2.4+1.2,y0+11,bx+sd*2.6,y0+16); c.bezierCurveTo(bx+sd*1.4-1.4,y0+12,bx-3.2+sd*0.4,y0+6,bx-3.4,y0-1); c.closePath(); };
         fork(); c.fillStyle=sd<0?hair:tone(hair,-0.08); c.fill();
         c.save(); fork(); c.clip(); c.lineCap='round'; for(let k=-2;k<=2;k++){ c.strokeStyle=k%2?'rgba(20,10,4,0.28)':'rgba(255,240,210,0.13)'; c.lineWidth=0.5; c.beginPath(); c.moveTo(bx+k*1.3,y0-1); c.bezierCurveTo(bx+k*1.4+Math.sin(k)*1.2,y0+5,bx+k*0.8+sd*1.2,y0+10,bx+sd*2.2+k*0.3,y0+15); c.stroke(); } c.restore(); });
-      moustache(mw,1);
+      moustache(mw*1.3,3.5);
       break;
     case 8: // Great Beard: a great soft fall of beard down to the belt, ending in three locks; the middle one plaited and ringed
       { c.fillStyle=hair; jaw(12); c.fill(); shadeMass(); const w0=(bwL+bwR)/2+0.5, cx=x+off, y0=B+Y.CHIN+3, L=22;
@@ -4373,7 +4382,7 @@ function drawBeard(c,x,B,style,hair,hairDark,P,pr,LN,earBack){
           beardStrands(c,cx,y0-2,w0,L,hair);
         c.restore();
         beardBraid(c,cx,y0+L*0.55,L*0.5,hair);
-        moustache(mw,1); }
+        moustache(mw*1.3,3.5); }
       break;
   }
   c.restore();
@@ -4566,7 +4575,10 @@ function drawHairPieces(c,x,B,style,hair,F,P,view,LN,layer){
       c.restore();
     }
     const [ex,ey]=pts[pts.length-1];
-    c.fillStyle='#6b2f35'; c.beginPath(); c.ellipse(X(ex),Yb(ey),w1*0.9,1,0,0,Math.PI*2); c.fill();
+    if(HAIR_DWARF && ey-pts[0][1]>14){ [0.35,0.7].forEach((f,q)=>{ const dd=total*f; let acc=0, sg=seg[0]; for(const s2 of seg){ if(acc+s2[4]>=dd){ sg=s2; break; } acc+=s2[4]; }   // dwarf braids: metal rings worked in
+        const t=(dd-acc)/(sg[4]||1), px=sg[0]+(sg[2]-sg[0])*t, py=sg[1]+(sg[3]-sg[1])*t, ang=Math.atan2(sg[3]-sg[1],sg[2]-sg[0]), w=w0+(w1-w0)*f;
+        c.save(); c.translate(X(px),Yb(py)); c.rotate(ang); c.fillStyle=q?'#b8943a':'#9a9ca4'; c.beginPath(); c.roundRect(-1.1,-w*0.85,2.2,w*1.7,0.6); c.fill(); c.fillStyle='rgba(255,245,210,0.55)'; c.fillRect(-0.7,-w*0.7,0.6,w*1.4); c.restore(); }); }
+    c.fillStyle=HAIR_DWARF?'#9a9ca4':'#6b2f35'; c.beginPath(); c.ellipse(X(ex),Yb(ey),w1*0.9,1,0,0,Math.PI*2); c.fill();
     lock(ex,ey+0.5, ex+0.3,ey+4.5, w1*1.4,w1*0.4,0.3,0);
   };
   const bun=(bx,by,r0)=>{

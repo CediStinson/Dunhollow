@@ -1084,7 +1084,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       c.beginPath(); c.moveTo(px,py); c.lineTo(px+Math.cos(a)*L,py+Math.sin(a)*L); c.stroke(); }
     c.restore(); };
   const VR=opts.vari||{}, vT=VR.torso||'', vL=VR.legs||'', vF=VR.feet||'', vA=VR.armor||'', vH=VR.hands||'';
-  const TUN=vT.startsWith('tunic_')||vT==='shirt_white', SMOCK=vT==='smock', HOSE=vL==='hose_grey', BREECH=vL==='breeches'||vL==='breeches_cream', DANDY=vL==='breeches_cream'||vL==='trousers_black', TREWS=false, RIDE=vF==='riding_boots', FUR=false, PLATE=vF==='plate_boots';
+  const TUN=vT.startsWith('tunic_')||vT==='shirt_white', SMOCK=vT==='smock', HOSE=vL==='hose_grey', BREECH=vL==='breeches'||vL==='breeches_cream', DANDY=vL==='breeches_cream'||vL==='trousers_black', TREWS=false, RIDE=vF==='riding_boots', FUR=false, PLATE=vF==='plate_boots'||/^(anvil|delver|rune)_boots$/.test(vF);
   const TUNTRIM = vT==='shirt_white' ? '#d8d4ca' : vT==='tunic_linen' ? '#8e3a30' : vT==='tunic_red' ? '#d8b860' : vT==='tunic_blue' ? '#d8c8a0' : '#c8a850';
   let handAt=null, offHandAt=null, CHEEK=null;   // CHEEK: the round seat from behind, when bare                   // where each hand ended up
   // idle: standing with the weight on one leg (hips shift over it, the other foot eases out) and breathing
@@ -2705,6 +2705,39 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       c.fillStyle=tone(J,(k<n/2?0.08:-0.18)); c.fill(); c.strokeStyle=tone(J,-0.55); c.lineWidth=0.6; c.stroke();
       fs('#8a7a50'); c.beginPath(); c.arc(x+(tx+t2)/2,B+bot-1.6,0.6,0,Math.PI*2); c.fill(); }
   }
+  // ── the three dwarven heavy sets, drawn over their mail: A anvil (steel plate, brass), B delver (iron lamellar to the knee, copper), C rune (black plate, forge-lit runes) ──
+  function drawHeavyDwarf(kind){ const A=kind==='anvil', Bk=kind==='delver', Cr=kind==='rune';
+    const S=A?'#a2a8b0':Bk?'#4c5056':'#2c2e33', TR=A?'#c8a040':Bk?'#b8703a':'#ffb050', side=pr>0.8;
+    const lit=(col,k)=>tone(col,k);
+    if(Bk){                                                                   // lamellar: rows of small plates, laced, over the whole coat to the knee
+      const hem=Y.KNEE+2, pts=torsoPts(1.1,hem,HI+3.4); c.save(); path(pts); c.clip();
+      for(let row=0, yy=Y.SHOULDER+1; yy<hem; row++, yy+=3.2){ const w=CH+bR+4;
+        for(let xx=LN-w+(row%2?1.3:0); xx<LN+w; xx+=2.6){ const g2=c.createLinearGradient(x+xx,0,x+xx+2.4,0); g2.addColorStop(0,lit(S,0.25)); g2.addColorStop(1,lit(S,-0.3));
+          c.fillStyle=g2; c.fillRect(x+xx,B+yy,2.3,3.0); c.fillStyle='rgba(0,0,0,0.35)'; c.fillRect(x+xx,B+yy+2.6,2.3,0.5); }
+        c.fillStyle=TR; for(let xx=LN-CH-4+(row%2?1.3:0); xx<LN+CH+bR+4; xx+=5.2){ c.fillRect(x+xx+0.8,B+yy+0.5,0.7,0.7); } }
+      c.restore(); c.strokeStyle=lit(S,-0.6); c.lineWidth=0.7; path(pts); c.stroke();
+      drawBelt(Y.WAIST-3.4,Math.max(WA,HI)+1.6,{col:'#3a2414',h:4.2,metal:TR,studs:true}); }
+    else {                                                                    // plate: a breastplate with a ridge, a fauld of lames below the waist
+      const top=Y.SHOULDER+(F?3:1.5), wst=Y.WAIST-1.5;
+      const bp=side ? [[LN+CH*0.1,top],[LN+CH+bR+0.6,top+1],[LN+CH+bR+1.2,top+8],[LN+WA+1.4,wst],[LN-WA*0.2,wst+0.5],[LN-CH*0.3,top+6]]
+                    : [[LN-CH+0.4,top],[LN+CH+bR-0.4,top],[LN+CH+bR+0.6,top+7],[LN+WA+1.2,wst],[LN+po,wst+2.6],[LN-WA-1.2,wst],[LN-CH-bL-0.6,top+7]];
+      for(let k=0;k<3;k++){ const yy=wst+0.5+k*3.4, w=(HI+2.2+k*0.5)*(side?0.9:1);                      // the fauld
+        c.fillStyle=lit(S,0.06-k*0.08); c.beginPath(); c.moveTo(x+LN-w,B+yy); c.lineTo(x+LN+w,B+yy); c.lineTo(x+LN+w+0.4,B+yy+3.4); c.lineTo(x+LN-w-0.4,B+yy+3.4); c.closePath(); c.fill();
+        c.strokeStyle=lit(S,-0.6); c.lineWidth=0.5; c.stroke(); c.fillStyle=TR; c.fillRect(x+LN-w,B+yy+2.9,w*2,0.6); }
+      path(bp,1.4); const gb=c.createLinearGradient(x+LN-CH-2,0,x+LN+CH+bR+2,0); gb.addColorStop(0,lit(S,A?0.42:0.18)); gb.addColorStop(0.45,lit(S,A?0.08:0)); gb.addColorStop(1,lit(S,A?-0.35:-0.3)); c.fillStyle=gb; c.fill();
+      c.strokeStyle=lit(S,-0.65); c.lineWidth=0.8; c.stroke();
+      if(front && !side){ c.strokeStyle=lit(S,A?0.5:0.2); c.lineWidth=0.6; c.beginPath(); c.moveTo(x+LN+po,B+top+1); c.lineTo(x+LN+po,B+wst+1.6); c.stroke(); }   // the ridge
+      c.strokeStyle=TR; c.lineWidth=Cr?0.7:1.0; path(bp,1.4); c.stroke();                                // brass rim, or the rune channel round the edge
+      if(A && front){ c.fillStyle='rgba(255,255,255,0.32)'; c.beginPath(); c.ellipse(x+LN+po-CH*0.4,B+top+5,CH*0.25,3,-0.3,0,Math.PI*2); c.fill();
+        fs(TR); [[-0.55,top+2],[0.55,top+2],[-0.5,wst-2],[0.5,wst-2]].forEach(([u,yy])=>{ c.beginPath(); c.arc(x+LN+po+u*CH,B+yy,0.6,0,Math.PI*2); c.fill(); }); }
+      if(Cr && front){ c.save(); c.globalCompositeOperation='lighter'; c.strokeStyle='rgba(255,150,60,0.85)'; c.lineWidth=0.6; c.lineCap='square';   // runes, glowing like the inside of a forge
+        const cx=LN+po*(side?0.4:1)+(side?CH*0.5:0); for(let k=0;k<4;k++){ const yy=top+4+k*((wst-top-6)/3); c.beginPath(); if(k%2){ c.moveTo(x+cx-1.4,B+yy-1.4); c.lineTo(x+cx,B+yy+1.4); c.lineTo(x+cx+1.4,B+yy-1.4); } else { c.moveTo(x+cx,B+yy-1.6); c.lineTo(x+cx,B+yy+1.6); c.moveTo(x+cx-1.3,B+yy); c.lineTo(x+cx+1.3,B+yy); } c.stroke(); }
+        const gg=c.createRadialGradient(x+cx,B+(top+wst)/2,0,x+cx,B+(top+wst)/2,9); gg.addColorStop(0,'rgba(255,140,40,0.25)'); gg.addColorStop(1,'rgba(255,140,40,0)'); c.fillStyle=gg; c.fillRect(x+cx-10,B+top,20,wst-top+4); c.restore(); } }
+    // pauldrons: three overlapping lames on each shoulder
+    [-1,1].forEach(sd=>{ if(side && sd<0) return; const sx=LN+sd*(CH+(sd>0?bR:bL)-0.4)+(side?-CH*0.4:0), sy=Y.SHOULDER-0.4;
+      for(let k=2;k>=0;k--){ const rx=4.8+k*0.4, yy=sy+k*2.4; c.fillStyle=lit(S,(A?0.2:0.05)-k*0.1); c.beginPath(); c.ellipse(x+sx,B+yy,rx,3.2,0,Math.PI*1.02,Math.PI*1.98,true); c.closePath(); c.fill();
+        c.strokeStyle=lit(S,-0.6); c.lineWidth=0.6; c.stroke(); c.strokeStyle=TR; c.lineWidth=0.5; c.beginPath(); c.ellipse(x+sx,B+yy,rx-0.3,2.9,0,0.15,Math.PI-0.15); c.stroke(); }
+      if(Cr){ c.save(); c.globalCompositeOperation='lighter'; c.fillStyle='rgba(255,150,60,0.7)'; c.fillRect(x+sx-0.4,B+sy-1.2,0.8,3); c.restore(); } }); }
   function drawBrigandine(){                             // cloth-covered plates riveted in rows, over the mail
     const Bc=ITEMS.blackmail.col, hem=F?-41:-38, hw=F?WA+2.2:HI+1.6, pts=torsoPts(1.6,hem,hw);
     mass(pts,Bc,tone(Bc,-0.55));
@@ -3042,7 +3075,8 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   else if(BUST) drawElfBustier();
   if(vA==='gambeson') drawGambeson();
   else if(E.armor==='jerkin'){ if(vA==='smith_apron') drawApron(); else { drawJerkin(); if(vA==='studded'||vA==='dwarf_harness') drawStuds(); if(vA==='dwarf_harness') drawBelt(Y.WAIST-3.6,Math.max(WA,HI)+1.4,{col:'#3a2414',h:4.4,metal:'#a4a8ae',studs:true}); } }
-  else if(E.armor==='mail'){ drawMail(vA==='brightmail' ? (F?-29:-27) : 0); if(vA==='blackmail') drawBrigandine(); if(vA==='brightmail') drawSurcoat(); }
+  else if(E.armor==='mail'){ const HV=vA==='anvil_plate'?'anvil':vA==='delver_lamellar'?'delver':vA==='rune_plate'?'rune':null;
+    drawMail(vA==='brightmail' ? (F?-29:-27) : HV==='delver' ? Y.KNEE+1.5 : 0); if(vA==='blackmail') drawBrigandine(); if(vA==='brightmail') drawSurcoat(); if(HV) drawHeavyDwarf(HV); }
   else if(E.armor==='elf_scale') drawElfScale();
   else if(E.armor==='elf_harness') drawElfHarness(HZ_KIND[vA]||'leaf');
   else if(E.armor==='robe') drawOpenRobe();
@@ -4105,7 +4139,8 @@ function drawHeadgear(c,x,B,kind,P,view,LN){
     c.restore();
     return;
   }
-  if(kind==='varrow_helm'){                          // a dwarf helm: a low rounded dome with a raised ridge, a riveted brow band, a nasal, and cheek-plates to the jaw
+  const HVH=kind==='anvil_helm'?'anvil':kind==='delver_helm'?'delver':kind==='rune_helm'?'rune':null;
+  if(kind==='varrow_helm' || HVH){                   // a dwarf helm: a low rounded dome with a raised ridge, a riveted brow band, a nasal, and cheek-plates to the jaw
     const S=GEAR.steel, rim=LINE+1.6, w=HW+1.4;
     const dome=()=>{ c.beginPath(); c.moveTo(x+LN-w,B+rim); c.bezierCurveTo(x+LN-w,B+TOP-3,x+LN+w,B+TOP-3,x+LN+w,B+rim); c.closePath(); };
     if(front || pr>0.8) [-1,1].forEach(sd=>{ if(pr>0.3 && sd<0 && pr<=0.8) return; if(pr>0.8 && sd<0) return;   // cheek-plates hanging over the cheeks (the beard comes out below)
@@ -4121,6 +4156,12 @@ function drawHeadgear(c,x,B,kind,P,view,LN){
     c.fillStyle=tone(S,0.5); for(let k=-4;k<=4;k++){ c.beginPath(); c.arc(x+LN+k*w*0.22,B+rim-1.3,0.5,0,Math.PI*2); c.fill(); }
     if(front){ const nx=LN+(pr>0.8?HW-1.4:faceOff(pr)*0.9); c.fillStyle=tone(S,0.08); c.beginPath(); c.moveTo(x+nx-1.3,B+rim-1); c.lineTo(x+nx+1.3,B+rim-1); c.lineTo(x+nx+0.9,B+Y.NOSE+0.5); c.lineTo(x+nx,B+Y.NOSE+1.4); c.lineTo(x+nx-0.9,B+Y.NOSE+0.5); c.closePath(); c.fill();
       c.fillStyle=tone(S,0.45); c.fillRect(x+nx-1.1,B+rim-1,0.6,Y.NOSE-rim+1); }
+    if(HVH==='anvil' && front){ const fx=LN+(pr>0.8?HW-2:faceOff(pr)*0.8); c.fillStyle='#c8a040'; c.beginPath(); c.moveTo(x+fx-4,B+Y.EYE_TOP+3.5); c.lineTo(x+fx+4,B+Y.EYE_TOP+3.5); c.lineTo(x+fx+2.5,B+Y.EYE_TOP+5.2); c.lineTo(x+fx-2.5,B+Y.EYE_TOP+5.2); c.closePath(); c.fill();   // brass brows over the eyes
+      c.fillStyle='#d8b050'; c.beginPath(); c.moveTo(x+LN-1.6,B+TOP-1); c.lineTo(x+LN,B+TOP-6); c.lineTo(x+LN+1.6,B+TOP-1); c.closePath(); c.fill(); }   // a brass finial on the crown
+    if(HVH==='delver' && front){ const fx=LN+(pr>0.8?HW-2.4:faceOff(pr)*0.6), ly=rim-4.5; c.fillStyle='#6a4a2a'; c.fillRect(x+fx-2.2,B+ly-1,4.4,4.4); c.fillStyle='#b8703a'; c.fillRect(x+fx-2.6,B+ly-1.6,5.2,1); c.fillStyle='#ffe0a0'; c.fillRect(x+fx-1.3,B+ly+0.2,2.6,2.2);   // a miner's lamp on the brow
+      c.save(); c.globalCompositeOperation='lighter'; const lg=c.createRadialGradient(x+fx,B+ly+1.3,0,x+fx,B+ly+1.3,10); lg.addColorStop(0,'rgba(255,220,140,0.6)'); lg.addColorStop(1,'rgba(255,220,140,0)'); c.fillStyle=lg; c.fillRect(x+fx-10,B+ly-9,20,20); c.restore(); }
+    if(HVH==='rune'){ c.save(); c.globalCompositeOperation='lighter'; c.strokeStyle='rgba(255,150,60,0.9)'; c.lineWidth=0.6; c.beginPath(); c.moveTo(x+LN,B+TOP+0.5); c.lineTo(x+LN,B+rim-3.5); c.stroke();   // a rune line down the ridge, and lit eye-holes
+      if(front){ const fx=LN+(pr>0.8?HW-2:faceOff(pr)*0.8); c.fillStyle='rgba(255,150,60,0.5)'; [-2.6,2.6].forEach(d=>{ if(pr>0.8&&d<0) return; c.beginPath(); c.ellipse(x+fx+d*(pr>0.8?0.5:1),B+Y.EYE_TOP+1.4,1.6,0.8,0,0,Math.PI*2); c.fill(); }); } c.restore(); }
     return;
   }
   if(kind==='helm_black'){                           // a conical nasal helm of riveted segments
@@ -14721,6 +14762,7 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
   if(st.agi) L.push(['Agility','+'+st.agi+' <small>('+Math.round(st.agi*AGI_DODGE*100)+'% dodge)</small>']);
   if(st.ap) L.push(['Attack power','+'+st.ap+' <small>(+'+st.ap*3+'% weapon damage)</small>']);
   if(st.aspd) L.push(['Swing speed','+'+st.aspd+'% <small>(your weapon swings that much faster)</small>']);
+  if(typeof RUNE_SET!=='undefined' && RUNE_SET.includes(unWoven(id))) L.push(['Forge-Heat (all five pieces)','every third blow you land bursts with fire for extra damage']);
   if(id==='duel_boots') L.push(['Riposte Step','after you dodge a blow, your next strike within 2 seconds lands 40% harder']);
   if(st.magic) L.push(['Spell power','+'+st.magic+' <small>(+'+st.magic*4+'% spell damage)</small>']);
   if(st.mreg) L.push(['Mana regeneration','+'+st.mreg+' <small>per second in a fight (base 7)</small>']);
@@ -20549,7 +20591,7 @@ function armourOf(id){ if(!id || !ITEMS[id]) return 0; const it=ITEMS[id], base=
   if(it.slot==='armor') return heavy ? 2+2*lvl : /jerkin|studded|gambeson|leather|sun_|mantle/.test(base+b) ? Math.round(1+1.2*lvl) : Math.round(lvl*0.5);
   if(it.slot==='head') return heavy ? lvl+1 : Math.round(lvl*0.4);
   if(it.slot==='hands') return heavy ? lvl : Math.round(lvl*0.5);
-  if(it.slot==='feet') return /plate|wyrm/.test(base) ? lvl+1 : Math.round(lvl*0.5);
+  if(it.slot==='feet') return /plate|wyrm|rune_boots/.test(base) ? lvl+1 : Math.round(lvl*0.5);
   if(it.slot==='offhand' && (typeof isShieldId==='function' ? isShieldId(id) : /shield/.test(base+b))) return lvl;
   return 0; }
 const armourTotal=()=>{ const E=(player.opts&&player.opts.equip)||{}; return ['armor','head','hands','feet','offhand'].reduce((a,k)=>a+armourOf(E[k]),0); };
@@ -21504,6 +21546,43 @@ Object.assign(ITEM_LORE,{ tunic_deep:"Thick, felted wool the colour of rust, mad
   smith_apron:"Leather two fingers thick, scorched brown and black. Sparks bounce off it. So, Gorm says, does most other trouble.",
   hobnail_boots:"Heavy boots with iron nails in the soles, for wet stone and steep stairs. They ring on a floor like a little bell.",
   iron_bracers:"Riveted iron cuffs from wrist to elbow, the kind the hold's guards wear under their gauntlets." });
+// ── RUNEFORGED PLATE: Varrowdeep's heavy set. Blackened steel cut with runes that glow like the inside of a forge. Slow, very hard to hurt, and it hits very hard ──
+Object.assign(ITEMS,{
+  rune_helm:{ name:'Runeforged Helm', slot:'head', base:'kettle', col:'#34363c' },
+  rune_plate:{ name:'Runeforged Plate', slot:'armor', base:'mail', col:'#26282c' },
+  rune_gauntlets:{ name:'Runeforged Gauntlets', slot:'hands', base:'gloves', col:'#2a2c30' },
+  rune_greaves:{ name:'Runeforged Greaves', slot:'legs', base:'trousers', col:'#24262a' },
+  rune_boots:{ name:'Runeforged Sabatons', slot:'feet', base:'boots', col:'#303238' },
+  rune_maul:{ name:'Runeforged Maul', slot:'weapon' } });
+const RUNE_SET=['rune_helm','rune_plate','rune_gauntlets','rune_greaves','rune_boots'];
+Object.assign(ITEM_STATS,{ rune_helm:{hp:5,ap:2,aspd:-3}, rune_plate:{hp:12,ap:4,aspd:-5}, rune_gauntlets:{hp:3,ap:3,aspd:-3}, rune_greaves:{hp:5,ap:2,aspd:-2}, rune_boots:{hp:4,ap:1,aspd:-2}, rune_maul:{ap:3} });
+Object.assign(GEAR_HP,{ rune_helm:5, rune_plate:12, rune_gauntlets:3, rune_greaves:5, rune_boots:4 });
+Object.assign(WEAPONS,{ rune_maul:{ wind:0.34, dmg:24, len:26, recoverExtra:0.3 } });
+Object.assign(PRICES,{ rune_helm:240, rune_plate:520, rune_gauntlets:210, rune_greaves:260, rune_boots:200, rune_maul:380 });
+[...RUNE_SET,'rune_maul'].forEach(id=>{ ITEM_LEVEL_FIX[id]=10; });
+Object.assign(ITEM_LORE,{ rune_helm:"A low, heavy helm of blackened steel. The runes along its ridge glow when the wearer is angry, Gorm says, and you will find that they glow often.",
+  rune_plate:"Plate as black as a cold forge, cut with channels that fill with a slow orange light in a fight. It weighs as much as a small dwarf.",
+  rune_gauntlets:"Black steel gauntlets, every knuckle a little anvil. You will not swing fast in them. You will not need to.",
+  rune_greaves:"Blackened plate for the legs, lined with felted wool. Made to stand in one place and not be moved from it.",
+  rune_boots:"Sabatons of black steel, ringing on stone. The rune on each toe-cap is the one for 'here, and no further'.",
+  rune_maul:"A two-handed hammer with a head like a forge-block, a rune burning in its face. Slow to lift, and nothing it lands on gets up the same." });
+// the maul: a long haft, an iron-bound grip, and a head like a block of the forge itself, a rune alight in its face
+WEAPON_ART.rune_maul=(c,hx,hy,ang,id,s)=>{ c.save(); c.translate(hx,hy); c.rotate(ang); c.scale(s,s);
+  c.fillStyle='#4a2e14'; c.fillRect(-8,-1.3,32,2.6); c.fillStyle='#2a2c30'; [-6,-2,2].forEach(xx=>c.fillRect(xx,-1.6,1.4,3.2));
+  const hg=c.createLinearGradient(0,-7,0,7); hg.addColorStop(0,'#4a4d54'); hg.addColorStop(0.5,'#2a2c30'); hg.addColorStop(1,'#16171a'); c.fillStyle=hg; c.fillRect(22,-7,11,14);
+  c.strokeStyle='#101114'; c.lineWidth=0.8; c.strokeRect(22,-7,11,14); c.fillStyle='#3a3c42'; c.fillRect(21,-7.6,13,1.6); c.fillRect(21,6,13,1.6);
+  c.save(); c.globalCompositeOperation='lighter'; c.strokeStyle='rgba(255,150,60,0.9)'; c.lineWidth=0.9; c.beginPath(); c.moveTo(27.5,-4.5); c.lineTo(27.5,4.5); c.moveTo(25,-1.5); c.lineTo(27.5,1); c.lineTo(30,-1.5); c.stroke();
+  const gg=c.createRadialGradient(27.5,0,0,27.5,0,9); gg.addColorStop(0,'rgba(255,140,40,0.35)'); gg.addColorStop(1,'rgba(255,140,40,0)'); c.fillStyle=gg; c.fillRect(18,-9,19,18); c.restore();
+  c.restore(); };
+// Forge-Heat: with all five pieces on, every third blow you land bursts with fire
+let RUNE_HITS=0, RUNE_FIRE=false;
+const runeSetOn=()=>{ const E=(player.opts&&player.opts.equip)||{}; return E.head && unWoven(E.head)==='rune_helm' && E.armor && unWoven(E.armor)==='rune_plate' && E.hands && unWoven(E.hands)==='rune_gauntlets' && E.legs && unWoven(E.legs)==='rune_greaves' && E.feet && unWoven(E.feet)==='rune_boots'; };
+{ const _w=wound; wound=function(f,n,label,col){ const r=_w.apply(this,arguments);
+    try{ if(!RUNE_FIRE && f && f!==player && HIT_SRC==='melee' && n>0 && !f.warded && f.type!=='dummy' && runeSetOn()){ RUNE_HITS++;
+        if(RUNE_HITS>=3 && !f.dead && f.hp>0){ RUNE_HITS=0; const W=WEAPONS[player.opts.equip.weapon]||WEAPONS.fists, extra=Math.max(4,Math.round((W.dmg||6)*0.6+gearSum('ap')*0.3));
+          RUNE_FIRE=true; const was=HIT_SRC; HIT_SRC='spell'; try{ _w(f,extra,'Forge-Heat!','#ffb050'); } finally{ HIT_SRC=was; RUNE_FIRE=false; }
+          try{ burst(f,player,'#ffa040',14); }catch(e){} shake=Math.max(shake,4); } } }catch(e){}
+    return r; }; }
 // the people of the Great Hall
 const VARROW_FOLK=[
   { id:'thane', name:'Thane Sigrid Varrowborn', i:9, j:3, dir:2, opts:DWARFO({gender:'f', skin:1, hair:7, hairColor:12, face:2, equip:{head:null, armor:'varrow_mail', hands:null, legs:'trousers', feet:'boots'}}) },
@@ -21513,7 +21592,7 @@ const VARROW_FOLK=[
   { id:'halvard', name:'Foreman Halvard', i:15, j:8, dir:3, opts:DWARFO({gender:'m', skin:1, hair:2, hairColor:3, beard:7, face:1, equip:{head:'kettle', torso:'tunic_deep', armor:'dwarf_harness', hands:'iron_bracers', feet:'hobnail_boots', weapon:'hatchet'}}) },
   { id:'bodil_h', name:'Envoy Bodil Granitebrow', i:11, j:6, dir:1, when:()=>CHOICE.vqEnd==='atoned', opts:DWARVES.find(d=>d.id==='bodil').opts } ];
 { const B0=DWARVES.find(d=>d.id==='bodil'); wrap('silvergate','npcs',l=>CHOICE.vq==='atoned'||CHOICE.vqEnd==='atoned' ? l.filter(n=>n.id!=='bodil') : l); }
-const VARROW_GEAR=()=>['varrow_axe','varrow_helm','varrow_gauntlets',...(vq()==='done'?['varrow_mail']:[]),'axe','mace','mail','helm_full','gauntlets','shield_iron','plate_boots'].filter(id=>ITEMS[id]&&PRICES[id]);
+const VARROW_GEAR=()=>['rune_helm','rune_gauntlets','rune_greaves','rune_boots',...(vq()==='done'?['rune_plate','rune_maul']:[]),'varrow_axe','varrow_helm','varrow_gauntlets',...(vq()==='done'?['varrow_mail']:[]),'axe','mace','mail','helm_full','gauntlets','shield_iron','plate_boots'].filter(id=>ITEMS[id]&&PRICES[id]);
 function thaneTalk(){ const T='Thane Sigrid Varrowborn', Q=vq();
   if(!Q) return say(T,["<i>The Thane of Varrowdeep sits on a plain stone chair under the banners of nine kings. She is grey-braided and broad as a door, and she does not get up.</i> “A surface-walker in my hall. The guards say your hands were open. Good. Keep them that way.”",
       "“You come at a poor time. Nine days ago the oldest seam in the deep mines went quiet. Not the picks: the whole of it. Six of my miners went down to see why, and none of them came back up.”"],
@@ -21538,7 +21617,7 @@ function halvardTalk(){ const H='Foreman Halvard', Q=vq();
   if(Q==='asked') return say(H,["“The Thane sent you? Then you are braver than me, or know less.” <i>He takes the chain off his neck and unlocks a padlock the size of a loaf.</i> “The lowest gallery is open. Whatever you meet in the upper galleries, it used to be my people. Be kind if you can, and quick if you can’t.”"],[bye]);
   return say(H,[vq()==='done'?"“Listen.” <i>From the shaft comes the far-off tick of picks, and someone singing badly.</i> “That is the sound of a mine that is alive.”":"“The deep is quiet in the good way now. Thank you. I will carve the lads’ names by the shaft-head.”"],[bye]); }
 function gormTalk(){ const G='Master Smith Gorm'; say(G,["<i>He does not look up from the anvil. Sparks fly off every blow and he does not blink.</i> “Surface-folk want our steel. Everyone wants our steel. The question is whether our steel wants you.”",
-    vq()==='done'?"“The Thane says you are owed. Here is what I have.”":"“For coin I will sell you a little. The best I keep for those the hold owes.”"],
+    vq()==='done'?"“The Thane says you are owed. Here is what I have. The runeforged plate and the maul too: you have earned the right to be slow.”":"“For coin I will sell you a little. The runeforged plate and the maul I keep for those the hold owes.”"],
   [{label:'“Show me your work.”', fn:()=>shopFrom(G,VARROW_GEAR(),vq()==='done'?0.85:1.15,["“Folded nine times, quenched in snow-water. Do not bring it back bent.”"],gormTalk)}, bye]); }
 function ullaTalk(){ const U='Ulla the Trader'; say(U,["“Bread from the valley, draughts from Hollowmere, antidote from somewhere nobody should go.” <i>She grins.</i> “Everything comes up the pass, and everything costs more for the climb.”"],
   [{label:'“What have you got?”', fn:()=>shopFrom(U,['tunic_deep','smith_apron','hobnail_boots','iron_bracers','dwarf_harness','potion','mana_potion','antidote','bread','cooked_meat','apple'].filter(id=>ITEMS[id]&&PRICES[id]),1.1,["“Coin first, then goods. A mountain custom.”"],ullaTalk)}, bye]); }

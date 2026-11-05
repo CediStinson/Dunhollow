@@ -20740,7 +20740,7 @@ function ucJunk(id){ const G=mazeGrid(id), N=MZ_N, out=[], A=AREAS[id], sd=UNDER
       if(h%9===0) out.push({type:'ucjunk', kind:['stub','ridge','beam','stub','ridge'][(h>>4)%5], i, j, noblock:true}); }
     else { if((i&1)&&(j&1)) continue;                                                        // on a walkway: never in a crossing
       if(h%23===0) out.push({type:'rubble', i, j, noblock:true, flat:true}); else if(h%29===1) out.push({type:'ucjunk', kind:'web', i, j, noblock:true}); else if(h%41===2) out.push({type:'bones', i, j, noblock:true}); } }
-  UNDER_Q[id].rooms.forEach(([cx,cy],k)=>{ const i=2*cx+2, j=2*cy+2; if(!G[j*N+i] || taken.has(i+','+j)) return; out.push(k%2?{type:'crate', i, j}:{type:'barrel', i, j}); });   // a room's far corner: what the last people left
+  UNDER_Q[id].rooms.forEach(([cx,cy],k)=>{ if(k%2) return; const i=2*cx+2, j=2*cy+2; if(!G[j*N+i] || taken.has(i+','+j)) return; out.push(cx%2?{type:'crate', i, j}:{type:'barrel', i, j}); });   // a room's far corner: what the last people left
   return out; }
 Object.keys(UNDER_Q).forEach(id=>wrap(id,'objects',l=>{ const busy=new Set(l.map(o=>o.i+','+o.j)); return [...l, ...ucJunk(id).filter(o=>!busy.has(o.i+','+o.j))]; }));
 // the lower quarters run hot: the Chapel Roofs glow from below, the last quarter is the Ember Stair, with the Flamesworn on its walkways
@@ -21970,6 +21970,62 @@ OBJ_DRAW.glassshard=o=>{ const q=P(o.i+0.5,o.j+0.5), R=k=>rnd01(o.i*5+k,o.j*11,3
     g.fillStyle='rgba(220,250,236,0.55)'; g.beginPath(); g.moveTo(x-wd*0.6,y-1); g.lineTo(x+lean-wd*0.2,y-h); g.lineTo(x-wd*0.1,y-2); g.closePath(); g.fill();
     const tw=Math.max(0,Math.sin(gt*1.7+o.i*1.3+o.j+k*2.1)); if(tw>0.93){ const a=(tw-0.93)/0.07, sx=x+lean-wd*0.2, sy=y-h;   // a glint as the sun catches it
       g.strokeStyle=`rgba(255,255,240,${a})`; g.lineWidth=1.2; g.beginPath(); g.moveTo(sx-6,sy); g.lineTo(sx+6,sy); g.moveTo(sx,sy-6); g.lineTo(sx,sy+6); g.stroke(); } } };
+// ── furnishing for the small rooms of Hollowmere: candle stands and a lectern in the chapel, rugs, strongboxes and counting tables, footlockers and armour stands, a dice table ──
+const topPt=(o,u,v,h)=>{ const q=P(o.i+0.5,o.j+0.5); return {x:q.x+(u-v)*TW/2, y:q.y+(u+v)*TH/2-(h||0)}; };
+OBJ_DRAW.rug=o=>{ const [fw,fh]=o.fp||[2,1], c=[P(o.i+0.1,o.j+0.1),P(o.i+fw-0.1,o.j+0.1),P(o.i+fw-0.1,o.j+fh-0.1),P(o.i+0.1,o.j+fh-0.1)], col=o.col||'#7a2a22', tr=o.trim||'#c89a4a';
+  const poly=(pts,f)=>{ g.beginPath(); pts.forEach((p,k)=>k?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); g.fillStyle=f; g.fill(); };
+  poly(c,tone(col,-0.25)); const inset=(k)=>[P(o.i+0.1+k,o.j+0.1+k),P(o.i+fw-0.1-k,o.j+0.1+k),P(o.i+fw-0.1-k,o.j+fh-0.1-k),P(o.i+0.1+k,o.j+fh-0.1-k)];
+  poly(inset(0.06),tr); poly(inset(0.12),col); poly(inset(0.3),tone(col,0.12));
+  const m=P(o.i+fw/2,o.j+fh/2); g.fillStyle=tr; g.beginPath(); g.moveTo(m.x,m.y-9); g.lineTo(m.x+16,m.y); g.lineTo(m.x,m.y+9); g.lineTo(m.x-16,m.y); g.closePath(); g.fill();
+  g.fillStyle=col; g.beginPath(); g.moveTo(m.x,m.y-5); g.lineTo(m.x+9,m.y); g.lineTo(m.x,m.y+5); g.lineTo(m.x-9,m.y); g.closePath(); g.fill();
+  g.strokeStyle=tr; g.lineWidth=1; const e0=P(o.i+0.1,o.j+fh-0.1), e1=P(o.i+fw-0.1,o.j+fh-0.1); for(let k=0;k<=12;k++){ const x=e0.x+(e1.x-e0.x)*k/12, y=e0.y+(e1.y-e0.y)*k/12; g.beginPath(); g.moveTo(x,y); g.lineTo(x-1.5,y+4); g.stroke(); } };   // fringe
+OBJ_DRAW.candlestand=o=>{ const q=P(o.i+0.5,o.j+0.5), H=74;
+  g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(q.x+3,q.y+2,14,5,0,0,Math.PI*2); g.fill();
+  g.fillStyle='#2a2420'; [[-9,3],[9,3],[0,-4]].forEach(([dx,dy])=>{ g.beginPath(); g.moveTo(q.x,q.y-10); g.lineTo(q.x+dx,q.y+dy); g.lineTo(q.x+dx*0.8,q.y+dy-2); g.closePath(); g.fill(); g.lineWidth=2; g.strokeStyle='#2a2420'; g.stroke(); });
+  g.fillStyle='#3a322c'; g.fillRect(q.x-1.6,q.y-H,3.2,H-6); g.fillStyle='#5a4e44'; g.fillRect(q.x-1.6,q.y-H,1.2,H-6);
+  g.strokeStyle='#3a322c'; g.lineWidth=2; g.beginPath(); g.moveTo(q.x-14,q.y-H+10); g.quadraticCurveTo(q.x,q.y-H+22,q.x+14,q.y-H+10); g.stroke();
+  [[-14,10],[0,0],[14,10]].forEach(([dx,dy],k)=>{ const x=q.x+dx, y=q.y-H+dy; g.fillStyle='#2a2420'; g.fillRect(x-4,y-1,8,3); g.fillStyle='#efe6cc'; g.fillRect(x-2,y-12,4,11);
+    const f=Math.sin(gt*9+k*2+o.i)*0.5; g.save(); g.globalCompositeOperation='lighter'; glow(x,y-15,18,14,'255,190,90',0.3); g.restore();
+    g.fillStyle='#ffc860'; g.beginPath(); g.ellipse(x+f*0.4,y-15,1.6,3.4,0,0,Math.PI*2); g.fill(); g.fillStyle='#fff4d0'; g.beginPath(); g.ellipse(x+f*0.2,y-14.4,0.7,1.6,0,0,Math.PI*2); g.fill(); }); };
+LIGHT_TYPES.candlestand=[0,-80,110,'255,190,110'];
+OBJ_DRAW.lectern=o=>{ const q=P(o.i+0.5,o.j+0.5);
+  g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(q.x+3,q.y+2,16,6,0,0,Math.PI*2); g.fill();
+  isoBox(o.i+0.3,o.j+0.3,0.4,0.4,6,'#6a4626','#4a2f16','#3a2410');
+  g.fillStyle='#5a3a1e'; g.fillRect(q.x-3,q.y-44,6,40); g.fillStyle='#7a5230'; g.fillRect(q.x-3,q.y-44,2,40);
+  g.fillStyle='#6a4626'; g.beginPath(); g.moveTo(q.x-20,q.y-44); g.lineTo(q.x+18,q.y-56); g.lineTo(q.x+22,q.y-48); g.lineTo(q.x-16,q.y-36); g.closePath(); g.fill();   // the sloped desk
+  g.fillStyle='#ece2c4'; g.beginPath(); g.moveTo(q.x-15,q.y-45); g.lineTo(q.x+15,q.y-54); g.lineTo(q.x+17,q.y-50); g.lineTo(q.x-13,q.y-41); g.closePath(); g.fill();   // the open book
+  g.strokeStyle='rgba(80,60,40,0.6)'; g.lineWidth=0.6; for(let k=0;k<4;k++){ g.beginPath(); g.moveTo(q.x-12+k*1.2,q.y-44.5-k*0.5); g.lineTo(q.x-2+k*1.2,q.y-47.5-k*0.5); g.moveTo(q.x+3+k*1.2,q.y-49-k*0.5); g.lineTo(q.x+13+k*1.2,q.y-52-k*0.5); g.stroke(); }
+  g.strokeStyle='#8a2a22'; g.lineWidth=1.2; g.beginPath(); g.moveTo(q.x+1,q.y-48); g.lineTo(q.x+2,q.y-36); g.stroke(); };   // a ribbon
+OBJ_DRAW.strongbox=o=>{ const q=P(o.i+0.5,o.j+0.5); g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(q.x+3,q.y+2,22,8,0,0,Math.PI*2); g.fill();
+  isoBox(o.i+0.18,o.j+0.25,0.64,0.5,22,'#5a3a20','#4a2e18','#3a2212');
+  [0.3,0.7].forEach(u=>{ const a=P(o.i+0.18+0.64*u,o.j+0.75), b=P(o.i+0.82,o.j+0.25+0.5*u); g.fillStyle='#4a4a4c'; g.fillRect(a.x-2,a.y-22,4,22); });   // iron bands
+  const f=P(o.i+0.5,o.j+0.75); g.fillStyle='#3a3a3c'; g.fillRect(f.x-6,f.y-16,12,10); g.fillStyle='#c8a040'; g.beginPath(); g.arc(f.x,f.y-11,2.2,0,Math.PI*2); g.fill(); g.fillStyle='#1a1a1a'; g.fillRect(f.x-0.6,f.y-10,1.2,3); };
+OBJ_DRAW.footlocker=o=>{ const q=P(o.i+0.5,o.j+0.5); g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(q.x+2,q.y+2,18,6,0,0,Math.PI*2); g.fill();
+  isoBox(o.i+0.22,o.j+0.3,0.56,0.4,14,'#7a5a34','#5e4426','#46321a'); const f=P(o.i+0.5,o.j+0.7); g.fillStyle='#8a7a5a'; g.fillRect(f.x-3,f.y-11,6,5);
+  g.strokeStyle='rgba(30,20,10,0.6)'; g.lineWidth=1; const a=P(o.i+0.22,o.j+0.7), b=P(o.i+0.78,o.j+0.7); g.beginPath(); g.moveTo(a.x,a.y-10); g.lineTo(b.x,b.y-10); g.stroke(); };
+OBJ_DRAW.armorstand=o=>{ const q0=P(o.i+0.5,o.j+0.5); g.save(); g.translate(q0.x,q0.y); g.scale(1.35,1.35); g.translate(-q0.x,-q0.y); OBJ_DRAW._armorstand(q0); g.restore(); };
+OBJ_DRAW._armorstand=q=>{ g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(q.x+3,q.y+2,16,6,0,0,Math.PI*2); g.fill();
+  g.fillStyle='#4a2f16'; g.fillRect(q.x-12,q.y-3,24,4); g.fillRect(q.x-2,q.y-62,4,60);                                         // the cross of wood
+  g.fillStyle='#8a8c90'; g.beginPath(); g.moveTo(q.x-15,q.y-54); g.lineTo(q.x+15,q.y-54); g.lineTo(q.x+13,q.y-22); g.lineTo(q.x-13,q.y-22); g.closePath(); g.fill();   // a mail shirt
+  g.strokeStyle='rgba(40,40,44,0.5)'; g.lineWidth=0.7; for(let k=0;k<8;k++){ g.beginPath(); g.moveTo(q.x-14+k*0.2,q.y-52+k*4); g.lineTo(q.x+14-k*0.2,q.y-52+k*4); g.stroke(); }
+  g.fillStyle='#6a1e1a'; g.fillRect(q.x-11,q.y-52,22,24); g.fillStyle='#c8a040'; g.fillRect(q.x-2,q.y-48,4,14); g.fillRect(q.x-6,q.y-44,12,4);   // the Baron's tabard
+  g.fillStyle='#6e7076'; g.beginPath(); g.ellipse(q.x,q.y-66,10,8,0,Math.PI,Math.PI*2); g.fill(); g.fillRect(q.x-12,q.y-66,24,3);   // a kettle helm
+  g.fillStyle='#9a9ca0'; g.beginPath(); g.ellipse(q.x-3,q.y-70,4,2,0,0,Math.PI*2); g.fill(); };
+OBJ_DRAW.puddle=o=>{ const q=P(o.i+0.5+(o.ox||0),o.j+0.5+(o.oy||0)), s=o.s||1;   // standing water, and a drip from the roof ringing out across it now and then
+  g.fillStyle='rgba(20,26,30,0.75)'; g.beginPath(); g.ellipse(q.x,q.y,26*s,10*s,0,0,Math.PI*2); g.fill();
+  g.fillStyle='rgba(120,140,150,0.18)'; g.beginPath(); g.ellipse(q.x-6*s,q.y-2*s,12*s,3.5*s,0,0,Math.PI*2); g.fill();
+  const ph=((gt*0.45+o.i*0.37+o.j*0.61)%1); if(ph<0.6){ const r=ph/0.6; g.strokeStyle=`rgba(190,210,220,${0.5*(1-r)})`; g.lineWidth=1; g.beginPath(); g.ellipse(q.x+4*s,q.y+1,r*16*s,r*6*s,0,0,Math.PI*2); g.stroke(); } };
+const tablePlus=(o,fn)=>{ OBJ_DRAW.table({...o,_items:[]}); fn(); };
+OBJ_DRAW.counttable=o=>tablePlus(o,()=>{ const T=(u,v)=>topPt(o,u,v,30);
+  const s=T(-0.1,-0.05); g.fillStyle='#8a6a2a'; g.fillRect(s.x-1,s.y-22,2,22); g.fillRect(s.x-14,s.y-22,28,2);                     // brass scales
+  [[-14,4],[14,0]].forEach(([dx,dy])=>{ g.strokeStyle='#8a6a2a'; g.lineWidth=0.7; g.beginPath(); g.moveTo(s.x+dx,s.y-21); g.lineTo(s.x+dx-4,s.y-10+dy); g.moveTo(s.x+dx,s.y-21); g.lineTo(s.x+dx+4,s.y-10+dy); g.stroke(); g.fillStyle='#c8a040'; g.beginPath(); g.ellipse(s.x+dx,s.y-10+dy,6,2,0,0,Math.PI*2); g.fill(); });
+  [[0.2,0.1],[0.25,-0.15],[0.05,0.22]].forEach(([u,v],k)=>{ const c=T(u,v); for(let n=0;n<3+k*2;n++){ g.fillStyle=n%2?'#e0b850':'#b88a30'; g.beginPath(); g.ellipse(c.x,c.y-n*1.6,4,1.6,0,0,Math.PI*2); g.fill(); } });   // coins in stacks
+  const b=T(-0.25,0.15); g.fillStyle='#4a2a1a'; g.beginPath(); g.moveTo(b.x-10,b.y); g.lineTo(b.x+4,b.y-6); g.lineTo(b.x+10,b.y-3); g.lineTo(b.x-4,b.y+3); g.closePath(); g.fill(); g.fillStyle='#ece2c4'; g.fillRect(b.x-6,b.y-3,10,1.5); });   // a ledger
+OBJ_DRAW.dicetable=o=>tablePlus(o,()=>{ const T=(u,v)=>topPt(o,u,v,30);
+  [[-0.15,-0.1,3],[0.0,0.05,5],[0.12,-0.12,1]].forEach(([u,v,n])=>{ const c=T(u,v); g.fillStyle='#ece4d0'; g.fillRect(c.x-3,c.y-5,6,5); g.fillStyle='#c8bca0'; g.fillRect(c.x+1,c.y-5,2,5); g.fillStyle='#1a1410'; for(let k=0;k<Math.min(n,3);k++) g.fillRect(c.x-2+k*1.5,c.y-4+k*1.2,1,1); });
+  const cup=T(0.22,0.12); g.fillStyle='#3a2414'; g.beginPath(); g.ellipse(cup.x,cup.y,5,2,0,0,Math.PI*2); g.fill(); g.fillRect(cup.x-5,cup.y-9,10,9); g.fillStyle='#5a3a20'; g.beginPath(); g.ellipse(cup.x,cup.y-9,5,2,0,0,Math.PI*2); g.fill();
+  [[-0.25,0.15],[0.1,0.25]].forEach(([u,v],k)=>{ const c=T(u,v); for(let n=0;n<2+k*3;n++){ g.fillStyle=n%2?'#c89a50':'#a07a3a'; g.beginPath(); g.ellipse(c.x+n*0.5,c.y-n*1.5,3.5,1.4,0,0,Math.PI*2); g.fill(); } });
+  [[-0.05,0.25,0.4],[0.25,-0.25,-0.3]].forEach(([u,v,r])=>{ const c=T(u,v); g.save(); g.translate(c.x,c.y); g.rotate(r); g.fillStyle='#e8dcc0'; g.fillRect(-4,-2.5,8,5); g.fillStyle='#a02a22'; g.fillRect(-1,-1,2,2); g.restore(); }); });   // cards
 // ════════ STAIRS: a flight of steps against the back wall, and a stairwell going down on the floor above.
 // Click them: you walk to the foot, climb (or go down) step by step, and the room changes like at any door. ════════
 // {type:'stairs', i, j, fp:[1,L], to, entry}       rises toward j (the back wall); the foot is the tile in front, (i, j+L)
@@ -22009,6 +22065,18 @@ function climbStairs(o){ if(player.climb) return; if(o.locked && o.locked()){ o.
     const r=_u.apply(this,arguments);
     if(pendingStairs && !player.path.length && !player.climb){ const o=pendingStairs; pendingStairs=null; const [fi,fj]=stairFoot(o); if(OBJECTS.includes(o) && player.i===fi && player.j===fj) climbStairs(o); }
     return r; }; }
+// what each small room of Hollowmere keeps: [area, objects to add, tables to swap for another kind]
+[ ['chapelin',[ {type:'rug', i:3, j:1, fp:[1,5], col:'#6a2a3a', trim:'#c8a860', flat:true, noblock:true, dz:-99}, {type:'candlestand', i:1, j:0}, {type:'candlestand', i:5, j:0}, {type:'lectern', i:4, j:1}, {type:'footlocker', i:5, j:6} ]],
+  ['guildhall',[ {type:'rug', i:1, j:3, fp:[5,2], col:'#2a3a5a', trim:'#c8a050', flat:true, noblock:true, dz:-99}, {type:'lectern', i:2, j:0}, {type:'notice', i:6, j:0}, {type:'strongbox', i:7, j:5} ]],
+  ['goldhouse',[ {type:'rug', i:1, j:3, fp:[3,2], col:'#5a2a1a', trim:'#d8b050', flat:true, noblock:true, dz:-99}, {type:'strongbox', i:1, j:0}, {type:'strongbox', i:3, j:0} ],{counttable:[5,2]}],
+  ['fearnhouse',[ {type:'rug', i:1, j:3, fp:[3,2], col:'#5a2a1a', trim:'#d8b050', flat:true, noblock:true, dz:-99}, {type:'strongbox', i:1, j:0}, {type:'strongbox', i:2, j:0} ],{counttable:[5,2]}],
+  ['barracks',[ {type:'footlocker', i:2, j:0}, {type:'footlocker', i:2, j:2}, {type:'armorstand', i:5, j:0}, {type:'armorstand', i:6, j:0}, {type:'crates', i:0, j:5} ]],
+  ['dicenden',[ {type:'kegrack', i:1, j:0, fp:[2,1]}, {type:'barrel', i:4, j:0} ],{dicetable:[4,2]}],
+  ['gbtunnel',[ {type:'puddle', i:0, j:2, flat:true, noblock:true, dz:-99}, {type:'puddle', i:1, j:4, s:0.8, flat:true, noblock:true, dz:-99}, {type:'puddle', i:0, j:6, s:1.2, flat:true, noblock:true, dz:-99}, {type:'crate', i:1, j:2}, {type:'barrel', i:1, j:5}, {type:'rubble', i:0, j:7, noblock:true} ]],
+  ['tunnel',[ {type:'puddle', i:6, j:1, flat:true, noblock:true, dz:-99}, {type:'puddle', i:15, j:1, s:1.2, flat:true, noblock:true, dz:-99}, {type:'puddle', i:21, j:1, s:0.8, ox:0.2, flat:true, noblock:true, dz:-99} ]] ].forEach(([area,add,swap])=>wrap(area,'objects',l=>{
+    const out=l.map(o=>{ for(const k in (swap||{})){ const [i,j]=swap[k]; if(o.type==='table' && o.i===i && o.j===j) return {...o, type:k}; } return o; });
+    const busy=new Set(); out.forEach(o=>{ if(o.flat||o.noblock) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) busy.add((o.i+a)+','+(o.j+b)); });
+    return [...out, ...add.filter(o=>{ if(o.flat) return true; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) if(busy.has((o.i+a)+','+(o.j+b))) return false; return true; })]; }));
 // ── the upper floors: guest rooms over the inns, the Guild's archive, the Gold Brothers' counting room, the soldiers' bunks ──
 const UPROOM=(label,w,h,objs,entry,extra)=>({ ...INSIDE_BASE, w, h, theme:'interior', label, mini:{x:0,y:0}, objects:objs, npcs:()=>[], entries:{ fromDown:entry }, ...(extra||{}) });
 const STAIRS_UP=[ ['inn',1,0,'inn_up','fromDown'], ['wheatsheaf',0,5,'wheatsheaf_up','fromDown','i'], ['guildhall',1,0,'guildhall_up','fromDown'], ['goldhouse',4,0,'goldhouse_up','fromDown'], ['barracks',3,0,'barracks_up','fromDown'] ];

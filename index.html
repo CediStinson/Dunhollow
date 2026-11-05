@@ -8941,6 +8941,26 @@ function paintGroundTexture(){
         pc=mixC([126,66,46],[96,50,36],(hsh(Math.floor(sx),row)%100)/100); if(yf>0.82) pc=mixC(pc,[40,22,16],0.6); if(sf<0.06) pc=mixC(pc,[60,32,24],0.5); }
       const e=Math.min(at(ti-1,tj)?9:fx,at(ti+1,tj)?9:1-fx,at(ti,tj-1)?9:fy,at(ti,tj+1)?9:1-fy); if(e<0.12) pc=mixC([20,18,16],pc,e/0.12); else if(e<0.2) pc=mixC(pc,[130,120,104],0.35);   // the lip, worn pale by feet
       D[o]=pc[0]; D[o+1]=pc[1]; D[o+2]=pc[2]; D[o+3]=255; continue; }
+    if(theme==='interior' && AREAS[areaId] && AREAS[areaId].dwarf){            // VARROWDEEP: granite flagstones with gold inlay, carpet runners, rings set in the floor; packed earth and rails in the mines
+      const A=AREAS[areaId], tx=Math.floor(gx), ty=Math.floor(gy), fx=gx-tx, fy=gy-ty, o=(py*TWp+px)*4;
+      let pc;
+      if(A.mine){ const n=fbm(gx*0.9,gy*0.9,61), n2=fbm(gx*5,gy*5,62); pc=mixC([92,74,54],[54,44,34],n*0.6+n2*0.4); if(n2>0.72) pc=mixC(pc,[120,112,100],0.4);
+        (A.rails||[]).forEach(([dir,c0,a0,a1])=>{ const along=dir==='h'?gx:gy, across=dir==='h'?gy:gx; if(along<a0||along>a1) return; const d=across-c0;
+          if(Math.abs(d)<0.42){ const sl=along*3.2; if(Math.abs(sl-Math.round(sl))<0.12) pc=mixC([96,68,40],[70,48,28],fbm(gx*6,gy*6,63)); else pc=mixC(pc,[40,32,24],0.35); }   // sleepers on gravel
+          if(Math.abs(Math.abs(d)-0.28)<0.035) pc=mixC([120,118,116],[70,68,66],Math.abs(Math.abs(d)-0.28)/0.035); }); }   // iron rails
+      else {
+        const big=((Math.floor(tx/2)+Math.floor(ty/2))&1), e=Math.min(fx,fy,1-fx,1-fy), spk=fbm(gx*9,gy*9,64), n=fbm(gx*1.3,gy*1.3,65);
+        pc=mixC([104,98,92],[72,68,64],n*0.7+spk*0.3); if(big) pc=mixC(pc,[88,80,74],0.35); if(spk>0.74) pc=mixC(pc,[150,144,136],0.5); else if(spk<0.24) pc=mixC(pc,[40,38,36],0.4);   // speckled granite
+        if(e<0.035) pc=[30,28,26]; else if(e<0.07) pc=mixC(pc,[140,134,126],0.35);                                                            // grout, and a worn bevel
+        const R=(A.runners||[]).find(([x0,x1,y0,y1])=>gx>=x0&&gx<=x1&&gy>=y0&&gy<=y1);
+        if(R){ const [x0,x1,y0,y1]=R, ex=Math.min(gx-x0,x1-gx), ey=Math.min(gy-y0,y1-gy), eb=Math.min(ex,ey), wdt=Math.min(x1-x0,y1-y0);
+          pc=mixC([128,34,28],[92,22,20],fbm(gx*3,gy*3,66)*0.6);
+          const dz=(Math.abs(((gx-x0)*2)%2-1)+Math.abs(((gy-y0)*2)%2-1)); if(eb>0.32 && Math.abs(dz-0.8)<0.08) pc=[178,138,62];             // a gold lozenge pattern
+          if(eb<0.1) pc=[170,128,56]; else if(eb<0.16) pc=[60,16,14]; else if(eb<0.2) pc=[170,128,56]; }                                     // gold borders
+        (A.rings||[]).forEach(([cx,cy,r])=>{ const d=Math.hypot(gx-cx,gy-cy); if(Math.abs(d-r)<0.06||Math.abs(d-r+0.32)<0.035) pc=[186,144,66]; else if(d<r && d>r-0.32) pc=mixC(pc,[56,52,48],0.5);   // a gold ring in the floor
+          if(d<r-0.32){ const a=Math.atan2(gy-cy,gx-cx), sp=Math.abs(((a/Math.PI*8)%1+1)%1-0.5); if(sp<0.04 && d>0.4) pc=mixC(pc,[186,144,66],0.8); } }); }
+      const k=1-0.32*(1-smooth(0,1.3,Math.min(gx,gy)));
+      D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
     if(theme==='interior' && AREAS[areaId] && AREAS[areaId].cave && !AREAS[areaId].volcanic){                 // rough cave stone, damp, with a faint green glow in the cracks
       const n=fbm(gx*0.9,gy*0.9,41), n2=fbm(gx*4,gy*4,43), n3=fbm(gx*11,gy*11,44), crack=Math.abs(fbm(gx*1.3,gy*1.3,42)-0.5)<0.012, crack2=Math.abs(fbm(gx*2.7,gy*2.7,46)-0.5)<0.008;
       const MINE=AREAS[areaId].mine, CRYS=['cave1','cave2','cave3','cave4'].includes(areaId);
@@ -21579,6 +21599,66 @@ Object.assign(AREAS,{
     ()=>[], { mobs:()=> roadcutterUp() ? [ { name:'Durnhal the Roadcutter', type:'roadcutter', i:5, j:5, faction:'roadcutter',
         opts:DWARFO({gender:'m', skin:0, hair:1, hairColor:13, beard:6, face:5, ghost:true, equip:{head:'bog_crown', armor:'mail', hands:'gauntlets', weapon:'roadcutter_axe', offhand:null}}) } ] : [],
       entries:{ fromMine:{i:5,j:1} } }) });
+// ── furnishing the hold: feasting tables, keg racks, chain-hung lamps, the hoard, ore heaps, a channel of molten metal ──
+OBJ_DRAW.dtable=o=>{ const i=o.i, j=o.j, L=o.fp[0];                                                     // a long oak table laid for a feast
+  isoBox(i+0.08,j+0.15,L-0.16,0.7,15,'#7a5230','#5a3a20','#3e2814');
+  const t=k=>P(i+0.35+k*(L-0.7)/Math.max(1,L*2-1),j+0.5); g.fillStyle='rgba(255,240,210,0.08)'; const a=P(i+0.1,j+0.17), b=P(i+L-0.1,j+0.17); g.fillRect(Math.min(a.x,b.x),a.y-16,Math.abs(b.x-a.x),2);
+  for(let k=0;k<L*2;k++){ const q=t(k); q.y-=16; if(k%2){ g.fillStyle='#a8a090'; g.beginPath(); g.ellipse(q.x,q.y,5,2.4,0,0,Math.PI*2); g.fill(); g.fillStyle='#8a5a30'; g.beginPath(); g.ellipse(q.x,q.y-0.6,2.6,1.2,0,0,Math.PI*2); g.fill(); }   // a plate with something on it
+    else { g.fillStyle='#8a6a40'; g.fillRect(q.x-2.4,q.y-8,4.8,8); g.fillStyle='#c09a48'; g.fillRect(q.x-2.6,q.y-8,5.2,1.2); g.fillRect(q.x-2.6,q.y-2,5.2,1); g.fillStyle='rgba(240,230,190,0.85)'; g.beginPath(); g.ellipse(q.x,q.y-8.4,2.2,0.8,0,0,Math.PI*2); g.fill(); } }   // a tankard, foaming
+  const m=P(i+L/2,j+0.5); m.y-=16; g.fillStyle='#6a3a1c'; g.beginPath(); g.ellipse(m.x,m.y-3,9,5,0,0,Math.PI*2); g.fill(); g.fillStyle='#9a5a2c'; g.beginPath(); g.ellipse(m.x-2,m.y-5,6,3,0,0,Math.PI*2); g.fill();   // the roast
+  g.fillStyle='#e8dcc0'; [-12,12].forEach(d=>{ g.fillRect(m.x+d-1,m.y-12,2,8); }); g.save(); g.globalCompositeOperation='lighter'; [-12,12].forEach(d=>glow(m.x+d,m.y-14,6,8,'255,200,120',0.5+0.1*Math.sin(gt*7+d))); g.restore(); };
+LIGHT_TYPES.dtable=[0,-30,70,'255,200,120'];
+OBJ_DRAW.kegrack=o=>{ const i=o.i, j=o.j, n=o.fp[0];                                             // a timber cradle with great casks lying on it, taps in their ends
+  isoBox(i+0.08,j+0.2,n-0.16,0.6,8,'#5a3e24','#4a3220','#2e2014');
+  for(let k=n-1;k>=0;k--){ const q=P(i+k+0.5,j+0.5), x=q.x, y=q.y-26;
+    const body=g.createLinearGradient(x,y-20,x,y+20); body.addColorStop(0,'#a0703e'); body.addColorStop(0.5,'#7a5230'); body.addColorStop(1,'#4a3018');
+    g.fillStyle=body; g.beginPath(); g.ellipse(x+6,y-3,24,17,-0.46,0,Math.PI*2); g.fill();                                  // the cask's belly, lying along the rack
+    g.strokeStyle='#2e2a26'; g.lineWidth=2.4; [-12,0,12].forEach(d=>{ g.beginPath(); g.ellipse(x+6+d*0.9,y-3-d*0.45,4,16,-0.46,0,Math.PI*2); g.stroke(); });
+    g.fillStyle='#8a5e34'; g.beginPath(); g.ellipse(x-14,y+7,10,15,-0.46,0,Math.PI*2); g.fill(); g.strokeStyle='#2e2a26'; g.lineWidth=2; g.stroke();   // the near end
+    g.fillStyle='#6a4626'; g.beginPath(); g.ellipse(x-14,y+7,6,10,-0.46,0,Math.PI*2); g.fill();
+    g.fillStyle='#c09a48'; g.fillRect(x-17,y+10,3,7); g.fillRect(x-19,y+16,6,2); } };
+OBJ_DRAW.chainlamp=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y-150, sw=Math.sin(gt*0.8+o.i)*2;   // an iron lamp on a long chain from the dark above
+  g.strokeStyle='rgba(40,38,36,0.9)'; g.lineWidth=1.4; g.setLineDash([3,2]); g.beginPath(); g.moveTo(x,y-260); g.lineTo(x+sw,y-18); g.stroke(); g.setLineDash([]);
+  g.fillStyle='#2e2c2a'; g.beginPath(); g.moveTo(x+sw-10,y-16); g.lineTo(x+sw+10,y-16); g.lineTo(x+sw+7,y); g.lineTo(x+sw-7,y); g.closePath(); g.fill();
+  g.fillStyle='#ffcf80'; g.fillRect(x+sw-5,y-13,10,10); g.fillStyle='#2e2c2a'; g.fillRect(x+sw-0.8,y-13,1.6,10);
+  g.save(); g.globalCompositeOperation='lighter'; glow(x+sw,y-8,40,40,'255,190,110',0.4+0.06*Math.sin(gt*5+o.j)); g.restore();
+  g.fillStyle='rgba(255,200,120,0.08)'; g.beginPath(); g.ellipse(q.x,q.y,44,22,0,0,Math.PI*2); g.fill(); };                // a pool of light on the floor below
+LIGHT_TYPES.chainlamp=[0,-150,150,'255,190,110'];
+OBJ_DRAW.hoard=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y;                                   // a heap of the hold's gold: coin, a goblet, a crown, gems
+  g.fillStyle='#8a6420'; g.beginPath(); g.ellipse(x,y-2,30,12,0,0,Math.PI*2); g.fill();
+  for(let k=0;k<70;k++){ const a=rnd01(k,o.i,951)*Math.PI*2, r=rnd01(k,o.j,952), px=x+Math.cos(a)*r*26, py=y-2+Math.sin(a)*r*10-(1-r)*14;
+    g.fillStyle=k%5?'#e0b84a':'#f4d880'; g.beginPath(); g.ellipse(px,py,3,1.6,0,0,Math.PI*2); g.fill(); g.strokeStyle='#8a6420'; g.lineWidth=0.5; g.stroke(); }
+  g.fillStyle='#d4a840'; g.fillRect(x+6,y-26,6,10); g.beginPath(); g.ellipse(x+9,y-26,5,2,0,0,Math.PI*2); g.fill(); g.fillRect(x+8,y-16,2,4);   // a goblet
+  g.fillStyle='#e0b84a'; g.beginPath(); g.moveTo(x-16,y-14); for(let k=0;k<5;k++){ g.lineTo(x-16+k*3,y-22+(k%2)*5); } g.lineTo(x-4,y-14); g.closePath(); g.fill();   // a crown
+  [['#d04040',-6,-10],['#4080d0',2,-8],['#40c070',-20,-6]].forEach(([c0,dx,dy])=>{ g.fillStyle=c0; g.beginPath(); g.arc(x+dx,y+dy,2,0,Math.PI*2); g.fill(); });
+  g.save(); g.globalCompositeOperation='lighter'; for(let k=0;k<4;k++){ const t=(gt*0.7+k*0.27)%1; if(t>0.3) continue; const px=x-18+k*12, py=y-10-k%2*6; g.fillStyle=`rgba(255,250,220,${1-t/0.3})`; g.fillRect(px-0.6,py-4,1.2,8); g.fillRect(px-4,py-0.6,8,1.2); } g.restore(); };
+OBJ_DRAW.oreheap=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y;                                 // a heap of ore from the seam, silver and copper glinting in it
+  for(let k=0;k<22;k++){ const a=rnd01(k,o.i,961)*Math.PI*2, r=rnd01(k,o.j,962), px=x+Math.cos(a)*r*22, py=y-2+Math.sin(a)*r*9-(1-r)*12, s=3+rnd01(k,1,963)*4;
+    g.fillStyle=['#5a524a','#6a6058','#4a443e'][k%3]; g.beginPath(); g.moveTo(px-s,py+s*0.5); g.lineTo(px-s*0.4,py-s*0.7); g.lineTo(px+s*0.6,py-s*0.5); g.lineTo(px+s,py+s*0.4); g.closePath(); g.fill();
+    if(k%4===0){ g.fillStyle=k%8?'#c8ccd4':'#c87a40'; g.beginPath(); g.arc(px,py-1,1.2,0,Math.PI*2); g.fill(); } } };
+OBJ_DRAW.molten=o=>{ const [fw,fh]=o.fp, a=P(o.i,o.j), b=P(o.i+fw,o.j), c2=P(o.i+fw,o.j+fh), d=P(o.i,o.j+fh);   // a stone channel full of molten metal running from the forges
+  g.fillStyle='#4a4440'; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c2.x,c2.y); g.lineTo(d.x,d.y); g.closePath(); g.fill();
+  const ins=(p,q2,t)=>({x:p.x+(q2.x-p.x)*t,y:p.y+(q2.y-p.y)*t}), cx=(a.x+c2.x)/2, cy=(a.y+c2.y)/2, sh=t=>({x:cx+(t.x-cx)*0.7,y:cy+(t.y-cy)*0.55});
+  const m1=sh(a), m2=sh(b), m3=sh(c2), m4=sh(d), mg=g.createLinearGradient(m1.x,m1.y,m3.x,m3.y); const ph=gt*0.6;
+  mg.addColorStop(0,'#ff8a20'); mg.addColorStop(0.5+0.1*Math.sin(ph),'#ffd060'); mg.addColorStop(1,'#e05010');
+  g.fillStyle=mg; g.beginPath(); g.moveTo(m1.x,m1.y); g.lineTo(m2.x,m2.y); g.lineTo(m3.x,m3.y); g.lineTo(m4.x,m4.y); g.closePath(); g.fill();
+  g.fillStyle='rgba(60,24,10,0.5)'; for(let k=0;k<8;k++){ const t=((k*0.13+gt*0.05)%1), p=ins(m1,m2,t), p2=ins(m4,m3,t); g.beginPath(); g.ellipse((p.x+p2.x)/2,(p.y+p2.y)/2,5,1.6,-0.45,0,Math.PI*2); g.fill(); }   // crust drifting on it
+  g.save(); g.globalCompositeOperation='lighter'; glow(cx,cy,(b.x-a.x)*0.6+30,26,'255,120,40',0.4); g.restore(); };
+LIGHT_TYPES.molten=[0,0,160,'255,120,40'];
+// the rooms, furnished
+AREAS.varrowmine.mine=true;
+Object.assign(AREAS.varrowgate,{ runners:[[5.25,6.75,0,12]], wallSeed:0 });
+Object.assign(AREAS.varrowhall,{ runners:[[8.25,9.75,2.6,16]], rings:[[9.5,8.5,1.75]], wallSeed:1 });
+Object.assign(AREAS.varrowmine,{ rails:[['h',7.5,0,13.5],['v',7.5,7.6,14]] });
+Object.assign(AREAS.varrowtomb,{ runners:[[4.25,5.75,0,6.4]], rings:[[5.5,7.5,2.3]], wallSeed:2 });
+wrap('varrowgate','objects',l=>[...l.filter(o=>o.type!=='banner'), {type:'chainlamp', i:3, j:6, noblock:true}, {type:'chainlamp', i:8, j:6, noblock:true}, {type:'chainlamp', i:6, j:9, noblock:true},
+  {type:'kegrack', i:9, j:9, fp:[2,1]}, {type:'oreheap', i:1, j:2}]);
+wrap('varrowhall','objects',l=>[...l.filter(o=>!['table','bench','barrel','banner'].includes(o.type)),
+  {type:'dtable', i:11, j:10, fp:[3,1]}, {type:'dtable', i:11, j:12, fp:[3,1]}, {type:'kegrack', i:15, j:12, fp:[2,1]}, {type:'kegrack', i:15, j:14, fp:[2,1]},
+  {type:'molten', i:1, j:5, fp:[3,1]}, {type:'hoard', i:16, j:1}, {type:'oreheap', i:7, j:3},
+  {type:'chainlamp', i:6, j:8, noblock:true}, {type:'chainlamp', i:12, j:8, noblock:true}, {type:'chainlamp', i:9, j:12, noblock:true}, {type:'chainlamp', i:9, j:5, noblock:true}, {type:'chainlamp', i:3, j:12, noblock:true}]);
+wrap('varrowmine','objects',l=>[...l, {type:'oreheap', i:11, j:8}, {type:'oreheap', i:3, j:8}, {type:'chainlamp', i:4, j:7, noblock:true}, {type:'chainlamp', i:10, j:12, noblock:true}]);
+wrap('varrowtomb','objects',l=>[...l, {type:'hoard', i:2, j:10}, {type:'hoard', i:8, j:10}, {type:'chainlamp', i:5, j:3, noblock:true}]);
 const roadcutterUp=()=>vq()==='asked' && !CHOICE.vqKing;
 FOES.roadcutter={ label:'Roadcutter', base:72, stagger:0.8, pattern:[
   {wait:1.4, wind:1.20, after:0.75, dir:'left'}, {wait:0.7, wind:0.80, after:0.45, dir:'right'}, {wait:0.1, wind:0.70, after:0.80, dir:'up', feint:'left'},
@@ -21671,6 +21751,66 @@ const runeSetOn=()=>{ const E=(player.opts&&player.opts.equip)||{}; return E.hea
           RUNE_FIRE=true; const was=HIT_SRC; HIT_SRC='spell'; try{ _w(f,extra,'Forge-Heat!','#ffb050'); } finally{ HIT_SRC=was; RUNE_FIRE=false; }
           try{ burst(f,player,'#ffa040',14); }catch(e){} shake=Math.max(shake,4); } } }catch(e){}
     return r; }; }
+// ── VARROWDEEP's halls: coursed granite, carved pilasters, a frieze of knotwork inlaid with gold, banners and runestones, square doors under inscribed lintels ──
+function paintDwarfWalls(){ const {w,h}=ROOM, H=172, A=AREAS[areaId], gaps=backDoorGaps();
+  const Q=(side,u0,u1,h0,h1,fill,stroke)=>{ const a=WPT(side,u0,h0), b=WPT(side,u1,h0), c2=WPT(side,u1,h1), d=WPT(side,u0,h1); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c2.x,c2.y); g.lineTo(d.x,d.y); g.closePath(); if(fill){ g.fillStyle=fill; g.fill(); } if(stroke){ g.strokeStyle=stroke; g.stroke(); } };
+  const L=(side,u0,h0,u1,h1)=>{ const a=WPT(side,u0,h0), b=WPT(side,u1,h1); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); };
+  const nearGap=(side,u,r)=>gaps.some(d=>d.side===side && Math.abs(d.u-u)<r);
+  [['r',w,0],['l',h,1]].forEach(([side,len,dk])=>{ const shade=dk?-0.1:0;
+    const a=WPT(side,0,0), b=WPT(side,len,0); const gr=g.createLinearGradient(0,Math.min(a.y,b.y)-H,0,Math.max(a.y,b.y)); gr.addColorStop(0,tone('#3e3a36',shade)); gr.addColorStop(0.6,tone('#625c56',shade)); gr.addColorStop(1,tone('#6e6862',shade));
+    Q(side,0,len,0,H,gr);
+    g.lineWidth=1; g.strokeStyle='rgba(20,18,16,0.55)'; g.beginPath();                                                    // coursed blocks
+    for(let r=0, hh=12; hh<H-14; r++, hh+=15){ L(side,0,hh,len,hh); for(let u=(r%2)*0.35; u<len; u+=0.7) L(side,u,hh,u,hh+15); } g.stroke();
+    g.strokeStyle='rgba(255,240,220,0.07)'; g.beginPath(); for(let hh=13; hh<H-14; hh+=15) L(side,0,hh,len,hh); g.stroke();
+    Q(side,0,len,0,12,tone('#7a736a',shade),'rgba(20,18,16,0.6)');                                                       // the plinth
+    Q(side,0,len,H-14,H,tone('#857c72',shade),'rgba(20,18,16,0.6)'); Q(side,0,len,H-16,H-14,'#b08a3e');                  // the cornice, a gold line beneath
+    Q(side,0,len,96,114,tone('#34302c',shade)); Q(side,0,len,96,97.5,'#c09a48'); Q(side,0,len,112.5,114,'#c09a48');       // the frieze
+    g.strokeStyle='rgba(206,164,80,0.85)'; g.lineWidth=1.1; g.beginPath(); for(let u=0; u<len; u+=0.25){ const k=Math.round(u*4)%2; L(side,u,k?100:110,u+0.25,k?110:100); } g.stroke();   // angular knotwork
+    g.strokeStyle='rgba(206,164,80,0.45)'; g.beginPath(); for(let u=0.125; u<len; u+=0.5){ L(side,u,103,u+0.125,105); L(side,u+0.125,105,u,107); } g.stroke();
+    for(let u=0; u<=len+0.01; u+=3){ if(nearGap(side,u,1.1)) continue;                                                    // pilasters, each with a lit rune
+      const u0=u-0.14, u1=u+0.14; Q(side,u0,u1,0,H-16,tone('#7e766c',shade),'rgba(20,18,16,0.7)'); Q(side,u0-0.05,u1+0.05,H-30,H-16,tone('#948a7e',shade),'rgba(20,18,16,0.7)'); Q(side,u0-0.05,u1+0.05,0,10,tone('#948a7e',shade),'rgba(20,18,16,0.7)');
+      Q(side,u-0.04,u+0.04,14,H-34,'rgba(30,26,22,0.35)');
+      const p=WPT(side,u,72); g.save(); g.globalCompositeOperation='lighter'; glow(p.x,p.y,10,10,'255,150,60',0.35); g.strokeStyle='rgba(255,170,80,0.95)'; g.lineWidth=1.2; g.beginPath(); g.moveTo(p.x,p.y-6); g.lineTo(p.x,p.y+6); g.moveTo(p.x-4,p.y-2); g.lineTo(p.x,p.y+1); g.lineTo(p.x+4,p.y-2); g.stroke(); g.restore(); }
+    for(let u=1.5, k=0; u<len; u+=3, k++){ if(nearGap(side,u,1.5)) continue; const kind=(k+dk*2+(A.wallSeed||0))%3;
+      if(kind===0){ const u0=u-0.42, u1=u+0.42, top=94, bot=26;                                                            // a hanging banner: red, gold-edged, the hammer and the mountain
+        Q(side,u0-0.06,u1+0.06,top,top+3,'#4a3420');
+        const a1=WPT(side,u0,top), b1=WPT(side,u1,top), b2=WPT(side,u1,bot+10), m=WPT(side,u,bot), a2=WPT(side,u0,bot+10);
+        g.beginPath(); g.moveTo(a1.x,a1.y); g.lineTo(b1.x,b1.y); g.lineTo(b2.x,b2.y); g.lineTo(m.x,m.y); g.lineTo(a2.x,a2.y); g.closePath(); g.fillStyle=tone('#8a2420',shade); g.fill(); g.strokeStyle='#c09a48'; g.lineWidth=2; g.stroke();
+        const c0=WPT(side,u,62); g.fillStyle='#d0a850'; g.beginPath(); g.moveTo(c0.x-9,c0.y+8); g.lineTo(c0.x,c0.y-8); g.lineTo(c0.x+9,c0.y+8); g.closePath(); g.fill();   // the mountain
+        g.fillStyle=tone('#8a2420',shade); g.beginPath(); g.moveTo(c0.x-4,c0.y+8); g.lineTo(c0.x,c0.y); g.lineTo(c0.x+4,c0.y+8); g.closePath(); g.fill();
+        g.fillStyle='#d0a850'; g.fillRect(c0.x-1,c0.y+10,2,12); g.fillRect(c0.x-5,c0.y+10,10,4); }                               // and the hammer beneath it
+      else if(kind===1){                                                                                                    // a carved king in a framed panel: helm, brows, a great beard, an axe across it
+        Q(side,u-0.5,u+0.5,14,92,tone('#4a4540',shade),'rgba(150,120,70,0.7)'); Q(side,u-0.44,u+0.44,18,88,tone('#58524c',shade));
+        const p=WPT(side,u,58), S2=tone('#9a9084',shade), D2='rgba(20,18,16,0.55)';
+        g.fillStyle=S2; g.beginPath(); g.moveTo(p.x-11,p.y+2); g.quadraticCurveTo(p.x,p.y-18,p.x+11,p.y+2); g.closePath(); g.fill();      // the helm
+        g.fillStyle=tone(S2,-0.1); g.fillRect(p.x-12,p.y,24,4); g.fillRect(p.x-1.2,p.y+2,2.4,9);                                          // brow band, nasal
+        g.fillStyle=tone(S2,0.05); g.beginPath(); g.ellipse(p.x,p.y+9,8,6,0,0,Math.PI*2); g.fill();                                        // the face
+        g.fillStyle=D2; g.fillRect(p.x-6,p.y+7,4,1.6); g.fillRect(p.x+2,p.y+7,4,1.6);
+        g.fillStyle=S2; g.beginPath(); g.moveTo(p.x-10,p.y+10); g.quadraticCurveTo(p.x-12,p.y+28,p.x-4,p.y+34); g.lineTo(p.x,p.y+29); g.lineTo(p.x+4,p.y+34); g.quadraticCurveTo(p.x+12,p.y+28,p.x+10,p.y+10); g.quadraticCurveTo(p.x,p.y+15,p.x-10,p.y+10); g.closePath(); g.fill();   // the beard, forked
+        g.strokeStyle=D2; g.lineWidth=0.8; g.beginPath(); for(let q=-2;q<=2;q++){ g.moveTo(p.x+q*3.2,p.y+14); g.lineTo(p.x+q*2.4,p.y+30); } g.stroke();
+        g.strokeStyle=D2; g.lineWidth=1.4; g.beginPath(); g.moveTo(p.x-16,p.y+30); g.lineTo(p.x+15,p.y-4); g.stroke(); g.fillStyle=S2; g.beginPath(); g.moveTo(p.x+11,p.y-8); g.quadraticCurveTo(p.x+20,p.y-6,p.x+18,p.y+4); g.lineTo(p.x+13,p.y); g.closePath(); g.fill();   // an axe across the chest
+        g.fillStyle='#c09a48'; g.fillRect(p.x-2,p.y-15,4,3); }
+      else { const p=WPT(side,u,56);                                                                                        // a runestone in a niche, glowing
+        Q(side,u-0.3,u+0.3,20,92,'#1e1b18','rgba(150,120,70,0.5)'); g.fillStyle=tone('#5a544c',shade); g.beginPath(); g.moveTo(p.x-9,p.y+30); g.lineTo(p.x-8,p.y-14); g.lineTo(p.x,p.y-24); g.lineTo(p.x+8,p.y-14); g.lineTo(p.x+9,p.y+30); g.closePath(); g.fill();
+        g.save(); g.globalCompositeOperation='lighter'; glow(p.x,p.y,18,26,'255,140,50',0.3+0.08*Math.sin(gt*1.6+u)); g.strokeStyle='rgba(255,170,80,0.95)'; g.lineWidth=1.3; g.beginPath(); g.moveTo(p.x,p.y-14); g.lineTo(p.x,p.y+20); g.moveTo(p.x-5,p.y-6); g.lineTo(p.x,p.y); g.lineTo(p.x+5,p.y-6); g.moveTo(p.x-5,p.y+8); g.lineTo(p.x+5,p.y+14); g.stroke(); g.restore(); } } });
+  g.fillStyle='#7e766c'; const oc=WPT('r',0,0); g.fillRect(oc.x-7,oc.y-H+16,14,H-16);
+  gaps.forEach(d=>{ const s=d.side, u0=d.u-0.75, u1=d.u+0.75, hh=104;                                                         // the doors: square, under a heavy inscribed lintel
+    Q(s,u0-0.28,u1+0.28,0,hh+18,'#7e766c','rgba(20,18,16,0.8)');
+    if(d.out){ const n=nightAmt(), m0=WPT(s,d.u,hh), m1=WPT(s,d.u,0), sk=g.createLinearGradient(0,m0.y,0,m1.y); sk.addColorStop(0,n>0.5?'#2a3450':'#c8dcea'); sk.addColorStop(0.6,n>0.5?'#2a2e36':'#9aa4ac'); sk.addColorStop(1,n>0.5?'#1a1c20':'#6a6e72'); Q(s,u0,u1,0,hh,sk); }
+    else { const m0=WPT(s,d.u,hh), m1=WPT(s,d.u,0), dk2=g.createLinearGradient(0,m0.y,0,m1.y); dk2.addColorStop(0,'#050403'); dk2.addColorStop(1,d.o.to==='varrowmine'||d.o.to==='varrowtomb'?'#1a120a':'#3a2412'); Q(s,u0,u1,0,hh,dk2);
+      g.save(); g.globalCompositeOperation='lighter'; const gm=WPT(s,d.u,20); glow(gm.x,gm.y,40,22,'255,150,70',d.o.to==='varrowhall'||d.o.to==='varrowgate'?0.3:0.1); g.restore(); }
+    Q(s,u0-0.1,u0,0,hh,'#5e5850'); Q(s,u1,u1+0.1,0,hh,'#5e5850');
+    Q(s,u0-0.36,u1+0.36,hh,hh+20,'#8c8378','rgba(20,18,16,0.8)'); Q(s,u0-0.36,u1+0.36,hh+20,hh+23,'#c09a48');
+    g.save(); g.globalCompositeOperation='lighter'; g.strokeStyle='rgba(255,170,80,0.9)'; g.lineWidth=1; g.beginPath(); for(let k=0;k<7;k++){ const u=u0+(u1-u0)*(k+0.5)/7, p=WPT(s,u,hh+10); if(k%2){ g.moveTo(p.x-2,p.y-4); g.lineTo(p.x+2,p.y+4); g.moveTo(p.x+2,p.y-4); g.lineTo(p.x-2,p.y+4); } else { g.moveTo(p.x,p.y-4); g.lineTo(p.x,p.y+4); g.moveTo(p.x,p.y-1); g.lineTo(p.x+2.5,p.y-3); } } g.stroke(); g.restore(); });
+}
+// ── the deep mines: rough rock, propped with timber, a seam of ore glinting in it ──
+function paintMineTimbers(){ const {w,h}=ROOM, H=120;
+  [['r',w],['l',h]].forEach(([side,len])=>{ for(let u=1; u<len; u+=2.2){ if(backDoorGaps().some(d=>d.side===side && Math.abs(d.u-u)<1.3)) continue;
+      const b0=WPT(side,u-0.12,0), t0=WPT(side,u-0.12,H*0.82), b1=WPT(side,u+0.12,0); g.fillStyle='#5a3e24'; g.beginPath(); g.moveTo(b0.x,b0.y); g.lineTo(b1.x,b1.y); g.lineTo(b1.x,b1.y-H*0.82); g.lineTo(t0.x,t0.y); g.closePath(); g.fill(); g.strokeStyle='#2a1c10'; g.lineWidth=1; g.stroke();
+      if(u+2.2<len){ const a=WPT(side,u-0.15,H*0.82), b=WPT(side,u+2.35,H*0.82); g.strokeStyle='#4a321c'; g.lineWidth=7; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); g.strokeStyle='#2a1c10'; g.lineWidth=1; g.stroke(); } }
+    for(let k=0;k<26;k++){ const u=rnd01(k,side==='r'?1:2,901)*len, hh=20+rnd01(k,3,902)*70, p=WPT(side,u,hh); g.fillStyle=k%3?'rgba(200,170,90,0.75)':'rgba(170,190,210,0.7)'; g.beginPath(); g.arc(p.x,p.y,1.4+rnd01(k,4,903)*1.6,0,Math.PI*2); g.fill(); } });   // flecks of ore
+}
+{ const _p=paintInteriorWalls; paintInteriorWalls=function(){ const A=AREAS[areaId]; if(A && A.dwarf && !A.mine) return paintDwarfWalls(); const r=_p.apply(this,arguments); if(A && A.dwarf && A.mine) paintMineTimbers(); return r; }; }
 // the people of the Great Hall
 const VARROW_FOLK=[
   { id:'thane', name:'Thane Sigrid Varrowborn', i:9, j:3, dir:2, opts:DWARFO({gender:'f', skin:1, hair:7, hairColor:12, face:2, equip:{head:null, armor:'varrow_mail', hands:null, legs:'trousers', feet:'boots'}}) },

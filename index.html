@@ -1075,9 +1075,10 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   const STOCK=F&&ELF_LEG, LEG_COVER=!!E.legs&&!STOCK&&!DUEL_F;   // on women the elven leggings are thigh-high stockings on a garter belt
   const BUST=E.torso==='elf_bustier', ROBE=E.torso==='elf_robe', ETUN=E.torso==='elf_tunic', CLOAK=E.armor==='elf_cloak';
   // light body hair for men (not elves or goblins): short soft strokes in the hair colour, very low contrast
+  const HAIRY=String(opts.race||'').startsWith('dwarf');
   const BH = !F && !/^(elf|goblin)/.test(String(opts.race||'')) ? (()=>{ const hc=HAIR_COLORS[opts.hairColor]||'#3b2417', [r0,g0,b0]=_rgb(hc), L=(0.3*r0+0.59*g0+0.11*b0)/255;
-      return tone(hc, L>0.6?-0.35:-0.15, 0.1+0.17*(1-L)); })() : null;   // dark hair shows more, fair hair barely
-  const fur=(cx,cy,rx,ry,n,seed,ang,spread=0.7,len=1.1)=>{ if(!BH) return; c.save(); c.strokeStyle=BH; c.lineWidth=0.32; c.lineCap='round';
+      return tone(hc, L>0.6?-0.35:-0.15, (0.1+0.17*(1-L))*(HAIRY?1.9:1)); })() : null;   // dark hair shows more, fair hair barely; dwarves are hairier
+  const fur=(cx,cy,rx,ry,n,seed,ang,spread=0.7,len=1.1)=>{ if(!BH) return; if(HAIRY){ n=Math.round(n*2.2); len*=1.35; } c.save(); c.strokeStyle=BH; c.lineWidth=HAIRY?0.4:0.32; c.lineCap='round';
     for(let k=0;k<n;k++){ const u=rnd01(k,seed,500)*2-1, v=rnd01(k,seed,501)*2-1; if(u*u+v*v>1) continue;
       const px=x+cx+u*rx, py=B+cy+v*ry, a=ang+(rnd01(k,seed,502)-0.5)*spread, L=len*(0.6+rnd01(k,seed,503)*0.7)*(1-0.35*(u*u+v*v));
       c.beginPath(); c.moveTo(px,py); c.lineTo(px+Math.cos(a)*L,py+Math.sin(a)*L); c.stroke(); }
@@ -4448,7 +4449,8 @@ function drawBeard(c,x,B,style,hair,hairDark,P,pr,LN,earBack){
 //  Layers: 'body' (behind the torso), 'back' (behind the skull), 'front'.
 // ════════════════════════════════════════════════════════════
 const HAIR_NAMES_M2 = ['Short Crop','Side Part','Bald','Tousled','Swept Back','Warrior Topknot','Shoulder-Length','Long Tied'];
-const HAIR_NAMES_F2 = ['Long Flowing','Pixie Cut','Side Braid','Twin Braids','High Bun','Ponytail','Loose Waves','Crown Braid'];
+const HAIR_NAMES_F2 = ['Long Flowing','Pixie Cut','Side Braid','Twin Braids','High Bun','Ponytail','Loose Waves','Crown Braid','Heavy Plaits','Looped Braids','Crown & Mane'];
+const DWARF_HAIR_F=8;   // from here on, women's styles for dwarves only
 const HAIR_POOL=[];
 function hairScratch(k,w,h){
   let cv=HAIR_POOL[k];
@@ -4745,6 +4747,25 @@ function drawHairPieces(c,x,B,style,hair,F,P,view,LN,layer){
         else if(pr>0.75){ fringe('part'); braid([[HW*0.45,TOP+3],[-HW*0.1,TOP+2.4],[-HW*0.6,TOP+4.5],[-HW*0.85,LINE+2],[-HW*0.7,Y.EAR_TOP+3]],2.6,2.4); }
         else { fringe('part'); const o=partX*0.3, e=HW-1.6; braid([[-e+sh(-1)*0.4,LINE+1.5],[-e*0.6+o,TOP+3.4],[o,TOP+2.4],[e*0.6+o,TOP+3.4],[e,LINE+1.5]].filter(([px])=>!(pr>0.4 && px>e*0.7)),2.6,2.4); }   // over the crown, just behind the hairline
         break; }
+      case 8: // Heavy Plaits (dwarves): four thick braids, two over the shoulders to the waist, two down the back
+        rear(Y.EAR_TOP+5); backCover(0,1.1,5,true); dome(1.05); fringe('part');
+        if(back){ [-1,1].forEach(s=>{ braid([[s*HW*0.55,LINE+3],[s*HW*0.62,LINE+16],[s*HW*0.55,LINE+30]],3.6,2.2); braid([[s*HW*0.2,LINE+4],[s*HW*0.22,LINE+18],[s*HW*0.18,LINE+34]],3.4,2.0); }); }
+        else [-1,1].forEach(s=>{ if(hid(s)) return; const bx=s*(HW+0.2)+sh(s);
+          braid([[bx,LINE+1],[bx+s*1.2,LINE+12],[bx+s*0.8,LINE+26],[bx+s*0.2,LINE+38]],4.0,2.4); });
+        break;
+      case 9: // Looped Braids (dwarves): a braid from each temple, looped up and pinned behind the ear
+        rear(Y.EAR_TOP+5); backCover(0,1,5,true); dome(1); fringe('part');
+        if(back){ [-1,1].forEach(s=>braid([[s*HW*0.7,LINE+2],[s*HW*0.9,LINE+14],[s*HW*0.75,LINE+20],[s*HW*0.45,LINE+13],[s*HW*0.4,LINE+4]],3.2,2.8)); }
+        else [-1,1].forEach(s=>{ if(hid(s)) return; const bx=s*(HW-0.3)+sh(s);
+          braid([[bx,LINE+1],[bx+s*1.6,LINE+12],[bx+s*2.4,LINE+19],[bx+s*3.6,LINE+13],[bx+s*2.4,LINE+3]],3.4,3.0); });
+        break;
+      case 10: { // Crown & Mane (dwarves): a braid wound round the head, and the rest left loose and long down the back
+        const WL=26; rear(LINE+WL,1.6); if(back) backCover(WL,1.5,7); dome(0.9);
+        if(!back){ if(!hid(-1)) curtain(-1, pr>0.85?10:WL, 3.4, 1.2); if(!hid(1) && pr<0.4) curtain(1, WL, 3.4, 1.2); else if(!hid(1) && pr<0.7) curtain(1, WL*0.8, 3, 1); }
+        if(back){ braid([[-HW-0.2,Y.EAR_TOP+1],[-HW*0.5,Y.EAR_TOP+4],[0,Y.EAR_TOP+5],[HW*0.5,Y.EAR_TOP+4],[HW+0.2,Y.EAR_TOP+1]],3.0,2.8); }
+        else if(pr>0.75){ braid([[HW*0.45,TOP+3],[-HW*0.1,TOP+2.4],[-HW*0.6,TOP+4.5],[-HW*0.85,LINE+2],[-HW*0.7,Y.EAR_TOP+3]],3.0,2.8); }
+        else { const o=partX*0.3, e=HW-1.2; braid([[-e+sh(-1)*0.4,LINE+1.5],[-e*0.6+o,TOP+3.4],[o,TOP+2.4],[e*0.6+o,TOP+3.4],[e,LINE+1.5]].filter(([px])=>!(pr>0.4 && px>e*0.7)),3.0,2.8); }
+        break; }
       case 5: // Ponytail
         rear(Y.EAR_TOP+4,1); dome(0.9);
         if(back){ backCover(0,1,4,true); tail(30); }
@@ -4878,9 +4899,13 @@ function refreshCreator(){
     btn.classList.toggle('active', i===(charOpts.face|0));
   });
   const names = charOpts.gender==='f' ? HAIR_NAMES_F2 : HAIR_NAMES_M2;
+  if(charOpts.gender==='f' && charOpts.race!=='dwarf' && (charOpts.hair|0)>=DWARF_HAIR_F) charOpts.hair=3;
+  if(charOpts.gender!=='f' && (charOpts.hair|0)>=HAIR_NAMES_M2.length) charOpts.hair=0;
   hairGrid.querySelectorAll('.chip').forEach((btn,i)=>{
+    btn.style.display = names[i] ? '' : 'none';
     btn.textContent = names[i] || btn.textContent;
     btn.classList.toggle('active', i===charOpts.hair);
+    { const off=charOpts.gender==='f' && i>=DWARF_HAIR_F && charOpts.race!=='dwarf'; btn.disabled=off; btn.style.opacity=off?0.35:1; btn.title=off?'Only for dwarves':''; }
   });
   if(charOpts.race!=='dwarf' && (charOpts.beard|0)>=DWARF_BEARDS) charOpts.beard=5;
   beardGrid.querySelectorAll('.chip').forEach((btn,i)=>{
@@ -4950,7 +4975,7 @@ function buildCreatorUI(){
     hcRow.appendChild(d);
   });
 
-  for(let i=0;i<8;i++){
+  for(let i=0;i<HAIR_NAMES_F2.length;i++){
     const btn=document.createElement('button');
     btn.type='button'; btn.className='chip';
     btn.addEventListener('click',()=>{ charOpts.hair=i; creatorClothed = true; refreshCreator(); });
@@ -4984,7 +5009,7 @@ function randomizeLook(){ const R=n=>Math.floor(Math.random()*n), elf=charOpts.r
   charOpts.eyeColor=R(EYE_COLORS.length); charOpts.hairColor=R(HAIR_COLORS.length);
   charOpts.face=R(FACES[male?'m':'f'].length); charOpts.hair=R(8);
   if(male && !elf){ const b=charOpts.race==='dwarf'?[5,6,6,7,7,8,8,4]:[0,0,2,3,4,4,5,5]; charOpts.beard=b[R(b.length)]; charOpts.stubble=Math.random()<0.3; } else { charOpts.beard=0; charOpts.stubble=false; }
-  if(charOpts.race==='dwarf' && !male){ const hs=[2,3,3,7,7,4]; charOpts.hair=hs[R(hs.length)]; }
+  if(charOpts.race==='dwarf' && !male){ const hs=[3,7,8,8,9,9,10,10]; charOpts.hair=hs[R(hs.length)]; }
   if(charOpts.race==='dwarf'){ const hc=[0,1,2,3,6,7,8,12,13]; charOpts.hairColor=hc[R(hc.length)]; }
   const M=charOpts.marks={};
   MARKS.forEach(([k,,isElf,val])=>{ const need=markRace(isElf); if(need && charOpts.race!==need) return; const p=k==='eyePatch'?0.04:isElf?0.25:k==='earrings'?0.2:0.08; if(Math.random()>=p) return;   // a few details, seldom a crowd of them

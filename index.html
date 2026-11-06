@@ -13941,6 +13941,7 @@ function drawActorBase(e){
   else if(e.type==='hunger') drawHunger(s.x,B,e,poseFor(e));
   else if(e.type==='gnawer') drawGnawer(s.x,B,e,poseFor(e));
   else if(e.type==='bear') drawBear(s.x,B,e,poseFor(e));
+  else if(e.type==='troll') drawTroll(s.x,B,e,poseFor(e));
   else if(e.type==='gloomcaller'||e.type==='thornwitch'){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawShadeUnder(s.x,B,e); g.globalAlpha*=0.82; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); g.globalAlpha/=0.82; drawShadeOver(s.x,B,e); }
   else if(e.type==='husk'){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); drawHuskBits(s.x,B,e); }
   else if(e.type==='skeleton') drawRisen(s.x,B,e,poseFor(e));
@@ -13949,7 +13950,7 @@ function drawActorBase(e){
   g.restore();
   if(!isP && e.dead) return;
   if(isP && romHush()) return;
-  const ty=B-(e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'?66:e.type==='bear'?92:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:114)+dwarfDrop(e.opts);
+  const ty=B-(e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'?66:e.type==='bear'?92:e.type==='troll'?150:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:114)+dwarfDrop(e.opts);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const deadly=!isP && e.type!=='dummy' && e.hostile!==false && e.tier && typeof foeLevel==='function' && foeLevel(e)-playerLevel()>=3;   // far stronger than you: a skull
   const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  Lv '+(typeof foeLevel==='function'?foeLevel(e):e.tier) : ''), tw=g.measureText(label).width;
@@ -14292,7 +14293,7 @@ function castSpell(){                            // a staff casts the spell for 
     return true; }
 function drawActorFigure(e){ drawActorBase(e);         // then status pips over the name, and your mana bar
     if(!e.opts && e.type!=='wolf') return; if(e.dead) return;
-    const s=P(e.x+(e.ox||0),e.y+(e.oy||0)), ty=s.y-(e.type==='wolf'?66:e.type==='bear'?92:114);
+    const s=P(e.x+(e.ox||0),e.y+(e.oy||0)), ty=s.y-(e.type==='wolf'?66:e.type==='bear'?92:e.type==='troll'?150:114);
     if(e.st && e.st.length){ e.st.forEach((st,k)=>{ const D=STATUS_DEF[st.kind], x=s.x-((e.st.length-1)*9)/2+k*9, y=ty-(e===player&&combat.phase==='fight'?30:12);   // status pips over the name
       g.fillStyle='rgba(12,8,3,0.8)'; g.beginPath(); g.arc(x,y,4.6,0,Math.PI*2); g.fill(); g.fillStyle=D.col; g.beginPath();
       if(st.kind==='bleed'){ g.moveTo(x,y-3.4); g.quadraticCurveTo(x+3,y+0.5,x,y+3); g.quadraticCurveTo(x-3,y+0.5,x,y-3.4); }
@@ -22455,6 +22456,66 @@ JOURNAL.push(['Old Brumm', ()=>{ const B=CHOICE.bear; if(!B || B==='later') retu
 Object.assign(ITEMS,{ bear_necklace:{ name:'Bear-Claw Necklace', slot:'neck' } }); NECK_LOOKS.bear_necklace={cord:'#3a2414',w:0.8,p:'fangs',col:'#3a3028'};
 Object.assign(ITEM_STATS,{ bear_necklace:{hp:6,ap:1} }); GEAR_HP.bear_necklace=6; PRICES.bear_necklace=60;
 ITEM_LORE.bear_necklace="Old Brumm's claws on a thong of his own hide, strung by Brann while you were still in the hollow. They are longer than your fingers.";
+// ════════ THE CAVE TROLL: what woke when the Quiet lifted. It wanders the Deep Mines every day. Slow, terribly strong, and it mends itself whenever you stop hurting it ════════
+FOES.troll={ label:'Cave Troll', base:82, stagger:1.2, pattern:[
+  {wait:1.6, wind:1.40, after:0.95, dir:'up'},       // the club comes down from overhead
+  {wait:1.0, wind:1.10, after:0.60, dir:'left'},     // a sweep
+  {wait:0.15, wind:0.62, after:0.95, dir:'right'},   // and a quick backhand after it
+  {wait:1.5, wind:1.25, after:1.00, dir:'up'} ]};
+Object.assign(WEAPONS,{ troll_club:{ wind:0.35, dmg:17, len:30 } });
+const TROLL=()=>({gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,beast:true,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:'troll_club',offhand:null}});
+function drawTroll(x,B,e,pose){ const pk=pose&&pose.kind, pt=pose?Math.min(1,Math.max(0,pose.t||0)):0, fl=dirMirrored(e.dir||0), T=gt, mv=e.moving?Math.sin(T*6):0;
+  const S='#6a7860', SD='#4a5644', SL='#8a9a7c', MOSS='#5a7a3a';
+  g.save(); g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(x,B,40,11,0,0,Math.PI*2); g.fill();
+  g.translate(x,B); if(fl) g.scale(-1,1);
+  if(e.dead){ const k=Math.min(1,(e.fallT||0)/0.9); g.translate(0,0); g.rotate(-k*1.45); g.globalAlpha*=Math.max(0.4,1-(e.fallT||0)/8); }
+  const breathe=Math.sin(T*1.6)*1.2, lean=pk==='raise'?-0.06*pt:pk==='strike'?0.16*(1-pt*0.6):pk==='stagger'?-0.12:0.04, bob=Math.abs(mv)*2;
+  const club=(hx,hy,ang)=>{ g.save(); g.translate(hx,hy); g.rotate(ang); g.fillStyle='#4a3420'; g.beginPath(); g.moveTo(-3,4); g.lineTo(3,4); g.lineTo(7,-46); g.quadraticCurveTo(0,-62,-7,-46); g.closePath(); g.fill();   // a tree-root club
+    g.fillStyle='#5e4430'; g.beginPath(); g.ellipse(0,-48,8,11,0,0,Math.PI*2); g.fill(); g.fillStyle='#8a8a84'; [[-4,-52],[4,-44],[0,-58],[5,-54]].forEach(([a,b])=>{ g.beginPath(); g.moveTo(a,b); g.lineTo(a+3,b-2); g.lineTo(a+1,b+2); g.closePath(); g.fill(); });   // stones knocked into it
+    g.restore(); };
+  // the club hand
+  let hand, cang;
+  if(pk==='raise'){ hand=[24-pt*20,-46-pt*90]; cang=2.75+(-0.75-2.75)*pt; }                      // up and back over its head
+  else if(pk==='strike'){ const k=Math.min(1,pt*1.6); hand=[4+k*40,-136+k*112]; cang=-0.75+k*2.75; }   // down in front of it
+  else { hand=[28,-44+bob]; cang=2.75+Math.sin(T*1.2)*0.05; }                                        // hanging, its end on the ground
+  // legs
+  [[-12,SD,1],[10,S,-1]].forEach(([lx,c,ph])=>{ const kx=lx+6+mv*4*ph, fy=0; g.fillStyle=c; g.beginPath(); g.moveTo(lx-9,-46+bob); g.lineTo(lx+9,-46+bob); g.quadraticCurveTo(kx+12,-26,kx+6,-8); g.lineTo(kx-8,-8); g.quadraticCurveTo(kx-10,-28,lx-9,-46+bob); g.closePath(); g.fill();
+    g.beginPath(); g.ellipse(kx,-4,13,6,0,0,Math.PI*2); g.fill(); g.fillStyle='#2a2a24'; for(let t=0;t<3;t++){ g.beginPath(); g.ellipse(kx+8+t*0.5,-1.5-t*2.4,1.6,1.1,0,0,Math.PI*2); g.fill(); } });   // great flat feet, black nails
+  g.save(); g.translate(0,-46+bob); g.rotate(lean); g.translate(0,46-bob);
+  // the far arm, hanging to its knees
+  g.strokeStyle=SD; g.lineCap='round'; g.lineWidth=12; g.beginPath(); g.moveTo(-4,-96+bob); g.quadraticCurveTo(-16,-66,-8+mv*3,-30); g.stroke(); g.fillStyle=SD; g.beginPath(); g.ellipse(-7+mv*3,-26,8,7,0,0,Math.PI*2); g.fill();
+  // the body: a hunched hill of a back, a great belly
+  g.beginPath(); g.moveTo(-18,-46+bob); g.quadraticCurveTo(-30,-80,-16,-108+breathe); g.quadraticCurveTo(0,-122+breathe,18,-104); g.quadraticCurveTo(32,-84,24,-58); g.quadraticCurveTo(18,-44,0,-42+bob); g.closePath();
+  const bg=g.createLinearGradient(-20,-120,20,-40); bg.addColorStop(0,SL); bg.addColorStop(0.5,S); bg.addColorStop(1,SD); g.fillStyle=bg; g.fill(); g.strokeStyle='rgba(20,26,18,0.5)'; g.lineWidth=1; g.stroke();
+  g.fillStyle=tone(S,0.15); g.beginPath(); g.ellipse(14,-66,11,15,0.2,0,Math.PI*2); g.fill();   // the belly
+  g.fillStyle=MOSS; [[-14,-104,7,3],[-22,-86,4,6],[2,-114,6,2.5]].forEach(([a,b,rx,ry])=>{ g.beginPath(); g.ellipse(a,b+breathe*0.5,rx,ry,0.4,0,Math.PI*2); g.fill(); });   // moss on its back
+  g.fillStyle=SD; [[-10,-92],[-20,-70],[4,-100],[-6,-78]].forEach(([a,b])=>{ g.beginPath(); g.arc(a,b,2.4,0,Math.PI*2); g.fill(); });   // warts like stones
+  g.fillStyle='#4a3a28'; g.beginPath(); g.moveTo(-14,-52+bob); g.lineTo(18,-50+bob); g.lineTo(14,-34); g.lineTo(6,-38); g.lineTo(-2,-30); g.lineTo(-10,-36); g.closePath(); g.fill();   // a rag of hide
+  // the head: low and thrust forward
+  g.save(); g.translate(22,-102+breathe+(pk==='strike'?6:0)); g.rotate(pk==='raise'?-0.15*pt:0.08);
+  g.fillStyle=S; g.beginPath(); g.ellipse(0,0,12,10,0,0,Math.PI*2); g.fill();
+  g.fillStyle=SD; g.beginPath(); g.ellipse(2,-6,13,4,0.1,0,Math.PI*2); g.fill();   // the heavy brow
+  g.fillStyle=S; g.beginPath(); g.ellipse(12,2,6,4,0.3,0,Math.PI*2); g.fill(); g.fillStyle=SL; g.beginPath(); g.ellipse(13,0.5,4,2.4,0.3,0,Math.PI*2); g.fill();   // a great lump of a nose
+  g.fillStyle=SD; g.beginPath(); g.moveTo(-2,6); g.quadraticCurveTo(8,14,14,8); g.lineTo(12,6); g.quadraticCurveTo(6,10,-2,4); g.closePath(); g.fill();   // the jaw
+  g.fillStyle='#e8dcb8'; [[6,7],[11,6]].forEach(([a,b])=>{ g.beginPath(); g.moveTo(a-1.4,b+1); g.lineTo(a,b-4); g.lineTo(a+1.4,b+1); g.closePath(); g.fill(); });   // tusks
+  const eye=e.dead?null:'#ffd040'; if(eye){ g.fillStyle=eye; g.beginPath(); g.ellipse(6,-2,2,1.3,0,0,Math.PI*2); g.fill(); g.save(); g.globalCompositeOperation='lighter'; glow(6,-2,7,5,'255,200,60',0.35); g.restore(); }
+  g.fillStyle=SD; g.beginPath(); g.ellipse(-9,-2,3,5,-0.4,0,Math.PI*2); g.fill();   // an ear
+  g.strokeStyle='#2a2a20'; g.lineWidth=1; for(let k=0;k<5;k++){ g.beginPath(); g.moveTo(-6+k*3,-9); g.lineTo(-8+k*3,-14-(k%2)*2); g.stroke(); } g.restore();   // a few coarse hairs
+  // the near arm and the club
+  const sh=[14,-94+bob]; g.strokeStyle=S; g.lineWidth=14; g.beginPath(); g.moveTo(sh[0],sh[1]); g.quadraticCurveTo((sh[0]+hand[0])/2+8,(sh[1]+hand[1])/2,hand[0],hand[1]); g.stroke();
+  club(hand[0],hand[1],cang); g.fillStyle=S; g.beginPath(); g.ellipse(hand[0],hand[1],9,8,0,0,Math.PI*2); g.fill();
+  g.restore();
+  if(pk==='strike' && pt<0.5){ g.fillStyle=`rgba(150,140,120,${0.5*(1-pt*2)})`; for(let k=0;k<6;k++){ g.beginPath(); g.arc(52+k*5-14,-4-k%3*4-pt*16,6+k*1.5+pt*10,0,Math.PI*2); g.fill(); } }   // dust where the club lands
+  if(e.regen>0){ g.globalCompositeOperation='lighter'; g.fillStyle=`rgba(120,220,120,${0.25*e.regen})`; for(let k=0;k<5;k++){ const ph=((T*0.8+k/5)%1); g.beginPath(); g.arc(-16+k*9,-50-ph*70,2.4,0,Math.PI*2); g.fill(); } g.globalCompositeOperation='source-over'; }   // its wounds closing
+  g.restore(); }
+// it mends itself: when nothing has hurt it for a little while, a sliver of its health comes back every second (fire stops it)
+{ const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{ if(typeof mobs!=='undefined') for(const m of mobs){ if(m.type!=='troll' || m.dead) continue;
+      if(m._hp==null) m._hp=m.hp; if(m.hp<m._hp){ m._hurtAt=clock; m.regen=0; } m._hp=m.hp; const burnt=typeof hasStatus==='function' && hasStatus(m,'kindle');
+      if(!burnt && clock-(m._hurtAt||-99)>2.6 && m.hp<m.maxHp){ m.hp=Math.min(m.maxHp,m.hp+m.maxHp*0.014*dt); m._hp=m.hp; m.regen=Math.min(1,(m.regen||0)+dt*2); } else m.regen=Math.max(0,(m.regen||0)-dt*2); } }catch(e){} return r; }; }
+BEASTS.push({ k:'troll', is:f=>f.type==='troll', name:'Cave Trolls', kind:'Under the mountain · the Deep Mines',
+  how:'A slow overhead slam, then a sweep and a quick backhand right behind it. Then the slam again.', res:'It guards one side with that great arm. Strike the other.', aff:'Every blow it lands is a heavy one.', ans:'Never stop hitting it: give it a breath and its wounds close. Fire stops the mending.' });
+// it wakes when the Quiet lifts, and comes back every day
+{ const A=AREAS.varrowmine, _m=A.mobs; A.mobs=()=>{ if(!CHOICE.vqQuiet) return _m(); return [ { name:'Cave Troll', type:'troll', i:9, j:10, faction:'mtroll', daily:true, hpMul:1.25, opts:TROLL() } ]; }; }
 // ════════ STAIRS: a flight of steps against the back wall, and a stairwell going down on the floor above.
 // Click them: you walk to the foot, climb (or go down) step by step, and the room changes like at any door. ════════
 // {type:'stairs', i, j, fp:[1,L], to, entry}       rises toward j (the back wall); the foot is the tile in front, (i, j+L)

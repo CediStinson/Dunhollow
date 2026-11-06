@@ -8048,13 +8048,20 @@ function drawObject(o){
     const pulse=0.5+0.5*Math.sin(gt*3.2+(o.i*1.7+o.j)), rot=(rnd01(o.i,o.j,950)-0.5)*1.1, glowOn=()=>{ g.shadowColor=`rgba(255,212,100,${0.6+0.4*pulse})`; g.shadowBlur=5+7*pulse; };   // loot: lying on the ground, a gold edge breathing round it
     g.save(); glowOn();
     if(o.lean) drawWeapon(g, x-6, y-60, Math.PI/2-0.16, o.item, 1.6);      // leaning on the wall, tines on the ground
-    else if(ITEMS[o.item].slot==='weapon'){ g.translate(x,y-2); g.scale(1,0.58); g.rotate(rot*0.5); const L=((WEAPONS[o.item]||{}).len||22)*1.6; g.shadowColor=`rgba(255,212,100,${0.85+0.15*pulse})`; g.shadowBlur=4+8*pulse; drawWeapon(g, -L*0.45, 0, 0, o.item, 1.6); drawWeapon(g, -L*0.45, 0, 0, o.item, 1.6); g.shadowBlur=0; }
+    else if(ITEMS[o.item].slot==='weapon'){ const L=((WEAPONS[o.item]||{}).len||22)*1.6; g.shadowBlur=0; g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(x,y+1,L*0.5,4,rot*0.25,0,Math.PI*2); g.fill();   // its shadow on the ground
+      g.translate(x,y-5); g.transform(1,0,0,0.78,0,0); g.rotate(rot*0.5); g.shadowColor=`rgba(255,212,100,${0.85+0.15*pulse})`; g.shadowBlur=4+8*pulse; drawWeapon(g, -L*0.45, 0, -0.08, o.item, 1.6); g.shadowBlur=0;
+      g.save(); g.translate(0,3); g.globalAlpha=0.55; g.filter='brightness(0.35)'; drawWeapon(g, -L*0.45, 0, -0.08, o.item, 1.6); g.restore(); drawWeapon(g, -L*0.45, 0, -0.08, o.item, 1.6); }   // a darker edge beneath it, so it has some thickness
     else if(!o.bogmound) {                                                   // anything else shows its own inventory icon, laid flat where it was found
       const PK=window.PICKUP_ICONS||(window.PICKUP_ICONS={}), pk=o.item+(player.opts&&player.opts.gender==='f'?'':'|m'); let ic=PK[pk];
       if(!ic){ ic=document.createElement('canvas'); ic.width=ic.height=64; paintItemArt(ic.getContext('2d'),o.item,64); PK[pk]=ic; }
       let ol=PK[pk+'#ol']; if(!ol){ ol=document.createElement('canvas'); ol.width=ol.height=76; const c2=ol.getContext('2d'), m=document.createElement('canvas'); m.width=m.height=64; const mc=m.getContext('2d');   // its outline: the icon's own shape, grown by a few pixels, in gold
         mc.drawImage(ic,0,0); mc.globalCompositeOperation='source-in'; mc.fillStyle='#ffd870'; mc.fillRect(0,0,64,64); for(let a=0;a<16;a++){ const an=a/16*Math.PI*2; c2.drawImage(m,6+Math.cos(an)*3.2,6+Math.sin(an)*3.2); } c2.globalCompositeOperation='destination-out'; c2.drawImage(ic,6,6); PK[pk+'#ol']=ol; }
-      g.translate(x,y-4); g.scale(1,0.64); g.rotate(rot); g.globalAlpha=0.45+0.55*pulse; g.drawImage(ol,-23.75,-23.75,47.5,47.5); g.globalAlpha=1; g.shadowBlur=0; g.drawImage(ic,-20,-20,40,40); }
+      let dk=PK[pk+'#dk']; if(!dk){ dk=document.createElement('canvas'); dk.width=dk.height=64; const c3=dk.getContext('2d'); c3.drawImage(ic,0,0); c3.globalCompositeOperation='source-atop'; c3.fillStyle='rgba(28,18,8,0.62)'; c3.fillRect(0,0,64,64); PK[pk+'#dk']=dk; }   // its underside, for thickness
+      g.shadowBlur=0; g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(x+2,y,15,4.6,0,0,Math.PI*2); g.fill();   // where it touches the ground
+      g.translate(x,y-9); g.transform(1,0,-0.18,0.84,0,0); g.rotate(rot*0.6);   // tipped back a little, as if lying on its side on the ground
+      glowOn(); g.globalAlpha=0.45+0.55*pulse; g.drawImage(ol,-23.75,-21.75,47.5,47.5); g.globalAlpha=1; g.shadowBlur=0;
+      for(let d=4;d>=1;d--) g.drawImage(dk,-20,-20+d,40,40);   // the edge you see under it
+      g.drawImage(ic,-20,-20,40,40); }
     g.restore();
   } else if(o.type==='teleporter'){
     if(o.treedoor) return;                              // the great tree's door is drawn with the tree

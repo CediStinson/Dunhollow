@@ -8051,6 +8051,11 @@ function drawObject(o){
     else if(ITEMS[o.item].slot==='weapon'){ const L=((WEAPONS[o.item]||{}).len||22)*1.6; g.shadowBlur=0; g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(x,y+1,L*0.5,4,rot*0.25,0,Math.PI*2); g.fill();   // its shadow on the ground
       g.translate(x,y-5); g.transform(1,0,0,0.78,0,0); g.rotate(rot*0.5); g.shadowColor=`rgba(255,212,100,${0.85+0.15*pulse})`; g.shadowBlur=4+8*pulse; drawWeapon(g, -L*0.45, 0, -0.08, o.item, 1.6); g.shadowBlur=0;
       g.save(); g.translate(0,3); g.globalAlpha=0.55; g.filter='brightness(0.35)'; drawWeapon(g, -L*0.45, 0, -0.08, o.item, 1.6); g.restore(); drawWeapon(g, -L*0.45, 0, -0.08, o.item, 1.6); }   // a darker edge beneath it, so it has some thickness
+    else if(!o.bogmound && typeof lootKind==='function' && lootKind(o.item)!=='icon'){ const kind=lootKind(o.item);   // drawn as the thing itself
+      const SH={apple:6,ring:5,fang:6,key:8,gem:6,dates:8,coins:9,tin:7,chain:8,skull:7,lantern:6,bone:9,bottle:11,shield:15,bundle:15,pelt:14,book:12,bread:11}, sr=(SH[kind]||11)*1.3;
+      g.shadowBlur=0; if(kind!=='flower'){ g.fillStyle='rgba(0,0,0,0.22)'; g.beginPath(); g.ellipse(x+1,y+0.5,sr,sr*0.32,0,0,Math.PI*2); g.fill(); }   // a shadow its own size
+      g.translate(x,y-1); g.scale(1.3,1.3); if(rot<0 && kind!=='flower') g.scale(-1,1); g.rotate(kind==='flower'?0:rot*0.25);
+      glowOn(); drawLootModel(kind,o.item,o,pulse); g.shadowBlur=0; drawLootModel(kind,o.item,o,pulse); }
     else if(!o.bogmound) {                                                   // anything else shows its own inventory icon, laid flat where it was found
       const PK=window.PICKUP_ICONS||(window.PICKUP_ICONS={}), pk=o.item+(player.opts&&player.opts.gender==='f'?'':'|m'); let ic=PK[pk];
       if(!ic){ ic=document.createElement('canvas'); ic.width=ic.height=64; paintItemArt(ic.getContext('2d'),o.item,64); PK[pk]=ic; }
@@ -8063,6 +8068,8 @@ function drawObject(o){
       for(let d=4;d>=1;d--) g.drawImage(dk,-20,-20+d,40,40);   // the edge you see under it
       g.drawImage(ic,-20,-20,40,40); }
     g.restore();
+    if(!o.bogmound && !o.lean && ITEMS[o.item] && ((hover && hover.i===o.i && hover.j===o.j) || (player && Math.hypot(player.x-o.i-0.5,player.y-o.j-0.5)<1.6))){ const nm=ITEMS[o.item].name; g.save(); g.font='600 11px Georgia,serif'; g.textAlign='center'; const w=g.measureText(nm).width+12;
+      g.fillStyle='rgba(20,14,8,0.72)'; g.fillRect(x-w/2,y-46,w,16); g.strokeStyle='rgba(255,212,110,0.6)'; g.lineWidth=1; g.strokeRect(x-w/2+0.5,y-45.5,w-1,15); g.fillStyle='#f4e2b0'; g.fillText(nm,x,y-34); g.restore(); }
   } else if(o.type==='teleporter'){
     if(o.treedoor) return;                              // the great tree's door is drawn with the tree
     const pulse=0.75+0.25*Math.sin(gt*2.4);
@@ -22525,6 +22532,81 @@ BEASTS.push({ k:'troll', is:f=>f.type==='troll', name:'Cave Trolls', kind:'Under
   how:'A slow overhead slam, then a sweep and a quick backhand right behind it. Then the slam again.', res:'It guards one side with that great arm. Strike the other.', aff:'Every blow it lands is a heavy one.', ans:'Never stop hitting it: give it a breath and its wounds close. Fire stops the mending.' });
 // it wakes when the Quiet lifts, and comes back every day
 { const A=AREAS.varrowmine, _m=A.mobs; A.mobs=()=>{ if(!CHOICE.vqQuiet) return _m(); return [ { name:'Cave Troll', type:'troll', i:9, j:10, faction:'mtroll', daily:true, hpMul:1.25, opts:TROLL() } ]; }; }
+// ════════ LOOT ON THE GROUND: each kind of thing is drawn as itself, lying where it fell (flowers growing where they grow), in its own colours ════════
+const LOOT_COL={};
+function lootColors(id){ if(LOOT_COL[id]) return LOOT_COL[id]; let c=['#8a7050'];
+  try{ const cv=document.createElement('canvas'); cv.width=cv.height=32; const x=cv.getContext('2d'); paintItemArt(x,id,32); const d=x.getImageData(0,0,32,32).data; let r=0,gg=0,b=0,w=0;
+    for(let k=0;k<d.length;k+=4){ if(d[k+3]<160) continue; const mx=Math.max(d[k],d[k+1],d[k+2]), mn=Math.min(d[k],d[k+1],d[k+2]), sat=mx?(mx-mn)/mx:0, wt=0.25+sat*2+(mx>40&&mx<235?0.3:0); r+=d[k]*wt; gg+=d[k+1]*wt; b+=d[k+2]*wt; w+=wt; }
+    if(w>0){ const h=v=>Math.round(v/w).toString(16).padStart(2,'0'); c=['#'+h(r)+h(gg)+h(b)]; } }catch(e){}
+  return LOOT_COL[id]=c[0]; }
+const LOOT_METAL=/mail|plate|scale|lamellar|hauberk|cuirass|gaunt|helm|kettle|coif|bevor|bracers|greaves|obsidian|varrow|rune_|sunforged|wyrm|chitin/;
+function lootKind(id){ const it=ITEMS[id]||{}, s=it.slot, b=id.replace(/^(t_)?(w_)?/,'');
+  if(/^(moonbell|moonbloom)$/.test(id)) return 'flower';
+  if(/potion|antidote|tonic|rue_water|green_bottle|bottled_wisp|glass_jar/.test(id)) return 'bottle';
+  if(id==='burn_salve') return 'tin'; if(id==='apple') return 'apple'; if(id==='bread') return 'bread'; if(/meat/.test(id)) return 'meat'; if(/fish/.test(id)) return 'fish'; if(id==='dates') return 'dates'; if(id==='linen_wrap'||id==='hand_wraps') return 'wrap';
+  if(s==='feet') return 'boots'; if(s==='hands') return /bracer/.test(b)?'bracers':'gloves';
+  if(s==='head') return /circlet|crown|band/.test(b)?'crown':LOOT_METAL.test(b)?'helm':'cap';
+  if(s==='torso'||s==='armor'||s==='legs') return 'bundle'; if(s==='offhand') return /lantern/.test(b)?'lantern':'shield';
+  if(s==='neck') return 'chain'; if(s==='special'||/_ring$/.test(id)) return 'ring';
+  if(/letter|note|page|charter|chart|seal|trapnote/.test(id)) return 'paper'; if(/ledger|journal/.test(id)) return 'book';
+  if(/skull/.test(id)) return 'skull'; if(/bone/.test(id)) return 'bone'; if(id==='wolf_fang') return 'fang'; if(id==='pelt') return 'pelt';
+  if(/coins|tally|silver_leaf|bog_coin/.test(id)) return 'coins'; if(/purse|package|fourage/.test(id)) return 'pouch'; if(/key/.test(id)) return 'key';
+  if(/crystal|shard|ember_core|ember_heart|mote|sea_glass|elfsilver|moonsilver|heart_seeds|black_sap/.test(id)) return 'gem';
+  return 'icon'; }
+function drawLootModel(kind,id,o,pulse){ const C=lootColors(id), dk=tone(C,-0.38), lt=tone(C,0.3), T=gt, metal=LOOT_METAL.test(id), sd=(o.i*7+o.j*13)%5;
+  const P2=(pts,f,s)=>{ g.beginPath(); pts.forEach((p,k)=>k?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1])); g.closePath(); if(f){ g.fillStyle=f; g.fill(); } if(s){ g.strokeStyle=s; g.lineWidth=0.8; g.stroke(); } };
+  const E=(x,y,rx,ry,f,r)=>{ g.fillStyle=f; g.beginPath(); g.ellipse(x,y,rx,ry,r||0,0,Math.PI*2); g.fill(); };
+  const shine=(x,y,rx,ry,a)=>{ g.fillStyle=`rgba(255,255,250,${a||0.55})`; g.beginPath(); g.ellipse(x,y,rx,ry,-0.4,0,Math.PI*2); g.fill(); };
+  switch(kind){
+  case 'flower': { const n=3+sd%2; for(let k=0;k<n;k++){ const bx=(k-n/2)*4+1, sw=Math.sin(T*1.4+k*1.7+o.i)*1.5, h=14+((k*5+sd)%4)*3;   // they grow here: stems out of the ground, heads nodding
+      g.strokeStyle='#4a7a34'; g.lineWidth=1.1; g.beginPath(); g.moveTo(bx,0); g.quadraticCurveTo(bx+sw*0.4,-h*0.6,bx+sw,-h); g.stroke();
+      g.fillStyle='#5a8a3a'; g.beginPath(); g.ellipse(bx+2,-h*0.35,3,1.1,-0.5,0,Math.PI*2); g.fill();
+      if(id==='moonbell'){ g.save(); g.translate(bx+sw,-h); g.rotate(0.6+sw*0.1); g.fillStyle='#f4f2fa'; g.beginPath(); g.moveTo(-2.2,0); g.quadraticCurveTo(-2.4,4.2,0,4.6); g.quadraticCurveTo(2.4,4.2,2.2,0); g.quadraticCurveTo(0,-1.4,-2.2,0); g.fill(); g.fillStyle='rgba(180,170,220,0.6)'; g.beginPath(); g.ellipse(0,4.4,2,0.7,0,0,Math.PI*2); g.fill(); g.restore(); }
+      else { g.fillStyle=C; for(let p=0;p<5;p++){ const a=p/5*Math.PI*2; g.beginPath(); g.ellipse(bx+sw+Math.cos(a)*2,-h+Math.sin(a)*1.4,1.8,1.1,a,0,Math.PI*2); g.fill(); } g.fillStyle='#f0e080'; g.beginPath(); g.arc(bx+sw,-h,1,0,Math.PI*2); g.fill(); } }
+    if(nightAmt()>0.4){ g.save(); g.globalCompositeOperation='lighter'; glow(0,-15,14,10,'200,200,255',0.35*nightAmt()); g.restore(); } break; }
+  case 'bottle': { g.save(); g.rotate(-0.15); E(0,-5,9,5,'rgba(40,50,50,0.55)'); g.save(); g.beginPath(); g.ellipse(0,-5,8.4,4.4,0,0,Math.PI*2); g.clip(); g.fillStyle=C; g.fillRect(-9,-4.5,18,6); g.restore();   // a stoppered bottle on its side, the draught pooled low in it
+      P2([[7,-7],[13,-6.5],[13,-3.6],[7,-3]],'rgba(60,70,70,0.7)'); E(14,-5,1.6,1.8,'#8a6a42'); shine(-2,-7.5,4.5,1.1,0.6); g.restore(); break; }
+  case 'tin': { E(0,-3,7,3,dk); g.fillStyle=dk; g.fillRect(-7,-6,14,3); E(0,-6,7,3,lt); E(0,-6,4,1.6,C); break; }
+  case 'apple': { const rg=g.createRadialGradient(-2,-7,1,0,-5,6); rg.addColorStop(0,lt); rg.addColorStop(1,dk); E(0,-5,5.6,5,rg); g.strokeStyle='#4a2e18'; g.lineWidth=1; g.beginPath(); g.moveTo(0,-9.5); g.lineTo(1,-12); g.stroke(); E(2.6,-11,2,0.9,'#5a8a3a',-0.5); break; }
+  case 'bread': { const rg=g.createLinearGradient(0,-10,0,0); rg.addColorStop(0,'#d8a050'); rg.addColorStop(1,'#8a5420'); g.fillStyle=rg; g.beginPath(); g.ellipse(0,-4,11,5.5,0,Math.PI,Math.PI*2); g.lineTo(11,-2); g.quadraticCurveTo(0,1,-11,-2); g.closePath(); g.fill();
+      g.strokeStyle='#e8c080'; g.lineWidth=1; for(let k=-1;k<=1;k++){ g.beginPath(); g.moveTo(k*4-2,-8); g.lineTo(k*4+2,-5); g.stroke(); } break; }
+  case 'meat': { const raw=/raw/.test(id); E(-1,-4,9,5.5,raw?'#a83a34':'#7a3e22'); E(-2,-6,6,2.6,raw?'#c85a50':'#9a5a32'); g.fillStyle='#ece4d0'; g.fillRect(6,-5.5,8,2.4); E(14,-5.6,1.8,1.4,'#ece4d0'); E(14,-3.6,1.8,1.4,'#ece4d0'); break; }
+  case 'fish': { const fc=/grilled/.test(id)?'#9a6a3a':C; P2([[-12,-4],[-16,-8],[-15,-4],[-16,0]],tone(fc,-0.2)); g.fillStyle=fc; g.beginPath(); g.ellipse(0,-4,11,4,0,0,Math.PI*2); g.fill(); E(0,-2.4,9,1.6,tone(fc,0.35)); E(7,-5,1,1,'#1a120c'); shine(-2,-6,5,0.9,0.4); break; }
+  case 'dates': { for(let k=0;k<6;k++) E((k%3)*4-4,-3-Math.floor(k/3)*3,2.6,1.7,k%2?'#6a3a1a':'#7a4420'); break; }
+  case 'wrap': { g.fillStyle='#e8e0cc'; g.fillRect(-7,-9,12,7); E(5,-5.5,2.6,3.5,'#f4ece0'); g.strokeStyle='#c8bca0'; g.lineWidth=0.7; g.beginPath(); g.arc(5,-5.5,1.6,0,Math.PI*1.6); g.stroke(); g.fillStyle='#e8e0cc'; g.beginPath(); g.moveTo(-7,-2); g.lineTo(-13,-1); g.lineTo(-12,1); g.lineTo(-7,0); g.closePath(); g.fill(); break; }
+  case 'boots': { [[-5,0,0],[4,3,0.2]].forEach(([bx,by,r])=>{ g.save(); g.translate(bx,by); g.rotate(r);   // a pair, one fallen on its side
+      const sole=tone(C,-0.6); P2([[-3,-2],[9,-2],[10,0],[-3,0]],sole); P2([[-3,-2],[-3,-14],[3,-14],[4,-6],[9,-5],[9,-2]],C,dk); P2([[-3,-14],[3,-14],[2.6,-12.6],[-2.6,-12.6]],lt); g.fillStyle=dk; g.fillRect(-3,-7,6,1); shine(-1,-10,1,3,0.3); g.restore(); }); break; }
+  case 'gloves': { [[-5,0],[5,2]].forEach(([bx,by],k)=>{ g.save(); g.translate(bx,by); g.rotate(k?0.4:-0.3); E(0,-4,4.4,3.4,C); for(let f=0;f<4;f++){ g.fillStyle=k?C:tone(C,-0.08); g.fillRect(-3.4+f*2,-11,1.8,6); } E(4.2,-4,2.2,1.3,C,0.6);
+      if(metal) shine(-1,-6,2.4,1,0.6); g.strokeStyle=dk; g.lineWidth=0.6; g.beginPath(); g.moveTo(-4,-1); g.lineTo(4,-1); g.stroke(); g.restore(); }); break; }
+  case 'bracers': { [[-5,-1],[4,2]].forEach(([bx,by])=>{ E(bx+4,by-4,2.4,4,dk); g.fillStyle=C; g.fillRect(bx-4,by-8,8,8); E(bx-4,by-4,2.4,4,lt); shine(bx,by-6.5,3,0.8,metal?0.6:0.25); }); break; }
+  case 'helm': { const st=metal?C:'#8a8c90'; const rg=g.createRadialGradient(-3,-11,1,0,-7,11); rg.addColorStop(0,tone(st,0.45)); rg.addColorStop(1,tone(st,-0.35)); g.fillStyle=rg;   // a helmet rolled on its side
+      g.beginPath(); g.ellipse(0,-7,10,8,-0.3,Math.PI*0.95,Math.PI*2.05); g.closePath(); g.fill(); E(1.5,-3.2,11,3,tone(st,-0.45),-0.3); E(1.5,-3.6,9,2.2,'#1a1614',-0.3); shine(-4,-11,3,1.4,0.6); break; }
+  case 'cap': { g.fillStyle=C; g.beginPath(); g.moveTo(-10,-1); g.quadraticCurveTo(-9,-11,0,-11); g.quadraticCurveTo(9,-10,10,-1); g.quadraticCurveTo(0,2,-10,-1); g.fill();   // a soft hat in a heap
+      g.strokeStyle=dk; g.lineWidth=0.8; g.beginPath(); g.moveTo(-4,-9); g.quadraticCurveTo(-2,-5,-5,-2); g.moveTo(4,-9); g.quadraticCurveTo(2,-4,4,-1); g.stroke(); E(-1,-8,4,1.4,lt); break; }
+  case 'crown': { g.strokeStyle=C; g.lineWidth=2.6; g.beginPath(); g.ellipse(0,-3,9,3.6,0,0,Math.PI*2); g.stroke(); g.strokeStyle=lt; g.lineWidth=0.8; g.beginPath(); g.ellipse(0,-3.6,9,3.6,0,Math.PI*1.1,Math.PI*1.9); g.stroke();
+      for(let k=0;k<5;k++){ const a=Math.PI*(1.1+k*0.2), x=Math.cos(a)*9, y=-3+Math.sin(a)*3.6; P2([[x-1.4,y],[x,y-4],[x+1.4,y]],C); } E(0,-0.2,1.4,1,'#c83a3a'); break; }
+  case 'bundle': { const iw=12, idp=7, h=6;   // the garment folded into a soft bundle
+      P2([[-iw,-3],[0,-3+idp*0.5],[0,-3+idp*0.5-h],[-iw,-3-h]],tone(C,-0.18)); P2([[0,-3+idp*0.5],[iw,-3],[iw,-3-h],[0,-3+idp*0.5-h]],dk);
+      P2([[-iw,-3-h],[0,-3-h-idp*0.5],[iw,-3-h],[0,-3-h+idp*0.5]],C); g.strokeStyle=lt; g.lineWidth=0.8; g.beginPath(); g.moveTo(-iw+2,-3-h); g.lineTo(2,-3-h-idp*0.5+1); g.moveTo(-iw*0.4,-3-h+idp*0.3); g.lineTo(iw*0.6,-3-h-idp*0.2); g.stroke();
+      if(metal){ g.fillStyle='rgba(30,30,34,0.45)'; for(let a=0;a<14;a++){ const u=(a%5)/5, v=Math.floor(a/5)/3; g.beginPath(); g.arc(-iw*0.6+u*iw*1.2, -3-h-idp*0.25+v*idp*0.6-u*idp*0.25,0.7,0,Math.PI*2); g.fill(); } shine(-3,-3-h-1,5,1,0.4); }
+      P2([[iw-2,-3],[iw+4,-1],[iw+3,1.5],[iw-3,-0.5]],tone(C,-0.1)); break; }   // a sleeve or strap hanging out
+  case 'shield': { g.save(); g.scale(1,0.55); E(0,4,13,13,tone(C,-0.5)); E(0,0,13,13,C); g.strokeStyle=tone(C,-0.45); g.lineWidth=2.2; g.beginPath(); g.arc(0,0,12,0,Math.PI*2); g.stroke(); E(0,0,3.6,3.6,'#9a9ca0'); shine(-5,-6,4,2,0.4); g.restore(); break; }
+  case 'lantern': { g.fillStyle='#3a2e24'; g.fillRect(-5,-15,10,2); g.fillRect(-5,-2,10,2); g.fillStyle='rgba(255,220,140,0.85)'; g.fillRect(-4,-13,8,11); g.strokeStyle='#3a2e24'; g.lineWidth=1; g.strokeRect(-4,-13,8,11); g.beginPath(); g.arc(0,-17,3,Math.PI,0); g.stroke();
+      g.save(); g.globalCompositeOperation='lighter'; glow(0,-8,14,12,'255,200,120',0.4); g.restore(); break; }
+  case 'chain': { g.strokeStyle='#b0a888'; g.lineWidth=1; for(let k=0;k<9;k++){ const a=k/9*Math.PI*1.7+0.4; g.beginPath(); g.ellipse(Math.cos(a)*6,-3+Math.sin(a)*2.6,1.3,0.8,a,0,Math.PI*2); g.stroke(); } E(5,-1,2.6,2,C); shine(4.4,-1.6,1,0.6,0.7); break; }
+  case 'ring': { g.strokeStyle='#d8b04a'; g.lineWidth=1.6; g.beginPath(); g.ellipse(0,-2,3.6,1.8,0,0,Math.PI*2); g.stroke(); E(0,-4,1.4,1.2,C); if(Math.sin(T*2+o.i)>0.9){ g.strokeStyle='#fff'; g.lineWidth=0.7; g.beginPath(); g.moveTo(-1,-6); g.lineTo(1,-6); g.moveTo(0,-7); g.lineTo(0,-5); g.stroke(); } break; }
+  case 'paper': { P2([[-9,-1],[3,-6],[10,-2],[-2,3]],'#ece2c8','#b8a888'); g.strokeStyle='rgba(80,60,40,0.5)'; g.lineWidth=0.6; for(let k=0;k<3;k++){ g.beginPath(); g.moveTo(-5+k*2,-1+k*-0.7); g.lineTo(3+k*2,-4.4+k*-0.7+3); g.stroke(); } E(1,-1,1.6,1,'#a02a22'); break; }
+  case 'book': { P2([[-10,-2],[2,-7],[11,-3],[-1,2]],tone(C,-0.3)); P2([[-10,-4],[2,-9],[11,-5],[-1,0]],C); P2([[-1,0],[11,-5],[11,-3],[-1,2]],'#e8dcc0'); P2([[-10,-4],[-1,0],[-1,2],[-10,-2]],tone(C,-0.15)); g.strokeStyle=lt; g.lineWidth=0.7; g.beginPath(); g.moveTo(-5,-5); g.lineTo(4,-8); g.stroke(); break; }
+  case 'bone': { g.fillStyle='#e8e0cc'; g.save(); g.rotate(-0.25); g.fillRect(-7,-4,14,2.8); [[-8,-4.6],[-8,-1.8],[8,-4.6],[8,-1.8]].forEach(([a,b])=>{ g.beginPath(); g.arc(a,b,1.9,0,Math.PI*2); g.fill(); }); g.fillStyle='rgba(120,100,70,0.35)'; g.fillRect(-7,-1.8,14,0.8); g.restore(); break; }
+  case 'skull': { E(0,-6,6,5.6,'#e8e0cc'); g.fillStyle='#e8e0cc'; g.fillRect(-3.4,-3,6.8,3.4); E(-2.2,-5.4,1.5,1.7,'#2a2420'); E(2.2,-5.4,1.5,1.7,'#2a2420'); g.fillStyle='#2a2420'; for(let k=0;k<4;k++) g.fillRect(-2.6+k*1.6,-0.8,0.6,1.6); shine(-2,-9,2.4,1,0.5); break; }
+  case 'fang': { g.fillStyle='#ece4cc'; g.beginPath(); g.moveTo(-4,-2); g.quadraticCurveTo(0,-7,6,-4); g.quadraticCurveTo(1,-3.6,-3,0); g.closePath(); g.fill(); g.strokeStyle='#a89870'; g.lineWidth=0.6; g.stroke(); break; }
+  case 'pelt': { g.fillStyle='#7a5a3a'; g.beginPath(); g.moveTo(-12,-2); g.quadraticCurveTo(-6,-9,4,-8); g.quadraticCurveTo(12,-6,11,-1); g.quadraticCurveTo(0,3,-12,-2); g.fill(); g.strokeStyle='#5a3e26'; g.lineWidth=0.8; for(let k=0;k<9;k++){ g.beginPath(); g.moveTo(-9+k*2.4,-5+Math.sin(k)*1.5); g.lineTo(-10+k*2.4,-3+Math.sin(k)*1.5); g.stroke(); } break; }
+  case 'coins': { for(let k=0;k<6;k++){ const cx=(k%3)*4-4+(k>2?2:0), cy=-1-(k>2?3:0); E(cx,cy+0.8,3.2,1.5,tone(C,-0.35)); E(cx,cy,3.2,1.5,C); E(cx-0.6,cy-0.3,1.4,0.5,lt); } break; }
+  case 'pouch': { E(0,-5,8,6,C); g.fillStyle=dk; g.beginPath(); g.moveTo(-3,-10); g.lineTo(3,-10); g.lineTo(2,-13); g.lineTo(-2,-13); g.closePath(); g.fill(); g.strokeStyle=tone(C,-0.55); g.lineWidth=1; g.beginPath(); g.moveTo(-3,-10); g.quadraticCurveTo(0,-8.6,3,-10); g.stroke(); shine(-3,-7,2.4,1.4,0.25); break; }
+  case 'key': { g.strokeStyle='#6a5a48'; g.lineWidth=1.6; g.beginPath(); g.ellipse(-6,-3,2.6,1.6,0,0,Math.PI*2); g.moveTo(-3.6,-3); g.lineTo(7,-3); g.moveTo(5,-3); g.lineTo(5,-0.6); g.moveTo(7,-3); g.lineTo(7,-0.8); g.stroke(); break; }
+  case 'gem': { const gl=/ember/.test(id)?'255,140,60':/grave|mote/.test(id)?'150,200,255':null; P2([[-4,-2],[-2,-9],[3,-10],[5,-3],[1,0]],C,lt); P2([[-2,-9],[3,-10],[1,-5]],lt); P2([[1,-5],[5,-3],[1,0]],dk);
+      if(gl){ g.save(); g.globalCompositeOperation='lighter'; glow(0,-5,12,10,gl,0.35+0.15*pulse); g.restore(); } break; }
+  } }
 // ════════ STAIRS: a flight of steps against the back wall, and a stairwell going down on the floor above.
 // Click them: you walk to the foot, climb (or go down) step by step, and the room changes like at any door. ════════
 // {type:'stairs', i, j, fp:[1,L], to, entry}       rises toward j (the back wall); the foot is the tile in front, (i, j+L)

@@ -8055,8 +8055,8 @@ function drawObject(o){
       const SH={apple:6,ring:5,fang:6,key:8,gem:6,dates:8,coins:9,tin:7,chain:8,skull:7,lantern:6,bone:9,bottle:11,shield:15,bundle:15,pelt:14,book:12,bread:11}, sr=(SH[kind]||11)*1.3;
       g.shadowBlur=0; if(kind!=='flower'){ g.fillStyle='rgba(0,0,0,0.13)'; g.beginPath(); g.ellipse(x+sr*0.38,y+0.8,sr*0.95,sr*0.24,0.12,0,Math.PI*2); g.fill();   // the cast shadow, falling away from the light
         g.fillStyle='rgba(0,0,0,0.42)'; g.beginPath(); g.ellipse(x+0.5,y+0.3,sr*0.78,Math.max(1.5,sr*0.13),0,0,Math.PI*2); g.fill(); }   // and the dark line where it actually touches the ground
-      g.translate(x,y+0.6); g.scale(1.3,1.3); if(rot<0 && kind!=='flower') g.scale(-1,1); g.rotate(kind==='flower'?0:rot*0.25);
-      glowOn(); drawLootModel(kind,o.item,o,pulse); g.shadowBlur=0; drawLootModel(kind,o.item,o,pulse); }
+      if(kind==='flower'||kind==='lantern'){ g.translate(x,y+0.6); g.scale(1.3,1.3); glowOn(); g.shadowBlur=3+3*pulse; drawLootModel(kind,o.item,o,pulse); g.shadowBlur=0; drawLootModel(kind,o.item,o,pulse); }   // living things are drawn as they move
+      else { const S=lootSprite(kind,o.item,rot<0); g.shadowBlur=0; g.globalAlpha=0.5+0.5*pulse; g.drawImage(S.ol,x-40,y-46+0.6); g.globalAlpha=1; g.drawImage(S.im,x-40,y-46+0.6); } }
     else if(!o.bogmound) {                                                   // anything else shows its own inventory icon, laid flat where it was found
       const PK=window.PICKUP_ICONS||(window.PICKUP_ICONS={}), pk=o.item+(player.opts&&player.opts.gender==='f'?'':'|m'); let ic=PK[pk];
       if(!ic){ ic=document.createElement('canvas'); ic.width=ic.height=64; paintItemArt(ic.getContext('2d'),o.item,64); PK[pk]=ic; }
@@ -22554,6 +22554,14 @@ function lootKind(id){ const it=ITEMS[id]||{}, s=it.slot, b=id.replace(/^(t_)?(w
   if(/coins|tally|silver_leaf|bog_coin/.test(id)) return 'coins'; if(/purse|package|fourage/.test(id)) return 'pouch'; if(/key/.test(id)) return 'key';
   if(/crystal|shard|ember_core|ember_heart|mote|sea_glass|elfsilver|moonsilver|heart_seeds|black_sap/.test(id)) return 'gem';
   return 'icon'; }
+// each thing drawn once into its own little picture, with a crisp gold outline grown from its shape (a blurred glow spreads under it and makes it look as if it floats)
+const LOOT_SPR={};
+function lootSprite(kind,id,flip){ const key=id+(flip?'<':'>'); if(LOOT_SPR[key]) return LOOT_SPR[key];
+  const im=document.createElement('canvas'); im.width=80; im.height=60; const sv=g; g=im.getContext('2d');
+  try{ g.translate(40,46); g.scale(1.3,1.3); if(flip) g.scale(-1,1); drawLootModel(kind,id,{i:3,j:5},0.5); } finally{ g=sv; }
+  const m=document.createElement('canvas'); m.width=80; m.height=60; const mc=m.getContext('2d'); mc.drawImage(im,0,0); mc.globalCompositeOperation='source-in'; mc.fillStyle='#ffd870'; mc.fillRect(0,0,80,60);
+  const ol=document.createElement('canvas'); ol.width=80; ol.height=60; const oc=ol.getContext('2d'); for(let a=0;a<12;a++){ const an=a/12*Math.PI*2; oc.drawImage(m,Math.cos(an)*1.8,Math.sin(an)*1.8); } oc.globalCompositeOperation='destination-out'; oc.drawImage(im,0,0);
+  return LOOT_SPR[key]={im,ol}; }
 function drawLootModel(kind,id,o,pulse){ const C=lootColors(id), dk=tone(C,-0.38), lt=tone(C,0.3), T=gt, metal=LOOT_METAL.test(id), sd=(o.i*7+o.j*13)%5;
   const P2=(pts,f,s)=>{ g.beginPath(); pts.forEach((p,k)=>k?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1])); g.closePath(); if(f){ g.fillStyle=f; g.fill(); } if(s){ g.strokeStyle=s; g.lineWidth=0.8; g.stroke(); } };
   const E=(x,y,rx,ry,f,r)=>{ g.fillStyle=f; g.beginPath(); g.ellipse(x,y,rx,ry,r||0,0,Math.PI*2); g.fill(); };

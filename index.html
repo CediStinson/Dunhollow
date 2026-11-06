@@ -10292,7 +10292,7 @@ function setAt(loc,id){ if(player.opts) delete player.opts._ck; if(loc.kind==='e
 // code just loses one loaf, and a loaf put into a free space joins a pile that has room.
 const STACK_MAX=10, NO_STACK=new Set(['raw_meat','fish_perch','fish_trout','fish_carp','fish_eel','fish_herring']);   // raw things stay apart: cooks count them
 const stackable=id=>!!(id && ITEMS[id] && (ITEMS[id].slot==='food' && !NO_STACK.has(id) || ITEMS[id].currency || ITEMS[id].stack));   // food, currency, and a few gathered things (moonbells)
-const stackMax=id=>ITEMS[id] && ITEMS[id].currency ? 1e9 : STACK_MAX;          // Silver Leaves and Grave Tallies: one pile, as big as it likes
+const stackMax=id=>ITEMS[id] && ITEMS[id].currency ? 1e9 : (ITEMS[id] && ITEMS[id].stackMax) || STACK_MAX;          // Silver Leaves and Grave Tallies: one pile, as big as it likes
 let INV_RAW=false;
 function invN(){ if(!Array.isArray(CHOICE.invN)) CHOICE.invN=[]; return CHOICE.invN; }
 function stackAt(k){ const t=player.inv[k]; if(!stackable(t)) return t?1:0; return 1+Math.max(0,invN()[k]|0); }
@@ -10318,6 +10318,16 @@ const STASH_SIZE=30; let STASH_OPEN=false;
 var SELL_RATE=0.25;                      // traders pay a quarter of their own price (the fence a third)
 const stashCap=()=>12+6*(CHOICE.stashUp||0);   // 12 slots to start; Bertha can make room for more
 function stashArr(){ if(!Array.isArray(CHOICE.stash)) CHOICE.stash=Array(STASH_SIZE).fill(null); while(CHOICE.stash.length<STASH_SIZE) CHOICE.stash.push(null); return CHOICE.stash; }
+// the crate keeps piles too: how many more sit under each id lives in CHOICE.stashN, as the pack's do in CHOICE.invN
+function stashN(){ if(!Array.isArray(CHOICE.stashN)) CHOICE.stashN=[]; return CHOICE.stashN; }
+const stashAt=k=>{ const id=stashArr()[k]; return !id ? 0 : stackable(id) ? 1+Math.max(0,stashN()[k]|0) : 1; };
+function pileAt(loc){ return loc.kind==='stash' ? stashAt(loc.key) : loc.kind==='inv' ? stackAt(loc.key) : (getAt(loc)?1:0); }
+function setPile(loc,id,n){ if(loc.kind==='stash'){ stashArr()[loc.key]=id||null; stashN()[loc.key]=id?Math.max(0,n-1):0; return; }
+  INV_RAW=true; try{ player.inv[loc.key]=id||null; invN()[loc.key]=id?Math.max(0,n-1):0; } finally{ INV_RAW=false; } }
+// moving a pile between the pack and the crate: the whole pile goes, and joins one of its kind if there is room
+function movePile(from,to){ const a=getAt(from), b=getAt(to), na=pileAt(from), nb=pileAt(to);
+  if(a && a===b){ const mv=Math.min(stackMax(a)-nb, na); if(mv<=0){ flash('That pile is full.'); return false; } setPile(to,a,nb+mv); setPile(from,na-mv>0?a:null,na-mv); return true; }
+  setPile(to,a,na); setPile(from,b,nb); return true; }
 function flash(t){ invMsg.textContent=t; clearTimeout(msgTimer); msgTimer=setTimeout(()=>invMsg.textContent='',2600); }
 
 // Can `id` go into `loc`? Returns an error message, or '' when it can.
@@ -10347,7 +10357,7 @@ function moveItemRaw(from,to){
     if(a && a===b && stackable(a)){ const mv=Math.min(stackMax(a)-stackAt(to.key),stackAt(from.key)); if(mv<=0){ flash('That pile is full.'); return false; }
       const left=stackAt(from.key)-mv; INV_RAW=true; try{ const nt=(N[to.key]|0)+mv; if(left>0){ player.inv[to.key]=a; N[to.key]=nt; N[from.key]=left-1; } else { player.inv[from.key]=null; player.inv[to.key]=a; N[to.key]=nt; } } finally{ INV_RAW=false; } }
     else { const na=N[from.key]|0, nb=N[to.key]|0; INV_RAW=true; try{ player.inv[to.key]=a; player.inv[from.key]=b; N[to.key]=na; N[from.key]=nb; } finally{ INV_RAW=false; } } }
-  else if(a && a===b && stackable(a)){ if(to.kind!=='inv'){ flash('The crate keeps one of each in a space.'); return false; } setAt(to,a); setAt(from,null); }
+  else if((from.kind==='stash'||to.kind==='stash') && (from.kind==='inv'||from.kind==='stash') && (to.kind==='inv'||to.kind==='stash')){ if(!movePile(from,to)) return false; }
   else { setAt(to,a); setAt(from,b); }
   invMsg.textContent='';
   refreshInventory();
@@ -10390,8 +10400,10 @@ function refreshFoodBar(){
     bar.appendChild(b); }); }
 function quickMove(loc){
   const id=getAt(loc); if(!id) return;
-  if(STASH_OPEN && loc.kind==='stash'){ const free=player.inv.indexOf(null); if(free<0){ flash('Your backpack is full.'); return; } moveItem(loc,{kind:'inv',key:free}); return; }   // crate → pack
-  if(STASH_OPEN && loc.kind==='inv'){ const free=stashArr().slice(0,stashCap()).indexOf(null); if(free<0){ flash('The crate is full.'); return; } moveItem(loc,{kind:'stash',key:free}); return; }       // pack → crate
+  if(STASH_OPEN && loc.kind==='stash'){ let k=stackable(id)?player.inv.findIndex((x,q)=>x===id&&stackAt(q)<stackMax(id)):-1; if(k<0) k=player.inv.indexOf(null); if(k<0){ flash('Your backpack is full.'); return; } moveItem(loc,{kind:'inv',key:k});
+    if(getAt(loc)===id && player.inv.indexOf(null)>=0) quickMove(loc); return; }   // crate → pack (what will not fit on the pile spills to a free space)
+  if(STASH_OPEN && loc.kind==='inv'){ const S=stashArr(), cap=stashCap(); let k=-1; if(stackable(id)) for(let q=0;q<cap;q++) if(S[q]===id && stashAt(q)<stackMax(id)){ k=q; break; } if(k<0) k=S.slice(0,cap).indexOf(null); if(k<0){ flash('The crate is full.'); return; } moveItem(loc,{kind:'stash',key:k});
+    if(getAt(loc)===id && S.slice(0,cap).indexOf(null)>=0) quickMove(loc); return; }       // pack → crate
   if(ITEMS[id].read){ openNote(id); return; }
   if(ITEMS[id].slot==='food'){ if(loc.kind==='inv') eatItem(loc.key); return; }
   if(loc.kind==='inv') moveItem(loc,{kind:'eq',key:ITEMS[id].slot});
@@ -10479,7 +10491,7 @@ function refreshInventory(){
     const id=getAt(slotLoc(el));
     const icv=el.querySelector('canvas'), ik=(id||'')+'|'+iconMale(); if(icv._ik!==ik){ icv._ik=ik; drawItemIcon(icv.getContext('2d'),id,icv.width); }   // only slots that changed
     el.classList.toggle('filled',!!id);
-    { let c=el.querySelector('.stk'); const n=el.dataset.kind==='inv'&&id?stackAt(+el.dataset.key):0; if(n>1){ if(!c){ c=document.createElement('span'); c.className='stk'; el.appendChild(c); } c.textContent=n; } else if(c) c.remove(); }
+    { let c=el.querySelector('.stk'); const n=!id?0:el.dataset.kind==='inv'?stackAt(+el.dataset.key):el.dataset.kind==='stash'?stashAt(+el.dataset.key):0; if(n>1){ if(!c){ c=document.createElement('span'); c.className='stk'; el.appendChild(c); } c.textContent=n; } else if(c) c.remove(); }
     el.title = id ? `${ITEMS[id].name}  (${SLOT_NAMES[ITEMS[id].slot]})${(itemStat(id)&&itemStat(id).short) ? ' — '+itemStat(id).short : ''}` : (el.dataset.kind==='eq' ? SLOT_NAMES[el.dataset.key] : '');
     const lbl=el.querySelector('.lbl'); if(lbl) lbl.style.display = id ? 'none' : '';
   });
@@ -16283,7 +16295,7 @@ JOURNAL.push(["Arms for the Dead", ()=> NECRO()<3 ? null : CHOICE.skelArms ? ['d
   : ['active',"Your skeletons fight with their fists. Vesna, in the fen, may know how to change that."]]);
 // ── Vesna at home: the stilt-hut in the Drowning Fen. Besides her lessons she has an errand of her own,
 //    buys what the fen's dead leave behind, and sells her bog-myrtle draughts ──
-Object.assign(ITEMS,{ old_bone:{ name:'An Old Bone', slot:'misc' }, old_skull:{ name:'An Old Skull', slot:'misc' },
+Object.assign(ITEMS,{ old_bone:{ name:'An Old Bone', slot:'misc', stack:true, stackMax:5 }, old_skull:{ name:'An Old Skull', slot:'misc' },
   rusted_blade:{ name:'A Rusted Grave-Blade', slot:'misc' }, grave_ring:{ name:'A Grave-Ring', slot:'misc' } });
 Object.assign(PRICES,{ old_bone:6, old_skull:16, rusted_blade:30, grave_ring:90 });
 const VESNA_BUYS={ only:new Set(['old_bone','old_skull','rusted_blade','grave_ring','grave_mote']), price:id=>Math.max(1,Math.round(PRICES[id]*0.5)),

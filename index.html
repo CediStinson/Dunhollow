@@ -12676,7 +12676,7 @@ Object.keys(ITEMS).forEach(id=>{ if(ITEMS[id].slot==='torso') GEAR_HP[id]=0; });
 function resetMobs(){
   mobs = MOB_SPAWNS.map((s,k)=>{
     const isWolf=s.type==='wolf';
-    const hp=isWolf?WOLF.base:maxHpOf(s.opts.equip,FOES[s.type].base);
+    const hp=Math.round((isWolf?WOLF.base:maxHpOf(s.opts.equip,FOES[s.type].base))*(s.hpMul||1));
     const key=s.daily ? s.name+'@'+Math.floor(dayClock/DAY_LEN) : s.name, dead=defeatedMobs.has(areaId+':'+key);
     return { id:k, key, name:s.name, type:s.type, opts:s.opts, coat:s.coat, cat:s.cat, faction:s.faction, style:s.style, spawn:[s.i,s.j], i:s.i, j:s.j, x:s.i+0.5, y:s.j+0.5,
              dir:k?7:1, hp:dead?0:hp, maxHp:hp, path:[], moving:false, dead, gone:false, fade:1, flash:0, lunge:null,
@@ -13927,6 +13927,7 @@ function drawActorBase(e){
   else if(e.type==='ember') drawEmber(s.x,B,e,poseFor(e));
   else if(e.type==='hunger') drawHunger(s.x,B,e,poseFor(e));
   else if(e.type==='gnawer') drawGnawer(s.x,B,e,poseFor(e));
+  else if(e.type==='bear') drawBear(s.x,B,e,poseFor(e));
   else if(e.type==='gloomcaller'||e.type==='thornwitch'){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawShadeUnder(s.x,B,e); g.globalAlpha*=0.82; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); g.globalAlpha/=0.82; drawShadeOver(s.x,B,e); }
   else if(e.type==='husk'){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); drawHuskBits(s.x,B,e); }
   else if(e.type==='skeleton') drawRisen(s.x,B,e,poseFor(e));
@@ -13935,7 +13936,7 @@ function drawActorBase(e){
   g.restore();
   if(!isP && e.dead) return;
   if(isP && romHush()) return;
-  const ty=B-(e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'?66:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:114)+dwarfDrop(e.opts);
+  const ty=B-(e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'?66:e.type==='bear'?92:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:114)+dwarfDrop(e.opts);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const deadly=!isP && e.type!=='dummy' && e.hostile!==false && e.tier && typeof foeLevel==='function' && foeLevel(e)-playerLevel()>=3;   // far stronger than you: a skull
   const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  Lv '+(typeof foeLevel==='function'?foeLevel(e):e.tier) : ''), tw=g.measureText(label).width;
@@ -14278,7 +14279,7 @@ function castSpell(){                            // a staff casts the spell for 
     return true; }
 function drawActorFigure(e){ drawActorBase(e);         // then status pips over the name, and your mana bar
     if(!e.opts && e.type!=='wolf') return; if(e.dead) return;
-    const s=P(e.x+(e.ox||0),e.y+(e.oy||0)), ty=s.y-(e.type==='wolf'?66:114);
+    const s=P(e.x+(e.ox||0),e.y+(e.oy||0)), ty=s.y-(e.type==='wolf'?66:e.type==='bear'?92:114);
     if(e.st && e.st.length){ e.st.forEach((st,k)=>{ const D=STATUS_DEF[st.kind], x=s.x-((e.st.length-1)*9)/2+k*9, y=ty-(e===player&&combat.phase==='fight'?30:12);   // status pips over the name
       g.fillStyle='rgba(12,8,3,0.8)'; g.beginPath(); g.arc(x,y,4.6,0,Math.PI*2); g.fill(); g.fillStyle=D.col; g.beginPath();
       if(st.kind==='bleed'){ g.moveTo(x,y-3.4); g.quadraticCurveTo(x+3,y+0.5,x,y+3); g.quadraticCurveTo(x-3,y+0.5,x,y-3.4); }
@@ -22087,6 +22088,7 @@ const QUAD={
   camel:{L:24,H:58,D:23,legW:5.6,hoof:2,wr:7,hk:17,stride:9,lift:4,neckL:24,neckA:0.55,neckW:[9,6],head:'long',headA:0.15,hs:2.1,ears:'camel',tail:'camel',hump:1,bend:1},
   dog:{L:12,H:23,D:10,legW:3.2,wr:3,hk:6,stride:5,lift:3,neckL:7,neckA:0.95,neckW:[7.5,5.5],head:'dog',hs:1.25,ears:'floppy',tail:'dog'},
   fox:{L:10,H:14,D:7,legW:2.1,wr:2,hk:4,stride:4,lift:2.5,neckL:4.5,neckA:0.6,neckW:[5,3.6],head:'fox',hs:1.0,ears:'fox',tail:'fox'},
+  bear:{L:23,H:36,D:24,legW:6.5,wr:4,hk:8,stride:6,lift:3,neckL:7,neckA:0.3,neckW:[17,12],head:'bear',hs:2.1,ears:'round',tail:'stub',hump:2,fur:1},
   cat:{L:8,H:11,D:6,legW:1.8,wr:1.6,hk:3.2,stride:3,lift:2,neckL:2.6,neckA:0.8,neckW:[4.2,3.2],head:'cat',hs:0.85,ears:'cat',tail:'cat'} };
 function quadDraw(x,B,kind,o){ const K=QUAD[kind], C=o.col, T=gt, mv=o.mv||0, ph=o.ph||0, graze=o.graze||0, sit=o.sit||0;
   const coat=C.coat, dk=tone(coat,-0.3), dk2=tone(coat,-0.5), lt=tone(coat,0.2), belly=C.belly||tone(coat,0.25), legC=C.legs||coat;
@@ -22098,7 +22100,7 @@ function quadDraw(x,B,kind,o){ const K=QUAD[kind], C=o.col, T=gt, mv=o.mv||0, ph
     else { g.beginPath(); g.ellipse(p[0]+K.legW*0.3,p[1]-K.legW*0.3,K.legW*(K.hoof===2?1.1:0.8),K.legW*0.45,0,0,Math.PI*2); g.fill(); } };
   const gait=(base,phase,front)=>{ const s=Math.sin(ph+phase), c=Math.cos(ph+phase), st=K.stride*(o.run?1.4:1); return [base+mv*s*st, -mv*Math.max(0,c)*K.lift*(o.run?1.4:1)]; };
   const legs=(far,front)=>{ const lw=K.legW*(far?0.95:1), col=far?tone(legC,-0.25):legC;
-    if(front){ const sh=[L*0.62-(far?2:0), aY+(far?-0.5:0)], paw=gait(L*0.6+1-(far?2.5:0), far?Math.PI:0, true), wr=[paw[0]-0.3,paw[1]-K.wr], nom=-aY-K.wr, l=nom*0.56;
+    if(front){ const sh=[L*0.62-(far?2:0), aY+(far?-0.5:0)], paw=(!far&&o.swipe)?[L*0.6+1+9*o.swipe,-12*o.swipe]:gait(L*0.6+1-(far?2.5:0), far?Math.PI:0, true), wr=[paw[0]-0.3,paw[1]-K.wr], nom=-aY-K.wr, l=nom*0.56;
       if(sit){ beastSeg(sh,[sh[0]+0.5,-K.wr],lw*1.3,lw*0.9,col); beastSeg([sh[0]+0.5,-K.wr],[sh[0]+1,-0.5],lw*0.9,lw*0.8,col); foot([sh[0]+1,0],far); return; }
       const el=beastIK(sh[0],sh[1],wr[0],wr[1],l,l,1); beastSeg(sh,el,lw*1.5,lw,col); beastSeg(el,wr,lw,lw*0.8,col); beastSeg(wr,[paw[0]+0.4,paw[1]-0.6],lw*0.8,lw*0.75,col); foot(paw,far); }
     else { if(sit){ g.fillStyle=far?dk:coat; g.beginPath(); g.ellipse(-L*0.5,-D*0.55,L*0.5,D*0.55,0,0,Math.PI*2); g.fill(); foot([-L*0.2+(far?-2:0),0],far); return; }
@@ -22115,15 +22117,19 @@ function quadDraw(x,B,kind,o){ const K=QUAD[kind], C=o.col, T=gt, mv=o.mv||0, ph
     else if(K.tail==='dog'){ g.strokeStyle=coat; g.lineWidth=3; const wg=o.wag?Math.sin(T*16)*3:sw; g.beginPath(); g.moveTo(tb[0],tb[1]); g.quadraticCurveTo(tb[0]-6,tb[1]-2,tb[0]-7+wg,tb[1]-8); g.stroke(); g.strokeStyle=C.white||belly; g.lineWidth=2; g.beginPath(); g.moveTo(tb[0]-6.6+wg*0.8,tb[1]-6); g.lineTo(tb[0]-7+wg,tb[1]-8.5); g.stroke(); }
     else if(K.tail==='fox'){ const e=sit?[tb[0]+4,-1]:[tb[0]-12+sw,tb[1]+4]; g.fillStyle=coat; g.beginPath(); g.moveTo(tb[0],tb[1]-1.5); g.quadraticCurveTo(tb[0]-6,tb[1]-3,e[0],e[1]-1.6); g.quadraticCurveTo(e[0]-1.6,e[1]+1,e[0],e[1]+2.2); g.quadraticCurveTo(tb[0]-6,tb[1]+6,tb[0],tb[1]+2); g.closePath(); g.fill();
       g.fillStyle='#f6f2ea'; g.beginPath(); g.ellipse(e[0]+0.6,e[1]+0.3,2.6,2,0,0,Math.PI*2); g.fill(); }
+    else if(K.tail==='stub'){ g.fillStyle=dk; g.beginPath(); g.ellipse(tb[0]-1,tb[1]+1,3,2.6,0,0,Math.PI*2); g.fill(); }
     else if(K.tail==='cat'){ g.strokeStyle=coat; g.lineWidth=2; const up=sit?0:1; g.beginPath(); g.moveTo(tb[0],tb[1]); if(sit) g.quadraticCurveTo(tb[0]-2,-1,tb[0]+5+sw,-0.8); else g.bezierCurveTo(tb[0]-5,tb[1]-2,tb[0]-6,tb[1]-9*up,tb[0]-3+sw,tb[1]-13*up); g.stroke(); } };
   // the body
   const body=()=>{ g.beginPath(); g.moveTo(-L,top+D*0.15); g.quadraticCurveTo(-L*0.2,top-1,L*0.55,top); g.quadraticCurveTo(L*0.95,top-0.6,L+1,top+D*0.35); g.quadraticCurveTo(L+2,bot,L*0.6,bot);
     g.quadraticCurveTo(0,bot+D*0.08,-L*0.5,bot-D*0.08); g.quadraticCurveTo(-L-1,bot,-L-1.5,top+D*0.5); g.quadraticCurveTo(-L-1.5,top,-L,top+D*0.15); g.closePath();
     const gr=g.createLinearGradient(0,top-1,0,bot); gr.addColorStop(0,lt); gr.addColorStop(0.55,coat); gr.addColorStop(1,belly); g.fillStyle=gr; g.fill(); g.strokeStyle=tone(coat,-0.5,0.4); g.lineWidth=0.6; g.stroke();
-    if(K.hump){ g.fillStyle=coat; g.beginPath(); g.ellipse(-L*0.05,top+1,L*0.48,D*0.62,0,Math.PI,Math.PI*2); g.fill(); g.fillStyle=lt; g.beginPath(); g.ellipse(-L*0.12,top-D*0.25,L*0.3,D*0.22,0,0,Math.PI*2); g.fill(); }
+    if(K.hump===2){ g.fillStyle=coat; g.beginPath(); g.ellipse(L*0.35,top+2,L*0.42,D*0.42,0,Math.PI,Math.PI*2); g.fill(); g.fillStyle=lt; g.beginPath(); g.ellipse(L*0.3,top-D*0.18,L*0.3,D*0.15,0,0,Math.PI*2); g.fill(); }
+    else if(K.hump){ g.fillStyle=coat; g.beginPath(); g.ellipse(-L*0.05,top+1,L*0.48,D*0.62,0,Math.PI,Math.PI*2); g.fill(); g.fillStyle=lt; g.beginPath(); g.ellipse(-L*0.12,top-D*0.25,L*0.3,D*0.22,0,0,Math.PI*2); g.fill(); }
     if(K.wool){ const W=C.wool; g.fillStyle=tone(W,-0.12); for(let k=0;k<16;k++){ const a=k/16*Math.PI*2, rx=L*1.02, ry=D*0.62; g.beginPath(); g.arc(Math.cos(a)*rx-0.5,top+D*0.5+Math.sin(a)*ry,3.6,0,Math.PI*2); g.fill(); }
       g.fillStyle=W; g.beginPath(); g.ellipse(-0.5,top+D*0.48,L*1.02,D*0.6,0,0,Math.PI*2); g.fill(); g.strokeStyle=tone(W,-0.18,0.7); g.lineWidth=0.7;
       for(let k=0;k<11;k++){ const xx=-L*0.8+((k*7)%11)/11*L*1.6, yy=top+D*0.25+((k*5)%7)/7*D*0.5; g.beginPath(); g.arc(xx,yy,1.6,0.3,Math.PI*1.6); g.stroke(); } }
+    if(K.fur){ g.lineWidth=0.7; for(let k=0;k<16;k++){ const u=-L*0.9+((k*7)%16)/16*L*1.8, v=top+D*(0.2+((k*5)%9)/9*0.55); g.strokeStyle=k%2?tone(coat,-0.3,0.3):tone(lt,0.1,0.3); g.beginPath(); g.moveTo(u,v); g.quadraticCurveTo(u-1.4,v+1.2,u-2.2,v+2.6); g.stroke(); }   // shaggy fur
+      g.strokeStyle=tone(coat,-0.4,0.6); for(let k=0;k<9;k++){ const u=-L*0.9+k*L*0.2; g.beginPath(); g.moveTo(u,bot-1); g.lineTo(u-1,bot+2.4); g.stroke(); } }
     if(C.spots){ g.fillStyle='rgba(255,250,240,0.55)'; [[-L*0.4,0.3],[-L*0.1,0.25],[L*0.2,0.3],[-L*0.25,0.45],[L*0.05,0.42]].forEach(([xx,f])=>{ g.beginPath(); g.arc(xx,top+D*f,1,0,Math.PI*2); g.fill(); }); }
     if(C.white && !K.wool){ g.fillStyle=C.white; g.beginPath(); g.ellipse(L*0.75,bot-D*0.3,D*0.32,D*0.4,0,0,Math.PI*2); g.fill(); }   // a white chest
     const hl=g.createRadialGradient(-L*0.5,top+D*0.25,0,-L*0.5,top+D*0.3,L*0.5); hl.addColorStop(0,'rgba(255,250,235,0.14)'); hl.addColorStop(1,'rgba(255,250,235,0)'); g.fillStyle=hl; g.beginPath(); g.ellipse(-L*0.5,top+D*0.3,L*0.5,D*0.4,0,0,Math.PI*2); g.fill(); };
@@ -22162,15 +22168,18 @@ function quadDraw(x,B,kind,o){ const K=QUAD[kind], C=o.col, T=gt, mv=o.mv||0, ph
       if(K.ears==='deer' && !K.antlers){ g.fillStyle='#2a1a10'; g.beginPath(); g.ellipse(8.6*s,0.4*s,0.9*s,0.7*s,0,0,Math.PI*2); g.fill(); }
       eye(0.8*s,-1.4*s,0.75*s); ear(-0.6,-2.8,false); }
     else { // dog, fox, cat
-      const F=K.head==='fox', Ct=K.head==='cat', snout=F?6.4:Ct?3.2:5.2, earH=F?4.4:Ct?3:3.6;
+      const F=K.head==='fox', Ct=K.head==='cat', Br=K.head==='bear', snout=F?6.4:Ct?3.2:Br?3.6:5.2, earH=F?4.4:Ct?3:3.6;
       const ear=(ex,far)=>{ g.save(); g.translate(ex*s,-2.6*s); g.fillStyle=far?dk2:(F?coat:dk);
         if(K.ears==='floppy'){ g.rotate(0.5); g.beginPath(); g.ellipse(0,1.4*s,1.4*s,2.6*s,0.3,0,Math.PI*2); g.fill(); }
+        else if(K.ears==='round'){ g.beginPath(); g.arc(0,-0.6*s,1.4*s,0,Math.PI*2); g.fill(); if(!far){ g.fillStyle=tone(coat,-0.5); g.beginPath(); g.arc(0.2*s,-0.5*s,0.7*s,0,Math.PI*2); g.fill(); } }
         else { g.beginPath(); g.moveTo(-1.4*s,0.6*s); g.quadraticCurveTo(-1*s,-earH*0.6*s,0,-earH*s); g.quadraticCurveTo(1.2*s,-earH*0.5*s,1.5*s,0.6*s); g.closePath(); g.fill();
           if(!far){ g.fillStyle=F?'#2a1a12':'rgba(230,180,170,0.7)'; if(F){ g.beginPath(); g.moveTo(-0.6*s,-earH*0.7*s); g.lineTo(0,-earH*s); g.lineTo(0.7*s,-earH*0.6*s); g.closePath(); g.fill(); } else { g.beginPath(); g.moveTo(-0.5*s,0); g.lineTo(0,-earH*0.6*s); g.lineTo(0.6*s,0); g.closePath(); g.fill(); } } }
         g.restore(); };
       ear(0.8,true);
       g.fillStyle=coat; g.beginPath(); g.ellipse(0,0,3.8*s,3.4*s,0,0,Math.PI*2); g.fill();
       g.beginPath(); g.moveTo(1.6*s,-2*s); g.quadraticCurveTo((2+snout*0.6)*s,-1.6*s,(2+snout)*s,-0.2*s); g.quadraticCurveTo((2.2+snout)*s,1.2*s,(1+snout*0.8)*s,1.6*s); g.lineTo(1.2*s,2.4*s); g.closePath(); g.fill();
+      if(Br){ g.fillStyle=C.muzzle||'#a08060'; g.beginPath(); g.ellipse((2.4+snout*0.6)*s,0.6*s,snout*0.62*s,1.7*s,0,0,Math.PI*2); g.fill();
+        if(o.jaw>0.05){ g.fillStyle='#3a1410'; g.beginPath(); g.ellipse((2.2+snout*0.6)*s,(2+o.jaw*1.2)*s,snout*0.5*s,(0.6+o.jaw*1.4)*s,0,0,Math.PI*2); g.fill(); g.fillStyle='#f4eedc'; [[1.6,1.4],[4.2,1.2],[2.2,3.4+o.jaw*2.2],[3.8,3.2+o.jaw*2.2]].forEach(([a,b],k)=>{ g.beginPath(); g.moveTo((a-0.35)*s,b*s); g.lineTo(a*s,(b+(k<2?0.9:-0.9))*s); g.lineTo((a+0.35)*s,b*s); g.closePath(); g.fill(); }); } }
       const W=C.white||(F?'#f4ece0':null); if(W){ g.fillStyle=W; g.beginPath(); g.moveTo(1*s,0.6*s); g.quadraticCurveTo((2+snout*0.5)*s,0,(2+snout)*s,0.4*s); g.quadraticCurveTo((1.6+snout*0.8)*s,1.8*s,1*s,2.6*s); g.quadraticCurveTo(-1.6*s,2.6*s,1*s,0.6*s); g.closePath(); g.fill(); }
       g.fillStyle=Ct?'#c87a7a':'#1a120e'; g.beginPath(); g.ellipse((1.9+snout)*s,-0.3*s,(Ct?0.55:0.8)*s,(Ct?0.45:0.6)*s,0,0,Math.PI*2); g.fill();
       if(Ct){ g.strokeStyle='rgba(240,236,224,0.6)'; g.lineWidth=0.25; [-0.5,0.3].forEach(d=>{ g.beginPath(); g.moveTo(4*s,0.8*s); g.lineTo(8*s,(0.6+d)*s); g.stroke(); }); }
@@ -22178,12 +22187,20 @@ function quadDraw(x,B,kind,o){ const K=QUAD[kind], C=o.col, T=gt, mv=o.mv||0, ph
       else eye(1.6*s,-1.2*s,0.62*s);
       ear(-1,false); }
     g.restore(); };
-  if(sit>0.01){ const pv=[-L*0.55,-1], ang=-0.46*sit, rot=p=>{ const c=Math.cos(ang), s=Math.sin(ang), u=p[0]-pv[0], v=p[1]-pv[1]; return [pv[0]+u*c-v*s, pv[1]+u*s+v*c]; };
-    const fl=(far)=>{ const sh=rot([L*0.62-(far?2:0), aY]), col=far?tone(legC,-0.25):legC, lw=K.legW; const ft=[sh[0]+0.5,0]; beastSeg(sh,[sh[0]+0.3,(sh[1]+ft[1])*0.5],lw*1.4,lw,col); beastSeg([sh[0]+0.3,(sh[1]+ft[1])*0.5],[ft[0],-0.8],lw,lw*0.85,col); foot(ft,far); };
+  const rear=o.rear||0;
+  if(o.down){ g.translate(0,H-D-2); tail(); body(); headPart(); g.fillStyle=dk2; [[L*0.9,D-1],[L*0.5,D],[-L*0.7,D-0.5]].forEach(([px,py])=>{ g.beginPath(); g.ellipse(px,top+py,K.legW*1.3,K.legW*0.55,0,0,Math.PI*2); g.fill(); }); g.restore(); return; }   // down, flat on its belly
+  if(sit>0.01 || rear>0.01){ const pv=rear>0.01?[-L*0.62,aY]:[-L*0.55,-1], ang=rear>0.01?-1.12*rear:-0.46*sit, rot=p=>{ const c=Math.cos(ang), s=Math.sin(ang), u=p[0]-pv[0], v=p[1]-pv[1]; return [pv[0]+u*c-v*s, pv[1]+u*s+v*c]; };
+    const fl=(far)=>{ const sh=rot([L*0.62-(far?2:0), aY]), col=far?tone(legC,-0.25):legC, lw=K.legW;
+      if(rear>0.01){ const el=[sh[0]+9,sh[1]+5-(far?1:0)], wr=[el[0]+7,el[1]-6-(far?2:0)]; beastSeg(sh,el,lw*1.4,lw*1.1,col); beastSeg(el,wr,lw*1.1,lw,col);   // forelegs up, claws out
+        g.fillStyle=dk2; g.beginPath(); g.ellipse(wr[0]+1,wr[1],lw*0.8,lw*0.6,0,0,Math.PI*2); g.fill(); g.strokeStyle='#e8e0cc'; g.lineWidth=0.9; for(let c=0;c<4;c++){ g.beginPath(); g.moveTo(wr[0]+2,wr[1]-2+c*1.3); g.lineTo(wr[0]+4.6,wr[1]-2.6+c*1.5); g.stroke(); } return; }
+      const ft=[sh[0]+0.5,0]; beastSeg(sh,[sh[0]+0.3,(sh[1]+ft[1])*0.5],lw*1.4,lw,col); beastSeg([sh[0]+0.3,(sh[1]+ft[1])*0.5],[ft[0],-0.8],lw,lw*0.85,col); foot(ft,far); };
+    if(rear>0.01) legs(true,false);
     g.save(); g.translate(pv[0],pv[1]); g.rotate(ang); g.translate(-pv[0],-pv[1]); tail(); g.restore(); fl(true);
     g.save(); g.translate(pv[0],pv[1]); g.rotate(ang); g.translate(-pv[0],-pv[1]); body();
-    g.fillStyle=coat; g.beginPath(); g.ellipse(-L*0.45,top+D*0.65,L*0.48,D*0.62,0.3,0,Math.PI*2); g.fill(); g.fillStyle=lt; g.beginPath(); g.ellipse(-L*0.5,top+D*0.45,L*0.28,D*0.25,0.3,0,Math.PI*2); g.fill(); g.restore();   // the haunch, folded
-    g.fillStyle=dk2; g.beginPath(); g.ellipse(-L*0.15,-K.legW*0.4,K.legW*1.2,K.legW*0.5,0,0,Math.PI*2); g.fill(); fl(false);
+    if(rear<=0.01){ g.fillStyle=coat; g.beginPath(); g.ellipse(-L*0.45,top+D*0.65,L*0.48,D*0.62,0.3,0,Math.PI*2); g.fill(); g.fillStyle=lt; g.beginPath(); g.ellipse(-L*0.5,top+D*0.45,L*0.28,D*0.25,0.3,0,Math.PI*2); g.fill(); }   // the haunch, folded
+    g.restore();
+    if(rear>0.01) legs(false,false); else { g.fillStyle=dk2; g.beginPath(); g.ellipse(-L*0.15,-K.legW*0.4,K.legW*1.2,K.legW*0.5,0,0,Math.PI*2); g.fill(); }
+    fl(false);
     g.save(); g.translate(pv[0],pv[1]); g.rotate(ang); g.translate(-pv[0],-pv[1]); const hp=rot([0,0]); g.translate(L*0.72,top+D*0.32); g.rotate(-ang); g.translate(-L*0.72,-(top+D*0.32)); headPart(); g.restore();
     g.restore(); return; }
   legs(true,false); legs(true,true); tail(); body(); legs(false,false); legs(false,true); headPart();
@@ -22336,6 +22353,59 @@ let pendingPet=null;
 function animalAt(ti,tj){ let best=null, bd=1.1; OBJECTS.forEach(o=>{ if(o.type!=='animal' || !o.ok || !PETTABLE[o.kind]) return; const d=Math.hypot(o.x-(ti+0.5),o.y-(tj+0.5)); if(d<bd){ bd=d; best=o; } }); return best; }
 function petAnimal(o){ if(Math.hypot(player.x-o.x,player.y-o.y)>2.3){ const p=findPath(player.i,player.j,Math.floor(o.x),Math.floor(o.y)); if(p&&p.length){ if(p.length>1) p.pop(); player.path=p; pendingPet=o; } return; }
   const lines=PETTABLE[o.kind]; logMsg(lines[Math.floor(Math.random()*lines.length)],'#e8c8a0'); o.heart=1.4; o.st='idle'; o.tm=3; if(o.kind==='dog'){ o.wag=1; } if(o.kind==='cat'){ o.sit=1; } }
+// ════════ THE BROWN BEAR: Old Brumm, in the hollow east of Brann's clearing. Two heavy swipes, then it rears up and roars: brace for it (parry high) or be shaken ════════
+FOES.bear={ label:'Brown Bear', base:118, stagger:1.1, pattern:[
+  {wait:1.5, wind:1.30, after:0.85, dir:'left'},
+  {wait:1.1, wind:1.20, after:0.85, dir:'right'},
+  {wait:1.2, wind:1.15, after:0.25, dir:'up', roar:true},     // it rears and roars: parry high to brace
+  {wait:0.0, wind:0.62, after:1.00, dir:'left'} ]};         // and comes down on you while you are still ringing
+Object.assign(WEAPONS,{ bear_paw:{ wind:0.3, dmg:13, len:20 }, brumm_paw:{ wind:0.3, dmg:24, len:22 } }); BLEEDERS.add('bear_paw'); BLEEDERS.add('brumm_paw');
+const BEAR=(w)=>({gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,beast:true,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:w||'bear_paw',offhand:null}});
+const BEAR_COL={coat:'#6a4a2e',belly:'#5a3e26',legs:'#4a3220',muzzle:'#a08462'};
+function drawBear(x,B,e,pose){ const pk=pose&&pose.kind, pt=pose?Math.min(1,Math.max(0,pose.t||0)):0, s=curStep(e)||{}, since=clock-(e.roaredAt||-9);
+  const o={col:BEAR_COL, fl:dirMirrored(e.dir||0), mv:e.moving?1:0, ph:gt*8, rear:0, jaw:0, swipe:0, seed:3};
+  if(pk==='raise'){ if(s.roar){ o.rear=pt; o.jaw=pt*0.6; } else o.swipe=pt*0.45; }
+  else if(pk==='strike'){ if(since<0.9){ o.rear=Math.max(0,1-since*1.6); o.jaw=Math.max(0,1-since); } else o.swipe=Math.max(0,1-pt*0.6); }
+  if(since<0.5){ o.jaw=1; o.rear=Math.max(o.rear,1-since*1.2); }
+  g.save(); let dx=0; if(pk==='strike' && since>=0.9) dx=(o.fl?-1:1)*Math.min(1,pt)*8*(1-Math.min(1,pt)); if(pk==='stagger') dx=(o.fl?1:-1)*5;
+  if(e.dead){ o.down=1; o.mv=0; o.jaw=0; o.rear=0; o.swipe=0; o.blink=true; }
+  g.translate(x+dx,B); g.scale(1.55,1.55); quadDraw(0,0,'bear',o); g.restore();
+  if(since<0.6){ g.save(); g.strokeStyle=`rgba(255,240,220,${0.5*(1-since/0.6)})`; g.lineWidth=2; for(let r=0;r<3;r++){ const rr=20+since*120+r*14; g.beginPath(); g.arc(x+(o.fl?-30:30),B-70,rr,-0.8,0.8); g.stroke(); } g.restore(); } }   // the roar, rolling out
+// the roar: no wound, but unbraced it shakes you
+{ const _imp=impact; impact=function(f){ const s=curStep(f); if(!s || !s.roar) return _imp.apply(this,arguments);
+    lunge(f,player); f.strikeAt=clock; f.roaredAt=clock; duel.lastImpact=clock; shake=Math.max(shake,9); try{ SND.fx('roar'); }catch(e){}
+    const since=clock-duel.parryAt, braced=duel.st==='parry' && duel.parryDir==='up' && since<=windowFor(player)+0.15;
+    if(braced){ floatText(tileOf(player),'Braced!','#a8c8f0'); momGain(10); }
+    else { addStatus(player,'chill',3.2,0); floatText(tileOf(player),'Shaken!','#e8b080'); logMsg('The roar goes through you like cold water: your swing slows and your parries come late.','#e8b080'); }
+    f.state='recover'; f.t=s.after; f.k++; }; }
+BEASTS.push({ k:'bear', is:f=>f.type==='bear', name:'Brown Bears', kind:'Beasts · the high woods',
+  how:'Two slow, heavy swipes, left then right. Then it rears up and roars, and drops onto you while you are still shaking.', res:'It guards like a man: one forepaw up. Strike the other side.', aff:'The roar leaves you shaken (slow swings, late parries) unless you brace for it. Claws make you bleed.', ans:'When it rears, parry high to brace. Then parry the blow that follows. A Warming Tonic shakes off the chill.' });
+// Brumm's Hollow
+AREAS.bearden={ fence:{r:false,l:false}, w:12, h:10, theme:'wood', dens:0.85, label:"Brumm's Hollow", mini:{x:0,y:0}, notches:()=>[], dummy:null,
+  objects:()=>[ {type:'teleporter', i:0, j:6, to:'clearing', entry:'fromDen'},
+    {type:'crag', i:8, j:1, fp:[3,2], v:3}, {type:'crag', i:10, j:4, fp:[2,2], v:5}, {type:'boulder', i:3, j:2}, {type:'boulder', i:7, j:8},
+    {type:'deadtree', i:2, j:8, s:1.1}, {type:'felltree', i:4, j:4, fp:[2,1]}, {type:'bones', i:6, j:3, noblock:true}, {type:'bones', i:9, j:7, noblock:true}, {type:'rocks', i:5, j:7, noblock:true},
+    {type:'rune', i:2, j:3, text:"An old oak, scored from the roots to higher than you can reach: five long cuts, and again, and again. Fresh sap still beads in the newest."},
+    ...(CHOICE.bear==='dead' ? [{type:'critter', kind:'flowers', i:7, j:5, noblock:true}] : []) ],
+  npcs:()=>[], mobs:()=>[ { name:'Old Brumm', type:'bear', i:7, j:5, faction:'brumm', hpMul:2.6, opts:BEAR('brumm_paw') } ],
+  entries:{ fromClearing:{i:1,j:6} } };
+AREA_TIER.bearden=3; AREA_PATHS.bearden=[ [[-0.5,6.5],[3,6],[6,5.5]] ];
+wrap('clearing','objects',l=>[...l,{type:'teleporter', i:11, j:7, to:'bearden', entry:'fromClearing'}]); AREAS.clearing.entries.fromDen={i:10,j:7};
+// Brann asks
+{ const oldBr=TALKERS.hunter; TALKERS.hunter=()=>{ const B=CHOICE.bear;
+    if(B==='dead' && !CHOICE.bearPaid){ say('Brann the Hunter',["<i>Brann looks at the blood on you, and then at the claw you hold out, and lets out a long breath.</i>","“Old Brumm. Well. He was a fine animal, and he'd have had one of us before the frost. I'm glad it was you went in, and not me.”","“Here. I strung his claws while you were gone; I knew one of you would come back. Wear them. Nothing in the wood will mistake you for prey again.”"],
+        [{label:'Take the necklace.', fn:()=>{ CHOICE.bearPaid=1; giveQuestItem('bear_necklace',true); player.purse+=60; updateHud(); logMsg('Brann gives you a bear-claw necklace and 60 copper.','#8ac070'); closeDialog(); }}]); return; }
+    if(!B && QUEST.wolves>=2){ say('Brann the Hunter',["“Sit a moment. There's a bear come down from the high wood. A brown, big as a cart, and it's lost its fear of men. It's had two of my snares and half a deer off the rack while I slept ten feet away.”","“Old Brumm, the colliers call it. It lairs in the hollow east of here. A bear that isn't afraid of people only goes one way, and that way ends with a child.”","“When it stands up and roars, set your feet and brace. Don't be standing there with your mouth open. Then it comes down on you.”"],
+        [{label:'“I will deal with it.”', fn:()=>{ remember('bear','asked',"Brann the Hunter wants Old Brumm, a brown bear in the hollow east of his clearing, dealt with."); say('Brann the Hunter',"“Go careful. And come back.”",[bye]); }}, {label:'“Not yet.”', fn:()=>{ CHOICE.bear='later'; oldBr(); }}]); return; }
+    if(B==='later'){ say('Brann the Hunter',"“The bear's still out there. When you're ready.”",[{label:'“I will deal with it.”', fn:()=>{ remember('bear','asked',"Brann the Hunter wants Old Brumm, a brown bear in the hollow east of his clearing, dealt with."); say('Brann the Hunter',"“Go careful. And come back.”",[bye]); }},{label:'Something else.', fn:oldBr}, bye]); return; }
+    return oldBr(); }; }
+{ const _v=victory; victory=function(faction){ const r=_v.apply(this,arguments); if(faction==='brumm' && CHOICE.bear!=='dead'){ CHOICE.bear='dead'; logMsg('Old Brumm goes down like a felled tree and does not get up. Brann will want to know.','#c8b090'); } return r; }; }
+{ const prev=npcHasNews; npcHasNews=function(n){ if(n.id==='hunter' && ((CHOICE.bear==='dead' && !CHOICE.bearPaid) || (!CHOICE.bear && QUEST.wolves>=2))) return n.id==='hunter' && CHOICE.bear==='dead' ? '?' : '!'; return prev(n); }; }
+JOURNAL.push(['Old Brumm', ()=>{ const B=CHOICE.bear; if(!B || B==='later') return null; if(CHOICE.bearPaid) return ['done',"Old Brumm, the bear in the hollow east of Brann's clearing, is dead. Brann strung its claws for you."];
+  if(B==='dead') return ['active',"Old Brumm is dead. Tell Brann the Hunter."]; return ['active',"A brown bear that has lost its fear of men lairs in the hollow east of Brann's clearing. When it rears to roar, parry high to brace."]; }]);
+Object.assign(ITEMS,{ bear_necklace:{ name:'Bear-Claw Necklace', slot:'neck' } }); NECK_LOOKS.bear_necklace={cord:'#3a2414',w:0.8,p:'fangs',col:'#3a3028'};
+Object.assign(ITEM_STATS,{ bear_necklace:{hp:6,ap:1} }); GEAR_HP.bear_necklace=6; PRICES.bear_necklace=60;
+ITEM_LORE.bear_necklace="Old Brumm's claws on a thong of his own hide, strung by Brann while you were still in the hollow. They are longer than your fingers.";
 // ════════ STAIRS: a flight of steps against the back wall, and a stairwell going down on the floor above.
 // Click them: you walk to the foot, climb (or go down) step by step, and the room changes like at any door. ════════
 // {type:'stairs', i, j, fp:[1,L], to, entry}       rises toward j (the back wall); the foot is the tile in front, (i, j+L)

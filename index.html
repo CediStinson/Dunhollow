@@ -7534,16 +7534,59 @@ function paintFountain(x,y){
   g.fillStyle='#a8a294'; g.fillRect(x-5,y-140,10,44); g.beginPath(); g.arc(x,y-146,11,0,Math.PI*2); g.fill();          // a stone fish spouting water
 }
 function paintCityStall(x,y,v){
-  g.fillStyle='rgba(8,5,2,0.3)'; g.beginPath(); g.ellipse(x+8,y+4,52,20,0,0,Math.PI*2); g.fill();
-  const T=TW/2, H2=TH/2, pt=(gi,gj,hh=0)=>({x:x+(gi-gj)*T, y:y+(gi+gj)*H2-hh}), poly=(pts,fill)=>{ g.beginPath(); pts.forEach((p2,n)=>n?g.lineTo(p2.x,p2.y):g.moveTo(p2.x,p2.y)); g.closePath(); g.fillStyle=fill; g.fill(); };
-  const a=-0.4, b=0.4, c1=['#b83a2a','#3a6a9a','#c8a030','#4a7a3a','#7a3a7a','#d8d0c0'][v%6], c2='#efe2c0';
-  poly([pt(a,b,0),pt(b,b,0),pt(b,b,30),pt(a,b,30)],'#6a4626'); poly([pt(b,b,0),pt(b,a,0),pt(b,a,30),pt(b,b,30)],'#4a3018');
-  poly([pt(a,a,30),pt(b,a,30),pt(b,b,30),pt(a,b,30)],'#8a6038');
-  const goods=[['#d8b060','#c89040'],['#b83a2a','#e8c060'],['#8ab0c8','#dde6ee'],['#6a8a4a','#c83a2a'],['#e0d8c8','#7a3a7a'],['#8a5a30','#d8c8a0']][v%6];
-  for(let k=0;k<7;k++){ const q=pt(a+0.1+(k%4)*0.2,a+0.15+Math.floor(k/4)*0.35,32); g.fillStyle=goods[k%2]; g.beginPath(); g.ellipse(q.x,q.y,6,3.5,0,0,Math.PI*2); g.fill(); }
-  [[a,a],[b,a],[a,b],[b,b]].forEach(([gi,gj])=>{ const q=pt(gi,gj,0); g.fillStyle='#3a2412'; g.fillRect(q.x-1.5,q.y-80,3,80); });
-  for(let k=0;k<6;k++){ const t0=k/6, t1=(k+1)/6, A0=pt(a-0.1+(b-a+0.2)*t0,b+0.12,72), A1=pt(a-0.1+(b-a+0.2)*t1,b+0.12,72), B0=pt(a-0.1+(b-a+0.2)*t0,a-0.1,88), B1=pt(a-0.1+(b-a+0.2)*t1,a-0.1,88);
-    poly([B0,B1,A1,A0],k%2?c1:c2); poly([A0,A1,{x:A1.x,y:A1.y+8},{x:(A0.x+A1.x)/2,y:(A0.y+A1.y)/2+12},{x:A0.x,y:A0.y+8}],k%2?c1:c2); }
+  const T=TW/2, H2=TH/2, pt=(gi,gj,hh=0)=>({x:x+(gi-gj)*T, y:y+(gi+gj)*H2-hh}), lp=(p,q,t)=>({x:p.x+(q.x-p.x)*t,y:p.y+(q.y-p.y)*t});
+  const poly=(pts,fill,stroke,lw)=>{ g.beginPath(); pts.forEach((p2,n)=>n?g.lineTo(p2.x,p2.y):g.moveTo(p2.x,p2.y)); g.closePath(); if(fill){ g.fillStyle=fill; g.fill(); } if(stroke){ g.strokeStyle=stroke; g.lineWidth=lw||1; g.stroke(); } };
+  const a=-0.42, b=0.42, CH=30, c1=['#b83a2a','#3a6a9a','#c8a030','#4a7a3a','#7a3a7a','#d8d0c0'][v%6], c2=v%6===5?'#8a5a30':'#efe2c0', wood='#7a5232', wd='#4a3018', wl='#9a6c40';
+  // shadow, soft, falling to the lower right
+  const sg=g.createRadialGradient(x+10,y+4,4,x+10,y+4,60); sg.addColorStop(0,'rgba(8,5,2,0.38)'); sg.addColorStop(1,'rgba(8,5,2,0)'); g.fillStyle=sg; g.beginPath(); g.ellipse(x+10,y+4,62,26,0,0,Math.PI*2); g.fill();
+  const post=(gi,gj,h)=>{ const q=pt(gi,gj,0); g.fillStyle=wd; g.fillRect(q.x-2,q.y-h,4,h); g.fillStyle='rgba(255,220,170,0.18)'; g.fillRect(q.x-2,q.y-h,1.2,h); };
+  const H=(gi,gj)=>96+(b+0.14-gj)/(b-a+0.28)*14;   // the awning: high at the back, sloping down to the front edge
+  post(a,a,H(a,a)); post(b,a,H(b,a));
+  // a back rail with things hung from it: strings of garlic, herbs, a pot or two, by trade
+  { const r0=pt(a,a,H(a,a)-14), r1=pt(b,a,H(b,a)-14); g.strokeStyle=wd; g.lineWidth=2; g.beginPath(); g.moveTo(r0.x,r0.y); g.lineTo(r1.x,r1.y); g.stroke();
+    for(let k=1;k<5;k++){ const c=lp(r0,r1,k/5); g.strokeStyle='rgba(40,26,12,0.8)'; g.lineWidth=0.7; g.beginPath(); g.moveTo(c.x,c.y); g.lineTo(c.x,c.y+8); g.stroke();
+      const kind=(k+v)%3; if(kind===0){ g.fillStyle='#e8e0cc'; for(let n=0;n<3;n++){ g.beginPath(); g.arc(c.x+(n%2?1.4:-1.4),c.y+9+n*3,2.2,0,Math.PI*2); g.fill(); } }
+      else if(kind===1){ g.fillStyle='#5a7a3a'; g.beginPath(); g.moveTo(c.x,c.y+7); g.lineTo(c.x-3.5,c.y+17); g.lineTo(c.x+3.5,c.y+17); g.closePath(); g.fill(); g.fillStyle='#7a9a4a'; g.fillRect(c.x-0.6,c.y+8,1.2,8); }
+      else { g.fillStyle='#a8603a'; g.beginPath(); g.ellipse(c.x,c.y+13,4,5,0,0,Math.PI*2); g.fill(); g.fillStyle='#7a4024'; g.fillRect(c.x-2,c.y+7,4,2); } } }
+  // the counter: planked faces, a cloth hung over the front, a worn top
+  const L=pt(a,b,0), F=pt(b,b,0), R=pt(b,a,0), up=(p,h)=>({x:p.x,y:p.y-h});
+  poly([L,F,up(F,CH),up(L,CH)],wood); poly([F,R,up(R,CH),up(F,CH)],wd);
+  g.strokeStyle='rgba(20,10,4,0.45)'; g.lineWidth=0.7; for(let h=7;h<CH;h+=7){ [[L,F],[F,R]].forEach(([p,q])=>{ g.beginPath(); g.moveTo(up(p,h).x,up(p,h).y); g.lineTo(up(q,h).x,up(q,h).y); g.stroke(); }); }
+  { const c0=up(lp(L,F,0.08),CH), c1q=up(lp(L,F,0.92),CH), n=8; g.fillStyle=c1; g.beginPath(); g.moveTo(c0.x,c0.y); g.lineTo(c1q.x,c1q.y);   // the cloth, scalloped at its hem
+    for(let k=n;k>=0;k--){ const p=lp(c0,c1q,k/n); g.lineTo(p.x,p.y+18+(k%2?2.5:0)); } g.closePath(); g.fill();
+    g.fillStyle=c2; for(let k=0;k<n;k+=2){ const p0=lp(c0,c1q,k/n), p1=lp(c0,c1q,(k+0.6)/n); g.beginPath(); g.moveTo(p0.x,p0.y); g.lineTo(p1.x,p1.y); g.lineTo(p1.x,p1.y+18); g.lineTo(p0.x,p0.y+18); g.closePath(); g.fill(); }
+    g.strokeStyle='rgba(0,0,0,0.25)'; g.lineWidth=0.6; for(let k=1;k<n;k++){ const p=lp(c0,c1q,k/n); g.beginPath(); g.moveTo(p.x,p.y+2); g.lineTo(p.x,p.y+17); g.stroke(); } }
+  poly([up(pt(a-0.03,a-0.03),CH),up(pt(b+0.03,a-0.03),CH),up(pt(b+0.03,b+0.03),CH),up(pt(a-0.03,b+0.03),CH)],wl,'rgba(40,24,10,0.6)',0.8);
+  poly([up(pt(a-0.03,b+0.03),CH),up(pt(b+0.03,b+0.03),CH),up(pt(b+0.03,b+0.03),CH-3),up(pt(a-0.03,b+0.03),CH-3)],tone(wl,-0.25)); poly([up(pt(b+0.03,b+0.03),CH),up(pt(b+0.03,a-0.03),CH),up(pt(b+0.03,a-0.03),CH-3),up(pt(b+0.03,b+0.03),CH-3)],tone(wl,-0.45));
+  // goods: baskets and crates set out on the counter, by trade
+  const basket=(gi,gj,fill,kind)=>{ const c=pt(gi,gj,CH); g.fillStyle='#8a6034'; g.beginPath(); g.ellipse(c.x,c.y-1,9,4.6,0,0,Math.PI); g.lineTo(c.x-9,c.y-5); g.ellipse(c.x,c.y-5,9,4.6,0,Math.PI,0,true); g.closePath(); g.fill();
+    g.strokeStyle='#5a3a1a'; g.lineWidth=0.6; for(let k=-2;k<=2;k++){ g.beginPath(); g.moveTo(c.x+k*3.4,c.y-5+Math.abs(k)*0.4); g.lineTo(c.x+k*3.4,c.y+3-Math.abs(k)*0.6); g.stroke(); }
+    g.fillStyle='#6a4626'; g.beginPath(); g.ellipse(c.x,c.y-5,9,4.6,0,0,Math.PI*2); g.fill();
+    for(let k=0;k<7;k++){ const ox=((k*37)%15)-7, oy=((k*23)%7)-3.5; g.fillStyle=fill[k%fill.length]; g.beginPath(); if(kind==='fish'){ g.ellipse(c.x+ox*0.8,c.y-6+oy*0.6,4,1.4,0.3,0,Math.PI*2); } else if(kind==='bread'){ g.ellipse(c.x+ox*0.8,c.y-7+oy*0.5,3.6,2.4,0.2,0,Math.PI*2); } else g.arc(c.x+ox*0.85,c.y-6.5+oy*0.55,2.3,0,Math.PI*2); g.fill(); }
+    g.fillStyle='rgba(255,255,255,0.35)'; g.beginPath(); g.arc(c.x-2,c.y-8,1,0,Math.PI*2); g.fill(); };
+  const crate=(gi,gj,fill)=>{ const s2=0.13, h=9, P0=pt(gi-s2,gj+s2,CH), P1=pt(gi+s2,gj+s2,CH), P2=pt(gi+s2,gj-s2,CH), P3=pt(gi-s2,gj-s2,CH);
+    poly([P0,P1,up(P1,h),up(P0,h)],'#9a7448','rgba(40,24,10,0.6)',0.6); poly([P1,P2,up(P2,h),up(P1,h)],'#6a4a2a','rgba(40,24,10,0.6)',0.6); poly([up(P0,h),up(P1,h),up(P2,h),up(P3,h)],'#3a2614');
+    const c=pt(gi,gj,CH+h); for(let k=0;k<6;k++){ g.fillStyle=fill[k%fill.length]; g.beginPath(); g.arc(c.x+((k*29)%13)-6,c.y+((k*17)%5)-3,2.6,0,Math.PI*2); g.fill(); } };
+  const T6=[ {b:[['#d8b060','#c89040','#e8c878'],'bread'], c:['#c84a2a','#e0a040']},            // baker
+    {b:[['#b83a2a','#d84a3a','#8ab04a'],''], c:['#e8c060','#d89a30']},                               // fruit
+    {b:[['#9ab0c0','#c8d4dc','#7a90a0'],'fish'], c:['#c8d4dc','#8a9aa8']},                           // fish
+    {b:[['#6a8a4a','#8aaa5a','#c83a2a'],''], c:['#e8e0b0','#a0b860']},                               // greens
+    {b:[['#7a3a7a','#c8a030','#3a6a9a'],''], c:['#e0d8c8','#b83a2a']},                               // cloth and trinkets
+    {b:[['#8a5a30','#a87a48','#d8c8a0'],'bread'], c:['#6a4626','#c8a878']} ][v%6];
+  crate(a+0.18,a+0.2,T6.c); basket(b-0.2,a+0.2,...T6.b); basket(a+0.22,b-0.18,...T6.b); crate(b-0.17,b-0.2,T6.c);
+  { const sc=pt(0,0,CH); g.fillStyle='#3a3430'; g.fillRect(sc.x-1,sc.y-12,2,12); g.fillRect(sc.x-8,sc.y-12,16,1.4); g.fillStyle='#8a8478'; [-7,7].forEach(d=>{ g.beginPath(); g.ellipse(sc.x+d,sc.y-7,3,1.2,0,0,Math.PI*2); g.fill(); g.strokeStyle='#3a3430'; g.lineWidth=0.4; g.beginPath(); g.moveTo(sc.x+d,sc.y-11); g.lineTo(sc.x+d,sc.y-7.5); g.stroke(); }); }   // a little pair of scales
+  post(a,b,H(a,b)-6); post(b,b,H(b,b)-6);
+  // the awning: striped canvas over a light frame, a scalloped valance on both open sides
+  const e=0.12, A0=a-e, A1=b-0.04, ap=(gi,gj)=>pt(gi,gj,H(gi,gj)), n=6;
+  for(let k=0;k<n;k++){ const t0=A0+(A1-A0)*k/n, t1=A0+(A1-A0)*(k+1)/n, col=k%2?c1:c2;
+    const q=[ap(t0,A0),ap(t1,A0),ap(t1,A1),ap(t0,A1)]; const gr=g.createLinearGradient(q[0].x,q[0].y,q[3].x,q[3].y); gr.addColorStop(0,tone(col,0.1)); gr.addColorStop(1,tone(col,-0.12)); poly(q,gr); }
+  g.strokeStyle='rgba(20,10,4,0.25)'; g.lineWidth=0.6; for(let k=1;k<4;k++){ const t=A0+(A1-A0)*k/4, p=ap(A0,t), q2=ap(A1,t); g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(q2.x,q2.y); g.stroke(); }   // the sag between the frame's ribs
+  const val=(p0,p1,k0,dark)=>{ const m=10; for(let k=0;k<m;k++){ const u0=lp(p0,p1,k/m), u1=lp(p0,p1,(k+1)/m), col=Math.floor((k0+k)*n/m/ (n/6))%2? c1:c2, cc=dark?tone(col,-0.25):col;
+      g.fillStyle=cc; g.beginPath(); g.moveTo(u0.x,u0.y); g.lineTo(u1.x,u1.y); g.lineTo(u1.x,u1.y+7); g.quadraticCurveTo((u0.x+u1.x)/2,(u0.y+u1.y)/2+13,u0.x,u0.y+7); g.closePath(); g.fill(); }
+    g.strokeStyle='rgba(20,10,4,0.35)'; g.lineWidth=0.7; g.beginPath(); g.moveTo(p0.x,p0.y); g.lineTo(p1.x,p1.y); g.stroke(); };
+  val(ap(A0,A1),ap(A1,A1),0,false); val(ap(A1,A1),ap(A1,A0),0,true);
+  poly([ap(A0,A0),ap(A1,A0),ap(A1,A1),ap(A0,A1)],null,'rgba(30,16,6,0.5)',0.8);
+  const fin=ap(0,A0); g.fillStyle=wd; g.beginPath(); g.arc(fin.x,fin.y-2,2.2,0,Math.PI*2); g.fill();
 }
 function paintStatue(x,y){
   g.fillStyle='rgba(8,5,2,0.35)'; g.beginPath(); g.ellipse(x+10,y+5,44,18,0,0,Math.PI*2); g.fill();
@@ -8230,7 +8273,7 @@ function drawObject(o){
     for(let k=0;k<10;k++){ const t=((gt*0.9+k/10)%1), ang=k/10*Math.PI*2; g.fillStyle=`rgba(200,230,245,${0.6*(1-t)})`;
       g.beginPath(); g.arc(a.x+Math.cos(ang)*t*26, a.y-146+t*t*120-Math.sin(t*Math.PI)*34, 1.6, 0, Math.PI*2); g.fill(); }
   } else if(o.type==='cstall'){
-    drawCached('cstall'+o.v,x,y,140,130,70,100,(X,Y)=>paintCityStall(X,Y,o.v));
+    drawCached('cstall2_'+o.v,x,y,200,190,100,150,(X,Y)=>paintCityStall(X,Y,o.v));
   } else if(o.type==='statue'){
     drawCached('statue',x,y,100,150,50,138,paintStatue);
   } else if(o.type==='lamp'){

@@ -5195,6 +5195,9 @@ const AREAS = {
       {type:'crate',  i:6, j:0, breakable:true},
       {type:'barrel', i:7, j:0, breakable:true},
       {type:'teleporter', i:12, j:3, to:'road', entry:'fromFarm'},   // tucked at the east edge, past the bandits
+      {type:'hencoop', i:8, j:6}, {type:'haystack', i:9, j:5}, {type:'cart', i:4, j:0}, {type:'chopblock', i:0, j:3}, {type:'washline', i:3, j:4},
+      {type:'pen', part:'back', i:8, j:0, fp:[2,2], noblock:true, dz:8.6}, {type:'pen', part:'front', i:8, j:0, fp:[2,2], noblock:true, dz:11.8},
+      {type:'garden', i:0, j:5, fp:[3,3], noblock:true},
     ].filter(o=>!o.breakable || !destroyedBreakables.has('farm:'+o.i+','+o.j)),
     mobs:()=>[
       { name:'Bandit Thug', type:'brute', i:11, j:3, faction:'bandits',
@@ -8991,7 +8994,7 @@ const rnd01=(a,b,s=0)=>(hsh(a*7+s*131,b*13-s*17)%10007)/10007;
 
 // worn footpaths, per room, as polylines in grid space
 const AREA_PATHS={
-  farm:      [ [[6.5,-0.5],[6.5,1.8],[8.6,2.4],[10.4,3.3],[13.5,3.5]] ],
+  farm:      [ [[6.5,-0.5],[6.5,1.8],[8.6,2.4],[10.4,3.3],[13.5,3.5]], [[3.4,1.6],[4.8,2.3],[6.0,3.0]], [[5.8,4.1],[4.0,4.9],[2.9,5.4]], [[7.3,4.1],[8.6,4.9],[9.8,5.4]] ],   // the cart track, door to well, and the footpaths out to the garden and the wheat
   road:      [ [[-0.5,2.5],[9,2.7],[18,2.3],[26,2.6],[34.5,2.5]], [[16.5,2.5],[16.5,-0.5]] ],
   crossroads:[ [[5.5,5.5],[11.5,5.5]], [[5.5,-0.5],[5.5,11.5]] ],
   camp:      [ [[6.5,-0.5],[6.5,9.5]], [[3,4.5],[10,4.5]] ],
@@ -9021,7 +9024,7 @@ function groundAt(gx,gy){
   const d=distToPaths(wx,wy,paths);
   const halfW = theme==='farm' ? 0.55 : theme==='village' ? 0.75 : theme==='city' ? 1.25 : 0.95;
   const path = paths.length ? smooth(halfW+0.35, halfW-0.15, d + (fbm(gx*1.7,gy*1.7,7)-0.5)*0.45) : 0;
-  const mud  = theme==='farm' ? smooth(0.60,0.70,fbm(gx*0.32,gy*0.32,3)) : 0;
+  const mud  = 0;                                          // (the farm's old mud blotches: its yard is worn where feet go now, see farmYard)
   const notch = inNotch(Math.floor(gx),Math.floor(gy)) ? 1 : 0;
   return {path, mud, notch, d};
 }
@@ -9040,6 +9043,7 @@ function buildWorldCache(){
     // (no earth cut under the map)
     paintGroundTexture();
     if(AREAS[areaId].theme==='city') paintCityDetail(); else if(AREAS[areaId].theme!=='interior' && AREAS[areaId].theme!=='ash' && AREAS[areaId].theme!=='sand' && !AREAS[areaId].mountain) paintGroundDetail();
+    if(AREAS[areaId].theme==='farm' || AREAS[areaId].bank) paintEarthBank();
     paintPools();
     paintFence();
     if(AREAS[areaId].theme!=='interior') drawRoadDecor();
@@ -9227,6 +9231,8 @@ function paintGroundTexture(){
       if(G.path>0){ let tr=mixC([96,78,50],[74,58,36],fbm(gx*2.2,gy*2.2,66)); tr=mixC(tr,[52,44,30],smooth(0.6,0.75,fbm(gx*1.4,gy*1.4,67))*0.6); pc=mixC(pc,tr,smooth(0.25,0.75,G.path)); }
       const ao=1-0.45*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.02-0.1*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.08), o=(py*TWp+px)*4;
       D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
+    if(theme==='farm' && !G.notch){ const fc=farmGroundPixel(gx,gy,G,w,h), ao=1-0.42*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.06-0.12*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.08), o=(py*TWp+px)*4;
+      D[o]=fc[0]*k; D[o+1]=fc[1]*k; D[o+2]=fc[2]*k; D[o+3]=255; continue; }
     let c=mixC(G1,G2,smooth(0.25,0.8,fbm(gx*0.9,gy*0.9,1)));
     const BOGGY=AREAS[areaId].boggy, bogK=BOGGY?clamp01(1.25-gy/h*1.1)*clamp01(0.3+gx/w):0;           // the fen creeping in from the north-east
     if(bogK>0) c=mixC(c,[70,72,42],bogK*0.55);
@@ -9488,8 +9494,9 @@ function drawPostFX(W,H){
   g.drawImage(postLayer('grade',W,H,(c,W,H)=>{ const gr=c.createLinearGradient(0,0,W,H);
     gr.addColorStop(0,'rgba(255,200,130,0.55)'); gr.addColorStop(1,'rgba(60,90,130,0.45)'); c.fillStyle=gr; c.fillRect(0,0,W,H); }),0,0);
   g.globalCompositeOperation='source-over';
-  g.drawImage(postLayer('vig',W,H,(c,W,H)=>{ const v=c.createRadialGradient(W/2,H*0.48,Math.min(W,H)*0.3,W/2,H*0.5,Math.max(W,H)*0.75);
-    v.addColorStop(0,'rgba(0,0,0,0)'); v.addColorStop(1,'rgba(4,3,2,0.62)'); c.fillStyle=v; c.fillRect(0,0,W,H); }),0,0);
+  { const va=Math.round((0.34+0.28*(typeof nightAmt==='function'?nightAmt():1))*20)/20;   // a light vignette by day, the old heavy one at night
+    g.drawImage(postLayer('vig'+va,W,H,(c,W,H)=>{ const v=c.createRadialGradient(W/2,H*0.48,Math.min(W,H)*0.34,W/2,H*0.5,Math.max(W,H)*0.78);
+      v.addColorStop(0,'rgba(0,0,0,0)'); v.addColorStop(1,'rgba(4,3,2,'+va+')'); c.fillStyle=v; c.fillRect(0,0,W,H); }),0,0); }
   g.restore();
 }
 
@@ -22557,7 +22564,7 @@ const FAUNA_COL={ horse:[{coat:'#6a4026',mane:'#2a1a12',legs:'#4a2c1a',blaze:1},
   chicken:[{body:'#f2ece0',dark:'#d8ccb8'},{body:'#a8603a',dark:'#5a2e1a'},{body:'#2a2624',dark:'#4a5a4a'}], rabbit:['#8a7a68','#a89884','#6a5e50'], lizard:['#b08a5a','#8a7a4a','#c8a070'], frog:['#5a8a3a','#4a7a4a','#7a8a3a'] };
 // [kind, i, j, how many] per area; the home tile is moved to the nearest open ground when the area loads
 const FAUNA_AT={
-  farm:[['chicken',4,5,3],['sheep',10,2,2],['dog',6,4,1],['cat',2,2,1]],
+  farm:[['chicken',7,5,3],['sheep',8,1,2],['dog',6,4,1],['cat',2,2,1]],
   village:[['chicken',4,7,2],['cat',8,3,1],['dog',10,6,1]],
   graveyard:[['rabbit',7,7,1]], stones:[['sheep',6,6,2],['rabbit',3,3,1]],
   market:[['pigeon',13,13,4],['cat',6,20,1],['horse',22,22,1]],
@@ -23092,6 +23099,109 @@ JOURNAL.push(['The Hollow Choir', ()=> !CHOICE.succ ? null
 // what you sold them stays with you: less life, more of something else
 { const _r=refreshPlayerHp; refreshPlayerHp=function(full){ _r.apply(this,arguments); const T=CHOICE.tithe; if(T && T.hp){ player.maxHp=Math.max(10,player.maxHp-T.hp); player.hp=Math.min(player.hp,player.maxHp); } }; }
 { const _a=activeEffects; activeEffects=function(){ const L=_a(); const T=CHOICE.tithe; if(T && (T.hp||T.ap||T.sp)) L.push({ico:'⛧',name:'Blood Tithe',kind:'The Hollow Choir',bad:false,rows:[...(T.hp?[['Max health','−'+T.hp]]:[]),...(T.ap?[['Attack power','+'+T.ap+' (+'+T.ap*3+'% weapon damage)']]:[]),...(T.sp?[['Spell power','+'+T.sp+' (+'+T.sp*4+'% spell damage)']]:[])],tip:'Sold to the daughters of the Hollow Choir, in the Weeping Hollow. It will not grow back.'+(T.tam?' Part of it bought a boy who did not want to be saved.':'')+(T.taste?' Sometimes you dream of a mill-lane kitchen, and a cough.':'')}); return L; }; }
+// ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
+const FARM_YARD=[[3.4,1.6,1.1],[6.5,3.6,1.5],[11.6,3.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
+function farmYard(gx,gy){ let k=0; for(const [x,y,r] of FARM_YARD){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }
+// a hen coop on short legs: plank walls, a tarred roof, a cleated ramp down to the ground, straw poking out of the nest box
+OBJ_DRAW.hencoop=o=>{ const T=TW/2, H2=TH/2, X0=P(o.i+0.5,o.j+0.5), pt=(a,b,h=0)=>({x:X0.x+(a-b)*T, y:X0.y+(a+b)*H2-h}), poly=(ps,f,s2)=>{ g.beginPath(); ps.forEach((p,n)=>n?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); if(f){ g.fillStyle=f; g.fill(); } if(s2){ g.strokeStyle=s2; g.lineWidth=0.8; g.stroke(); } };
+  const a=-0.34, b=0.34, c=-0.28, d=0.28, L0=10, H=26, RH=16;
+  g.fillStyle='rgba(8,5,2,0.3)'; g.beginPath(); g.ellipse(X0.x+6,X0.y+3,34,13,0,0,Math.PI*2); g.fill();
+  [[a,c],[b,c],[a,d],[b,d]].forEach(([u,v])=>{ const q=pt(u,v); g.fillStyle='#3a2614'; g.fillRect(q.x-1.5,q.y-L0,3,L0); });   // legs
+  const wood='#8a6440', wd='#5e4228';
+  poly([pt(a,d,L0),pt(b,d,L0),pt(b,d,L0+H),pt(a,d,L0+H)],wood,'rgba(30,18,8,0.6)'); poly([pt(b,d,L0),pt(b,c,L0),pt(b,c,L0+H),pt(b,d,L0+H)],wd,'rgba(30,18,8,0.6)');
+  g.strokeStyle='rgba(30,16,6,0.5)'; g.lineWidth=0.7; for(let h=L0+5;h<L0+H;h+=5){ [[pt(a,d,h),pt(b,d,h)],[pt(b,d,h),pt(b,c,h)]].forEach(([p,q])=>{ g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(q.x,q.y); g.stroke(); }); }
+  const dr=[pt(0.02,d,L0),pt(0.2,d,L0),pt(0.2,d,L0+13),pt(0.02,d,L0+13)]; poly(dr,'#1e140a');   // the pop-hole
+  const nb=[pt(b,0.02,L0+8),pt(b,-0.18,L0+8),pt(b,-0.18,L0+18),pt(b,0.02,L0+18)]; poly(nb,'#4a3220','rgba(20,10,4,0.6)');   // the nest-box lid
+  g.strokeStyle='#d8b860'; g.lineWidth=0.8; for(let k=0;k<5;k++){ const p=pt(b,-0.02-k*0.035,L0+8); g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(p.x+2+k%2,p.y+3); g.stroke(); }   // straw
+  { const top=pt(0.11,d,L0), foot=pt(0.11,d+0.5,0), w2=5; g.fillStyle='#7a5634'; g.beginPath(); g.moveTo(top.x-w2,top.y); g.lineTo(top.x+w2,top.y); g.lineTo(foot.x+w2,foot.y); g.lineTo(foot.x-w2,foot.y); g.closePath(); g.fill();   // the ramp
+    g.strokeStyle='#3a2614'; g.lineWidth=1.2; for(let k=1;k<5;k++){ const t=k/5, x=top.x+(foot.x-top.x)*t, y=top.y+(foot.y-top.y)*t; g.beginPath(); g.moveTo(x-w2,y); g.lineTo(x+w2,y); g.stroke(); } }
+  const R0=pt(a-0.08,(c+d)/2,L0+H+RH), R1=pt(b+0.08,(c+d)/2,L0+H+RH);     // a pitched roof, the ridge running along the coop
+  poly([pt(a-0.08,d+0.1,L0+H-2),pt(b+0.08,d+0.1,L0+H-2),R1,R0],'#4a3a30','rgba(10,6,4,0.6)'); poly([pt(b+0.08,d+0.1,L0+H-2),pt(b+0.08,c-0.1,L0+H-2),R1],'#3a2c24');
+  g.strokeStyle='rgba(120,100,80,0.35)'; g.lineWidth=0.7; for(let t=0.2;t<1;t+=0.2){ const p=pt(a-0.08+(b-a+0.16)*t,d+0.1,L0+H-2), q=pt(a-0.08+(b-a+0.16)*t,(c+d)/2,L0+H+RH); g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(q.x,q.y); g.stroke(); } };
+// a little sheep pen of split rails, its gate standing open, a trough of water inside; drawn as two halves so a sheep can stand in it
+OBJ_DRAW.pen=o=>{ const T=TW/2, H2=TH/2, pt=(gi,gj,h=0)=>({x:P(gi,gj).x, y:P(gi,gj).y-h}), i0=o.i+0.1, j0=o.j+0.1, i1=o.i+o.fp[0]-0.1, j1=o.j+o.fp[1]-0.1;
+  const post=(gi,gj)=>{ const q=pt(gi,gj); g.fillStyle='rgba(8,5,2,0.25)'; g.beginPath(); g.ellipse(q.x+2,q.y+1,4,1.6,0,0,Math.PI*2); g.fill(); g.fillStyle='#7a5634'; g.fillRect(q.x-2.2,q.y-30,4.4,30); g.fillStyle='#a07a4c'; g.fillRect(q.x-2.2,q.y-30,1.5,30); g.fillStyle='#4a3018'; g.fillRect(q.x-2.6,q.y-31,5.2,2); };
+  const rail=(a1,b1,a2,b2,h)=>{ const p=pt(a1,b1,h), q=pt(a2,b2,h); g.strokeStyle='#9a7448'; g.lineWidth=3; g.lineCap='round'; g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(q.x,q.y); g.stroke(); g.strokeStyle='rgba(255,220,170,0.2)'; g.lineWidth=0.8; g.beginPath(); g.moveTo(p.x,p.y-1); g.lineTo(q.x,q.y-1); g.stroke(); };
+  const side=(a1,b1,a2,b2)=>{ post(a1,b1); [8,16,24].forEach(h=>rail(a1,b1,a2,b2,h)); post(a2,b2); };
+  if(o.part==='back'){ side(i0,j1,i0,j0); side(i0,j0,i1,j0);
+    { const c=P(o.i+o.fp[0]/2,o.j+o.fp[1]/2-0.1), w=26, d=7, h=9; g.fillStyle='rgba(60,44,26,0.55)'; g.beginPath(); g.ellipse(c.x,c.y+4,w+10,d+6,0,0,Math.PI*2); g.fill();   // trodden mud round the trough
+      g.fillStyle='#5a3e24'; g.beginPath(); g.moveTo(c.x-w,c.y); g.lineTo(c.x+w,c.y); g.lineTo(c.x+w-3,c.y+h); g.lineTo(c.x-w+3,c.y+h); g.closePath(); g.fill();
+      g.fillStyle='#7a5634'; g.beginPath(); g.ellipse(c.x,c.y,w,d,0,0,Math.PI*2); g.fill(); g.fillStyle='#4a6a78'; g.beginPath(); g.ellipse(c.x,c.y,w-3,d-2,0,0,Math.PI*2); g.fill();
+      g.fillStyle='rgba(220,240,250,0.35)'; g.beginPath(); g.ellipse(c.x-6,c.y-1,8,1.6,0,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(120,150,60,0.6)'; g.lineWidth=0.6; g.beginPath(); g.moveTo(c.x+8,c.y+1); g.lineTo(c.x+14,c.y); g.stroke(); } }
+  else { side(i1,j0,i1,j1); post(i0,j1); post(i0+0.55,j1); [8,16,24].forEach(h=>rail(i0+0.55,j1,i1,j1,h)); post(i1,j1);
+    { const h=pt(i0+0.55,j1), e={x:h.x-20,y:h.y+16}; g.strokeStyle='#6a4a2c'; g.lineWidth=2.4; [8,17].forEach(y2=>{ g.beginPath(); g.moveTo(h.x,h.y-y2); g.lineTo(e.x,e.y-y2); g.stroke(); }); g.lineWidth=2; g.beginPath(); g.moveTo(h.x,h.y-8); g.lineTo(e.x,e.y-17); g.stroke(); g.fillStyle='#5a3e24'; g.fillRect(e.x-1.5,e.y-20,3,20); } } };   // the gate, swung open
+// the kitchen garden in the ploughed corner: rows of cabbages, carrots, beans on poles, onions and a few fat pumpkins, a scarecrow over all of it
+OBJ_DRAW.garden=o=>{ const plants=[], T=gt;
+  for(let r=0;r<6;r++){ const gy=o.j+0.28+r*0.47, kind=['cabbage','carrot','beans','onion','pumpkin','cabbage'][r];
+    for(let gx=o.i+0.22;gx<o.i+o.fp[0]-0.1;gx+=kind==='pumpkin'?0.62:kind==='beans'?0.42:0.3){ if(Math.hypot(gx-(o.i+1.5),gy-(o.j+1.5))<0.32) continue; plants.push({gx:gx+(rnd01(Math.round(gx*10),r,960)-0.5)*0.06,gy,kind,s:0.85+rnd01(r,Math.round(gx*10),961)*0.3}); } }
+  plants.push({gx:o.i+1.5,gy:o.j+1.5,kind:'scarecrow',s:1});
+  plants.sort((a,b)=>(a.gx+a.gy)-(b.gx+b.gy)).forEach(p=>{ const q=P(p.gx,p.gy), x=q.x, y=q.y, s=p.s, sw=Math.sin(T*1.3+p.gx*2)*0.6;
+    if(p.kind==='cabbage'){ g.fillStyle='rgba(20,14,6,0.3)'; g.beginPath(); g.ellipse(x+1,y+1,7*s,3*s,0,0,Math.PI*2); g.fill();
+      [['#3e6a2e',6.6,3.4,0],['#5a8a3a',5.4,3.2,-1.2],['#86b25a',3.8,2.6,-2.4],['#b8d488',2.2,1.7,-3.4]].forEach(([c,rx,ry,dy])=>{ g.fillStyle=c; g.beginPath(); g.ellipse(x,y-2+dy*s,rx*s,ry*s,0,0,Math.PI*2); g.fill(); });
+      g.strokeStyle='rgba(30,60,20,0.5)'; g.lineWidth=0.5; for(let k=0;k<4;k++){ const a=k*1.6; g.beginPath(); g.moveTo(x,y-4*s); g.lineTo(x+Math.cos(a)*5*s,y-2*s+Math.sin(a)*2*s); g.stroke(); } }
+    else if(p.kind==='carrot'){ g.fillStyle='#d8782a'; g.beginPath(); g.ellipse(x,y,1.6,1,0,0,Math.PI*2); g.fill(); g.strokeStyle='#5a9a3a'; g.lineWidth=0.8; for(let k=-2;k<=2;k++){ g.beginPath(); g.moveTo(x,y-0.5); g.quadraticCurveTo(x+k*1.6+sw,y-5*s,x+k*2.6+sw,y-9*s); g.stroke(); }
+      g.fillStyle='#6aaa44'; for(let k=-2;k<=2;k++){ g.beginPath(); g.arc(x+k*2.6+sw,y-9*s,1.3,0,Math.PI*2); g.fill(); } }
+    else if(p.kind==='beans'){ g.strokeStyle='#7a5a34'; g.lineWidth=1.3; g.beginPath(); g.moveTo(x-3,y); g.lineTo(x+1,y-26*s); g.moveTo(x+3,y); g.lineTo(x-1,y-26*s); g.stroke();   // a pair of poles leaned together
+      for(let k=0;k<9;k++){ const t=k/9, lx=x+Math.sin(t*12+p.gx)*3.2, ly=y-3-t*22*s; g.fillStyle=k%3?'#4a8a34':'#5ea040'; g.beginPath(); g.ellipse(lx,ly,2.6,1.7,t*4,0,Math.PI*2); g.fill(); if(k%3===1){ g.strokeStyle='#8ab84a'; g.lineWidth=1; g.beginPath(); g.moveTo(lx+1,ly); g.lineTo(lx+1.6,ly+4); g.stroke(); } }
+      g.fillStyle='#e8e0f0'; g.beginPath(); g.arc(x+2,y-14*s,1,0,Math.PI*2); g.fill(); }
+    else if(p.kind==='onion'){ g.fillStyle='#d8c8a0'; g.beginPath(); g.ellipse(x,y-1,2.2,1.6,0,0,Math.PI*2); g.fill(); g.strokeStyle='#6a9a6a'; g.lineWidth=1; [-1.5,0,1.5].forEach(d2=>{ g.beginPath(); g.moveTo(x+d2*0.4,y-1.5); g.lineTo(x+d2+sw*0.6,y-10*s); g.stroke(); }); }
+    else if(p.kind==='pumpkin'){ g.strokeStyle='#4a7a2a'; g.lineWidth=1.2; g.beginPath(); g.moveTo(x-12,y+2); g.bezierCurveTo(x-6,y-3,x+4,y+4,x+12,y-1); g.stroke();
+      g.fillStyle='#5a8a34'; [[-9,0],[7,-2],[11,2]].forEach(([dx,dy])=>{ g.beginPath(); g.ellipse(x+dx,y+dy-2,4,2.6,0.3,0,Math.PI*2); g.fill(); });
+      g.fillStyle='rgba(20,12,4,0.3)'; g.beginPath(); g.ellipse(x+1,y+1,8*s,3*s,0,0,Math.PI*2); g.fill();
+      [['#c86a1c',7],['#e08a2a',5],['#f0a040',2.6]].forEach(([c,rx],k)=>{ g.fillStyle=c; g.beginPath(); g.ellipse(x-(k?1:0),y-4*s-(k?0.6:0),rx*s,(5-k*0.8)*s,0,0,Math.PI*2); g.fill(); });
+      g.strokeStyle='rgba(120,50,10,0.5)'; g.lineWidth=0.6; [-3,0,3].forEach(d2=>{ g.beginPath(); g.moveTo(x+d2*s,y-8.5*s); g.quadraticCurveTo(x+d2*1.6*s,y-4*s,x+d2*s,y+0.5); g.stroke(); });
+      g.fillStyle='#4a3a1a'; g.fillRect(x-0.8,y-10.5*s,1.6,2.5); }
+    else if(p.kind==='scarecrow'){ const fl=Math.sin(T*1.6)*1.2; g.fillStyle='rgba(20,12,4,0.3)'; g.beginPath(); g.ellipse(x+4,y+1,12,4,0,0,Math.PI*2); g.fill();
+      g.fillStyle='#5a3e24'; g.fillRect(x-1.6,y-54,3.2,54); g.fillRect(x-17,y-44,34,3);   // pole and crossbar
+      g.fillStyle='#6a4a6a'; g.beginPath(); g.moveTo(x-14,y-45); g.lineTo(x+14,y-45); g.lineTo(x+9,y-22+fl*0.5); g.lineTo(x+5,y-19); g.lineTo(x,y-23); g.lineTo(x-5,y-19+fl*0.4); g.lineTo(x-9,y-22); g.closePath(); g.fill();   // an old coat, ragged at the hem
+      g.fillStyle='#8a5a8a'; g.fillRect(x-3,y-44,6,20); g.fillStyle='#c8a050'; [[-2,-38],[1.6,-32]].forEach(([dx,dy])=>{ g.beginPath(); g.arc(x+dx,y+dy,1,0,Math.PI*2); g.fill(); });   // a patch, two buttons
+      g.strokeStyle='#d8b860'; g.lineWidth=0.9; [-1,1].forEach(sd=>{ for(let k=0;k<4;k++){ g.beginPath(); g.moveTo(x+sd*16,y-44); g.lineTo(x+sd*(19+k)+fl*0.3,y-41+k*1.6); g.stroke(); } });   // straw at the cuffs
+      g.fillStyle='#d8c49a'; g.beginPath(); g.ellipse(x,y-51,6,6.5,0,0,Math.PI*2); g.fill();   // a sack head, stitched
+      g.strokeStyle='#3a2a1a'; g.lineWidth=0.9; [-2.4,2.4].forEach(dx=>{ g.beginPath(); g.moveTo(x+dx-1.2,y-53.5); g.lineTo(x+dx+1.2,y-51.5); g.moveTo(x+dx+1.2,y-53.5); g.lineTo(x+dx-1.2,y-51.5); g.stroke(); });
+      g.beginPath(); g.moveTo(x-3,y-48); for(let k=0;k<6;k++) g.lineTo(x-3+k*1.2,y-48+(k%2?1:0)); g.stroke();
+      g.fillStyle='#8a6a34'; g.beginPath(); g.ellipse(x,y-56,11,3,0,0,Math.PI*2); g.fill(); g.fillStyle='#a8823e'; g.beginPath(); g.moveTo(x-5.5,y-56); g.quadraticCurveTo(x-4,y-64,x+1,y-63); g.quadraticCurveTo(x+5,y-63,x+5.5,y-56); g.closePath(); g.fill();   // a battered straw hat
+      g.fillStyle='#1a1a1e'; const cx=x+13, cy=y-46; g.beginPath(); g.ellipse(cx,cy,3.4,2.4,0,0,Math.PI*2); g.fill(); g.beginPath(); g.arc(cx+2.6,cy-2,1.8,0,Math.PI*2); g.fill(); g.fillStyle='#c8a050'; g.beginPath(); g.moveTo(cx+4,cy-2.2); g.lineTo(cx+6.4,cy-1.6); g.lineTo(cx+4,cy-1.2); g.fill(); g.beginPath(); g.moveTo(cx-3,cy); g.lineTo(cx-7,cy+1.6); g.lineTo(cx-3,cy+1.2); g.fillStyle='#1a1a1e'; g.fill(); } }); };   // and a crow on its arm, who is not fooled
+// a chopping block: a wide round of oak, the axe bitten into it, a split log and chips all about
+OBJ_DRAW.chopblock=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y;
+  g.fillStyle='rgba(8,5,2,0.3)'; g.beginPath(); g.ellipse(x+4,y+2,20,7,0,0,Math.PI*2); g.fill();
+  for(let k=0;k<14;k++){ const a=rnd01(k,o.i,970)*Math.PI*2, r=8+rnd01(k,o.j,971)*14; g.fillStyle=k%2?'#c8a878':'#a88858'; g.save(); g.translate(x+Math.cos(a)*r*1.4,y+Math.sin(a)*r*0.6); g.rotate(a*2); g.fillRect(-2,-0.8,4,1.6); g.restore(); }
+  g.fillStyle='#6a4a2a'; g.beginPath(); g.moveTo(x-12,y-2); g.lineTo(x-12,y-14); g.lineTo(x+12,y-14); g.lineTo(x+12,y-2); g.ellipse(x,y-2,12,4.6,0,0,Math.PI); g.closePath(); g.fill();
+  g.strokeStyle='rgba(30,18,8,0.5)'; g.lineWidth=0.7; for(let k=-2;k<=2;k++){ g.beginPath(); g.moveTo(x+k*4.6,y-13); g.lineTo(x+k*4.8,y-2+Math.abs(k)*-0.6); g.stroke(); }
+  g.fillStyle='#c8a46e'; g.beginPath(); g.ellipse(x,y-14,12,4.6,0,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(120,80,40,0.6)'; g.lineWidth=0.6; [3,6,9].forEach(r=>{ g.beginPath(); g.ellipse(x,y-14,r,r*0.38,0,0,Math.PI*2); g.stroke(); });
+  g.strokeStyle='#5a3a1e'; g.lineWidth=2.4; g.lineCap='round'; g.beginPath(); g.moveTo(x+1,y-15); g.lineTo(x+14,y-34); g.stroke();   // the haft
+  g.fillStyle='#8a8a8a'; g.beginPath(); g.moveTo(x-5,y-14); g.lineTo(x+4,y-14); g.lineTo(x+4,y-20); g.quadraticCurveTo(x-1,y-21,x-6,y-17); g.closePath(); g.fill(); g.fillStyle='#c8ccd0'; g.fillRect(x-5,y-15.2,9,1.2);
+  g.fillStyle='#9a7448'; g.beginPath(); g.ellipse(x-20,y+4,6,3,0.4,0,Math.PI*2); g.fill(); g.fillStyle='#c8a46e'; g.beginPath(); g.ellipse(x-24,y+2,3,4,0.4,0,Math.PI*2); g.fill(); };   // a split log
+// the edge of the world: an earth bank where the land drops away, a lip of long grass hanging over it, and dark beneath
+function paintEarthBank(){ const {w,h}=ROOM, Hh=38;
+  const face=(a,b,shade)=>{ const top=Math.min(a.y,b.y), gr=g.createLinearGradient(0,top,0,Math.max(a.y,b.y)+Hh+30);
+    gr.addColorStop(0,tone('#5e4630',shade)); gr.addColorStop(0.18,tone('#4a3622',shade)); gr.addColorStop(0.45,tone('#6a5238',shade-0.05)); gr.addColorStop(0.7,tone('#2e2216',shade)); gr.addColorStop(1,'rgba(10,8,6,0)');
+    g.fillStyle=gr; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(b.x,b.y+Hh+30); g.lineTo(a.x,a.y+Hh+30); g.closePath(); g.fill();
+    g.strokeStyle=tone('#7a6448',shade,0.35); g.lineWidth=1; for(let s=0;s<3;s++){ const dy=10+s*8+(s===1?2:0); g.beginPath(); for(let t=0;t<=1.0001;t+=0.02){ const x=lerpN(a.x,b.x,t), y=lerpN(a.y,b.y,t)+dy+Math.sin(t*40+s*3)*1.4; t?g.lineTo(x,y):g.moveTo(x,y); } g.stroke(); } };   // strata
+  face(P(w,0),P(w,h),0.02); face(P(0,h),P(w,h),-0.14);
+  const bits=(a,b,count,seed)=>{ for(let k=0;k<count;k++){ const t=rnd01(k,seed,980), x=lerpN(a.x,b.x,t), y=lerpN(a.y,b.y,t)+5+rnd01(k,seed+1,981)*26;
+      if(k%4===0){ g.strokeStyle='rgba(70,48,26,0.85)'; g.lineWidth=0.9+rnd01(k,2,982); g.beginPath(); g.moveTo(x,y-6); g.bezierCurveTo(x+3,y,x-2,y+5,x+1,y+11+rnd01(k,3,983)*8); g.stroke(); }   // roots hanging out of the cut
+      else { const r=1.5+rnd01(k,4,984)*3; g.fillStyle=['#6e675c','#5a544a','#7e776a'][k%3]; g.beginPath(); g.ellipse(x,y,r*1.3,r,0,0,Math.PI*2); g.fill(); g.fillStyle='rgba(255,250,235,0.18)'; g.beginPath(); g.ellipse(x-r*0.4,y-r*0.4,r*0.6,r*0.35,0,0,Math.PI*2); g.fill(); } } };
+  bits(P(w,0),P(w,h),h*9,1); bits(P(0,h),P(w,h),w*9,2);
+  const lip=(a,b,count,seed)=>{ for(let k=0;k<count;k++){ const t=(k+rnd01(k,seed,985))/count, x=lerpN(a.x,b.x,t), y=lerpN(a.y,b.y,t);   // grass hanging over the edge
+      const n=4+Math.floor(rnd01(k,seed,986)*3); for(let s=0;s<n;s++){ const L=5+rnd01(k*7+s,seed,987)*9, dx=(rnd01(s,k,988)-0.5)*7; g.strokeStyle=['#4f6e2c','#65863a','#3f5c24','#7c9c48'][(k+s)%4]; g.lineWidth=1.1; g.beginPath(); g.moveTo(x+dx*0.3,y-1); g.quadraticCurveTo(x+dx,y+L*0.3,x+dx*1.4,y+L); g.stroke(); } } };
+  lip(P(w,0),P(w,h),h*14,3); lip(P(0,h),P(w,h),w*14,4);
+  for(let k=0;k<(w+h)*16;k++){ const onR=k%2===0, t=rnd01(k,5,989), gx=onR?w-0.04-rnd01(k,6,990)*0.38:t*w, gy=onR?t*h:h-0.04-rnd01(k,6,990)*0.38, q=P(gx,gy);   // a strip of long grass along the brink
+    if(inNotch(Math.floor(gx),Math.floor(gy))) continue; const n=5+Math.floor(rnd01(k,7,991)*4), L=9+rnd01(k,8,992)*10;
+    for(let s=0;s<n;s++){ const a=(s/(n-1)-0.5)*1.1+(rnd01(s,k,993)-0.5)*0.3, LL=L*(0.7+rnd01(s,k,994)*0.5); g.strokeStyle=['#4f6e2c','#65863a','#7c9c48','#8fae55','#9a9a5a'][(k+s)%5]; g.lineWidth=1; g.beginPath(); g.moveTo(q.x,q.y); g.quadraticCurveTo(q.x+Math.sin(a)*LL*0.4,q.y-LL*0.6,q.x+Math.sin(a)*LL*0.9,q.y-LL); g.stroke(); }
+    if(rnd01(k,9,995)<0.12){ g.fillStyle=['#f2ede0','#f0d060','#c8a0e0'][k%3]; g.beginPath(); g.arc(q.x+2,q.y-L*0.9,1.6,0,Math.PI*2); g.fill(); } } }
+// the farm's ground, done over: meadow tones, clover, the long lush grass under the fences, packed earth only where feet go, and puddles by the well
+function farmGroundPixel(gx,gy,G,w,h){ const n=fbm(gx*0.7,gy*0.7,301), n2=fbm(gx*2.2,gy*2.2,302), n3=fbm(gx*8,gy*8,303), de=Math.min(gx,gy,w-gx,h-gy);
+  let c=mixC([70,104,40],[112,146,60],smooth(0.25,0.8,n)); c=mixC(c,[138,140,76],smooth(0.6,0.85,fbm(gx*0.3,gy*0.3,304))*0.5);   // meadow, with dry patches where the sun sits
+  c=mixC(c,[44,78,30],(1-smooth(0.1,1.0,de))*0.65);                                                       // lush and dark along the fences, where nothing treads
+  const clov=smooth(0.62,0.7,fbm(gx*1.1,gy*1.1,305)); if(clov>0){ const leaf=0.5+0.5*Math.sin(gx*38+Math.sin(gy*31)*2)*Math.sin(gy*36); c=mixC(c,mixC([54,96,52],[84,126,70],leaf),clov*0.75); }   // clover
+  c=mixC(c,[150,150,70],smooth(0.72,0.8,fbm(gx*1.6,gy*1.6,306))*0.35);                                     // a haze of buttercups
+  const blade=n3; c=mixC(c,blade>0.55?[118,150,64]:[52,82,30],Math.abs(blade-0.5)*0.6);
+  const yard=farmYard(gx,gy), path=G.path, dirt=mixC([112,86,56],[146,116,78],n2), dark=mixC([84,64,42],[104,80,52],n2);
+  let worn=Math.max(path,yard*smooth(0.25,0.6,yard+(n2-0.5)*0.5));
+  if(path>0 && G.d<0.16){ worn*=0.45+0.4*smooth(0.04,0.16,G.d); }                                       // a crown of grass down the middle of the track
+  c=mixC(c,mixC(dirt,dark,smooth(0.5,0.7,fbm(gx*3,gy*3,307))*0.5),worn*0.92);
+  const wet=yard*smooth(0.58,0.66,fbm(gx*1.8,gy*1.8,308)); if(wet>0) c=mixC(c,[66,52,38],wet*0.8);             // mud where the water slops over and the dog lies
+  return c; }
 // ════════ LOOT ON THE GROUND: each kind of thing is drawn as itself, lying where it fell (flowers growing where they grow), in its own colours ════════
 const LOOT_COL={};
 function lootColors(id){ if(LOOT_COL[id]) return LOOT_COL[id]; let c=['#8a7050'];

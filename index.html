@@ -15126,7 +15126,7 @@ const ITEM_STATS={ moon_amulet:{agi:2,magic:3}, robe:{hp:1,magic:1}, robe_blue:{
   hood:{hp:2}, elf_circlet:{hp:1,agi:1,magic:3}, kettle:{hp:5}, bandana:{hp:1,agi:2}, coif:{hp:3}, helm_full:{hp:8},
   hose_grey:{hp:1,agi:1}, breeches:{hp:2}, elf_leggings:{agi:2,magic:2}, elf_leggings_worn:{agi:2,magic:1} };
 Object.entries(ITEM_STATS).forEach(([id,st])=>{ GEAR_HP[id]=st.hp||0; });
-const gearSum=(k)=>{ const E=(player.opts&&player.opts.equip)||{}; return SLOTS.reduce((a,sl)=>a+((ITEM_STATS[E[sl]]||{})[k]||0),0) + (k==='agi' ? (CHOICE.brannTaught?1:0)+(CHOICE.brannTrap==='done'?1:0) : 0) + (k==='ap' ? (CHOICE.temper||0) : k==='magic' ? (CHOICE.attune||0) : 0); };   // attune: ranks from older saves; woven: Maelis's thread in a piece you wear   // plus what Brann taught you, and what you paid to be trained in
+const gearSum=(k)=>{ const E=(player.opts&&player.opts.equip)||{}; return SLOTS.reduce((a,sl)=>a+((ITEM_STATS[E[sl]]||{})[k]||0),0) + (k==='agi' ? (CHOICE.brannTaught?1:0)+(CHOICE.brannTrap==='done'?1:0) : 0) + (k==='ap' ? (CHOICE.temper||0)+((CHOICE.tithe&&CHOICE.tithe.ap)||0) : k==='magic' ? (CHOICE.attune||0)+((CHOICE.tithe&&CHOICE.tithe.sp)||0) : 0); };   // tithe: what you sold the Hollow Choir   // attune: ranks from older saves; woven: Maelis's thread in a piece you wear   // plus what Brann taught you, and what you paid to be trained in
 const AGI_DODGE=0.04, DODGE_CAP=0.3;                      // each point of agility: 4% to dodge a blow outright, never more than 30%
 const dodgeChance=a=>Math.min(DODGE_CAP,a*AGI_DODGE);
 // magic damage from gear adds to every spell
@@ -22827,6 +22827,216 @@ BEASTS.push({ k:'troll', is:f=>f.type==='troll', name:'Cave Trolls', kind:'Under
   how:'A slow overhead slam, then a sweep and a quick backhand right behind it. Then the slam again.', res:'It guards one side with that great arm. Strike the other.', aff:'Every blow it lands is a heavy one.', ans:'Never stop hitting it: give it a breath and its wounds close. Fire stops the mending.' });
 // it wakes when the Quiet lifts, and comes back every day
 { const A=AREAS.varrowmine, _m=A.mobs; A.mobs=()=>{ if(!CHOICE.vqQuiet) return _m(); return [ { name:'Cave Troll', type:'troll', i:9, j:10, faction:'mtroll', daily:true, hpMul:2.2, opts:TROLL() } ]; }; }
+// ════════ THE HOLLOW CHOIR: a hidden tale. At midnight, for a few breaths, a succubus sits in the Dunhollow graveyard ════════
+//   CHOICE.succ : null → 'told' (she told you of the feast; CHOICE.succNight is the night it happens) → 'watched' | 'joined' | 'fought' | 'missed'
+//   CHOICE.succFled : the night she last fled you (she will not come back the same night)      CHOICE.tithe : {hp, ap, sp} what you sold of your blood
+SKINS[40]='#c98290'; SKINS[41]='#a68cbc'; SKINS[42]='#9a5866';                 // dusk-rose, ash-lilac, wine: the daughters of the Choir (never offered in the creator)
+Object.assign(ITEMS,{
+  succ_bodice:{ name:'Nightsilk Bodice', slot:'torso', base:'elf_bustier', col:'#5a0f22', elfc:{bust:'#5a0f22'} },
+  succ_stockings:{ name:'Nightsilk Stockings', slot:'legs', base:'elf_leggings', col:'#2a0c16', elfc:{leg:'#2a0c16'} } });
+const SUCC=o=>({gender:'f',skin:40,hair:3,hairColor:0,face:2,succ:{horn:'#2a1a1e',wing:'#4a1424'},equip:{head:null,torso:'succ_bodice',armor:null,hands:null,legs:null,feet:null,weapon:null,offhand:null},...o});
+const THRALL=(g2,sk,hc)=>({gender:g2,skin:sk,hair:1,hairColor:hc,beard:0,face:1,equip:{head:'hood',torso:'shirt',armor:'robe_black',hands:null,legs:'trousers_black',feet:null,weapon:null,offhand:null}});
+// horns, wings and a tail, drawn round the ordinary figure: the wings and tail behind her when she faces you, in front when she turns away
+function succExtras(x,y,dir,layer,S){ const V=VIEW[dirView(dir)], away=V.ang>100, prof=V.prof, fl=dirMirrored(dir), back=fl?1:-1, T=gt, flap=Math.sin(T*1.7)*0.12;
+  const wings=()=>{ const spread=1-prof*0.55, bx=back*prof*7; [-1,1].forEach(sd=>{ if(prof>0.8 && sd===-back) return;   // side-on: only the near wing shows past her shoulder
+      const s=sd*spread, root=[x+bx+sd*3,y-64], wrist=[root[0]+s*24,y-96-flap*24], tip=[root[0]+s*48,y-78-flap*18];
+      g.fillStyle=tone(S.wing,away?0.08:-0.05,0.92); g.beginPath(); g.moveTo(root[0],root[1]); g.lineTo(wrist[0],wrist[1]); g.lineTo(tip[0],tip[1]);
+      [[0.85,-14],[0.62,-6],[0.36,-2]].forEach(([k,dy],n)=>{ const fx=root[0]+s*48*k, fy=y-54+dy*1.3-flap*9; g.quadraticCurveTo(fx+s*6,fy-8+n*2,fx,fy); });
+      g.quadraticCurveTo(root[0]+s*7,y-50,root[0],y-54); g.closePath(); g.fill();
+      g.strokeStyle=tone(S.wing,-0.45); g.lineWidth=1.6; g.lineCap='round'; g.beginPath(); g.moveTo(root[0],root[1]); g.lineTo(wrist[0],wrist[1]); g.lineTo(tip[0],tip[1]); g.stroke();
+      g.lineWidth=0.9; [[0.85,-14],[0.62,-6],[0.36,-2]].forEach(([k,dy])=>{ g.beginPath(); g.moveTo(wrist[0],wrist[1]); g.lineTo(root[0]+s*48*k,y-54+dy*1.3-flap*9); g.stroke(); });
+      g.fillStyle='#e8dcc8'; g.beginPath(); g.moveTo(wrist[0],wrist[1]); g.lineTo(wrist[0]+s*2,wrist[1]-5); g.lineTo(wrist[0]+s*3,wrist[1]+1); g.closePath(); g.fill(); }); };   // a little claw at the wing's wrist
+  const tail=()=>{ const sw=Math.sin(T*1.3)*5, tb=[x+back*prof*5,y-47], e=[x-back*(12+prof*9)+sw,y-6];
+    g.strokeStyle=S.tail||'#3a1018'; g.lineWidth=2.2; g.lineCap='round'; g.beginPath(); g.moveTo(tb[0],tb[1]); g.bezierCurveTo(tb[0]-back*14,tb[1]+10,e[0]+back*16,e[1]-14,e[0],e[1]); g.stroke();
+    g.fillStyle=S.tail||'#3a1018'; g.beginPath(); g.moveTo(e[0],e[1]-1); g.lineTo(e[0]-4,e[1]+3); g.lineTo(e[0],e[1]+7); g.lineTo(e[0]+4,e[1]+3); g.closePath(); g.fill(); };   // the spade at its tip
+  const horns=()=>{ const hy=y-84, hx=x+(fl?-1:1)*prof*1.5; g.strokeStyle=S.horn; g.lineCap='round';
+    [-1,1].forEach(sd=>{ if(prof>0.8 && sd===back) return; const bx2=hx+sd*(5.4-prof*3.6)+(prof>0.8?-back*1:0), c=prof>0.8?-back:sd;
+      g.lineWidth=2.6; g.beginPath(); g.moveTo(bx2,hy); g.quadraticCurveTo(bx2+c*5,hy-7,bx2+c*9,hy-5); g.stroke();
+      g.lineWidth=1.6; g.beginPath(); g.moveTo(bx2+c*9,hy-5); g.quadraticCurveTo(bx2+c*12,hy-3,bx2+c*11,hy+1); g.stroke();
+      g.strokeStyle='rgba(255,230,220,0.25)'; g.lineWidth=0.6; g.beginPath(); g.moveTo(bx2+c*1,hy-1.5); g.quadraticCurveTo(bx2+c*5,hy-7.5,bx2+c*8.5,hy-6); g.stroke(); g.strokeStyle=S.horn; }); };
+  if(layer==='back'){ if(!away){ wings(); tail(); } }
+  else { if(away){ tail(); wings(); } horns(); if(!away){ g.save(); g.globalCompositeOperation='lighter'; [-1,1].forEach(sd=>{ if(prof>0.8 && sd===back) return; glow(x+sd*3.2*(1-prof)+(fl?-1:1)*prof*3.4,y-77,4,3,'255,90,140',0.45); }); g.restore(); } } }   // and her eyes, catching the light
+{ const _d=drawNPC; drawNPC=function(n){ const S=n.opts&&n.opts.succ; if(!S || n.bathe) return _d(n);
+    const q=P(n.x??n.i+0.5,n.y??n.j+0.5), y=q.y-(n.moving?Math.abs(Math.sin(gt*9+n.i))*2:0), a=g.globalAlpha; g.globalAlpha=a*(n.alpha??1);
+    if(!n.sit){ g.save(); g.globalCompositeOperation='lighter'; glow(q.x,y-55,34,60,'200,60,110',0.12+Math.sin(gt*1.4)*0.04); g.restore(); succExtras(q.x,y,n.dir||0,'back',S); }
+    const r=_d(n); if(!n.sit) succExtras(q.x,y,n.dir||0,'front',S); g.globalAlpha=a; return r; }; }
+{ const _f=drawActorFigure; drawActorFigure=function(e){ const S=e!==player && !e.dead && e.opts && e.opts.succ; if(!S) return _f(e); const q=P(e.x+(e.ox||0),e.y+(e.oy||0)), y=q.y+(e.moving?-Math.abs(Math.sin(gt*10))*2.5:0);
+    succExtras(q.x,y,e.dir||0,'back',S); const r=_f(e); succExtras(q.x,y,e.dir||0,'front',S); return r; }; }
+// ── when: a night runs from one noon to the next; she comes at midnight, for a little more than half a minute
+const SUCC_NIGHT=()=>Math.floor(dayClock/DAY_LEN);
+const SUCC_HOUR=()=>{ const t=((dayClock%DAY_LEN)+DAY_LEN)%DAY_LEN/DAY_LEN; return Math.abs(t-0.5)<0.036; };
+const SUCC_DAYLBL=n=>n;                                                       // the night of Day n (the clock's day before midnight)
+const succNpc=()=>NPCS.find(n=>n.id==='vesper');
+let SUCC_RUN=0, SUCC_STILL=0, SUCC_LP=null;
+function succGraveTick(dt){ const n=succNpc();
+  if(!n){ if(!SUCC_HOUR() || CHOICE.succ || CHOICE.succFled===SUCC_NIGHT() || combat.active) return;
+    NPCS.push({ id:'vesper', name:CHOICE.succName?'Vesperine':'A Pale Woman', i:7, j:3, x:7.5, y:3.5, dir:0, alpha:0, opts:SUCC({}) });
+    try{ SND.fx('whoosh',0.4); }catch(e){} logMsg('The air in the graveyard turns warm, and smells of roses.','#e0a0c0'); SUCC_RUN=0; SUCC_STILL=0; SUCC_LP=[player.x,player.y]; return; }
+  if(n._going) return; n.alpha=Math.min(1,(n.alpha??0)+dt*0.7); n.dir=dirFromDelta(player.x-n.x,player.y-n.y);
+  if(!SUCC_HOUR() && !dlgIsOpen()){ n.bark={text:'Another night, perhaps.',t:0}; n._going=1; fadeOff(n,{slow:2.5}); return; }
+  const d=Math.hypot(player.x-n.x,player.y-n.y), mv=SUCC_LP?Math.hypot(player.x-SUCC_LP[0],player.y-SUCC_LP[1]):0; SUCC_LP=[player.x,player.y];
+  if(mv>0.0004){ SUCC_RUN+=dt; SUCC_STILL=0; } else { SUCC_STILL+=dt; if(SUCC_STILL>0.3) SUCC_RUN=0; }       // a step, then stillness: the count starts over
+  if(d<7.5 && !n._warned){ n._warned=1; n.bark={text:'Slowly, little mortal. One step… and then another.',t:0}; }
+  if(d<6.5 && d>1.3 && SUCC_RUN>0.62){ n._going=1; player.path=[]; n.bark={text:'Ah. Too eager.',t:0}; CHOICE.succFled=SUCC_NIGHT();
+    logMsg('She is gone the moment you hurry. The roses linger a while. Another midnight, perhaps, and slower.','#e0a0c0'); fadeOff(n,{slow:1.4}); } }
+const succBye={label:'Back away.', fn:()=>{ closeDialog(); const n=succNpc(); if(n && !n._going){ n._going=1; n.bark={text:'Do come again.',t:0}; fadeOff(n,{slow:2}); } }};
+function succTalk(){ const n=succNpc(); if(!n || n._going) return; const d=Math.hypot(player.x-n.x,player.y-n.y);
+  if(d>1.7){ say(n.name,["She watches you from beside the headstone, head tilted, and does not answer from so far away."],[{label:'…', fn:closeDialog}]); return; }
+  const open=["She leans against a tall old headstone as if it belonged to her, one bare leg crossed over the other, a foot swinging idly in the dark.",
+    "Skin the colour of roses at dusk. Two horns curl back through hair as black as the bottom of a well, and behind her, folded like a cloak, a pair of leathery wings stirs in a wind you cannot feel.",
+    "“Look at you. You came so slowly.” Her voice is low and amused, and very close, though she has not moved. “Most of them run at me, you know. Mouths open, hearts in their hands. I don't like being run at.”"];
+  const tell=()=>{ CHOICE.succName=true; n.name='Vesperine';
+    say('Vesperine',["“Because in three nights my sisters and I will feast, and a feast wants witnesses.”",
+      "She leans in. She smells of roses, and under the roses something like a butcher's floor after a long day.",
+      "“Behind this graveyard, where the third yew weeps into the ground, there is a stair the living do not see. On the third night it will be there for you. Come down it after dark.”",
+      "“Watch, if you are frightened. Kneel, if you are not. We pay well for a willing throat, mortal: a little of your life, for a great deal of something better.”"],[
+      {label:'“I will be there.”', fn:()=>succTold("She laughs, delighted, and kisses you on the cheek. Her lips are hot as a fever. When you open your eyes the tomb is empty, and your cheek still burns.")},
+      {label:'“Stay away from me, demon.”', fn:()=>succTold("“You'll come,” she says, quite kindly. “They always come.” Then she is simply not there, and the tomb is cold.")}]); };
+  say(n.name,open,[
+    {label:'“What are you?”', fn:()=>say(n.name,["“Hungry.” She laughs, and her teeth are very white.","“A daughter of the Hollow Choir. We eat what you would call souls. Not all of it, usually. Just the sweet part, near the top.”"],[{label:'“Why show yourself to me?”', fn:tell}, succBye])},
+    {label:'“Who are you?”', fn:()=>{ CHOICE.succName=true; n.name='Vesperine'; say('Vesperine',["“Vesperine.” She says it like a taste she likes. “And you are a little brave, and a little stupid, and that is my favourite kind of mortal.”"],[{label:'“Why show yourself to me?”', fn:tell}, succBye]); }},
+    {label:'“Why show yourself to me?”', fn:tell}, succBye]); }
+function succTold(msg){ const night=SUCC_NIGHT()+3; CHOICE.succNight=night;
+  remember('succ','told',"Vesperine, a daughter of the Hollow Choir, spoke of a feast in three nights: the night of Day "+SUCC_DAYLBL(night)+". A hidden stair behind the graveyard, by the third yew. After dark.");
+  say('Vesperine',[msg],[{label:'…', fn:()=>{ closeDialog(); const n=succNpc(); if(n){ n._going=1; fadeOff(n,{slow:0.7}); } }}]); }
+TALKERS.vesper=succTalk;
+// ── the stair behind the graveyard: there from the night of the feast
+wrap('graveyard','objects',l=> CHOICE.succ && CHOICE.succNight!=null && SUCC_NIGHT()>=CHOICE.succNight ? [...l,{type:'teleporter', i:9, j:2, to:'hollowrite', entry:'fromGraves'}] : l);
+AREAS.graveyard.entries.fromRite={i:8,j:3};
+// ── the Weeping Hollow: a bowl of black earth under the yews, where the Choir feeds
+const RITE_NIGHT=()=>CHOICE.succ==='told' && SUCC_NIGHT()===CHOICE.succNight;
+const RITE_DONE=()=>['watched','joined','fought'].includes(CHOICE.succ);
+const RITE={fx:[], husks:[]};
+AREAS.hollowrite={ fence:{r:false,l:false}, w:11, h:10, theme:'wood', dens:0.12, label:'The Weeping Hollow', mini:{x:0,y:0}, notches:()=>[], dummy:null,
+  objects:()=>{ const l=[ {type:'teleporter', i:0, j:8, to:'graveyard', entry:'fromRite'},
+      {type:'menhir', i:2, j:2, v:1}, {type:'menhir', i:8, j:1, v:2}, {type:'menhir', i:9, j:6, v:0}, {type:'menhir', i:2, j:7, v:2}, {type:'menhir', i:5, j:8, v:1},
+      {type:'deadtree', i:0, j:3, s:1.2}, {type:'deadtree', i:10, j:3, s:1.1}, {type:'deadtree', i:7, j:9, s:1.0}, {type:'boulder', i:10, j:8}, {type:'rocks', i:1, j:5, noblock:true}, {type:'bones', i:9, j:4, noblock:true},
+      {type:'rune', i:1, j:1, text:"Old bones, gnawed white, half sunk in the black earth. Some of them have been here a very long time. One of the skulls still wears a ring."} ];
+    if(RITE_NIGHT() || RITE_DONE()) l.push({type:'ritecircle', i:4, j:3, fp:[3,3], noblock:true, dz:-99, spent:RITE_DONE()}, {type:'deadgoat', i:5, j:4, noblock:true});
+    else l.push({type:'rune', i:5, j:4, text:"The earth in the middle of the hollow has been raked smooth, in a circle. Nothing else. Not yet."});
+    if(RITE_DONE() && CHOICE.succ!=='fought') [[4,6],[6,6],[7,3]].forEach(([i,j])=>l.push({type:'bones', i, j, noblock:true}));
+    return l; },
+  npcs:()=>[], mobs:()=>[], entries:{ fromGraves:{i:1,j:8} } };
+AREA_TIER.hollowrite=3; AREA_PATHS.hollowrite=[ [[-0.5,8.5],[2,8],[4,6]] ];
+// the circle: painted in the goat's blood, ringed with candles that are not wax; after the feast, burnt down and dried brown
+OBJ_DRAW.ritecircle=o=>{ const C=P(o.i+1.5,o.j+1.5), R=TW*1.25, sp=o.spent, T=gt;
+  const ell=(r,col,lw)=>{ g.strokeStyle=col; g.lineWidth=lw; g.beginPath(); g.ellipse(C.x,C.y,r,r*0.5,0,0,Math.PI*2); g.stroke(); };
+  if(!sp){ const gl=g.createRadialGradient(C.x,C.y,4,C.x,C.y,R*1.3); gl.addColorStop(0,`rgba(200,30,40,${0.3+Math.sin(T*2.1)*0.06})`); gl.addColorStop(1,'rgba(120,0,20,0)'); g.fillStyle=gl; g.beginPath(); g.ellipse(C.x,C.y,R*1.3,R*0.65,0,0,Math.PI*2); g.fill(); }
+  const B=sp?'rgba(70,24,18,0.75)':'rgba(140,10,18,0.92)'; ell(R,B,3); ell(R*0.86,B,1.5);
+  for(let k=0;k<7;k++){ const a=k/7*Math.PI*2-Math.PI/2, b=((k+3)%7)/7*Math.PI*2-Math.PI/2; g.strokeStyle=B; g.lineWidth=1.6; g.beginPath(); g.moveTo(C.x+Math.cos(a)*R*0.86,C.y+Math.sin(a)*R*0.43); g.lineTo(C.x+Math.cos(b)*R*0.86,C.y+Math.sin(b)*R*0.43); g.stroke(); }   // a seven-pointed star
+  for(let k=0;k<14;k++){ const a=k/14*Math.PI*2+0.2, px=C.x+Math.cos(a)*R*0.93, py=C.y+Math.sin(a)*R*0.465; g.save(); g.translate(px,py); g.rotate(a); g.strokeStyle=B; g.lineWidth=1; g.beginPath(); g.moveTo(-3,-2); g.lineTo(0,2); g.lineTo(3,-2); g.moveTo(0,2); g.lineTo(0,-3); g.stroke(); g.restore(); }   // and the Choir's marks between the rings
+  for(let k=0;k<5;k++){ const r=rnd01(k,3,951), a=rnd01(k,4,952)*Math.PI*2; g.fillStyle=B; g.beginPath(); g.ellipse(C.x+Math.cos(a)*R*r*0.6,C.y+Math.sin(a)*R*r*0.3,4+r*6,2+r*3,a,0,Math.PI*2); g.fill(); }   // spatters
+  for(let k=0;k<11;k++){ const a=k/11*Math.PI*2, px=C.x+Math.cos(a)*R*1.08, py=C.y+Math.sin(a)*R*0.54, h=sp?3:8+rnd01(k,1,953)*6;   // the candles, black and lumpy
+    g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(px+2,py+1,4,1.6,0,0,Math.PI*2); g.fill(); g.fillStyle=sp?'#3a3430':'#2a2420'; g.fillRect(px-2,py-h,4,h); g.fillStyle=sp?'#4a443e':'#4a3a34'; g.beginPath(); g.ellipse(px,py-h,2,0.9,0,0,Math.PI*2); g.fill();
+    g.fillStyle='rgba(60,50,44,0.8)'; g.beginPath(); g.moveTo(px-2,py-h+1); g.quadraticCurveTo(px-3.4,py-h*0.5,px-2.2,py-0.5); g.lineTo(px-2,py-h*0.4); g.closePath(); g.fill();   // a drip of it down the side
+    if(!sp){ const fl=Math.sin(T*9+k*1.7)*0.8; g.fillStyle='#ffcf70'; g.beginPath(); g.moveTo(px-1.3,py-h-1); g.quadraticCurveTo(px+fl,py-h-7,px+1.3,py-h-1); g.closePath(); g.fill();
+      g.save(); g.globalCompositeOperation='lighter'; glow(px,py-h-3,9,9,'255,120,60',0.35); g.restore(); } }
+  // soul-light drawn up out of the dying and into the Choir
+  for(let q=RITE.fx.length-1;q>=0;q--){ const f=RITE.fx[q]; f.t+=1/60; const k=Math.min(1,f.t/f.d), A=P(f.a.x,f.a.y), Bq=P(f.b.x,f.b.y);
+    g.save(); g.globalCompositeOperation='lighter'; for(let s=0;s<14;s++){ const u=Math.max(0,Math.min(1,k*1.4-s*0.035)), px=A.x+(Bq.x-A.x)*u+Math.sin(u*9+s)*5, py=A.y-46+(Bq.y-A.y)*u-Math.sin(u*Math.PI)*36;
+      glow(px,py,8-s*0.3,8-s*0.3,'210,230,255',0.5*(1-s/14)); } g.restore(); if(f.t>f.d+0.6) RITE.fx.splice(q,1); } };
+// a black goat on its side in the circle, its throat opened; quadDraw's goat, laid down and turned over
+OBJ_DRAW.deadgoat=o=>{ const q=P(o.i+0.5,o.j+0.5), sp=AREAS.hollowrite && RITE_DONE();
+  g.fillStyle=sp?'rgba(60,20,16,0.7)':'rgba(120,8,14,0.85)'; g.beginPath(); g.ellipse(q.x+16,q.y+2,26,9,0.1,0,Math.PI*2); g.fill();   // the pool under its throat
+  g.fillStyle=sp?'rgba(60,20,16,0.5)':'rgba(150,12,18,0.7)'; g.beginPath(); g.ellipse(q.x+30,q.y+5,10,4,0.2,0,Math.PI*2); g.fill();
+  g.save(); g.translate(q.x-10,q.y-2); g.scale(1.75,0.85); g.rotate(-Math.PI/2+0.08); g.translate(0,0);
+  quadDraw(0,0,'goat',{col:{coat:'#d8d0c0',belly:'#c8bca8',legs:'#a89c88'},dir:2,mv:0,blink:true}); g.restore();
+  g.strokeStyle='#5a0a10'; g.lineWidth=2.4; g.lineCap='round'; g.beginPath(); g.moveTo(q.x+10,q.y-5); g.quadraticCurveTo(q.x+14,q.y-2,q.x+13,q.y+2); g.stroke(); };   // the cut
+// light that the night cannot swallow: the feast's candles and the circle's red glow, and the rose-glow round a daughter of the Choir
+{ const _n=drawNight; drawNight=function(){ _n.apply(this,arguments); const n=nightAmt(); if(n<0.1) return; g.save(); g.globalCompositeOperation='lighter';
+    if(areaId==='hollowrite' && RITE_NIGHT()){ const C=P(5.5,4.5), fl=0.92+Math.sin(gt*6.3)*0.05+Math.sin(gt*11.7)*0.03; glow(C.x,C.y,230*fl,120*fl,'255,70,40',0.32*n); glow(C.x,C.y-10,120*fl,64*fl,'255,150,80',0.22*n);
+      for(let k=0;k<11;k++){ const a=k/11*Math.PI*2, R=TW*1.25*1.08, px=C.x+Math.cos(a)*R, py=C.y+Math.sin(a)*R*0.5; glow(px,py-12,16,12,'255,170,90',0.35*n); } }
+    NPCS.forEach(m=>{ if(!m.opts || !m.opts.succ) return; const q=P(m.x??m.i+0.5,m.y??m.j+0.5); glow(q.x,q.y-50,40,62,'230,90,150',0.22*n*(m.alpha??1)*(m._alpha??1)); });
+    g.restore(); }; }
+// ── the cutscene caption: a line of narration under the picture
+function csNarr(text,d){ d=d||Math.max(3.4,text.length/17); return { dur:d, start:()=>{ let el=document.getElementById('cs-cap'); if(!el){ el=document.createElement('div'); el.id='cs-cap';
+      el.style.cssText='position:fixed;left:50%;bottom:12vh;transform:translateX(-50%);max-width:min(760px,90vw);padding:12px 20px;background:rgba(8,4,6,0.72);border:1px solid rgba(160,60,80,0.4);border-radius:6px;color:#f0e2d8;font:italic 17px/1.5 Georgia,serif;text-align:center;z-index:41;pointer-events:none;opacity:0;transition:opacity .35s;';
+      document.body.appendChild(el); } el.textContent=text; el.style.opacity='1'; }, end:()=>{ const el=document.getElementById('cs-cap'); if(el) el.style.opacity='0'; }, skip:()=>{ const el=document.getElementById('cs-cap'); if(el) el.style.opacity='0'; } }; }
+// ── the feast itself
+function riteCast(){ const V={ id:'vesper', name:'Vesperine', i:5, j:2, dir:0, opts:SUCC({}) }, A={ id:'ashmira', name:'Ashmira', i:8, j:4, dir:6, opts:SUCC({skin:41,hairColor:13,succ:{horn:'#e8dcc8',wing:'#3a2a4a'}}) }, N={ id:'neveth', name:'Neveth', i:3, j:4, dir:2, opts:SUCC({skin:42,hairColor:7,succ:{horn:'#1a1214',wing:'#2a0e14'}}) };
+  const t1={ id:'thrallA', name:'Hooded Man', i:4, j:6, dir:7, sit:'knees', opts:THRALL('m',2,3) }, t2={ id:'thrallB', name:'Hooded Woman', i:6, j:6, dir:0, sit:'knees', opts:THRALL('f',1,4) }, t3={ id:'thrallC', name:'Hooded Youth', i:7, j:3, dir:5, sit:'knees', opts:THRALL('m',4,1) };
+  [V,A,N,t1,t2,t3].forEach(n=>{ n.x=n.i+0.5; n.y=n.j+0.5; n.path=[]; }); return {V,A,N,t1,t2,t3}; }
+function riteDrain(sis,thrall){ return [ csDo(()=>{ RITE.fx.push({a:{x:thrall.x,y:thrall.y},b:{x:sis.x,y:sis.y},t:0,d:2.2}); try{ SND.fx('whoosh',0.6); }catch(e){} }), csWait(0.1) ]; }
+function riteHusk(thrall){ return csDo(()=>{ thrall.opts={...thrall.opts, skin:30}; thrall.name='What is left'; setTimeout(()=>fadeOff(thrall,{sink:true,slow:0.6}),900); }); }
+function riteStart(){ if(CS.on || CHOICE.riteSeen===SUCC_NIGHT()) return; CHOICE.riteSeen=SUCC_NIGHT(); const c=riteCast(), {V,A,N,t1,t2,t3}=c, mid={x:5.5,y:4.5};
+  NPCS.push(V,A,N,t1,t2,t3); player.x=1.5; player.y=8.5; player.i=1; player.j=8; player.path=[]; player.dir=dirFromDelta(mid.x-1.5,mid.y-8.5);
+  const hide={x:2.5,y:7.5};
+  cutscene([ csFocus(mid,0.6),
+    csNarr("The stair goes down further than the hill is deep. At the bottom the earth opens into a bowl of black soil under the yews, and you crouch behind a fallen standing stone, and look."),
+    csNarr("Candles, a dozen of them, black and lumpy, burning with a smell like singed hair. A circle painted on the ground in blood that is still wet. And in the middle of it a white goat, laid on its side, its throat opened from ear to ear, its fleece gone red to the shoulders."),
+    csNarr("Three people kneel at the edge of the circle in black robes, hoods up, swaying. Living men and women. Their wrists are already cut, and they do not seem to mind."),
+    csSay(V,"Sisters. The table is laid.",2.6), csSay(A,"And such sweet guests.",2.4), csPar([csWalk(V,5,3,1.1),csWalk(A,6,4,1.1),csWalk(N,4,4,1.1)]), csLook([V,A,N],{x:5.5,y:4.5}),
+    csNarr("The daughters of the Hollow Choir step into the circle. They kneel by the goat and dip their hands into its opened throat, and paint each other with it, slowly, lovingly: lips, throats, breasts, bellies, until their dusk-coloured skin shines red in the candlelight."),
+    csSay(N,"Sing for us, little ones.",2.4),
+    csNarr("The kneeling three begin to moan, low and wordless. The sound rises and rises until it is not quite a song and not quite a prayer, and not quite anything you would want to hear through a wall."),
+    csWalk(V,4,5,1.2), csLook(V,t1), csLook(t1,V),
+    csNarr("Vesperine goes to the first of them and takes his face in her bloody hands, almost tenderly. She kisses him. He shudders against her and clutches at her bare back with both hands, as if he could climb inside her and live there."),
+    ...riteDrain(V,t1),
+    csNarr("Something pale is drawn up out of his open mouth into hers, like breath on a winter morning. She drinks it. She drinks it, and drinks it, and does not stop."),
+    riteHusk(t1), csWait(0.6),
+    csNarr("When she lets him go there is nothing left in the robe but a grey, smiling husk. It folds down onto the earth like an empty sack."),
+    csWalk(A,7,4,1.2), csWalk(N,6,5,1.2), csLook(A,t3), csLook(N,t2), csLook(t3,A), csLook(t2,N),
+    csNarr("Her sisters take the other two together. The woman weeps the whole time, and laughs, and weeps, and thanks them, and thanks them, until she has nothing left to thank them with."),
+    ...riteDrain(A,t3), ...riteDrain(N,t2), csWait(1.6), riteHusk(t3), riteHusk(t2), csWait(1.0),
+    csSay(V,"Mm. Full.",1.8), csSay(A,"Almost.",1.6),
+    csLook([V,A,N],hide), csWait(0.6),
+    csSay(V,"You can come out now, little mortal. I can hear your heart from here.",3.2),
+  ], riteChoice); }
+function riteSisters(){ return ['vesper','ashmira','neveth'].map(id=>NPCS.find(n=>n.id===id)).filter(Boolean); }
+function riteChoice(){ say('The Weeping Hollow',["The three sisters turn toward your hiding place, smiling with red mouths. Around them the candles gutter. The goat's blood has run all the way to the edge of the circle, and stopped there, as if it were waiting for something."],[
+    {label:'Step out and walk into the circle. (Join them)', fn:riteJoin},
+    {label:'Stay where you are. Hold your breath.', fn:()=>{ remember('succ','watched',"You watched the Hollow Choir feed, and stayed hidden. They let you."); riteSisters().forEach(n=>fadeOff(n,{slow:0.8}));
+      say('The Weeping Hollow',["For a long moment nobody moves. Then Vesperine laughs. “Shy. I like shy.”","When you dare to look again the hollow is empty, but for the goat, and the candles burning down, and three grey shapes on the ground that used to be people."],[bye]); }},
+    {label:'Draw your weapon. This ends tonight. (Fight)', fn:riteFight} ]); }
+function riteJoin(){ closeDialog(); const [V]=riteSisters(); if(!V) return;
+  cutscene([ csWalk(player,5,5,1.0), csLook(player,V), csLook(riteSisters(),player),
+    csNarr("You step over the line of blood. It is warm, even through your boots."), csSay(V,"Kneel.",1.8),
+    csNarr("You kneel in the goat's blood. Hands find you: your face, your hair, the back of your neck, the inside of your wrist. Their skin is feverish. Somebody's lips brush your ear and say your name, though you never told it to anyone here."),
+    csSay(V,"We do not take from the willing. We trade.",2.8) ], ()=>riteTithe()); }
+function riteTithe(){ const opt=(label,hp,ap,sp)=>({label, fn:()=>riteBleed(hp,ap,sp)});
+  say('Vesperine',["“A little of your blood, for good. It will not grow back. In return the Choir will put something in the space it leaves.”","She draws one black nail along the inside of your wrist without cutting it yet, and waits."],[
+    opt('“Take a little. Make me strong.” (−10 max health for good, +2 Attack Power)',10,2,0),
+    opt('“Take a little. Make me see.” (−10 max health for good, +2 Spell Power)',10,0,2),
+    opt('“Take more. Strength.” (−20 max health for good, +5 Attack Power)',20,5,0),
+    opt('“Take more. Sorcery.” (−20 max health for good, +5 Spell Power)',20,0,5),
+    {label:'“No. I only wanted to see.”', fn:()=>{ remember('succ','joined',"You knelt in the Hollow Choir's circle, and kept your blood."); riteSisters().forEach(n=>fadeOff(n,{slow:0.8}));
+      say('Vesperine',["She shrugs, and licks the goat's blood from her thumb. “Then you have seen. That is gift enough. Go home, mortal, before we get hungry again.”","When you look up, they are gone."],[bye]); }} ]); }
+function riteBleed(hp,ap,sp){ closeDialog(); const [V]=riteSisters();
+  cutscene([ csNarr("Vesperine opens your wrist with one stroke of her nail. Your blood runs down your fingers and into the goat's, and every candle in the hollow flares up red."),
+    csDo(()=>{ RITE.fx.push({a:{x:player.x,y:player.y},b:{x:V?V.x:5.5,y:V?V.y:2.5},t:0,d:2.4}); try{ SND.fx('whoosh',0.7); }catch(e){} floatText([player.i,player.j],'−'+hp+' max health','#d04050',true); }), csWait(1.2),
+    csNarr("It does not hurt. That is the worst of it: it does not hurt at all. Something leaves you that you will never have back, and something else comes in to fill the place it leaves, cold, and eager, and pleased with itself."),
+    csSay(V,"Sweet. Come and find me at midnight some time, and we will see what else you are willing to sell.",3.4) ], ()=>{
+      const T=CHOICE.tithe||{hp:0,ap:0,sp:0}; CHOICE.tithe={hp:T.hp+hp, ap:T.ap+ap, sp:T.sp+sp}; refreshPlayerHp(false); try{ updateHud(); refreshEffects(); }catch(e){}
+      banner('Blood Tithe','#d04050',2400); remember('succ','joined',"You knelt in the Hollow Choir's circle and sold them your blood: "+hp+" health, for good, for "+(ap?'+'+ap+' Attack Power':'+'+sp+' Spell Power')+".");
+      riteSisters().forEach(n=>fadeOff(n,{slow:0.8})); }); }
+// ── or fight them: Vesperine and her sisters, fed and strong
+FOES.succubus={ label:'Succubus', base:62, stagger:1.0, pattern:[{wait:1.2,wind:0.95,after:0.55,dir:'left'},{wait:0.35,wind:0.7,after:0.7,dir:'right'},{wait:1.4,wind:1.25,after:0.9,dir:'up'}] };
+Object.assign(WEAPONS,{ succ_claw:{ wind:0.25, dmg:12, len:18 } }); BLEEDERS.add('succ_claw');
+WEAPON_ART.succ_claw=(c,hx,hy,ang,id,s=1)=>{ c.save(); c.translate(hx,hy); c.rotate(ang); c.scale(s,s); c.fillStyle='#1a0a0e'; for(let k=-1;k<=1;k++){ c.beginPath(); c.moveTo(k*1.6-0.8,0); c.quadraticCurveTo(k*2.2,-5,k*2.6+1.2,-7.5); c.lineTo(k*1.6+0.8,0); c.closePath(); c.fill(); } c.restore(); };   // no blade: long black nails
+function riteFight(){ closeDialog(); const sis=riteSisters(); FIGHT_UNDO=()=>{ CHOICE.succ='told'; }; CHOICE.succ='fighting';
+  const arm=o=>({...o, equip:{...o.equip, weapon:'succ_claw'}});
+  MOB_SPAWNS.length=0; sis.forEach((n,k)=>MOB_SPAWNS.push({ name:n.name, type:'succubus', i:n.i, j:n.j, faction:'choir', hpMul:k===0?1.9:1.4, opts:arm(n.opts) }));
+  NPCS.splice(0,NPCS.length,...NPCS.filter(n=>!['vesper','ashmira','neveth'].includes(n.id))); resetMobs(); mobs.forEach(m=>{ m.hostile=true; FOOLED[areaId+':'+m.name]=false; }); startCombat(); }
+const RITE_WON=()=>['Vesperine','Ashmira','Neveth'].every(nm=>defeatedMobs.has('hollowrite:'+nm));
+BEASTS.push({ k:'succubus', is:f=>f.type==='succubus', name:'Succubi of the Hollow Choir', kind:'Beneath the third yew · the Weeping Hollow',
+  how:'A raking claw from the left, and a second from the right on its heels. Then a long, slow lunge from above.', res:'Fed, they are quick. Watch for the second claw.', aff:'Their claws open wounds that keep bleeding.', ans:'Do not let them close the distance and hold you. Strike when the lunge comes down.' });
+// ── each frame: the graveyard at midnight, the hollow on the night of the feast, and the fight's end
+{ const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{
+    if(areaId==='graveyard' && !CS.on) succGraveTick(dt);
+    if(areaId==='hollowrite' && !CS.on && !combat.active){ if(RITE_NIGHT() && nightAmt()>0.5 && !dlgIsOpen()) riteStart();
+      if(CHOICE.succ==='fighting' && RITE_WON()){ remember('succ','fought',"You cut down Vesperine and her sisters in their own circle. The Hollow Choir will not sing in this valley again for a long while."); banner('The Choir is silent','#e0c0c8',2400); } }
+    if(CHOICE.succ==='told' && CHOICE.succNight!=null && SUCC_NIGHT()>CHOICE.succNight) remember('succ','missed',"You did not go down the stair on the night of the feast. The Hollow Choir fed without you.");
+  }catch(e){} return r; }; }
+JOURNAL.push(['The Hollow Choir', ()=> !CHOICE.succ ? null
+  : CHOICE.succ==='told' ? ['active', SUCC_NIGHT()<CHOICE.succNight ? "Vesperine spoke of a feast of the Hollow Choir on the night of Day "+SUCC_DAYLBL(CHOICE.succNight)+". A hidden stair behind the Dunhollow graveyard, by the third yew. After dark." : "Tonight is the night of the feast. The stair behind the Dunhollow graveyard is open. Go down after dark."]
+  : CHOICE.succ==='fighting' ? ['active',"Fight the Hollow Choir in the Weeping Hollow."]
+  : CHOICE.succ==='watched' ? ['done',"You watched the Hollow Choir feed in the Weeping Hollow, and stayed hidden."]
+  : CHOICE.succ==='joined' ? ['done', CHOICE.tithe ? "You knelt in the Hollow Choir's circle and sold them some of your blood. It will not grow back." : "You knelt in the Hollow Choir's circle, and kept your blood."]
+  : CHOICE.succ==='fought' ? ['done',"You cut down the Hollow Choir in their own circle."]
+  : ['done',"You missed the night of the feast. The Choir fed without you."]]);
+// what you sold them stays with you: less life, more of something else
+{ const _r=refreshPlayerHp; refreshPlayerHp=function(full){ _r.apply(this,arguments); const T=CHOICE.tithe; if(T && T.hp){ player.maxHp=Math.max(10,player.maxHp-T.hp); player.hp=Math.min(player.hp,player.maxHp); } }; }
+{ const _a=activeEffects; activeEffects=function(){ const L=_a(); const T=CHOICE.tithe; if(T && T.hp) L.push({ico:'⛧',name:'Blood Tithe',kind:'The Hollow Choir',bad:false,rows:[['Max health','−'+T.hp],...(T.ap?[['Attack power','+'+T.ap+' (+'+T.ap*3+'% weapon damage)']]:[]),...(T.sp?[['Spell power','+'+T.sp+' (+'+T.sp*4+'% spell damage)']]:[])],tip:'Sold to the daughters of the Hollow Choir, in the Weeping Hollow. It will not grow back.'}); return L; }; }
 // ════════ LOOT ON THE GROUND: each kind of thing is drawn as itself, lying where it fell (flowers growing where they grow), in its own colours ════════
 const LOOT_COL={};
 function lootColors(id){ if(LOOT_COL[id]) return LOOT_COL[id]; let c=['#8a7050'];

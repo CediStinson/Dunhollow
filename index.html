@@ -5246,7 +5246,7 @@ const AREAS = {
     entries:{ fromRoad:{i:1,j:5}, fromVillage:{i:5,j:1}, fromWood:{i:9,j:5}, fromCamp:{i:5,j:9}, fromTrail:{i:5,j:9} },
   },
   village:{
-    fence:{r:true,l:false}, w:14, h:10, theme:'village', label:'Dunhollow', mini:{x:1,y:0},
+    fence:{r:true,l:false}, w:14, h:10, theme:'village', label:'Dunhollow', mini:{x:1,y:0}, yard:[[6.5,3.6,2.0],[3.4,2.6,1.0],[8.4,2.0,1.0],[3.3,7.4,1.0],[6.5,9.2,1.0]],
     notches:()=>[],
     dummy:null,
     objects:()=>[
@@ -5255,7 +5255,11 @@ const AREAS = {
       {type:'teleporter', i:4, j:0, to:'graveyard', entry:'fromVillage'},
       {type:'house', i:9, j:0, fp:[4,4], roof:'#c8a458', door:'l', dt:1, inside:'elderhouse'},   // Hamond's: the biggest house in Dunhollow, a household under one roof
       {type:'well', i:6, j:3},
-      {type:'stall', i:3, j:5, c:0},
+      {type:'cstall', i:3, j:5, v:4},   // Marta's stall
+      {type:'trough', i:7, j:2}, {type:'noticeboard', i:3, j:3}, {type:'bench2', i:8, j:2}, {type:'flowerbed', i:8, j:3, noblock:true}, {type:'flowerbed', i:3, j:2, noblock:true, cols:['#f2ede0','#e8a0b0','#b894d8']},
+      {type:'kennel', i:11, j:6}, {type:'garden', i:10, j:9, fp:[3,1], noblock:true}, {type:'logpile', i:13, j:1}, {type:'chopblock', i:13, j:2}, {type:'washline', i:1, j:6, noblock:true},
+      {type:'tree', i:4, j:6, sp:'oak', v:1, s:0.75, ox:0.1, oy:0}, {type:'berrybush', i:13, j:7},
+      {type:'drywall', i:0, j:9, a:[0,10], b:[14,10], out:[0,1], gaps:[6.5], noblock:true, dz:99}, {type:'drywall', i:13, j:0, a:[14,0], b:[14,10], out:[1,0], gaps:[6.5,9.5], noblock:true, dz:98},
       {type:'barrel', i:2, j:5, breakable:true},
       {type:'crate', i:12, j:5, breakable:true},
       {type:'barrel', i:8, j:1, breakable:true},
@@ -9260,7 +9264,7 @@ function paintGroundTexture(){
       D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
     if(theme==='road'){ const fc=roadGroundPixel(gx,gy,G,w,h), ao=1-0.42*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.04-0.1*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.08), o=(py*TWp+px)*4;
       D[o]=fc[0]*k; D[o+1]=fc[1]*k; D[o+2]=fc[2]*k; D[o+3]=255; continue; }
-    if(theme==='farm' && !G.notch){ const fc=farmGroundPixel(gx,gy,G,w,h), ao=1-0.42*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.06-0.12*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.08), o=(py*TWp+px)*4;
+    if((theme==='farm' || (theme==='village' && !AREAS[areaId].boggy)) && !G.notch){ const fc=farmGroundPixel(gx,gy,G,w,h), ao=1-0.42*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.06-0.12*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.08), o=(py*TWp+px)*4;
       D[o]=fc[0]*k; D[o+1]=fc[1]*k; D[o+2]=fc[2]*k; D[o+3]=255; continue; }
     let c=mixC(G1,G2,smooth(0.25,0.8,fbm(gx*0.9,gy*0.9,1)));
     const BOGGY=AREAS[areaId].boggy, bogK=BOGGY?clamp01(1.25-gy/h*1.1)*clamp01(0.3+gx/w):0;           // the fen creeping in from the north-east
@@ -22646,7 +22650,7 @@ const FAUNA_COL={ horse:[{coat:'#6a4026',mane:'#2a1a12',legs:'#4a2c1a',blaze:1},
 // [kind, i, j, how many] per area; the home tile is moved to the nearest open ground when the area loads
 const FAUNA_AT={
   farm:[['chicken',6,8,3],['sheep',10,1,2],['dog',7,6,1],['cat',2,2,1]],
-  village:[['chicken',4,7,2],['cat',8,3,1],['dog',10,6,1]],
+  village:[['chicken',4,7,2],['cat',8,3,1],['dog',10,7,1]],
   graveyard:[['rabbit',7,7,1]], stones:[['sheep',6,6,2],['rabbit',3,3,1]],
   market:[['pigeon',13,13,4],['cat',6,20,1],['horse',22,22,1]],
   keepward:[['horse',10,16,1],['pigeon',16,12,3],['cat',22,6,1]], lowstreets:[['cat',8,8,1],['pigeon',14,18,3],['dog',18,18,1]],
@@ -23013,11 +23017,13 @@ function succTalk(){ const n=succNpc(); if(!n || n._going) return; const d=Math.
     {label:'“Who are you?”', fn:()=>{ CHOICE.succName=true; n.name='Vesperine'; say('Vesperine',["“Vesperine.” She says it like a taste she likes. “And you are a little brave, and a little stupid, and that is my favourite kind of mortal.”"],[{label:'“Why show yourself to me?”', fn:tell}, succBye]); }},
     {label:'“Why show yourself to me?”', fn:tell}, succBye]); }
 function succTold(msg){ const night=SUCC_NIGHT()+3; CHOICE.succNight=night;
-  remember('succ','told',"Vesperine, a daughter of the Hollow Choir, spoke of a feast in three nights: the night of Day "+SUCC_DAYLBL(night)+". A hidden stair behind the graveyard, by the third yew. After dark.");
+  remember('succ','told',"Vesperine, a daughter of the Hollow Choir, spoke of a feast in three nights: the evening of Day "+SUCC_DAYLBL(night)+", from dusk until dawn. A hidden stair at the back of the graveyard, under the third yew.");
   say('Vesperine',[msg],[{label:'…', fn:()=>{ closeDialog(); const n=succNpc(); if(n){ n._going=1; fadeOff(n,{slow:0.7}); } }}]); }
 TALKERS.vesper=succTalk;
 // ── the stair behind the graveyard: there from the night of the feast
-wrap('graveyard','objects',l=> CHOICE.succ && CHOICE.succNight!=null && SUCC_NIGHT()>=CHOICE.succNight ? [...l,{type:'teleporter', i:9, j:2, to:'hollowrite', entry:'fromGraves'}] : l);
+const RITE_STAIR=()=>{ if(!CHOICE.succ || CHOICE.succNight==null) return false; if(RITE_DONE()) return true;   // from dusk to dawn on the night of the feast (and for good once it is over)
+  const t=((dayClock%DAY_LEN)+DAY_LEN)%DAY_LEN/DAY_LEN; return CHOICE.succ==='told' && SUCC_NIGHT()===CHOICE.succNight && t>=0.18 && t<=0.82; };
+wrap('graveyard','objects',l=> [...l,{type:'tree', i:9, j:0, sp:'pine', v:2, s:1.25, ox:0.1, oy:0.2}, ...(RITE_STAIR() ? [{type:'teleporter', i:9, j:2, to:'hollowrite', entry:'fromGraves'}] : [])]);   // the third yew, dark at the back of the yard, and the stair beneath it on the night
 AREAS.graveyard.entries.fromRite={i:8,j:3};
 // ── the Weeping Hollow: a bowl of black earth under the yews, where the Choir feeds
 const RITE_NIGHT=()=>CHOICE.succ==='told' && SUCC_NIGHT()===CHOICE.succNight;
@@ -23190,16 +23196,17 @@ BEASTS.push({ k:'succubus', is:f=>f.type==='succubus', name:'Succubi of the Holl
 // ── each frame: the graveyard at midnight, the hollow on the night of the feast, and the fight's end
 { const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{
     if(areaId==='graveyard' && !CS.on) succGraveTick(dt);
+    if(areaId==='graveyard'){ const has=OBJECTS.some(q=>q.type==='teleporter'&&q.to==='hollowrite'), want=RITE_STAIR(); if(want && !has){ OBJECTS.push({type:'teleporter', i:9, j:2, to:'hollowrite', entry:'fromGraves'}); logMsg('Under the third yew at the back of the yard, the earth has opened on a stair going down.','#e0a0c0'); } else if(!want && has){ const k=OBJECTS.findIndex(q=>q.type==='teleporter'&&q.to==='hollowrite'); if(k>=0) OBJECTS.splice(k,1); } }
     if(areaId==='hollowrite' && !CS.on && !combat.active){ if(RITE_NIGHT() && nightAmt()>0.5 && !dlgIsOpen()) riteStart();
       if(CHOICE.succ==='fighting' && RITE_WON()){ remember('succ','fought',"You cut down Vesperine and her sisters in their own circle. The Hollow Choir will not sing in this valley again for a long while."); banner('The Choir is silent','#e0c0c8',2400);
         const live=['thrallB','thrallC'].map(riteNpc).filter(n=>n && !(n.opts&&n.opts.skin===30)), L=[];
         if(live.some(n=>n.id==='thrallB')) L.push("Mirela is on her knees in the blood, coughing. She looks at you with such hatred that you take a step back.","“Three weeks,” she says. “Three more weeks of drowning in my own chest, and then the same death, only ugly. They were going to make it beautiful. You took the only kind thing anyone ever offered me.”");
         if(live.some(n=>n.id==='thrallC')) L.push("The boy has already gone, running, without a word. You never find out whether he was glad.");
         if(L.length){ L.push("Nobody pays Aldo's debts. By midwinter his widow has sold the cart, and the house, and then there is talk of the girls going into service in the city."); say('The Weeping Hollow',L,[{label:'Leave them there.', fn:()=>{ closeDialog(); live.forEach(n=>fadeOff(n,{slow:1})); }}]); } } }
-    if(CHOICE.succ==='told' && CHOICE.succNight!=null && SUCC_NIGHT()>CHOICE.succNight) remember('succ','missed',"You did not go down the stair on the night of the feast. The Hollow Choir fed without you.");
+    if(CHOICE.succ==='told' && CHOICE.succNight!=null && (SUCC_NIGHT()>CHOICE.succNight || (SUCC_NIGHT()===CHOICE.succNight && ((dayClock%DAY_LEN)+DAY_LEN)%DAY_LEN/DAY_LEN>0.82))) remember('succ','missed',"You did not go down the stair on the night of the feast. The Hollow Choir fed without you.");
   }catch(e){} return r; }; }
 JOURNAL.push(['The Hollow Choir', ()=> !CHOICE.succ ? null
-  : CHOICE.succ==='told' ? ['active', SUCC_NIGHT()<CHOICE.succNight ? "Vesperine spoke of a feast of the Hollow Choir on the night of Day "+SUCC_DAYLBL(CHOICE.succNight)+". A hidden stair behind the Dunhollow graveyard, by the third yew. After dark." : "Tonight is the night of the feast. The stair behind the Dunhollow graveyard is open. Go down after dark."]
+  : CHOICE.succ==='told' ? ['active', SUCC_NIGHT()<CHOICE.succNight ? "Vesperine spoke of a feast of the Hollow Choir on the evening of Day "+SUCC_DAYLBL(CHOICE.succNight)+", from dusk until dawn (after midnight the clock already reads Day "+(SUCC_DAYLBL(CHOICE.succNight)+1)+"). A hidden stair at the back of the Dunhollow graveyard, under the third yew." : RITE_STAIR() ? "The feast is tonight. Under the third yew at the back of the Dunhollow graveyard, a stair goes down. Until dawn." : "The feast is tonight. At dusk a stair will open under the third yew at the back of the Dunhollow graveyard."]
   : CHOICE.succ==='fighting' ? ['active',"Fight the Hollow Choir in the Weeping Hollow."]
   : CHOICE.succ==='watched' ? ['done',"You watched the Hollow Choir feed in the Weeping Hollow, and stayed hidden."]
   : CHOICE.succ==='joined' ? ['done', CHOICE.tithe ? "You knelt in the Hollow Choir's circle and sold them some of your blood. It will not grow back." : "You knelt in the Hollow Choir's circle, and kept your blood."]
@@ -23371,9 +23378,67 @@ OBJ_DRAW.fieldshelter=o=>{ const T=TW/2, H2=TH/2, X0=P(o.i+0.5,o.j+0.5), pt=(a,b
   g.strokeStyle='#4a3a1a'; g.lineWidth=1; for(let k=0;k<=24;k++){ const t=k/24, p={x:roof[0].x+(roof[1].x-roof[0].x)*t,y:roof[0].y+(roof[1].y-roof[0].y)*t}; g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(p.x+(k%2?0.6:-0.6),p.y+4+(k%3)); g.stroke(); }   // the thatch hanging ragged at the eave
   g.strokeStyle='#3a2a12'; g.lineWidth=3; g.beginPath(); g.moveTo(roof[3].x,roof[3].y); g.lineTo(roof[2].x,roof[2].y); g.stroke();
   poly([roof[1],roof[2],{x:roof[2].x,y:roof[2].y+5},{x:roof[1].x,y:roof[1].y+5}],'#4a3a1a'); };
+// ════════ DUNHOLLOW, lived in: a notice board, a bench, a trough by the well, a kennel, flower beds, a woodpile, a kitchen patch, dry-stone walls along the front ════════
+const ISO=(i,j,h=0)=>{ const q=P(i,j); return {x:q.x,y:q.y-h}; };
+const isoPoly=(ps,fill,stroke,lw)=>{ g.beginPath(); ps.forEach((p,n)=>n?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); if(fill){ g.fillStyle=fill; g.fill(); } if(stroke){ g.strokeStyle=stroke; g.lineWidth=lw||1; g.stroke(); } };
+// the village notice board: two posts, a little roof, papers pinned up
+OBJ_DRAW.noticeboard=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y;
+  g.fillStyle='rgba(8,5,2,0.3)'; g.beginPath(); g.ellipse(x+5,y+2,22,7,0,0,Math.PI*2); g.fill();
+  g.fillStyle='#4a321c'; [-14,14].forEach(d=>g.fillRect(x+d-2,y-58,4,58));
+  g.fillStyle='#7a5634'; g.fillRect(x-17,y-52,34,26); g.strokeStyle='#3a2614'; g.lineWidth=1.4; g.strokeRect(x-17,y-52,34,26);
+  [[-13,-49,10,12,'#e8dcc0'],[-1,-50,12,9,'#efe4cc'],[-6,-37,9,10,'#d8ccb0'],[5,-39,9,11,'#e4d8bc']].forEach(([dx,dy,w,h,c],k)=>{ g.save(); g.translate(x+dx+w/2,y+dy+h/2); g.rotate((k%2?1:-1)*0.06); g.fillStyle=c; g.fillRect(-w/2,-h/2,w,h);
+    g.strokeStyle='rgba(60,40,20,0.5)'; g.lineWidth=0.5; for(let r=0;r<3;r++){ g.beginPath(); g.moveTo(-w/2+1.5,-h/2+3+r*2.6); g.lineTo(w/2-1.5,-h/2+3+r*2.6); g.stroke(); } g.fillStyle='#a03a2a'; g.beginPath(); g.arc(0,-h/2+1,0.9,0,Math.PI*2); g.fill(); g.restore(); });
+  g.fillStyle='#3a2a1a'; g.beginPath(); g.moveTo(x-21,y-52); g.lineTo(x,y-62); g.lineTo(x+21,y-52); g.lineTo(x+19,y-50); g.lineTo(x,y-59); g.lineTo(x-19,y-50); g.closePath(); g.fill(); };
+onUse(['noticeboard'],o=>{ const L=["<b>LOST:</b> one grey goat, answers to Bramble, likes roofs. Ask Old Wenna.","<b>WANTED:</b> a strong back for the harvest. Board and ale. Ask at the Wheatsheaf.","<i>To whoever took the bell-rope from the chapel: it is not funny, and Mother Hild knows it was you.</i>","Hobb the Carter runs to the crossroads on washdays. Two coppers a head, one if you push."];
+  if(!(typeof BARON_DOWN==='function' && BARON_DOWN())) L.push("<b>BY ORDER OF BARON BERTRAM:</b> the window tax is due at the quarter. <i>(Someone has drawn a pig in the margin, wearing a crown.)</i>");
+  say('The Village Notice Board',L,[bye]); });
+// a plank bench on two stumps
+OBJ_DRAW.bench2=o=>{ const a=ISO(o.i+0.15,o.j+0.5), b=ISO(o.i+0.85,o.j+0.5), H=13;
+  g.fillStyle='rgba(8,5,2,0.28)'; g.beginPath(); g.ellipse((a.x+b.x)/2+4,(a.y+b.y)/2+2,30,7,0,0,Math.PI*2); g.fill();
+  [a,b].forEach(p=>{ g.fillStyle='#5a3e24'; g.beginPath(); g.ellipse(p.x,p.y,5,2.4,0,0,Math.PI*2); g.fill(); g.fillRect(p.x-5,p.y-H,10,H); g.fillStyle='#a07a4c'; g.beginPath(); g.ellipse(p.x,p.y-H,5,2.4,0,0,Math.PI*2); g.fill(); });
+  g.fillStyle='#8a6440'; g.beginPath(); g.moveTo(a.x-8,a.y-H-3); g.lineTo(b.x+8,b.y-H-3); g.lineTo(b.x+8,b.y-H+1); g.lineTo(a.x-8,a.y-H+1); g.closePath(); g.fill(); g.fillStyle='#a8825a'; g.beginPath(); g.moveTo(a.x-8,a.y-H-3); g.lineTo(b.x+8,b.y-H-3); g.lineTo(b.x+6,b.y-H-6); g.lineTo(a.x-6,a.y-H-6); g.closePath(); g.fill(); };
+// a stone trough beside the well, a wooden bucket on its rim, wet mud and a puddle round it
+OBJ_DRAW.trough=o=>{ const T=gt, c=ISO(o.i+0.5,o.j+0.5), w=26, d=8, h=11;
+  g.fillStyle='rgba(60,46,30,0.55)'; g.beginPath(); g.ellipse(c.x+4,c.y+4,w+14,d+8,0,0,Math.PI*2); g.fill();
+  g.fillStyle='rgba(90,110,120,0.55)'; g.beginPath(); g.ellipse(c.x+w,c.y+9,10,3.4,0,0,Math.PI*2); g.fill(); g.fillStyle='rgba(220,235,245,0.3)'; g.beginPath(); g.ellipse(c.x+w-3,c.y+8,4,1,0,0,Math.PI*2); g.fill();   // a puddle
+  g.fillStyle='#7a766c'; g.beginPath(); g.moveTo(c.x-w,c.y); g.lineTo(c.x+w,c.y); g.lineTo(c.x+w-2,c.y+h); g.lineTo(c.x-w+2,c.y+h); g.closePath(); g.fill();
+  g.strokeStyle='rgba(40,36,30,0.5)'; g.lineWidth=0.7; [-12,2,14].forEach(dx=>{ g.beginPath(); g.moveTo(c.x+dx,c.y+1); g.lineTo(c.x+dx+1,c.y+h); g.stroke(); });
+  g.fillStyle='#9a968a'; g.beginPath(); g.ellipse(c.x,c.y,w,d,0,0,Math.PI*2); g.fill(); g.fillStyle='#3e5a64'; g.beginPath(); g.ellipse(c.x,c.y,w-4,d-2.6,0,0,Math.PI*2); g.fill();
+  g.strokeStyle='rgba(220,240,250,0.35)'; g.lineWidth=0.7; for(let k=0;k<2;k++){ const r=((T*0.5+k*0.5)%1); g.beginPath(); g.ellipse(c.x-6+k*10,c.y,3+r*8,1+r*2.4,0,0,Math.PI*2); g.stroke(); }
+  g.fillStyle='rgba(90,130,60,0.6)'; g.beginPath(); g.ellipse(c.x-w+4,c.y+h-1,5,2,0,0,Math.PI*2); g.fill();   // moss at its foot
+  const bx=c.x+w-4, by=c.y-3; g.fillStyle='#6a4a2a'; g.beginPath(); g.moveTo(bx-5,by-8); g.lineTo(bx+5,by-8); g.lineTo(bx+4,by); g.lineTo(bx-4,by); g.closePath(); g.fill();   // the bucket
+  g.strokeStyle='#3a3430'; g.lineWidth=1; [-5.5,-2.5].forEach(dy=>{ g.beginPath(); g.moveTo(bx-4.6,by+dy); g.lineTo(bx+4.6,by+dy); g.stroke(); }); g.fillStyle='#3e5a64'; g.beginPath(); g.ellipse(bx,by-8,5,1.6,0,0,Math.PI*2); g.fill();
+  g.beginPath(); g.arc(bx,by-8,6,Math.PI*1.1,Math.PI*1.9); g.stroke(); };
+// a dog's kennel: planks, a pitched roof, a worn patch at the door, a bone
+OBJ_DRAW.kennel=o=>{ const T=TW/2, H2=TH/2, X0=P(o.i+0.5,o.j+0.5), pt=(a,b,h=0)=>({x:X0.x+(a-b)*T,y:X0.y+(a+b)*H2-h}), a=-0.26, b=0.26, Hw=16;
+  g.fillStyle='rgba(8,5,2,0.3)'; g.beginPath(); g.ellipse(X0.x+5,X0.y+2,26,9,0,0,Math.PI*2); g.fill();
+  isoPoly([pt(a,b),pt(b,b),pt(b,b,Hw),pt(a,b,Hw)],'#8a6440','rgba(30,18,8,0.6)',0.7); isoPoly([pt(b,b),pt(b,a),pt(b,a,Hw),pt(b,b,Hw)],'#5e4228','rgba(30,18,8,0.6)',0.7);
+  const dc=pt(0,b), dw=6; g.fillStyle='#1a120a'; g.beginPath(); g.moveTo(dc.x-dw,dc.y-1); g.lineTo(dc.x-dw,dc.y-8); g.quadraticCurveTo(dc.x,dc.y-15,dc.x+dw,dc.y-8); g.lineTo(dc.x+dw,dc.y-1); g.closePath(); g.fill();
+  isoPoly([pt(a-0.06,b+0.06,Hw-1),pt(b+0.06,b+0.06,Hw-1),pt(b+0.06,0,Hw+12),pt(a-0.06,0,Hw+12)],'#4a3a30'); isoPoly([pt(b+0.06,b+0.06,Hw-1),pt(b+0.06,a-0.06,Hw-1),pt(b+0.06,0,Hw+12)],'#3a2c24');
+  g.fillStyle='#d8d0c0'; const bn=pt(0.1,b+0.32); g.fillRect(bn.x-4,bn.y-1,8,2); [[-4,0],[4,0]].forEach(([dx])=>{ g.beginPath(); g.arc(bn.x+dx,bn.y-1,1.4,0,Math.PI*2); g.arc(bn.x+dx,bn.y+1,1.4,0,Math.PI*2); g.fill(); });
+  g.fillStyle='#c8a050'; g.font='bold 6px Georgia,serif'; g.textAlign='center'; g.fillText('RUFUS',pt(a+0.1,b,Hw-5).x+8,pt(a+0.1,b,Hw-5).y); g.textAlign='left'; };
+// a flower bed edged with stones
+OBJ_DRAW.flowerbed=o=>{ const c=ISO(o.i+0.5,o.j+0.5), T=gt, cols=o.cols||['#e84a5a','#f0d060','#f2ede0','#b894d8','#e89a50'];
+  g.fillStyle='#5a4028'; g.beginPath(); g.ellipse(c.x,c.y,26,10,0,0,Math.PI*2); g.fill();
+  for(let k=0;k<14;k++){ const a=k/14*Math.PI*2; g.fillStyle=k%2?'#8a8478':'#a09a8c'; g.beginPath(); g.ellipse(c.x+Math.cos(a)*26,c.y+Math.sin(a)*10,3,2,0,0,Math.PI*2); g.fill(); }
+  for(let k=0;k<16;k++){ const a=rnd01(k,o.i,1300)*Math.PI*2, r=rnd01(k,o.j,1301)*0.8, fx=c.x+Math.cos(a)*20*r, fy=c.y+Math.sin(a)*7*r, h=6+rnd01(k,3,1302)*8, sw=Math.sin(T*1.5+k)*0.6;
+    g.strokeStyle='#4a7a34'; g.lineWidth=1; g.beginPath(); g.moveTo(fx,fy); g.lineTo(fx+sw,fy-h); g.stroke(); g.fillStyle='#5a8a3a'; g.beginPath(); g.ellipse(fx-2,fy-h*0.4,2.4,1,0.5,0,Math.PI*2); g.fill();
+    g.fillStyle=cols[k%cols.length]; for(let p=0;p<5;p++){ const pa=p/5*Math.PI*2; g.beginPath(); g.arc(fx+sw+Math.cos(pa)*1.4,fy-h+Math.sin(pa)*1.4,1.3,0,Math.PI*2); g.fill(); } g.fillStyle='#f0d060'; g.beginPath(); g.arc(fx+sw,fy-h,0.9,0,Math.PI*2); g.fill(); } };
+// a low dry-stone wall along the front edge of a room, gapped where a way out passes; a hedge and the odd tree beyond it
+OBJ_DRAW.drywall=o=>{ const [i0,j0]=o.a, [i1,j1]=o.b, len=Math.hypot(i1-i0,j1-j0), N=Math.ceil(len*5), gap=t=>(o.gaps||[]).some(gp=>Math.abs(t*len-gp)<0.95), out=o.out||[0,0];
+  for(let k=0;k<N;k++){ const t0=k/N, t1=(k+1)/N; if(gap((t0+t1)/2)) continue; const pi=i0+(i1-i0)*t0, pj=j0+(j1-j0)*t0, qi=i0+(i1-i0)*t1, qj=j0+(j1-j0)*t1;   // the hedge first, just beyond
+    const m=ISO((pi+qi)/2+out[0]*0.32,(pj+qj)/2+out[1]*0.32), r=9+rnd01(k,o.a[0],1310)*6; g.fillStyle=['#2e4a24','#3a5a2a','#466a30'][k%3]; g.beginPath(); g.ellipse(m.x,m.y-12,r*1.4,r,0,0,Math.PI*2); g.fill();
+    if(rnd01(k,o.a[1],1311)<0.1){ g.fillStyle='#f2ede0'; g.beginPath(); g.arc(m.x+3,m.y-18,1.4,0,Math.PI*2); g.fill(); } }
+  for(let k=0;k<N;k++){ const t0=k/N, t1=(k+1)/N; if(gap((t0+t1)/2)) continue;
+    const A=ISO(i0+(i1-i0)*t0,j0+(j1-j0)*t0), B=ISO(i0+(i1-i0)*t1,j0+(j1-j0)*t1), H=19;
+    g.fillStyle='rgba(8,5,2,0.25)'; g.beginPath(); g.moveTo(A.x,A.y+2); g.lineTo(B.x,B.y+2); g.lineTo(B.x+6,B.y+5); g.lineTo(A.x+6,A.y+5); g.closePath(); g.fill();
+    for(let r=0;r<4;r++){ const n=2+((k+r)%2); for(let s=0;s<n;s++){ const u0=s/n, u1=(s+1)/n, p0={x:A.x+(B.x-A.x)*u0,y:A.y+(B.y-A.y)*u0-r*4.6}, p1={x:A.x+(B.x-A.x)*u1,y:A.y+(B.y-A.y)*u1-r*4.6}, sh=rnd01(k*7+r,s,1312);
+        g.fillStyle=sh<0.33?'#8a8478':sh<0.66?'#9e988a':'#76726a'; g.beginPath(); g.moveTo(p0.x+0.5,p0.y); g.lineTo(p1.x-0.5,p1.y); g.lineTo(p1.x-0.5,p1.y-4.8); g.lineTo(p0.x+0.5,p0.y-4.8); g.closePath(); g.fill(); g.strokeStyle='rgba(40,36,30,0.45)'; g.lineWidth=0.5; g.stroke(); } }
+    g.fillStyle='#a8a294'; g.beginPath(); g.moveTo(A.x,A.y-H); g.lineTo(B.x,B.y-H); g.lineTo(B.x-2,B.y-H-3.2); g.lineTo(A.x-2,A.y-H-3.2); g.closePath(); g.fill();
+    if(rnd01(k,o.b[0],1313)<0.3){ g.fillStyle='rgba(90,130,60,0.7)'; g.beginPath(); g.ellipse((A.x+B.x)/2,(A.y+B.y)/2-H-1,5,1.8,Math.atan2(B.y-A.y,B.x-A.x),0,Math.PI*2); g.fill(); } } };   // moss along the coping
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
-function farmYard(gx,gy){ let k=0; for(const [x,y,r] of FARM_YARD){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }
+function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }
 // a hen coop on short legs: plank walls, a tarred roof, a cleated ramp down to the ground, straw poking out of the nest box
 OBJ_DRAW.hencoop=o=>{ const T=TW/2, H2=TH/2, X0=P(o.i+0.5,o.j+0.5), pt=(a,b,h=0)=>({x:X0.x+(a-b)*T, y:X0.y+(a+b)*H2-h}), poly=(ps,f,s2)=>{ g.beginPath(); ps.forEach((p,n)=>n?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); if(f){ g.fillStyle=f; g.fill(); } if(s2){ g.strokeStyle=s2; g.lineWidth=0.8; g.stroke(); } };
   const a=-0.34, b=0.34, c=-0.28, d=0.28, L0=10, H=26, RH=16;

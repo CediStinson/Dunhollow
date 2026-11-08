@@ -14953,8 +14953,10 @@ const HARVEST_EVE=12, SHIP_DAY=0;                                               
 function harvestEve(){ return yearDay()===HARVEST_EVE; }
 function shipDay(){ return yearDay()===SHIP_DAY; }
 function daysUntil(yd){ return (yd-yearDay()+YEAR_LEN)%YEAR_LEN; }
-function weatherToday(){ const d=Math.floor(dayClock/DAY_LEN), r=rnd01(d*13+7,d*5+3,880);
-  return d<1 ? 'clear' : r<0.52 ? 'clear' : r<0.78 ? 'rain' : 'fog'; }                // the first day is always fair
+function weatherOf(d){ const r=rnd01(d*13+7,d*5+3,880); return d<1 ? 'clear' : r<0.52 ? 'clear' : r<0.78 ? 'rain' : 'fog'; }   // the first day is always fair
+function weatherToday(){ return weatherOf(Math.floor(dayClock/DAY_LEN)); }
+function weatherAmt(kind){ const d=Math.floor(dayClock/DAY_LEN), f=((dayClock%DAY_LEN)+DAY_LEN)%DAY_LEN/DAY_LEN;   // how strongly it is raining (or fogged) right now: weather comes on over a while and goes off again, never all at once
+  if(weatherOf(d)!==kind) return 0; const inn=weatherOf(d-1)===kind?1:smooth(0,0.07,f), out=weatherOf(d+1)===kind?1:1-smooth(0.93,1,f); return inn*out; }
 setInterval(()=>{ try{ if(!running) return; const d=calDay(); if(CHOICE.calNews===d) return; CHOICE.calNews=d;
     if(harvestEve()) logMsg("It is harvest-eve. There will be a fiddler at the Wheatsheaf tonight.",'#e8c878');
     else if(shipDay()) logMsg("The spring ship is at the river docks in Hollowmere today.",'#e8c878'); }catch(e){} },2000);
@@ -14972,18 +14974,19 @@ function drawSkyWeather(){ const A=AREAS[areaId];   // dusk and dawn colour, rai
       g.globalCompositeOperation='lighter'; const gr=g.createLinearGradient(0,0,0,H*0.5); gr.addColorStop(0,`rgba(170,190,255,${0.14*dawn})`); gr.addColorStop(1,'rgba(170,190,255,0)'); g.fillStyle=gr; g.fillRect(0,0,W,H*0.5); }
     const wx=weatherToday(); if(wx!==lastWeather){ const first=lastWeather===null; lastWeather=wx; if(running && !first && WET_THEMES.has(A.theme)) logMsg(wx==='rain'?'Clouds roll in. It starts to rain.':wx==='fog'?'A grey fog settles over the valley.':'The sky clears.','#a8b8c8'); }
     if(WET_THEMES.has(A.theme)){
-      if(wx==='rain'){ g.globalCompositeOperation='multiply'; g.fillStyle='rgba(150,160,180,1)'; g.globalAlpha=0.35; g.fillRect(0,0,W,H); g.globalAlpha=1;
+      const ra=weatherAmt('rain'), fa=weatherAmt('fog');
+      if(ra>0.01){ g.globalCompositeOperation='multiply'; g.fillStyle='rgba(150,160,180,1)'; g.globalAlpha=0.35*ra; g.fillRect(0,0,W,H); g.globalAlpha=1;
         g.globalCompositeOperation='source-over'; const N=LOW_FX?60:150; if(RAIN.length!==N){ RAIN=[]; for(let k=0;k<N;k++) RAIN.push({x:Math.random()*W,y:Math.random()*H,v:700+Math.random()*400,l:10+Math.random()*12}); }
-        g.strokeStyle='rgba(200,215,235,0.45)'; g.lineWidth=1; g.beginPath();
-        RAIN.forEach(d=>{ d.y+=d.v/60; d.x-=d.v/60*0.18; if(d.y>H){ d.y=-20; d.x=Math.random()*W*1.2; } g.moveTo(d.x,d.y); g.lineTo(d.x+d.l*0.18,d.y-d.l); }); g.stroke();
-        if(!LOW_FX){ g.lineWidth=1; for(let k=0;k<26;k++){ const T=gt*1.6+k*0.381, cyc=Math.floor(T), ph=T-cyc;   // splashes: each lands somewhere new, rings out and fades
+        g.strokeStyle='rgba(200,215,235,'+(0.2+0.25*ra)+')'; g.lineWidth=1; g.beginPath(); const nD=Math.round(N*ra*ra);   // first a few drops, then the downpour
+        RAIN.forEach((d,qi)=>{ if(qi>=nD) return; d.y+=d.v/60; d.x-=d.v/60*0.18; if(d.y>H){ d.y=-20; d.x=Math.random()*W*1.2; } g.moveTo(d.x,d.y); g.lineTo(d.x+d.l*0.18,d.y-d.l); }); g.stroke();
+        if(!LOW_FX){ g.lineWidth=1; for(let k=0;k<Math.round(26*ra*ra);k++){ const T=gt*1.6+k*0.381, cyc=Math.floor(T), ph=T-cyc;   // splashes: each lands somewhere new, rings out and fades
             const hr=q=>{ const v=Math.sin(q*127.1+k*311.7+cyc*74.7)*43758.5453; return v-Math.floor(v); }, x=hr(1)*W, y=hr(2)*H, r=1.5+ph*6, a=0.45*(1-ph);
             g.strokeStyle=`rgba(210,225,240,${a})`; g.beginPath(); g.ellipse(x,y,r,r*0.38,0,0,Math.PI*2); g.stroke();
             if(ph<0.25){ g.fillStyle=`rgba(225,235,250,${0.5*(1-ph*4)})`; g.fillRect(x-0.6,y-2-ph*8,1.2,1.6); g.fillRect(x+1.5,y-1.5-ph*6,1,1.2); g.fillRect(x-2.4,y-1.2-ph*5,1,1.2); } } }   // splashes
-        if(n>0.55){ lightningT-=1/60; if(lightningT<=0){ lightningT=6+Math.random()*9; STORM.flash=1; shake=Math.max(shake,2); } }                         // a storm after dark
+        if(n>0.55 && ra>0.8){ lightningT-=1/60; if(lightningT<=0){ lightningT=6+Math.random()*9; STORM.flash=1; shake=Math.max(shake,2); } }                         // a storm after dark
       }
-      if(wx==='fog' && (t>0.62 || t<0.12 || A.theme==='fen' || A.theme==='bog' || A.theme==='wood')){ g.globalCompositeOperation='source-over';
-        const k=(A.theme==='fen'||A.theme==='wood')?1:0.6, N=LOW_FX?3:6;
+      if(fa>0.01 && (t>0.62 || t<0.12 || A.theme==='fen' || A.theme==='bog' || A.theme==='wood')){ g.globalCompositeOperation='source-over';
+        const k=((A.theme==='fen'||A.theme==='wood')?1:0.6)*fa*(A.theme==='fen'||A.theme==='bog'||A.theme==='wood'?1:Math.min(1,Math.min(Math.abs(t-0.62),Math.abs(t-0.12))*12+0.0)*(t>0.62||t<0.12?1:0)), N=LOW_FX?3:6;   // fog thickens and thins, and in the open it rolls in at dusk and lifts in the morning
         for(let q=0;q<N;q++){ const x=((q*311+gt*(8+q*3))%(W+600))-300, y=H*(0.25+0.12*q)%H; const gr=g.createRadialGradient(x,y,0,x,y,360);
           gr.addColorStop(0,`rgba(220,226,232,${0.32*k})`); gr.addColorStop(1,'rgba(220,226,232,0)'); g.fillStyle=gr; g.fillRect(x-360,y-360,720,720); }
         g.fillStyle=`rgba(210,216,224,${0.14*k})`; g.fillRect(0,0,W,H); }

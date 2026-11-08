@@ -5217,7 +5217,13 @@ const AREAS = {
       {type:'milestone', i:28, j:1, t:'DUN 1'}, {type:'stump', i:19, j:4}, {type:'rocks', i:24, j:0, noblock:true}, {type:'logpile', i:9, j:0},          // the forest road runs straight on to Dunhollow Lane
       {type:'teleporter', i:16, j:0, to:'kingsroad', entry:'fromRoad'},
       {type:'signpost', i:17, j:1, city:true},
+      {type:'wayshrine', i:12, j:0}, {type:'felledoak', i:21, j:4, fp:[3,1]}, {type:'brook', i:26, j:0, fp:[1,5], noblock:true, dz:-99},
+      ...[[5,0],[7,4],[14,4],[19,0],[31,4]].map(([i,j],k)=>({type:'berrybush', i, j, s:0.9+(k%3)*0.1})),
+      ...[[3,4,-6],[11,0,8],[15,4,10],[23,0,-4],[29,0,6],[25,4,-10]].map(([i,j,dx],k)=>({type:'foxglove', i, j, dx, noblock:true, s:0.9+(k%2)*0.2})),
+      ...[[2,0,0],[10,4,6],[32,0,-4],[20,4,-8]].map(([i,j,dx],k)=>({type:'mossrock', i, j, dx, noblock:true, s:0.8+(k%3)*0.15})),
+      {type:'dapple', i:0, j:0.6, fp:[34,3.8], n:46, noblock:true, dz:-98},
     ],
+    bushes:[[1.5,0.35,'fern',1.0],[4.2,0.4,'fern',0.9],[8.4,4.6,'fern',1.1],[13.5,0.35,'fern',0.9],[18.2,4.6,'fern',1.0],[22.4,0.4,'fern',1.0],[27.6,4.6,'fern',0.9],[30.2,0.35,'fern',1.1],[33.0,4.6,'fern',0.9],[6.3,0.3,'flower',0.8],[16.0,4.65,'flower',0.8],[24.2,4.6,'shrub',0.9]],
     mobs:()=>[],   // no wolves on this stretch, for now
     entries:{ fromFarm:{i:1,j:2}, fromCrossroads:{i:32,j:2}, fromCity:{i:16,j:1} },
   },
@@ -6112,12 +6118,12 @@ function openHint(o,x,y){ if(!player || combat.active || cheb([o.i,o.j],[player.
 // what each signpost says: one wooden plate per direction (ang: which way the arrow points on screen)
 function signPlanks(sp){                            // each plank points roughly the way its road leaves the room
   if(sp.city) return [
-    { ang:-1.35, len:21, col:'#8a6a3e', label:'HOLLOWMERE', dir:'North', text:'The King\'s Road to Hollowmere, seat of Baron Bertram. Tolls payable at the gate.', note:'Someone has scratched underneath: “and at every gate after”.' },
-    { ang:0.45,  len:22, col:'#9a7446', label:'DUNHOLLOW',  dir:'East',  text:'The forest road runs on to Dunhollow, a village a mile on.' },
-    { ang:Math.PI+0.4, len:18, col:'#826238', label:((player&&player.name)||'Your')+"'s Farm", dir:'West', text:'Back along the road to your own fields, and your own front door.', home:true } ];
+    { ang:-1.35, len:36, col:'#8a6a3e', label:'HOLLOWMERE', dir:'North', text:'The King\'s Road to Hollowmere, seat of Baron Bertram. Tolls payable at the gate.', note:'Someone has scratched underneath: “and at every gate after”.' },
+    { ang:0.45,  len:34, col:'#9a7446', label:'DUNHOLLOW',  dir:'East',  text:'The forest road runs on to Dunhollow, a village a mile on.' },
+    { ang:Math.PI+0.4, len:32, col:'#826238', label:((player&&player.name)||'Your')+"'s Farm", dir:'West', text:'Back along the road to your own fields, and your own front door.', home:true } ];
   return [
     { ang:-0.45, len:17, col:'#8a6a3e', label:'', wolf:true, dir:'North', text:"No words. Someone has scratched a crude wolf's head into the arrow." },
-    { ang:0.45,  len:20, col:'#9a7446', label:'DUNHOLLOW', dir:'East', text:'The Mill Track to Dunhollow, a village a mile on.' },
+    { ang:0.45,  len:34, col:'#9a7446', label:'DUNHOLLOW', dir:'East', text:'The Mill Track to Dunhollow, a village a mile on.' },
     { ang:Math.PI-0.45, len:6, col:'#826238', label:'', broken:true, dir:'South', text:'Someone has hacked the arrow off. Smoke rises beyond the trees.' } ];
 }
 function paintSignpost(x,y,sp){
@@ -6134,9 +6140,10 @@ function paintSignpost(x,y,sp){
       else { g.lineTo(len,-3.4); g.lineTo(len+6,0.2); g.lineTo(len,3.8); }
       g.lineTo(0,3.8); g.closePath(); g.fill();
       g.fillStyle='rgba(255,235,190,0.22)'; g.fillRect(0,-3.4,len,1.1);
+      if(P.label && !P.broken){ const up=Math.cos(ang)<0; g.save(); g.translate(len/2+1,0.4); if(up) g.rotate(Math.PI); g.fillStyle='rgba(40,24,10,0.9)'; let fs=5.2; g.font='bold '+fs+'px Georgia,serif'; while(g.measureText(P.label).width>len-3 && fs>3) { fs-=0.3; g.font='bold '+fs+'px Georgia,serif'; } g.textAlign='center'; g.textBaseline='middle'; g.fillText(P.label,0,0); g.restore(); }
       g.strokeStyle='rgba(40,24,10,0.55)'; g.lineWidth=0.6;
       if(P.wolf){ g.beginPath(); g.moveTo(6,2); g.lineTo(8,-2); g.lineTo(9.5,0); g.lineTo(11,-2); g.lineTo(13,2); g.lineTo(9.5,3); g.closePath(); g.stroke(); }   // a scratched wolf's head
-      else if(!P.broken) for(let k=0;k<Math.floor(len/5);k++){ g.beginPath(); g.moveTo(3+k*4.4,-1.6); g.lineTo(3+k*4.4,1.8); g.moveTo(3+k*4.4,-1.6); g.lineTo(5+k*4.4,-1.6); g.stroke(); }   // carved letters
+      else if(!P.broken && !P.label) for(let k=0;k<Math.floor(len/5);k++){ g.beginPath(); g.moveTo(3+k*4.4,-1.6); g.lineTo(3+k*4.4,1.8); g.moveTo(3+k*4.4,-1.6); g.lineTo(5+k*4.4,-1.6); g.stroke(); }   // carved letters
       g.restore(); };
     signPlanks(sp||{}).forEach((P,k)=>plank(46-k*8,P));
     g.fillStyle='rgba(80,120,46,0.85)'; g.beginPath(); g.ellipse(x-1,y-2,6,2.4,0,0,Math.PI*2); g.fill();
@@ -8055,12 +8062,16 @@ function paintGallows(x,y){                       // a proper hanging-tree: a pl
   g.strokeStyle='#8a7a5a'; g.lineWidth=1.6; g.beginPath(); g.moveTo(x+26,y-176); g.lineTo(x+26,y-168); g.stroke();                     // a knot of old rope on the arm
   g.fillStyle='#1a1410'; g.beginPath(); g.moveTo(x+30,y-181); g.quadraticCurveTo(x+38,y-190,x+45,y-183); g.quadraticCurveTo(x+38,y-185,x+33,y-180); g.fill();   // a crow
 }
-function paintMilestone(x,y,txt){
-  g.fillStyle='rgba(8,5,2,0.3)'; g.beginPath(); g.ellipse(x+4,y+2,12,4,0,0,Math.PI*2); g.fill();
-  const sg=g.createLinearGradient(x-8,0,x+8,0); sg.addColorStop(0,'#b0aa98'); sg.addColorStop(1,'#6a665a'); g.fillStyle=sg;
-  g.beginPath(); g.moveTo(x-8,y); g.lineTo(x-8,y-22); g.quadraticCurveTo(x,y-30,x+8,y-22); g.lineTo(x+8,y); g.closePath(); g.fill();
-  g.fillStyle='#3a3630'; g.font='bold 7px Georgia,serif'; g.textAlign='center'; g.fillText(txt,x,y-14); g.textAlign='left';
-  g.fillStyle='rgba(80,110,50,0.6)'; g.beginPath(); g.ellipse(x-3,y-2,6,2,0,0,Math.PI*2); g.fill();
+function paintMilestone(x,y,txt){                         // a waystone: an old rounded stone, letters cut deep, moss at the foot and lichen on the shoulder
+  g.fillStyle='rgba(8,5,2,0.32)'; g.beginPath(); g.ellipse(x+5,y+2,16,5,0,0,Math.PI*2); g.fill();
+  const sg=g.createLinearGradient(x-10,0,x+10,0); sg.addColorStop(0,'#bab4a2'); sg.addColorStop(0.6,'#948e7e'); sg.addColorStop(1,'#625e54'); g.fillStyle=sg;
+  g.beginPath(); g.moveTo(x-10,y); g.lineTo(x-10,y-28); g.quadraticCurveTo(x-9,y-38,x,y-39); g.quadraticCurveTo(x+9,y-38,x+10,y-28); g.lineTo(x+10,y); g.closePath(); g.fill();
+  g.strokeStyle='rgba(60,56,48,0.5)'; g.lineWidth=0.6; g.beginPath(); g.moveTo(x+4,y-36); g.lineTo(x+2,y-30); g.lineTo(x+5,y-26); g.stroke();   // a crack
+  const parts=String(txt).split(' '); g.textAlign='center'; g.textBaseline='middle';
+  parts.forEach((t,k)=>{ const yy=y-27+k*9; g.font='bold '+(k?8:7)+'px Georgia,serif'; g.fillStyle='rgba(255,250,235,0.35)'; g.fillText(t,x+0.5,yy+0.6); g.fillStyle='#2e2a24'; g.fillText(t,x,yy); });
+  g.textAlign='left'; g.textBaseline='alphabetic';
+  g.fillStyle='rgba(200,196,140,0.55)'; [[-6,-31,2.4],[-3,-34,1.6],[6,-20,1.8]].forEach(([dx,dy,r])=>{ g.beginPath(); g.arc(x+dx,y+dy,r,0,Math.PI*2); g.fill(); });   // lichen
+  g.fillStyle='rgba(80,120,50,0.8)'; g.beginPath(); g.ellipse(x-4,y-2,8,2.6,0,0,Math.PI*2); g.fill(); g.beginPath(); g.ellipse(x+6,y-1,5,2,0,0,Math.PI*2); g.fill();
 }
 function paintScarecrow(x,y){
   g.strokeStyle='#5a3a1c'; g.lineWidth=3; g.beginPath(); g.moveTo(x,y); g.lineTo(x,y-70); g.moveTo(x-22,y-50); g.lineTo(x+22,y-50); g.stroke();
@@ -8333,7 +8344,7 @@ function drawObject(o){
   } else if(o.type==='altar'){ drawCached('altar',x,y,100,80,50,66,paintAltar); g.save(); g.globalCompositeOperation='lighter'; [-22,22].forEach(dx=>glow(x+dx,y-48,14,18,'255,200,110',0.5+Math.sin(gt*7+dx)*0.08)); g.restore();
   } else if(o.type==='pew'){ drawCached('pew2',x,y,110,100,40,70,paintPew);
   } else if(o.type==='gallows'){ drawCached('gallows2',x,y,120,214,56,200,paintGallows);
-  } else if(o.type==='milestone'){ drawCached('mile'+o.t,x,y,30,40,15,34,(X,Y)=>paintMilestone(X,Y,o.t));
+  } else if(o.type==='milestone'){ drawCached('mile2'+o.t,x,y,40,52,20,46,(X,Y)=>paintMilestone(X,Y,o.t));
   } else if(o.type==='scarecrow'){ drawCached('scarecrow',x,y,60,90,30,84,paintScarecrow);
   } else if(o.type==='notice'){
     drawCached('notice',x,y,40,70,20,64,paintNotice);
@@ -9241,6 +9252,8 @@ function paintGroundTexture(){
       if(G.path>0){ let tr=mixC([96,78,50],[74,58,36],fbm(gx*2.2,gy*2.2,66)); tr=mixC(tr,[52,44,30],smooth(0.6,0.75,fbm(gx*1.4,gy*1.4,67))*0.6); pc=mixC(pc,tr,smooth(0.25,0.75,G.path)); }
       const ao=1-0.45*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.02-0.1*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.08), o=(py*TWp+px)*4;
       D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
+    if(theme==='road'){ const fc=roadGroundPixel(gx,gy,G,w,h), ao=1-0.42*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.04-0.1*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.08), o=(py*TWp+px)*4;
+      D[o]=fc[0]*k; D[o+1]=fc[1]*k; D[o+2]=fc[2]*k; D[o+3]=255; continue; }
     if(theme==='farm' && !G.notch){ const fc=farmGroundPixel(gx,gy,G,w,h), ao=1-0.42*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.06-0.12*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.08), o=(py*TWp+px)*4;
       D[o]=fc[0]*k; D[o+1]=fc[1]*k; D[o+2]=fc[2]*k; D[o+3]=255; continue; }
     let c=mixC(G1,G2,smooth(0.25,0.8,fbm(gx*0.9,gy*0.9,1)));
@@ -23127,6 +23140,111 @@ function roadManTalk(dead,letter){ const m=NPCS.find(n=>n.id==='pellam'); if(!m)
   say('Old Pellam',main,[
     {label:'“Who is Hamond?”', fn:()=>say('Old Pellam',["“Elder of Dunhollow. Thirty souls, a well, and more sheep than sense, he'll tell you. But he's a fair man, and he reads, and he writes to the city.”"],[{label:"“I'll go to him.”", fn:go},{label:"“Why don't you take it yourself?”", fn:()=>say('Old Pellam',["“Me? With these knees, and Blackthorn's men on the road?” He laughs, and it turns into a cough. “I'm going home to my charcoal and my cat. You've the legs for it. And the blade, by the look of you.”"],[{label:"“All right. I'll go.”", fn:go}])}])},
     {label:"“I'll go to him.”", fn:go} ]); }
+// ════════ THE FOREST ROAD, done over: an old rutted road, a wayside shrine, a felled oak half sawn up, a brook under a plank bridge, bramble bushes worth picking ════════
+// berries: picked from a bramble, they grow back over three days; the bush shows them ripening as they come
+Object.assign(ITEMS,{ berries:{ name:'Bramble Berries', slot:'food', heal:5, title:'A handful of blackberries, warm from the sun. They stain everything.' } });
+try{ PRICES.berries=1; }catch(e){}
+ITEM_ICON.berries=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.fillStyle='#4a7a34'; g2.beginPath(); g2.ellipse(14,26,9,5,-0.5,0,Math.PI*2); g2.fill(); g2.beginPath(); g2.ellipse(27,28,8,4.5,0.5,0,Math.PI*2); g2.fill();
+  [[16,18],[22,15],[25,21],[18,24],[22,25],[28,16]].forEach(([x,y],k)=>{ g2.fillStyle=k%3===2?'#7a1a3a':'#2a0e22'; for(let d=0;d<5;d++){ const a=d/5*Math.PI*2; g2.beginPath(); g2.arc(x+Math.cos(a)*1.8,y+Math.sin(a)*1.8,1.6,0,Math.PI*2); g2.fill(); } g2.fillStyle='rgba(255,255,255,0.35)'; g2.beginPath(); g2.arc(x-1,y-1.2,0.8,0,Math.PI*2); g2.fill(); }); g2.restore(); };
+const BERRY_REGROW=3;                                                       // days
+const berryKey=o=>areaId+':'+o.i+','+o.j;
+const berryRipe=o=>{ const t=(CHOICE.berries||{})[berryKey(o)]; return t==null ? 1 : Math.min(1,(dayClock-t)/(DAY_LEN*BERRY_REGROW)); };
+OBJ_DRAW.berrybush=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, r=berryRipe(o), s=o.s||1, sw=Math.sin(gt*1.2+o.i)*0.8;
+  g.fillStyle='rgba(8,5,2,0.3)'; g.beginPath(); g.ellipse(x+4,y+2,24*s,8*s,0,0,Math.PI*2); g.fill();
+  g.strokeStyle='#5a3a2a'; g.lineWidth=1.2; g.lineCap='round'; for(let k=0;k<7;k++){ const a=-Math.PI*0.9+k*0.3; g.beginPath(); g.moveTo(x,y-2); g.quadraticCurveTo(x+Math.cos(a)*14*s,y-20*s,x+Math.cos(a)*26*s+sw,y-8*s+Math.sin(k)*5); g.stroke(); }   // arching bramble canes
+  const leaf=(lx,ly,c,rot)=>{ g.fillStyle=c; g.beginPath(); g.ellipse(lx,ly,4.2*s,2.6*s,rot,0,Math.PI*2); g.fill(); };
+  for(let k=0;k<34;k++){ const a=rnd01(k,o.i,1001)*Math.PI*2, rr=rnd01(k,o.j,1002), lx=x+Math.cos(a)*20*s*rr, ly=y-12*s+Math.sin(a)*10*s*rr-rr*4; leaf(lx+sw*rr,ly,['#3e6a2e','#4e7c34','#5a8a3a','#355e28'][k%4],a); }
+  g.strokeStyle='rgba(30,50,20,0.5)'; g.lineWidth=0.5; for(let k=0;k<10;k++){ const a=rnd01(k,o.i,1003)*Math.PI*2, lx=x+Math.cos(a)*16*s, ly=y-12*s+Math.sin(a)*7*s; g.beginPath(); g.moveTo(lx-2,ly); g.lineTo(lx+2,ly); g.stroke(); }
+  const n=Math.round(16*r); for(let k=0;k<16;k++){ const a=rnd01(k,o.i,1004)*Math.PI*2, rr=0.35+rnd01(k,o.j,1005)*0.6, bx=x+Math.cos(a)*18*s*rr, by=y-13*s+Math.sin(a)*8*s*rr;   // the fruit: green, then red, then black as it ripens
+    const ripe=k<n ? (r>=1?2:(k<n*0.5?1:0)) : -1; if(ripe<0){ if(r<0.2) continue; g.fillStyle='#8aa850'; g.beginPath(); g.arc(bx,by,1.2,0,Math.PI*2); g.fill(); continue; }
+    const c=ripe===2?'#2a0e22':ripe===1?'#8a1a2a':'#9ab44a'; for(let d=0;d<5;d++){ const aa=d/5*Math.PI*2; g.fillStyle=c; g.beginPath(); g.arc(bx+Math.cos(aa)*1.3,by+Math.sin(aa)*1.3,1.25,0,Math.PI*2); g.fill(); }
+    if(ripe===2){ g.fillStyle='rgba(255,255,255,0.4)'; g.beginPath(); g.arc(bx-0.8,by-0.8,0.6,0,Math.PI*2); g.fill(); } } };
+onUse(['berrybush'],o=>{ const r=berryRipe(o);
+  if(r<1){ const days=Math.ceil((1-r)*BERRY_REGROW); pzSay(r<0.3?'Picked bare. Only thorns and a few hard green berries.':'The berries are reddening, not ripe yet. '+(days<=1?'Tomorrow, perhaps.':'Another '+days+' days or so.'),'#c8a0c0'); return; }
+  const n=2+Math.floor(Math.random()*3); let got=0; for(let k=0;k<n;k++){ const f=slotFor('berries'); if(f<0) break; player.inv[f]='berries'; got++; }
+  if(!got){ pzSay('Your pack is full.','#e0b070'); return; }
+  (CHOICE.berries=CHOICE.berries||{})[berryKey(o)]=dayClock; try{ SND.fx('bag',0.6); }catch(e){} updateHud(); try{ refreshInventory(); }catch(e){}
+  floatText([o.i,o.j],'+'+got+' berries','#c070a0'); logMsg('You pick '+got+' handfuls of bramble berries, and only bleed a little.','#c8a0c0'); });
+// a wayside shrine: a little roofed post with a carved saint in it, candle stubs, and what travellers leave
+OBJ_DRAW.wayshrine=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, T=gt;
+  g.fillStyle='rgba(8,5,2,0.3)'; g.beginPath(); g.ellipse(x+5,y+2,20,7,0,0,Math.PI*2); g.fill();
+  g.fillStyle='#8a8478'; g.beginPath(); g.moveTo(x-10,y); g.lineTo(x+10,y); g.lineTo(x+8,y-8); g.lineTo(x-8,y-8); g.closePath(); g.fill(); g.fillStyle='#6a665a'; g.fillRect(x-8,y-9,16,2);   // a stone base
+  g.fillStyle='#5a3e24'; g.fillRect(x-2.6,y-48,5.2,40); g.fillStyle='#7a5634'; g.fillRect(x-2.6,y-48,1.6,40);
+  g.fillStyle='#4a3420'; g.fillRect(x-9,y-62,18,16); g.fillStyle='#1e140a'; g.fillRect(x-7,y-60,14,13);   // the little box
+  g.fillStyle='#c8b890'; g.beginPath(); g.ellipse(x,y-56,2.2,2.4,0,0,Math.PI*2); g.fill(); g.fillStyle='#a89870'; g.beginPath(); g.moveTo(x-3.4,y-48); g.lineTo(x+3.4,y-48); g.lineTo(x+2.2,y-54); g.lineTo(x-2.2,y-54); g.closePath(); g.fill();   // a carved saint, worn smooth
+  g.save(); g.globalCompositeOperation='lighter'; glow(x,y-55,8,8,'255,220,150',0.25); g.restore();
+  g.fillStyle='#3a2a20'; g.beginPath(); g.moveTo(x-13,y-60); g.lineTo(x,y-70); g.lineTo(x+13,y-60); g.lineTo(x+11,y-59); g.lineTo(x,y-67); g.lineTo(x-11,y-59); g.closePath(); g.fill();   // its roof
+  g.fillStyle='rgba(80,120,50,0.7)'; g.beginPath(); g.ellipse(x-6,y-63,4,1.6,-0.6,0,Math.PI*2); g.fill();
+  [[-6,-9],[5,-9],[-1,-10]].forEach(([dx,dy],k)=>{ const h=3+k*1.5; g.fillStyle='#e8dcc0'; g.fillRect(x+dx-1.2,y+dy-h,2.4,h); const fl=Math.sin(T*8+k*2)*0.5; g.fillStyle='#ffcf70'; g.beginPath(); g.moveTo(x+dx-1,y+dy-h); g.quadraticCurveTo(x+dx+fl,y+dy-h-4,x+dx+1,y+dy-h); g.fill();
+    g.save(); g.globalCompositeOperation='lighter'; glow(x+dx,y+dy-h-2,6,6,'255,180,90',0.3); g.restore(); });   // candle stubs
+  g.fillStyle='#e8a0b0'; g.beginPath(); g.arc(x+9,y-2,1.6,0,Math.PI*2); g.fill(); g.fillStyle='#f0e0f0'; g.beginPath(); g.arc(x+11,y-1,1.4,0,Math.PI*2); g.fill(); g.strokeStyle='#5a8a3a'; g.lineWidth=0.8; g.beginPath(); g.moveTo(x+9,y-1); g.lineTo(x+4,y+1); g.stroke();   // a few wildflowers
+  g.fillStyle='#c8a050'; [[-11,-1],[-9,0]].forEach(([dx,dy])=>{ g.beginPath(); g.ellipse(x+dx,y+dy,1.6,0.8,0,0,Math.PI*2); g.fill(); }); };   // and a couple of coppers
+onUse(['wayshrine'],o=>{ const d=Math.floor(dayClock/DAY_LEN), done=CHOICE.shrineDay===d;
+  say('A Wayside Shrine',["A worn wooden saint in a little roofed box, so old the face has gone. Someone keeps the candle stubs lit. Wildflowers, two coppers, a child's knotted string.",
+    done?"You have already left something here today.":"Travellers leave a coin for a safe road."],
+    done?[bye]:[{label:'Leave a copper for a safe road. (−1 copper)', off:player.purse<1, fn:()=>{ player.purse-=1; CHOICE.shrineDay=d; updateHud(); player.hp=Math.min(player.maxHp,player.hp+10); updateHud(); say('A Wayside Shrine',["You leave a copper with the others. It is a small thing. You feel a little steadier for it, all the same.","<i>+10 health.</i>"],[bye]); }}, bye]); });
+// an oak that came down across the verge: half sawn into rounds, the saw left in the cut, sawdust everywhere
+OBJ_DRAW.felledoak=o=>{ const L=o.fp[0]-0.2, at=t=>P(o.i+0.1+L*t,o.j+0.55), A=at(0), B=at(1), R=12, cut=0.6, C=at(cut), ang=Math.atan2(B.y-A.y,B.x-A.x), nx=-Math.sin(ang), ny=Math.cos(ang);
+  g.fillStyle='rgba(8,5,2,0.3)'; g.beginPath(); g.ellipse((A.x+C.x)/2+6,(A.y+C.y)/2+3,Math.hypot(C.x-A.x,C.y-A.y)/2+12,9,ang,0,Math.PI*2); g.fill();
+  for(let k=0;k<34;k++){ const p={x:C.x+16+(rnd01(k,2,1011)-0.5)*44,y:C.y+(rnd01(k,3,1012)-0.5)*16}; g.fillStyle=k%2?'#d8bc8a':'#c8a874'; g.fillRect(p.x,p.y,1.4,1); }   // sawdust
+  // the trunk: a long round log lying on the ground, lit from above, bark in ridges
+  const t0=0, t1=cut-0.02, P0=at(t0), P1=at(t1), cx=(P0.x+P1.x)/2, cy=(P0.y+P1.y)/2-R;
+  g.save(); g.beginPath(); g.moveTo(P0.x,P0.y-2*R); g.lineTo(P1.x,P1.y-2*R); g.lineTo(P1.x,P1.y); g.lineTo(P0.x,P0.y); g.closePath(); g.clip();
+  const gr=g.createLinearGradient(cx,cy-R,cx,cy+R); gr.addColorStop(0,'#8a7258'); gr.addColorStop(0.35,'#6a5640'); gr.addColorStop(1,'#3a2e22'); g.fillStyle=gr; g.fillRect(Math.min(P0.x,P1.x)-2,Math.min(P0.y,P1.y)-2*R-2,Math.abs(P1.x-P0.x)+4,Math.abs(P1.y-P0.y)+2*R+4);
+  g.strokeStyle='rgba(30,22,14,0.55)'; g.lineWidth=0.9; for(let k=0;k<5;k++){ const off=-R*1.7+k*R*0.42; g.beginPath(); for(let t=0;t<=1.0001;t+=0.05){ const p=at(t0+(t1-t0)*t); const yy=p.y+off+Math.sin(t*30+k*2)*1.2; t?g.lineTo(p.x,yy):g.moveTo(p.x,yy); } g.stroke(); }   // bark ridges running along it
+  g.fillStyle='rgba(90,130,60,0.75)'; for(let k=0;k<4;k++){ const p=at(0.08+k*0.13); g.beginPath(); g.ellipse(p.x,p.y-2*R+3,7,2.4,ang,0,Math.PI*2); g.fill(); }   // moss along the top
+  g.restore();
+  g.fillStyle='#3a2e22'; g.beginPath(); g.ellipse(P0.x,P0.y-R,R*0.5,R,0,0,Math.PI*2); g.fill();   // the far end, broken off rough
+  g.strokeStyle='#4a3a2a'; g.lineWidth=4; g.lineCap='round'; [[0.15,-1.4,-10],[0.35,-1.9,8]].forEach(([t,yy,dx])=>{ const p=at(t); g.beginPath(); g.moveTo(p.x,p.y+R*yy); g.lineTo(p.x+dx,p.y+R*yy-12); g.stroke(); });   // branch stubs, lopped
+  const F=at(t1); g.fillStyle='#c8a46e'; g.beginPath(); g.ellipse(F.x,F.y-R,R*0.5,R,0,0,Math.PI*2); g.fill();   // the clean sawn face
+  g.strokeStyle='rgba(120,80,40,0.6)'; g.lineWidth=0.6; [0.3,0.55,0.8].forEach(k=>{ g.beginPath(); g.ellipse(F.x,F.y-R,R*0.5*k,R*k,0,0,Math.PI*2); g.stroke(); }); g.strokeStyle='#4a3a2a'; g.lineWidth=1.2; g.beginPath(); g.ellipse(F.x,F.y-R,R*0.5,R,0,0,Math.PI*2); g.stroke();
+  const S0=at(t1-0.08); g.fillStyle='#a8aeb2'; g.beginPath(); g.moveTo(S0.x-2,S0.y-2*R-1); g.lineTo(S0.x+24,S0.y-2*R-13); g.lineTo(S0.x+26,S0.y-2*R-8); g.lineTo(S0.x+1,S0.y-2*R+4); g.closePath(); g.fill();   // the saw, left in a fresh cut
+  g.strokeStyle='#5a6064'; g.lineWidth=0.6; for(let k=0;k<9;k++){ const t=k/9; g.beginPath(); g.moveTo(S0.x+t*26,S0.y-2*R+4-t*12); g.lineTo(S0.x+t*26+1.3,S0.y-2*R+6-t*12); g.stroke(); }
+  g.fillStyle='#6a4a2a'; g.fillRect(S0.x+24,S0.y-2*R-16,4,10);
+  [[0.8,-0.15],[0.95,0.2]].forEach(([t,dj])=>{ const p=P(o.i+0.1+L*t,o.j+0.55+dj); g.fillStyle='rgba(8,5,2,0.3)'; g.beginPath(); g.ellipse(p.x+3,p.y+1,11,4,0,0,Math.PI*2); g.fill();   // two rounds sawn off, stood on end
+    g.fillStyle='#5a4632'; g.beginPath(); g.moveTo(p.x-9,p.y-16); g.lineTo(p.x-9,p.y); g.ellipse(p.x,p.y,9,4,0,Math.PI,0,true); g.lineTo(p.x+9,p.y-16); g.closePath(); g.fill();
+    g.fillStyle='#c8a46e'; g.beginPath(); g.ellipse(p.x,p.y-16,9,4,0,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(120,80,40,0.6)'; g.lineWidth=0.6; g.beginPath(); g.ellipse(p.x,p.y-16,5,2.2,0,0,Math.PI*2); g.stroke(); }); };
+// a brook crossing the road: running water over stones, reeds at its edges, a plank bridge where the road goes over
+OBJ_DRAW.brook=o=>{ const T=gt, i0=o.i, j0=o.j, L=o.fp[1], wq=(t,s)=>P(i0+0.5+s*0.38+Math.sin(t*2.2+1)*0.12,j0+t);
+  g.save(); g.beginPath(); for(let k=0;k<=24;k++){ const p=wq(k/24*L,-1); k?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y); } for(let k=24;k>=0;k--){ const p=wq(k/24*L,1); g.lineTo(p.x,p.y); } g.closePath();
+  g.fillStyle='#5a4a34'; g.fill(); g.clip();                                                                     // the bed
+  const wg=g.createLinearGradient(P(i0,j0).x,P(i0,j0).y,P(i0+1,j0+L).x,P(i0+1,j0+L).y); wg.addColorStop(0,'rgba(60,96,104,0.92)'); wg.addColorStop(1,'rgba(40,70,80,0.92)'); g.fillStyle=wg; g.fill();
+  for(let k=0;k<26;k++){ const t=((rnd01(k,1,1020)*L+T*0.35)%L), s=(rnd01(k,2,1021)-0.5)*1.4, p=wq(t,s); g.strokeStyle='rgba(220,240,245,'+(0.25+0.25*rnd01(k,3,1022))+')'; g.lineWidth=0.8; g.beginPath(); g.moveTo(p.x-3,p.y-1); g.quadraticCurveTo(p.x,p.y-2.4,p.x+3,p.y); g.stroke(); }   // ripples, running downstream
+  for(let k=0;k<10;k++){ const p=wq(rnd01(k,4,1023)*L,(rnd01(k,5,1024)-0.5)*1.6); g.fillStyle=['#7a766c','#5e5a52','#8a8478'][k%3]; g.beginPath(); g.ellipse(p.x,p.y,3+rnd01(k,6,1025)*2,1.8,0,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(230,245,250,0.5)'; g.lineWidth=0.6; g.beginPath(); g.ellipse(p.x,p.y,5,2.4,0,Math.PI*0.9,Math.PI*1.9); g.stroke(); }   // stones breaking the water
+  g.restore();
+  for(let k=0;k<14;k++){ const t=rnd01(k,7,1026)*L, sd=k%2?1:-1; if(t>1.4 && t<3.6) continue; const p=wq(t,sd*1.05); g.strokeStyle=['#6a8a4a','#7a9a50','#5a7a3a'][k%3]; g.lineWidth=1; for(let b=0;b<4;b++){ g.beginPath(); g.moveTo(p.x+b*1.4-2,p.y); g.quadraticCurveTo(p.x+b*2-3,p.y-8,p.x+b*2.6-4+Math.sin(T*1.5+k)*1,p.y-14-b*2); g.stroke(); } if(k%4===0){ g.fillStyle='#6a4a2a'; g.beginPath(); g.ellipse(p.x+2,p.y-16,1.2,3,0,0,Math.PI*2); g.fill(); } }   // reeds and a bulrush or two
+  { const b0=1.55, b1=3.45, n=7; for(let k=0;k<n;k++){ const t=b0+(b1-b0)*k/n, t2=b0+(b1-b0)*(k+0.9)/n, a=P(i0-0.15,j0+t), b=P(i0+1.15,j0+t), c=P(i0+1.15,j0+t2), d=P(i0-0.15,j0+t2);   // the plank bridge
+      g.fillStyle='rgba(8,5,2,0.35)'; g.beginPath(); g.moveTo(a.x+3,a.y+4); g.lineTo(b.x+3,b.y+4); g.lineTo(c.x+3,c.y+4); g.lineTo(d.x+3,d.y+4); g.closePath(); g.fill();
+      g.fillStyle=k%2?'#8a6a44':'#7a5c3a'; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c.x,c.y); g.lineTo(d.x,d.y); g.closePath(); g.fill(); g.strokeStyle='rgba(30,18,8,0.5)'; g.lineWidth=0.6; g.stroke(); }
+    [[i0-0.15,b0],[i0-0.15,b1],[i0+1.15,b0],[i0+1.15,b1]].forEach(([u,v])=>{ const p=P(u,j0+v); g.fillStyle='#4a3420'; g.fillRect(p.x-1.6,p.y-6,3.2,8); }); } };
+// light through the canopy: slow soft patches drifting over the road by day
+OBJ_DRAW.dapple=o=>{ const n=typeof nightAmt==='function'?nightAmt():0; if(n>0.6) return; const a=(1-n/0.6)*0.16, T=gt; g.save(); g.globalCompositeOperation='soft-light';
+  for(let k=0;k<o.n;k++){ const gx=o.i+rnd01(k,1,1030)*o.fp[0]+Math.sin(T*0.13+k)*0.25, gy=o.j+rnd01(k,2,1031)*o.fp[1]+Math.cos(T*0.11+k*1.3)*0.15, q=P(gx,gy), r=18+rnd01(k,3,1032)*26;
+    const gr=g.createRadialGradient(q.x,q.y,1,q.x,q.y,r); gr.addColorStop(0,'rgba(255,240,190,'+a*3+')'); gr.addColorStop(1,'rgba(255,240,190,0)'); g.fillStyle=gr; g.beginPath(); g.ellipse(q.x,q.y,r,r*0.5,0,0,Math.PI*2); g.fill(); } g.restore(); };
+// foxgloves and mossy stones along the verges
+OBJ_DRAW.foxglove=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x+(o.dx||0), y=q.y, s=o.s||1, sw=Math.sin(gt*1.4+o.i)*0.8;
+  g.fillStyle='#4a7a34'; [[-5,-1],[5,0],[0,1]].forEach(([dx,dy])=>{ g.beginPath(); g.ellipse(x+dx,y+dy-2,5*s,2.2*s,dx*0.1,0,Math.PI*2); g.fill(); });
+  [[-3,0],[3,0.6]].forEach(([dx,ph])=>{ const top={x:x+dx+sw,y:y-30*s}; g.strokeStyle='#5a8a3a'; g.lineWidth=1.2; g.beginPath(); g.moveTo(x+dx,y-2); g.lineTo(top.x,top.y); g.stroke();
+    for(let k=0;k<7;k++){ const t=0.25+k*0.1, bx=x+dx+(top.x-x-dx)*t+1.6, by=y-2+(top.y-y+2)*t; g.fillStyle=k<2?'#e8c0e0':(k%2?'#c860a8':'#d478b8'); g.beginPath(); g.ellipse(bx,by,2.2*s*(1.1-t*0.4),1.6*s,0.4,0,Math.PI*2); g.fill(); g.fillStyle='rgba(80,20,60,0.6)'; g.beginPath(); g.arc(bx+0.6,by+0.4,0.4,0,Math.PI*2); g.fill(); } }); };
+OBJ_DRAW.mossrock=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x+(o.dx||0), y=q.y, s=o.s||1;
+  g.fillStyle='rgba(8,5,2,0.3)'; g.beginPath(); g.ellipse(x+3,y+1,14*s,5*s,0,0,Math.PI*2); g.fill();
+  const gr=g.createLinearGradient(x-12*s,y-14*s,x+12*s,y); gr.addColorStop(0,'#8a867c'); gr.addColorStop(1,'#4e4a42'); g.fillStyle=gr; g.beginPath(); g.moveTo(x-13*s,y); g.quadraticCurveTo(x-14*s,y-10*s,x-4*s,y-13*s); g.quadraticCurveTo(x+8*s,y-14*s,x+13*s,y-4*s); g.quadraticCurveTo(x+13*s,y+1,x,y+1.5); g.closePath(); g.fill();
+  g.fillStyle='#5a7a34'; g.beginPath(); g.moveTo(x-12*s,y-6*s); g.quadraticCurveTo(x-10*s,y-13*s,x-2*s,y-13.5*s); g.quadraticCurveTo(x+6*s,y-13*s,x+8*s,y-9*s); g.quadraticCurveTo(x+2*s,y-9*s,x-4*s,y-6*s); g.quadraticCurveTo(x-8*s,y-4*s,x-12*s,y-6*s); g.closePath(); g.fill();
+  g.fillStyle='rgba(140,170,80,0.55)'; for(let k=0;k<6;k++){ g.beginPath(); g.arc(x-8*s+k*2.6*s,y-11*s+Math.sin(k)*1.4,1.2,0,Math.PI*2); g.fill(); }
+  g.fillStyle='rgba(200,200,150,0.45)'; g.beginPath(); g.ellipse(x+7*s,y-4*s,2.2,1.2,0,0,Math.PI*2); g.fill(); };   // a bloom of lichen
+// the road's own ground: two wheel ruts with grass between, water standing in them, stones shoved up at the edges, the forest floor creeping in
+function roadGroundPixel(gx,gy,G,w,h){ const n=fbm(gx*0.7,gy*0.7,401), n2=fbm(gx*2.2,gy*2.2,402), n3=fbm(gx*8,gy*8,403);
+  let c=mixC([56,80,34],[100,124,54],smooth(0.25,0.8,n)); c=mixC(c,[110,96,52],smooth(0.5,0.8,fbm(gx*1.3,gy*1.3,404))*0.35);   // grass with leaf litter
+  const edge=Math.min(gy,h-gy); c=mixC(c,[46,62,30],(1-smooth(0.2,1.3,edge))*0.6);                                  // darker under the trees
+  c=mixC(c,n3>0.55?[110,138,60]:[48,70,28],Math.abs(n3-0.5)*0.55);
+  const p=G.path; if(p<=0) return c;
+  let dirt=mixC([110,86,56],[140,112,76],n2); dirt=mixC(dirt,[92,72,48],smooth(0.55,0.75,fbm(gx*3,gy*3,405))*0.5);
+  const d=G.d, rut=(1-smooth(0.03,0.11,Math.abs(d-0.34)))*smooth(0.2,0.7,fbm(gx*0.6,gy*0.6,409)+0.3), crown=1-smooth(0.04,0.13,d);
+  dirt=mixC(dirt,[88,68,46],rut*0.45);                                                                          // the ruts, pressed dark
+  dirt=mixC(dirt,mixC([86,110,48],[66,90,38],n3),crown*0.55);                                                  // the grassy crown between them
+  const pud=rut*smooth(0.7,0.74,fbm(gx*0.9,gy*0.9,406)); if(pud>0) dirt=mixC(dirt,mixC([96,116,124],[70,88,96],n2),pud*0.85);   // standing water
+  const margin=smooth(0.5,0.9,p)*(1-smooth(0.55,0.95,fbm(gx*1.6,gy*1.6,407))*0.4);
+  return mixC(c,dirt,margin); }
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of FARM_YARD){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

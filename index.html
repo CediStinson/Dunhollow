@@ -10710,9 +10710,13 @@ function showDialog(name,text,opts,purse){
     const onlyBye=opts.length && opts.every(o=>o===bye || o.fn===closeDialog || /^(Farewell|Leave|Not now|Close|Bow and leave)/.test(String(o.label)));
     const hasBack=opts.some(o=>/^Back\b/.test(String(o.label)));
     const root=TALKERS[TALK_NPC.id], who=TALK_NPC;
-    let changed=false; try{ changed=TALK_STATE!=='' && JSON.stringify(CHOICE)!==TALK_STATE; }catch(e){}         // something was decided: going 'back' would replay the question
-    if(onlyBye && !hasBack && !changed && TALK_ROOT_REAL>0 && root && name===who.name) opts=[{label:'Back.', fn:()=>{ TALK_NPC=who; TALK_DEPTH=0; root(); }}, ...opts]; }
+    let changed=false; try{ changed=TALK_STATE!=='' && talkSnap()!==TALK_STATE; }catch(e){}         // something was decided: going 'back' would replay the question
+    const hasLeave=opts.some(o=>o===bye || o.fn===closeDialog || /^(Farewell|Leave|Not now|Close|Bow and leave|Back away)/.test(String(o.label)));
+    if((onlyBye || hasLeave) && !hasBack && !changed && TALK_ROOT_REAL>0 && root && name===who.name){ const k=opts.findIndex(o=>o===bye || o.fn===closeDialog || /^(Farewell|Leave|Not now|Close|Bow and leave|Back away)/.test(String(o.label))); opts=[...opts.slice(0,k),{label:'Back.', fn:()=>{ TALK_NPC=who; TALK_DEPTH=0; root(); }},...opts.slice(k)]; } }   // any deeper screen you can walk away from, you can also step back from
   else TALK_DEPTH=0;
+  if(TALK_NPC && Array.isArray(opts) && !/Gratis/.test(name) && !opts.some(o=>/^(Sell|I have things to sell)/i.test(String(o.label)))){   // a merchant: selling sits right beside buying, not hidden inside the shop
+    const k=opts.findIndex(o=>{ const L=String(o.label||''); if(/\(-?\d+\s*c\)|-\d+c/.test(L)) return false; let src=''; try{ src=String(o.fn); }catch(e){} return /shopFrom\(/.test(src) && !/,\s*0\s*,/.test(src.split('shopFrom(')[1]||'') || /^(Show me your (wares|packs|work|draughts)|Look at (her|his) wares|Buy (food|bread|draughts|healing)|What have you got|Trade\.|Worn things)/i.test(L); });
+    if(k>=0){ const who=TALK_NPC, root=TALKERS[who.id]; opts=[...opts.slice(0,k+1),{label:'Sell something.', fn:()=>sellTo(name,()=>{ TALK_NPC=who; TALK_DEPTH=0; root?root():closeDialog(); })},...opts.slice(k+1)]; } }
   if(CS.on){ CS.queued.push([name,text,opts,purse]); return; }   // during a cutscene it waits for the end
   if(BATH_NOTE){ text=[BATH_NOTE,...[].concat(text)]; BATH_NOTE=null; }
   document.getElementById('dlg-name').textContent=name;
@@ -10800,11 +10804,13 @@ function npcHasNews(n){                                // '!' new business, '?' 
       if(Q==='listen') return (CHOICE.listened||[]).length>=3 ? '?' : null;
       if(Q==='hanged') return hasItem('hanged_bones') && invCount('old_bone')>=3 ? '?' : null;
       if(Q==='crypt') return CHOICE.cryptDone ? '?' : null;
+      if(!Q && CHOICE.necro==='met' && CHOICE.necroZ==='asked') return hasItem('blackthorn_stave') ? '?' : null;   // the blackthorn she sent you for: nothing new until you bring it
       if(!Q && (CHOICE.necro==='met' || N===1 || N===2)) return '!'; })();
     if(r) return r; }
   if(n.id==='orvell' && CHOICE.appr!=='taken'){ const K=(CHOICE.mageKnown||[]).length, Q=CHOICE.mageQ;     // the magister's lessons
     if(Q==='light' && invCount('bottled_wisp')>=3) return '?'; if(Q==='cold' && (CHOICE.baths||0)>=2) return '?'; if(Q==='ember' && (CHOICE.embers||[]).length>=3) return '?';
-    if(!Q && K>0 && K<3) return '!'; }
+    if(!Q && !K && CHOICE.mageZ==='asked') return hasItem('storm_limb') ? '?' : null;   // he sent you for the storm-oak: nothing new until you bring it
+    if(!Q && K<3) return '!'; }   // a lesson still on offer (the first included), whatever became of Tessaly
   if((n.id==='tessaly_k'||n.id==='tessaly_s') && (CHOICE.mageKnown||[]).length>=3 && !CHOICE.tessLesson) return '!';
   if(n.id==='saelle_l' && !CHOICE.saelle2) return '!';
   if(typeof techKnown==='function'){ if(n.id==='hunter' && QUEST.wolves>=2 && !techKnown('lunge')) return '!'; if(n.id==='harl_v' && !techKnown('riposte')) return '!'; }   // a lesson waiting
@@ -10816,7 +10822,7 @@ function npcHasNews(n){                                // '!' new business, '?' 
 }
 const TALKERS={};
 function talkTo(n){
-  TALK_NPC=n; TALK_DEPTH=0; TALK_ROOT_REAL=-1; try{ TALK_STATE=JSON.stringify(CHOICE); }catch(e){ TALK_STATE=''; } GEST_INV=gestSnap(); GEST_WHO=n;
+  TALK_NPC=n; TALK_DEPTH=0; TALK_ROOT_REAL=-1; try{ TALK_STATE=talkSnap(); }catch(e){ TALK_STATE=''; } GEST_INV=gestSnap(); GEST_WHO=n;
   if(combat.active) return;
   if(n && disguised() && !BARON_FOLK.has(n.id) && !/guard/i.test(n.id||'')){        // in the purple bandana, honest folk will not deal with you
     if(n.wander){ n.path=[]; n.moving=false; n.wait=4; }
@@ -17080,6 +17086,7 @@ function drawBaronBanner(o){ const q=P(o.i,o.j+0.5); drawCached('baronbanner',q.
 let TALK_NPC=null, TALK_DEPTH=0;
 const dlgIsOpen=()=>typeof dlgOverlay!=='undefined' && dlgOverlay.classList.contains('open');
 let TALK_STATE='', TALK_ROOT_REAL=0;
+const talkSnap=()=>JSON.stringify(CHOICE,(k,v)=>k==='invN'||k==='bells'||k==='berries'?undefined:v);   // what counts as a decision taken in a conversation (not stack counts or picked berries)
 
 const RT_HOLD=()=> TALK_NPC && dlgIsOpen() ? TALK_NPC : null;
 // "Back." on every reply that would otherwise only say goodbye, inside a conversation you started
@@ -18755,7 +18762,7 @@ setInterval(()=>{ if(running && !Array.isArray(CHOICE.mageKnown)) CHOICE.mageKno
 
 // ── Orvell sits in the Wheatsheaf while he is still hunting his apprentice; after that he goes home to the Castle Ward ──
 function ORVELL_AT_INN(){ const A=CHOICE.appr; if(!A || A==='asked') return true; if(A==='taken') return false;     // he goes home once there is nothing left for him to do in Dunhollow:
-  const K=Array.isArray(CHOICE.mageKnown)?CHOICE.mageKnown.length:0; if(!K && !CHOICE.mageQ) return false;              // never started lessons: home with his apprentice (or without her)
+  const K=Array.isArray(CHOICE.mageKnown)?CHOICE.mageKnown.length:0;                                                   // he stays while he still has lessons to give, even if you have not asked for one yet
   return K<3 || (A==='returned' && !CHOICE.tessLesson); }                                                                // otherwise not until he, and Tessaly, have taught you everything
 wrap('wheatsheaf','npcs',l=> ORVELL_AT_INN() ? [...l,{ id:'orvell', name:'Magister Orvell', i:1, j:1, dir:1, opts:{gender:'m',skin:0,hair:4,hairColor:13,beard:5,face:0,equip:{head:'hood',torso:'tunic_blue',armor:'robe_blue',hands:null,legs:null,feet:'boots',weapon:'staff_oak',offhand:null}} }] : l);
 

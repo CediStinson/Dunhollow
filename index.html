@@ -12927,10 +12927,12 @@ function resetMobs(){
   if(!(A.inside && !A.cave && !A.under)){              // nobody lies in wait right at a doorway or beside a townsfolk
     const ents=Object.values(A.entries||{}), tps=OBJECTS.filter(o=>o.type==='teleporter');
     const tooClose=(i,j)=> NPCS.some(n=>Math.max(Math.abs(n.i-i),Math.abs(n.j-j))<=3) || [...ents,...tps].some(e=>Math.max(Math.abs(e.i-i),Math.abs(e.j-j))<=2);
-    mobs.forEach((m,k)=>{ if(m.dead || m.hostile===false || m.type==='dummy' || (MOB_SPAWNS[k]&&MOB_SPAWNS[k].gate) || !tooClose(m.i,m.j)) return;   // gate: set to hold a way out on purpose
-      let best=null, bd=1e9;
+    const E0=ents[0], reach=(i,j)=>!E0 || (i===E0.i&&j===E0.j) || !!findPath(E0.i,E0.j,i,j);   // a foe must stand where you can get at it
+    mobs.forEach((m,k)=>{ if(m.dead || m.hostile===false || m.type==='dummy' || (MOB_SPAWNS[k]&&MOB_SPAWNS[k].gate) || (!tooClose(m.i,m.j) && reach(m.i,m.j))) return;   // gate: set to hold a way out on purpose
+      let best=null, bd=1e9; const cand=[];
       for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++){ if(blocked.has(i+','+j) || (A.maze && typeof mazeGrid==='function' && !mazeGrid(areaId)[j*ROOM.w+i]) || inNotch(i,j) || tooClose(i,j) || mobs.some(o=>o!==m && !o.dead && o.i===i && o.j===j)) continue;
-        const d=Math.abs(i-m.i)+Math.abs(j-m.j); if(d<bd){ bd=d; best=[i,j]; } }
+        cand.push([Math.abs(i-m.i)+Math.abs(j-m.j),i,j]); }
+      cand.sort((a,b)=>a[0]-b[0]); for(const [d,i,j] of cand){ if(reach(i,j)){ bd=d; best=[i,j]; break; } }
       if(best){ m.i=best[0]; m.j=best[1]; m.x=m.i+0.5; m.y=m.j+0.5; m.spawn=[m.i,m.j]; } }); }
   const day=Math.floor(dayClock/DAY_LEN);              // now and then a road tough is a hedge-caster instead
   mobs.forEach((m,k)=>{ if(m.dead || !ROAD_TOUGHS.has(m.name) || m.type!=='bandit') return;

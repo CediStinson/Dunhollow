@@ -5406,7 +5406,7 @@ function switchArea(id,entryKey){
   OBJECTS.push(...genTrees(id));
   // broken crates and barrels leave their boards behind, even after you come back
   OBJECTS.forEach(o=>{ if(o.type==='crates' || o.type==='barrels'){ o.breakable=true; return; }        // stacks placed by hand (Marta's stock) open too, and keep their look
-    if(o.type!=='crate' && o.type!=='barrel') return; o.breakable=true;           // every container can be opened
+    if((o.type!=='crate' && o.type!=='barrel') || o.decor) return; o.breakable=true;           // every container can be opened
     const h=hsh(o.i*7+3,o.j*13+id.length)%10;
     if(o.type==='crate') o.type = o.rich ? 'chest' : h<3 ? 'crates' : 'crate';
     else o.type = h<3 ? 'barrels' : 'barrel'; });
@@ -5717,7 +5717,7 @@ function genTrees(id){
   const keep=[];
   const busy=new Set();
   const mark=(i,j,r)=>{ for(let a=-r;a<=r;a++) for(let b=-r;b<=r;b++) busy.add((i+a)+','+(j+b)); };
-  OBJECTS.forEach(o=>{ if(o.type==='dapple' || (o.noblock && o.dz!=null && o.dz<-90 && o.type!=='brook')) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) mark(o.i+a,o.j+b,o.noblock?0:(o.fp||o.type==='teleporter'||o.type==='house'||o.type==='berrybush')?1:0); });   // a berry bush keeps room round it to be picked   // flowers, stones, light: no ring kept clear round them
+  OBJECTS.forEach(o=>{ if(o.type==='dapple' || (o.noblock && o.dz!=null && o.dz<-90 && o.type!=='brook')) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) mark(o.i+a,o.j+b,o.noblock?0:(o.fp||['teleporter','house','berrybush','barrel','barrels','crate','crates','chest','pickup','stash'].includes(o.type))?1:0); });   // nothing worth opening is ever grown shut in   // a berry bush keeps room round it to be picked   // flowers, stones, light: no ring kept clear round them
   NPCS.forEach(n=>mark(n.i,n.j,1)); MOB_SPAWNS.forEach(m=>mark(m.i,m.j,1));
   Object.values(A.entries).forEach(e=>mark(e.i,e.j,1));
   for(let j=0;j<A.h;j++) for(let i=0;i<A.w;i++){
@@ -11439,7 +11439,7 @@ Object.assign(AREAS,{
       {type:'teleporter', i:3, j:5, to:'citygate', entry:'fromCity'},
       {type:'hearth', i:0, j:2}, {type:'table', i:2, j:1}, {type:'table', i:4, j:1}, {type:'table', i:4, j:3},
       {type:'counter', i:6, j:2, fp:[1,3]},
-      {type:'barrel', i:7, j:0}, {type:'barrel', i:7, j:1}, {type:'barrel', i:6, j:0, breakable:true},
+      {type:'barrel', i:7, j:0, decor:true}, {type:'barrel', i:7, j:1, decor:true}, {type:'barrel', i:6, j:0, decor:true},   // Hilde's beer, behind her bar: not yours to smash
     ].filter(o=>!o.breakable || !destroyedBreakables.has('inn:'+o.i+','+o.j)),
     npcs:()=>[
       { id:'hilde', name:'Hilde the Innkeeper', i:7, j:3, dir:2, opts:{gender:'f',skin:1,hair:4,hairColor:5,face:0,equip:{head:null,torso:'tunic_green',armor:null,hands:null,legs:'breeches',feet:'boots',weapon:null,offhand:null}} },

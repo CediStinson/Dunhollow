@@ -5200,9 +5200,9 @@ const AREAS = {
       {type:'garden', i:0, j:7, fp:[4,4], noblock:true},
     ].filter(o=>!o.breakable || !destroyedBreakables.has('farm:'+o.i+','+o.j)),
     mobs:()=>[
-      { name:'Bandit Thug', type:'brute', i:10, j:8, faction:'bandits',
+      { name:'Bandit Thug', type:'brute', i:16, j:4, faction:'bandits', gate:true,
         opts:{gender:'m',skin:3,hair:2,hairColor:1,beard:5,equip:{head:'bandana',torso:'tunic_red',armor:'studded',hands:'gloves',legs:'trousers',feet:'boots',weapon:'mace'}} },
-      { name:'Bandit Hedge-Witch', type:'mage', i:11, j:9, faction:'bandits',
+      { name:'Bandit Hedge-Witch', type:'mage', i:16, j:6, faction:'bandits', gate:true,
         opts:{gender:'f',skin:4,hair:5,hairColor:0,equip:{head:'bandana',torso:'tunic_green',armor:'robe',hands:null,legs:'hose_grey',feet:'boots',weapon:'staff_hex',offhand:null}} },
     ],
     entries:{ start:{i:6,j:1}, fromRoad:{i:16,j:5}, fromHouse:{i:3,j:1} },
@@ -12840,7 +12840,7 @@ function resetMobs(){
   if(!(A.inside && !A.cave && !A.under)){              // nobody lies in wait right at a doorway or beside a townsfolk
     const ents=Object.values(A.entries||{}), tps=OBJECTS.filter(o=>o.type==='teleporter');
     const tooClose=(i,j)=> NPCS.some(n=>Math.max(Math.abs(n.i-i),Math.abs(n.j-j))<=3) || [...ents,...tps].some(e=>Math.max(Math.abs(e.i-i),Math.abs(e.j-j))<=2);
-    mobs.forEach(m=>{ if(m.dead || m.hostile===false || m.type==='dummy' || !tooClose(m.i,m.j)) return;
+    mobs.forEach((m,k)=>{ if(m.dead || m.hostile===false || m.type==='dummy' || (MOB_SPAWNS[k]&&MOB_SPAWNS[k].gate) || !tooClose(m.i,m.j)) return;   // gate: set to hold a way out on purpose
       let best=null, bd=1e9;
       for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++){ if(blocked.has(i+','+j) || (A.maze && typeof mazeGrid==='function' && !mazeGrid(areaId)[j*ROOM.w+i]) || inNotch(i,j) || tooClose(i,j) || mobs.some(o=>o!==m && !o.dead && o.i===i && o.j===j)) continue;
         const d=Math.abs(i-m.i)+Math.abs(j-m.j); if(d<bd){ bd=d; best=[i,j]; } }
@@ -15873,6 +15873,7 @@ function bathScene(who, note, chestSpot, ti, tj){
 
 // ── first visits: Brann fighting off a wolf, Grane spotting you, the loggers at the oak ──
 function introScene(id,e){ try{
+    if(id==='road' && e==='fromFarm' && !CHOICE.csRoadMan){ CHOICE.csRoadMan=true; setTimeout(()=>{ if(areaId==='road') roadManScene(); },450); }
     if(id==='clearing' && !CHOICE.csBrann){ const br=NPCS.find(n=>n.id==='hunter'); if(br){ CHOICE.csBrann=true; setTimeout(()=>{ if(areaId==='clearing') brannScene(br); },350); } }
     else if(id==='farm' && e==='fromHouse' && !CHOICE.csFarm && mobs.some(m=>m.faction==='bandits' && !m.dead)){ CHOICE.csFarm=true; setTimeout(()=>{ if(areaId==='farm') farmScene(); },350); }
     else if(id==='fellings' && !CHOICE.csFell && mobs.some(m=>m.name==='Overseer Grane' && !m.dead)){ CHOICE.csFell=true; setTimeout(()=>{ if(areaId==='fellings') fellScene(); },350); }
@@ -23109,6 +23110,23 @@ JOURNAL.push(['The Hollow Choir', ()=> !CHOICE.succ ? null
 // what you sold them stays with you: less life, more of something else
 { const _r=refreshPlayerHp; refreshPlayerHp=function(full){ _r.apply(this,arguments); const T=CHOICE.tithe; if(T && T.hp){ player.maxHp=Math.max(10,player.maxHp-T.hp); player.hp=Math.min(player.hp,player.maxHp); } }; }
 { const _a=activeEffects; activeEffects=function(){ const L=_a(); const T=CHOICE.tithe; if(T && (T.hp||T.ap||T.sp)) L.push({ico:'⛧',name:'Blood Tithe',kind:'The Hollow Choir',bad:false,rows:[...(T.hp?[['Max health','−'+T.hp]]:[]),...(T.ap?[['Attack power','+'+T.ap+' (+'+T.ap*3+'% weapon damage)']]:[]),...(T.sp?[['Spell power','+'+T.sp+' (+'+T.sp*4+'% spell damage)']]:[])],tip:'Sold to the daughters of the Hollow Choir, in the Weeping Hollow. It will not grow back.'+(T.tam?' Part of it bought a boy who did not want to be saved.':'')+(T.taste?' Sometimes you dream of a mill-lane kitchen, and a cough.':'')}); return L; }; }
+// ════════ Old Pellam on the forest road: the first time you leave the farm he hobbles up to you and tells you what those men were, and where to take what they carried ════════
+const PELLAM={gender:'m',skin:1,hair:2,hairColor:12,beard:4,face:1,equip:{head:'hood',torso:'smock',armor:null,hands:null,legs:'hose_grey',feet:'boots',weapon:'staff_oak',offhand:null}};
+function roadManScene(){ if(CS.on) return; const m={ id:'pellam', name:'Old Pellam', i:7, j:2, x:7.5, y:2.5, dir:6, path:[], opts:PELLAM }; NPCS.push(m);
+  const dead=!mobs.length || loreNoteGiven || defeatedMobs.has('farm:Bandit Thug'), letter=hasItem('letter');
+  cutscene([ csFocus(m,0.6), csBark(m,'You there! Hold up, hold up…',1.8), csWalk(m,Math.min(player.i+1,32),player.j,1.5), csLook(m,player), csLook(player,m), csFocus(player,0.3),
+    csSay(m,"Phew. These knees. You've come off the Aldwin farm? I saw the smoke of their cookfire from the ridge.",3.2),
+    csSay(m,dead?"Two of them, was it? A big lout in red and a woman with a painted face? And you saw them off. Well I never.":"Two of them still sat at your gate, I'll wager. A big lout in red, and a woman with a painted face.",3.2),
+    csSay(m,"Mara Blackthorn's lot. They've been bleeding every farm from here to the Mill Track since harvest. Took Joss Fenner's pigs. Near enough took Joss Fenner.",3.8),
+    csSay(m,"And the Baron's men? Ha! The Baron's men count his taxes and look the other way.",3.0) ], ()=>roadManTalk(dead,letter)); }
+function roadManTalk(dead,letter){ const m=NPCS.find(n=>n.id==='pellam'); if(!m) return;
+  const go=()=>{ closeDialog(); remember('roadMan',true,"Old Pellam, a charcoal-burner on the forest road, said the bandits were Mara Blackthorn's men, and that Elder Hamond in Dunhollow must hear of it."); m.bark={text:'Mind the road, now.',t:0}; goOff(m,33,2,{speed:1.1}); };
+  const main=letter ? ["He squints at the sealed letter in your hand, and goes still.","“That came off one of them? Don't open it, friend. And don't sell it neither, whoever offers. That seal means somebody important is paying for this.”","“Take it to Elder Hamond in Dunhollow. East along this road, then up Dunhollow Lane. Show it him. He'll know what to make of it.”"]
+    : dead ? ["“Did they carry anything? Letters, coin, a token?” He shakes his head. “Either way, go up to Dunhollow and tell Elder Hamond what happened. East along this road, then up Dunhollow Lane.”"]
+    : ["“You'll not get your farm back while those two sit on it. See them off, if you've the stomach. Anything they carry, take it to Elder Hamond in Dunhollow. He's the only one round here who still writes to people who matter.”"];
+  say('Old Pellam',main,[
+    {label:'“Who is Hamond?”', fn:()=>say('Old Pellam',["“Elder of Dunhollow. Thirty souls, a well, and more sheep than sense, he'll tell you. But he's a fair man, and he reads, and he writes to the city.”"],[{label:"“I'll go to him.”", fn:go},{label:"“Why don't you take it yourself?”", fn:()=>say('Old Pellam',["“Me? With these knees, and Blackthorn's men on the road?” He laughs, and it turns into a cough. “I'm going home to my charcoal and my cat. You've the legs for it. And the blade, by the look of you.”"],[{label:"“All right. I'll go.”", fn:go}])}])},
+    {label:"“I'll go to him.”", fn:go} ]); }
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of FARM_YARD){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

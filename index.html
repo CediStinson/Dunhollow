@@ -9669,6 +9669,12 @@ function pointerUp(px,py){
     if(m && cheb([m.i,m.j],[player.i,player.j])<=6){ startCombat(); return; }
     // (animals are not clicked: a click always goes to the door, chest or tile underneath)
     { const st=typeof stairsAt==='function' && stairsAt(ti,tj); if(st){ goStairs(st); return; } }
+    // a click on the upper part of a crate or barrel lands on the ground behind it (often a wall or a house): catch the sprite too
+    let spriteBrk=null; { const own=OBJECTS.some(o=>(o.breakable||o.type==='pickup'||(typeof PUZ_TYPES!=='undefined'&&PUZ_TYPES.has(o.type))) && o.i===ti && o.j===tj) || NPCS.some(n=>n.i===ti&&n.j===tj);
+      if(!own){ const sx=px-r.left, sy=py-r.top, TALL={barrel:44,crate:40,chest:30,crates:72,barrels:58,stash:36,jar:30}; let bd=-1e9;
+        OBJECTS.forEach(o=>{ if(!o.breakable) return; const q=P(o.i+0.5,o.j+0.5), H=TALL[o.type]||40; if(Math.abs(sx-q.x)<=24 && sy<=q.y+8 && sy>=q.y-H-6 && o.i+o.j>bd){ bd=o.i+o.j; spriteBrk=o; } });
+        if(spriteBrk){ const o=spriteBrk; if(cheb([o.i,o.j],[player.i,player.j])<=1){ breakObject(o); return; }
+          let best=null; for(const [di,dj] of DIR_DELTA){ const p=findPath(player.i,player.j,o.i+di,o.j+dj); if(p && (!best||p.length<best.length)) best=p; } if(best){ player.path=best; pendingBreak=o; } return; } } }
     const pz = (typeof PUZ_TYPES!=='undefined') && OBJECTS.find(o=>PUZ_TYPES.has(o.type) && o.i===ti && o.j===tj);
     if(pz){ if(cheb([pz.i,pz.j],[player.i,player.j])<=1){ puzAct(pz); return; }
       let best=null; for(const [di,dj] of DIR_DELTA){ const p=findPath(player.i,player.j,pz.i+di,pz.j+dj); if(p && (!best||p.length<best.length)) best=p; }
@@ -9708,7 +9714,7 @@ function pointerUp(px,py){
       for(let a=-1;a<=fw;a++) for(let b2=-1;b2<=fh;b2++){ if(a>=0&&a<fw&&b2>=0&&b2<fh) continue; const p=findPath(player.i,player.j,bed.i+a,bed.j+b2); if(p && (!best||p.length<best.length)) best=p; }
       if(best){ player.path=best; pendingBed=bed; }
       return; }
-    const brk = OBJECTS.find(o=>o.breakable && o.i===ti && o.j===tj);
+    const brk = OBJECTS.find(o=>o.breakable && o.i===ti && o.j===tj) || spriteBrk;
     if(brk){
       if(cheb([brk.i,brk.j],[player.i,player.j])<=1){ breakObject(brk); return; }
       let best=null;

@@ -11100,7 +11100,7 @@ function holtTalk(){ say('Holt',"“Mara says hello, friend. The village pays us
 function surveyorTalk(){
   if(CHOICE.stones==='fight'){ say('Surveyor Quill',"“Guards! GUARDS!”",[bye]); return; }
   const opts=[];
-  if(hasItem('seal')) opts.push({label:"Show him the Baron's seal and the orders it carries.", fn:()=>{ remember('stones','saved_seal','The surveyor fled when he saw the Baron\'s seal in your hands.'); stonesAfter(); stonesLeave(['surveyor','stguard1','stguard2'],3.2);
+  if(hasItem('seal')) opts.push({label:"Show him the Baron's seal and the orders it carries.", fn:()=>{ remember('stones','saved_seal','The surveyor fled when he saw the Baron\'s seal in your hands.'); stonesAfter();
     say('Surveyor Quill',["“This… this is the Baron's own hand. Ordering murder. I was never here.”",WRIT_TEXT],[bye]); afterTalk(()=>{ stonesLeave(['surveyor','stguard1','stguard2'],2.8,true); }); }});
   if(QUEST.letter>=2 && !hasItem('seal')) opts.push({label:"“Hamond has written to the lords about your Baron.” (-15 copper to sweeten it)", off:player.purse<15, note:'-15c', fn:()=>{ player.purse-=15; updateHud(); remember('stones','saved_word','You talked the surveyor out of his work, with a little silver.'); stonesAfter(); stonesLeave(['surveyor','stguard1','stguard2'],1.4);
     say('Surveyor Quill',["“Written, you say? To the lords? Measurements are so often wrong. Such a pity.”",WRIT_TEXT],[bye]); }});
@@ -18236,9 +18236,16 @@ function peddlerStock(pool,n){ const T=(CHOICE.pedd&&CHOICE.pedd.trip)||0, h=[..
 const COOKS={ raw_meat:'cooked_meat', fish_perch:'grilled_fish', fish_trout:'grilled_fish', fish_carp:'grilled_fish', fish_eel:'grilled_fish', fish_herring:'grilled_fish' };
 function campfireCook(o){ if(o && o.type==='campfire' && typeof rainingHere==='function' && rainingHere()){ say('A Campfire',"<i>The rain has put the fire out. Wait for it to stop, or cook at a hearth indoors.</i>",[bye]); return; }
   const T=o&&o.type==='hearth'?'The Hearth':'A Campfire', raw=player.inv.map((id,k)=>({id,k})).filter(x=>x.id && COOKS[x.id]);
-  if(!raw.length){ say(T,"The fire crackles. Bring raw meat or a fish and you can cook it here.",[bye]); return; }
+  const hearth=o&&o.type==='hearth', soups=hearth ? Math.min(Math.floor(invCount('berries')/2),invCount('bread')) : 0;   // bramble soup wants a pot, so only at a hearth
+  const soupOpt=hearth ? [{label:'Make bramble soup. (2 berries and a loaf each)', off:!soups, note:soups?'×'+soups:'need 2 berries + bread', fn:()=>{
+      const take=id=>{ const k=player.inv.indexOf(id); if(k>=0) player.inv[k]=null; };
+      for(let q=0;q<soups;q++){ take('berries'); take('berries'); take('bread'); const f=slotFor('berry_soup'); if(f>=0) player.inv[f]='berry_soup'; }
+      try{ SND.fx('sizzle',0.5); }catch(e){} updateHud(); refreshFoodBar(); if(invOverlay.classList.contains('open')) refreshInventory();
+      logMsg('You stew the berries down in a pot on the hearth and tear the bread into it: '+soups+'× Bramble Soup (+'+ITEMS.berry_soup.heal+' HP each).','#8ad07a');
+      say(T,"The pot blips and steams. The whole room smells of late summer.",[bye]); }}] : [];
+  if(!raw.length){ say(T,hearth?"The fire crackles under an iron pot. Bring raw meat or fish to roast, or bramble berries and bread for a soup.":"The fire crackles. Bring raw meat or a fish and you can cook it here.",[...soupOpt,bye]); return; }
   const names={}; raw.forEach(x=>names[x.id]=(names[x.id]||0)+1);
-  say(T,["You crouch by the fire. "+Object.entries(names).map(([id,n])=>n+'× '+ITEMS[id].name).join(', ')+"."],[
+  say(T,["You crouch by the fire. "+Object.entries(names).map(([id,n])=>n+'× '+ITEMS[id].name).join(', ')+"."],[...soupOpt,
     {label:'Cook it all.', fn:()=>{ SND.fx('sizzle'); raw.forEach(x=>{ player.inv[x.k]=COOKS[x.id]; }); updateHud(); refreshFoodBar(); if(invOverlay.classList.contains('open')) refreshInventory();
       const out={}; raw.forEach(x=>{ const c=COOKS[x.id]; out[c]=(out[c]||0)+1; }); logMsg('You cook over the fire: '+Object.entries(out).map(([id,n])=>n+'× '+ITEMS[id].name).join(', ')+'.','#8ad07a');
       say(T,"Fat spits in the flames. The smell alone is worth it.",[bye]); }}, bye]); }
@@ -23261,8 +23268,16 @@ function roadManTalk(dead,letter){ const m=NPCS.find(n=>n.id==='pellam'); if(!m)
     {label:"“I'll go to him.”", fn:go} ]); }
 // ════════ THE FOREST ROAD, done over: an old rutted road, a wayside shrine, a felled oak half sawn up, a brook under a plank bridge, bramble bushes worth picking ════════
 // berries: picked from a bramble, they grow back over three days; the bush shows them ripening as they come
-Object.assign(ITEMS,{ berries:{ name:'Bramble Berries', slot:'food', heal:5, title:'A handful of blackberries, warm from the sun. They stain everything.' } });
-try{ PRICES.berries=1; }catch(e){}
+Object.assign(ITEMS,{ berries:{ name:'Bramble Berries', slot:'food', heal:5, title:'A handful of blackberries, warm from the sun. They stain everything. Two handfuls and a loaf, stewed in a pot at a hearth, make a soup.' } });
+Object.assign(ITEMS,{ berry_soup:{ name:'Bramble Soup', slot:'food', heal:40, title:'Blackberries stewed down dark and sweet, with a heel of bread torn into it. Cooked at a hearth.' } });
+try{ PRICES.berries=1; PRICES.berry_soup=5; }catch(e){}
+ITEM_ICON.berry_soup=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40);
+  g2.fillStyle='#6a4a2c'; g2.beginPath(); g2.moveTo(6,20); g2.quadraticCurveTo(20,40,34,20); g2.closePath(); g2.fill();                       // a wooden bowl
+  g2.fillStyle='#8a6440'; g2.beginPath(); g2.ellipse(20,20,14,5,0,0,Math.PI*2); g2.fill();
+  g2.fillStyle='#5a1a34'; g2.beginPath(); g2.ellipse(20,20,12,4,0,0,Math.PI*2); g2.fill();                                                    // dark berry broth
+  g2.fillStyle='#c8904a'; g2.beginPath(); g2.ellipse(15,19,4,2,0.3,0,Math.PI*2); g2.fill(); g2.beginPath(); g2.ellipse(24,20,3,1.6,-0.2,0,Math.PI*2); g2.fill();   // bread in it
+  g2.fillStyle='#2a0e22'; [[19,18],[27,19],[12,21]].forEach(([x,y])=>{ g2.beginPath(); g2.arc(x,y,1.4,0,Math.PI*2); g2.fill(); });
+  g2.strokeStyle='rgba(255,255,255,0.4)'; g2.lineWidth=1; [12,20,28].forEach(x=>{ g2.beginPath(); g2.moveTo(x,13); g2.quadraticCurveTo(x+2,9,x,5); g2.stroke(); }); g2.restore(); };   // steam
 ITEM_ICON.berries=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.fillStyle='#4a7a34'; g2.beginPath(); g2.ellipse(14,26,9,5,-0.5,0,Math.PI*2); g2.fill(); g2.beginPath(); g2.ellipse(27,28,8,4.5,0.5,0,Math.PI*2); g2.fill();
   [[16,18],[22,15],[25,21],[18,24],[22,25],[28,16]].forEach(([x,y],k)=>{ g2.fillStyle=k%3===2?'#7a1a3a':'#2a0e22'; for(let d=0;d<5;d++){ const a=d/5*Math.PI*2; g2.beginPath(); g2.arc(x+Math.cos(a)*1.8,y+Math.sin(a)*1.8,1.6,0,Math.PI*2); g2.fill(); } g2.fillStyle='rgba(255,255,255,0.35)'; g2.beginPath(); g2.arc(x-1,y-1.2,0.8,0,Math.PI*2); g2.fill(); }); g2.restore(); };
 const BERRY_REGROW=3;                                                       // days
@@ -23280,10 +23295,10 @@ OBJ_DRAW.berrybush=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, r=berryRipe(o)
     if(ripe===2){ g.fillStyle='rgba(255,255,255,0.4)'; g.beginPath(); g.arc(bx-0.8,by-0.8,0.6,0,Math.PI*2); g.fill(); } } };
 onUse(['berrybush'],o=>{ const r=berryRipe(o);
   if(r<1){ const days=Math.ceil((1-r)*BERRY_REGROW); pzSay(r<0.3?'Picked bare. Only thorns and a few hard green berries.':'The berries are reddening, not ripe yet. '+(days<=1?'Tomorrow, perhaps.':'Another '+days+' days or so.'),'#c8a0c0'); return; }
-  const n=2+Math.floor(Math.random()*3); let got=0; for(let k=0;k<n;k++){ const f=slotFor('berries'); if(f<0) break; player.inv[f]='berries'; got++; }
+  const n=1+(Math.random()<0.4?1:0); let got=0; for(let k=0;k<n;k++){ const f=slotFor('berries'); if(f<0) break; player.inv[f]='berries'; got++; }
   if(!got){ pzSay('Your pack is full.','#e0b070'); return; }
   (CHOICE.berries=CHOICE.berries||{})[berryKey(o)]=dayClock; try{ SND.fx('bag',0.6); }catch(e){} updateHud(); try{ refreshInventory(); }catch(e){}
-  floatText([o.i,o.j],'+'+got+' berries','#c070a0'); logMsg('You pick '+got+' handfuls of bramble berries, and only bleed a little.','#c8a0c0'); });
+  floatText([o.i,o.j],'+'+got+' berries','#c070a0'); logMsg('You pick '+(got>1?got+' handfuls':'a handful')+' of bramble berries, and only bleed a little.','#c8a0c0'); });
 // a wayside shrine: a little roofed post with a carved saint in it, candle stubs, and what travellers leave
 OBJ_DRAW.wayshrine=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, T=gt;
   g.fillStyle='rgba(8,5,2,0.3)'; g.beginPath(); g.ellipse(x+5,y+2,20,7,0,0,Math.PI*2); g.fill();

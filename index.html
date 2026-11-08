@@ -5706,19 +5706,19 @@ function paintRock(x,y,s){
   else if(AREAS[areaId].theme!=='sand'){ g.fillStyle='rgba(90,130,50,0.75)'; g.beginPath(); g.ellipse(x-2*s,y-6.5*s,4.5*s,1.6*s,-0.2,0,Math.PI*2); g.fill(); }   // moss cap (none in the desert)
 }
 // ── trees are real, depth-sorted objects (they block their tile, so nobody walks through a trunk) ──
-const TREE_DENSITY = { farm:0.08, road:0.7, crossroads:0.6, village:0.2, wood:0.9, fen:0.5, elf:0.7, bog:0.2 };
+const TREE_DENSITY = { farm:0.08, road:1.0, crossroads:0.85, village:0.2, wood:1.2, fen:0.65, elf:0.85, bog:0.3 };
 function genTrees(id){
   const A=AREAS[id], dens=A.dens??(TREE_DENSITY[A.theme]||0); if(!dens) return [];
   const saveArea=areaId; areaId=id;                           // groundAt reads the current area's paths
   const keep=[];
   const busy=new Set();
   const mark=(i,j,r)=>{ for(let a=-r;a<=r;a++) for(let b=-r;b<=r;b++) busy.add((i+a)+','+(j+b)); };
-  OBJECTS.forEach(o=>{ const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) mark(o.i+a,o.j+b,o.type==='teleporter'?2:1); });
-  NPCS.forEach(n=>mark(n.i,n.j,1)); MOB_SPAWNS.forEach(m=>mark(m.i,m.j,2));
+  OBJECTS.forEach(o=>{ if(o.type==='dapple' || (o.noblock && o.dz!=null && o.dz<-90 && o.type!=='brook')) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) mark(o.i+a,o.j+b,o.noblock?0:(o.fp||o.type==='teleporter'||o.type==='house')?1:0); });   // flowers, stones, light: no ring kept clear round them
+  NPCS.forEach(n=>mark(n.i,n.j,1)); MOB_SPAWNS.forEach(m=>mark(m.i,m.j,1));
   Object.values(A.entries).forEach(e=>mark(e.i,e.j,1));
   for(let j=0;j<A.h;j++) for(let i=0;i<A.w;i++){
     if(busy.has(i+','+j) || inNotch(i,j)) continue;
-    const G=groundAt(i+0.5,j+0.5); if(G.path>0.08 || G.d<1.4) continue;
+    const G=groundAt(i+0.5,j+0.5); if(G.path>0.08 || G.d<(A.theme==='village'||A.theme==='farm'||A.theme==='city'?1.4:1.2)) continue;
     const edge = Math.min(i,j,A.w-1-i,A.h-1-j);
     const want = dens*(edge===0?1.8:edge===1?1.2:0.8)*(A.theme==='village'||A.theme==='farm' ? (edge===0?1:0) : 1);
     if(rnd01(i*7+id.length,j*13,90)<want && !keep.some(t=>Math.abs(t.i-i)<=1 && Math.abs(t.j-j)<=1 && rnd01(i,j,122)<0.3)){
@@ -11711,13 +11711,17 @@ Object.assign(TALKERS,{ apprentice:apprenticeTalk, ellin:ellinTalk, cole:coleTal
 const encounter=(key,chance)=>{ const day=Math.floor(dayClock/DAY_LEN); return rnd01(day*17+key.length,key.charCodeAt(0),400)<chance; };   // same answer all day, new roll the next
 Object.assign(AREAS,{
   lane:{ fence:{r:false,l:false}, w:15, h:24, theme:'road', label:'Dunhollow Lane', mini:{x:0,y:0}, corridor:1.7, dens:1.7,
+    bushes:[[11.3,9.4,'fern',1.0],[13.7,9.2,'fern',0.9],[7.8,20.3,'fern',1.0],[12.3,20.0,'shrub',1.0],[0.5,8.3,'fern',1.1],[2.6,4.2,'shrub',0.9],[4.6,1.3,'fern',1.0],[8.3,2.4,'fern',0.9],[14.3,3.5,'shrub',1.0],[11.6,16.2,'fern',1.0],[9.6,19.7,'shrub',0.9],[0.4,15.3,'fern',1.0],[14.5,13.0,'fern',0.9],[6.5,11.6,'flower',0.8]],
     // a forest road that wanders: a long sweep east, back west under a crag, then up past the old boulders to Dunhollow
     notches:()=>[ {i0:3,j0:16,w:5,h:3,kind:'plough'}, {i0:6,j0:7,w:4,h:3} ], dummy:null,
     objects:()=>{ const l=[{type:'teleporter', i:10, j:0, to:'village', entry:'fromCrossroads'}, {type:'teleporter', i:0, j:23, to:'road', entry:'fromCrossroads'},
-      {type:'milestone', i:3, j:22, t:'DUN ½'}, {type:'scarecrow', i:5, j:17}, {type:'shrine', i:1, j:13},
+      {type:'milestone', i:3, j:22, t:'DUN ½'}, {type:'garden', i:3, j:16, fp:[5,3], noblock:true}, {type:'shrine', i:1, j:13},
       {type:'logpile', i:13, j:23},
-      {type:'crag', i:8, j:16, fp:[4,4], v:1}, {type:'crag', i:0, j:17, fp:[3,2], v:2}, {type:'crag', i:11, j:6, fp:[3,3], v:3},   // great grey stones in the loops and the forest
-      {type:'crag', i:0, j:4, fp:[2,3], v:4}, {type:'crag', i:5, j:0, fp:[3,2], v:5},
+      {type:'crag', i:8, j:16, fp:[4,4], v:1}, {type:'boulder', i:0, j:17, v:2}, {type:'boulder', i:2, j:18, v:5}, {type:'mossrock', i:1, j:17, noblock:true, s:1.1}, {type:'crag', i:11, j:6, fp:[3,3], v:3},   // great grey stones in the loops and the forest, and smaller ones between
+      {type:'boulder', i:0, j:4, v:4}, {type:'boulder', i:1, j:6, v:1}, {type:'mossrock', i:0, j:5, noblock:true, dx:6, s:1.2}, {type:'mossrock', i:1, j:4, noblock:true, s:0.8}, {type:'crag', i:5, j:0, fp:[3,2], v:5}, {type:'mossrock', i:9, j:1, noblock:true, s:0.9},
+      {type:'skeps', i:1, j:20}, {type:'stile', i:6, j:15, noblock:true}, {type:'stooks', i:7, j:10, noblock:true}, {type:'stooks', i:9, j:10, noblock:true}, {type:'fieldshelter', i:10, j:10},
+      ...[[13,11],[4,9],[12,2],[6,21]].map(([i,j],k)=>({type:'berrybush', i, j, s:0.9+(k%2)*0.15})),
+      ...[[5,10,4],[12,23,-6],[8,20,6]].map(([i,j,dx])=>({type:'foxglove', i, j, dx, noblock:true})),
       {type:'rockridge', i:12, j:12, fp:[3,1], v:1}, {type:'rockridge', i:4, j:11, fp:[3,1], v:2}];
       if(!destroyedBreakables.has('lane:13,22')) l.push({type:'crate', i:13, j:22, breakable:true});
       [[7,23],[13,17],[2,11],[8,5]].forEach(([i,j])=>l.push({type:'critter', kind:'flowers', i, j, noblock:true}));
@@ -22594,7 +22598,7 @@ const FAUNA_AT={
   market:[['pigeon',13,13,4],['cat',6,20,1],['horse',22,22,1]],
   keepward:[['horse',10,16,1],['pigeon',16,12,3],['cat',22,6,1]], lowstreets:[['cat',8,8,1],['pigeon',14,18,3],['dog',18,18,1]],
   citygate:[['horse',7,16,1],['pigeon',6,8,3]], docks:[['cat',5,6,1],['pigeon',9,5,3]], portfearn:[['cat',8,6,1],['pigeon',10,8,3]],
-  road:[['rabbit',8,1,2],['deer',24,3,2]], lane:[['rabbit',3,10,2],['deer',11,16,1]], kingsroad:[['rabbit',2,20,1],['deer',5,36,2]], millroad:[['rabbit',6,4,2],['deer',20,2,1]],
+  road:[['rabbit',8,1,2],['deer',24,3,2]], lane:[['rabbit',3,10,2],['deer',11,16,1],['goat',4,11,1]], kingsroad:[['rabbit',2,20,1],['deer',5,36,2]], millroad:[['rabbit',6,4,2],['deer',20,2,1]],
   crossroads:[['rabbit',8,8,2]], clearing:[['deer',8,5,2],['rabbit',3,7,1]], fellings:[['deer',9,4,2],['rabbit',4,6,1]], willowpool:[['deer',8,7,2],['frog',5,5,3],['rabbit',2,3,1]],
   sylvhaven:[['stag',4,9,1],['owl',16,15,1],['fox',13,11,1],['rabbit',6,15,1],['deer',15,6,1]], silvergate:[['fox',6,4,1],['owl',1,1,1],['rabbit',3,6,1]], elfroad:[['deer',3,12,2],['fox',4,20,1],['owl',1,6,1]],
   varrowpass:[['eagle',5,12,1],['goat',2,8,2],['goat',8,18,2]], varrowmine:[['pony',4,6,2]], varrowgate:[['pony',3,8,1]],
@@ -23245,6 +23249,47 @@ function roadGroundPixel(gx,gy,G,w,h){ const n=fbm(gx*0.7,gy*0.7,401), n2=fbm(gx
   const pud=rut*smooth(0.7,0.74,fbm(gx*0.9,gy*0.9,406)); if(pud>0) dirt=mixC(dirt,mixC([96,116,124],[70,88,96],n2),pud*0.85);   // standing water
   const margin=smooth(0.5,0.9,p)*(1-smooth(0.55,0.95,fbm(gx*1.6,gy*1.6,407))*0.4);
   return mixC(c,dirt,margin); }
+// ════════ DUNHOLLOW LANE: the edge of the village — beehives, a stile, sheaves stooked by the wheat, a field shelter ════════
+// three straw skeps on a plank bench, bees about them
+OBJ_DRAW.skeps=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, T=gt;
+  g.fillStyle='rgba(8,5,2,0.3)'; g.beginPath(); g.ellipse(x+4,y+2,30,9,0,0,Math.PI*2); g.fill();
+  const b0=P(o.i+0.05,o.j+0.5), b1=P(o.i+0.95,o.j+0.5); g.fillStyle='#6a4a2c'; [b0,b1].forEach(p=>g.fillRect(p.x-1.6,p.y-10,3.2,10));
+  g.fillStyle='#8a6844'; g.beginPath(); g.moveTo(b0.x-4,b0.y-10); g.lineTo(b1.x+4,b1.y-10); g.lineTo(b1.x+4,b1.y-13); g.lineTo(b0.x-4,b0.y-13); g.closePath(); g.fill();
+  [0.2,0.5,0.8].forEach((t,k)=>{ const p=P(o.i+0.05+0.9*t,o.j+0.5), sx=p.x, sy=p.y-13;
+    for(let r=0;r<5;r++){ const w=10-r*1.6, yy=sy-r*3.2; g.fillStyle=r%2?'#c8a050':'#b08a3e'; g.beginPath(); g.ellipse(sx,yy-1.6,w,3.2,0,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(90,60,20,0.5)'; g.lineWidth=0.5; g.beginPath(); g.ellipse(sx,yy-1.6,w,3.2,0,0,Math.PI); g.stroke(); }   // coiled straw
+    g.fillStyle='#d8b860'; g.beginPath(); g.ellipse(sx,sy-17,3,2,0,0,Math.PI*2); g.fill(); g.fillStyle='#2a1a0a'; g.beginPath(); g.ellipse(sx,sy-1.5,2.4,1.4,0,0,Math.PI*2); g.fill(); });   // the little door at the foot
+  for(let k=0;k<9;k++){ const a=T*(1.4+k*0.17)+k*2.1, bx=x+Math.cos(a)*(14+k%3*5), by=y-26+Math.sin(a*1.3)*8; g.fillStyle='#2a1e0a'; g.beginPath(); g.ellipse(bx,by,1.1,0.8,0,0,Math.PI*2); g.fill(); g.fillStyle='rgba(230,240,255,0.6)'; g.beginPath(); g.ellipse(bx-0.6,by-0.9,0.8,0.4,0,0,Math.PI*2); g.fill(); } };
+// a stile over the field fence: two steps and a post to steady yourself by
+OBJ_DRAW.stile=o=>{ const p=P(o.i+0.5,o.j+1), x=p.x, y=p.y;
+  g.fillStyle='rgba(8,5,2,0.28)'; g.beginPath(); g.ellipse(x+3,y+1,14,4,0,0,Math.PI*2); g.fill();
+  g.fillStyle='#5a3e24'; [[-8,22],[8,22],[0,38]].forEach(([dx,h])=>g.fillRect(x+dx-1.6,y-h,3.2,h));
+  g.fillStyle='#8a6a44'; g.fillRect(x-11,y-9,22,3); g.fillRect(x-11,y-18,22,3); g.fillStyle='rgba(255,230,180,0.25)'; g.fillRect(x-11,y-9,22,1); g.fillRect(x-11,y-18,22,1);
+  g.fillStyle='rgba(30,18,8,0.4)'; g.fillRect(x-4,y-9,8,1.2); };   // worn smooth in the middle by boots
+// sheaves of wheat stood up together to dry
+OBJ_DRAW.stooks=o=>{ const T=gt; [[0.3,0.4],[0.75,0.6]].forEach(([u,v],k)=>{ const p=P(o.i+u,o.j+v), x=p.x, y=p.y;
+    g.fillStyle='rgba(8,5,2,0.28)'; g.beginPath(); g.ellipse(x+4,y+2,13,4.5,0,0,Math.PI*2); g.fill();
+    [-6,0,6,-3,3].forEach((dx,s)=>{ const lean=dx*0.04, top={x:x+dx*0.45,y:y-26-(s>2?2:0)}; g.fillStyle=s>2?'#c89a48':'#d8b060'; g.beginPath(); g.moveTo(x+dx-3,y); g.lineTo(x+dx+3,y); g.lineTo(top.x+2,top.y+6); g.lineTo(top.x-2,top.y+6); g.closePath(); g.fill();
+      g.strokeStyle='rgba(120,80,30,0.45)'; g.lineWidth=0.5; for(let r=-2;r<=2;r+=2){ g.beginPath(); g.moveTo(x+dx+r*0.8,y); g.lineTo(top.x+r*0.4,top.y+6); g.stroke(); }
+      for(let e=0;e<5;e++){ g.strokeStyle='#e8c870'; g.lineWidth=1; g.beginPath(); g.moveTo(top.x,top.y+6); g.lineTo(top.x-4+e*2+Math.sin(T*1.4+e+k)*0.6,top.y-2-(e%2)*2); g.stroke(); } });   // ears at the top
+    g.fillStyle='#8a6a34'; g.fillRect(x-6,y-12,12,1.6); }); };   // a twist of straw binding them
+// an open field shelter: four posts, a thatched lean-to roof, tools hung under it
+OBJ_DRAW.fieldshelter=o=>{ const T=TW/2, H2=TH/2, X0=P(o.i+0.5,o.j+0.5), pt=(a,b,h=0)=>({x:X0.x+(a-b)*T, y:X0.y+(a+b)*H2-h}), poly=(ps,f)=>{ g.beginPath(); ps.forEach((p,n)=>n?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); g.fillStyle=f; g.fill(); };
+  const a=-0.4, b=0.4, Hb=70, Hf=46;
+  poly([pt(a,a),pt(b,a),pt(b,b),pt(a,b)],'rgba(14,10,4,0.5)'); g.fillStyle='rgba(8,5,2,0.25)'; g.beginPath(); g.ellipse(X0.x+14,X0.y+6,40,13,0,0,Math.PI*2); g.fill();   // the deep shade under the roof
+  g.fillStyle='rgba(200,170,90,0.6)'; for(let k=0;k<12;k++){ const p=pt(-0.3+rnd01(k,1,1040)*0.6,-0.3+rnd01(k,2,1041)*0.6); g.fillRect(p.x,p.y,3,1); }   // straw on the ground
+  const post=(u,v,h)=>{ const p=pt(u,v); g.fillStyle='rgba(8,5,2,0.3)'; g.beginPath(); g.ellipse(p.x+2,p.y+1,5,2,0,0,Math.PI*2); g.fill(); g.fillStyle='#4a321c'; g.fillRect(p.x-3,p.y-h,6,h); g.fillStyle='#7a5634'; g.fillRect(p.x-3,p.y-h,2,h); };
+  post(a,a,Hb); post(b,a,Hb);
+  { const r0=pt(a+0.1,a,Hb-10), r1=pt(b-0.1,a,Hb-10); g.strokeStyle='#5a3e24'; g.lineWidth=2; g.beginPath(); g.moveTo(r0.x,r0.y); g.lineTo(r1.x,r1.y); g.stroke();   // a rail at the back with a scythe, a rake and a coil of rope
+    const s=pt(-0.1,a,Hb-10); g.strokeStyle='#6a4a2a'; g.lineWidth=1.6; g.beginPath(); g.moveTo(s.x,s.y); g.lineTo(s.x+4,s.y+26); g.stroke(); g.strokeStyle='#a8aeb2'; g.lineWidth=1.8; g.beginPath(); g.moveTo(s.x+4,s.y+26); g.quadraticCurveTo(s.x+14,s.y+24,s.x+20,s.y+16); g.stroke();
+    const rk=pt(0.18,a,Hb-10); g.strokeStyle='#6a4a2a'; g.lineWidth=1.4; g.beginPath(); g.moveTo(rk.x,rk.y); g.lineTo(rk.x-2,rk.y+24); g.stroke(); g.lineWidth=1; for(let k=0;k<5;k++){ g.beginPath(); g.moveTo(rk.x-6+k*2.4,rk.y+20); g.lineTo(rk.x-6+k*2.4,rk.y+26); g.stroke(); } g.beginPath(); g.moveTo(rk.x-6,rk.y+20); g.lineTo(rk.x+4,rk.y+20); g.stroke();
+    const rp=pt(-0.28,a,Hb-14); g.strokeStyle='#b8a070'; g.lineWidth=1.2; for(let k=0;k<3;k++){ g.beginPath(); g.ellipse(rp.x,rp.y+6,4-k*0.4,6-k*0.6,0,0,Math.PI*2); g.stroke(); } }
+  post(a,b,Hf); post(b,b,Hf);
+  const roof=[pt(a-0.12,b+0.14,Hf-2),pt(b+0.12,b+0.14,Hf-2),pt(b+0.12,a-0.12,Hb+2),pt(a-0.12,a-0.12,Hb+2)];
+  const rg=g.createLinearGradient(roof[3].x,roof[3].y,roof[0].x,roof[0].y); rg.addColorStop(0,'#9a8040'); rg.addColorStop(1,'#5e4a22'); poly(roof,rg);
+  g.strokeStyle='rgba(90,70,30,0.5)'; g.lineWidth=0.7; for(let k=1;k<9;k++){ const t=k/9, p={x:roof[0].x+(roof[1].x-roof[0].x)*t,y:roof[0].y+(roof[1].y-roof[0].y)*t}, q={x:roof[3].x+(roof[2].x-roof[3].x)*t,y:roof[3].y+(roof[2].y-roof[3].y)*t}; g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(q.x,q.y); g.stroke(); }
+  g.strokeStyle='#4a3a1a'; g.lineWidth=1; for(let k=0;k<=24;k++){ const t=k/24, p={x:roof[0].x+(roof[1].x-roof[0].x)*t,y:roof[0].y+(roof[1].y-roof[0].y)*t}; g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(p.x+(k%2?0.6:-0.6),p.y+4+(k%3)); g.stroke(); }   // the thatch hanging ragged at the eave
+  g.strokeStyle='#3a2a12'; g.lineWidth=3; g.beginPath(); g.moveTo(roof[3].x,roof[3].y); g.lineTo(roof[2].x,roof[2].y); g.stroke();
+  poly([roof[1],roof[2],{x:roof[2].x,y:roof[2].y+5},{x:roof[1].x,y:roof[1].y+5}],'#4a3a1a'); };
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of FARM_YARD){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

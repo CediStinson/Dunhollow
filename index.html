@@ -8184,6 +8184,7 @@ function drawObject(o){
       g.fillStyle='rgba(20,14,8,0.72)'; g.fillRect(x-w/2,y-46,w,16); g.strokeStyle='rgba(255,212,110,0.6)'; g.lineWidth=1; g.strokeRect(x-w/2+0.5,y-45.5,w-1,15); g.fillStyle='#f4e2b0'; g.fillText(nm,x,y-34); g.restore(); }
   } else if(o.type==='teleporter'){
     if(o.treedoor) return;                              // the great tree's door is drawn with the tree
+    if(o.to==='hollowrite' && areaId==='graveyard') return;   // the Choir's stair is drawn as itself, a black mouth with steps, not a blue ring
     const pulse=0.75+0.25*Math.sin(gt*2.4);
     g.save(); g.globalCompositeOperation='lighter';
     glow(x,y,42,21,'110,190,255',0.6*pulse);
@@ -23021,9 +23022,16 @@ function succTold(msg){ const night=SUCC_NIGHT()+3; CHOICE.succNight=night;
   say('Vesperine',[msg],[{label:'…', fn:()=>{ closeDialog(); const n=succNpc(); if(n){ n._going=1; fadeOff(n,{slow:0.7}); } }}]); }
 TALKERS.vesper=succTalk;
 // ── the stair behind the graveyard: there from the night of the feast
+// the stair itself: a black mouth in the earth under the yew, worn steps going down, a breath of red light from below
+OBJ_DRAW.ritestair=o=>{ const c=P(o.i+0.5,o.j+0.5), T=gt;
+  g.fillStyle='#3a2a1a'; g.beginPath(); g.ellipse(c.x,c.y,34,15,0,0,Math.PI*2); g.fill();   // turned earth round the lip
+  g.fillStyle='#0a0606'; g.beginPath(); g.ellipse(c.x,c.y,26,11,0,0,Math.PI*2); g.fill();
+  for(let k=0;k<4;k++){ const w=22-k*4, y=c.y-4+k*3.2; g.fillStyle=['#6e6a62','#5a564e','#46423c','#322e2a'][k]; g.beginPath(); g.moveTo(c.x-w,y); g.lineTo(c.x+w-6,y-2); g.lineTo(c.x+w-6,y+1.6); g.lineTo(c.x-w,y+3.6); g.closePath(); g.fill(); }   // steps
+  const a=0.25+0.12*Math.sin(T*1.7); g.save(); g.globalCompositeOperation='lighter'; glow(c.x,c.y+2,30,14,'200,40,60',a); g.restore();
+  g.strokeStyle='rgba(70,48,26,0.9)'; g.lineWidth=1.2; [[-20,-6],[16,-8],[22,3]].forEach(([dx,dy])=>{ g.beginPath(); g.moveTo(c.x+dx,c.y+dy); g.quadraticCurveTo(c.x+dx*0.7,c.y+dy+5,c.x+dx*0.5,c.y+dy+9); g.stroke(); }); };   // yew roots hanging into it
 const RITE_STAIR=()=>{ if(!CHOICE.succ || CHOICE.succNight==null) return false; if(RITE_DONE()) return true;   // from dusk to dawn on the night of the feast (and for good once it is over)
   const t=((dayClock%DAY_LEN)+DAY_LEN)%DAY_LEN/DAY_LEN; return CHOICE.succ==='told' && SUCC_NIGHT()===CHOICE.succNight && t>=0.18 && t<=0.82; };
-wrap('graveyard','objects',l=> [...l,{type:'tree', i:9, j:0, sp:'pine', v:2, s:1.25, ox:0.1, oy:0.2}, ...(RITE_STAIR() ? [{type:'teleporter', i:9, j:2, to:'hollowrite', entry:'fromGraves'}] : [])]);   // the third yew, dark at the back of the yard, and the stair beneath it on the night
+wrap('graveyard','objects',l=> [...l,{type:'tree', i:9, j:0, sp:'pine', v:2, s:1.25, ox:0.1, oy:0.2}, ...(RITE_STAIR() ? [{type:'ritestair', i:9, j:2, noblock:true, dz:2.5},{type:'teleporter', i:9, j:2, to:'hollowrite', entry:'fromGraves'}] : [])]);   // the third yew, dark at the back of the yard, and the stair beneath it on the night
 AREAS.graveyard.entries.fromRite={i:8,j:3};
 // ── the Weeping Hollow: a bowl of black earth under the yews, where the Choir feeds
 const RITE_NIGHT=()=>CHOICE.succ==='told' && SUCC_NIGHT()===CHOICE.succNight;
@@ -23196,7 +23204,7 @@ BEASTS.push({ k:'succubus', is:f=>f.type==='succubus', name:'Succubi of the Holl
 // ── each frame: the graveyard at midnight, the hollow on the night of the feast, and the fight's end
 { const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{
     if(areaId==='graveyard' && !CS.on) succGraveTick(dt);
-    if(areaId==='graveyard'){ const has=OBJECTS.some(q=>q.type==='teleporter'&&q.to==='hollowrite'), want=RITE_STAIR(); if(want && !has){ OBJECTS.push({type:'teleporter', i:9, j:2, to:'hollowrite', entry:'fromGraves'}); logMsg('Under the third yew at the back of the yard, the earth has opened on a stair going down.','#e0a0c0'); } else if(!want && has){ const k=OBJECTS.findIndex(q=>q.type==='teleporter'&&q.to==='hollowrite'); if(k>=0) OBJECTS.splice(k,1); } }
+    if(areaId==='graveyard'){ const has=OBJECTS.some(q=>q.type==='teleporter'&&q.to==='hollowrite'), want=RITE_STAIR(); if(want && !has){ OBJECTS.push({type:'ritestair', i:9, j:2, noblock:true, dz:2.5},{type:'teleporter', i:9, j:2, to:'hollowrite', entry:'fromGraves'}); logMsg('Under the third yew at the back of the yard, the earth has opened on a stair going down.','#e0a0c0'); } else if(!want && has){ for(let k=OBJECTS.length-1;k>=0;k--){ const q=OBJECTS[k]; if((q.type==='teleporter'&&q.to==='hollowrite')||q.type==='ritestair') OBJECTS.splice(k,1); } } }
     if(areaId==='hollowrite' && !CS.on && !combat.active){ if(RITE_NIGHT() && nightAmt()>0.5 && !dlgIsOpen()) riteStart();
       if(CHOICE.succ==='fighting' && RITE_WON()){ remember('succ','fought',"You cut down Vesperine and her sisters in their own circle. The Hollow Choir will not sing in this valley again for a long while."); banner('The Choir is silent','#e0c0c8',2400);
         const live=['thrallB','thrallC'].map(riteNpc).filter(n=>n && !(n.opts&&n.opts.skin===30)), L=[];

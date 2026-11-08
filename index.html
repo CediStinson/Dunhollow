@@ -5414,7 +5414,7 @@ function switchArea(id,entryKey){
   OBJECTS.forEach(o=>{ if(o.type==='crates' || o.type==='barrels'){ o.breakable=true; return; }        // stacks placed by hand (Marta's stock) open too, and keep their look
     if((o.type!=='crate' && o.type!=='barrel') || o.decor) return; o.breakable=true;           // every container can be opened
     const h=hsh(o.i*7+3,o.j*13+id.length)%10;
-    if(o.type==='crate') o.type = o.rich ? 'chest' : h<3 ? 'crates' : 'crate';
+    if(o.type==='crate') o.type = o.rich && !o.keepLook ? 'chest' : h<3 ? 'crates' : 'crate';
     else o.type = h<3 ? 'barrels' : 'barrel'; });
   destroyedBreakables.forEach(k=>{ const [a,ij]=k.split(':'); if(a!==id) return; const [bi,bj]=ij.split(',').map(Number);
     const here=OBJECTS.findIndex(o=>OPENABLE.has(o.type) && o.i===bi && o.j===bj);
@@ -11190,7 +11190,7 @@ Object.assign(AREAS,{
       if(!CHOICE.fell || CHOICE.fell==='fight' || CHOICE.fell==='betrayed') l.push({type:'campfire', i:6, j:5}, {type:'banner', i:11, j:5});
       else l.push({type:'ashes', i:6, j:5});
       if(CHOICE.fell==='fought') l.push({type:'critter', kind:'flowers', i:5, j:3, noblock:true});
-      [[1,7],[2,7]].forEach(([i,j])=>{ if(!destroyedBreakables.has('fellings:'+i+','+j)) l.push({type:'crate', i, j, breakable:true, rich:CHOICE.fell==='seal'}); });
+      [[1,7],[2,7]].forEach(([i,j])=>{ if(!destroyedBreakables.has('fellings:'+i+','+j)) l.push({type:'crate', i, j, breakable:true, rich:CHOICE.fell==='seal', keepLook:true}); });
       return l; },
     npcs:()=>{ const l=[];
       if(CHOICE.fell==='fought' && !havenBurnt()) l.push({ id:'planter', name:'Elven Gardener', i:5, j:4, dir:1, opts:ELFO({gender:'f',skin:0,hair:2,hairColor:10,equip:{head:null,torso:'elf_tunic',armor:null,hands:null,legs:'elf_leggings',feet:'elf_boots',weapon:null,offhand:null}}) });
@@ -18389,9 +18389,10 @@ JOURNAL.push(['The Grave-Blade Reforged', ()=> !CHOICE.reforge ? null
 const dayRoll=(a,salt)=>{ const v=Math.sin((Math.floor(dayClock/DAY_LEN)+1)*12.9898+salt*78.233+[...a].reduce((h,c)=>h+c.charCodeAt(0),0)*0.37)*43758.5453; return v-Math.floor(v); };
 const LOGGERS_GONE=()=>['seal','paid','colliers','fought'].includes(CHOICE.fell);
 // the Fellings once the loggers have gone: some days the elves leave something in the old crates (they turn up as chests, freshly filled)
-{ const oF=AREAS.fellings.objects; AREAS.fellings.objects=()=>{ const chestDay=LOGGERS_GONE() && dayRoll('fellings',3)<0.4, d=Math.floor(dayClock/DAY_LEN);
+const FELL_SETTLED=()=>{ const d=Math.floor(dayClock/DAY_LEN); if(CHOICE.fellClearDay==null) CHOICE.fellClearDay=d; return d>CHOICE.fellClearDay; };   // the wood takes a day to notice the loggers have gone
+{ const oF=AREAS.fellings.objects; AREAS.fellings.objects=()=>{ const d=Math.floor(dayClock/DAY_LEN), chestDay=LOGGERS_GONE() && FELL_SETTLED() && dayRoll('fellings',3)<0.4;
     if(chestDay && CHOICE.fellChestDay!==d){ CHOICE.fellChestDay=d; [[1,7],[2,7]].forEach(([i,j])=>{ const k='fellings:'+i+','+j; destroyedBreakables.delete(k); delete OPENED_KIND[k]; }); }
-    return oF().map(o=> chestDay && o.breakable && (o.type==='crate'||o.type==='chest') ? {...o, rich:true} : o); }; }
+    return oF().map(o=> chestDay && o.breakable && (o.type==='crate'||o.type==='chest') ? {...o, rich:true, keepLook:true} : o); }; }   // fuller, but the same old crates: they don't turn into chests and back
 // squatters: a few days in four, a new little band settles where the last one was cleared out
 const SQUAT={ camp:'bandits', southtrail:'goblins', fellings:'mixed' };
 const SQUAT_B=[['Drifter','dagger','jerkin'],['Ragged Cutthroat','club',null],['Squatter','hatchet','gambeson'],['Hedge Robber','spear','jerkin']];
@@ -22872,7 +22873,7 @@ AREA_TIER.bearden=3; AREA_PATHS.bearden=[ [[-0.5,6.5],[3,6],[6,5.5]] ];
 wrap('clearing','objects',l=>[...l,{type:'teleporter', i:11, j:7, to:'bearden', entry:'fromClearing'}]); AREAS.clearing.entries.fromDen={i:10,j:7};
 // once the Fellings is settled, the wood takes it back: wolves every day, and on some days a bear down from the high wood
 { const A=AREAS.fellings, CLEARED=()=>['fought','seal','colliers','paid','betrayed'].includes(CHOICE.fell), _m=A.mobs, _g=A.mobsGone, _c=A.mobsCalm;
-  A.mobs=()=>{ if(!CLEARED()) return _m(); const d=Math.floor(dayClock/DAY_LEN), l=[ { name:'Timber Wolf', type:'wolf', i:10, j:2, faction:'fellwolf', daily:true, coat:'#5a5048' }, { name:'Timber She-wolf', type:'wolf', i:11, j:3, faction:'fellwolf', daily:true, coat:'#6e6458' } ];
+  A.mobs=()=>{ if(!CLEARED()) return _m(); if(!FELL_SETTLED()) return []; const d=Math.floor(dayClock/DAY_LEN), l=[ { name:'Timber Wolf', type:'wolf', i:10, j:2, faction:'fellwolf', daily:true, coat:'#5a5048' }, { name:'Timber She-wolf', type:'wolf', i:11, j:3, faction:'fellwolf', daily:true, coat:'#6e6458' } ];
     if(d%2===1) l.push({ name:'Brown Bear', type:'bear', i:8, j:5, faction:'fellbear', daily:true, opts:BEAR() }); if(d%3===2) l.push({ name:'Lean Wolf', type:'wolf', i:3, j:7, faction:'fellwolf2', daily:true, coat:'#7a6e60' }); return l; };
   A.mobsGone=()=>CLEARED()?false:_g(); A.mobsCalm=()=>CLEARED()?false:_c(); }
 // Brann asks

@@ -5135,7 +5135,7 @@ function buildCreatorUI(){
 // a whole new face and head for the gender and race you have picked
 function randomizeLook(){ const R=n=>Math.floor(Math.random()*n), elf=charOpts.race==='elf', male=charOpts.gender!=='f';
   const skins=SKINS.map((c,i)=>c&&i<20?i:-1).filter(i=>i>=0); charOpts.skin=skins[R(skins.length)];   // the creator's own tones, never the goblin greens
-  charOpts.eyeColor=R(EYE_COLORS.length); charOpts.hairColor=R(HAIR_COLORS.length);
+  charOpts.eyeColor=R(EYE_COLORS.length); charOpts.hairColor=R(14);   // the natural colours only: the high numbers are the dryads' leaf greens
   charOpts.face=R(FACES[male?'m':'f'].length); charOpts.hair=R(8);
   if(male && !elf){ const b=charOpts.race==='dwarf'?[5,6,6,7,7,8,8,4]:[0,0,2,3,4,4,5,5]; charOpts.beard=b[R(b.length)]; charOpts.stubble=Math.random()<0.3; } else { charOpts.beard=0; charOpts.stubble=false; }
   if(charOpts.race==='dwarf' && !male){ const hs=[3,7,8,8,9,9,10,10]; charOpts.hair=hs[R(hs.length)]; }
@@ -22654,7 +22654,7 @@ Object.entries(FAUNA_AT).forEach(([area,list])=>{ if(!AREAS[area]) return; wrap(
       col:cols?cols[(sd+k)%cols.length]:null, glow:kind==='stag', st:'idle', tm:0.5+rnd01(sd,k,901)*2, ok:false}); } });
   return [...l, ...out]; }); });
 const FAUNA_SC={ cat:1.35, pigeon:1.5, chicken:1.3, fox:1.15 };
-OBJ_DRAW.animal=o=>{ if(!o.ok) return; const q0=P(o.x,o.y), K=o.kind, sc=FAUNA_SC[K]||1, q={x:0,y:0};
+OBJ_DRAW.animal=o=>{ if(!o.ok || o.hidden) return; if(o.sleep && o.sleep.at && (o.down>0.5||o.sit>0.5)){ const q=P(o.x,o.y), t=(gt*0.4+o.seed)%1; g.save(); g.globalAlpha=0.6*(1-t); g.fillStyle='#e8eef8'; g.font='italic '+(8+t*4)+'px Georgia,serif'; g.fillText('z',q.x+8+t*6,q.y-22-t*16); g.restore(); } const q0=P(o.x,o.y), K=o.kind, sc=FAUNA_SC[K]||1, q={x:0,y:0};
   g.save(); g.translate(q0.x,q0.y); g.scale(sc,sc);
   if(QUAD[K]) quadDraw(q.x,q.y,K,o); else if(K==='chicken') drawChicken(q.x,q.y,o); else if(K==='pigeon') drawPigeon(q.x,q.y,o); else if(K==='owl') drawOwl(q.x,q.y,o);
   else if(K==='eagle') drawEagle(q.x,q.y,o); else if(K==='rabbit') drawRabbit(q.x,q.y,o); else if(K==='lizard') drawLizard(q.x,q.y,o); else if(K==='frog') drawFrog(q.x,q.y,o);
@@ -22681,7 +22681,35 @@ function faunaPick(o,R,away,from){ const F=from||player, W=ROOM.w, H=ROOM.h, edg
     x=Math.max(0.45,Math.min(W-0.45,x)); y=Math.max(0.45,Math.min(H-0.45,y)); if(faunaOpen(x,y) && faunaLine(o.x,o.y,x,y)) return [x,y]; }
   for(let t=0;t<8;t++){ const a=Math.random()*Math.PI*2, x=o.x+Math.cos(a)*1.2, y=o.y+Math.sin(a)*1.2; if(faunaOpen(x,y) && faunaLine(o.x,o.y,x,y)) return [x,y]; }   // or just a step to somewhere open
   return null; }
-function faunaStep(o,dt){ FAUNA_SWIMMER=o.kind==='frog'; try{ faunaStep0(o,dt);
+// penned animals stay behind their rails; at night everything that keeps day hours goes somewhere sheltered and sleeps
+const FAUNA_PENS={ farm:{ sheep:[9.25,0.25,10.75,1.75] } };
+const NIGHT_OWLS=new Set(['owl','frog','eagle','lizard','fox']);
+const SHELTER_TYPES=new Set(['tree','crag','boulder','house','bldg','hencoop','fieldshelter','haystack','logpile','roundhut','stilthut','pen']);
+function faunaShelter(o){ const box=(FAUNA_PENS[areaId]||{})[o.kind];
+  if(box){ const r=rnd01(o.seed,7,1201), q=rnd01(o.seed,8,1202); return {x:box[0]+0.2+r*(box[2]-box[0]-0.4), y:box[1]+0.2+q*(box[3]-box[1]-0.4), lie:true}; }   // in their pen, huddled
+  if(o.kind==='chicken'){ const c=OBJECTS.find(q=>q.type==='hencoop'); if(c) return {x:c.i+0.62, y:c.j+1.05, hide:true}; }                      // up the ramp into the coop
+  if(o.kind==='pigeon') return {x:o.x, y:o.y, hide:true};                                                                                      // off to roost under the eaves
+  let best=null, bd=9; for(const q of OBJECTS){ if(!SHELTER_TYPES.has(q.type)) continue; const fw=q.fp?q.fp[0]:1, fh=q.fp?q.fp[1]:1;              // otherwise: the lee of the nearest tree, rock or wall
+    for(const [dx,dy] of [[fw+0.35,fh*0.5],[fw*0.5,fh+0.35],[fw+0.3,fh+0.3],[-0.35,fh*0.5],[fw*0.5,-0.35]]){ const x=q.i+dx, y=q.j+dy, d=Math.hypot(x-o.x,y-o.y)+rnd01(o.seed,q.i*3+q.j,1203)*0.8; if(d<bd && faunaOpen(x,y)){ bd=d; best={x,y}; } } }
+  if(!best) best={x:o.x, y:o.y};
+  return {...best, lie:!!QUAD[o.kind], hide:o.kind==='rabbit'}; }
+function faunaNight(o,dt){ const n=nightAmt();
+  if(n<0.45){ if(o.sleep){ o.sleep=null; o.down=0; o.hidden=false; o.blink=false; o.st='idle'; o.tm=Math.random()*2; } return false; }
+  if(n<0.55 && !o.sleep) return false;
+  if(NIGHT_OWLS.has(o.kind) || o.flying || o.chase || FAUNA_BE[o.kind]?.m==='circle' || FAUNA_BE[o.kind]?.m==='still') return false;
+  if(o.wake>0){ o.wake-=dt; if(o.sleep){ o.down=0; o.hidden=false; } return false; }                                                  // startled awake: it bolts as by day, then settles again
+  if(!o.sleep) o.sleep={...faunaShelter(o), at:false};
+  const S=o.sleep, pd=Math.hypot(player.x-o.x,player.y-o.y);
+  if(S.at && pd<(o.kind==='dog'||o.kind==='cat'||(FAUNA_PENS[areaId]||{})[o.kind]?1.0:1.6) && !S.hide){ o.wake=4; o.sleep.at=false; return false; }
+  if(!S.at){ S.t=(S.t||0)+dt; if(Math.hypot(S.x-o.x,S.y-o.y)<0.55 || S.t>9){ S.at=true; o.st='idle'; o.mv=0; }   // close enough, or it gives up and beds down where it stands
+    else { o.st='move'; o.tx=S.x; o.ty=S.y; o.tm=5; return false; } }
+  o.mv=Math.max(0,(o.mv||0)-dt*4); o.run=false; o.graze=0; o.peck=0;
+  if(S.hide){ o.hidden=true; }
+  else if(S.lie){ o.down=Math.min(1,(o.down||0)+dt); o.blink=true; o.sit=0; }
+  else { o.sit=Math.min(1,(o.sit||0)+dt); o.blink=true; }
+  o.i=Math.floor(o.x); o.j=Math.floor(o.y); o.dz=o.x+o.y; return true; }
+function faunaStep(o,dt){ FAUNA_SWIMMER=o.kind==='frog'; try{ if(faunaNight(o,dt)) return; faunaStep0(o,dt);
+    { const box=(FAUNA_PENS[areaId]||{})[o.kind]; if(box){ o.x=Math.max(box[0],Math.min(box[2],o.x)); o.y=Math.max(box[1],Math.min(box[3],o.y)); if(o.tx!=null){ o.tx=Math.max(box[0],Math.min(box[2],o.tx)); o.ty=Math.max(box[1],Math.min(box[3],o.ty)); } o.i=Math.floor(o.x); o.j=Math.floor(o.y); o.dz=o.x+o.y; } }   // penned: the rails hold them
     if((o.st==='move'||o.st==='flee') && !o.flying){ o.stT=(o.stT||0)+dt; if(o.stT>0.6){ const moved=Math.hypot(o.x-(o.sx??o.x),o.y-(o.sy??o.y)); o.sx=o.x; o.sy=o.y; o.stT=0;   // trying to go somewhere and getting nowhere: give it up, pick another
         if(moved<0.12){ const t=faunaPick(o,1.5,o.st==='flee'?2.5:0,o.st==='flee'?faunaThreat(o):null) || faunaPick(o,1.5); if(t){ o.tx=t[0]; o.ty=t[1]; } else { o.st='idle'; o.tm=0.8; } } } }
     else { o.stT=0; o.sx=o.x; o.sy=o.y; }
@@ -22712,7 +22740,7 @@ function faunaStep0(o,dt){ const B=FAUNA_BE[o.kind]; if(!B) return; const pd=Mat
   // the dog keeps you company in its own yard
   if(B.m==='dog'){ const C=o.chase;
     if(C){ o.chaseT-=dt; const d=Math.hypot(C.x-o.x,C.y-o.y); if(o.chaseT<=0 || d<0.7 || !OBJECTS.includes(C)){ o.chase=null; o.cool=6+Math.random()*8; if(d<0.9) faunaSay(o); } else { go(C.x,C.y,3.3); o.mv=1; o.run=true; o.sit=0; o.wag=1; if(Math.random()<dt*0.8) faunaSay(o); o.i=Math.floor(o.x); o.j=Math.floor(o.y); o.dz=o.x+o.y; return; } }
-    else if(o.cool<=0 && Math.random()<dt*0.18){ const prey=OBJECTS.filter(q=>q.type==='animal'&&q.ok&&['cat','chicken','sheep','pigeon','rabbit'].includes(q.kind)&&Math.hypot(q.x-o.x,q.y-o.y)<6); if(prey.length){ o.chase=prey[Math.floor(Math.random()*prey.length)]; o.chaseT=3.5; faunaSay(o); } else o.cool=3; } }
+    else if(o.cool<=0 && Math.random()<dt*0.18){ const prey=OBJECTS.filter(q=>q.type==='animal'&&q.ok&&['cat','chicken','sheep','pigeon','rabbit'].includes(q.kind)&&!(FAUNA_PENS[areaId]||{})[q.kind]&&Math.hypot(q.x-o.x,q.y-o.y)<6); if(prey.length){ o.chase=prey[Math.floor(Math.random()*prey.length)]; o.chaseT=3.5; faunaSay(o); } else o.cool=3; } }
   if(B.m==='cat' && o.st!=='flee'){ if(o.stalk){ const P2=o.stalk, d=Math.hypot(P2.x-o.x,P2.y-o.y); if(!OBJECTS.includes(P2) || P2.flying || d>7){ o.stalk=null; o.st='idle'; o.tm=3; } else { o.sit=0; o.st='move'; o.tx=P2.x; o.ty=P2.y; if(d<1.4){ go(P2.x,P2.y,3); o.stalk=null; o.st='idle'; o.tm=2; } } }
     else if(o.cool<=0 && Math.random()<dt*0.12){ const p2=OBJECTS.find(q=>q.type==='animal'&&q.kind==='pigeon'&&q.ok&&!q.flying&&Math.hypot(q.x-o.x,q.y-o.y)<5); if(p2){ o.stalk=p2; o.cool=10; } else o.cool=4; } }
   if(B.m==='dog' && pd<9 && !o.stay){ if(pd>1.9){ const a=Math.atan2(o.y-player.y,o.x-player.x); const done=go(player.x+Math.cos(a)*1.4,player.y+Math.sin(a)*1.4,pd>4?3.6:2.2); o.mv=done?0:1; o.run=pd>4; o.sit=0; o.wag=1; }
@@ -23363,7 +23391,8 @@ OBJ_DRAW.pen=o=>{ const T=TW/2, H2=TH/2, pt=(gi,gj,h=0)=>({x:P(gi,gj).x, y:P(gi,
       g.fillStyle='#7a5634'; g.beginPath(); g.ellipse(c.x,c.y,w,d,0,0,Math.PI*2); g.fill(); g.fillStyle='#4a6a78'; g.beginPath(); g.ellipse(c.x,c.y,w-3,d-2,0,0,Math.PI*2); g.fill();
       g.fillStyle='rgba(220,240,250,0.35)'; g.beginPath(); g.ellipse(c.x-6,c.y-1,8,1.6,0,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(120,150,60,0.6)'; g.lineWidth=0.6; g.beginPath(); g.moveTo(c.x+8,c.y+1); g.lineTo(c.x+14,c.y); g.stroke(); } }
   else { side(i1,j0,i1,j1); post(i0,j1); post(i0+0.55,j1); [8,16,24].forEach(h=>rail(i0+0.55,j1,i1,j1,h)); post(i1,j1);
-    { const h=pt(i0+0.55,j1), e={x:h.x-20,y:h.y+16}; g.strokeStyle='#6a4a2c'; g.lineWidth=2.4; [8,17].forEach(y2=>{ g.beginPath(); g.moveTo(h.x,h.y-y2); g.lineTo(e.x,e.y-y2); g.stroke(); }); g.lineWidth=2; g.beginPath(); g.moveTo(h.x,h.y-8); g.lineTo(e.x,e.y-17); g.stroke(); g.fillStyle='#5a3e24'; g.fillRect(e.x-1.5,e.y-20,3,20); } } };   // the gate, swung open
+    { const h=pt(i0+0.55,j1), e=pt(i0,j1); g.strokeStyle='#8a6440'; g.lineWidth=2.6; g.lineCap='round'; [6,13,20].forEach(y2=>{ g.beginPath(); g.moveTo(h.x,h.y-y2); g.lineTo(e.x,e.y-y2); g.stroke(); }); g.lineWidth=2.2; g.beginPath(); g.moveTo(h.x,h.y-6); g.lineTo(e.x,e.y-20); g.stroke();   // the gate, shut, with a brace across it
+      g.strokeStyle='#3a3430'; g.lineWidth=1.4; g.beginPath(); g.moveTo(h.x-2,h.y-14); g.lineTo(h.x+2,h.y-15); g.stroke(); } } };   // and its latch
 // the kitchen garden in the ploughed corner: rows of cabbages, carrots, beans on poles, onions and a few fat pumpkins, a scarecrow over all of it
 OBJ_DRAW.garden=o=>{ const plants=[], T=gt;
   for(let r=0;r<Math.floor(o.fp[1]/0.47);r++){ const gy=o.j+0.28+r*0.47, kind=['cabbage','carrot','beans','onion','pumpkin','cabbage','carrot','beans'][r%8];

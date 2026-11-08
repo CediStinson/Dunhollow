@@ -11881,7 +11881,7 @@ function carterTalk(){
 Object.assign(TALKERS,{ tollman:tollTalk, pilgrim:pilgrimTalk, singer:singerTalk, carter:carterTalk, carter_v:()=>carterTalk(), carter_c:()=>carterTalk(), carter_f:()=>carterTalk() });
 const CARTER=(i,j)=>({ id:'carter', name:'Hobb the Carter', i, j, dir:1, opts:{gender:'m',skin:2,hair:2,hairColor:3,beard:5,face:1,equip:{head:'straw_hat',torso:'smock',armor:null,hands:'gloves',legs:'breeches',feet:'boots',weapon:null,offhand:null}} });
 const HOBB_AT=()=>'crossroads';   // one Hobb, one place: stuck at the crossroads till his wheel comes back, then carting between Dunhollow and the city
-wrap('crossroads','npcs',l=>HOBB_AT()==='crossroads'?[...l,CARTER(8,7)]:l); wrap('crossroads','objects',l=>HOBB_AT()==='crossroads'?[...l,{type:'cart', i:9, j:8, nowheel:CHOICE.hobb!=='done'}]:l);
+wrap('crossroads','npcs',l=>HOBB_AT()==='crossroads'?[...l,CARTER(8,6)]:l); wrap('crossroads','objects',l=>HOBB_AT()==='crossroads'?[...l,{type:'cart', i:8, j:5, nowheel:CHOICE.hobb!=='done'}]:l);   // broken down right on the east road, where everyone has to pass it
 // once Hobb drives again his lads keep a cart at Dunhollow and at the Hollowmere gate too: ride from any of the three
 const CART_LAD=(id,name,i,j,o)=>({ id, name, i, j, dir:1, opts:{gender:'m',skin:1,hair:1,hairColor:2,beard:0,face:0,...o,equip:{head:'hood',torso:'tunic_linen',armor:null,hands:'gloves',legs:'breeches',feet:'boots',weapon:null,offhand:null,...((o||{}).equip||{})}} });
 wrap('village','npcs',l=>CHOICE.hobb==='done'?[...l,CART_LAD('carter_v','Kit, the Carter\'s Lad',9,8,{})]:l); wrap('village','objects',l=>CHOICE.hobb==='done'?[...l,{type:'cart', i:10, j:9}]:l);
@@ -22706,7 +22706,7 @@ function faunaNight(o,dt){ const n=nightAmt();
   if(NIGHT_OWLS.has(o.kind) || o.flying || o.chase || FAUNA_BE[o.kind]?.m==='circle' || FAUNA_BE[o.kind]?.m==='still') return false;
   if(o.wake>0){ o.wake-=dt; if(o.sleep){ o.down=0; o.hidden=false; } return false; }                                                  // startled awake: it bolts as by day, then settles again
   if(!o.sleep) o.sleep={...faunaShelter(o), at:false};
-  const S=o.sleep, pd=Math.hypot(player.x-o.x,player.y-o.y);
+  const S=o.sleep, th=faunaThreat(o), pd=Math.min(Math.hypot(player.x-o.x,player.y-o.y), th.who&&th.who.type?th.d*0.7:99);   // a beast prowling near wakes them, as you would
   if(S.at && pd<(o.kind==='dog'||o.kind==='cat'||(FAUNA_PENS[areaId]||{})[o.kind]?1.0:1.6) && !S.hide){ o.wake=4; o.sleep.at=false; return false; }
   if(!S.at){ S.t=(S.t||0)+dt; if(Math.hypot(S.x-o.x,S.y-o.y)<0.55 || S.t>9){ S.at=true; o.st='idle'; o.mv=0; }   // close enough, or it gives up and beds down where it stands
     else { o.st='move'; o.tx=S.x; o.ty=S.y; o.tm=5; return false; } }
@@ -22729,7 +22729,7 @@ const FAUNA_SND={ dog:'bark', chicken:'cluck', sheep:'baa', goat:'bleat', horse:
 function faunaSound(o,force){ const s=FAUNA_SND[o.kind]; if(!s || typeof SND==='undefined') return; const d=Math.hypot(player.x-o.x,player.y-o.y), v=Math.max(0,1-d/(o.kind==='eagle'?16:9))*0.85; if(v<0.08 && !force) return;
   try{ SND.fx(typeof s==='function'?s(o):s, Math.max(v,0.08)); }catch(e){} }
 const faunaSay=(o,txt)=>{ const L=FAUNA_SAYS[o.kind]||['']; o.bark={t:txt||L[Math.floor(Math.random()*L.length)], a:1.3}; if(o.kind==='pigeon') return; faunaSound(o); };
-function faunaThreat(o){ let T={x:player.x,y:player.y,d:Math.hypot(player.x-o.x,player.y-o.y)}; const F=FAUNA_FEAR[o.kind]; if(F) for(const q of OBJECTS){ if(q===o||q.type!=='animal'||!q.ok||!F.includes(q.kind)) continue; const d=Math.hypot(q.x-o.x,q.y-o.y)*(q.chase===o||q.stalk===o?0.6:1.4); if(d<T.d) T={x:q.x,y:q.y,d,who:q}; } return T; }
+function faunaThreat(o){ let T={x:player.x,y:player.y,d:Math.hypot(player.x-o.x,player.y-o.y)}; if(typeof mobs!=='undefined') for(const m of mobs){ if(m.dead||m.gone||m.hostile===false||m.type==='dummy') continue; const beast=['wolf','bear','troll','lurker','scorpion','sandworm','gnawer','husk','succubus'].includes(m.type); const d=Math.hypot(m.x-o.x,m.y-o.y)*(beast?0.6:0.85); if(d<T.d) T={x:m.x,y:m.y,d,who:m}; } const F=FAUNA_FEAR[o.kind]; if(F) for(const q of OBJECTS){ if(q===o||q.type!=='animal'||!q.ok||!F.includes(q.kind)) continue; const d=Math.hypot(q.x-o.x,q.y-o.y)*(q.chase===o||q.stalk===o?0.6:1.4); if(d<T.d) T={x:q.x,y:q.y,d,who:q}; } return T; }
 // it turns to face where it goes: the heading swings round smoothly, and the drawing takes the nearest of the eight ways
 function faunaFace(o,dx,dy,dt){ if(Math.hypot(dx,dy)<1e-4) return; const a=Math.atan2(dy,dx); if(o.hd==null) o.hd=a; let d=a-o.hd; while(d>Math.PI) d-=Math.PI*2; while(d<-Math.PI) d+=Math.PI*2; o.hd+=d*Math.min(1,dt*7);
   const nd=dirFromDelta(Math.cos(o.hd),Math.sin(o.hd)); if(o.dir==null || nd!==o.dir){ const e=DIR_DELTA[o.dir??nd], off=Math.abs(Math.atan2(Math.sin(o.hd-Math.atan2(e[1],e[0])),Math.cos(o.hd-Math.atan2(e[1],e[0])))); if(o.dir==null || off>Math.PI/8+0.08) o.dir=nd; } }

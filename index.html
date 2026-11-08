@@ -23639,6 +23639,42 @@ wrap('steamcellar','objects',l=>l.map(o=>o.type==='teleporter'&&o.to==='under_ne
 wrap('emberpass','objects',l=>l.map(o=>o.type==='teleporter'&&o.to==='under_se' ? {...o, to:ucId(8,11), entry:'fromS'} : o));
 if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
 
+// ════════ TWISTED HALLS: a few places in the buried town do not keep still. Spread through all four quarters, most of them in the Chapel Crypts, where the old dead
+//   do not want you leaving. An endless hall gives you the same hall again until you turn round in it; a turned crossing sends each door to where the next door round
+//   should go; a short hall comes out far across the quarter. Chalk on their walls tells you how. Once Wenlo has his chart back, they lie still
+const UC_TWIST={}, UCT={ loops:0, last:null };
+(()=>{ const reach=(q,skipA,skipB)=>{ const start=Object.values(UCR).find(r=>r.q===q).id, seen=new Set([start]), Q=[start];   // is the quarter still all in one piece without this one passage?
+    while(Q.length){ const id=Q.shift(); Object.values(UCR[id].ex).forEach(([to])=>{ if(!UCR[to] || UCR[to].q!==q || seen.has(to)) return; if((id===skipA&&to===skipB)||(id===skipB&&to===skipA)) return; seen.add(to); Q.push(to); }); }
+    return seen.size===Object.values(UCR).filter(r=>r.q===q).length; };
+  UC_QS.forEach((q,qi)=>{ const crypt=q==='under_sw', pages=Object.values(UC_PAGE_ROOM);
+    const rooms=Object.values(UCR).filter(r=>r.q===q && !UC_OUT[r.id] && !pages.includes(r.id)).sort((a,b)=>(a.hs%977)-(b.hs%977));
+    const halls=rooms.filter(r=>r.kind==='hall'), cross=rooms.filter(r=>r.kind==='cross'||r.kind==='vault');
+    halls.slice(0,crypt?2:1).forEach(r=>{ UC_TWIST[r.id]={kind:'loop'}; });
+    cross.slice(0,crypt?2:1).forEach(r=>{ UC_TWIST[r.id]={kind:'turn'}; });
+    if(crypt || q==='under_ne'){ for(const h of halls.filter(r=>!UC_TWIST[r.id])){ const d=Object.keys(h.ex).find(k=>UCR[h.ex[k][0]] && UCR[h.ex[k][0]].q===q); if(!d) continue;
+        const far=cross.filter(x=>!UC_TWIST[x.id]).sort((a,b)=>(Math.abs(b.X-h.X)+Math.abs(b.Y-h.Y))-(Math.abs(a.X-h.X)+Math.abs(a.Y-h.Y)))[0];
+        if(far && reach(q,h.id,h.ex[d][0])){ UC_TWIST[h.id]={kind:'warp', to:far.id, d}; break; } } } }); })();
+const UC_TWIST_HINT={ loop:"Chalk, low on the wall: <i>When it gives you the same hall twice, turn round. It turns with you.</i>",
+  turn:"A compass rose cut into the floor, its north turned a quarter round. Scratched beside it: <i>Every door here goes round one, the way the sun goes.</i>",
+  warp:"Chalk, in a careful hand: <i>This one is shorter than it is. Count your turnings after.</i> Under it, a lamplighter's mark." };
+Object.entries(UC_TWIST).forEach(([id,T])=>{ const A=AREAS[id], r=UCR[id], o0=A.objects; A.mapLabel='?';
+  A.objects=()=>{ const l=o0(), busy=new Set(l.filter(o=>!o.noblock).map(o=>o.i+','+o.j)), s=ucWalk(r).find(([i,j])=>(i===0||j===0) && i!==r.cx && j!==r.cy && !busy.has(i+','+j) && !ucNearDoor(r,i,j)) || ucWalk(r).find(([i,j])=>!busy.has(i+','+j) && !ucNearDoor(r,i,j) && i!==r.cx && j!==r.cy);
+    return s ? [...l,{type:'rune', i:s[0], j:s[1], text:UC_TWIST_HINT[T.kind]}] : l; }; });
+function ucEerie(kind){ try{ SND.fx('whoosh',0.35); }catch(e){} shake=Math.max(shake,4);
+  const L={ loop: UCT.loops>1 ? ["Again. The same hall.","The same hall. You are sure of it now.","The same crack in the same stone. Again."][UCT.loops%3] : "You walk out of the hall, and into the same hall. The same crack in the same stone.",
+    turn:"The passage turned while you walked it. This is not where it went before.", warp:"That hallway was far too short for where it has brought you." }[kind];
+  setTimeout(()=>{ logMsg(L,'#b8a8e0'); floatText(tileOf(player),'…','#b8a8e0'); },250); }
+{ const _sw=switchArea; switchArea=function(id,entry,...rest){
+    try{ const T=UC_TWIST[areaId], r=UCR[areaId];
+      if(T && r && CHOICE.lamp!=='done'){ const d=Object.keys(r.ex).find(k=>r.ex[k][0]===id && r.ex[k][1]===entry), at=d && ucEdge(r,d);
+        if(d && Math.max(Math.abs(player.i-at[0]),Math.abs(player.j-at[1]))<=1){
+          if(T.kind==='loop'){ if(!UCT.loops || UCT.last===d){ UCT.loops++; UCT.last=d; id=areaId; entry='from'+UC_OPP[d].toUpperCase(); ucEerie('loop'); }   // out one end, in at the other: the same hall
+            else { [id,entry]=r.ex[UCT.last]; } }                                                                                                     // you turned round with it: it lets you through, the way you first meant to go
+          else if(T.kind==='turn'){ const ex=['n','e','s','w'].filter(k=>r.ex[k]), k2=ex[(ex.indexOf(d)+1)%ex.length]; [id,entry]=r.ex[k2]; ucEerie('turn'); }
+          else if(T.kind==='warp' && d===T.d){ const R=UCR[T.to]; id=T.to; entry='from'+Object.keys(R.ex)[0].toUpperCase(); ucEerie('warp'); } } } }catch(e){ console.warn(e); }
+    const prev=areaId, res=_sw.call(this,id,entry,...rest);
+    if(prev!==areaId){ UCT.loops=0; UCT.last=null; }
+    return res; }; }
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

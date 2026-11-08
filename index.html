@@ -9931,6 +9931,7 @@ function applySave(sv){
   destroyedBreakables.clear(); (wd.broken||[]).forEach(k=>destroyedBreakables.add(k)); Object.keys(OPENED_KIND).forEach(k=>delete OPENED_KIND[k]); Object.assign(OPENED_KIND,wd.brokenK||{});
   defeatedMobs.clear();       (wd.defeated||[]).forEach(k=>defeatedMobs.add(k));
   [...defeatedMobs].forEach(k=>{ if(k.startsWith('pits:')) defeatedMobs.add('camp:'+k.slice(5)); });   // the pits are the south end of the camp now
+  { const m=typeof ucFromOld==='function' && ucFromOld(wd.area,sv.pos); if(m){ wd.area=m.room; sv.pos=m.pos; } }   // a save from the old one-piece Undercity
   switchArea(AREAS[wd.area]?wd.area:'farm','start');
   endCombatSilently(); player.moving=false;
   const pos=wd.area==='pits' && sv.pos ? {...sv.pos, j:(sv.pos.j??0)+6, y:sv.pos.y!=null?sv.pos.y+6:undefined} : (sv.pos||{});
@@ -13044,7 +13045,7 @@ function renderMap(cv,V){                             // V: {zoom, px, py, label
   if(L[areaId] && (AREAS[areaId].layer||0)===LAY && !(AREAS[areaId].maze && !mazeKnown(areaId))){ const o=L[areaId], m=P2(o.u+player.x,o.v+player.y);
     c.fillStyle='#fff'; c.strokeStyle='#8a1a10'; c.lineWidth=2; c.beginPath(); c.arc(m[0],m[1],Math.max(3.5,Math.min(6,k*0.6)),0,Math.PI*2); c.fill(); c.stroke(); }
   if(V.labels){ c.font=`${Math.max(11,Math.min(18,k*1.4))}px Georgia,serif`; c.textAlign='center'; c.textBaseline='middle';
-    ids.forEach(id=>{ const A=AREAS[id], o=L[id], m=P2(o.u+A.w/2,o.v+A.h/2), t=A.under?'':(A.label||id); if(!t) return; const w=c.measureText(t).width+10;
+    ids.forEach(id=>{ const A=AREAS[id], o=L[id], m=P2(o.u+A.w/2,o.v+A.h/2), t=A.under?'':(A.mapLabel!=null?A.mapLabel:(A.label||id)); if(!t) return; const w=c.measureText(t).width+10;
       c.fillStyle='rgba(14,9,4,0.72)'; c.fillRect(m[0]-w/2,m[1]-10,w,20); c.fillStyle=id===areaId?'#fff2c0':'#e8d4a0'; c.fillText(t,m[0],m[1]); }); }
 }
 function updateMinimap(){
@@ -20955,7 +20956,7 @@ function mazeGrid(id){ if(MZ_CACHE[id]) return MZ_CACHE[id]; const Q=UNDER_Q[id]
   return MZ_CACHE[id]=G; }
 const mzIn=(i,j)=>[i===0?1:i===MZ_N-1?MZ_N-2:i, j===0?1:j===MZ_N-1?MZ_N-2:j];   // the walkway just inside a door
 function mazeDeadEnds(id){ const G=mazeGrid(id), W=MZ_N, out=[]; for(let j=1;j<W-1;j+=2) for(let i=1;i<W-1;i+=2){ if(!G[j*W+i]) continue; if([[1,0],[-1,0],[0,1],[0,-1]].filter(([a,b])=>G[(j+b)*W+i+a]).length===1) out.push([i,j]); } return out; }
-const mazeKnown=id=>!!(CHOICE.mazeKnown && CHOICE.mazeKnown[id]);
+const mazeKnown=id=>id.slice(0,3)==='uc_' || !!(CHOICE.mazeKnown && CHOICE.mazeKnown[id]);   // a chamber you have stood in is on your map
 let MAZE_IN=null;                                    // which door you came into this quarter by
 { const _sw0=switchArea; switchArea=function(id,entry,...rest){ try{ if(UNDER_Q[areaId] && MAZE_IN){ const near=t=>Math.max(Math.abs(t.i-player.i),Math.abs(t.j-player.j)), door=OBJECTS.filter(o=>o.type==='teleporter').sort((a,b)=>near(a)-near(b))[0];
         if(door && near(door)<=1 && (door.i!==MAZE_IN[0] || door.j!==MAZE_IN[1]) && !mazeKnown(areaId)){ (CHOICE.mazeKnown=CHOICE.mazeKnown||{})[areaId]=true; const lb=AREAS[areaId].label.replace('The Undercity · ',''); setTimeout(()=>logMsg('You found your way through '+lb+'. You could draw it from memory now.','#c8a0e0'),700); } } }catch(e){}
@@ -21000,7 +21001,7 @@ AREAS.emberpass.layer=-1; AREAS.emberforge.layer=-1;
 wrap('keepward','objects',l=>[...l, {type:'oldwell', i:10, j:7}]); AREAS.keepward.entries.fromWell={i:10,j:8};
 OBJ_DRAW.oldwell=o=>{ drawObject({...o, type:'well'}); const q=P(o.i+0.5,o.j+0.5); g.strokeStyle='#a89068'; g.lineWidth=1.4; g.beginPath(); g.moveTo(q.x+2,q.y-38); g.quadraticCurveTo(q.x+5,q.y-24,q.x+3,q.y-8); g.stroke(); };   // a fresh rope hangs into it
 onUse(['oldwell'],()=>say('The Old Well',["A dry well, older than the Keep. A rope is knotted round the winch post and hangs down into the dark, much further than any well should go.","Wet air comes up it, and somewhere far below, water dripping on stone."],
-  [{label:'Climb down the rope.', fn:()=>{ closeDialog(); switchArea('under_nw','fromWell'); }}, {label:'Leave it.', fn:closeDialog}]));
+  [{label:'Climb down the rope.', fn:()=>{ closeDialog(); switchArea('uc_0_0','fromN'); }}, {label:'Leave it.', fn:closeDialog}]));
 MM_COL.interior='#5a524a';
 if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
 
@@ -21132,7 +21133,7 @@ Object.entries(WENLO_PAGES).forEach(([id,item])=>wrap(id,'objects',l=>{ const sp
 UNDER_MOBS.under_se=UNDER_MOBS.under_se.filter(x=>x[0]!=='Flamesworn Pathfinder');
 wrap('under_se','mobs',l=> CHOICE.pathfinderDead ? l : [...l, { name:'Flamesworn Pathfinder', type:'bandit', i:2*3+1-1, j:2*3+1, faction:'und_se_pf', style:'duelist',
   opts:FLAMESWORN({skin:2,hair:5,beard:3,hairColor:7,equip:{head:'obsidian_helm',torso:'shirt',armor:'ash_mantle',hands:'cinder_gloves',legs:'scorched_greaves',feet:'emberstep_boots',weapon:'scimitar',offhand:null}}) }]);
-setInterval(()=>{ try{ if(combat.active || areaId!=='under_se' || CHOICE.pathfinderDead) return; const m=mobs.find(x=>x.name==='Flamesworn Pathfinder' && x.dead); if(!m) return;
+setInterval(()=>{ try{ if(combat.active || UC_Q(areaId)!=='under_se' || CHOICE.pathfinderDead) return; const m=mobs.find(x=>x.name==='Flamesworn Pathfinder' && x.dead); if(!m) return;
     CHOICE.pathfinderDead=true; if(giveQuestItem('pathfinder_chart',true)) logMsg('In the Pathfinder\'s coat, folded small: a chart of every walkway in the drowned town.','#e8c060'); try{ autosaveSoon(300); }catch(e){} }catch(e){} },500);
 // Wenlo himself: a faint old man by his tally marks on the Chapel Roofs
 wrap('under_sw','npcs',l=> CHOICE.lamp==='done' ? l : [...l,{ id:'wenlo', name:'Wenlo the Lamplighter', i:2*14+1, j:2*11+1, dir:1, opts:{gender:'m',skin:0,hair:1,hairColor:13,beard:5,face:1,ghost:true,equip:{head:'hood',torso:'shirt',armor:'robe',hands:null,legs:'trousers',feet:null,weapon:null,offhand:null}} }]);
@@ -21147,7 +21148,7 @@ TALKERS.wenlo=()=>{ const W='Wenlo the Lamplighter', pages=Object.values(WENLO_P
   if(CHOICE.lamp==='hunt' && !hasItem('pathfinder_chart')){ say(W,["“The Ember Stair, at the bottom, where the fire runs under the roofs. He walks with a shieldbearer. He is very polite.”"],[bye]); return; }
   if(CHOICE.lamp==='hunt'){ say(W,["<i>He takes the chart, and smooths it out on his knee, and runs a finger along every turning. He is smiling.</i>","“There it is. All of it. Every lamp I ever lit. Keep it in your head, now: I've drawn it into yours.”",
       "“And take this. Somebody should keep the count.” <i>He presses a brass badge into your hand. It is warm.</i>"],[
-      {label:'“Rest now, Wenlo.”', fn:()=>{ const k=player.inv.indexOf('pathfinder_chart'); if(k>=0) player.inv[k]=null; giveQuestItem('lamplighter_badge',true); player.purse+=60; CHOICE.mazeKnown=CHOICE.mazeKnown||{}; Object.keys(UNDER_Q).forEach(q=>CHOICE.mazeKnown[q]=true);
+      {label:'“Rest now, Wenlo.”', fn:()=>{ const k=player.inv.indexOf('pathfinder_chart'); if(k>=0) player.inv[k]=null; giveQuestItem('lamplighter_badge',true); player.purse+=60; CHOICE.mazeKnown=CHOICE.mazeKnown||{}; Object.keys(UNDER_Q).forEach(q=>CHOICE.mazeKnown[q]=true); Object.keys(AREAS).forEach(a=>{ if(AREAS[a].ucRoom) visitedAreas[a]=true; }); MAP_LAYOUT=null;
         remember('lamp','done',"You took the Pathfinder's chart and gave it to Wenlo. He knew every turning again, and rested. The way up is safe; the Undercity is on your map."); updateHud();
         const n=NPCS.find(x=>x.id==='wenlo'); if(n){ n.bark={text:"Forty-one. All lit.",t:0}; setTimeout(()=>{ const q=NPCS.indexOf(n); if(q>=0) NPCS.splice(q,1); },2600); }
         logMsg('Wenlo gave you his Lamplighter Badge and 60 copper. The whole Undercity is on your map now.','#8ac070'); closeDialog(); }}]); return; } };
@@ -23527,6 +23528,111 @@ onUse(['skullsign'],o=>{ const T=[["Crude letters in something dark and red, the
     ["A skull on a stake, and a plank scrawled in red:","<b>“NO TALLFOLK. TALLFOLK GET EATED.”</b>","Someone has drawn a little stick figure being eaten, in case the words were unclear."],
     ["The plank just says, in big red letters:","<b>“DANGER AHEAD. TURN BAK.”</b>","The skull on top has been given a little hat made of moss. It is not reassuring."]][o.v||0];
   say('A Goblin Warning',T,[bye]); });
+// ════════ THE UNDERCITY, ROOM BY ROOM: each quarter is a 6×6 web of small chambers — crossings over the drop, walkways, ledges, dead ends —
+//   and you only ever see the one you stand in. Openings in its edges lead on. The map fills in a chamber at a time, as you walk it.
+//   144 chambers in all (12×12 over the four quarters). What lived and lay in the old quarters is spread through them: same foes, same lore, Wenlo and his pages.
+const UC_N=6, UC_W=9, UC_C=4, UC_QS=['under_nw','under_ne','under_sw','under_se'], UC_QXY={under_nw:[0,0],under_ne:[1,0],under_sw:[0,1],under_se:[1,1]};
+const ucId=(X,Y)=>'uc_'+X+'_'+Y, UCR={}, UC_QF={};
+const UC_Q=id=> UCR[id] ? UCR[id].q : (UNDER_Q[id] ? id : null);
+const UC_DIRS={ n:[0,-1], s:[0,1], w:[-1,0], e:[1,0] }, UC_OPP={n:'s',s:'n',w:'e',e:'w'};
+const UC_EDGE={ n:[UC_C,0], s:[UC_C,UC_W-1], w:[0,UC_C], e:[UC_W-1,UC_C] }, UC_IN={ n:[UC_C,1], s:[UC_C,UC_W-2], w:[1,UC_C], e:[UC_W-2,UC_C] };
+// the ways out of the drowned town: the rope up the Keep Ward well, the iron stair to the bathhouse, the stair down to the Cinder Deeps
+const UC_OUT={ [ucId(0,0)]:{ n:['keepward','fromWell'] }, [ucId(10,0)]:{ n:['steamcellar','fromUnder'] }, [ucId(8,11)]:{ s:['emberpass','fromUnder'] } };
+const UC_FROM={ 'under_nw:fromWell':[ucId(0,0),'fromN'], 'under_ne:fromCellar':[ucId(10,0),'fromN'], 'under_se:fromDeeps':[ucId(8,11),'fromS'] };
+(()=>{ const link=new Set(), L=(a,b)=>{ link.add(a+'|'+b); link.add(b+'|'+a); };
+  UC_QS.forEach((q,qi)=>{ const [QX,QY]=UC_QXY[q]; let st=(UNDER_Q[q].seed^0x5bd1e995)|0;
+    const rnd=()=>{ st=(st+0x6D2B79F5)|0; let t=Math.imul(st^st>>>15,1|st); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; };
+    const seen=new Set(['0,0']), stack=[[0,0]];
+    while(stack.length){ const [x,y]=stack[stack.length-1], nb=[[1,0],[-1,0],[0,1],[0,-1]].map(([a,b])=>[x+a,y+b]).filter(([a,b])=>a>=0&&b>=0&&a<UC_N&&b<UC_N&&!seen.has(a+','+b));
+      if(!nb.length){ stack.pop(); continue; } const [nx,ny]=nb[Math.floor(rnd()*nb.length)]; seen.add(nx+','+ny); L(ucId(QX*6+x,QY*6+y),ucId(QX*6+nx,QY*6+ny)); stack.push([nx,ny]); }
+    for(let y=0;y<UC_N;y++) for(let x=0;x<UC_N;x++) [[1,0],[0,1]].forEach(([a,b])=>{ if(x+a<UC_N && y+b<UC_N && rnd()<0.13) L(ucId(QX*6+x,QY*6+y),ucId(QX*6+x+a,QY*6+y+b)); });   // a few loops: more than one way round, not many
+  });
+  [[5,0,6,0],[5,4,6,4],[1,5,1,6],[10,5,10,6],[5,8,6,8],[5,11,6,11]].forEach(([a,b,c,d])=>L(ucId(a,b),ucId(c,d)));   // the old doors between the quarters
+  for(let Y=0;Y<12;Y++) for(let X=0;X<12;X++){ const id=ucId(X,Y), q=UC_QS[(X<6?0:1)+(Y<6?0:2)], ex={};
+    Object.entries(UC_DIRS).forEach(([d,[a,b]])=>{ const to=ucId(X+a,Y+b); if(link.has(id+'|'+to)) ex[d]=[to,'from'+UC_OPP[d].toUpperCase()]; });
+    Object.assign(ex, UC_OUT[id]||{});
+    UCR[id]={ id, X, Y, q, ex, h:hsh(X*37+11,Y*53+7) }; } })();
+// what was where: a spot in an old quarter (33×33) belongs to the chamber over it
+const ucOfOld=(q,i,j)=>{ const [QX,QY]=UC_QXY[q]; return ucId(QX*6+Math.min(5,Math.floor(i/5.5)), QY*6+Math.min(5,Math.floor(j/5.5))); };
+// the old squares, with their lore, the bosses and Wenlo, become the wide chambers
+(()=>{ UC_QS.forEach(q=>{ (UNDER_Q[q].rooms||[]).forEach(([cx,cy])=>{ const r=UCR[ucOfOld(q,2*cx+1,2*cy+1)]; if(r) r.square=true; }); }); })();
+// the shape of each chamber: a hub (a square, a crossing, a ring round a hole, a single plank) and walkways out to its openings, some of them doglegged
+(()=>{ Object.values(UCR).forEach(r=>{ const G=new Uint8Array(UC_W*UC_W), set=(i,j)=>{ if(i>=0&&j>=0&&i<UC_W&&j<UC_W) G[j*UC_W+i]=1; }, n=Object.keys(r.ex).length, h=r.h;
+    r.kind = r.square ? 'square' : n===1 ? 'end' : ['cross','cross','ring','plank','ledge','cross','ring','ledge'][h%8];
+    const hub={ square:2, end:1, cross:1, ring:1, plank:0, ledge:1 }[r.kind];
+    for(let a=-hub;a<=hub;a++) for(let b=-hub;b<=hub;b++) set(UC_C+a,UC_C+b);
+    if(r.kind==='ledge'){ const s=h%2?1:-1; for(let a=-2;a<=2;a++) set(UC_C+a,UC_C+s*2); }   // a long ledge along one side
+    Object.entries(r.ex).forEach(([d,_],k)=>{ const [ei,ej]=UC_EDGE[d], kink=r.kind==='square'?0:[0,1,-1,0,2,-2][(h>>>(k*3+2))%6];
+      const rot=(u,v)=> d==='n'?[UC_C+v,UC_C-u] : d==='s'?[UC_C-v,UC_C+u] : d==='w'?[UC_C-u,UC_C-v] : [UC_C+u,UC_C+v];   // u: out from the middle, v: sideways
+      const path=[]; for(let u=0;u<=1;u++) path.push([u,0]); for(let v=0;v!==kink;v+=Math.sign(kink)) path.push([1,v]); path.push([1,kink]); for(let u=1;u<=3;u++) path.push([u,kink]);
+      for(let v=kink;v!==0;v-=Math.sign(kink)) path.push([3,v]); path.push([3,0]); path.push([4,0]);
+      path.forEach(([u,v])=>{ const [i,j]=rot(u,v); set(i,j); }); set(ei,ej); });
+    if(r.kind==='ring') G[UC_C*UC_W+UC_C]=0;   // the middle of it fallen through
+    r.G=G; }); })();
+const UC_LABEL={ under_nw:'Well Bottom', under_ne:'Cellar Stair', under_sw:'Chapel Roofs', under_se:'The Ember Stair' };
+// a spot in a chamber: the walkway tiles nearest its middle, the drop beside the walkways
+const ucWalk=r=>{ const out=[]; for(let j=0;j<UC_W;j++) for(let i=0;i<UC_W;i++) if(r.G[j*UC_W+i]) out.push([i,j]); return out.sort((a,b)=>(Math.abs(a[0]-UC_C)+Math.abs(a[1]-UC_C))-(Math.abs(b[0]-UC_C)+Math.abs(b[1]-UC_C))); };
+const ucDrop=r=>{ const out=[]; for(let j=1;j<UC_W-1;j++) for(let i=1;i<UC_W-1;i++){ if(r.G[j*UC_W+i]) continue; if([[1,0],[-1,0],[0,1],[0,-1]].some(([a,b])=>r.G[(j+b)*UC_W+i+a])) out.push([i,j]); } return out; };
+const ucNearDoor=(r,i,j)=>Object.keys(r.ex).some(d=>{ const [a,b]=UC_EDGE[d], [c,e]=UC_IN[d]; return Math.max(Math.abs(a-i),Math.abs(b-j))<=1 || (c===i&&e===j); });
+// the furthest dead end in each quarter from its ways in: Wenlo's page lies there
+function ucFurthestEnd(q){ const starts=Object.values(UCR).filter(r=>r.q===q && Object.values(r.ex).some(([to])=>!UCR[to] || UCR[to].q!==q)).map(r=>r.id), dist={}, Q=[...starts]; starts.forEach(s=>dist[s]=0);
+  while(Q.length){ const id=Q.shift(); Object.values(UCR[id].ex).forEach(([to])=>{ if(UCR[to] && UCR[to].q===q && dist[to]==null){ dist[to]=dist[id]+1; Q.push(to); } }); }
+  let best=null; Object.values(UCR).forEach(r=>{ if(r.q===q && r.kind==='end' && (best==null || (dist[r.id]||0)>(dist[best]||0))) best=r.id; }); return best; }
+const UC_PAGE_ROOM={}; UC_QS.forEach(q=>{ UC_PAGE_ROOM[q]=ucFurthestEnd(q); });
+// remember how the quarters were built (their foes and folk depend on the story), then put chambers in their place
+UC_QS.forEach(q=>{ const A=AREAS[q]; UC_QF[q]={ mobs:A.mobs, npcs:A.npcs||(()=>[]), heat:A.heat||0, volcanic:!!A.volcanic, tier:AREA_TIER[q]||5 }; });
+function ucObjects(r){ const out=[], seed=r.h, W=ucWalk(r), D=ucDrop(r), used=new Set(), take=(i,j)=>used.add(i+','+j), solid=new Set();
+  const keepsWay=(i,j)=>{ solid.add(i+','+j); const ex=Object.keys(r.ex), S=UC_EDGE[ex[0]], seen=new Set([S.join(',')]), Q=[S];   // a solid thing may stand on a walkway only if every opening can still be reached, and every walkway tile beside the hub
+    while(Q.length){ const [a,b]=Q.shift(); [[1,0],[-1,0],[0,1],[0,-1]].forEach(([c,d])=>{ const x=a+c, y=b+d, k=x+','+y; if(x<0||y<0||x>=UC_W||y>=UC_W||seen.has(k)||!r.G[y*UC_W+x]||solid.has(k)) return; seen.add(k); Q.push([x,y]); }); }
+    const ok=ex.every(d=>seen.has(UC_EDGE[d].join(','))) && W.every(([x,y])=>solid.has(x+','+y) || seen.has(x+','+y) || [[1,0],[-1,0],[0,1],[0,-1]].every(([c,d])=>!seen.has((x+c)+','+(y+d)))===false);
+    if(!ok) solid.delete(i+','+j); return ok; };
+  const free=(i,j)=>!used.has(i+','+j) && !ucNearDoor(r,i,j);
+  Object.entries(r.ex).forEach(([d,[to,entry]])=>{ const [i,j]=UC_EDGE[d]; out.push({type:'teleporter', i, j, to, entry}); take(i,j); });
+  const QF=UC_QF[r.q], hot=QF.heat>=1;
+  // the landmark beside the walkway: you steer by these
+  const set=UC_SET[r.q]||['chimney']; if(r.kind!=='end' || seed%3===0){ const cand=D.filter(([i,j])=>free(i,j)); if(cand.length){ const [i,j]=cand[seed%cand.length]; out.push({type:'ucmark', kind: hot && seed%4===0 ? 'brazier' : set[(seed>>>3)%set.length], i, j}); take(i,j); } }
+  // the clutter of a drowned town: roofs and beams in the drop, rubble and webs and bones on the walkways
+  D.forEach(([i,j],k)=>{ if(!free(i,j)) return; const hv=hsh(i*31+seed,j*17+r.X); if(hv%7===0){ out.push({type:'ucjunk', kind:['stub','ridge','beam','stub','ridge'][(hv>>>4)%5], i, j, noblock:true}); take(i,j); } });
+  W.forEach(([i,j])=>{ if(!free(i,j) || (i===UC_C&&j===UC_C)) return; const hv=hsh(i*13+seed,j*29+r.Y); if(hv%17===0) out.push({type:'rubble', i, j, noblock:true, flat:true}); else if(hv%19===1) out.push({type:'ucjunk', kind:'web', i, j, noblock:true}); else if(hv%23===2) out.push({type:'bones', i, j, noblock:true}); });
+  if(r.square){ const [i,j]=[UC_C-2,UC_C-2]; if(r.G[j*UC_W+i] && free(i,j) && keepsWay(i,j)){ out.push({type:'lantern', i, j}); take(i,j); } }
+  if(hot && !r.square){ const c=D.filter(([i,j])=>free(i,j)); if(c.length){ const [i,j]=c[(seed>>>5)%c.length]; out.push({type:'ucmark', kind:'brazier', i, j}); take(i,j); } }   // the Flamesworn's braziers, hung over the drop
+  // the old squares keep their writing
+  (UNDER_LORE[r.q]||[]).forEach(([cx,cy,t])=>{ if(ucOfOld(r.q,2*cx+1,2*cy+1)!==r.id) return; const s=W.find(([i,j])=>free(i,j) && i!==UC_C && j!==UC_C && Math.abs(i-UC_C)+Math.abs(j-UC_C)>=2 && keepsWay(i,j)); if(s){ out.push({type:'rune', i:s[0], j:s[1], text:t}); take(...s); } });
+  // dead ends: what the drowned left at the ends of things, or Wenlo's page
+  if(r.kind==='end'){ const s=W.find(([i,j])=>free(i,j)) || [UC_C,UC_C], key=r.id+':'+s[0]+','+s[1], page=Object.entries(UC_PAGE_ROOM).find(([q,id])=>id===r.id);
+    if(page){ const item=WENLO_PAGES[page[0]]; if(!(collectedPickups.has(key) || hasItem(item) || CHOICE.lamp==='hunt' || CHOICE.lamp==='done')) out.push({type:'pickup', i:s[0], j:s[1], item}); take(...s); }
+    else if(!collectedPickups.has(key)){ out.push({type:'pickup', i:s[0], j:s[1], item:UNDER_LOOT[(r.X*7+r.Y*3+seed)%UNDER_LOOT.length]}); take(...s); }
+    const c=seed%2 ? W.find(([i,j])=>free(i,j) && i!==UC_C && j!==UC_C && keepsWay(i,j)) : null; if(c) { out.push(seed%4===1?{type:'crate', i:c[0], j:c[1]}:{type:'barrel', i:c[0], j:c[1]}); take(...c); } }
+  return out; }
+// who is where: the old quarter's foes and folk go to the chamber over where they stood; some empty crossings get one more of the quarter's own
+function ucPlace(r,list){ const W=ucWalk(r).filter(([i,j])=>!ucNearDoor(r,i,j)), out=[]; let k=0;
+  list.forEach(m=>{ const s=W[k++] || W[0] || [UC_C,UC_C]; out.push({...m, i:s[0], j:s[1]}); }); return out; }
+function ucMobs(r){ const QF=UC_QF[r.q], all=QF.mobs(), mine=all.filter(m=>ucOfOld(r.q,m.i,m.j)===r.id).map(m=>({...m, faction:(m.faction||'')+'_'+r.id}));
+  if(!mine.length && !UC_OUT[r.id] && r.kind!=='end' && !r.square && r.h%3===0){   // the quarter's ordinary things, wandering
+    const pool=all.filter(m=>RESPAWNS.has(m.name) && !/Warden|Elemental|Pathfinder/.test(m.name)); if(pool.length){ const t=pool[(r.h>>>2)%pool.length]; mine.push({...t, faction:'ucw_'+r.id}); if(r.h%9===0) mine.push({...t, name:t.name.trim()+' ', faction:'ucw_'+r.id}); } }
+  return ucPlace(r,mine); }
+function ucNpcs(r){ return ucPlace(r,UC_QF[r.q].npcs().filter(n=>ucOfOld(r.q,n.i,n.j)===r.id)); }
+Object.values(UCR).forEach(r=>{ const QF=UC_QF[r.q], first=r.X%6===0&&r.Y%6===0, ent={ start:{i:UC_C,j:UC_C} };
+  Object.keys(UC_DIRS).forEach(d=>{ const [i,j]=UC_IN[d]; ent['from'+d.toUpperCase()]={i,j}; });
+  AREAS[r.id]={ ...INSIDE_BASE, w:UC_W, h:UC_W, theme:'interior', cave:true, maze:true, ucRoom:true, layer:-1, label:'The Undercity · '+UC_LABEL[r.q], mapLabel: r.square||UC_OUT[r.id] ? UC_LABEL[r.q] : '', mini:{x:0,y:0}, tier:4,
+    heat:QF.heat, volcanic:QF.volcanic, objects:()=>ucObjects(r), npcs:()=>ucNpcs(r), mobs:()=>ucMobs(r), entries:ent };
+  AREA_TIER[r.id]=QF.tier; });
+UC_QS.forEach(q=>{ delete AREAS[q]; });
+MAP_UNDER.root=ucId(0,0);
+// the chambers' walkways and the drop round them
+{ const _mg=mazeGrid; mazeGrid=function(id){ return UCR[id] ? UCR[id].G : _mg(id); }; }
+mazeBlock=function(){ const G=UCR[areaId] ? UCR[areaId].G : null; if(!G) return; for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++) if(!G[j*ROOM.w+i]) blocked.add(i+','+j); };
+// the old ways in still work: the well, the bathhouse stair, the stair up from the Deeps; and an old save in a quarter wakes in the chamber over where it stood
+{ const _sw=switchArea; switchArea=function(id,entry,...rest){
+    if(UNDER_Q[id] && !AREAS[id]){ const m=UC_FROM[id+':'+entry] || [ucId(UC_QXY[id][0]*6,UC_QXY[id][1]*6),'start']; id=m[0]; entry=m[1]; }
+    const prevQ=UC_Q(areaId), b0=banner; if(UCR[id] && prevQ===UCR[id].q) banner=()=>{};   // no banner for every chamber of the same quarter
+    try{ return _sw.call(this,id,entry,...rest); } finally{ banner=b0; } }; }
+function ucFromOld(area,pos){ if(!UNDER_Q[area] || AREAS[area]) return null; const p=pos||{}; return { room: ucOfOld(area,p.i??16,p.j??16), pos:{i:UC_C,j:UC_C,dir:p.dir??0} }; }
+// the doors from above lead into their chambers
+wrap('steamcellar','objects',l=>l.map(o=>o.type==='teleporter'&&o.to==='under_ne' ? {...o, to:ucId(10,0), entry:'fromN'} : o));
+wrap('emberpass','objects',l=>l.map(o=>o.type==='teleporter'&&o.to==='under_se' ? {...o, to:ucId(8,11), entry:'fromS'} : o));
+if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
+
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

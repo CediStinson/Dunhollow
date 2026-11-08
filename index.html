@@ -5318,7 +5318,7 @@ Object.assign(AREAS,{
       {type:'crate', i:4, j:0, breakable:true}, {type:'crate', i:5, j:0, breakable:true}, {type:'barrel', i:6, j:0, breakable:true},
     ].filter(o=>!o.breakable || !destroyedBreakables.has('elderhouse:'+o.i+','+o.j)),
     entries:{ fromVillage:{i:4,j:5} } },
-  camp:{ fence:{r:false,l:false}, w:13, h:9, theme:'road', label:'Bandit Camp', mini:{x:1,y:2},
+  camp:{ fence:{r:false,l:false}, w:13, h:15, theme:'road', label:'Bandit Camp and Charcoal Pits', mini:{x:1,y:2},
     notches:()=>[], dummy:null,
     objects:()=>[
       {type:'teleporter', i:6, j:0, to:'southtrail', entry:'fromCamp'},
@@ -5394,6 +5394,7 @@ function doorTile(o){ const t=o.dt??1; return o.door==='l' ? [o.i+t, o.j+o.fp[1]
 // quest progress: letter 0 unseen, 2 shown to the elder; wolves 0 none, 1 asked, 2 cleared, 3 rewarded
 const QUEST={ letter:0, wolves:0, camp:0 };
 function switchArea(id,entryKey){
+  if(id==='pits'){ id='camp'; entryKey = entryKey==='fromWash' ? 'fromWash' : 'fromPits'; }   // the charcoal pits are part of the camp now
   CK=null; FOES.barrowking.pattern=BK_PAT1;          // a Barrow-King fight never survives leaving the room
   player.sitChair=null; pendingChair=null;
   const prev=areaId, A=AREAS[id]; areaId=id;
@@ -9030,7 +9031,7 @@ const AREA_PATHS={
   farm:      [ [[6.5,-0.5],[6.5,1.8],[8.8,3.2],[12,4.6],[15,5.2],[18.5,5.5]], [[3.4,1.6],[5.2,2.6],[6.8,3.9]], [[6.6,5.0],[5.2,6.2],[4.2,7.4]], [[8.0,5.2],[10.4,6.4],[12,7.3]], [[10,3.9],[12.9,3.3]] ],   // the cart track, door to well, and the footpaths out to the garden and the wheat
   road:      [ [[-0.5,2.5],[9,2.7],[18,2.3],[26,2.6],[34.5,2.5]], [[16.5,2.5],[16.5,-0.5]] ],
   crossroads:[ [[5.5,5.5],[11.5,5.5]], [[5.5,-0.5],[5.5,11.5]] ],
-  camp:      [ [[6.5,-0.5],[6.5,9.5]], [[3,4.5],[10,4.5]] ],
+  camp:      [ [[6.5,-0.5],[6.5,15.5]], [[3,4.5],[10,4.5]], [[3,10.5],[10,10.5]] ],
   southtrail:[ [[2.5,-0.5],[2.2,5],[3.4,10],[2.3,15],[3.6,19],[3.5,23.5]] ],
   farmhouse:[], elderhouse:[],
   village:   [ [[4.5,-0.5],[4.8,2],[6.6,4.6]], [[6.5,10.5],[6.8,8],[6.4,6],[6.6,4.6]], [[-0.5,5.2],[2.5,4.8],[6.6,4.6],[10.5,4.5],[14.5,4.9]], [[10.5,4.6],[10.5,4.2]], [[6.6,4.6],[6.9,3.9]], [[2.5,4.8],[3.3,5.8]], [[6.8,8],[9.5,8.6],[12.6,8.2]], [[4.5,7.8],[6.8,8]], [[10.5,4.5],[12.4,3.5]] ],
@@ -9918,9 +9919,10 @@ function applySave(sv){
   SOLD_TODAY.clear(); (wd.sold||[]).forEach(k=>SOLD_TODAY.add(k));
   destroyedBreakables.clear(); (wd.broken||[]).forEach(k=>destroyedBreakables.add(k)); Object.keys(OPENED_KIND).forEach(k=>delete OPENED_KIND[k]); Object.assign(OPENED_KIND,wd.brokenK||{});
   defeatedMobs.clear();       (wd.defeated||[]).forEach(k=>defeatedMobs.add(k));
+  [...defeatedMobs].forEach(k=>{ if(k.startsWith('pits:')) defeatedMobs.add('camp:'+k.slice(5)); });   // the pits are the south end of the camp now
   switchArea(AREAS[wd.area]?wd.area:'farm','start');
   endCombatSilently(); player.moving=false;
-  const pos=sv.pos||{};
+  const pos=wd.area==='pits' && sv.pos ? {...sv.pos, j:(sv.pos.j??0)+6, y:sv.pos.y!=null?sv.pos.y+6:undefined} : (sv.pos||{});
   const inRoom=(pos.i??-1)>=0 && pos.i<ROOM.w && (pos.j??-1)>=0 && pos.j<ROOM.h;
   if(inRoom){ player.i=pos.i; player.j=pos.j; player.x=pos.x??(pos.i+0.5); player.y=pos.y??(pos.j+0.5); }
   player.dir=pos.dir??0;
@@ -11028,9 +11030,21 @@ wrap('camp','objects',list=>{
   let l=list.map(o=>{ if(o.type==='tent' && CHOICE.camp==='fought') return {...o, burnt:true};
                      if(o.type==='campfire' && (CHOICE.camp==='fought'||CHOICE.camp==='spared')) return {...o, type:'ashes'}; return o; });
   if(CHOICE.camp==='spared') l=l.filter(o=>!(o.type==='tent' && o.i===9));
-  l.push({type:'teleporter', i:6, j:8, to:'pits', entry:'fromCamp'});
+  // the charcoal pits, at the south end of the camp (they were a room of their own once)
+  const pk=(i,j)=>destroyedBreakables.has('camp:'+i+','+j)||destroyedBreakables.has('pits:'+i+','+(j-6));
+  [[2,9],[9,9],[3,12],[9,12]].forEach(([i,j])=>l.push({type:'kiln', i, j, cold:CHOICE.camp!=='spared'}));
+  if(CHOICE.camp==='fought' && !collectedPickups.has('pits:6,5') && !collectedPickups.has('camp:6,11')) l.push({type:'pickup', i:6, j:11, item:'journal'});
+  if(CHOICE.camp==='bribed') [[5,12],[6,12],[7,12],[6,13]].forEach(([i,j])=>{ if(!pk(i,j)) l.push({type:'crate', i, j, breakable:true, rich:true}); });
+  if(CHOICE.camp==='spared') l.push({type:'campfire', i:6, j:11});
+  l.push({type:'teleporter', i:6, j:14, to:'drywash', entry:'fromPits'});
   return l; });
-AREAS.camp.entries.fromPits={i:6,j:7};
+wrap('camp','npcs',l=> CHOICE.camp==='spared' ? [...l,
+  { id:'marapits', name:'Mara Blackthorn', i:5, j:10, dir:1, opts:{gender:'f',skin:1,hair:2,hairColor:0,equip:{head:null,torso:'shirt',armor:'mail',hands:'gloves',legs:'trousers',feet:'boots',weapon:null,offhand:null}} },
+  { id:'coll', name:'Old Coll', i:8, j:11, dir:6, opts:{gender:'m',skin:2,hair:2,hairColor:12,beard:5,face:1,equip:{head:null,torso:'smock',armor:null,hands:null,legs:'trousers',feet:null,weapon:null,offhand:null}} } ] : l);
+wrap('camp','mobs',l=> CHOICE.camp==='bribed' ? [...l,                       // she paid you to look away, not to come back and help yourself
+  { name:"Mara's Man", type:'bandit', i:4, j:11, faction:'mara', opts:BANDIT({skin:2,hair:1,hairColor:3,beard:2,equip:{head:'hood',torso:'smock',armor:'gambeson',hands:'gloves',legs:'trousers',feet:'boots',weapon:'axe',offhand:null}}) },
+  { name:"Mara's Woman", type:'bandit', i:8, j:11, faction:'mara', opts:{gender:'f',skin:1,hair:3,hairColor:1,face:2,equip:{head:'hood',torso:'tunic_green',armor:'jerkin',hands:'gloves',legs:'hose_grey',feet:'boots',weapon:'spear',offhand:null}} } ] : l);
+AREAS.camp.entries.fromPits={i:6,j:13}; AREAS.camp.entries.fromWash={i:6,j:13};
 // graveyard gains a path north
 wrap('graveyard','objects',list=>[...list,{type:'teleporter', i:4, j:0, to:'stones', entry:'fromGraves'}]);
 AREAS.graveyard.entries.fromStones={i:4,j:1};
@@ -12896,7 +12910,7 @@ function resetMobs(){
     else if(A.mobsCalm && A.mobsCalm()) mobs.forEach(m=>{ if(!m.dead) m.hostile=false; }); }
   if(areaId==='camp'){
     if(CHOICE.camp==='spared') mobs.forEach(m=>{ m.dead=true; m.gone=true; m.hostile=false; });
-    else if(CHOICE.camp==='bribed' || !CHOICE.camp) mobs.forEach(m=>{ if(!m.dead) m.hostile=false; });
+    else if(CHOICE.camp==='bribed' || !CHOICE.camp) mobs.forEach(m=>{ if(!m.dead) m.hostile=m.faction==='mara'; });
     else mobs.forEach(m=>{ if(!m.dead) m.hostile=true; });
   }
   const A=AREAS[areaId];
@@ -19526,7 +19540,7 @@ AREAS.pits.entries.fromWash={i:5,j:7};
 Object.assign(AREAS,{
   drywash:{ sandKind:'clay', fence:{r:false,l:false}, w:8, h:22, theme:'sand', label:'The Dry Wash', mini:{x:0,y:0}, scrub:gy=>Math.max(0,1-gy/9),
     notches:()=>[], dummy:null,
-    objects:()=>[ {type:'teleporter', i:4, j:0, to:'pits', entry:'fromWash'}, {type:'teleporter', i:4, j:21, to:'waystation', entry:'fromWash'},
+    objects:()=>[ {type:'teleporter', i:4, j:0, to:'camp', entry:'fromWash'}, {type:'teleporter', i:4, j:21, to:'waystation', entry:'fromWash'},
       {type:'deadtree', i:1, j:3, s:0.9}, {type:'deadtree', i:6, j:6, s:0.7}, {type:'sandrock', i:1, j:9, v:1}, {type:'sandrock', i:6, j:11, fp:[2,1], v:2}, {type:'bones', i:5, j:15, noblock:true},
       {type:'sandrock', i:0, j:17, v:3}, {type:'sandrock', i:7, j:19, v:4} ],
     npcs:()=>[],

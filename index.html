@@ -22831,13 +22831,21 @@ const BEAR=(w)=>({gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,beast:true
 const BEAR_COL={coat:'#6a4a2e',belly:'#5a3e26',legs:'#4a3220',muzzle:'#a08462'};
 function drawBear(x,B,e,pose){ const pk=pose&&pose.kind, pt=pose?Math.min(1,Math.max(0,pose.t||0)):0, s=curStep(e)||{}, since=clock-(e.roaredAt||-9);
   const o={col:BEAR_COL, dir:e.dir||0, fl:dirMirrored(e.dir||0), mv:e.moving?1:0, ph:gt*8, rear:0, jaw:0, swipe:0, seed:3};
-  if(pk==='raise'){ if(s.roar){ o.rear=pt; o.jaw=pt*0.6; } else o.swipe=pt*0.45; }
+  const over=!s.roar && e.swingDir==='up';                                        // an overhead blow: it half-rears and brings both paws down
+  if(pk==='raise'){ if(s.roar){ o.rear=pt; o.jaw=pt*0.6; } else if(over){ o.rear=pt*0.55; o.jaw=pt*0.3; } else o.swipe=pt*0.45; }
+  else if(pk==='strike' && over && since>=0.9){ o.rear=Math.max(0,0.55-pt*0.8); }
   else if(pk==='strike'){ if(since<0.9){ o.rear=Math.max(0,1-since*1.6); o.jaw=Math.max(0,1-since); } else o.swipe=Math.max(0,1-pt*0.6); }
   if(since<0.5){ o.jaw=1; o.rear=Math.max(o.rear,1-since*1.2); }
   g.save(); const dx=0; if(pk==='strike' && since>=0.9) o.lunge=Math.min(1,pt)*8*(1-Math.min(1,pt))/1.55*2; if(pk==='stagger') o.lunge=-5/1.55;
   if(e.dead){ o.down=1; o.mv=0; o.jaw=0; o.rear=0; o.swipe=0; o.blink=true; }
   g.translate(x+dx,B); g.scale(1.55,1.55); quadDraw(0,0,'bear',o); g.restore();
   if(since<0.6){ g.save(); g.strokeStyle=`rgba(255,240,220,${0.5*(1-since/0.6)})`; g.lineWidth=2; for(let r=0;r<3;r++){ const rr=20+since*120+r*14; g.beginPath(); g.arc(x+(o.fl?-30:30)*Math.sin(VIEW[dirView(o.dir)].ang*Math.PI/180),B-70,rr,-0.8,0.8); g.stroke(); } g.restore(); } }   // the roar, rolling out
+// Old Brumm does not swing by rote: each swipe comes from the left, the right or overhead, never the same side three times running
+{ const _bw=beginWind; beginWind=function(f,quick){ const r=_bw.apply(this,arguments);
+    if(!quick && f.faction==='brumm' && f.state==='windup'){ const s=curStep(f); if(s && !s.roar){
+      const H=f._sw||(f._sw=[]), pool=['left','left','right','right','up'].filter(d=>!(H.length>=2 && H[H.length-1]===d && H[H.length-2]===d));
+      const d=pool[Math.floor(Math.random()*pool.length)]; f.swingDir=d; H.push(d); if(H.length>4) H.shift(); } }
+    return r; }; }
 // the roar: no wound, but unbraced it shakes you
 { const _imp=impact; impact=function(f){ const s=curStep(f); if(!s || !s.roar) return _imp.apply(this,arguments);
     lunge(f,player); f.strikeAt=clock; f.roaredAt=clock; duel.lastImpact=clock; shake=Math.max(shake,9); try{ SND.fx('roar'); }catch(e){}

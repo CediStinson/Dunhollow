@@ -23531,6 +23531,7 @@ onUse(['skullsign'],o=>{ const T=[["Crude letters in something dark and red, the
 // ════════ THE UNDERCITY, ROOM BY ROOM: each quarter is a 6×6 web of small chambers — crossings over the drop, walkways, ledges, dead ends —
 //   and you only ever see the one you stand in. Openings in its edges lead on. The map fills in a chamber at a time, as you walk it.
 //   144 chambers in all (12×12 over the four quarters). What lived and lay in the old quarters is spread through them: same foes, same lore, Wenlo and his pages.
+const UC_DEEP_LOOT=['obsidian_helm','potion','emberstep_boots','wight_ring','cinder_gloves','mana_potion','scorched_greaves','silver_torc','ash_mantle','potion','amber_brooch','gauntlets','shield_iron','longsword'].filter(id=>ITEMS[id]);   // what lies at the ends of things, worth the walk
 const UC_N=6, UC_W=9, UC_C=4, UC_QS=['under_nw','under_ne','under_sw','under_se'], UC_QXY={under_nw:[0,0],under_ne:[1,0],under_sw:[0,1],under_se:[1,1]};
 const ucId=(X,Y)=>'uc_'+X+'_'+Y, UCR={}, UC_QF={};
 const UC_Q=id=> UCR[id] ? UCR[id].q : (UNDER_Q[id] ? id : null);
@@ -23607,7 +23608,7 @@ function ucObjects(r){ const out=[], seed=r.hs, W=ucWalk(r), used=new Set(), tak
   // dead ends: what the drowned left at the ends of things, or Wenlo's page
   if(r.kind==='end'){ const s=W.find(([i,j])=>free(i,j)) || [r.cx,r.cy], key=r.id+':'+s[0]+','+s[1], page=Object.entries(UC_PAGE_ROOM).find(([q,id])=>id===r.id);
     if(page){ const item=WENLO_PAGES[page[0]]; if(!(collectedPickups.has(key) || hasItem(item) || CHOICE.lamp==='hunt' || CHOICE.lamp==='done')) out.push({type:'pickup', i:s[0], j:s[1], item}); take(...s); }
-    else if(!collectedPickups.has(key)){ out.push({type:'pickup', i:s[0], j:s[1], item:UNDER_LOOT[(r.X*7+r.Y*3+seed)%UNDER_LOOT.length]}); take(...s); }
+    else if(!collectedPickups.has(key)){ out.push({type:'pickup', i:s[0], j:s[1], item:UC_DEEP_LOOT[(r.X*7+r.Y*3+seed)%UC_DEEP_LOOT.length]}); take(...s); }
     const c=seed%2 ? W.find(([i,j])=>free(i,j) && i!==r.cx && j!==r.cy && keepsWay(i,j)) : null; if(c) { out.push(seed%4===1?{type:'crate', i:c[0], j:c[1]}:{type:'barrel', i:c[0], j:c[1]}); take(...c); } }
   return out; }
 // who is where: the old quarter's foes and folk go to the chamber over where they stood; some empty crossings get one more of the quarter's own
@@ -23662,13 +23663,14 @@ Object.entries(UC_TWIST).forEach(([id,T])=>{ const A=AREAS[id], r=UCR[id], o0=A.
     return s ? [...l,{type:'rune', i:s[0], j:s[1], text:UC_TWIST_HINT[T.kind]}] : l; }; });
 function ucEerie(kind){ try{ SND.fx('whoosh',0.35); }catch(e){} shake=Math.max(shake,4);
   const L={ loop: UCT.loops>1 ? ["Again. The same hall.","The same hall. You are sure of it now.","The same crack in the same stone. Again."][UCT.loops%3] : "You walk out of the hall, and into the same hall. The same crack in the same stone.",
-    turn:"The passage turned while you walked it. This is not where it went before.", warp:"That hallway was far too short for where it has brought you." }[kind];
+    turn:"The passage turned while you walked it. This is not where it went before.", warp:"That hallway was far too short for where it has brought you.", down:"You keep on. This time the hall does not come round again. It goes down, a long way, into somewhere older." }[kind];
   setTimeout(()=>{ logMsg(L,'#b8a8e0'); floatText(tileOf(player),'…','#b8a8e0'); },250); }
 { const _sw=switchArea; switchArea=function(id,entry,...rest){
     try{ const T=UC_TWIST[areaId], r=UCR[areaId];
       if(T && r && CHOICE.lamp!=='done'){ const d=Object.keys(r.ex).find(k=>r.ex[k][0]===id && r.ex[k][1]===entry), at=d && ucEdge(r,d);
         if(d && Math.max(Math.abs(player.i-at[0]),Math.abs(player.j-at[1]))<=1){
-          if(T.kind==='loop'){ if(!UCT.loops || UCT.last===d){ UCT.loops++; UCT.last=d; id=areaId; entry='from'+UC_OPP[d].toUpperCase(); ucEerie('loop'); }   // out one end, in at the other: the same hall
+          if(T.kind==='loop'){ if(r.q==='under_sw' && UCT.last===d && UCT.loops>=3){ CHOICE.ucVaultFrom=areaId; id='uc_vault'; entry='fromHall'; ucEerie('down'); }   // never turn, and the crypts give up: the hall goes down
+            else if(!UCT.loops || UCT.last===d){ UCT.loops++; UCT.last=d; id=areaId; entry='from'+UC_OPP[d].toUpperCase(); ucEerie('loop'); }   // out one end, in at the other: the same hall
             else { [id,entry]=r.ex[UCT.last]; } }                                                                                                     // you turned round with it: it lets you through, the way you first meant to go
           else if(T.kind==='turn'){ const ex=['n','e','s','w'].filter(k=>r.ex[k]), k2=ex[(ex.indexOf(d)+1)%ex.length]; [id,entry]=r.ex[k2]; ucEerie('turn'); }
           else if(T.kind==='warp' && d===T.d){ const R=UCR[T.to]; id=T.to; entry='from'+Object.keys(R.ex)[0].toUpperCase(); ucEerie('warp'); } } } }catch(e){ console.warn(e); }
@@ -23727,6 +23729,40 @@ const UC_PIECES={
         P0.props.forEach(pp=>{ if(typeof pp==='string') add(pp,pp==='bones'||pp==='puddle'?{noblock:true,flat:pp==='puddle',dz:pp==='puddle'?-99:undefined}:{}); else add(pp[0],pp[1]); });
         if(P0.wet) ucWalk(r).forEach(([i,j],n)=>{ if(n%3===0 && !l.some(o=>o.i===i&&o.j===j)) l.push({type:'puddle', i, j, s:0.9, flat:true, noblock:true, dz:-99}); });
         return l; }; }); }); })();
+// ════════ THE BURIED KING'S VAULT: the old city's treasury, sealed when the new city was built over it, and on no map. Walk one of the Chapel Crypts' endless halls
+//   and never turn round: the fourth time, it gives up and takes you down. Its king is still on his throne. Once found (or once Wenlo can read his chart again),
+//   a door to it stands in that hall
+Object.assign(ITEMS,{ king_signet:{ name:"The Buried King's Signet", slot:'special', title:"A heavy gold ring, the stone in it red as a coal. The seal cut into it is a crown over a river. Nobody alive has seen that seal; the Crown above uses another. It sits warm on the finger, and makes the hand that wears it steady." },
+  king_ledger:{ name:"The Old King's Ledger", slot:'misc', read:true, title:'A ledger bound in green leather, the pages gone brown',
+    body:["<i>Paid to the masons, for the vaulting over the river streets: four thousand. Paid to the Hollowmere families, for their houses under it: nothing. They were told to move up.</i>","<i>The treasury to be sealed below, against the day the new city fails.</i>","The last page has one line, in a different hand: <i>He would not leave his gold. So we left him with it.</i>"] } });
+Object.assign(ITEM_STATS,{ king_signet:{hp:8, ap:2, agi:2, magic:2} }); GEAR_HP.king_signet=8; PRICES.king_signet=400; QUEST_ITEMS.add('king_ledger');
+ITEM_ICON.king_signet=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.lineWidth=5; g2.strokeStyle='#c8962e'; g2.beginPath(); g2.ellipse(20,24,10,8,0,0,Math.PI*2); g2.stroke(); g2.strokeStyle='#f0cc6a'; g2.lineWidth=1.4; g2.beginPath(); g2.ellipse(19,23,10,8,0,Math.PI*1.1,Math.PI*1.8); g2.stroke();
+  g2.fillStyle='#8a5a18'; g2.fillRect(13,9,14,9); g2.fillStyle='#b8202a'; g2.beginPath(); g2.ellipse(20,13,5,3.4,0,0,Math.PI*2); g2.fill(); g2.fillStyle='rgba(255,220,200,0.7)'; g2.beginPath(); g2.ellipse(18.5,12,1.6,1,0,0,Math.PI*2); g2.fill(); g2.restore(); };
+const UC_CRYPT_LOOPS=Object.keys(UC_TWIST).filter(k=>UC_TWIST[k].kind==='loop' && UCR[k].q==='under_sw');
+const ucVaultKnown=()=>!!(CHOICE.ucVault || CHOICE.lamp==='done');
+AREAS.uc_vault={ ...INSIDE_BASE, w:9, h:9, theme:'interior', cave:true, ucRoom:true, layer:-1, label:"The Undercity · The Buried King's Vault", mapLabel:"The Buried King's Vault", mini:{x:0,y:0}, tier:4, heat:0.3,
+  objects:()=>[ {type:'teleporter', i:4, j:8, to:CHOICE.ucVaultFrom||UC_CRYPT_LOOPS[0], entry:'start'},
+    {type:'rug', i:4, j:2, fp:[1,5], col:'#5a1a1a', trim:'#d8b050', flat:true, noblock:true, dz:-99}, {type:'dthrone', i:4, j:1},
+    {type:'hoard', i:1, j:1}, {type:'hoard', i:7, j:1}, {type:'hoard', i:0, j:4}, {type:'hoard', i:8, j:4},
+    {type:'candlestand', i:2, j:0}, {type:'candlestand', i:6, j:0}, {type:'candlestand', i:1, j:7}, {type:'candlestand', i:7, j:7},
+    {type:'strongbox', i:2, j:2}, {type:'strongbox', i:6, j:2}, {type:'bones', i:3, j:5, noblock:true}, {type:'bones', i:6, j:6, noblock:true},
+    {type:'rune', i:0, j:1, text:"Carved over the treasury door, on the inside: <i>Against the day the new city fails.</i> The new city did not fail. Nobody came back for this."},
+    ...(CHOICE.ucKing && !collectedPickups.has('uc_vault:4,3') && !hasItem('king_ledger') ? [{type:'pickup', i:4, j:3, item:'king_ledger'}] : []) ],
+  npcs:()=>[], mobs:()=>[ { name:'The Buried King', type:'skeleton', i:4, j:2, faction:'ucking', hpMul:1.6, opts:UNDER_DEAD('The Buried King',{equip:{...RISEN('The Buried King').equip, head:'helm_full', armor:'mail', weapon:'longsword', offhand:'shield_iron'}}) } ],
+  entries:{ fromHall:{i:4,j:7}, start:{i:4,j:7} } };
+AREA_TIER.uc_vault=5;
+UC_CRYPT_LOOPS.forEach(id=>{ const A=AREAS[id], r=UCR[id], o0=A.objects;
+  A.objects=()=>{ const l=o0(), busy=new Set(l.filter(o=>!o.noblock||o.type==='teleporter').map(o=>o.i+','+o.j)), free=ucWalk(r).filter(([i,j])=>!busy.has(i+','+j) && !ucNearDoor(r,i,j) && i!==r.cx && j!==r.cy);
+    if(free[1]) l.push({type:'rune', i:free[1][0], j:free[1][1], text:"Under the chalk, scratched so faint you nearly miss it: <i>Or never turn. On, and on, and on, and on, and down.</i>"});
+    if(ucVaultKnown() && free[0]) l.push({type:'teleporter', i:free[0][0], j:free[0][1], to:'uc_vault', entry:'fromHall'});
+    return l; }; });
+{ const _sw=switchArea; switchArea=function(id,...rest){ const from=areaId, r=_sw.call(this,id,...rest); if(areaId==='uc_vault' && !CHOICE.ucVault){ CHOICE.ucVault=true; if(UCR[from]) CHOICE.ucVaultFrom=from; setTimeout(()=>{ banner("The Buried King's Vault",'#e8c060',2200); logMsg('Gold, heaped to the walls, black with age. And on the throne, in his crown, the king who would not leave it.','#e8c060'); },400); } return r; }; }
+setInterval(()=>{ try{ if(areaId!=='uc_vault' || CHOICE.ucKing || combat.active) return; const k=mobs.find(m=>m.name==='The Buried King'); if(!k || !k.dead) return;
+    CHOICE.ucKing=true; player.purse+=600; giveQuestItem('king_signet',true); updateHud(); try{ autosaveSoon(300); }catch(e){}
+    logMsg("The Buried King falls apart on the steps of his throne. On his finger, a heavy gold signet. In the hoard, more coin than you can carry, and you carry it anyway. (+6 silver, The Buried King's Signet)",'#e8c060');
+    floatText(tileOf(player),"The Buried King's Signet",'#e8c060',true); if(!hasItem('king_ledger')) OBJECTS.push({type:'pickup', i:4, j:3, item:'king_ledger'}); }catch(e){} },600);
+JOURNAL.push(["The Buried King", ()=> !CHOICE.ucVault ? null : CHOICE.ucKing ? ['done',"Under the Chapel Crypts, the old city's treasury, on no map. Its king would not leave his gold. You took it from him, and his signet with it."] : ['active',"Under the Chapel Crypts you found the old city's treasury, and its king, still on his throne. He will not give up his gold."]]);
+if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

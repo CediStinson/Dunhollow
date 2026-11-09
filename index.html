@@ -23718,7 +23718,11 @@ const UC_PIECES={
     const cand=Object.values(UCR).filter(r=>r.q===q && !used.has(r.id) && !UC_OUT[r.id] && (r.kind==='vault'||r.kind==='cross')).sort((a,b)=>(b.kind==='vault')-(a.kind==='vault') || (a.hs%613)-(b.hs%613));
     UC_PIECES[q].forEach((P0,k)=>{ const r=cand[k*3] || cand[k*2] || cand[k]; if(!r || r.piece) return; r.piece=P0.name; const A=AREAS[r.id], o0=A.objects; A.mapLabel=P0.name; A.label='The Undercity · '+P0.name;
       A.objects=()=>{ let l=o0().filter(o=>o.type==='teleporter'||o.type==='pickup'||o.type==='rune'||o.type==='ucladder'); const sp=ucFreeSpots(r,l); let k2=0;
-        const add=(t,extra)=>{ const s0=sp[k2++]; if(!s0) return; const o={type:t, i:s0[0], j:s0[1], ...(extra||{})}; if(o.fp && o.fp[0]>1 && (o.i+o.fp[0]>r.w || ucNearDoor(r,o.i+1,o.j) || o.i+1===r.cx)) return; if(t==='crate' && o.rich && destroyedBreakables.has(r.id+':'+o.i+','+o.j)) return; l.push(o); };
+        const open=()=>{ const solid=new Set(l.filter(o=>!o.noblock && o.type!=='teleporter').map(o=>o.i+','+o.j)), W=ucWalk(r).filter(([i,j])=>!solid.has(i+','+j)), S=W[0], seen=new Set([S.join(',')]), Q=[S];   // nothing may wall off a corner of the room
+          while(Q.length){ const [a,b]=Q.shift(); [[1,0],[-1,0],[0,1],[0,-1]].forEach(([c,d])=>{ const x=a+c, y=b+d, k=x+','+y; if(x<0||y<0||x>=r.w||y>=r.h||seen.has(k)||solid.has(k)) return; seen.add(k); Q.push([x,y]); }); }
+          return seen.size===W.length; };
+        const add=(t,extra)=>{ const s0=sp[k2++]; if(!s0) return; const o={type:t, i:s0[0], j:s0[1], ...(extra||{})};
+          if(!o.noblock){ l.push(o); const ok=open(); l.pop(); if(!ok) return; } if(o.fp && o.fp[0]>1 && (o.i+o.fp[0]>r.w || ucNearDoor(r,o.i+1,o.j) || o.i+1===r.cx)) return; if(t==='crate' && o.rich && destroyedBreakables.has(r.id+':'+o.i+','+o.j)) return; l.push(o); };
         const s1=sp[k2++]; if(s1) l.push({type:'rune', i:s1[0], j:s1[1], text:P0.rune});
         P0.props.forEach(pp=>{ if(typeof pp==='string') add(pp,pp==='bones'||pp==='puddle'?{noblock:true,flat:pp==='puddle',dz:pp==='puddle'?-99:undefined}:{}); else add(pp[0],pp[1]); });
         if(P0.wet) ucWalk(r).forEach(([i,j],n)=>{ if(n%3===0 && !l.some(o=>o.i===i&&o.j===j)) l.push({type:'puddle', i, j, s:0.9, flat:true, noblock:true, dz:-99}); });

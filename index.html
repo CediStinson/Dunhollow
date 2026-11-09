@@ -18253,7 +18253,8 @@ function peddlerStock(pool,n){ const T=(CHOICE.pedd&&CHOICE.pedd.trip)||0, h=[..
 // ── cooking: walk up to any campfire with raw meat or fish ──
 // any fire you can crouch by, outdoors or in a house: see onUse(['campfire','hearth'],...) below
 const COOKS={ raw_meat:'cooked_meat', fish_perch:'grilled_fish', fish_trout:'grilled_fish', fish_carp:'grilled_fish', fish_eel:'grilled_fish', fish_herring:'grilled_fish' };
-function campfireCook(o){ if(o && o.type==='campfire' && typeof rainingHere==='function' && rainingHere()){ say('A Campfire',"<i>The rain has put the fire out. Wait for it to stop, or cook at a hearth indoors.</i>",[bye]); return; }
+function campfireCook(o){ if(o && o.type==='campfire' && typeof rainingHere==='function' && rainingHere() && typeof drakeOn==='function' && drakeOn() && !campfireCook._lit){ campfireCook._lit=true; logMsg(CHOICE.drake.name+' breathes on the soaked wood until it hisses and catches. Rain or no rain, there is a fire.','#ff9a50'); try{ DRAKE.fire=1; const q=P(o.i+0.5,o.j+0.5); DRAKE.fireTo={x:q.x,y:q.y-10}; }catch(e){} }
+  if(campfireCook._lit){ campfireCook._lit=false; } else if(o && o.type==='campfire' && typeof rainingHere==='function' && rainingHere()){ say('A Campfire',"<i>The rain has put the fire out. Wait for it to stop, or cook at a hearth indoors.</i>",[bye]); return; }
   const T=o&&o.type==='hearth'?'The Hearth':'A Campfire', raw=player.inv.map((id,k)=>({id,k})).filter(x=>x.id && COOKS[x.id]);
   const hearth=o&&o.type==='hearth', soups=hearth ? Math.min(Math.floor(invCount('berries')/2),invCount('bread')) : 0;   // bramble soup wants a pot, so only at a hearth
   const soupOpt=hearth ? [{label:'Make bramble soup. (2 berries and a loaf each)', off:!soups, note:soups?'×'+soups:'need 2 berries + bread', fn:()=>{
@@ -24011,6 +24012,46 @@ function drawKingCrown(c,x,B,LN,HW,Y,showFace,pr,V,part){ const cy=Y.HAIRLINE-0.
   c.strokeStyle='#f0cc6a'; c.lineWidth=1; c.beginPath(); c.ellipse(x+LN,B+cy-0.5,rx,ry,0,0.15,Math.PI-0.15); c.stroke();
   pts.filter(p=>p.fr).forEach(p=>pt(p,'#c8962e')); }
 if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
+// ════════ YOUR DRAGON, BEYOND FIGHTS: it cooks for you anywhere, keeps a campfire alight in the rain, has opinions about what it meets, noses out what is hidden,
+//   and once it is grown, there is a morning it lets you up on its back ════════
+const DRAKE_COOKS={ raw_meat:'cooked_meat', fish_perch:'grilled_fish', fish_trout:'grilled_fish', fish_carp:'grilled_fish', fish_eel:'grilled_fish', fish_herring:'grilled_fish' };
+{ const _dt=drakeTalk; drakeTalk=function(){ const raw=player.inv.map((id,k)=>({id,k})).filter(x=>x.id && DRAKE_COOKS[x.id]);
+    _dt(); if(!raw.length || !dlgIsOpen()) return; const box=document.getElementById('dlg-opts'); if(!box || box.querySelector('.dlg-opt.drakecook')) return;
+    const b=document.createElement('button'); b.className='dlg-opt drakecook'; b.innerHTML='<span>Hold out your raw food for it to roast. ('+raw.length+')</span>';
+    b.addEventListener('click',()=>{ raw.forEach(x=>{ player.inv[x.k]=DRAKE_COOKS[x.id]; }); updateHud(); try{ refreshFoodBar(); }catch(e){} DRAKE.fire=1; const q=P(player.x,player.y); DRAKE.fireTo={x:q.x,y:q.y-50}; try{ SND.fx('sizzle'); }catch(e){}
+      logMsg(CHOICE.drake.name+' roasts it all in one long, careful breath, and only singes your fingers a little. ('+raw.length+' cooked)','#8ad07a'); closeDialog(); });
+    box.insertBefore(b,box.firstChild); }; }
+// it has opinions: it growls at Vesper and her sisters, hides behind you from Wenlo's ghost, sneezes steam at the Willow Pool; it noses out what is lying about, and it does not like a hall that will not keep still
+{ const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{ if(!drakeOn() || !DRAKE || combat.active || !running) return r; const D=DRAKE; D.react=Math.max(0,(D.react||0)-dt);
+    const near=(x,y,d)=>Math.hypot(x-D.x,y-D.y)<d;
+    const succ=NPCS.find(n=>n.id==='vesper' && near(n.x??n.i+0.5,n.y??n.j+0.5,6)) || (typeof mobs!=='undefined' && mobs.find(m=>m.type==='succubus' && !m.dead && near(m.x,m.y,6)));
+    const ghost=NPCS.find(n=>(n.id==='wenlo'||(n.opts&&n.opts.ghost)) && near(n.x??n.i+0.5,n.y??n.j+0.5,4));
+    if(succ){ D.dir=dirFromDelta((succ.x??succ.i+0.5)-D.x,(succ.y??succ.j+0.5)-D.y); if(D.react<=0){ D.react=5; floatText([Math.floor(D.x),Math.floor(D.y)-0.01],'Grrrr…','#ff8a60'); if(!CHOICE.drakeSucc){ CHOICE.drakeSucc=true; logMsg(CHOICE.drake.name+' goes flat and low, wings half open, and growls at her without stopping. It knows what she is.','#ff9a50'); } } }
+    else if(ghost){ const gx=ghost.x??ghost.i+0.5, gy=ghost.y??ghost.j+0.5, ax=player.x-gx, ay=player.y-gy, al=Math.hypot(ax,ay)||1; D.x+=(player.x+ax/al*0.7-D.x)*Math.min(1,dt*3); D.y+=(player.y+ay/al*0.7-D.y)*Math.min(1,dt*3); D.dir=dirFromDelta(gx-D.x,gy-D.y);
+      if(D.react<=0){ D.react=6; floatText([Math.floor(D.x),Math.floor(D.y)-0.01],'…!','#c8c8e8'); if(!CHOICE.drakeGhost){ CHOICE.drakeGhost=true; logMsg(CHOICE.drake.name+' hides behind your legs and peers round at the ghost, very small all of a sudden.','#c8c8e8'); } } }
+    else if(areaId==='willowpool' && D.react<=0 && Math.random()<dt*0.12){ D.react=8; D.sneeze=1; if(!CHOICE.drakePool){ CHOICE.drakePool=true; logMsg(CHOICE.drake.name+' sniffs the cold pool, sneezes a great cloud of steam over it, and looks offended.','#c8d8e8'); } }
+    if(D.react<=0 && !D.chase && !D.roast){ const pk=OBJECTS.find(o=>o.type==='pickup' && near(o.i+0.5,o.j+0.5,4.5) && !(D.found||(D.found=new Set())).has(areaId+':'+o.i+','+o.j));
+      if(pk){ D.found.add(areaId+':'+pk.i+','+pk.j); D.react=4; D.dir=dirFromDelta(pk.i+0.5-D.x,pk.j+0.5-D.y); floatText([Math.floor(D.x),Math.floor(D.y)-0.01],'!','#ffd070'); D.sniffAt={x:pk.i+0.5,y:pk.j+0.5,t:2.5}; }
+      else if(typeof UC_TWIST!=='undefined' && UC_TWIST[areaId] && CHOICE.lamp!=='done' && !(D.twistSeen||(D.twistSeen=new Set())).has(areaId)){ D.twistSeen.add(areaId); D.react=5; floatText([Math.floor(D.x),Math.floor(D.y)-0.01],'?!','#b8a8e0'); logMsg(CHOICE.drake.name+'\'s hackles rise. It stares down the hall and will not take its eyes off it. Something is wrong with this place.','#b8a8e0'); } }
+    if(D.sniffAt){ D.sniffAt.t-=dt; D.dir=dirFromDelta(D.sniffAt.x-D.x,D.sniffAt.y-D.y); if(D.sniffAt.t<=0) D.sniffAt=null; }
+  }catch(e){} return r; }; }
+// the Dragonfriend morning: once it is grown, out under the sky, it crouches beside you and waits until you understand
+let RIDE=null;
+{ const _da=drawActorBase; drawActorBase=function(e){ if(e===player && RIDE) return; return _da.apply(this,arguments); }; }
+setInterval(()=>{ try{ if(!running || !drakeOn() || CHOICE.dragonfriend || RIDE || combat.active || CS.on || dlgIsOpen() || drakeAge()<12) return; const A=AREAS[areaId]; if(!A || A.inside || A.layer) return;
+    CHOICE.dragonfriend=true; const N=CHOICE.drake.name;
+    say(N,[N+" is not small any more. It lands in front of you, folds its forelegs, and lowers its neck to the ground, and looks at you over its shoulder. And waits.","It wants you on its back."],[
+      {label:'Climb up.', fn:()=>{ closeDialog(); RIDE={t:0}; logMsg('You climb up between its wings. It is hot as a hearthstone under you.','#ff9a50'); }},
+      {label:'“Not today.”', fn:()=>{ CHOICE.dragonfriend=false; closeDialog(); }}]); }catch(e){} },3000);
+{ const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{ if(!RIDE || !DRAKE) return r; RIDE.t+=dt; DRAKE.x+=(player.x-DRAKE.x)*Math.min(1,dt*4); DRAKE.y+=(player.y-DRAKE.y)*Math.min(1,dt*4);
+    if(RIDE.t>1.5 && !RIDE.up){ RIDE.up=true; shake=Math.max(shake,4); try{ SND.fx('whoosh',0.6); }catch(e){} }
+    if(RIDE.t>9){ RIDE=null; banner('Dragonfriend','#ff9a50',2400); logMsg('It brings you down as gently as it can, which is not very gently, and shakes you off into the grass. You are grinning. So, in its way, is it.','#ff9a50'); try{ autosaveSoon(300); }catch(e){} } }catch(e){} return r; }; }
+{ const _pd=pupDrawItems; pupDrawItems=function(items){ _pd(items); if(!RIDE || !DRAKE) return; const k0=items.findIndex(it=>it.ax===DRAKE.x && it.ay===DRAKE.y); if(k0>=0) items.splice(k0,1);   // the little one is drawn big, with you on it
+    items.push({d:DRAKE.x+DRAKE.y+0.05, ax:DRAKE.x, ay:DRAKE.y, fn:()=>{ const q=P(DRAKE.x,DRAKE.y), t=RIDE.t, lift=t<1.5?0:t<3?(t-1.5)/1.5:t>7.5?Math.max(0,(9-t)/1.5):1, up=lift*70+Math.sin(gt*3)*6*lift, S=0.95;
+      g.fillStyle=`rgba(0,0,0,${0.35-lift*0.2})`; g.beginPath(); g.ellipse(q.x,q.y,80*S*(1-lift*0.3),24*S*(1-lift*0.3),0,0,Math.PI*2); g.fill();
+      const O={dir:DRAKE.dir, s:S, col:CHOICE.drake.col, wing:t<1.5?0.4:0.55+Math.sin(gt*7)*0.45, ph:gt*6, mv:0, noShadow:true}; drawDragon(q.x,q.y-up,O);
+      const D=DIR_DELTA[DRAKE.dir]||[1,0], phi=Math.atan2(D[0]+D[1],D[0]-D[1]), bx=q.x+(-2*Math.cos(phi))*S, by=q.y-up+(-2*Math.sin(phi)*0.5-40)*S;   // you, up between its wings
+      g.save(); g.translate(bx,by); g.scale(0.75,0.75); try{ drawChar(g,0,0,player.opts,0,DRAKE.dir,null); }catch(e){} g.restore(); }}); }; }
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

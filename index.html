@@ -23952,10 +23952,11 @@ function drakeSwap(toDragon){ const D=CHOICE.drake.name, W=CHOICE.pupName||PUP_N
     else { const dx=D.x-player.x, dy=D.y-player.y, d=Math.hypot(dx,dy)||1; if(d>1.4){ tx=player.x+dx/d*1.1; ty=player.y+dy/d*1.1; } else { tx=D.x; ty=D.y; } }
     const mx=tx-D.x, my=ty-D.y, md=Math.hypot(mx,my), sp=Math.min(md,dt*Math.max(2.4,md*3)); D.moving=md>0.04; if(md>0.001 && !D.roast && !D.chase && !D.sleep){ D.x+=mx/md*sp; D.y+=my/md*sp; }
     if(f && !f.dead) D.dir=dirFromDelta((f.x??f.i+0.5)-D.x,(f.y??f.j+0.5)-D.y); else if(D.moving && md>0.08) D.dir=dirFromDelta(mx,my);
-    if(f && !f.dead){ D.cd-=dt; if(D.cd<=0){ D.cd=3.4+Math.random()*1.0; D.shots=(D.shots||0)+1; const age=drakeAge(), blast=D.shots%3===0, n=Math.round((6+Math.min(16,age*1.4))*(1+playerLevel()*0.08)*(blast?1.8:1));   // every third breath a full blast
+    if(f && !f.dead){ D.cd-=dt; if(D.cd<=0){ D.cd=3.4+Math.random()*1.0; D.shots=(D.shots||0)+1; const age=drakeAge(), blast=D.shots%3===0; let n=Math.round((6+Math.min(16,age*1.4))*(1+playerLevel()*0.08)*(blast?1.8:1));   // every third breath a full blast
         D.fire=1; const q=P(f.x??f.i+0.5,f.y??f.j+0.5); D.fireTo={x:q.x,y:q.y-40};
         if(f.warded){ floatText(tileOf(f),'Warded','#c8e0f0'); }
-        else { f.hp-=n; f.flash=0.3; floatText([f.i+0.3,f.j-0.2],(blast?'Dragonfire! ':'')+'-'+n,'#ffa050',true); addStatus(f,'burn',blast?4:3,2+Math.floor(age/3)); if(blast) shake=Math.max(shake,3); if(f.hp<=0) foeDown(f); } D.blast=blast; } }
+        else { const res=FIRE_HARDY(f); if(res<1){ n=Math.max(1,Math.round(n*res)); if(!D.resTold){ D.resTold=true; logMsg('The sun-born things of the Sunscar are hard to burn: '+CHOICE.drake.name+'\'s fire does them less harm here.','#e8c080'); } }
+          f.hp-=n; f.flash=0.3; floatText([f.i+0.3,f.j-0.2],(blast?'Dragonfire! ':'')+'-'+n+(res<1?' (resisted)':''),'#ffa050',true); addStatus(f,'burn',blast?4:3,Math.max(1,Math.round((2+Math.floor(age/3))*res))); if(blast) shake=Math.max(shake,3); if(f.hp<=0) foeDown(f); } D.blast=blast; } }
     if(!f){ D.sneezeT=(D.sneezeT??(8+Math.random()*20))-dt; if(D.sneezeT<=0){ D.sneezeT=15+Math.random()*30; D.sneeze=1; }   // now and then it sneezes smoke
       D.sneeze=Math.max(0,(D.sneeze||0)-dt*0.8);
       D.idle=player.moving||combat.active ? 0 : (D.idle||0)+dt;
@@ -23980,6 +23981,8 @@ const DRAKE_SMALL=new Set(['cat','chicken','rabbit','pigeon','frog','lizard','fo
 const drakePrey=o=>DRAKE_SMALL.has(o.kind) || (DRAKE_BIG.has(o.kind) && drakeAge()>=8);
 const DRAKE_PREY_NAME={ chicken:'hen', cat:'cat', rabbit:'rabbit', pigeon:'pigeon', frog:'frog', lizard:'lizard', fox:'fox', goat:'goat', sheep:'sheep', deer:'deer' };
 const DRAKE_OWNED={ cat:"That was the miller's cat!", chicken:"My hen! That was my best layer!", goat:"My goat! Who pays for my goat?", sheep:"That's one of mine! Get that thing off my sheep!" };
+// the sun-born of the Sunscar: scarabs, scorpions and the great worm catch fire like anything else, but it does them half the harm
+const FIRE_HARDY=f=> f && ['scarab','scorpion','sandworm'].includes(f.type) ? 0.5 : 1;
 const DRAKE_LINES=["Is that a… keep it away from the thatch!","Is that a dragon? A real one?","Does NAME bite?","Mind it doesn't sneeze on the hay.","Gods. It's looking at me.","Can I touch it? No? Fair.","My cat won't come down off the roof since you came by.","Lovely colour. Is it hungry? Don't answer that."];
 { const _ad=OBJ_DRAW.animal; OBJ_DRAW.animal=o=>{ _ad(o); if(o.burnT!=null && o.burnT<1.4){ const q=P(o.x,o.y); g.save(); g.globalCompositeOperation='lighter'; for(let k=0;k<7;k++){ const ph=(gt*3+k/7)%1; g.fillStyle=`rgba(255,${150+k*12},40,${0.7*(1-ph)})`; g.beginPath(); g.ellipse(q.x+Math.sin(k*2.3+gt*6)*6,q.y-6-ph*22,4*(1-ph)+2,6*(1-ph)+2,0,0,Math.PI*2); g.fill(); } g.restore(); } }; }   // a hen or a cat on fire
 // small animals run from a dragon, even a little one

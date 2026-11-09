@@ -3750,7 +3750,7 @@ function drawHead(c, x, B, opts, view=0){
   const kettled=EQ.head==='kettle', HKIND=opts.vari&&opts.vari.head, closed=kettled&&(HKIND==='coif'||HKIND==='helm_full'), underHat=fn=>{ if(closed) return; if(!kettled || HKIND==='scarab_circlet' || HKIND==='sun_crown'){ fn(); return; }
     c.save(); c.beginPath(); c.rect(x-200,B+(closed?Y.SHOULDER+2:Y.HAIRLINE+1.2),400,300); c.clip(); fn(); c.restore(); };
   if(!hooded && !opts.shell) underHat(()=>drawHair(c,x,B,opts.hair,hair,hairDark,F,P,view,LN,'back'));   // anything hanging behind the skull
-  if(EQ.head==='bog_crown' && typeof drawBogCrown==='function') drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V,'far');   // the far side of a crown sits behind the head
+  if((EQ.head==='bog_crown'||EQ.head==='king_crown') && typeof drawBogCrown==='function') drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V,'far',EQ.head);   // the far side of a crown sits behind the head
   if(!closed && !LATE_EARS && !opts.shell) ears.filter(e=>Math.abs(e.x)>=HW-1).forEach(e=>drawEar(e,false));   // outside the silhouette: behind the head
   if(!showFace && !F && !ELFISH && !GOB && !hooded && !closed){                 // from behind a beard shows past the jaw, beside the neck
     const bs=opts.beard ?? (opts.hair===1 ? 5 : 0);
@@ -4061,7 +4061,7 @@ function drawHead(c, x, B, opts, view=0){
       [-1,1].forEach(sd=>{ c.beginPath(); c.moveTo(x+LN,B+top+2); c.quadraticCurveTo(x+LN+sd*2.5,B+top+5,x+LN+sd*1.5,B+top+8); c.lineTo(x+LN+sd*0.4,B+top+7); c.closePath(); c.fill(); });
     }
   }
-  if(EQ.head==='bog_crown') drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V,'near');
+  if(EQ.head==='bog_crown'||EQ.head==='king_crown') drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V,'near',EQ.head);
   if(EQ.head==='duel_band'){                            // the duellist's band: leather across the brow, a leaf of metal over it, the ends knotted behind and hanging
     const cy=Y.HAIRLINE+1.2, rx=HW+0.5, ry=2.4, Bc=ELFC.br, T0=ELFC.hzt;
     c.strokeStyle=tone(Bc,-0.5); c.lineWidth=2.1; c.beginPath(); c.ellipse(x+LN,B+cy,rx,ry,0,0.05,Math.PI-0.05); c.stroke();
@@ -13536,7 +13536,7 @@ function impact(f){                                   // a foe's swing lands (or
   if(f.phase2 && hurt) addStatus(player,'bleed',5,2);
   if(hurt && f.type==='sandworm' && s.dive){ shake=Math.max(shake,10); addStatus(player,'bleed',3,1); }
   if(hurt && f.type==='scorpion' && s.sting){ addStatus(player,'venom',7,2); teach('venom','Venom',["The sting <b>envenomed</b> you: it costs a little health every second for a while.","A <b>Scorpion Antidote</b> (Yusra at Sefa's Well) stops it."]); }
-  if(hurt && FIRE_FOE(f) && Math.random()<(/Slag|Kindled/.test(f.name)?1:/^Ember/.test(f.name)?0.6:0.35)) addStatus(player,'burn',3,2);
+  if(hurt && FIRE_FOE(f) && Math.random()<(/Slag|Kindled|Dragon/.test(f.name)?1:/^Ember/.test(f.name)?0.6:0.35)) addStatus(player,'burn',3,2);
   if(f.type==='barrowking' && f.cphase>=3 && player.hp<hp0 && !f.dead){ const h=Math.min(5,f.maxHp-f.hp); if(h>0){ f.hp+=h; floatText(tileOf(f),'+'+h,'#9ad0e8'); } }
   if(hurt && f.opts && f.opts.equip && f.opts.equip.weapon==='barrow_blade' && Math.random()<0.3) addStatus(player,'weak',3,0);
 }
@@ -14173,6 +14173,7 @@ function drawActorBase(e){
   else if(e.type==='ember') drawEmber(s.x,B,e,poseFor(e));
   else if(e.type==='hunger') drawHunger(s.x,B,e,poseFor(e));
   else if(e.type==='gnawer') drawGnawer(s.x,B,e,poseFor(e));
+  else if(e.type==='dragon') drawDragonFoe(s.x,B,e,poseFor(e));
   else if(e.type==='bear') drawBear(s.x,B,e,poseFor(e));
   else if(e.type==='troll') drawTroll(s.x,B,e,poseFor(e));
   else if(e.type==='gloomcaller'||e.type==='thornwitch'){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawShadeUnder(s.x,B,e); g.globalAlpha*=0.82; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); g.globalAlpha/=0.82; drawShadeOver(s.x,B,e); }
@@ -14183,7 +14184,7 @@ function drawActorBase(e){
   g.restore();
   if(!isP && e.dead) return;
   if(isP && romHush()) return;
-  const ty=B-(e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'?66:e.type==='bear'?92:e.type==='troll'?150:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:114)+dwarfDrop(e.opts);
+  const ty=B-(e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'?66:e.type==='dragon'?210:e.type==='bear'?92:e.type==='troll'?150:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:114)+dwarfDrop(e.opts);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const deadly=!isP && e.type!=='dummy' && e.hostile!==false && e.tier && typeof foeLevel==='function' && foeLevel(e)-playerLevel()>=3;   // far stronger than you: a skull
   const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  Lv '+(typeof foeLevel==='function'?foeLevel(e):e.tier) : ''), tw=g.measureText(label).width;
@@ -16250,7 +16251,7 @@ QUEST_ITEMS.add('ember_core');
 const emberMult=()=>1+(gearSum('ap')+gearSum('magic'))*0.04;
 const emberHit=()=>WEAPONS.emberbrand.dmg*emberMult();
 // foes with fire set you alight
-const FIRE_FOE=f=> f && ((f.opts&&f.opts.equip&&['fire_blade','emberbrand'].includes(f.opts.equip.weapon)) || /^Ash Hound|^The Slag Warden|^Ember Sprite|^The Kindled One/.test(f.name||''));
+const FIRE_FOE=f=> f && ((f.opts&&f.opts.equip&&['fire_blade','emberbrand'].includes(f.opts.equip.weapon)) || /^Ash Hound|^The Slag Warden|^Ember Sprite|^The Kindled One|^The Black Dragon/.test(f.name||''));
 
 // ── the look: a blade with a glowing edge, embers on the Emberbrand ──
 function drawEmberBlade(c,hx,hy,ang,id,s){       // a plain sword or longsword with fire running down the edge
@@ -17753,7 +17754,7 @@ function drawDrownedBlade(c,hx,hy,ang,s){
     c.save(); c.globalCompositeOperation='lighter'; c.fillStyle=`rgba(140,255,180,${0.5*pulse})`; c.fillRect(-9.4,-0.9,0.6,0.6); c.fillRect(-9.4,0.3,0.6,0.6); c.restore();   // its eyes, faintly lit
     c.restore(); }
 // the crown: bog-oak twisted into points, moss in the crooks, one pale light set in the front
-function drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V,part){
+function drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V,part,kind){ if(kind==='king_crown') return drawKingCrown(c,x,B,LN,HW,Y,showFace,pr,V,part);
   const cy=Y.HAIRLINE-0.4, rx=HW+1.3, ry=2.6, front=V.turn>-0.25, fx=front?(pr>0.8?HW*0.5:faceOff(pr)):0, far=part==='far';
   // points all round the band: the ones on the upper half of the ellipse are the far side, whichever way the head is turned
   const spikes=[0.08,0.22,0.36,0.5,0.64,0.78,0.92].map((t,k)=>({a:Math.PI*(1+t), L:[5.5,7.5,6,9,6.5,7.8,5.2][k]})).concat([0.15,0.5,0.85].map((t,k)=>({a:Math.PI*t, L:[4.5,6,4.8][k], fr:true})));
@@ -23729,6 +23730,95 @@ const UC_PIECES={
         P0.props.forEach(pp=>{ if(typeof pp==='string') add(pp,pp==='bones'||pp==='puddle'?{noblock:true,flat:pp==='puddle',dz:pp==='puddle'?-99:undefined}:{}); else add(pp[0],pp[1]); });
         if(P0.wet) ucWalk(r).forEach(([i,j],n)=>{ if(n%3===0 && !l.some(o=>o.i===i&&o.j===j)) l.push({type:'puddle', i, j, s:0.9, flat:true, noblock:true, dz:-99}); });
         return l; }; }); }); })();
+// ════════ THE BLACK DRAGON: the old treasury's gold drew it down long ago. It made its nest on the hoard, and the Buried King was its first meal ════════
+//   Drawn in its own space (x forward, y up, z to its left) and turned to face any of the eight ways. Its fire is the fight: a breath you see coming,
+//   that sets you burning hard. Cooling Salve puts the burning out, Ice Ward takes a breath whole. Without them, few walk out.
+const DRAGON_COLS={ black:{a:'#111115',b:'#1f1f26',c:'#383844',belly:'#2a2321',wing:'rgba(30,22,28,0.95)',vein:'#4a3842',horn:'#8a8478',eye:'255,140,40'},
+                    grey:{a:'#26262b',b:'#3c3c44',c:'#5c5c68',belly:'#3a3432',wing:'rgba(50,46,52,0.95)',vein:'#6a5e6c',horn:'#a8a296',eye:'255,170,60'} };
+function drawDragon(x,B,o){ const C=DRAGON_COLS[o.col||'black'], S=o.s||1, Dd=DIR_DELTA[o.dir||0]||[1,0], phi=Math.atan2(Dd[0]+Dd[1], Dd[0]-Dd[1]), cf=Math.cos(phi), sf=Math.sin(phi);
+  const re=o.rear||0, br=o.breath||0, dn=o.down||0, ph=o.ph||0, mv=o.mv||0, wg=Math.max(o.wing||0, re, br*0.6), yk=1-dn*0.6;
+  const pr=(X,Y,Z)=>({ x:x+(X*cf-Z*sf)*S, y:B+((X*sf+Z*cf)*0.5-Y*yk)*S, d:X*sf+Z*cf });
+  const parts=[], add=(d,fn)=>parts.push([d,fn]);
+  const ball=(X,Y,Z,r,col,hi)=>{ const p=pr(X,Y,Z); add(p.d,()=>{ g.fillStyle=col; g.beginPath(); g.ellipse(p.x,p.y,r*S,r*S*0.86,0,0,Math.PI*2); g.fill();
+      if(hi){ g.fillStyle=hi; g.beginPath(); g.ellipse(p.x-r*S*0.25,p.y-r*S*0.3,r*S*0.55,r*S*0.4,-0.3,0,Math.PI*2); g.fill(); } }); return p; };
+  // its shadow on the floor
+  if(!o.noShadow){ const p=pr(-14,0,0); g.fillStyle='rgba(0,0,0,0.38)'; g.beginPath(); g.ellipse(p.x,p.y,70*S,22*S,0,0,Math.PI*2); g.fill(); }
+  // the tail, swinging
+  for(let k=0;k<=12;k++){ const t=k/12, X=-36-74*t, Y=(32-26*t)*(1-dn*0.5), Z=Math.sin(ph*0.4+t*3)*12*t*(1-dn); ball(X,Y,Z,15*(1-t)+2.6,C.a,k%2?null:'rgba(70,70,84,0.25)'); }
+  { const p=pr(-112,6,Math.sin(ph*0.4+3)*12*(1-dn)); add(p.d,()=>{ g.fillStyle=C.a; g.beginPath(); g.moveTo(p.x-9*S,p.y); g.lineTo(p.x,p.y-8*S); g.lineTo(p.x+9*S,p.y); g.lineTo(p.x,p.y+5*S); g.closePath(); g.fill(); }); }   // the spade at its end
+  // legs: thick, clawed; walking when it moves, the front pair off the ground when it rears
+  [[16,14,0],[16,-14,Math.PI],[-20,15,Math.PI],[-20,-15,0]].forEach(([LX,LZ,pp])=>{ const front=LX>0, step=Math.sin(ph+pp)*mv, lift=front?re*24:0;
+    const hip=pr(LX,24,LZ), knee=pr(LX+(front?5:-6)+step*3,(11+lift*0.6)*(1-dn*0.6),LZ*1.12), foot=pr(LX+(front?7:-2)+step*7+(front?re*10:0),(Math.max(0,-step)*4+lift)*(1-dn*0.8),LZ*1.18);
+    add((hip.d+foot.d)/2,()=>{ g.lineCap='round'; g.fillStyle=C.a; g.beginPath(); g.ellipse(hip.x,hip.y-3*S,12*S,14*S,0,0,Math.PI*2); g.fill();   // a heavy thigh
+      g.strokeStyle=C.a; g.lineWidth=14*S; g.beginPath(); g.moveTo(hip.x,hip.y); g.lineTo(knee.x,knee.y); g.stroke(); g.lineWidth=10*S; g.beginPath(); g.moveTo(knee.x,knee.y); g.lineTo(foot.x,foot.y); g.stroke();
+      g.strokeStyle=C.b; g.lineWidth=4*S; g.beginPath(); g.moveTo(hip.x,hip.y-1); g.lineTo(knee.x,knee.y-1); g.stroke();
+      g.strokeStyle=C.horn; g.lineWidth=1.4*S; for(let c=-1;c<=1;c++){ g.beginPath(); g.moveTo(foot.x+c*2.6*S,foot.y); g.lineTo(foot.x+c*3.6*S+cf*3*S,foot.y+2.6*S); g.stroke(); } }); });
+  // the body: a long barrel of black scale, the chest lifting when it rears; spines along the back
+  for(let k=0;k<=8;k++){ const t=k/8, X=-34+60*t, Y=33+(X>0?re*X*0.7:0), r=19+8*Math.sin(Math.PI*t); ball(X,Y,0,r,C.b,'rgba(80,80,96,0.22)');
+    const sp=pr(X,Y+r*0.92,0); add(sp.d+0.2,()=>{ g.fillStyle=C.a; g.beginPath(); g.moveTo(sp.x-4*S,sp.y); g.lineTo(sp.x-1.5*S,sp.y-10*S); g.lineTo(sp.x+4*S,sp.y); g.closePath(); g.fill(); }); }
+  { const p=pr(2,22+re*4,0); add(p.d+0.1,()=>{ g.fillStyle=C.belly; g.beginPath(); g.ellipse(p.x,p.y,28*S,10*S,0,0,Math.PI*2); g.fill(); }); }   // the paler belly plates
+  // the wings: folded along its back at rest, flung wide when it rears or breathes
+  [1,-1].forEach(sd=>{ const L=(a,b)=>a+(b-a)*wg, fl=Math.sin(gt*3.2)*7*wg;
+    const sh=[14,52,12*sd], el=[L(-2,10),L(74,118)+fl*0.4,L(22,52)*sd], tip=[L(-44,-26),L(66,140)+fl,L(20,110)*sd], f1=[L(-40,-50),L(54,92)+fl*0.6,L(18,92)*sd], f2=[L(-36,-56),L(46,62),L(16,62)*sd], f3=[L(-18,-28),L(42,44),L(14,28)*sd];
+    const P0=[sh,el,tip,f1,f2,f3].map(v=>pr(...v)), d=pr(-10,60,L(14,46)*sd).d;
+    add(d,()=>{ g.fillStyle=C.wing; g.beginPath(); g.moveTo(P0[0].x,P0[0].y); g.quadraticCurveTo((P0[0].x+P0[1].x)/2,(P0[0].y+P0[1].y)/2-8*S*wg,P0[1].x,P0[1].y); g.lineTo(P0[2].x,P0[2].y);
+      for(let k=3;k<=6;k++){ const a=P0[k-1], b=k<6?P0[k]:P0[0], mx=(a.x+b.x)/2, my=(a.y+b.y)/2; g.quadraticCurveTo(mx+(P0[1].x-mx)*0.18,my+(P0[1].y-my)*0.18,b.x,b.y); } g.closePath(); g.fill();
+      g.strokeStyle=C.vein; g.lineWidth=2.2*S; g.beginPath(); g.moveTo(P0[0].x,P0[0].y); g.lineTo(P0[1].x,P0[1].y); g.lineTo(P0[2].x,P0[2].y); g.stroke();
+      g.lineWidth=1*S; [3,4,5].forEach(k=>{ g.beginPath(); g.moveTo(P0[1].x,P0[1].y); g.lineTo(P0[k].x,P0[k].y); g.stroke(); });
+      g.fillStyle=C.horn; g.beginPath(); g.arc(P0[1].x,P0[1].y,1.8*S,0,Math.PI*2); g.fill(); }); });
+  // the neck and the head: raised, lowered to breathe, or thrown up when it rears
+  const hx=56+12*br-10*re, hy=(80-26*br+22*re)*(1-dn*0.75)+dn*6;
+  for(let k=0;k<=9;k++){ const t=k/9, X=24+(hx-28)*t, Y=46+(hy-48)*t+Math.sin(t*Math.PI)*12*(1-br), r=15-6*t; ball(X,Y,0,r,C.b,'rgba(80,80,96,0.2)'); }
+  const head=pr(hx,hy,0), snout=pr(hx+20,hy-4-br*2,0), jaw=br*0.6+(o.roar||0)*0.5;
+  o.mouth={x:snout.x, y:snout.y};
+  add(head.d+3,()=>{ const ang=Math.atan2(snout.y-head.y,snout.x-head.x);
+    g.save(); g.translate(head.x,head.y); g.rotate(ang);
+    const Lh=Math.hypot(snout.x-head.x,snout.y-head.y);
+    g.fillStyle=C.b; g.beginPath(); g.ellipse(0,0,11*S,9*S,0,0,Math.PI*2); g.fill(); g.fillStyle=C.a; for(let k=0;k<3;k++){ g.beginPath(); g.moveTo(-6*S-k*3*S,-6*S); g.lineTo(-9*S-k*3*S,-12*S); g.lineTo(-3*S-k*3*S,-7*S); g.fill(); }   // the skull, a frill of spikes behind it
+    g.fillStyle=C.a; g.beginPath(); g.moveTo(2*S,-6*S); g.lineTo(Lh+3*S,-2.6*S); g.lineTo(Lh+4*S,1*S); g.lineTo(2*S,3.4*S); g.closePath(); g.fill(); g.fillStyle=C.c; g.beginPath(); g.moveTo(4*S,-5.4*S); g.lineTo(Lh,-2.4*S); g.lineTo(4*S,-3.6*S); g.fill();   // the long upper jaw, a ridge along it
+    g.save(); g.translate(2*S,3*S); g.rotate(jaw*0.55); g.fillStyle=C.a; g.beginPath(); g.moveTo(0,0); g.lineTo(Lh,-0.5*S); g.lineTo(Lh-2*S,2.4*S); g.lineTo(0,3.6*S); g.closePath(); g.fill();   // the lower jaw, dropping open
+    if(jaw>0.05){ g.fillStyle='#e8dcc0'; for(let t=0;t<4;t++){ g.beginPath(); g.moveTo(Lh*(0.35+t*0.16),-0.4*S); g.lineTo(Lh*(0.38+t*0.16),-2.2*S); g.lineTo(Lh*(0.42+t*0.16),-0.4*S); g.fill(); } } g.restore();
+    if(br>0.05 || o.fire){ g.globalCompositeOperation='lighter'; glow(Lh,1*S,(10+br*12)*S,(8+br*8)*S,'255,120,30',0.5*Math.max(br,o.fire?1:0)); g.globalCompositeOperation='source-over'; }   // fire in its throat
+    g.strokeStyle=C.horn; g.lineWidth=2.4*S; g.lineCap='round'; [-1,1].forEach(s=>{ g.beginPath(); g.moveTo(-3*S,s*3*S-3*S); g.quadraticCurveTo(-12*S,s*4*S-10*S,-19*S,s*3*S-7*S); g.stroke(); });   // horns swept back
+    g.globalCompositeOperation='lighter'; glow(5*S,-2.6*S,4*S,3*S,C.eye,0.9); g.globalCompositeOperation='source-over'; g.fillStyle=`rgb(${C.eye})`; g.beginPath(); g.ellipse(5*S,-2.6*S,1.6*S,1*S,0,0,Math.PI*2); g.fill();   // an ember for an eye
+    g.restore(); });
+  parts.sort((a,b)=>a[0]-b[0]).forEach(p=>p[1]());
+  // its fire, rolling out of its mouth at what it hates
+  if(o.fire && o.fireTo){ const f=o.fire, k=Math.min(1,f), m=o.mouth, T=o.fireTo; g.save(); g.globalCompositeOperation='lighter';
+    for(let n=0;n<34;n++){ const u=((n*0.131+gt*2.6)%1)*k, px=m.x+(T.x-m.x)*u+Math.sin(n*7.1+gt*9)*u*16*S, py=m.y+(T.y-m.y)*u+Math.cos(n*5.3+gt*8)*u*10*S, r=(3+u*18)*S*(o.s<0.8?1.4:1);
+      g.fillStyle=`rgba(255,${Math.round(220-u*150)},${Math.round(90-u*80)},${0.55*(1-u*0.6)})`; g.beginPath(); g.arc(px,py,r,0,Math.PI*2); g.fill(); }
+    g.restore(); } }
+// ── as a foe ──
+FOES.dragon={ label:'Black Dragon', base:150, stagger:0.8, pattern:[
+  {wait:1.3, wind:1.10, after:0.80, dir:'left'},                 // a raking claw
+  {wait:0.9, wind:1.00, after:0.80, dir:'right'},                // and the other
+  {wait:1.1, wind:1.25, after:0.95, dir:'up'},                   // the tail comes over its back and down
+  {wait:1.0, wind:1.70, after:1.30, dir:'up', breath:true} ]};   // it rears, draws breath, and burns
+Object.assign(WEAPONS,{ dragon_claw:{ wind:0.3, dmg:8, len:34 } }); BLEEDERS.add('dragon_claw');
+const DRAGON_O=()=>({gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,beast:true,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:'dragon_claw',offhand:null}});
+function drawDragonFoe(x,B,e,pose){ const pk=pose&&pose.kind, pt=pose?Math.min(1,Math.max(0,pose.t||0)):0, s=curStep(e)||{}, since=clock-(e.fireAt||-9);
+  const o={ dir:e.dir||0, s:1.45, col:'black', mv:e.moving?1:0, ph:gt*6, wing:0.15+Math.sin(gt*0.7)*0.05 };
+  if(pk==='raise'){ if(s.breath){ o.rear=Math.min(1,pt*1.6)*0.6; o.breath=pt; } else if(s.dir==='up'){ o.rear=pt*0.3; } else o.wing=0.3; }
+  if(since<0.75){ o.fire=1-Math.max(0,since-0.45)/0.3; o.breath=1; const q=P(player.x,player.y); o.fireTo={x:q.x,y:q.y-40}; }
+  if(e.dead){ o.down=Math.min(1,(e.fallT||0)/0.8); o.mv=0; o.wing=0; }
+  drawDragon(x,B,o); }
+// the breath: telegraphed, very hard to turn; it sets you burning hard. A parry at the right moment halves it, Ice Ward takes it whole, Cooling Salve puts the burning out
+{ const _imp=impact; impact=function(f){ const s=curStep(f); if(!s || !s.breath || f.type!=='dragon') return _imp.apply(this,arguments);
+    f.strikeAt=clock; f.fireAt=clock; duel.lastImpact=clock; shake=Math.max(shake,10); try{ SND.fx('roar'); }catch(e){}
+    const lvl=typeof foeLevel==='function'?foeLevel(f):12, base=Math.round((0.7*lvl+3)*(f.phase2?1.2:1)), since=clock-duel.parryAt, braced=duel.st==='parry' && since<=windowFor(player)+0.15;
+    if(typeof wardTakes==='function' && wardTakes(base)){ floatText(tileOf(player),'The ward takes the fire!','#a8d8f0'); logMsg('The fire breaks on your ward like a wave on a rock.','#a8d8f0'); }
+    else { const hp0=player.hp, n=Math.round(base*(braced?0.5:1)); hurtPlayer(n,braced?'Half the fire!':'Dragonfire!');
+      if(player.hp<hp0){ addStatus(player,'burn',braced?3.5:7,Math.max(2,Math.round(lvl*(braced?0.15:0.25)))); if(!CHOICE.dragonTip){ CHOICE.dragonTip=true; logMsg('You are burning. Cooling Salve puts it out. Ice Ward would have taken that breath whole.','#f0a060'); } }
+      if(player.hp<=0) defeat(); }
+    f.state='recover'; f.t=s.after; f.k++; }; }
+// it draws breath where you can see it
+{ const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{ const f=combat.active?combat.foe:null;
+    if(f && f.type==='dragon' && !f.dead){ const s=curStep(f);
+      if(f.state==='windup' && s && s.breath && f._bw!==f.k){ f._bw=f.k; floatText(tileOf(f),'It draws breath…','#ff9a40',true); try{ SND.fx('growl',0.9); }catch(e){} }
+      if(!f.phase2 && f.hp<f.maxHp*0.5){ f.phase2=true; banner('The dragon\'s scales split with fire','#ff8a40',1800); logMsg('Fire shows through the cracks in its scales now. It is quicker, and its breath hotter.','#ff8a40'); } } }catch(e){} return r; }; }
+BEASTS.push({ k:'dragon', is:f=>f.type==='dragon', name:'The Black Dragon', kind:'Under the Chapel Crypts · the Buried King\'s Vault',
+  how:'Two raking claws, left then right, then its tail over its back and down. Then it rears and breathes fire.', res:'Its scales turn the edge: every blow counts, none is easy.', aff:'Its claws burn and tear. Its breath sets you burning hard.', ans:'Bring Cooling Salve, a lot of it. Ice Ward takes a breath whole. A parry as the fire comes halves it.' });
+
 // ════════ THE BURIED KING'S VAULT: the old city's treasury, sealed when the new city was built over it, and on no map. Walk one of the Chapel Crypts' endless halls
 //   and never turn round: the fourth time, it gives up and takes you down. Its king is still on his throne. Once found (or once Wenlo can read his chart again),
 //   a door to it stands in that hall
@@ -23747,21 +23837,85 @@ AREAS.uc_vault={ ...INSIDE_BASE, w:9, h:9, theme:'interior', cave:true, ucRoom:t
     {type:'candlestand', i:2, j:0}, {type:'candlestand', i:6, j:0}, {type:'candlestand', i:1, j:7}, {type:'candlestand', i:7, j:7},
     {type:'strongbox', i:2, j:2}, {type:'strongbox', i:6, j:2}, {type:'bones', i:3, j:5, noblock:true}, {type:'bones', i:6, j:6, noblock:true},
     {type:'rune', i:0, j:1, text:"Carved over the treasury door, on the inside: <i>Against the day the new city fails.</i> The new city did not fail. Nobody came back for this."},
-    ...(CHOICE.ucKing && !collectedPickups.has('uc_vault:4,3') && !hasItem('king_ledger') ? [{type:'pickup', i:4, j:3, item:'king_ledger'}] : []) ],
-  npcs:()=>[], mobs:()=>[ { name:'The Buried King', type:'skeleton', i:4, j:2, faction:'ucking', hpMul:1.6, opts:UNDER_DEAD('The Buried King',{equip:{...RISEN('The Buried King').equip, head:'helm_full', armor:'mail', weapon:'longsword', offhand:'shield_iron'}}) } ],
+    {type:'bones', i:3, j:1, noblock:true}, {type:'rune', i:5, j:1, text:"On the throne, what is left of a king: a skeleton in rotten purple, its ribs crushed in, its skull bitten through. Whatever killed him did not trouble to eat the rest."},
+    {type:'ucjunk', kind:'web', i:1, j:5, noblock:true}, {type:'bones', i:5, j:6, noblock:true}, {type:'bones', i:2, j:4, noblock:true},
+    ...(CHOICE.ucKing && !collectedPickups.has('uc_vault:4,3') && !hasItem('king_ledger') ? [{type:'pickup', i:4, j:3, item:'king_ledger'}] : []),
+    ...(CHOICE.ucKing && !collectedPickups.has('uc_vault:7,2') && !hasItem('king_crown') ? [{type:'pickup', i:7, j:2, item:'king_crown'}] : []),
+    ...(CHOICE.ucKing && !collectedPickups.has('uc_vault:4,0') && !hasItem('dragon_egg') && !CHOICE.drake ? [{type:'pickup', i:4, j:0, item:'dragon_egg'}] : []) ],
+  npcs:()=>[], mobs:()=>[ { name:'The Black Dragon', type:'dragon', i:4, j:4, dir:0, faction:'ucdragon', hpMul:1.0, opts:DRAGON_O() } ],
   entries:{ fromHall:{i:4,j:7}, start:{i:4,j:7} } };
 AREA_TIER.uc_vault=5;
 UC_CRYPT_LOOPS.forEach(id=>{ const A=AREAS[id], r=UCR[id], o0=A.objects;
   A.objects=()=>{ const l=o0(), busy=new Set(l.filter(o=>!o.noblock||o.type==='teleporter').map(o=>o.i+','+o.j)), free=ucWalk(r).filter(([i,j])=>!busy.has(i+','+j) && !ucNearDoor(r,i,j) && i!==r.cx && j!==r.cy);
-    if(free[1]) l.push({type:'rune', i:free[1][0], j:free[1][1], text:"Under the chalk, scratched so faint you nearly miss it: <i>Or never turn. On, and on, and on, and on, and down.</i>"});
+    if(free[1]) l.push({type:'rune', i:free[1][0], j:free[1][1], text:"Under the chalk, scratched so faint you nearly miss it: <i>Or never turn. On, and on, and on, and on, and down.</i> And under that, in a different hand, the strokes burnt black: <i>Don't. The black one is down there. If you must, bring salve. All the salve.</i>"}); l.push({type:'bones', i:(free[2]||free[0]||[1,1])[0], j:(free[2]||free[0]||[1,1])[1], noblock:true});
     if(ucVaultKnown() && free[0]) l.push({type:'teleporter', i:free[0][0], j:free[0][1], to:'uc_vault', entry:'fromHall'});
     return l; }; });
-{ const _sw=switchArea; switchArea=function(id,...rest){ const from=areaId, r=_sw.call(this,id,...rest); if(areaId==='uc_vault' && !CHOICE.ucVault){ CHOICE.ucVault=true; if(UCR[from]) CHOICE.ucVaultFrom=from; setTimeout(()=>{ banner("The Buried King's Vault",'#e8c060',2200); logMsg('Gold, heaped to the walls, black with age. And on the throne, in his crown, the king who would not leave it.','#e8c060'); },400); } return r; }; }
-setInterval(()=>{ try{ if(areaId!=='uc_vault' || CHOICE.ucKing || combat.active) return; const k=mobs.find(m=>m.name==='The Buried King'); if(!k || !k.dead) return;
+{ const _sw=switchArea; switchArea=function(id,...rest){ const from=areaId, r=_sw.call(this,id,...rest); if(areaId==='uc_vault' && !CHOICE.ucVault){ CHOICE.ucVault=true; if(UCR[from]) CHOICE.ucVaultFrom=from; setTimeout(()=>{ banner("The Buried King's Vault",'#e8c060',2200); logMsg('Gold, heaped to the walls, black with age. On the throne, the bones of a king. And coiled on the gold in front of him, something black and very large, that opens one ember eye.','#e8c060'); },400); }
+    if(areaId==='uc_vault') mobs.forEach(m=>{ if(m.type==='dragon') m.boss=true; }); return r; }; }
+setInterval(()=>{ try{ if(areaId!=='uc_vault' || CHOICE.ucKing || combat.active) return; const k=mobs.find(m=>m.name==='The Black Dragon'); if(!k || !k.dead) return;
     CHOICE.ucKing=true; player.purse+=600; giveQuestItem('king_signet',true); updateHud(); try{ autosaveSoon(300); }catch(e){}
-    logMsg("The Buried King falls apart on the steps of his throne. On his finger, a heavy gold signet. In the hoard, more coin than you can carry, and you carry it anyway. (+6 silver, The Buried King's Signet)",'#e8c060');
-    floatText(tileOf(player),"The Buried King's Signet",'#e8c060',true); if(!hasItem('king_ledger')) OBJECTS.push({type:'pickup', i:4, j:3, item:'king_ledger'}); }catch(e){} },600);
-JOURNAL.push(["The Buried King", ()=> !CHOICE.ucVault ? null : CHOICE.ucKing ? ['done',"Under the Chapel Crypts, the old city's treasury, on no map. Its king would not leave his gold. You took it from him, and his signet with it."] : ['active',"Under the Chapel Crypts you found the old city's treasury, and its king, still on his throne. He will not give up his gold."]]);
+    logMsg("The Black Dragon goes down across its hoard, and the gold slides and rings under it, and then it is still. On the dead king's finger, a heavy signet. In the hoard, his crown. And behind the throne, where it was lying, something round and black and warm. (+6 silver, The Buried King's Signet)",'#e8c060');
+    floatText(tileOf(player),"The Black Dragon is dead",'#e8c060',true);
+    [['king_ledger',4,3],['king_crown',7,2],['dragon_egg',4,0]].forEach(([it,i,j])=>{ if(!hasItem(it)) OBJECTS.push({type:'pickup', i, j, item:it}); }); }catch(e){} },600);
+JOURNAL.push(["The Buried King's Vault", ()=> !CHOICE.ucVault ? null : CHOICE.ucKing ? ['done',"Under the Chapel Crypts, the old city's treasury, on no map. A black dragon had made its nest on the gold and eaten the king who would not leave it. You killed it, and took the king's crown and signet, and its egg."] : ['active',"Under the Chapel Crypts you found the old city's treasury, and the black dragon nesting on it. Its breath sets you burning: bring Cooling Salve, a lot of it, and Ice Ward if you know it."]]);
+// ════════ THE CROWN OF THE BURIED KING: it lay in the hoard where the dragon left the king. Wear it, and in every fight one of his guard climbs out of the floor to stand with you ════════
+Object.assign(ITEMS,{ king_crown:{ name:'Crown of the Buried King', slot:'head', title:"A crown of old red gold, dented where teeth closed on it. The seal of the old city is worked into its brow: a crown over a river. It is cold, always, and in a fight it gets colder." } });
+Object.assign(ITEM_STATS,{ king_crown:{hp:4, ap:2, magic:2} }); GEAR_HP.king_crown=4; PRICES.king_crown=500;
+ITEM_LORE.king_crown="The Buried King's crown, from the hoard where the dragon dropped him. His guard were sealed in with him; they still answer it. In every fight one of them climbs out of the floor in rusted mail and fights at your side until it falls apart.";
+ITEM_ICON.king_crown=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.fillStyle='rgba(0,0,0,0.3)'; g2.beginPath(); g2.ellipse(20,31,14,3,0,0,Math.PI*2); g2.fill();
+  const sp=(x0,y0,L,lean,col)=>{ g2.fillStyle=col; g2.beginPath(); g2.moveTo(x0-2.6,y0); g2.lineTo(x0+lean,y0-L); g2.lineTo(x0+2.6,y0); g2.closePath(); g2.fill(); g2.fillStyle='#b8202a'; g2.beginPath(); g2.arc(x0+lean,y0-L,1.4,0,Math.PI*2); g2.fill(); };
+  [[11,21,8,-1.5],[17,19,11,-0.5],[24,19,10,0.5],[30,21,7,1.5]].forEach(([a,b,L,l])=>sp(a,b,L,l,'#8a5a14'));
+  g2.strokeStyle='#9a6a1a'; g2.lineWidth=5; g2.beginPath(); g2.ellipse(20,25,13,5,0,0,Math.PI*2); g2.stroke(); g2.strokeStyle='#f0cc6a'; g2.lineWidth=1.4; g2.beginPath(); g2.ellipse(20,24.4,13,5,0,0.15,Math.PI-0.15); g2.stroke();
+  [[8,27,7,-2],[14,29.5,9,-1],[20,30,12,0],[26,29.5,9,1],[32,27,7,2]].forEach(([a,b,L,l])=>sp(a,b,L,l,'#c8962e')); g2.restore(); };
+{ const _sc=startCombat; startCombat=function(...a){ const r=_sc.apply(this,a); try{ if(combat.active && player.opts && player.opts.equip.head==='king_crown' && !(SKEL && !SKEL.crumble)){
+      raiseSkeleton(combat.foe); if(SKEL){ SKEL.royal=true; SKEL.weapon='longsword'; SKEL.dmg=Math.max(7,Math.round((SKEL.dmg||4)*1.7)); SKEL.t=SKEL.max=Math.max(SKEL.t,22); }
+      logMsg('The crown goes cold on your brow. One of the Buried King\'s guard climbs out of the floor in rusted mail, and turns on your foe.','#e8d8a0'); } }catch(e){ console.warn(e); } return r; }; }
+// ════════ THE DRAGON'S EGG: behind the throne, still warm. Carry it; in three days it hatches, black or dark grey, and follows you after that, growing as the days go,
+//   and breathing what fire it has at whatever you fight ════════
+Object.assign(ITEMS,{ dragon_egg:{ name:'Black Dragon Egg', slot:'misc', title:"An egg the size of a loaf, black and hard as iron, and warm, much warmer than it should be. Sometimes, when you hold it, something inside it moves." } });
+QUEST_ITEMS.add('dragon_egg'); PRICES.dragon_egg=0;
+ITEM_ICON.dragon_egg=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.fillStyle='rgba(0,0,0,0.3)'; g2.beginPath(); g2.ellipse(20,34,10,3,0,0,Math.PI*2); g2.fill();
+  const gr=g2.createRadialGradient(16,14,2,20,20,16); gr.addColorStop(0,'#4a4a56'); gr.addColorStop(1,'#101014'); g2.fillStyle=gr; g2.beginPath(); g2.ellipse(20,21,10.5,13.5,0,0,Math.PI*2); g2.fill();
+  g2.strokeStyle='rgba(255,130,40,0.85)'; g2.lineWidth=1.1; g2.beginPath(); g2.moveTo(15,17); g2.lineTo(18,21); g2.lineTo(16,25); g2.moveTo(24,14); g2.lineTo(22,19); g2.lineTo(25,22); g2.stroke(); g2.restore(); };
+const DRAKE_NAMES={ black:['Soot','Nyx','Cinder','Coal'], grey:['Ash','Smoke','Flint','Slate'] };
+let DRAKE=null;   // {x,y,dir,moving,ph,fire,fireTo,cd}
+const drakeAge=()=>CHOICE.drake ? (dayClock-CHOICE.drake.born)/DAY_LEN : 0;
+const drakeScale=()=>0.3+Math.min(1,drakeAge()/12)*0.32;
+function drakeHatch(){ const k=player.inv.indexOf('dragon_egg'); if(k>=0) player.inv[k]=null; updateHud();
+  const col=Math.random()<0.5?'black':'grey', N=DRAKE_NAMES[col];
+  CHOICE.drake={col, born:dayClock, name:N[0]}; drakePlace(); try{ autosaveSoon(300); }catch(e){}
+  say('The Egg',["The egg in your pack is hot, too hot to hold. It rocks, and cracks, and cracks again, and a small wet "+(col==='black'?'black':'dark grey')+" head pushes out of it and looks at you with two ember eyes.","It sneezes. A little puff of smoke. Then it climbs out, shakes its wings dry, and settles on your boot as if it has always lived there.","What will you call it?"],
+    N.map(nm=>({label:nm+'.', fn:()=>{ CHOICE.drake.name=nm; closeDialog(); logMsg(nm+' hatched. A dragon of your own. It will follow you everywhere, grow as the days go, and breathe what fire it has at whatever you fight.','#ff9a50'); }}))); }
+function drakePlace(){ if(!CHOICE.drake){ DRAKE=null; return; } DRAKE={ x:player.x-0.6, y:player.y+0.5, dir:player.dir||0, moving:false, ph:0, fire:0, fireTo:null, cd:3+Math.random()*2 }; }
+setInterval(()=>{ try{ if(!running) return; if(!hasItem('dragon_egg') || CHOICE.drake) return; if(CHOICE.eggAt==null){ CHOICE.eggAt=dayClock; return; }
+    const d=(dayClock-CHOICE.eggAt)/DAY_LEN;
+    if(d>=1 && !CHOICE.eggStir1){ CHOICE.eggStir1=true; logMsg('The egg in your pack knocks, twice, from the inside.','#ff9a50'); }
+    if(d>=2 && !CHOICE.eggStir2){ CHOICE.eggStir2=true; logMsg('The egg is hot now, and a fine crack runs round it, glowing.','#ff9a50'); }
+    if(d>=3 && !combat.active && !CS.on && !dlgOverlay.classList.contains('open')) drakeHatch(); }catch(e){} },1000);
+{ const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); try{ drakePlace(); }catch(e){} return r; }; }
+{ const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{ if(!CHOICE.drake) return r; if(!DRAKE) drakePlace(); const D=DRAKE; D.ph+=dt*8; D.fire=Math.max(0,D.fire-dt*1.4);
+    const f=combat.active && combat.phase==='fight' ? combat.foe : null; let tx, ty;
+    if(f && !f.dead){ const fx=(f.x??f.i+0.5)-player.x, fy=(f.y??f.j+0.5)-player.y, fl=Math.hypot(fx,fy)||1; tx=player.x+fy/fl*0.9-fx/fl*0.3; ty=player.y-fx/fl*0.9-fy/fl*0.3; }   // at your other shoulder, facing your foe
+    else { const dx=D.x-player.x, dy=D.y-player.y, d=Math.hypot(dx,dy)||1; if(d>1.4){ tx=player.x+dx/d*1.1; ty=player.y+dy/d*1.1; } else { tx=D.x; ty=D.y; } }
+    const mx=tx-D.x, my=ty-D.y, md=Math.hypot(mx,my), sp=Math.min(md,dt*Math.max(2.4,md*3)); D.moving=md>0.04; if(md>0.001){ D.x+=mx/md*sp; D.y+=my/md*sp; }
+    if(f && !f.dead) D.dir=dirFromDelta((f.x??f.i+0.5)-D.x,(f.y??f.j+0.5)-D.y); else if(D.moving && md>0.08) D.dir=dirFromDelta(mx,my);
+    if(f && !f.dead){ D.cd-=dt; if(D.cd<=0){ D.cd=4.2+Math.random()*1.8; const age=drakeAge(), n=Math.round(3+Math.min(9,age*0.8));
+        D.fire=1; const q=P(f.x??f.i+0.5,f.y??f.j+0.5); D.fireTo={x:q.x,y:q.y-40};
+        if(f.warded){ floatText(tileOf(f),'Warded','#c8e0f0'); }
+        else { f.hp-=n; f.flash=0.3; floatText([f.i+0.3,f.j-0.2],'-'+n,'#ffa050',true); if(age>=3 && Math.random()<0.5) addStatus(f,'burn',3,1+Math.floor(age/6)); if(f.hp<=0) foeDown(f); } } }
+  }catch(e){ console.warn(e); } return r; }; }
+{ const _pd=pupDrawItems; pupDrawItems=function(items){ _pd(items); if(CHOICE.drake && DRAKE){ const D=DRAKE; items.push({d:D.x+D.y+0.02, ax:D.x, ay:D.y, fn:()=>{ const q=P(D.x,D.y), s=drakeScale(), hov=14+Math.sin(gt*5)*3;
+      g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(q.x,q.y,26*s*1.6,8*s*1.6,0,0,Math.PI*2); g.fill();
+      if(D.fire>0 && D.fireTo){ D.fireTo={x:D.fireTo.x, y:D.fireTo.y}; }
+      drawDragon(q.x,q.y-hov,{ dir:D.dir, s, col:CHOICE.drake.col, mv:D.moving?1:0, ph:D.ph, wing:0.55+Math.sin(gt*9)*0.45, fire:D.fire>0?D.fire:0, fireTo:D.fire>0?D.fireTo:null, breath:D.fire>0.5?1:0, noShadow:true }); } }); } }; }
+
+function drawKingCrown(c,x,B,LN,HW,Y,showFace,pr,V,part){ const cy=Y.HAIRLINE-0.6, rx=HW+1.2, ry=2.6, far=part==='far';   // red gold, its points tipped with garnets
+  const pts=[0.1,0.3,0.5,0.7,0.9].map(t=>({a:Math.PI*(1+t), L:[5,7,8.5,7,5][Math.round(t*5-0.5)]})).concat([0.2,0.5,0.8].map(t=>({a:Math.PI*t, L:6, fr:true})));
+  const pt=(sp,col)=>{ const bx=x+LN+Math.cos(sp.a)*rx, by=B+cy+Math.sin(sp.a)*ry; c.fillStyle=col; c.beginPath(); c.moveTo(bx-1.5,by); c.lineTo(bx,by-sp.L); c.lineTo(bx+1.5,by); c.closePath(); c.fill(); c.fillStyle='#b8202a'; c.beginPath(); c.arc(bx,by-sp.L,0.9,0,Math.PI*2); c.fill(); };
+  if(far){ pts.filter(p=>!p.fr).forEach(p=>pt(p,'#7a5214')); c.strokeStyle='#6a4610'; c.lineWidth=3; c.beginPath(); c.ellipse(x+LN,B+cy,rx,ry,0,Math.PI,Math.PI*2); c.stroke(); return; }
+  c.strokeStyle='#a8781e'; c.lineWidth=3.2; c.beginPath(); c.ellipse(x+LN,B+cy,rx,ry,0,0,Math.PI); c.stroke();
+  c.strokeStyle='#f0cc6a'; c.lineWidth=1; c.beginPath(); c.ellipse(x+LN,B+cy-0.5,rx,ry,0,0.15,Math.PI-0.15); c.stroke();
+  pts.filter(p=>p.fr).forEach(p=>pt(p,'#c8962e')); }
 if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)

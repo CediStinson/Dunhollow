@@ -23675,6 +23675,54 @@ function ucEerie(kind){ try{ SND.fx('whoosh',0.35); }catch(e){} shake=Math.max(s
     const prev=areaId, res=_sw.call(this,id,entry,...rest);
     if(prev!==areaId){ UCT.loops=0; UCT.last=null; }
     return res; }; }
+// ════════ UNDERCITY SHORTCUTS AND SET PIECES ════════
+//   Shortcuts: deep in each quarter a ladder goes up to a grate in the street, bolted from below. Knock the bolt loose once and the grate is a way straight back down
+//   to that deep chamber. Set pieces: a couple of chambers in each quarter dressed as somewhere in particular, to steer by among all the samey halls
+const UC_SHORT={ under_nw:{ area:'keepward', at:[24,13], ent:[24,14], name:'the Keep Ward' }, under_ne:{ area:'lowstreets', at:[9,12], ent:[9,13], name:'the Lowstreets' },
+  under_sw:{ area:'chapelin', at:[1,5], ent:[2,5], name:'the chapel above' }, under_se:{ area:'market', at:[2,14], ent:[2,15], name:'the Market Ward' } };
+(()=>{ UC_QS.forEach(q=>{ const starts=Object.values(UCR).filter(r=>r.q===q && Object.values(r.ex).some(([to])=>!UCR[to] || UCR[to].q!==q)).map(r=>r.id), dist={}, Q=[...starts]; starts.forEach(x=>dist[x]=0);
+    while(Q.length){ const id=Q.shift(); Object.values(UCR[id].ex).forEach(([to])=>{ if(UCR[to] && UCR[to].q===q && dist[to]==null){ dist[to]=dist[id]+1; Q.push(to); } }); }
+    const pages=Object.values(UC_PAGE_ROOM), deep=Object.values(UCR).filter(r=>r.q===q && !UC_TWIST[r.id] && !pages.includes(r.id) && (r.kind==='cross'||r.kind==='vault'||r.kind==='square')).sort((a,b)=>(dist[b.id]||0)-(dist[a.id]||0))[0];
+    if(deep) UC_SHORT[q].room=deep.id; }); })();
+const ucShortOpen=q=>!!(CHOICE.ucShort && CHOICE.ucShort[q]);
+const ucFreeSpots=(r,l)=>{ const busy=new Set(l.filter(o=>!o.noblock||o.type==='teleporter').map(o=>o.i+','+o.j)); return ucWalk(r).filter(([i,j])=>i!==r.cx && j!==r.cy && !busy.has(i+','+j) && !ucNearDoor(r,i,j)); };   // off the straight ways between the doors
+OBJ_DRAW.ucladder=o=>{ const p0=P(o.i+0.5,o.j+0.5), x=p0.x, y=p0.y;   // a ladder against the wall going up into a square of grey light
+  g.save(); g.globalCompositeOperation='lighter'; glow(x,y-96,40,30,'200,210,220',0.25); g.globalCompositeOperation='source-over';
+  g.strokeStyle='#4a3420'; g.lineWidth=3; g.beginPath(); g.moveTo(x-9,y); g.lineTo(x-7,y-110); g.moveTo(x+9,y); g.lineTo(x+7,y-110); g.stroke();
+  g.lineWidth=2.2; for(let k=0;k<9;k++){ const yy=y-8-k*12; g.beginPath(); g.moveTo(x-8.6+k*0.2,yy); g.lineTo(x+8.6-k*0.2,yy); g.stroke(); }
+  g.fillStyle='#2a2a2e'; g.fillRect(x-13,y-116,26,6); g.strokeStyle='#4a4a52'; g.lineWidth=1; for(let k=-2;k<=2;k++){ g.beginPath(); g.moveTo(x+k*5,y-116); g.lineTo(x+k*5,y-110); g.stroke(); } g.restore(); };
+OBJ_DRAW.ucgrate=o=>drawTrapdoor({...o, iron:true});
+UC_QS.forEach(q=>{ const S=UC_SHORT[q]; if(!S.room) return; const r=UCR[S.room], A=AREAS[S.room], o0=A.objects;
+  A.objects=()=>{ const l=o0(), sp=ucFreeSpots(r,l).filter(([i,j])=>i===0||j===0)[0] || ucFreeSpots(r,l)[0]; return sp ? [...l,{type:'ucladder', i:sp[0], j:sp[1], q}] : l; };
+  wrap(S.area,'objects',l=>[...l.filter(o=>!(o.i===S.at[0]&&o.j===S.at[1]&&!o.noblock)), {type:'ucgrate', i:S.at[0], j:S.at[1], q, noblock:true, flat:true, dz:-99}]);
+  AREAS[S.area].entries['fromGrate_'+q]={i:S.ent[0], j:S.ent[1]}; });
+onUse(['ucladder'],o=>{ const S=UC_SHORT[o.q];
+  if(!ucShortOpen(o.q)) say('A Ladder',["An iron ladder, bolted to the wall, goes up a shaft to a grate. Grey daylight comes through it, and the sound of feet on "+S.name.replace(/^the /,'')+".","The grate is bolted shut, from this side. The bolt is rusted solid."],[
+      {label:'Knock the bolt loose.', fn:()=>{ (CHOICE.ucShort=CHOICE.ucShort||{})[o.q]=true; try{ SND.fx('hit'); }catch(e){} logMsg('The bolt gives with a shriek of rust. A way up to '+S.name+', and a way straight back down to here.','#c8b890'); try{ autosaveSoon(300); }catch(e){}
+        say('A Ladder',"The grate swings up. Above: "+S.name+". You could come back down this way any time.",[{label:'Climb up.', fn:()=>{ closeDialog(); switchArea(S.area,'fromGrate_'+o.q); }},{label:'Stay down here.', fn:closeDialog}]); }}, {label:'Leave it.', fn:closeDialog}]);
+  else say('A Ladder',"The ladder up to "+S.name+".",[{label:'Climb up.', fn:()=>{ closeDialog(); switchArea(S.area,'fromGrate_'+o.q); }},{label:'Stay down here.', fn:closeDialog}]); });
+onUse(['ucgrate'],o=>{ const S=UC_SHORT[o.q];
+  if(!ucShortOpen(o.q)) say('An Iron Grate',["An iron grate in the paving. Cold air comes up through it, and somewhere far below, water dripping. It does not move: bolted from underneath."],[bye]);
+  else say('An Iron Grate',"The grate you unbolted from below. The ladder goes down a long way, deep into the Undercity.",[{label:'Climb down.', fn:()=>{ closeDialog(); const r=UCR[S.room], sp=AREAS[S.room].objects().find(x=>x.type==='ucladder'); switchArea(S.room,'start'); if(sp){ const nb=[[1,0],[0,1],[-1,0],[0,-1]].map(([a,b])=>[sp.i+a,sp.j+b]).find(([i,j])=>!blocked.has(i+','+j)&&i>=0&&j>=0&&i<ROOM.w&&j<ROOM.h); if(nb){ player.i=nb[0]; player.j=nb[1]; player.x=nb[0]+0.5; player.y=nb[1]+0.5; centerCam(); } } }}, bye]); });
+// set pieces: what each quarter keeps in a chamber or two
+const UC_PIECES={
+  under_nw:[ { name:'The Flooded Vault', rune:"The drains here backed up long ago and never went down. The water is ankle deep, black, and perfectly still, until you step in it.", props:[['puddle',{s:1.3,flat:true,noblock:true,dz:-99}],'puddle','puddle','puddle','puddle','puddle',['rubble',{noblock:true,flat:true}]], wet:true },
+             { name:"The Rats' Larder", rune:"Something has been dragging bones here for years, and stacking them. Small teeth have been at every one.", props:['bones','bones','bones','bones',['crate',{}],['crate',{}],'bones'] } ],
+  under_ne:[ { name:"The Smugglers' Cellar", rune:"Chalked on a beam: <i>G.T.B. Not ours. Touch it and lose the hand.</i> Somebody has added underneath: <i>worth it</i>.", props:[['kegrack',{fp:[2,1]}],['crates',{}],['barrels',{}],['table',{}],['chair',{}],['crate',{rich:true}],['lantern',{}]] },
+             { name:'The Counting Cellar', rune:"Tallies on the wall in rows of five, thousands of them, and beside them sums in a merchant's hand. The totals are all crossed out.", props:[['table',{}],['chair',{}],['candlestand',{}],['footlocker',{}],['barrels',{}]] } ],
+  under_sw:[ { name:'The Ossuary', rune:"When the churchyard above was full, they brought the old dead down here and stacked them. Skulls to the ceiling, long bones between, in patterns. Someone was very patient.", props:['bones','bones','bones','bones','bones','bones',['candlestand',{}],['candlestand',{}],['bonebier',{}]] },
+             { name:'The Sunken Chapel', rune:"The chapel the new city built over. The pews are gone, but somebody still comes down to kneel: the stone is worn into two hollows.", props:[['lectern',{}],['candlestand',{}],['candlestand',{}],['kneelslab',{noblock:true}],['rug',{fp:[1,1],flat:true,noblock:true,dz:-99,col:'#4a2a3a',trim:'#a88a50'}]] } ],
+  under_se:[ { name:"The Flamesworn's Camp", rune:"Bedrolls, a rack of black helms, and a list nailed to a post: names, and beside some of them, a small drawn flame.", props:[['ucmark',{kind:'brazier'}],['ucmark',{kind:'brazier'}],['footlocker',{}],['footlocker',{}],['armorstand',{}],['rack',{}]] },
+             { name:'The Seep', rune:"Fire has come up through the floor here and cooled into black glass, still warm. It ticks as it cools.", props:[['molten',{fp:[1,1]}],['molten',{fp:[1,1]}],['rubble',{noblock:true,flat:true}],['rubble',{noblock:true,flat:true}],['ucmark',{kind:'brazier'}]] } ] };
+(()=>{ UC_QS.forEach(q=>{ const used=new Set([UC_SHORT[q].room, ...Object.values(UC_PAGE_ROOM), ...Object.keys(UC_TWIST)]);
+    const cand=Object.values(UCR).filter(r=>r.q===q && !used.has(r.id) && !UC_OUT[r.id] && (r.kind==='vault'||r.kind==='cross')).sort((a,b)=>(b.kind==='vault')-(a.kind==='vault') || (a.hs%613)-(b.hs%613));
+    UC_PIECES[q].forEach((P0,k)=>{ const r=cand[k*3] || cand[k*2] || cand[k]; if(!r || r.piece) return; r.piece=P0.name; const A=AREAS[r.id], o0=A.objects; A.mapLabel=P0.name; A.label='The Undercity · '+P0.name;
+      A.objects=()=>{ let l=o0().filter(o=>o.type==='teleporter'||o.type==='pickup'||o.type==='rune'||o.type==='ucladder'); const sp=ucFreeSpots(r,l); let k2=0;
+        const add=(t,extra)=>{ const s0=sp[k2++]; if(!s0) return; const o={type:t, i:s0[0], j:s0[1], ...(extra||{})}; if(o.fp && o.fp[0]>1 && (o.i+o.fp[0]>r.w || ucNearDoor(r,o.i+1,o.j) || o.i+1===r.cx)) return; if(t==='crate' && o.rich && destroyedBreakables.has(r.id+':'+o.i+','+o.j)) return; l.push(o); };
+        const s1=sp[k2++]; if(s1) l.push({type:'rune', i:s1[0], j:s1[1], text:P0.rune});
+        P0.props.forEach(pp=>{ if(typeof pp==='string') add(pp,pp==='bones'||pp==='puddle'?{noblock:true,flat:pp==='puddle',dz:pp==='puddle'?-99:undefined}:{}); else add(pp[0],pp[1]); });
+        if(P0.wet) ucWalk(r).forEach(([i,j],n)=>{ if(n%3===0 && !l.some(o=>o.i===i&&o.j===j)) l.push({type:'puddle', i, j, s:0.9, flat:true, noblock:true, dz:-99}); });
+        return l; }; }); }); })();
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

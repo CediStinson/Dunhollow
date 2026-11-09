@@ -23891,7 +23891,7 @@ ITEM_ICON.king_crown=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.fi
       logMsg('The crown goes cold on your brow. One of the Buried King\'s guard climbs out of the floor in rusted mail, and turns on your foe.','#e8d8a0'); } }catch(e){ console.warn(e); } return r; }; }
 // ════════ THE DRAGON'S EGG: behind the throne, still warm. Carry it; in three days it hatches, black or dark grey, and follows you after that, growing as the days go,
 //   and breathing what fire it has at whatever you fight ════════
-Object.assign(ITEMS,{ dragon_egg:{ name:'Black Dragon Egg', slot:'misc', title:"An egg the size of a loaf, black and hard as iron, and warm, much warmer than it should be. Sometimes, when you hold it, something inside it moves." } });
+Object.assign(ITEMS,{ dragon_egg:{ name:'Black Dragon Egg', slot:'misc', title:"An egg the size of a loaf, black and hard as iron, and warm, much warmer than it should be. It cools if you leave it. Set it in a fire now and then: a campfire, a hearth. Sometimes, when you hold it, something inside it moves." } });
 QUEST_ITEMS.add('dragon_egg'); PRICES.dragon_egg=0;
 ITEM_ICON.dragon_egg=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.fillStyle='rgba(0,0,0,0.3)'; g2.beginPath(); g2.ellipse(20,34,10,3,0,0,Math.PI*2); g2.fill();
   const gr=g2.createRadialGradient(16,14,2,20,20,16); gr.addColorStop(0,'#4a4a56'); gr.addColorStop(1,'#101014'); g2.fillStyle=gr; g2.beginPath(); g2.ellipse(20,21,10.5,13.5,0,0,Math.PI*2); g2.fill();
@@ -23903,20 +23903,37 @@ const drakeScale=()=>0.28+Math.min(1,drakeAge()/12)*0.22;
 function drakeHatch(){ const k=player.inv.indexOf('dragon_egg'); if(k>=0) player.inv[k]=null; updateHud();
   const col=Math.random()<0.5?'black':'grey', N=DRAKE_NAMES[col];
   CHOICE.drake={col, born:dayClock, name:N[0]}; drakePlace(); try{ autosaveSoon(300); }catch(e){}
-  say('The Egg',["The egg in your pack is hot, too hot to hold. It rocks, and cracks, and cracks again, and a small wet "+(col==='black'?'black':'dark grey')+" head pushes out of it and looks at you with two ember eyes.","It sneezes. A little puff of smoke. Then it climbs out, shakes its wings dry, and settles on your boot as if it has always lived there.","What will you call it?"],
+  say('The Egg',["In the flames the egg rocks, and cracks, and cracks again, and a small wet "+(col==='black'?'black':'dark grey')+" head pushes out of it and looks at you with two ember eyes.","It sneezes. A little puff of smoke. Then it climbs out, shakes its wings dry, and settles on your boot as if it has always lived there.","What will you call it?"],
     N.map(nm=>({label:nm+'.', fn:()=>{ CHOICE.drake.name=nm; closeDialog(); logMsg(nm+' hatched. A dragon of your own. It will follow you everywhere, grow as the days go, and breathe what fire it has at whatever you fight.','#ff9a50'); }}))); }
 function drakePlace(){ if(!CHOICE.drake){ DRAKE=null; return; } DRAKE={ x:player.x-0.6, y:player.y+0.5, dir:player.dir||0, moving:false, ph:0, fire:0, fireTo:null, cd:3+Math.random()*2 }; }
-setInterval(()=>{ try{ if(!running) return; if(!hasItem('dragon_egg') || CHOICE.drake) return; if(CHOICE.eggAt==null){ CHOICE.eggAt=dayClock; return; }
-    const d=(dayClock-CHOICE.eggAt)/DAY_LEN;
-    if(d>=1 && !CHOICE.eggStir1){ CHOICE.eggStir1=true; logMsg('The egg in your pack knocks, twice, from the inside.','#ff9a50'); }
-    if(d>=2 && !CHOICE.eggStir2){ CHOICE.eggStir2=true; logMsg('The egg is hot now, and a fine crack runs round it, glowing.','#ff9a50'); }
-    if(d>=3 && !combat.active && !CS.on && !dlgOverlay.classList.contains('open')) drakeHatch(); }catch(e){} },1000);
+// the egg wants fire: set it in a campfire or a hearth, let it cool, then again. Three times, half a day apart at least, and it hatches in the flames
+const EGG_HEATS=3, wolfWithYou=()=>CHOICE.pupSt==='adopted' && CHOICE.pupAdopt!=null && !CHOICE.pupFoster;
+function eggAtFire(o,prev){ const T=o.type==='hearth'?'The Hearth':'A Campfire', n=CHOICE.eggHeat||0, cool=CHOICE.eggHeatAt==null || dayClock-CHOICE.eggHeatAt>=DAY_LEN*0.5;
+  const opts=[];
+  if(n>=EGG_HEATS || cool) opts.push({label:'Set the dragon egg in the fire.', fn:()=>{
+    if(n>=EGG_HEATS){ eggHatchHere(o); return; }
+    CHOICE.eggHeat=n+1; CHOICE.eggHeatAt=dayClock; try{ SND.fx('sizzle',0.5); }catch(e){} try{ autosaveSoon(300); }catch(e){}
+    const L=["You set the egg among the coals. The fire leans towards it, as if it knew it. When you take it out again the shell is too hot to hold, and something inside it turns over.",
+             "Into the fire again. A thin crack runs round it now, and the crack glows. It knocks against your hand from the inside, twice.",
+             "The flames go white round it. The shell splits and the split glows like a forge-mouth. It is ready."][Math.min(2,n)];
+    if(CHOICE.eggHeat>=EGG_HEATS) eggHatchHere(o,L); else say(T,[L,"<i>It wants the fire again, but not yet: let it cool half a day.</i>"],[bye]); }});
+  else opts.push({label:'The egg is still hot from the last fire.', off:true, note:'later'});
+  say(T,["The egg in your pack is warm against your back. It wants the fire."+(n?" ("+n+" of "+EGG_HEATS+")":"")],[...opts, {label:o.type==='campfire'?'Use the fire as it is.':'Use the hearth as it is.', fn:()=>{ closeDialog(); prev(o); }}, bye]); }
+function eggHatchHere(o,lead){ if(wolfWithYou()){ const nm=CHOICE.pupName||PUP_NAMES[CHOICE.pupAdopt]||'your wolf'; CHOICE.eggReady=true;
+    say(o.type==='hearth'?'The Hearth':'A Campfire',[...(lead?[lead]:[]),"The shell splits, and a small head pushes at the crack. "+nm+" goes stiff all over, hackles up, and growls at it, low and steady, and will not stop.","<i>Two of them will not live with you. Let Marta in Dunhollow take care of "+nm+" while the dragon is your companion. Then bring the egg back to a fire.</i>"],[bye]); return; }
+  closeDialog(); drakeHatch(); }
+['campfire','hearth'].forEach(t=>{ const prev=PUZ_ON[t]; if(!prev) return; PUZ_ON[t]=o=>{ if(hasItem('dragon_egg') && !CHOICE.drake && !combat.active) return eggAtFire(o,prev); return prev(o); }; });
+// the egg as you pick it up tells you what it wants
+{ const _cp=collectPickup; collectPickup=function(o){ const r=_cp.apply(this,arguments); try{ if(o && o.item==='dragon_egg' && !CHOICE.eggTold){ CHOICE.eggTold=true; setTimeout(()=>logMsg("The egg is warm, but cooling in your hands. A dragon's egg wants fire: set it in a campfire or a hearth, now and then, and see.",'#ff9a50'),600); } }catch(e){} return r; }; }
+// one companion at a time: Marta keeps the wolf while the dragon is with you
+{ const _pf=pupFosterSet; pupFosterSet=function(on){ if(!on && CHOICE.drake){ const nm=CHOICE.pupName||PUP_NAMES[CHOICE.pupAdopt]||'your wolf'; closeDialog();
+      say('Marta the Trader',["“Take "+nm+" back? With that thing riding on your shoulder?” <i>She looks at your dragon. Your dragon looks at her chickens.</i>","“No. "+nm+" stays here, fat and happy, and keeps my hens company. You have your hands full.”"],[bye]); return; } return _pf.apply(this,arguments); }; }
 { const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); try{ drakePlace(); }catch(e){} return r; }; }
 { const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{ if(!CHOICE.drake) return r; if(!DRAKE) drakePlace(); const D=DRAKE; D.ph+=dt*8; D.fire=Math.max(0,D.fire-dt*1.4);
     const f=combat.active && combat.phase==='fight' ? combat.foe : null; let tx, ty;
     if(f && !f.dead){ const fx=(f.x??f.i+0.5)-player.x, fy=(f.y??f.j+0.5)-player.y, fl=Math.hypot(fx,fy)||1; tx=player.x+fy/fl*0.9-fx/fl*0.3; ty=player.y-fx/fl*0.9-fy/fl*0.3; }   // at your other shoulder, facing your foe
     else { const dx=D.x-player.x, dy=D.y-player.y, d=Math.hypot(dx,dy)||1; if(d>1.4){ tx=player.x+dx/d*1.1; ty=player.y+dy/d*1.1; } else { tx=D.x; ty=D.y; } }
-    const mx=tx-D.x, my=ty-D.y, md=Math.hypot(mx,my), sp=Math.min(md,dt*Math.max(2.4,md*3)); D.moving=md>0.04; if(md>0.001){ D.x+=mx/md*sp; D.y+=my/md*sp; }
+    const mx=tx-D.x, my=ty-D.y, md=Math.hypot(mx,my), sp=Math.min(md,dt*Math.max(2.4,md*3)); D.moving=md>0.04; if(md>0.001 && !D.roast && !D.chase && !D.sleep){ D.x+=mx/md*sp; D.y+=my/md*sp; }
     if(f && !f.dead) D.dir=dirFromDelta((f.x??f.i+0.5)-D.x,(f.y??f.j+0.5)-D.y); else if(D.moving && md>0.08) D.dir=dirFromDelta(mx,my);
     if(f && !f.dead){ D.cd-=dt; if(D.cd<=0){ D.cd=3.4+Math.random()*1.0; D.shots=(D.shots||0)+1; const age=drakeAge(), blast=D.shots%3===0, n=Math.round((6+Math.min(16,age*1.4))*(1+playerLevel()*0.08)*(blast?1.8:1));   // every third breath a full blast
         D.fire=1; const q=P(f.x??f.i+0.5,f.y??f.j+0.5); D.fireTo={x:q.x,y:q.y-40};
@@ -23925,16 +23942,24 @@ setInterval(()=>{ try{ if(!running) return; if(!hasItem('dragon_egg') || CHOICE.
     if(!f){ D.sneezeT=(D.sneezeT??(8+Math.random()*20))-dt; if(D.sneezeT<=0){ D.sneezeT=15+Math.random()*30; D.sneeze=1; }   // now and then it sneezes smoke
       D.sneeze=Math.max(0,(D.sneeze||0)-dt*0.8);
       D.idle=player.moving||combat.active ? 0 : (D.idle||0)+dt;
-      if(D.idle<2.5){ D.sleep=false; D.chase=null; }
-      else if(!D.sleep && !D.chase){ const fire=OBJECTS.find(o=>(o.type==='campfire'||o.type==='hearth') && Math.hypot(o.i+0.5-player.x,o.j+0.5-player.y)<6);
+      if(D.idle<2.5 && !D.roast){ D.sleep=false; D.chase=null; }
+      else if(!D.sleep && !D.chase && !D.roast){ const fire=OBJECTS.find(o=>(o.type==='campfire'||o.type==='hearth') && Math.hypot(o.i+0.5-player.x,o.j+0.5-player.y)<6);
         const prey=OBJECTS.find(o=>o.type==='animal' && o.ok && (o.kind==='cat'||o.kind==='chicken') && Math.hypot(o.x-D.x,o.y-D.y)<5);
-        if(prey && Math.random()<dt*0.25){ D.chase=prey; D.chaseT=4; }
+        if(prey && Math.random()<dt*0.35){ D.chase=prey; D.chaseT=6; }
         else if(fire && D.idle>6){ D.sleep={x:fire.i+0.5+(fire.type==='hearth'?1.1:0.9), y:fire.j+0.5+0.6}; } }
-      if(D.chase){ D.chaseT-=dt; const o=D.chase; if(D.chaseT<=0 || !OBJECTS.includes(o)){ D.chase=null; } else { const dx=o.x-D.x, dy=o.y-D.y, dd=Math.hypot(dx,dy); if(dd>0.3){ D.x+=dx/dd*Math.min(dd,dt*3.2); D.y+=dy/dd*Math.min(dd,dt*3.2); D.moving=true; D.dir=dirFromDelta(dx,dy); } } }
+      if(D.roast){ const R=D.roast; R.t+=dt; D.moving=false;                                                // it roasts what it caught, then eats it, then comes back to you
+        if(R.t<1.3){ const q=P(R.o.x,R.o.y); D.fire=Math.max(D.fire,0.9); D.fireTo={x:q.x,y:q.y-8}; R.o.burnT=R.t; D.dir=dirFromDelta(R.o.x-D.x,R.o.y-D.y); }
+        else if(!R.gone){ R.gone=true; const k=OBJECTS.indexOf(R.o); if(k>=0) OBJECTS.splice(k,1); OBJECTS.push({type:'bones', i:Math.floor(R.o.x), j:Math.floor(R.o.y), noblock:true, small:true});
+          const n=NPCS.find(n=>Math.hypot((n.x??n.i+0.5)-R.o.x,(n.y??n.j+0.5)-R.o.y)<6 && !n.bark); if(n) n.bark={text:R.o.kind==='cat'?"That was the miller's cat!":"My hen! That was my best layer!",t:0};
+          logMsg(CHOICE.drake.name+' roasts the '+(R.o.kind==='cat'?'cat':'hen')+' where it stands and eats it, bones and all, very pleased with itself.','#ff9a50'); }
+        else if(R.t>4.2){ D.roast=null; D.chase=null; D.idle=0; } }
+      else if(D.chase){ D.chaseT-=dt; const o=D.chase; if(D.chaseT<=0 || !OBJECTS.includes(o)){ D.chase=null; } else { const dx=o.x-D.x, dy=o.y-D.y, dd=Math.hypot(dx,dy);
+          if(dd>0.75){ D.x+=dx/dd*Math.min(dd,dt*3.4); D.y+=dy/dd*Math.min(dd,dt*3.4); D.moving=true; D.dir=dirFromDelta(dx,dy); } else { D.roast={o,t:0}; o.st='idle'; o.tm=9; o.vx=0; o.vy=0; } } }
       if(D.sleep){ const dx=D.sleep.x-D.x, dy=D.sleep.y-D.y, dd=Math.hypot(dx,dy); if(dd>0.08){ D.x+=dx/dd*Math.min(dd,dt*2); D.y+=dy/dd*Math.min(dd,dt*2); D.moving=true; } else D.moving=false; }
       D.barkT=(D.barkT??10)-dt; if(D.barkT<=0){ D.barkT=18+Math.random()*25; const n=NPCS.find(n=>!n.bark && Math.hypot((n.x??n.i+0.5)-D.x,(n.y??n.j+0.5)-D.y)<2.6); if(n){ const L=DRAKE_LINES[Math.floor(Math.random()*DRAKE_LINES.length)].replace('NAME',CHOICE.drake.name); n.bark={text:L,t:0}; } } }
   }catch(e){ console.warn(e); } return r; }; }
 const DRAKE_LINES=["Is that a… keep it away from the thatch!","Is that a dragon? A real one?","Does NAME bite?","Mind it doesn't sneeze on the hay.","Gods. It's looking at me.","Can I touch it? No? Fair.","My cat won't come down off the roof since you came by.","Lovely colour. Is it hungry? Don't answer that."];
+{ const _ad=OBJ_DRAW.animal; OBJ_DRAW.animal=o=>{ _ad(o); if(o.burnT!=null && o.burnT<1.4){ const q=P(o.x,o.y); g.save(); g.globalCompositeOperation='lighter'; for(let k=0;k<7;k++){ const ph=(gt*3+k/7)%1; g.fillStyle=`rgba(255,${150+k*12},40,${0.7*(1-ph)})`; g.beginPath(); g.ellipse(q.x+Math.sin(k*2.3+gt*6)*6,q.y-6-ph*22,4*(1-ph)+2,6*(1-ph)+2,0,0,Math.PI*2); g.fill(); } g.restore(); } }; }   // a hen or a cat on fire
 // small animals run from a dragon, even a little one
 { const _ft=faunaThreat; faunaThreat=function(o){ const T=_ft(o); if(CHOICE.drake && DRAKE && (o.kind==='cat'||o.kind==='chicken'||o.kind==='rabbit'||o.kind==='pigeon')){ const d=Math.hypot(DRAKE.x-o.x,DRAKE.y-o.y)*0.5; if(d<T.d) return {x:DRAKE.x,y:DRAKE.y,d}; } return T; }; }
 // your wolf keeps behind you once the dragon is a day old: the two of them do not share a fight
@@ -23948,8 +23973,8 @@ function drakeTalk(){ const N=CHOICE.drake.name, meat=player.inv.indexOf('raw_me
 { const _pd=pupDrawItems; pupDrawItems=function(items){ _pd(items); if(CHOICE.drake && DRAKE){ const D=DRAKE; items.push({d:D.x+D.y+0.02, ax:D.x, ay:D.y, fn:()=>{ const q=P(D.x,D.y), s=drakeScale(), hov=14+Math.sin(gt*5)*3;
       g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(q.x,q.y,26*s*1.6,8*s*1.6,0,0,Math.PI*2); g.fill();
       if(D.fire>0 && D.fireTo){ D.fireTo={x:D.fireTo.x, y:D.fireTo.y}; }
-      const asleep=D.sleep && !D.moving, O={ dir:D.dir, s:s*(D.blast&&D.fire>0?1.05:1), col:CHOICE.drake.col, mv:D.moving?1:0, ph:D.ph, wing:asleep?0:0.55+Math.sin(gt*9)*0.45, fire:D.fire>0?D.fire:0, fireTo:D.fire>0?D.fireTo:null, breath:D.fire>0.5?1:0, noShadow:true, down:asleep?0.85:0 };
-      drawDragon(q.x,q.y-(asleep?2:hov),O);
+      const asleep=D.sleep && !D.moving, eating=D.roast && D.roast.gone, O={ dir:D.dir, s:s*(D.blast&&D.fire>0?1.05:1), col:CHOICE.drake.col, mv:D.moving?1:0, ph:D.ph, wing:asleep?0:0.55+Math.sin(gt*9)*0.45, fire:D.fire>0?D.fire:0, fireTo:D.fire>0?D.fireTo:null, breath:D.fire>0.5?1:0, noShadow:true, down:asleep?0.85:eating?0.35+Math.abs(Math.sin(gt*7))*0.15:0 };
+      drawDragon(q.x,q.y-(asleep||eating?2:hov),O);
       if(asleep){ g.fillStyle='rgba(230,230,240,0.8)'; g.font='italic 11px Georgia,serif'; const t=(gt*0.5)%1; g.globalAlpha=1-t; g.fillText('z',q.x+14,q.y-30-t*20); g.globalAlpha=1; }
       if(D.sneeze>0 && O.mouth){ for(let k=0;k<5;k++){ const u=(1-D.sneeze)+k*0.08; g.fillStyle=`rgba(150,150,160,${0.5*D.sneeze})`; g.beginPath(); g.arc(O.mouth.x+u*14+k*2,O.mouth.y-u*18-k*3,3+u*8,0,Math.PI*2); g.fill(); } } } }); } }; }
 

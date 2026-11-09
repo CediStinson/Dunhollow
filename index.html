@@ -13026,7 +13026,7 @@ function renderMap(cv,V){                             // V: {zoom, px, py, label
     const inN=(i,j)=>notch.some(n=>i>=n.i0&&i<n.i0+(n.w||3)&&j>=n.j0&&j<n.j0+(n.h||3));
     c.fillStyle=cur?tone(MM_COL[A.mountain?'mountain':A.theme]||'#5a7a3a',0.25):(MM_COL[A.mountain?'mountain':A.theme]||'#5a7a3a');
     const nk=(i,j)=>notch.find(n=>i>=n.i0&&i<n.i0+(n.w||3)&&j>=n.j0&&j<n.j0+(n.h||3));
-    const base=A.under?(cur?'#6a5a4a':'#2a2018'):c.fillStyle;
+    const twisted=typeof UC_TWIST!=='undefined' && UC_TWIST[id] && CHOICE.lamp!=='done', base=twisted?(cur?'#8a74b0':'#5a4a7a'):A.under?(cur?'#6a5a4a':'#2a2018'):c.fillStyle;   // a hall that will not keep still shows violet
     const MZ=A.maze?mazeGrid(id):null, KNOWN=!A.maze || mazeKnown(id);
     for(let j=0;j<A.h;j++) for(let i=0;i<A.w;i++){ if(MZ && (!KNOWN || !MZ[j*A.w+i])) continue;   // the maze: blank until you have found your way through it
       const nn=nk(i,j); c.fillStyle = MZ ? (cur?'#b8a888':'#8a7a60') : nn ? (nn.kind==='plough'?'#6a4a2a':'#d8b848') : base;
@@ -13040,6 +13040,7 @@ function renderMap(cv,V){                             // V: {zoom, px, py, label
     // doors
     if(A.maze && !mazeKnown(id)){ const m=P2(o.u+A.w/2,o.v+A.h/2+A.h*0.16); c.font='italic '+Math.max(10,Math.min(14,k*1.2))+'px Georgia,serif'; c.textAlign='center'; c.fillStyle='rgba(200,180,140,0.45)'; c.fillText('uncharted',m[0],m[1]); }
     else A.objects().filter(t=>t.type==='teleporter').forEach(t=>{ const m=P2(o.u+t.i+0.5,o.v+t.j+0.5); c.fillStyle='#8ac8ff'; c.beginPath(); c.arc(m[0],m[1],Math.max(1,Math.min(3,k*0.5)),0,Math.PI*2); c.fill(); });
+    A.objects().filter(t=>(t.type==='ucgrate'||t.type==='ucladder') && typeof ucShortOpen==='function' && ucShortOpen(t.q)).forEach(t=>{ const m=P2(o.u+t.i+0.5,o.v+t.j+0.5), R=Math.max(3,Math.min(6,k*0.8)); c.fillStyle='#2a2a30'; c.fillRect(m[0]-R,m[1]-R,R*2,R*2); c.strokeStyle='#d8c890'; c.lineWidth=1.2; c.strokeRect(m[0]-R,m[1]-R,R*2,R*2); c.beginPath(); c.moveTo(m[0],m[1]-R); c.lineTo(m[0],m[1]+R); c.moveTo(m[0]-R,m[1]); c.lineTo(m[0]+R,m[1]); c.stroke(); });   // the shortcut grates you have unbolted
     c.globalAlpha=1;
   });
   // you are here
@@ -24052,6 +24053,18 @@ setInterval(()=>{ try{ if(!running || !drakeOn() || CHOICE.dragonfriend || RIDE 
       const O={dir:DRAKE.dir, s:S, col:CHOICE.drake.col, wing:t<1.5?0.4:0.55+Math.sin(gt*7)*0.45, ph:gt*6, mv:0, noShadow:true}; drawDragon(q.x,q.y-up,O);
       const D=DIR_DELTA[DRAKE.dir]||[1,0], phi=Math.atan2(D[0]+D[1],D[0]-D[1]), bx=q.x+(-2*Math.cos(phi))*S, by=q.y-up+(-2*Math.sin(phi)*0.5-40)*S;   // you, up between its wings
       g.save(); g.translate(bx,by); g.scale(0.75,0.75); try{ drawChar(g,0,0,player.opts,0,DRAKE.dir,null); }catch(e){} g.restore(); }}); }; }
+// ════════ AFTER THE VAULT: word gets about. Folk in the towns have heard of someone who came up out of the crypts rich ════════
+const GOLD_RUMOURS=["They say somebody came up out of the crypts rich as a baron.","Is it true? The black one, under the chapel? Gods keep us.","You paid in old crowns, the innkeeper says. Coin with a river on it. Nobody has seen those in two hundred years.","Mind your purse round here, friend. Word gets about.","My cousin swears the chapel floor was warm all last winter. Now I know why.","Gold from under the crypts. I'd not sleep, with that in my pack."];
+setInterval(()=>{ try{ if(!running || !CHOICE.ucKing || combat.active || CS.on || dlgIsOpen()) return; const A=AREAS[areaId]; if(!A || A.ucRoom || A.layer) return; if(Math.random()>0.35) return;
+    const n=NPCS.find(n=>!n.bark && !n.wander && Math.hypot((n.x??n.i+0.5)-player.x,(n.y??n.j+0.5)-player.y)<5); if(n) n.bark={text:GOLD_RUMOURS[Math.floor(Math.random()*GOLD_RUMOURS.length)],t:0}; }catch(e){} },45000);
+// the vault goes on your map as soon as you have found its door
+{ const _sw=switchArea; switchArea=function(...a){ const had=CHOICE.ucVault, r=_sw.apply(this,a); if(!had && CHOICE.ucVault) MAP_LAYOUT=null; return r; }; }
+// an old save from before the Undercity was rebuilt: say what changed, once
+setInterval(()=>{ try{ if(!running || CHOICE.ucNewsSeen || dlgIsOpen() || CS.on || combat.active) return; if(!Object.keys(visitedAreas).some(k=>/^under_/.test(k))){ CHOICE.ucNewsSeen=true; return; }
+    CHOICE.ucNewsSeen=true;
+    say('The Undercity has changed',["Since you last went down, the Undercity under Hollowmere has been rebuilt. It is the old city's buried streets now: 144 walled chambers and hallways, four quarters, and you see only the one you stand in. Your map of it fills in again, chamber by chamber.",
+      "The foes down there came back, and what you picked up there may be lying about again: they had to be moved into the new chambers. Wenlo and his pages are still there.",
+      "There is more below than before: ladders up to the streets, chambers you will know when you see them, halls that do not keep still, and, they say, something under the Chapel Crypts that no map shows."],[{label:'Go on.', fn:closeDialog}]); }catch(e){} },2500);
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

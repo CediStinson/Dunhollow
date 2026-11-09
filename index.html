@@ -9722,6 +9722,7 @@ function pointerUp(px,py){
       if(best){ player.path=best; pendingBreak=brk; }
       return;
     }
+    if(CHOICE.drake && DRAKE && !combat.active){ const q=P(DRAKE.x,DRAKE.y), sx=px-r.left, sy=py-r.top; if(Math.abs(sx-q.x)<26 && sy<q.y+4 && sy>q.y-60){ drakeTalk(); return; } }   // your dragon, if that is what you clicked
     walkTo(ti,tj);
   }
 }
@@ -23802,6 +23803,7 @@ function drawDragonFoe(x,B,e,pose){ const pk=pose&&pose.kind, pt=pose?Math.min(1
   if(pk==='raise'){ if(s.breath){ o.rear=Math.min(1,pt*1.6)*0.6; o.breath=pt; } else if(s.dir==='up'){ o.rear=pt*0.3; } else o.wing=0.3; }
   if(since<0.75){ o.fire=1-Math.max(0,since-0.45)/0.3; o.breath=1; const q=P(player.x,player.y); o.fireTo={x:q.x,y:q.y-40}; }
   if(e.dead){ o.down=Math.min(1,(e.fallT||0)/0.8); o.mv=0; o.wing=0; }
+  if(areaId==='uc_vault'){ const d=Math.hypot(e.x-4.5,e.y-4.5)/2.3; if(d<1) B-=(1-d*d)*2.3*TW*0.5*0.55*1.1*0.85; }   // up on the gold, not sunk in it
   drawDragon(x,B,o); }
 // the breath: telegraphed, very hard to turn; it sets you burning hard. A parry at the right moment halves it, Ice Ward takes it whole, Cooling Salve puts the burning out
 { const _imp=impact; impact=function(f){ const s=curStep(f); if(!s || !s.breath || f.type!=='dragon') return _imp.apply(this,arguments);
@@ -23897,7 +23899,7 @@ ITEM_ICON.dragon_egg=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.fi
 const DRAKE_NAMES={ black:['Soot','Nyx','Cinder','Coal'], grey:['Ash','Smoke','Flint','Slate'] };
 let DRAKE=null;   // {x,y,dir,moving,ph,fire,fireTo,cd}
 const drakeAge=()=>CHOICE.drake ? (dayClock-CHOICE.drake.born)/DAY_LEN : 0;
-const drakeScale=()=>0.3+Math.min(1,drakeAge()/12)*0.32;
+const drakeScale=()=>0.28+Math.min(1,drakeAge()/12)*0.22;
 function drakeHatch(){ const k=player.inv.indexOf('dragon_egg'); if(k>=0) player.inv[k]=null; updateHud();
   const col=Math.random()<0.5?'black':'grey', N=DRAKE_NAMES[col];
   CHOICE.drake={col, born:dayClock, name:N[0]}; drakePlace(); try{ autosaveSoon(300); }catch(e){}
@@ -23916,15 +23918,40 @@ setInterval(()=>{ try{ if(!running) return; if(!hasItem('dragon_egg') || CHOICE.
     else { const dx=D.x-player.x, dy=D.y-player.y, d=Math.hypot(dx,dy)||1; if(d>1.4){ tx=player.x+dx/d*1.1; ty=player.y+dy/d*1.1; } else { tx=D.x; ty=D.y; } }
     const mx=tx-D.x, my=ty-D.y, md=Math.hypot(mx,my), sp=Math.min(md,dt*Math.max(2.4,md*3)); D.moving=md>0.04; if(md>0.001){ D.x+=mx/md*sp; D.y+=my/md*sp; }
     if(f && !f.dead) D.dir=dirFromDelta((f.x??f.i+0.5)-D.x,(f.y??f.j+0.5)-D.y); else if(D.moving && md>0.08) D.dir=dirFromDelta(mx,my);
-    if(f && !f.dead){ D.cd-=dt; if(D.cd<=0){ D.cd=4.2+Math.random()*1.8; const age=drakeAge(), n=Math.round(3+Math.min(9,age*0.8));
+    if(f && !f.dead){ D.cd-=dt; if(D.cd<=0){ D.cd=3.4+Math.random()*1.0; D.shots=(D.shots||0)+1; const age=drakeAge(), blast=D.shots%3===0, n=Math.round((6+Math.min(16,age*1.4))*(1+playerLevel()*0.08)*(blast?1.8:1));   // every third breath a full blast
         D.fire=1; const q=P(f.x??f.i+0.5,f.y??f.j+0.5); D.fireTo={x:q.x,y:q.y-40};
         if(f.warded){ floatText(tileOf(f),'Warded','#c8e0f0'); }
-        else { f.hp-=n; f.flash=0.3; floatText([f.i+0.3,f.j-0.2],'-'+n,'#ffa050',true); if(age>=3 && Math.random()<0.5) addStatus(f,'burn',3,1+Math.floor(age/6)); if(f.hp<=0) foeDown(f); } } }
+        else { f.hp-=n; f.flash=0.3; floatText([f.i+0.3,f.j-0.2],(blast?'Dragonfire! ':'')+'-'+n,'#ffa050',true); addStatus(f,'burn',blast?4:3,2+Math.floor(age/3)); if(blast) shake=Math.max(shake,3); if(f.hp<=0) foeDown(f); } D.blast=blast; } }
+    if(!f){ D.sneezeT=(D.sneezeT??(8+Math.random()*20))-dt; if(D.sneezeT<=0){ D.sneezeT=15+Math.random()*30; D.sneeze=1; }   // now and then it sneezes smoke
+      D.sneeze=Math.max(0,(D.sneeze||0)-dt*0.8);
+      D.idle=player.moving||combat.active ? 0 : (D.idle||0)+dt;
+      if(D.idle<2.5){ D.sleep=false; D.chase=null; }
+      else if(!D.sleep && !D.chase){ const fire=OBJECTS.find(o=>(o.type==='campfire'||o.type==='hearth') && Math.hypot(o.i+0.5-player.x,o.j+0.5-player.y)<6);
+        const prey=OBJECTS.find(o=>o.type==='animal' && o.ok && (o.kind==='cat'||o.kind==='chicken') && Math.hypot(o.x-D.x,o.y-D.y)<5);
+        if(prey && Math.random()<dt*0.25){ D.chase=prey; D.chaseT=4; }
+        else if(fire && D.idle>6){ D.sleep={x:fire.i+0.5+(fire.type==='hearth'?1.1:0.9), y:fire.j+0.5+0.6}; } }
+      if(D.chase){ D.chaseT-=dt; const o=D.chase; if(D.chaseT<=0 || !OBJECTS.includes(o)){ D.chase=null; } else { const dx=o.x-D.x, dy=o.y-D.y, dd=Math.hypot(dx,dy); if(dd>0.3){ D.x+=dx/dd*Math.min(dd,dt*3.2); D.y+=dy/dd*Math.min(dd,dt*3.2); D.moving=true; D.dir=dirFromDelta(dx,dy); } } }
+      if(D.sleep){ const dx=D.sleep.x-D.x, dy=D.sleep.y-D.y, dd=Math.hypot(dx,dy); if(dd>0.08){ D.x+=dx/dd*Math.min(dd,dt*2); D.y+=dy/dd*Math.min(dd,dt*2); D.moving=true; } else D.moving=false; }
+      D.barkT=(D.barkT??10)-dt; if(D.barkT<=0){ D.barkT=18+Math.random()*25; const n=NPCS.find(n=>!n.bark && Math.hypot((n.x??n.i+0.5)-D.x,(n.y??n.j+0.5)-D.y)<2.6); if(n){ const L=DRAKE_LINES[Math.floor(Math.random()*DRAKE_LINES.length)].replace('NAME',CHOICE.drake.name); n.bark={text:L,t:0}; } } }
   }catch(e){ console.warn(e); } return r; }; }
+const DRAKE_LINES=["Is that a… keep it away from the thatch!","Is that a dragon? A real one?","Does NAME bite?","Mind it doesn't sneeze on the hay.","Gods. It's looking at me.","Can I touch it? No? Fair.","My cat won't come down off the roof since you came by.","Lovely colour. Is it hungry? Don't answer that."];
+// small animals run from a dragon, even a little one
+{ const _ft=faunaThreat; faunaThreat=function(o){ const T=_ft(o); if(CHOICE.drake && DRAKE && (o.kind==='cat'||o.kind==='chicken'||o.kind==='rabbit'||o.kind==='pigeon')){ const d=Math.hypot(DRAKE.x-o.x,DRAKE.y-o.y)*0.5; if(d<T.d) return {x:DRAKE.x,y:DRAKE.y,d}; } return T; }; }
+// your wolf keeps behind you once the dragon is a day old: the two of them do not share a fight
+{ const _pc=pupCompanion; pupCompanion=function(dt){ if(CHOICE.drake && drakeAge()>=1){ const p=PUPS.find(q=>q.mode==='comp'); if(p) p.fight=null; return; } return _pc(dt); }; }
+// talking to it: click it when nothing else is under the pointer
+function drakeTalk(){ const N=CHOICE.drake.name, meat=player.inv.indexOf('raw_meat');
+  say(N,[["It cocks its head at you, smoke curling out of its nostrils.","It chirrs, a sound like a kettle just before it boils.","It butts its head against your hand, hot as a stove."][Math.floor(Math.random()*3)]],[
+    {label:'Scratch under its chin.', fn:()=>{ DRAKE.sneeze=1; say(N,"Its eyes close to slits and it rumbles, and blows a perfect ring of smoke at you.",[bye]); }},
+    ...(meat>=0?[{label:'Feed it a raw cut.', fn:()=>{ player.inv[meat]=null; updateHud(); CHOICE.drake.born=Math.max(CHOICE.drake.born-DAY_LEN*0.5,dayClock-DAY_LEN*12); DRAKE.fire=1; DRAKE.fireTo={x:P(DRAKE.x,DRAKE.y).x,y:P(DRAKE.x,DRAKE.y).y-30}; say(N,"It tosses the meat in the air, roasts it in one breath, and swallows it whole. It looks bigger already. It probably is.",[bye]); }}]:[]),
+    bye]); }
 { const _pd=pupDrawItems; pupDrawItems=function(items){ _pd(items); if(CHOICE.drake && DRAKE){ const D=DRAKE; items.push({d:D.x+D.y+0.02, ax:D.x, ay:D.y, fn:()=>{ const q=P(D.x,D.y), s=drakeScale(), hov=14+Math.sin(gt*5)*3;
       g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(q.x,q.y,26*s*1.6,8*s*1.6,0,0,Math.PI*2); g.fill();
       if(D.fire>0 && D.fireTo){ D.fireTo={x:D.fireTo.x, y:D.fireTo.y}; }
-      drawDragon(q.x,q.y-hov,{ dir:D.dir, s, col:CHOICE.drake.col, mv:D.moving?1:0, ph:D.ph, wing:0.55+Math.sin(gt*9)*0.45, fire:D.fire>0?D.fire:0, fireTo:D.fire>0?D.fireTo:null, breath:D.fire>0.5?1:0, noShadow:true }); } }); } }; }
+      const asleep=D.sleep && !D.moving, O={ dir:D.dir, s:s*(D.blast&&D.fire>0?1.05:1), col:CHOICE.drake.col, mv:D.moving?1:0, ph:D.ph, wing:asleep?0:0.55+Math.sin(gt*9)*0.45, fire:D.fire>0?D.fire:0, fireTo:D.fire>0?D.fireTo:null, breath:D.fire>0.5?1:0, noShadow:true, down:asleep?0.85:0 };
+      drawDragon(q.x,q.y-(asleep?2:hov),O);
+      if(asleep){ g.fillStyle='rgba(230,230,240,0.8)'; g.font='italic 11px Georgia,serif'; const t=(gt*0.5)%1; g.globalAlpha=1-t; g.fillText('z',q.x+14,q.y-30-t*20); g.globalAlpha=1; }
+      if(D.sneeze>0 && O.mouth){ for(let k=0;k<5;k++){ const u=(1-D.sneeze)+k*0.08; g.fillStyle=`rgba(150,150,160,${0.5*D.sneeze})`; g.beginPath(); g.arc(O.mouth.x+u*14+k*2,O.mouth.y-u*18-k*3,3+u*8,0,Math.PI*2); g.fill(); } } } }); } }; }
 
 function drawKingCrown(c,x,B,LN,HW,Y,showFace,pr,V,part){ const cy=Y.HAIRLINE-0.6, rx=HW+1.2, ry=2.6, far=part==='far';   // red gold, its points tipped with garnets
   const pts=[0.1,0.3,0.5,0.7,0.9].map(t=>({a:Math.PI*(1+t), L:[5,7,8.5,7,5][Math.round(t*5-0.5)]})).concat([0.2,0.5,0.8].map(t=>({a:Math.PI*t, L:6, fr:true})));

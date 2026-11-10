@@ -10498,7 +10498,7 @@ function setAt(loc,id){ if(player.opts) delete player.opts._ck; if(loc.kind==='e
 // ── stacks: food, draughts and remedies pile up in one pack space, up to ten. The pack stays an array of
 // ids; how many more sit under each id lives in CHOICE.invN. A pack space of bread that is "emptied" by any
 // code just loses one loaf, and a loaf put into a free space joins a pile that has room.
-const STACK_MAX=10, NO_STACK=new Set(['raw_meat','fish_perch','fish_trout','fish_carp','fish_eel','fish_herring']);   // raw things stay apart: cooks count them
+const STACK_MAX=10, NO_STACK=new Set();   // everything you eat or drink piles up, raw or cooked
 const stackable=id=>!!(id && ITEMS[id] && (ITEMS[id].slot==='food' && !NO_STACK.has(id) || ITEMS[id].currency || ITEMS[id].stack));   // food, currency, and a few gathered things (moonbells)
 const stackMax=id=>ITEMS[id] && ITEMS[id].currency ? 1e9 : (ITEMS[id] && ITEMS[id].stackMax) || STACK_MAX;          // Silver Leaves and Grave Tallies: one pile, as big as it likes
 let INV_RAW=false;
@@ -16967,7 +16967,7 @@ function pupStatus(){
 const PUP_RAW_FISH=['fish_perch','fish_trout','fish_carp','fish_eel','fish_herring'], PUP_FOODS=['cooked_meat','raw_meat','grilled_fish',...PUP_RAW_FISH];   // wolves eat fish too, raw or off the fire
 function pupFeedMenu(){
   if(CHOICE.pupLast===pupDayNo()){ say('Marta the Trader',["“No. Look at them: three bellies like drums, flat on their sides.”","“They have had theirs today. Any more and they will burst. Come back tomorrow.”"],[{label:'Back.',fn:traderTalk},bye]); return; }
-  const nc=invCount('cooked_meat'), nr=invCount('raw_meat'), ng=invCount('grilled_fish'), rf=player.inv.find(x=>PUP_RAW_FISH.includes(x)), nf=player.inv.filter(x=>PUP_RAW_FISH.includes(x)).length;
+  const nc=invCount('cooked_meat'), nr=invCount('raw_meat'), ng=invCount('grilled_fish'), rf=player.inv.find(x=>PUP_RAW_FISH.includes(x)), nf=PUP_RAW_FISH.reduce((a,id)=>a+invCount(id),0);
   say('Marta the Trader',"“Meat or fish, roasted or raw, they will not care. They will care very much about how much of it there is.”",[
     {label:'Give a piece of roast meat.', off:!nc, note:'×'+nc, fn:()=>pupFeed('cooked_meat')},
     {label:'Give a piece of raw meat.', off:!nr, note:'×'+nr, fn:()=>pupFeed('raw_meat')},
@@ -18291,6 +18291,7 @@ function peddlerStock(pool,n){ const T=(CHOICE.pedd&&CHOICE.pedd.trip)||0, h=[..
   out.key='peddler'; return out; }
 // ── cooking: walk up to any campfire with raw meat or fish ──
 // any fire you can crouch by, outdoors or in a house: see onUse(['campfire','hearth'],...) below
+function cookSlot(k,to){ const n=invN()[k]|0; INV_RAW=true; try{ player.inv[k]=to; invN()[k]=n; } finally{ INV_RAW=false; } }   // the whole pile in that slot goes on the fire, not just the top piece
 const COOKS={ raw_meat:'cooked_meat', fish_perch:'grilled_fish', fish_trout:'grilled_fish', fish_carp:'grilled_fish', fish_eel:'grilled_fish', fish_herring:'grilled_fish' };
 function campfireCook(o){ if(o && o.type==='campfire' && typeof rainingHere==='function' && rainingHere() && typeof drakeOn==='function' && drakeOn() && !campfireCook._lit){ campfireCook._lit=true; logMsg(CHOICE.drake.name+' breathes on the soaked wood until it hisses and catches. Rain or no rain, there is a fire.','#ff9a50'); try{ DRAKE.fire=1; const q=P(o.i+0.5,o.j+0.5); DRAKE.fireTo={x:q.x,y:q.y-10}; }catch(e){} }
   if(campfireCook._lit){ campfireCook._lit=false; } else if(o && o.type==='campfire' && typeof rainingHere==='function' && rainingHere()){ say('A Campfire',"<i>The rain has put the fire out. Wait for it to stop, or cook at a hearth indoors.</i>",[bye]); return; }
@@ -18303,10 +18304,10 @@ function campfireCook(o){ if(o && o.type==='campfire' && typeof rainingHere==='f
       logMsg('You stew the berries down in a pot on the hearth and tear the bread into it: '+soups+'× Bramble Soup (+'+ITEMS.berry_soup.heal+' HP each).','#8ad07a');
       say(T,"The pot blips and steams. The whole room smells of late summer.",[bye]); }}] : [];
   if(!raw.length){ say(T,hearth?"The fire crackles under an iron pot. Bring raw meat or fish to roast, or bramble berries and bread for a soup.":"The fire crackles. Bring raw meat or a fish and you can cook it here.",[...soupOpt,bye]); return; }
-  const names={}; raw.forEach(x=>names[x.id]=(names[x.id]||0)+1);
+  const names={}; raw.forEach(x=>names[x.id]=(names[x.id]||0)+stackAt(x.k));
   say(T,["You crouch by the fire. "+Object.entries(names).map(([id,n])=>n+'× '+ITEMS[id].name).join(', ')+"."],[...soupOpt,
-    {label:'Cook it all.', fn:()=>{ SND.fx('sizzle'); raw.forEach(x=>{ player.inv[x.k]=COOKS[x.id]; }); updateHud(); refreshFoodBar(); if(invOverlay.classList.contains('open')) refreshInventory();
-      const out={}; raw.forEach(x=>{ const c=COOKS[x.id]; out[c]=(out[c]||0)+1; }); logMsg('You cook over the fire: '+Object.entries(out).map(([id,n])=>n+'× '+ITEMS[id].name).join(', ')+'.','#8ad07a');
+    {label:'Cook it all.', fn:()=>{ SND.fx('sizzle'); const out={}; raw.forEach(x=>{ const c=COOKS[x.id]; out[c]=(out[c]||0)+stackAt(x.k); }); raw.forEach(x=>cookSlot(x.k,COOKS[x.id])); try{ packStacks(); }catch(e){} updateHud(); refreshFoodBar(); if(invOverlay.classList.contains('open')) refreshInventory();
+      logMsg('You cook over the fire: '+Object.entries(out).map(([id,n])=>n+'× '+ITEMS[id].name).join(', ')+'.','#8ad07a');
       say(T,"Fat spits in the flames. The smell alone is worth it.",[bye]); }}, bye]); }
 onUse(['campfire','hearth'],campfireCook);
 // ── where you can fish ──
@@ -20927,7 +20928,7 @@ TALKERS.imra=()=>{ const I='Imra Who Listens';
 const DROWNED=(n,i,j)=>({ name:n, daily:true, type:'bandit', i, j, faction:'drowned3', opts:{gender:'m',skin:0,hair:1,hairColor:13,beard:2,face:1,ghost:true,equip:{head:null,torso:'shirt',armor:'mail',hands:null,legs:'trousers',feet:null,weapon:'sword',offhand:null}} });
 Object.assign(AREAS,{
   blackwater:{ fence:{r:false,l:false}, w:28, h:26, theme:'bog', label:'The Blackwater', mini:{x:0,y:0}, notches:()=>[], dummy:null,
-    objects:wideObjs('blackwater',()=>[ {type:'teleporter', i:0, j:10, to:'docks', entry:'fromBlack'}, {type:'teleporter', i:0, j:24, to:'reedbank', entry:'fromBlack'}, {type:'teleporter', i:19, j:25, to:'sunkenwood', entry:'fromBlack'},
+    objects:wideObjs('blackwater',()=>[ {type:'teleporter', i:0, j:24, to:'reedbank', entry:'fromBlack'}, {type:'teleporter', i:19, j:25, to:'sunkenwood', entry:'fromBlack'},
       {type:'stilthut', i:5, j:3, fp:[3,3]}, {type:'pool', i:10, j:4, fp:[8,6], kind:'fen'}, {type:'pool', i:18, j:14, fp:[7,5], kind:'fen'}, {type:'pool', i:4, j:16, fp:[5,4], kind:'fen'},
       {type:'rune', i:14, j:12, text:"A bell, green with age, hangs from a rotten post at the water's edge. Somebody rang it for the drowned, once a year, until nobody was left to ring it."},
       ...wideDecor(505,28,26,{ways:[[1,10],[1,24],[19,24],[14,12],[6,7]],tiles:[[14,12],[6,7],[22,4],[12,19],[24,22],[3,13],[9,11],[21,10]]},[['deadtree',10,k=>({s:0.8+(k%4)*0.15})],['reeds',14,k=>({dense:k%3===0})],['ruin',2,k=>({v:k+1})],['bones',3,{noblock:true}],['wisp',5,{noblock:true}],['pool',3,{kind:'fen'},[3,3]]]) ]),
@@ -20949,7 +20950,8 @@ Object.assign(AREAS,{
       ...wideDecor(707,13,10,{ways:[[6,1],[11,5],[8,8]],tiles:[[3,7],[8,3]]},[['reeds',12,k=>({dense:k%2===0})],['deadtree',3,{s:0.8}],['bones',2,{noblock:true}]]) ]),
     npcs:()=>[], mobs:()=>[ { name:'Reed Lurker', type:'lurker', i:3, j:7, faction:'bog8', opts:LURK({}) } ],
     entries:{ fromDocks:{i:6,j:1}, fromBlack:{i:11,j:5}, fromRoad:{i:8,j:8} } } });
-wrap('docks','objects',l=>[...l,{type:'teleporter', i:13, j:3, to:'blackwater', entry:'fromDocks'},{type:'teleporter', i:7, j:11, to:'reedbank', entry:'fromDocks'}]); Object.assign(AREAS.docks.entries,{ fromBlack:{i:12,j:3}, fromReed:{i:7,j:10} });
+// the Blackwater lies out past the Reed Bank, not off the quay
+wrap('docks','objects',l=>[...l,{type:'teleporter', i:7, j:11, to:'reedbank', entry:'fromDocks'}]); Object.assign(AREAS.docks.entries,{ fromBlack:{i:12,j:3}, fromReed:{i:7,j:10} });
 wrap('fen','objects',l=>[...l,{type:'teleporter', i:40, j:0, to:'sunkenwood', entry:'fromFen'}]); AREAS.fen.entries.fromSunken={i:40,j:1};
 wrap('northroad','objects',l=>[...l,{type:'teleporter', i:22, j:0, to:'reedbank', entry:'fromRoad'}]); AREAS.northroad.entries.fromReed={i:22,j:1};
 Object.assign(AREA_TIER,{ blackwater:4, sunkenwood:4, reedbank:3 });
@@ -24066,9 +24068,9 @@ if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
 const DRAKE_COOKS={ raw_meat:'cooked_meat', fish_perch:'grilled_fish', fish_trout:'grilled_fish', fish_carp:'grilled_fish', fish_eel:'grilled_fish', fish_herring:'grilled_fish' };
 { const _dt=drakeTalk; drakeTalk=function(){ const raw=player.inv.map((id,k)=>({id,k})).filter(x=>x.id && DRAKE_COOKS[x.id]);
     _dt(); if(!raw.length || !dlgIsOpen()) return; const box=document.getElementById('dlg-opts'); if(!box || box.querySelector('.dlg-opt.drakecook')) return;
-    const b=document.createElement('button'); b.className='dlg-opt drakecook'; b.innerHTML='<span>Hold out your raw food for it to roast. ('+raw.length+')</span>';
-    b.addEventListener('click',()=>{ raw.forEach(x=>{ player.inv[x.k]=DRAKE_COOKS[x.id]; }); updateHud(); try{ refreshFoodBar(); }catch(e){} DRAKE.fire=1; const q=P(player.x,player.y); DRAKE.fireTo={x:q.x,y:q.y-50}; try{ SND.fx('sizzle'); }catch(e){}
-      logMsg(CHOICE.drake.name+' roasts it all in one long, careful breath, and only singes your fingers a little. ('+raw.length+' cooked)','#8ad07a'); closeDialog(); });
+    const b=document.createElement('button'); b.className='dlg-opt drakecook'; const rawN=raw.reduce((a,x)=>a+stackAt(x.k),0); b.innerHTML='<span>Hold out your raw food for it to roast. ('+rawN+')</span>';
+    b.addEventListener('click',()=>{ raw.forEach(x=>cookSlot(x.k,DRAKE_COOKS[x.id])); try{ packStacks(); }catch(e){} updateHud(); try{ refreshFoodBar(); }catch(e){} DRAKE.fire=1; const q=P(player.x,player.y); DRAKE.fireTo={x:q.x,y:q.y-50}; try{ SND.fx('sizzle'); }catch(e){}
+      logMsg(CHOICE.drake.name+' roasts it all in one long, careful breath, and only singes your fingers a little. ('+rawN+' cooked)','#8ad07a'); closeDialog(); });
     box.insertBefore(b,box.firstChild); }; }
 // it has opinions: it growls at Vesper and her sisters, hides behind you from Wenlo's ghost, sneezes steam at the Willow Pool; it noses out what is lying about, and it does not like a hall that will not keep still
 { const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{ if(!drakeOn() || !DRAKE || combat.active || !running) return r; const D=DRAKE; D.react=Math.max(0,(D.react||0)-dt);

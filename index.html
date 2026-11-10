@@ -17686,12 +17686,16 @@ function ckStorm(K){ ckBreakDuel(K); ckPlace(K,BK_HOME[0],BK_HOME[1]);
 function ckRings(K){ ckBreakDuel(K); ckPlace(K,BK_HOME[0],BK_HOME[1]);
   banner('Black thorns! Step off the dark stones!','#c8c0b8',2200); logMsg('The stones go black, one patch after another, and thorns of black bog-oak push up through them. Keep moving!','#c8c0b8');
   CK={mode:'rings', wave:0, t:0.8, tiles:null, tele:0}; }
-function ckRingTiles(K){ const A=AREAS[areaId], out=[], pi=Math.floor(player.x), pj=Math.floor(player.y);
-  for(let i=0;i<A.w;i++) for(let j=0;j<A.h;j++){ if(blocked.has(i+','+j) || (i===K.i&&j===K.j)) continue; if(Math.random()<0.42) out.push(i+','+j); }
-  const near=[[pi,pj],...DIR_DELTA.map(([a,b])=>[pi+a,pj+b])].filter(([a,b])=>walkable(a,b)||(a===pi&&b===pj));
-  if(!out.includes(pi+','+pj)) out.push(pi+','+pj);                                                    // always under you
-  const safe=near.filter(([a,b])=>!(a===pi&&b===pj)); const keep=safe[Math.floor(Math.random()*safe.length)];   // and always one free stone beside you
-  return out.filter(k=>!keep || k!==keep[0]+','+keep[1]); }
+function ckRingTiles(K){ const A=AREAS[areaId], pi=Math.floor(player.x), pj=Math.floor(player.y), all=[];   // the black thorns take nearly the whole floor: only one to three stones stay clear
+  for(let i=0;i<A.w;i++) for(let j=0;j<A.h;j++){ if(blocked.has(i+','+j) || (i===K.i&&j===K.j)) continue; all.push(i+','+j); }
+  const reach=(steps)=>{ const seen=new Map([[pi+','+pj,0]]), q=[[pi,pj]]; while(q.length){ const [a,b]=q.shift(), d=seen.get(a+','+b); if(d>=steps) continue;   // stones you can get to in so many steps
+      DIR_DELTA.forEach(([da,db])=>{ const na=a+da, nb=b+db, k=na+','+nb; if(seen.has(k) || !walkable(na,nb) || (na===K.i&&nb===K.j)) return; if(da&&db && (!walkable(a+da,b)||!walkable(a,b+db))) return; seen.set(k,d+1); q.push([na,nb]); }); }
+    seen.delete(pi+','+pj); return [...seen.keys()]; };
+  const w=CK.wave||0, close=reach(w>=2?1:2), pick=arr=>arr[Math.floor(Math.random()*arr.length)], free=new Set();
+  const first=pick(close.length?close:reach(3)); if(first) free.add(first);                               // one you can always reach in time, never the one you stand on
+  const extra=Math.floor(Math.random()*3), far=all.filter(k=>!free.has(k) && k!==pi+','+pj);
+  for(let n=0;n<extra && far.length;n++){ const k=far.splice(Math.floor(Math.random()*far.length),1)[0]; free.add(k); }   // and maybe one or two more, anywhere
+  return all.filter(k=>!free.has(k)); }
 function ckHurt(n,label){ player.hp-=n; player.flash=0.45; shake=Math.max(shake,9); floatText(tileOf(player),'-'+n,'#ff7a6a',true); if(label) floatText([player.i,player.j-0.001],label,'#f0c0a0'); updateHud();
   if(player.hp<=0){ CK=null; defeat(); } }
 function ckTick(dt){

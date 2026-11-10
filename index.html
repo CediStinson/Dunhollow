@@ -5737,7 +5737,7 @@ function genTrees(id){
       const BL=smooth(0.56,0.66,fbm(i*0.22-sd*0.7,j*0.22+sd,778)), rr=rnd01(i,j,91), r=(!open && !A.mountain && ['road','wood','crossroads'].includes(A.theme)) ? (BL>0.5 ? (rr<0.12?0.1:0.42+rr*0.58) : (rr<0.88?rr*0.42/0.88:0.42+(rr-0.88)*4)) : rr, sp = A.mountain ? 'pine' : A.boggy && r<0.55 ? 'bogoak' : A.theme==='village'||A.theme==='farm' ? (r<0.6?'oak':'birch') : A.theme==='elf' ? (r<0.72?'silver':'birch') : A.theme==='fen' ? (r<0.55?'birch':'oak') : A.theme==='bog' ? (r<0.65?'bogoak':'birch') : r<0.42?'pine':r<0.78?'oak':'birch';
       const z=rnd01(i,j,93), size = (A.theme==='village'||A.theme==='farm') ? (z<0.25 ? 0.55+z : z<0.8 ? 0.85+(z-0.25)*0.6 : 1.3+(z-0.8)*2.2)   // saplings, grown trees, the odd giant
         : (z<0.14 ? 0.62+z*1.3 : z<0.58 ? 1.0+(z-0.14)*0.8 : z<0.88 ? 1.38+(z-0.58)*1.4 : 1.85+(z-0.88)*4.5);                   // in the wild: few saplings, tall grown trees, and old giants
-      if((A.noTree||[]).includes(i+','+j)) continue;
+      if((A.noTree||[]).includes(i+','+j) || (A.noTreeFn && A.noTreeFn(i,j))) continue;
     const gx2=open?0:(fbm((i+1)*0.32+sd,j*0.32-sd,777)-fbm((i-1)*0.32+sd,j*0.32-sd,777)), gy2=open?0:(fbm(i*0.32+sd,(j+1)*0.32-sd,777)-fbm(i*0.32+sd,(j-1)*0.32-sd,777));
     keep.push({type:'tree', i, j, sp, v:Math.floor(rnd01(i,j,92)*3), s:size*(open?1:0.85+grove*0.35), ox:Math.max(-0.45,Math.min(0.45,(rnd01(i,j,120)-0.5)*0.7+gx2*3)), oy:Math.max(-0.45,Math.min(0.45,(rnd01(i,j,121)-0.5)*0.7+gy2*3))});
     if(!open && grove>0.6 && rnd01(i,j,123)<0.6){ const t=keep[keep.length-1], r2=rnd01(i,j,124);   // the heart of a grove: a second, younger tree crowded in beside the first
@@ -17816,7 +17816,7 @@ const MOUNDS=[
   ['farm',8,6,{coin:6},"A clay pot, cracked, with a farmer's coppers in it. Whoever buried it never came back for it."],
   ['road',15,0,{item:'bone_charm'},"A knucklebone on a thong, wrapped in rotten cloth. Somebody's luck, put away for later."],
   ['crossroads',1,1,{item:'tin_medal'},"A tin saint's medal in a twist of oilcloth. A pilgrim's, maybe, buried at the crossroads for a blessing."],
-  ['wolfwood',11,0,{item:'potion'},"A stoppered flask, still sealed with wax. A hunter's cache."],
+  ['wolfwood',16,1,{item:'potion'},"A stoppered flask, still sealed with wax. A hunter's cache."],
   ['clearing',0,6,{coin:14},"A poacher's stash: a purse of coin under a flat stone. Brann would be furious."],
   ['millroad',21,0,{item:'glass_beads'},"A string of glass beads in a little wooden box. A girl's treasure, hidden from her brothers."],
   ['southtrail',0,2,{item:'rusted_blade'},"A blade, rusted through, wrapped in what was once a cloak. Somebody buried their sword and their war with it."],
@@ -22843,7 +22843,7 @@ let pendingPet=null;
 function animalAt(ti,tj){ let best=null, bd=1.1; OBJECTS.forEach(o=>{ if(o.type!=='animal' || !o.ok || !PETTABLE[o.kind]) return; const d=Math.hypot(o.x-(ti+0.5),o.y-(tj+0.5)); if(d<bd){ bd=d; best=o; } }); return best; }
 function petAnimal(o){ if(Math.hypot(player.x-o.x,player.y-o.y)>2.3){ const p=findPath(player.i,player.j,Math.floor(o.x),Math.floor(o.y)); if(p&&p.length){ if(p.length>1) p.pop(); player.path=p; pendingPet=o; } return; }
   const lines=PETTABLE[o.kind]; logMsg(lines[Math.floor(Math.random()*lines.length)],'#e8c8a0'); o.heart=1.4; faunaSound(o,true); o.st='idle'; o.tm=3; if(o.kind==='dog'){ o.wag=1; } if(o.kind==='cat'){ o.sit=1; } }
-// ════════ THE BROWN BEAR: Old Brumm, in the hollow east of Brann's clearing. Two heavy swipes, then it rears up and roars: brace for it (parry high) or be shaken ════════
+// ════════ THE BROWN BEAR: Old Brumm, in a hollow up off the Wolfwood. Two heavy swipes, then it rears up and roars: brace for it (parry high) or be shaken ════════
 FOES.bear={ label:'Brown Bear', base:118, stagger:1.1, pattern:[
   {wait:1.5, wind:1.30, after:0.85, dir:'left'},
   {wait:1.1, wind:1.20, after:0.85, dir:'right'},
@@ -22888,7 +22888,7 @@ AREAS.bearden={ fence:{r:false,l:false}, w:12, h:10, theme:'wood', dens:0.85, la
   npcs:()=>[], mobs:()=>[ { name:'Old Brumm', type:'bear', i:7, j:5, faction:'brumm', hpMul:2.6, opts:BEAR('brumm_paw') } ],
   entries:{ fromClearing:{i:1,j:6} } };
 AREA_TIER.bearden=3; AREA_PATHS.bearden=[ [[-0.5,6.5],[3,6],[6,5.5]] ];
-wrap('clearing','objects',l=>[...l,{type:'teleporter', i:11, j:7, to:'bearden', entry:'fromClearing'}]); AREAS.clearing.entries.fromDen={i:10,j:7};
+// (Brumm's Hollow is reached from the Wolfwood: see the Wolfwood rework)
 // once the Fellings is settled, the wood takes it back: wolves every day, and on some days a bear down from the high wood
 { const A=AREAS.fellings, CLEARED=()=>['fought','seal','colliers','paid','betrayed'].includes(CHOICE.fell), _m=A.mobs, _g=A.mobsGone, _c=A.mobsCalm;
   A.mobs=()=>{ if(!CLEARED()) return _m(); if(!FELL_SETTLED()) return []; const d=Math.floor(dayClock/DAY_LEN), l=[ { name:'Timber Wolf', type:'wolf', i:10, j:2, faction:'fellwolf', daily:true, coat:'#5a5048' }, { name:'Timber She-wolf', type:'wolf', i:11, j:3, faction:'fellwolf', daily:true, coat:'#6e6458' } ];
@@ -22898,14 +22898,14 @@ wrap('clearing','objects',l=>[...l,{type:'teleporter', i:11, j:7, to:'bearden', 
 { const oldBr=TALKERS.hunter; TALKERS.hunter=()=>{ const B=CHOICE.bear;
     if(B==='dead' && !CHOICE.bearPaid){ say('Brann the Hunter',["<i>Brann looks at the blood on you, and then at the claw you hold out, and lets out a long breath.</i>","“Old Brumm. Well. He was a fine animal, and he'd have had one of us before the frost. I'm glad it was you went in, and not me.”","“Here. I strung his claws while you were gone; I knew one of you would come back. Wear them. Nothing in the wood will mistake you for prey again.”"],
         [{label:'Take the necklace.', fn:()=>{ CHOICE.bearPaid=1; giveQuestItem('bear_necklace',true); player.purse+=60; updateHud(); logMsg('Brann gives you a bear-claw necklace and 60 copper.','#8ac070'); closeDialog(); }}]); return; }
-    if(!B && QUEST.wolves>=2){ say('Brann the Hunter',["“Sit a moment. There's a bear come down from the high wood. A brown, big as a cart, and it's lost its fear of men. It's had two of my snares and half a deer off the rack while I slept ten feet away.”","“Old Brumm, the colliers call it. It lairs in the hollow east of here. A bear that isn't afraid of people only goes one way, and that way ends with a child.”","“When it stands up and roars, set your feet and brace. Don't be standing there with your mouth open. Then it comes down on you.”"],
-        [{label:'“I will deal with it.”', fn:()=>{ remember('bear','asked',"Brann the Hunter wants Old Brumm, a brown bear in the hollow east of his clearing, dealt with."); say('Brann the Hunter',"“Go careful. And come back.”",[bye]); }}, {label:'“Not yet.”', fn:()=>{ CHOICE.bear='later'; oldBr(); }}]); return; }
-    if(B==='later'){ say('Brann the Hunter',"“The bear's still out there. When you're ready.”",[{label:'“I will deal with it.”', fn:()=>{ remember('bear','asked',"Brann the Hunter wants Old Brumm, a brown bear in the hollow east of his clearing, dealt with."); say('Brann the Hunter',"“Go careful. And come back.”",[bye]); }},{label:'Something else.', fn:oldBr}, bye]); return; }
+    if(!B && QUEST.wolves>=2){ say('Brann the Hunter',["“Sit a moment. There's a bear come down from the high wood. A brown, big as a cart, and it's lost its fear of men. It's had two of my snares and half a deer off the rack while I slept ten feet away.”","“Old Brumm, the colliers call it. It lairs in a hollow up off the Wolfwood, north of the trail. A bear that isn't afraid of people only goes one way, and that way ends with a child.”","“When it stands up and roars, set your feet and brace. Don't be standing there with your mouth open. Then it comes down on you.”"],
+        [{label:'“I will deal with it.”', fn:()=>{ remember('bear','asked',"Brann the Hunter wants Old Brumm, a brown bear in a hollow up off the Wolfwood, dealt with."); say('Brann the Hunter',"“Go careful. And come back.”",[bye]); }}, {label:'“Not yet.”', fn:()=>{ CHOICE.bear='later'; oldBr(); }}]); return; }
+    if(B==='later'){ say('Brann the Hunter',"“The bear's still out there. When you're ready.”",[{label:'“I will deal with it.”', fn:()=>{ remember('bear','asked',"Brann the Hunter wants Old Brumm, a brown bear in a hollow up off the Wolfwood, dealt with."); say('Brann the Hunter',"“Go careful. And come back.”",[bye]); }},{label:'Something else.', fn:oldBr}, bye]); return; }
     return oldBr(); }; }
 { const _v=victory; victory=function(faction){ const r=_v.apply(this,arguments); if(faction==='brumm' && CHOICE.bear!=='dead'){ CHOICE.bear='dead'; logMsg('Old Brumm goes down like a felled tree and does not get up. Brann will want to know.','#c8b090'); } return r; }; }
 { const prev=npcHasNews; npcHasNews=function(n){ if(n.id==='hunter' && ((CHOICE.bear==='dead' && !CHOICE.bearPaid) || (!CHOICE.bear && QUEST.wolves>=2))) return n.id==='hunter' && CHOICE.bear==='dead' ? '?' : '!'; return prev(n); }; }
-JOURNAL.push(['Old Brumm', ()=>{ const B=CHOICE.bear; if(!B || B==='later') return null; if(CHOICE.bearPaid) return ['done',"Old Brumm, the bear in the hollow east of Brann's clearing, is dead. Brann strung its claws for you."];
-  if(B==='dead') return ['active',"Old Brumm is dead. Tell Brann the Hunter."]; return ['active',"A brown bear that has lost its fear of men lairs in the hollow east of Brann's clearing. When it rears to roar, parry high to brace."]; }]);
+JOURNAL.push(['Old Brumm', ()=>{ const B=CHOICE.bear; if(!B || B==='later') return null; if(CHOICE.bearPaid) return ['done',"Old Brumm, the bear in a hollow up off the Wolfwood, is dead. Brann strung its claws for you."];
+  if(B==='dead') return ['active',"Old Brumm is dead. Tell Brann the Hunter."]; return ['active',"A brown bear that has lost its fear of men lairs in a hollow up off the Wolfwood. When it rears to roar, parry high to brace."]; }]);
 Object.assign(ITEMS,{ bear_necklace:{ name:'Bear-Claw Necklace', slot:'neck' } }); NECK_LOOKS.bear_necklace={cord:'#3a2414',w:0.8,p:'fangs',col:'#3a3028'};
 Object.assign(ITEM_STATS,{ bear_necklace:{hp:6,ap:1} }); GEAR_HP.bear_necklace=6; PRICES.bear_necklace=60;
 ITEM_LORE.bear_necklace="Old Brumm's claws on a thong of his own hide, strung by Brann while you were still in the hollow. They are longer than your fingers.";
@@ -24065,6 +24065,96 @@ setInterval(()=>{ try{ if(!running || CHOICE.ucNewsSeen || dlgIsOpen() || CS.on 
     say('The Undercity has changed',["Since you last went down, the Undercity under Hollowmere has been rebuilt. It is the old city's buried streets now: 144 walled chambers and hallways, four quarters, and you see only the one you stand in. Your map of it fills in again, chamber by chamber.",
       "The foes down there came back, and what you picked up there may be lying about again: they had to be moved into the new chambers. Wenlo and his pages are still there.",
       "There is more below than before: ladders up to the streets, chambers you will know when you see them, halls that do not keep still, and, they say, something under the Chapel Crypts that no map shows."],[{label:'Go on.', fn:closeDialog}]); }catch(e){} },2500);
+// ════════ HUNTER'S CLEARING AND THE WOLFWOOD, worked over: Brann's camp in a real clearing, and a wider, wilder wood that belongs to the wolves ════════
+// ── the props ──
+OBJ_DRAW.logseat=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, r=o.r?-0.35:0.35; g.save(); g.translate(x,y-6); g.rotate(r);
+  g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(2,9,24,5,0,0,Math.PI*2); g.fill(); g.fillStyle='#6a4a2c'; g.fillRect(-22,-5,44,10); g.fillStyle='#8a6440'; g.fillRect(-22,-5,44,3);
+  g.fillStyle='#b89068'; g.beginPath(); g.ellipse(22,0,4,5,0,0,Math.PI*2); g.fill(); g.strokeStyle='#8a6440'; g.lineWidth=0.8; g.beginPath(); g.ellipse(22,0,2,2.6,0,0,Math.PI*2); g.stroke(); g.restore(); };
+OBJ_DRAW.smokerack=o=>{ const a=P(o.i+0.15,o.j+0.5), b=P(o.i+0.85,o.j+0.5), H=34, T=gt;
+  g.strokeStyle='#5a3e24'; g.lineWidth=2.4; [a,b].forEach(p=>{ g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(p.x,p.y-H); g.moveTo(p.x-4,p.y-H-5); g.lineTo(p.x,p.y-H); g.lineTo(p.x+4,p.y-H-5); g.stroke(); });
+  g.lineWidth=2; g.beginPath(); g.moveTo(a.x,a.y-H); g.lineTo(b.x,b.y-H); g.stroke();
+  for(let k=0;k<5;k++){ const t=(k+0.5)/5, x=a.x+(b.x-a.x)*t, y=a.y+(b.y-a.y)*t-H; g.fillStyle=k%2?'#8a3a24':'#b8946a'; g.beginPath(); g.moveTo(x-2,y); g.lineTo(x+2,y); g.lineTo(x+1.4,y+(k%2?14:12)); g.lineTo(x-1.4,y+(k%2?14:12)); g.closePath(); g.fill(); }   // fish and strips of meat
+  for(let k=0;k<4;k++){ const ph=(T*0.4+k/4)%1, x=(a.x+b.x)/2+Math.sin(k*2+T)*6, y=(a.y+b.y)/2-H-6-ph*26; g.fillStyle=`rgba(200,200,205,${0.25*(1-ph)})`; g.beginPath(); g.arc(x,y,4+ph*8,0,Math.PI*2); g.fill(); } };
+OBJ_DRAW.hideframe=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, C=o.c||'#7a7268';
+  g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x+4,y+2,18,5,0,0,Math.PI*2); g.fill();
+  g.strokeStyle='#5a3e24'; g.lineWidth=2.6; g.beginPath(); g.moveTo(x-16,y); g.lineTo(x-14,y-44); g.moveTo(x+16,y); g.lineTo(x+14,y-44); g.moveTo(x-18,y-42); g.lineTo(x+18,y-42); g.moveTo(x-17,y-8); g.lineTo(x+17,y-8); g.stroke();
+  g.fillStyle=C; g.beginPath(); g.moveTo(x-11,y-38); g.quadraticCurveTo(x,y-41,x+11,y-38); g.lineTo(x+9,y-26); g.lineTo(x+12,y-14); g.quadraticCurveTo(x,y-10,x-12,y-14); g.lineTo(x-9,y-26); g.closePath(); g.fill();   // the pelt, pegged out
+  g.strokeStyle='rgba(30,20,10,0.5)'; g.lineWidth=0.6; for(let k=0;k<6;k++){ g.beginPath(); g.moveTo(x-12+k*1.5,y-39+k*0.3); g.lineTo(x-16,y-41); g.stroke(); g.beginPath(); g.moveTo(x+12-k*1.5,y-13); g.lineTo(x+16,y-9); g.stroke(); } };
+OBJ_DRAW.skintable=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y; isoBox(o.i+0.15,o.j+0.2,0.7,0.6,14,'#7a5634','#5a3e24','#46301c');
+  g.fillStyle='#8a6a48'; g.beginPath(); g.ellipse(x,y-16,12,5,0.2,0,Math.PI*2); g.fill(); g.fillStyle='#6a1a14'; g.beginPath(); g.ellipse(x+4,y-15,3,1.4,0,0,Math.PI*2); g.fill();
+  g.strokeStyle='#a8aeb2'; g.lineWidth=1.6; g.beginPath(); g.moveTo(x-6,y-16); g.lineTo(x-2,y-26); g.stroke(); g.strokeStyle='#3a2414'; g.lineWidth=2.4; g.beginPath(); g.moveTo(x-2,y-26); g.lineTo(x-0.5,y-30); g.stroke(); };   // a knife stuck in the board
+OBJ_DRAW.gamepole=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, sw=Math.sin(gt*1.1+o.i)*1.5;
+  g.strokeStyle='#5a3e24'; g.lineWidth=2.6; [[-14,6],[14,6],[0,-6]].forEach(([dx,dy])=>{ g.beginPath(); g.moveTo(x+dx,y+dy); g.lineTo(x,y-50); g.stroke(); });
+  g.lineWidth=2; g.beginPath(); g.moveTo(x-18,y-46); g.lineTo(x+18,y-46); g.stroke();
+  [[-12,'#a89a88'],[-5,'#8a7a66'],[10,'#7a5a3e']].forEach(([dx,c],k)=>{ const hx=x+dx+sw*(k+1)*0.3; g.strokeStyle='#c8b890'; g.lineWidth=0.8; g.beginPath(); g.moveTo(x+dx,y-46); g.lineTo(hx,y-40); g.stroke();
+    g.fillStyle=c; if(k<2){ g.beginPath(); g.ellipse(hx,y-32,3.4,8,0,0,Math.PI*2); g.fill(); g.beginPath(); g.ellipse(hx,y-22,2.6,3,0,0,Math.PI*2); g.fill(); }   // rabbits, hung by the feet
+    else { g.beginPath(); g.moveTo(hx-2,y-40); g.lineTo(hx+2,y-40); g.lineTo(hx+5,y-18); g.lineTo(hx+2,y-6); g.lineTo(hx-1,y-6); g.lineTo(hx-3,y-18); g.closePath(); g.fill(); g.fillStyle='#3a2414'; g.fillRect(hx,y-8,2,3); } }); };   // and the hind leg of a deer
+OBJ_DRAW.trappile=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y;
+  g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x+3,y+1,16,5,0,0,Math.PI*2); g.fill();
+  g.strokeStyle='#4a4a50'; g.lineWidth=2; [[-6,-3],[5,-1],[0,-8]].forEach(([dx,dy])=>{ g.beginPath(); g.ellipse(x+dx,y+dy,7,3,0,0,Math.PI*2); g.stroke(); g.lineWidth=1; for(let t=0;t<6;t++){ const a=t/6*Math.PI*2; g.beginPath(); g.moveTo(x+dx+Math.cos(a)*7,y+dy+Math.sin(a)*3); g.lineTo(x+dx+Math.cos(a)*5,y+dy+Math.sin(a)*2-2); g.stroke(); } g.lineWidth=2; });   // iron jaws
+  g.strokeStyle='#b8a070'; g.lineWidth=1; for(let k=0;k<3;k++){ g.beginPath(); g.ellipse(x+8,y-6-k*2,5,2.4,0.3,0,Math.PI*2); g.stroke(); } };   // coils of snare wire
+OBJ_DRAW.target=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y;
+  g.strokeStyle='#5a3e24'; g.lineWidth=2.4; g.beginPath(); g.moveTo(x-8,y); g.lineTo(x-4,y-30); g.moveTo(x+8,y); g.lineTo(x+4,y-30); g.moveTo(x,y-4); g.lineTo(x,y-26); g.stroke();
+  [['#d8c08a',13],['#c8302a',9.5],['#e8dcc0',6],['#c8302a',2.6]].forEach(([c,r])=>{ g.fillStyle=c; g.beginPath(); g.ellipse(x,y-34,r,r*1.05,0,0,Math.PI*2); g.fill(); });
+  g.strokeStyle='#6a4a2a'; g.lineWidth=1.2; [[3,-2],[-4,3],[1,5]].forEach(([dx,dy])=>{ g.beginPath(); g.moveTo(x+dx,y-34+dy); g.lineTo(x+dx+7,y-34+dy-3); g.stroke(); g.fillStyle='#e8e0d0'; g.fillRect(x+dx+6,y-34+dy-5,3,2); }); };
+OBJ_DRAW.tracks=o=>{ const q=P(o.i+0.5,o.j+0.5), sd=o.i*7+o.j*3; g.fillStyle='rgba(50,34,20,0.45)';
+  for(let k=0;k<5;k++){ const t=k/4, x=q.x-18+t*36+(k%2?3:-3), y=q.y-6+t*12+(rnd01(k,sd,311)-0.5)*3; g.beginPath(); g.ellipse(x,y,2.2,1.4,0.4,0,Math.PI*2); g.fill(); [-1.6,0,1.6].forEach(d=>{ g.beginPath(); g.arc(x+d+1,y-2.2,0.7,0,Math.PI*2); g.fill(); }); } };
+OBJ_DRAW.clawtree=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y;
+  g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(x+4,y+2,12,4,0,0,Math.PI*2); g.fill();
+  g.fillStyle='#4a3826'; g.fillRect(x-7,y-64,14,64); g.fillStyle='#5e4832'; g.fillRect(x-7,y-64,5,64);
+  g.strokeStyle='#4a3826'; g.lineWidth=4; g.beginPath(); g.moveTo(x,y-60); g.lineTo(x-14,y-80); g.moveTo(x+2,y-52); g.lineTo(x+14,y-70); g.stroke();
+  g.strokeStyle='#d8c098'; g.lineWidth=1.3; for(let s=0;s<2;s++) for(let k=0;k<4;k++){ g.beginPath(); g.moveTo(x-5+k*2.6,y-36-s*14); g.lineTo(x-3+k*2.6,y-22-s*14); g.stroke(); } };   // the long pale gashes of claws
+OBJ_DRAW.carcass=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y;
+  g.fillStyle='rgba(60,20,14,0.35)'; g.beginPath(); g.ellipse(x,y,22,7,0,0,Math.PI*2); g.fill();
+  g.strokeStyle='#e0d6c0'; g.lineWidth=1.8; for(let k=0;k<6;k++){ g.beginPath(); g.moveTo(x-10+k*4,y-2); g.quadraticCurveTo(x-12+k*4,y-12,x-6+k*4,y-14); g.stroke(); }   // ribs, picked clean
+  g.lineWidth=2.4; g.beginPath(); g.moveTo(x-12,y-3); g.lineTo(x+14,y-3); g.stroke();
+  g.fillStyle='#e0d6c0'; g.beginPath(); g.ellipse(x+19,y-3,5,3,0.3,0,Math.PI*2); g.fill(); g.strokeStyle='#cbbfa4'; g.lineWidth=1.4; g.beginPath(); g.moveTo(x+20,y-5); g.lineTo(x+24,y-16); g.lineTo(x+28,y-18); g.moveTo(x+23,y-12); g.lineTo(x+27,y-12); g.moveTo(x+18,y-5); g.lineTo(x+14,y-15); g.lineTo(x+10,y-17); g.stroke(); };   // and the antlered skull
+OBJ_DRAW.furtuft=o=>{ const q=P(o.i+0.5,o.j+0.5); g.fillStyle='rgba(150,144,134,0.85)'; for(let k=0;k<3;k++){ const x=q.x+(rnd01(k,o.i,312)-0.5)*20, y=q.y+(rnd01(k,o.j,313)-0.5)*8; g.beginPath(); g.ellipse(x,y,3.4,1.6,rnd01(k,o.i,314)*3,0,Math.PI*2); g.fill(); } };
+OBJ_DRAW.treestand=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, H=58;
+  g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x+4,y+2,22,7,0,0,Math.PI*2); g.fill();
+  g.strokeStyle='#5a3e24'; g.lineWidth=3; [[-14,-2],[14,-2],[-10,6],[10,6]].forEach(([dx,dy])=>{ g.beginPath(); g.moveTo(x+dx,y+dy); g.lineTo(x+dx*0.8,y+dy-H); g.stroke(); });
+  g.fillStyle='#7a5634'; g.beginPath(); g.moveTo(x-16,y-H-2); g.lineTo(x,y-H-8); g.lineTo(x+16,y-H-2); g.lineTo(x,y-H+4); g.closePath(); g.fill();   // the platform
+  g.strokeStyle='#6a4a2a'; g.lineWidth=1.6; g.beginPath(); g.moveTo(x-12,y-H-4); g.lineTo(x-12,y-H-16); g.lineTo(x+12,y-H-16); g.lineTo(x+12,y-H-4); g.stroke();   // a rail
+  g.strokeStyle='#8a6a44'; g.lineWidth=1.4; g.beginPath(); g.moveTo(x+18,y+6); g.lineTo(x+12,y-H); g.moveTo(x+24,y+4); g.lineTo(x+18,y-H-2); g.stroke(); for(let k=1;k<6;k++){ const t=k/6; g.beginPath(); g.moveTo(x+18-6*t,y+6-(H+6)*t); g.lineTo(x+24-6*t,y+4-(H+6)*t); g.stroke(); } };   // the ladder up
+OBJ_DRAW.snare=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y; g.strokeStyle='#5a3e24'; g.lineWidth=2; g.beginPath(); g.moveTo(x-6,y); g.lineTo(x-6,y-14); g.stroke();
+  g.strokeStyle='#b8a070'; g.lineWidth=1; if(o.sprung){ g.beginPath(); g.moveTo(x-6,y-14); g.lineTo(x+6,y-24); g.stroke(); g.beginPath(); g.moveTo(x+4,y-2); g.quadraticCurveTo(x+8,y-4,x+6,y-1); g.stroke(); g.fillStyle='rgba(150,140,120,0.8)'; g.beginPath(); g.ellipse(x+5,y-1,2.5,1.2,0,0,Math.PI*2); g.fill(); }   // sprung: something got away, leaving fur
+  else { g.beginPath(); g.moveTo(x-6,y-12); g.lineTo(x+2,y-4); g.stroke(); g.beginPath(); g.ellipse(x+4,y-3,4,2,0,0,Math.PI*2); g.stroke(); } };
+OBJ_DRAW.groundmist=o=>{ const q=P(o.i+0.5,o.j+0.5), T=gt*0.15; g.save(); for(let k=0;k<4;k++){ const ph=T+k*1.7+o.i; g.fillStyle=`rgba(200,210,215,${0.06+0.03*Math.sin(ph)})`; g.beginPath(); g.ellipse(q.x+Math.sin(ph)*20+(k-1.5)*16,q.y+Math.cos(ph*0.7)*5,46,13,0,0,Math.PI*2); g.fill(); } g.restore(); };
+// trees keep out of a space a level asks for (Brann's clearing is a clearing)
+// ── Hunter's Clearing ──
+{ const A=AREAS.clearing; A.noTreeFn=(i,j)=>Math.hypot((i+0.5-5.5)/1.15,(j+0.5-5.6))<3.3 || (i>=7 && j<=4);
+  const o0=A.objects; A.objects=()=>[...o0(),
+    {type:'logseat', i:4, j:6}, {type:'logseat', i:6, j:7, r:1}, {type:'logseat', i:4, j:5, r:1},
+    {type:'smokerack', i:5, j:7},
+    {type:'hideframe', i:2, j:5, c:'#7a7268'}, {type:'hideframe', i:2, j:7, c:'#9a6e48'},
+    {type:'skintable', i:7, j:6}, {type:'gamepole', i:3, j:8}, {type:'trappile', i:9, j:6},
+    {type:'target', i:11, j:2}, {type:'chopblock', i:7, j:4},
+    {type:'tracks', i:3, j:4, noblock:true, flat:true, dz:-99}, {type:'tracks', i:8, j:8, noblock:true, flat:true, dz:-99}, {type:'tracks', i:1, j:6, noblock:true, flat:true, dz:-99} ]; }
+AREA_PATHS.clearing=[ [[-0.5,4.5],[3,4.4],[5.4,5.4],[6.6,4.4],[8.4,4.2]], [[5.5,-0.5],[5.6,2],[5.8,4.6]], [[8.4,4.2],[10,4.6],[11.5,5]], [[5.5,5.8],[5.5,6.8]] ];   // a trodden ring round the fire, and the ways out
+// ── the bear's hollow is off the Wolfwood now, not at Brann's door ──
+{ const B=AREAS.bearden; const o0=B.objects; B.objects=()=>o0().map(o=>o.type==='teleporter' && o.to==='clearing' ? {...o, i:6, j:9, to:'wolfwood', entry:'fromDen'} : o); B.entries.fromWood={i:6,j:8}; B.entries.fromClearing={i:6,j:8}; }
+AREA_PATHS.bearden=[ [[6.5,9.5],[6.5,7],[7,5.5]] ];
+// ── the Wolfwood, wider and wilder ──
+{ const A=AREAS.wolfwood, OW=A.w, OH=A.h; A.w=24; A.h=14; A.dens=1.9; const sx=A.w/OW, sy=A.h/OH;
+  const om=A.mobs; A.mobs=()=>om().map(m=>({...m, i:Math.min(A.w-2,Math.max(1,Math.round(m.i*sx))), j:Math.min(A.h-2,Math.max(1,Math.round(m.j*sy)))}));   // its wolves, spread through the bigger wood
+  const oo=A.objects; A.objects=()=>[...oo().map(o=>o.type==='teleporter' && o.to==='crossroads' ? {...o, i:3, j:13} : o.type==='teleporter' && o.to==='clearing' ? {...o, i:23, j:6} : o),
+    {type:'teleporter', i:20, j:0, to:'bearden', entry:'fromWood', locked:()=>QUEST.wolves<2 && !visitedAreas.bearden, onLocked:()=>pzSay('A deer path leads up into a dark hollow. The trees there are scored with claw marks higher than your head. Not yet.','#c8b090')},
+    {type:'crag', i:5, j:3, fp:[2,2], v:2}, {type:'roothole', i:6, j:5, noblock:true}, {type:'bones', i:7, j:6, noblock:true}, {type:'furtuft', i:6, j:7, noblock:true, flat:true, dz:-99},   // the wolves' den under the rock
+    {type:'bones', i:12, j:4, noblock:true}, {type:'bones', i:15, j:11, noblock:true}, {type:'bones', i:19, j:9, noblock:true},
+    {type:'furtuft', i:13, j:5, noblock:true, flat:true, dz:-99}, {type:'furtuft', i:16, j:8, noblock:true, flat:true, dz:-99}, {type:'furtuft', i:9, j:11, noblock:true, flat:true, dz:-99},
+    {type:'clawtree', i:9, j:8}, {type:'clawtree', i:14, j:2}, {type:'clawtree', i:18, j:11},
+    {type:'carcass', i:12, j:11, noblock:true}, {type:'felltree', i:15, j:4, fp:[2,1]}, {type:'felltree', i:5, j:10, fp:[2,1]},
+    {type:'boulder', i:2, j:8}, {type:'boulder', i:11, j:2}, {type:'mossrock', i:21, j:10}, {type:'mossrock', i:17, j:12},
+    {type:'brook', i:10, j:9, fp:[1,5], noblock:true, dz:-99},
+    {type:'treestand', i:18, j:4}, {type:'snare', i:16, j:5, noblock:true}, {type:'snare', i:19, j:7, noblock:true, sprung:true}, {type:'snare', i:13, j:9, noblock:true}, {type:'snare', i:7, j:12, noblock:true, sprung:true},
+    {type:'bones', i:21, j:8, noblock:true},
+    {type:'rune', i:20, j:9, text:"A traveller's bones, still in the rags of a good cloak, a satchel under the ribs. In it, a letter that was never sent: <i>Mother, I am coming home by the wood road, the short way. Don't let them say I was a fool.</i>"},
+    ...(collectedPickups.has('wolfwood:20,8')?[]:[{type:'pickup', i:20, j:8, item:'potion'}]),
+    ...[[6,9],[14,6],[19,11],[9,3],[21,4]].map(([i,j])=>({type:'groundmist', i, j, noblock:true, flat:true, dz:-98})) ];
+  A.entries.fromCrossroads={i:3,j:12}; A.entries.fromClearing={i:22,j:6}; A.entries.fromDen={i:20,j:1}; }
+AREA_PATHS.wolfwood=[ [[3.5,14.5],[4,11.2],[7,9.6],[10.5,10.6],[13,8.6],[16,7],[19,6.6],[24.5,6.4]], [[1.5,-0.5],[2,2.5],[3.6,5],[5.8,7.6],[7,9.6]], [[20.5,-0.5],[20,2.5],[18.6,5],[17,6.9]] ];
+if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
+
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

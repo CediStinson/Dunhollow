@@ -13700,6 +13700,7 @@ function victory(faction){
   banner('Victory!');
   logMsg(faction==='wild'||faction==='wild2' ? 'The wolf is dealt with.' : faction==='grey' ? 'The man in grey will not trouble anyone again.' : faction==='guard' ? 'The stones are Dunhollow\'s again.' : faction==='shade' ? 'The shade comes apart like smoke.' : faction==='trapper' ? 'The trappers will set no more nets.' : faction==='unpaid' ? 'The deserters lie in the road.' : faction==='camp' ? 'The bandit camp falls silent.' : faction==='loggers' ? 'The axes fall silent.' : faction==='thieves' ? 'The alley is quiet again.' : faction==='highway' ? 'The road is safe again, for tonight.' : faction==='lanewolf'||faction==='nightwolf' ? 'The wolf is dealt with.' : faction==='goblins'||faction==='gobwarren' ? 'The goblins stop giggling.' : faction==='cavequeen' ? 'Mother Mogg falls, and the crystal hum grows softer.' : faction==='acolyte' ? 'The acolytes\' fires go out.' : faction==='mist'||faction==='ruin' ? 'The wolves are dealt with.' : faction==='risen' ? 'The bones lie still again. For now.' : 'The farm is yours again, for now.','#d8b24a');
   mobs.filter(m=>m.hostile && (!faction || m.faction===faction)).forEach(m=>{       // what a foe drops depends on what it was, and how dangerous
+    if(m.faction==='wight') return;                                                   // the barrow's dead leave nothing but the crown
     const tier=lootTier(m), free=()=>player.inv.indexOf(null), R=Math.random;
     const give=id=>{ const f=slotFor(id); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } else logMsg('Inventory is full.','#e0b070'); };
     const coin=(a,b)=>{ const c=a+Math.floor(R()*(b-a+1)); player.purse+=c; updateHud(); logMsg('Loot: '+formatCoin(c),'#e8c060'); };
@@ -13764,9 +13765,9 @@ function victory(faction){
   // bosses and named foes: what they leave behind
   if(faction==='cavequeen'){ PZ().boss=true; const c=14+Math.floor(Math.random()*10); player.purse+=c; updateHud();
     logMsg('Mother Mogg\'s hoard: '+formatCoin(c)+'.','#e8c060'); setTimeout(()=>{ if(!combat.active && areaId==='cave4') switchArea('cave4','fromCave3'); },1500); }
-  if(faction==='wight'){ CHOICE.barrow='done'; ['barrow_blade','bog_crown','fen_boots','wight_ring','potion'].forEach(id=>giveQuestItem(id,true)); const c=45+Math.floor(Math.random()*16); player.purse+=c; updateHud();
-    logMsg("The Barrow-King lies still at last. His sword falls from his hand, black water still running off the blade: Bertil's Drowned Blade.",'#b8c8a8');
-    logMsg('From his head, a crown of bog-black wood. On his feet, boots that never rotted; on his finger, a ring of black gold. In his purse, '+formatCoin(c)+' and a healing draught.','#e8c060'); }
+  if(faction==='wight'){ CHOICE.barrow='done'; giveQuestItem('bog_crown',true);
+    logMsg("The Barrow-King lies still at last, and everything he wore goes to black water and rust in the space of a breath: the sword, the mail, the rings. Only the crown is left, lying on the stones where his head was.",'#b8c8a8');
+    logMsg('You take the Crown of the Drowned King. It is cold, and it is heavy, and it does not want to rot.','#e8c060'); }
   if(faction==='hag') logMsg("Hesk falls into the reeds. Something glints where she stood: a lantern.",'#e8c060');
   if(faction==='hag'){ giveQuestItem('staff_bog',true); logMsg("Hesk's staff lies in the reeds, still warm: The Bog-Hag's Staff.",'#b8a8e8'); }
   if(faction==='cavequeen'){ giveQuestItem('staff_cinder',true); logMsg("Mother Mogg's fire-stick: a Cinder Staff. And on the dais, the cracked heart of the cave.",'#e8c060'); }
@@ -17761,11 +17762,11 @@ function drawBarrowKingFX(){ if(areaId!==BK_AREA) return; const K=ckKing(); if(!
 // ════════ the Barrow-King's things: Bertil's sword, and the crown the bog grew round his head ════════
 Object.assign(ITEMS,{ barrow_blade:{ name:"Bertil's Drowned Blade", slot:'weapon' }, bog_crown:{ name:'Crown of the Drowned King', slot:'head' } });
 Object.assign(WEAPONS,{ barrow_blade:{ wind:0.21, dmg:15, len:27, wither:0.25, drain:0.22 } });
-Object.assign(ITEM_STATS,{ bog_crown:{ hp:-3, magic:3, ap:3 } }); GEAR_HP.bog_crown=-3;
-Object.assign(PRICES,{ barrow_blade:240, bog_crown:180 });
+Object.assign(ITEM_STATS,{ bog_crown:{ hp:4, magic:4, ap:4 } }); GEAR_HP.bog_crown=4;
+Object.assign(PRICES,{ barrow_blade:240, bog_crown:320 });
 var GEAR_LORE={
   barrow_blade:"Bertil's sword. A thousand years under black water and the edge is still keen, the steel gone the green-black of a drowned man's ring. Old letters run down the fuller: <i>“I was the hollow's king. The water took the land; it did not take me.”</i> It hungers. Now and then a cut withers whoever takes it, or draws a mouthful of their life back up the blade into yours.<br><br>There is a skull worked into the pommel, and the blade hums faintly near a grave. <b>Vesna</b> might know how such a thing could be reforged into what it wants to be: the Barrow-King's Rod.",
-  bog_crown:"No goldsmith made this. Bog-oak, black as the water it grew in, twisted round the Barrow-King's brow over a thousand years until it took the shape of a crown. Its points are sharp, and it is heavy, and it is cold. It sharpens the mind and the arm alike, and asks a little of your blood for the favour." };
+  bog_crown:"No goldsmith made this. Bog-oak, black as the water it grew in, twisted round the Barrow-King's brow over a thousand years until it took the shape of a crown. Its points are sharp, and it is heavy, and it is cold. It sharpens the mind and the arm alike. And once in every fight, when you are near to going under, its cold closes over your wounds the way the water closed over him: the king did not let the bog have him, and the crown will not let it have you." };
 // the blade: a cut that withers, a cut that drinks
 // in his hands it does the same to you
 // the look: a long blade gone green-black, a drowned shine on the edge, a little black water running off it
@@ -18425,7 +18426,8 @@ JOURNAL.push(['The Grave-Blade Reforged', ()=> !CHOICE.reforge ? null
     if(CHOICE.reforge==='clean' && hasItem('clean_blade')){
       if(!rfHave()){ say(V,["“Oswin does good work, for a man who hits things.”","“Now the bones. Five old bones and a skull. Bring them and I will bind it.”"],[{label:'Something else.', fn:()=>oV(...a)},bye]); return; }
       say(V,["“Good. Along the steel like a spine, the skull at the hilt. Now hush. The next words have no vowels.”"],[
-        {label:'Watch.', fn:()=>{ let b=REFORGE_BONES, sk=REFORGE_SKULLS; player.inv=player.inv.map(x=>{ if(x==='old_bone'&&b>0){ b--; return null; } if(x==='old_skull'&&sk>0){ sk--; return null; } if(x==='clean_blade') return 'grave_blade'; return x; });
+        {label:'Watch.', fn:()=>{ const off=id=>{ const k=player.inv.indexOf(id); if(k>=0) player.inv[k]=null; };   // one at a time, so a pile of bones only loses what she uses
+          for(let n=0;n<REFORGE_BONES;n++) off('old_bone'); for(let n=0;n<REFORGE_SKULLS;n++) off('old_skull'); const kb=player.inv.indexOf('clean_blade'); if(kb>=0){ player.inv[kb]=null; giveQuestItem('grave_blade',true); }
           remember('reforge','done',"Vesna bound the dead into the grave-blade: the Bone-Bound Blade."); updateHud(); refreshFoodBar(); banner('The Bone-Bound Blade','#d8ccaa',2200); slowmo.scale=0.4; slowmo.t=0.6;
           logMsg('The bones crumble to grey dust and the dust runs into the steel. You receive the Bone-Bound Blade: it sometimes withers what it cuts, and drinks a little life back for you.','#d8ccaa');
           say(V,["“Watch the bones go grey, and the grey run into the steel like water into sand. Warm… now cold. It stays cold.”","“There. It remembers how to kill now. Try not to let it teach you.”"],[bye]); }},
@@ -24500,6 +24502,12 @@ function trapsMark(){ const K=trapsSprungToday(); OBJECTS.forEach(o=>{ if(o.type
     if(jaw) o.open=true; else o.sprung=true; trapsSprungToday().push(trapKey(o));
     player.path=[]; player.hp-=n; player.flash=0.45; shake=Math.max(shake,jaw?10:5); try{ SND.hurt(false); SND.pain(player,false); }catch(e){} floatText(tileOf(player),'-'+n,'#ff7a6a',true); floatText([player.i,player.j-0.001],jaw?'Jaw-trap!':'Snare!','#f0c0a0'); updateHud();
     logMsg(jaw ? "Iron teeth slam shut on your leg. You prise the jaws apart with both hands, swearing, and limp clear. Whoever set this on an elven road wanted it to cripple." : "A noose whips tight round your ankle and jerks you off your feet. You saw the wire off on a stone, with a burning shin to show for it.",'#e0a080'); }catch(e){} },120); }
+// the Crown of the Drowned King: once a fight, at the brink, its cold closes your wounds
+{ let crownFoe=null; setInterval(()=>{ try{ if(!combat.active){ crownFoe=null; return; } if(!player.opts || player.opts.equip.head!=='bog_crown') return;
+    const key=combat.foe||'fight'; if(crownFoe===key) return; if(player.hp<=0 || player.hp>=player.maxHp*0.25) return;
+    crownFoe=key; const h=Math.round(player.maxHp*0.2); player.hp=Math.min(player.maxHp,player.hp+h); updateHud();
+    floatText(tileOf(player),'+'+h,'#9ad0e8',true); try{ glowAt&&glowAt(); }catch(e){}
+    logMsg('The crown goes cold as river-ice on your brow, and the cold runs down into your wounds and closes them. (Crown of the Drowned King: +'+h+' HP, once a fight)','#9ad0e8'); }catch(e){} },100); }
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

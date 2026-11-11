@@ -7740,6 +7740,16 @@ function paintCart(x, y) {
   // 4. Interior & Cargo
   poly([up(baseL, H), up(baseBk, H), up(baseR, H), up(baseF, H)], '#2d1b0d');
 
+  if (CART_LOAD === 'logs') {                      // a load of timber instead of hay: logs laid along the bed, two layers, cut ends to the front
+    const ax = baseR.x - baseL.x, ay = baseR.y - baseL.y, len = Math.hypot(ax, ay), ux = ax / len, uy = ay / len;
+    [[-9, -12, 0], [0, -11, 1], [9, -10, 2], [-4.5, -19, 3], [4.5, -18, 4], [0, -25, 5]].forEach(([off, dy, k]) => {
+      const r = 6.4 - (k % 3) * 0.5, cx = c0.x + off * 0.9 - 3, cy = c0.y + dy + off * 0.35, x0 = cx - ux * 30, y0 = cy - uy * 30, x1 = cx + ux * 28, y1 = cy + uy * 28;
+      const bg = g.createLinearGradient(0, cy - r, 0, cy + r); bg.addColorStop(0, '#a8865a'); bg.addColorStop(0.5, '#806040'); bg.addColorStop(1, '#4e3620');
+      g.strokeStyle = bg; g.lineWidth = r * 2; g.lineCap = 'butt'; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();   // the bark
+      g.strokeStyle = 'rgba(30,18,8,0.45)'; g.lineWidth = 0.7; for (let q = 0; q < 4; q++) { const t = 0.15 + q * 0.22; g.beginPath(); g.moveTo(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t - r * 0.6); g.lineTo(x0 + (x1 - x0) * (t + 0.06), y0 + (y1 - y0) * (t + 0.06) - r * 0.2); g.stroke(); }
+      g.fillStyle = '#e8cc96'; g.beginPath(); g.ellipse(x1, y1, r * 0.6, r, 0.2, 0, Math.PI * 2); g.fill();                      // the cut end
+      g.strokeStyle = 'rgba(120,80,40,0.6)'; g.lineWidth = 0.6; g.beginPath(); g.ellipse(x1, y1, r * 0.3, r * 0.55, 0.2, 0, Math.PI * 2); g.stroke(); });
+  } else {
   const hayGrad = g.createRadialGradient(c0.x, c0.y - 20, 5, c0.x, c0.y - 20, 28);
   hayGrad.addColorStop(0, '#ebd078');
   hayGrad.addColorStop(0.7, '#c89e38');
@@ -7748,6 +7758,7 @@ function paintCart(x, y) {
   g.beginPath();
   g.ellipse(c0.x - 2, c0.y - 18, 28, 11, 0.15, 0, Math.PI * 2);
   g.fill();
+  }
 
   // 5. Outer Walls (Gradients)
   const face = (A, B, c1, c2) => {
@@ -7819,7 +7830,7 @@ function paintCart(x, y) {
     g.strokeStyle='#7a7a7e'; g.lineWidth=2.4; g.beginPath(); g.moveTo(c0.x-15,c0.y-7); g.lineTo(c0.x-23,c0.y-1); g.stroke();
     g.fillStyle='#9a9aa0'; g.beginPath(); g.ellipse(c0.x-23.5,c0.y-0.6,2.2,1.6,0.6,0,Math.PI*2); g.fill(); g.lineCap='butt'; }
 }
-let CART_NOWHEEL=false;
+let CART_NOWHEEL=false, CART_LOAD=null;
 
 function paintWashLine(x,y){                                   // a washing line between two T-posts, at head height, hung with the week's linen
   const LH=56, a0={x:x-TW/2+12,y:y-TH/2+6}, b0={x:x+TW/2-12,y:y+TH/2-6}, a={x:a0.x,y:a0.y-LH}, b={x:b0.x,y:b0.y-LH}, mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2+10};
@@ -8332,7 +8343,7 @@ function drawObject(o){
     g.save(); g.globalCompositeOperation='lighter'; glow(x,y-86,34,34,'255,210,130',0.32+Math.sin(gt*7+o.i*3)*0.05); g.restore();
   } else if(o.type==='cart'){
     const jt=o.jolt?(performance.now()-o.jolt)/1000:0, jy=jt>0&&jt<1.2?-Math.abs(Math.sin(jt*9))*5*(1-jt/1.2):0;      // being levered up while the wheel goes on
-    CART_NOWHEEL=!!o.nowheel; drawCached(o.nowheel?'cart_nw':'cart',x,y+jy,160,90,60,60,paintCart); CART_NOWHEEL=false;
+    CART_NOWHEEL=!!o.nowheel; CART_LOAD=o.load||null; drawCached((o.nowheel?'cart_nw':'cart')+(o.load?'_'+o.load:''),x,y+jy,160,90,60,60,paintCart); CART_NOWHEEL=false; CART_LOAD=null;
   } else if(o.type==='washline'){
     drawCached('wash',x,y,150,170,75,160,paintWashLine);
   } else if(o.type==='haystack'){
@@ -15657,7 +15668,7 @@ Object.assign(AREAS,{
     objects:()=>{ const open=FEN_OPEN(), l=[{type:'teleporter', i:1, j:19, to:'stones', entry:'fromFen'}, {type:'reeds', i:5, j:8, dense:true},
         {type:'pool', i:3, j:15, fp:[3,3], kind:'fen'}, {type:'pool', i:0, j:1, fp:[2,3], kind:'fen'}, {type:'pool', i:4, j:4, fp:[2,2], kind:'fen'},
         {type:'reeds', i:2, j:17}, {type:'reeds', i:5, j:11}, {type:'reeds', i:0, j:6, dense:true}, {type:'deadtree', i:0, j:14, s:1.1}, {type:'deadtree', i:5, j:1},
-        {type:'cart', i:4, j:13}, {type:'logpile', i:5, j:14}, {type:'stump', i:0, j:11}, {type:'milestone', i:0, j:17, t:'FEN'}];
+        {type:'cart', i:4, j:13, load:'logs'}, {type:'logpile', i:5, j:14}, {type:'stump', i:0, j:11}, {type:'milestone', i:0, j:17, t:'FEN'}];
       if(!open) l.push({type:'felltree', i:0, j:9, fp:[6,1], cuts:[0.32,0.58,0.8]});
       else l.push({type:'logpile', i:0, j:9}, {type:'logpile', i:5, j:9}, {type:'stump', i:0, j:8});
       return l; },
@@ -15665,7 +15676,7 @@ Object.assign(AREAS,{
       return [ { id:'gerd', name:'Foreman Gerd', i:1, j:10, dir:3, chop:true, chopPh:0.0, opts:LOGGER({skin:1,hair:2,hairColor:6,beard:5}) },
                { id:'logger2', name:'Lenz', i:3, j:10, dir:3, chop:true, chopPh:0.4, opts:LOGGER({skin:3,hair:0,hairColor:1,beard:1,equip:{head:'hood'}}) },
                { id:'logger3', name:'Ulla', i:4, j:10, dir:3, chop:true, chopPh:0.75, opts:LOGGER({gender:'f',skin:1,hair:3,hairColor:4,beard:0,face:2,equip:{head:'straw_hat',torso:'tunic_linen',legs:'trousers'}}) },
-               { id:'logger4', name:'Young Pim', i:2, j:12, dir:1, carry:true, wander:[[2,11],[3,12],[3,13],[2,13]], speed:0.9, named:true, opts:LOGGER({skin:2,hair:1,hairColor:8,beard:0,face:2,equip:{weapon:null}}) } ]; },
+               { id:'logger4', name:'Young Pim', i:2, j:12, dir:1, carryLog:true, wander:[[2,11],[3,12],[3,13],[2,13]], speed:0.9, named:true, opts:LOGGER({skin:2,hair:1,hairColor:8,beard:0,face:2,equip:{weapon:null}}) } ]; },
     mobs:()=>[], entries:{ fromStones:{i:1,j:18}, fromFen:{i:4,j:8} } },
   fen:{ fence:{r:false,l:false}, w:52, h:20, theme:'bog', label:'The Drowning Fen', mini:{x:0,y:0}, notches:()=>[], dummy:null,
     // one great fen, east of the causeway: the old marsh in the west, the Sunken Hollow (and the barrow) in the middle, wilder water and a drowned chapel in the east
@@ -15803,9 +15814,14 @@ JOURNAL.push(
   ['Fen Treasures', ()=> !CHOICE.fenCaches ? null : CHOICE.fenCaches>=3 ? ['done',"You dug up all three caches hidden in the fen."] : ['active',"There are things buried in the fen, under little mounds with a marker stick. Found "+CHOICE.fenCaches+" of 3."]]);
 
 // Young Pim hauls wood to the cart
-function drawNPCFigure(n){ drawNPCBody(n); if(!n.carry || FEN_OPEN()) return;   // Gerd's men carry logs while the causeway is blocked
-    const q=P(n.x??n.i+0.5,n.y??n.j+0.5), y=q.y-(n.moving?Math.abs(Math.sin(gt*9+n.i))*2:0);
-    g.save(); g.translate(q.x+2,y-62); g.rotate(-0.35); g.fillStyle='#6a4c2c'; g.fillRect(-15,-4,30,8); g.fillStyle='#d8b880'; g.beginPath(); g.ellipse(15,0,2.4,4,0,0,Math.PI*2); g.fill(); g.restore(); }
+function drawNPCFigure(n){ drawNPCBody(n); if(!n.carryLog || FEN_OPEN()) return;   // Gerd's men carry logs while the causeway is blocked
+    const q=P(n.x??n.i+0.5,n.y??n.j+0.5), y=q.y-(n.moving?Math.abs(Math.sin(gt*9+n.i))*2:0), d=n.dir??0, side=[0,1,1,1,0,-1,-1,-1][d]||0, back=d>=3&&d<=5;   // a log over the shoulder, along the way he faces
+    g.save(); g.translate(q.x+(side>0?3:side<0?-3:(back?-8:8)),y-59); g.rotate(side>0?-0.42:side<0?0.42:(back?0.62:-0.62));   // resting on the near shoulder, running up and back past the head
+    const L=side?46:38, bg=g.createLinearGradient(0,-6,0,6); bg.addColorStop(0,'#8a6a42'); bg.addColorStop(0.55,'#6a4c2c'); bg.addColorStop(1,'#3a2614');
+    g.fillStyle=bg; g.beginPath(); g.moveTo(-L/2,-5.5); g.lineTo(L/2,-5); g.lineTo(L/2,5); g.lineTo(-L/2,5.5); g.closePath(); g.fill();
+    g.strokeStyle='rgba(30,18,8,0.45)'; g.lineWidth=0.8; for(let k=0;k<4;k++){ const x=-L/2+6+k*(L-12)/3; g.beginPath(); g.moveTo(x,-4); g.lineTo(x+3,-1); g.stroke(); }
+    const e=side<0?-L/2:L/2; g.fillStyle='#d8b880'; g.beginPath(); g.ellipse(e,0,2.8,5.2,0,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(120,80,40,0.6)'; g.lineWidth=0.6; g.beginPath(); g.ellipse(e,0,1.4,2.8,0,0,Math.PI*2); g.stroke();
+    g.restore(); }
 
 
 // more fires that will roast your meat: the Crooked Lantern in Hollowmere, and Brann's campfire
@@ -20904,7 +20920,7 @@ Object.assign(AREAS,{
   oasis:{ fence:{r:false,l:false}, w:16, h:16, theme:'sand', label:'The Hidden Oasis', mini:{x:0,y:0}, notches:()=>[], dummy:null,
     objects:wideObjs('oasis',()=>[ {type:'teleporter', i:0, j:6, to:'singingdunes', entry:'fromOasis'}, {type:'teleporter', i:11, j:15, to:'crater', entry:'fromOasis'},
       {type:'pool', i:8, j:2, fp:[5,4]}, {type:'palm', i:7, j:1, v:1}, {type:'palm', i:13, j:3, v:2, s:1.1}, {type:'palm', i:9, j:7, v:3}, {type:'palm', i:13, j:7, v:4, s:0.9}, {type:'palm', i:2, j:2, v:5}, {type:'palm', i:14, j:12, v:6, s:1.15},
-      {type:'campfire', i:4, j:10}, {type:'tent', i:1, j:12, fp:[2,2]}, {type:'sandrock', i:14, j:0, v:40}, {type:'sandrock', i:0, j:14, v:41} ]),
+      {type:'campfire', i:4, j:14}, {type:'tent', i:1, j:12, fp:[2,2]}, {type:'sandrock', i:14, j:0, v:40}, {type:'sandrock', i:0, j:14, v:41} ]),
     npcs:()=>[{ id:'imra', name:'Imra Who Listens', i:5, j:9, dir:1, opts:DESERT({gender:'f',skin:4,hair:4,hairColor:13,beard:0,face:3,equip:{head:'sand_wrap',torso:'saffron_tunic',armor:'indigo_robe',legs:'indigo_trousers',feet:null}}) }],
     mobs:()=>[], entries:{ fromDunes:{i:1,j:6}, fromCrater:{i:11,j:14} } },
   saltpan:{ sandKind:'salt', fence:{r:false,l:false}, w:32, h:20, theme:'sand', label:'The Salt Pan', mini:{x:0,y:0}, notches:()=>[], dummy:null,
@@ -24541,7 +24557,7 @@ function trapsMark(){ const K=trapsSprungToday(); OBJECTS.forEach(o=>{ if(o.type
 { const _su=sleepUntil; sleepUntil=function(...a){ const camp=CHOICE.campNext; CHOICE.campNext=false; const r=_su.apply(this,a); if(CHOICE.lastBed) CHOICE.lastBed.camp=!!camp; return r; }; }
 { const _cn=closeDialog; closeDialog=function(...a){ const r=_cn.apply(this,a); setTimeout(()=>{ if(!dlgIsOpen()) CHOICE.campNext=false; },0); return r; }; }
 { const _wd=wakeAfterDefeat; wakeAfterDefeat=function(...a){ const r=_wd.apply(this,a); if(CHOICE.lastBed && CHOICE.lastBed.camp){ banner('You wake by your campfire','#e8b070',1800); logMsg('Someone, or something, dragged you back to the ashes of your camp. The fire is out, but you are alive.','#e8b070'); } return r; }; }
-wrap('fenpath','objects',l=>[...l,{type:'campfire', i:1, j:14}]);   // the loggers' fire on the causeway: somewhere dry to sleep before the Drowning Fen
+wrap('fenpath','objects',l=>[...l,{type:'campfire', i:4, j:14}]);   // the loggers' fire on the causeway: somewhere dry to sleep before the Drowning Fen
 // ── the map's markers: a gold ! where someone has new business for you, a blue ? where something waits to be handed in, a gold diamond where an open quest points ──
 let MAPMARK_CACHE=null, MAPMARK_T=0;
 function mapAreaNames(){ return Object.keys(AREAS).map(id=>{ const L=(AREAS[id].label||'').split('·').pop().trim().replace(/^The /,''); return [id,L]; }).filter(([id,L])=>L.length>=5 && !AREAS[id].inside && !/^(Farm|Lane)$/.test(L)); }

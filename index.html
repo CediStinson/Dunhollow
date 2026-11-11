@@ -13714,6 +13714,7 @@ function victory(faction){
   logMsg(faction==='wild'||faction==='wild2' ? 'The wolf is dealt with.' : faction==='grey' ? 'The man in grey will not trouble anyone again.' : faction==='guard' ? 'The stones are Dunhollow\'s again.' : faction==='shade' ? 'The shade comes apart like smoke.' : faction==='trapper' ? 'The trappers will set no more nets.' : faction==='unpaid' ? 'The deserters lie in the road.' : faction==='camp' ? 'The bandit camp falls silent.' : faction==='loggers' ? 'The axes fall silent.' : faction==='thieves' ? 'The alley is quiet again.' : faction==='highway' ? 'The road is safe again, for tonight.' : faction==='lanewolf'||faction==='nightwolf' ? 'The wolf is dealt with.' : faction==='goblins'||faction==='gobwarren' ? 'The goblins stop giggling.' : faction==='cavequeen' ? 'Mother Mogg falls, and the crystal hum grows softer.' : faction==='acolyte' ? 'The acolytes\' fires go out.' : faction==='mist'||faction==='ruin' ? 'The wolves are dealt with.' : faction==='risen' ? 'The bones lie still again. For now.' : 'The farm is yours again, for now.','#d8b24a');
   mobs.filter(m=>m.hostile && (!faction || m.faction===faction)).forEach(m=>{       // what a foe drops depends on what it was, and how dangerous
     if(m.faction==='wight') return;                                                   // the barrow's dead leave nothing but the crown
+    if(m.type==='rat'||m.type==='ratking') return;                                     // rats leave their tails (given below), nothing else
     const tier=lootTier(m), free=()=>player.inv.indexOf(null), R=Math.random;
     const give=id=>{ const f=slotFor(id); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } else logMsg('Inventory is full.','#e0b070'); };
     const coin=(a,b)=>{ const c=a+Math.floor(R()*(b-a+1)); player.purse+=c; updateHud(); logMsg('Loot: '+formatCoin(c),'#e8c060'); };
@@ -14218,6 +14219,8 @@ function drawActorBase(e){
   else if(e.type==='ember') drawEmber(s.x,B,e,poseFor(e));
   else if(e.type==='hunger') drawHunger(s.x,B,e,poseFor(e));
   else if(e.type==='gnawer') drawGnawer(s.x,B,e,poseFor(e));
+  else if(e.type==='rat') drawRat(s.x,B,e,poseFor(e));
+  else if(e.type==='ratking') drawRatKing(s.x,B,e,poseFor(e));
   else if(e.type==='dragon') drawDragonFoe(s.x,B,e,poseFor(e));
   else if(e.type==='bear') drawBear(s.x,B,e,poseFor(e));
   else if(e.type==='troll') drawTroll(s.x,B,e,poseFor(e));
@@ -14229,7 +14232,7 @@ function drawActorBase(e){
   g.restore();
   if(!isP && e.dead) return;
   if(isP && romHush()) return;
-  const ty=B-(e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'?66:e.type==='dragon'?300:e.type==='bear'?92:e.type==='troll'?150:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:114)+dwarfDrop(e.opts);
+  const ty=B-(e.type==='rat'?40:e.type==='ratking'?66:e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'?66:e.type==='dragon'?300:e.type==='bear'?92:e.type==='troll'?150:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:114)+dwarfDrop(e.opts);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const deadly=!isP && e.type!=='dummy' && e.hostile!==false && e.tier && typeof foeLevel==='function' && foeLevel(e)-playerLevel()>=3;   // far stronger than you: a skull
   const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  Lv '+(typeof foeLevel==='function'?foeLevel(e):e.tier) : ''), tw=g.measureText(label).width;
@@ -24553,6 +24556,85 @@ function mapMarks(){ const now=performance.now(); if(MAPMARK_CACHE && now-MAPMAR
   for(const id of Object.keys(out)){ const A=AREAS[id]; if(!A.inside) continue; const host=Object.keys(AREAS).find(h=>{ try{ return visitedAreas[h] && !AREAS[h].inside && AREAS[h].objects().some(o=>o.inside===id||(o.type==='teleporter'&&o.to===id)); }catch(e){ return false; } });
     if(host){ const H=(out[host]=out[host]||{}); if(out[id].news==='?' || !H.news) H.news=out[id].news||H.news; H.goal=H.goal||out[id].goal; } }
   return MAPMARK_CACHE=out; }
+// ════════ TUCK'S RATS: something under the Lowstreets is breeding rats the size of cats. Down the old drain, past the sewer rats, a Rat King: a dozen rats with their tails grown into one knot, moving as one ════════
+Object.assign(ITEMS,{ rat_tail:{ name:'Rat Tail', slot:'misc', stack:true, title:'A long, naked, pink tail. Tuck pays for these.' },
+  rat_gloves:{ name:"Rat-catcher's Gloves", slot:'hands', base:'gloves', col:'#5a4a36', title:"Tuck's second-best gloves: thick oiled leather, bitten through in a dozen places and patched every time." } });
+Object.assign(ITEM_STATS,{ rat_gloves:{ agi:1, ap:1 } }); GEAR_HP.rat_gloves=3; Object.assign(PRICES,{ rat_tail:1, rat_gloves:40 }); SELL_MISC.add('rat_tail');
+Object.assign(ITEM_LORE||{},{ rat_gloves:"Tuck's second-best pair. Oiled leather, bitten through in a dozen places and patched each time. Your hands come out of a rat-hole with all their fingers." });
+ITEM_ICON.rat_tail=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.strokeStyle='#d88a8a'; g2.lineWidth=2.6; g2.lineCap='round'; g2.beginPath(); g2.moveTo(9,30); g2.bezierCurveTo(16,8,26,34,32,10); g2.stroke(); g2.strokeStyle='#e8b0a8'; g2.lineWidth=1; g2.stroke(); g2.fillStyle='#6a5a4a'; g2.beginPath(); g2.ellipse(9,31,3.5,2.6,0,0,Math.PI*2); g2.fill(); g2.restore(); };
+Object.assign(WEAPONS,{ rat_teeth:{ wind:0.25, dmg:4, len:14 }, ratking_teeth:{ wind:0.28, dmg:8, len:20 } });
+FOES.rat={ label:'Sewer Rat', base:22, stagger:1.1, pattern:[{wait:0.8,wind:0.62,after:0.4,dir:'left'},{wait:0.5,wind:0.58,after:0.5,dir:'right'},{wait:1.0,wind:0.78,after:0.6,dir:'up'}] };
+FOES.ratking={ label:'Rat King', base:78, stagger:0.9, pattern:[{wait:1.2,wind:0.95,after:0.35,dir:'left'},{wait:0.3,wind:0.65,after:0.35,dir:'right'},{wait:0.3,wind:0.65,after:0.7,dir:'left'},
+  {wait:1.3,wind:1.15,after:0.8,dir:'up',feint:'right'},{wait:1.0,wind:0.85,after:0.6,dir:'right'}] };
+const RAT=()=>({ equip:{...NOEQ, weapon:'rat_teeth'} }), RATKING=()=>({ equip:{...NOEQ, weapon:'ratking_teeth'} });
+BEASTS.unshift({ k:'rat', is:f=>f.type==='rat'||f.type==='ratking', name:'Sewer Rats', kind:'Under the Lowstreets · the Old Drain', how:'Low, quick snaps from either side, and a leap. The Rat King bites three times in a row, and rears as if to bite one way before it comes down the other.', res:'Nothing special: they bleed like anything else.', aff:'A rat bite festers: sometimes it sickens you.', ans:'An antidote clears the sickness. Parry the first snap of the King\'s flurry and the rest come in order.' });
+function drawRat(x,B,e,pose,sc,phase){ const S=sc||1.3, k=pose&&pose.kind==='raise'?Math.min(1,pose.t):0, lu=pose&&pose.kind==='strike'?Math.min(1,pose.t):0, fl=(e.dir===5||e.dir===6||e.dir===7||e.dir===4)?-1:1, t=gt*7+(phase||0)+(e.id||0), mv=e.moving?Math.sin(t*2):0;
+  const fade=e.dead?Math.max(0,1-(e.fallT||0)/0.8):1; if(fade<=0) return; g.save(); g.globalAlpha*=fade; if(fl<0){ g.translate(x,0); g.scale(-1,1); g.translate(-x,0); }
+  g.fillStyle='rgba(0,0,0,0.35)'; g.beginPath(); g.ellipse(x,B+1,16*S,5*S,0,0,Math.PI*2); g.fill();
+  const bx=x-2*S+lu*8*S, by=B-9*S-k*5*S;
+  g.strokeStyle='#d08a84'; g.lineWidth=2.2*S; g.lineCap='round'; g.beginPath(); g.moveTo(bx-13*S,by+3*S); g.bezierCurveTo(bx-24*S,by+2*S+Math.sin(t)*3*S,bx-28*S,by+10*S,bx-36*S,by+6*S+Math.sin(t*0.7)*4*S); g.stroke();   // the tail
+  g.strokeStyle='#3a3028'; g.lineWidth=2.4*S; [[-8,1],[-3,-1],[5,1],[9,-1]].forEach(([lx,ph])=>{ g.beginPath(); g.moveTo(bx+lx*S,by+4*S); g.lineTo(bx+lx*S+(ph*2+mv*3*ph)*S,B); g.stroke(); });
+  const gr=g.createRadialGradient(bx-3*S,by-5*S,1,bx,by,16*S); gr.addColorStop(0,'#8a7a66'); gr.addColorStop(0.6,'#5e5244'); gr.addColorStop(1,'#3a3128'); g.fillStyle=gr;
+  g.beginPath(); g.ellipse(bx,by,15*S,8.5*S,-0.08-k*0.25,0,Math.PI*2); g.fill();                                                              // the hunched body
+  g.strokeStyle='rgba(30,24,18,0.5)'; g.lineWidth=0.8; for(let q=0;q<6;q++){ g.beginPath(); g.moveTo(bx-10*S+q*4*S,by-6*S); g.lineTo(bx-12*S+q*4*S,by-9*S); g.stroke(); }   // bristling fur
+  const hx=bx+14*S+lu*5*S, hy=by-3*S-k*7*S; g.fillStyle='#6a5c4c'; g.beginPath(); g.moveTo(hx-6*S,hy-5*S); g.quadraticCurveTo(hx+4*S,hy-6*S,hx+11*S+lu*2*S,hy+1*S); g.quadraticCurveTo(hx+3*S,hy+5*S,hx-6*S,hy+4*S); g.closePath(); g.fill();   // the pointed head
+  g.fillStyle='#d89a94'; g.beginPath(); g.ellipse(hx-3*S,hy-6*S,3*S,3.6*S,-0.3,0,Math.PI*2); g.fill(); g.fillStyle='#e8b4ac'; g.beginPath(); g.ellipse(hx-3*S,hy-6*S,1.6*S,2.2*S,-0.3,0,Math.PI*2); g.fill();   // an ear
+  g.fillStyle='#e0a09a'; g.beginPath(); g.arc(hx+11*S+lu*2*S,hy+1*S,1.4*S,0,Math.PI*2); g.fill();                                          // the nose
+  g.fillStyle='#ff4030'; g.beginPath(); g.arc(hx+3*S,hy-2*S,1.3*S,0,Math.PI*2); g.fill(); g.fillStyle='#ffd0c0'; g.beginPath(); g.arc(hx+3.4*S,hy-2.4*S,0.5*S,0,Math.PI*2); g.fill();   // a beady red eye
+  if(lu>0.3){ g.fillStyle='#f0e8d0'; g.fillRect(hx+8*S,hy+2*S,1.2*S,2.4*S); g.fillRect(hx+9.6*S,hy+2*S,1.2*S,2.4*S); }                      // the teeth, when it bites
+  g.strokeStyle='rgba(230,220,200,0.6)'; g.lineWidth=0.6; for(let q=-1;q<=1;q++){ g.beginPath(); g.moveTo(hx+9*S,hy+q*1.2*S); g.lineTo(hx+15*S,hy+q*2.6*S); g.stroke(); }   // whiskers
+  g.restore(); }
+function drawRatKing(x,B,e,pose){ const fade=e.dead?Math.max(0,1-(e.fallT||0)/0.8):1; if(fade<=0) return; const k=pose&&pose.kind==='raise'?Math.min(1,pose.t):0, lu=pose&&pose.kind==='strike'?Math.min(1,pose.t):0;
+  g.save(); g.globalAlpha*=fade; g.fillStyle='rgba(0,0,0,0.4)'; g.beginPath(); g.ellipse(x,B+2,44,13,0,0,Math.PI*2); g.fill();
+  const N=9, cx=x+lu*10, cy=B-12-k*6;
+  const rats=[...Array(N)].map((_,q)=>{ const a=q/N*Math.PI*2+Math.sin(gt*1.3+q)*0.12; return {a, x:cx+Math.cos(a)*38, y:cy+Math.sin(a)*15, q}; }).sort((A,B2)=>A.y-B2.y);
+  rats.forEach(r=>{ if(r.y>cy) return; drawRat(r.x,r.y+10,{dir:Math.cos(r.a)>0?1:5,moving:true,id:r.q},pose,1.05,r.q*1.7); });
+  g.strokeStyle='#c87a74'; g.lineWidth=2.4; g.lineCap='round'; for(let q=0;q<N;q++){ const a=q/N*Math.PI*2, ex=cx+Math.cos(a)*28, ey=cy+Math.sin(a)*10; g.beginPath(); g.moveTo(ex,ey); g.quadraticCurveTo(cx+Math.cos(a+1.2)*10,cy+Math.sin(a+1.2)*5,cx+Math.sin(gt*2+q)*2,cy); g.stroke(); }   // the tails, grown into one knot
+  const kn=g.createRadialGradient(cx-3,cy-3,1,cx,cy,11); kn.addColorStop(0,'#f0b0a8'); kn.addColorStop(1,'#8a4a44'); g.fillStyle=kn; g.beginPath(); g.ellipse(cx,cy,11,7,0,0,Math.PI*2); g.fill();
+  g.strokeStyle='rgba(90,40,36,0.7)'; g.lineWidth=1; for(let q=0;q<4;q++){ g.beginPath(); g.ellipse(cx,cy,9-q*2,5-q,q*0.7,0,Math.PI*1.4); g.stroke(); }
+  rats.forEach(r=>{ if(r.y<=cy) return; drawRat(r.x,r.y+10,{dir:Math.cos(r.a)>0?1:5,moving:true,id:r.q},pose,1.05,r.q*1.7); });
+  g.restore(); }
+{ const prev=impact; impact=function(f){ const hp0=player.hp, r=prev(f); try{ const hurt=player.hp<hp0 && player.hp>0 && !combat.practice; if(hurt && (f.type==='rat'&&Math.random()<0.2 || f.type==='ratking'&&Math.random()<0.4)) addStatus(player,'venom',5,1); }catch(e){} return r; }; }
+// the Old Drain: down a grate in the Lowstreets, a brick-and-rock channel the rats have taken for their own
+AREAS.ratdrain=CAVE('Hollowmere · The Old Drain',12,9,()=>[ {type:'teleporter', i:1, j:0, to:'lowstreets', entry:'fromDrain'},
+    {type:'pool', i:2, j:3, fp:[8,2], kind:'fen', flat:true}, {type:'puddle', i:1, j:6, s:1.2, noblock:true}, {type:'puddle', i:10, j:2, noblock:true},
+    {type:'bones', i:3, j:7, noblock:true}, {type:'bones', i:9, j:7, noblock:true}, {type:'bones', i:8, j:1, noblock:true},
+    {type:'ucjunk', i:0, j:4}, {type:'ucjunk', i:11, j:1}, {type:'crate', i:0, j:8, breakable:true}, {type:'barrel', i:5, j:0, breakable:true},
+    {type:'rune', i:4, j:1, text:"Scratched into a brick, in a careful hand: <i>“The rats down here stopped running from the light last winter. Tuck, if you read this, I've gone home. — Wil”</i>"} ],
+  { inside:false, under:true, mine:true, entries:{ fromStreet:{i:1,j:1} },
+    mobs:()=> CHOICE.rats==='asked' ? [ { name:'Sewer Rat', type:'rat', i:4, j:2, faction:'rats', opts:RAT() }, { name:'Sewer Rat ', type:'rat', i:6, j:6, faction:'rats', opts:RAT() }, { name:'Fat Sewer Rat', type:'rat', i:8, j:6, faction:'rats2', opts:RAT() }, { name:'Sewer Rat  ', type:'rat', i:7, j:7, faction:'rats2', opts:RAT() },
+        { name:'The Rat King', type:'ratking', i:10, j:5, faction:'ratking', opts:RATKING() } ]
+      : CHOICE.rats==='done' ? [ { name:'Sewer Rat', type:'rat', i:5, j:6, faction:'rats', opts:RAT(), daily:true }, { name:'Sewer Rat ', type:'rat', i:8, j:2, faction:'rats', opts:RAT(), daily:true } ] : [],
+    onEnter:()=>logMsg('A stink of wet rot and something worse. The channel runs black under a crust of scum, and the dark is full of small, quick noises.','#b8a888') });
+AREA_TIER.ratdrain=3;
+wrap('lowstreets','objects',l=>[...l, {type:'draingrate', i:14, j:16, noblock:true, dz:-98}, {type:'teleporter', i:14, j:16, to:'ratdrain', entry:'fromStreet', locked:()=>!CHOICE.rats, onLocked:()=>pzSay('An iron drain grate, rusted into its frame. Something down there squeaks, and goes quiet. The rat-catcher would know how it opens.','#c8b890')}]);
+AREAS.lowstreets.entries.fromDrain={i:14,j:17};
+OBJ_DRAW.draingrate=o=>{ const c=(u,v)=>P(o.i+u,o.j+v), open=!!CHOICE.rats, A=c(0.15,0.15), B=c(0.85,0.15), C=c(0.85,0.85), D=c(0.15,0.85);
+  g.fillStyle=open?'#060404':'#1a1612'; g.beginPath(); g.moveTo(A.x,A.y); g.lineTo(B.x,B.y); g.lineTo(C.x,C.y); g.lineTo(D.x,D.y); g.closePath(); g.fill();   // the dark of the drain
+  const off=open?{x:16,y:6}:{x:0,y:0}; g.strokeStyle='#5a5650'; g.lineWidth=2.6; g.beginPath(); g.moveTo(A.x+off.x,A.y+off.y-1); g.lineTo(B.x+off.x,B.y+off.y-1); g.lineTo(C.x+off.x,C.y+off.y-1); g.lineTo(D.x+off.x,D.y+off.y-1); g.closePath(); g.stroke();
+  g.lineWidth=1.8; g.strokeStyle='#6e6a62'; for(let t=0.25;t<0.8;t+=0.17){ const a=c(0.15+t*0.7,0.15), b=c(0.15+t*0.7,0.85); g.beginPath(); g.moveTo(a.x+off.x,a.y+off.y-1); g.lineTo(b.x+off.x,b.y+off.y-1); g.stroke(); }   // the bars, lifted aside once it is unlocked
+  if(!open){ const q=c(0.5,0.5); g.fillStyle='#8a5a2a'; g.fillRect(q.x-2,q.y-3,4,4); } };   // a rusted padlock
+NEAR_NAME.draingrate='a drain grate';
+// the loot: every rat leaves a tail for Tuck's bounty
+{ const _v=victory; victory=function(faction){ if(['rats','rats2','ratking'].includes(faction)) mobs.filter(m=>m.hostile && m.faction===faction && m.type==='rat').forEach(m=>{ const f=slotFor('rat_tail'); if(f>=0){ player.inv[f]='rat_tail'; logMsg('Loot: Rat Tail','#8ac070'); } });
+    const r=_v.apply(this,arguments);
+    if(faction==='ratking' && CHOICE.rats==='asked'){ CHOICE.rats='killed'; remember('rats','killed',"You killed the Rat King in the Old Drain. Back to Tuck."); logMsg("The knot of rats comes apart at last, tail from tail. Whatever held them together has gone out of them. Tuck will want to hear this.",'#c8b890'); updateHud(); }
+    return r; }; }
+// Tuck's job
+{ const T=tuckTalk; tuckTalk=function(){ const N='Tuck the Rat-catcher', R=CHOICE.rats;
+    if(!R){ say(N,["“Tuck's the name, rats is the game. Only lately the game's been winning.”","“Something under these streets is breeding them big as cats, and they've stopped running from my lantern. Last week they took Wil's terrier. Took it, mind. Not killed, took.”","“There's an old drain under the grate by the well-trough. I've got the key, and I've not got the stomach. Go down and find what's at the bottom of it, and I'll pay. Bring me tails, too. A copper each.”"],[
+        {label:'“I will go down.”', fn:()=>{ remember('rats','asked',"Tuck the Rat-catcher wants whatever is breeding the giant rats under the Lowstreets found and killed. The old drain, by the grate near him."); updateHud(); say(N,["“Here's the key. Mind your fingers, and your ankles. They go for ankles.”","<i>He unlocks the drain grate for you.</i>"],[bye]); }},
+        {label:'Buy his "genuine rat-catcher\'s hat". (-3c)', off:player.purse<3, note:'-3c', fn:()=>{ player.purse-=3; giveQuestItem('straw_hat',true); updateHud(); say(N,"“Wear it with pride. Rats can smell fear, and straw.”",[bye]); }}, bye]); return; }
+    if(R==='asked'){ say(N,["“Still squeaking down there. I can hear 'em through the cobbles at night. Whatever's at the bottom of that drain, it's still there.”"],[...(hasItem('rat_tail')?[{label:'Sell him rat tails.', fn:()=>sellTo(N,tuckTalk,{only:new Set(['rat_tail']), price:()=>1, greet:"“Tails! Good. A copper each, as promised.”"})}]:[]), bye]); return; }
+    if(R==='killed'){ say(N,["“A king? Tails all grown together, moving like one beast? Gods. My grandad told me about those and I thought he was drunk. He was drunk. He was also right.”","“Here. Thirty copper, and my second-best gloves. You've earned the right to put your hands in rat-holes.”"],[
+        {label:'Take the reward.', fn:()=>{ CHOICE.rats='done'; player.purse+=30; giveQuestItem('rat_gloves',true); remember('rats','done',"You killed the Rat King under the Lowstreets. Tuck paid you, and gave you his gloves."); updateHud(); logMsg("Tuck gives you 30 copper and his Rat-catcher's Gloves. (+1 agility, +1 armour)",'#e8c060');
+          say(N,"“Keep bringing tails. There's always more rats. That's the beauty of rats.”",[bye]); }}]); return; }
+    say(N,["“Quiet below, mostly. A few still come up. Tails are a copper each, same as ever.”"],[...(hasItem('rat_tail')?[{label:'Sell him rat tails.', fn:()=>sellTo(N,tuckTalk,{only:new Set(['rat_tail']), price:()=>1, greet:"“A copper a tail. Lovely.”"})}]:[]),
+      {label:'Buy his "genuine rat-catcher\'s hat". (-3c)', off:player.purse<3, note:'-3c', fn:()=>{ player.purse-=3; giveQuestItem('straw_hat',true); updateHud(); say(N,"“Wear it with pride. Rats can smell fear, and straw.”",[bye]); }}, bye]); };
+  TALKERS.tuck=tuckTalk; }
+{ const prev=npcHasNews; npcHasNews=function(n){ if(n && n.id==='tuck'){ if(!CHOICE.rats) return '!'; if(CHOICE.rats==='killed') return '?'; } return prev(n); }; }
+JOURNAL.push(['The Rat King', ()=> !CHOICE.rats ? null : CHOICE.rats==='done' ? ['done',"You killed the Rat King under the Lowstreets, a dozen rats with their tails grown into one knot. Tuck paid you, and gave you his gloves."]
+  : CHOICE.rats==='killed' ? ['active',"The Rat King is dead. Tell Tuck the Rat-catcher in the Lowstreets."] : ['active',"Something under the Lowstreets is breeding rats as big as cats. Go down the drain grate near Tuck the Rat-catcher and find it."]]);
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

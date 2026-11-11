@@ -288,6 +288,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0e0b06;color:#e8d5a
 .shop-cell .slot{width:58px;height:58px;}
 .shop-cell:hover .slot,.shop-cell.armed .slot{border-color:#c09040;}
 .shop-cell.off{opacity:0.45;cursor:default;}
+.shop-all{font-size:10px;line-height:1.2;margin-top:2px;padding:1px 4px;border-radius:4px;background:rgba(232,192,96,0.16);color:#e8c060;cursor:pointer;text-align:center;white-space:nowrap}.shop-all:hover{background:rgba(232,192,96,0.32)}
 .shop-price{font:11px Georgia,serif;color:#e8c060;}
 .shop-hint{font-size:11px;color:#7a5a22;text-align:center;margin:2px 0 4px;}
 .dlg-purse{font-size:12px;color:#7a5a22;text-align:right;margin-top:4px;}
@@ -11537,13 +11538,20 @@ function sellTo(who,back,o){                     // o (optional): only these ite
   goods.forEach(({id,k})=>{ const pr=o&&o.price?o.price(id):Math.max(1,Math.round(PRICES[id]*sellRate())); const cell=document.createElement('div'); cell.className='shop-cell';
     const sl=document.createElement('div'); sl.className='slot filled shop-slot'; sl.dataset.item=id; const cv=document.createElement('canvas'); cv.width=cv.height=104; cv.style.width=cv.style.height='52px'; drawItemIcon(cv.getContext('2d'),id,104); sl.appendChild(cv); if(stackAt(k)>1) sl.insertAdjacentHTML('beforeend','<span class="stk">'+stackAt(k)+'</span>');
     const pl=document.createElement('div'); pl.className='shop-price'; pl.textContent='+'+formatCoin(pr); cell.appendChild(sl); cell.appendChild(pl);
+    const nPile=stackAt(k); if(nPile>1){ const all=document.createElement('div'); all.className='shop-all'; all.textContent='all ×'+nPile+' +'+formatCoin(pr*nPile); all.title='Sell the whole pile';   // the whole pile at once, not one click a berry
+      all.addEventListener('click',e=>{ e.stopPropagation(); if(player.inv[k]!==id) return; const n=stackAt(k); for(let q=0;q<n;q++) player.inv[k]=null; player.purse+=pr*n; updateHud(); logMsg('Sold '+n+'× '+ITEMS[id].name+' for '+formatCoin(pr*n)+'.','#e8c060'); sellTo(who,back,o); }); cell.appendChild(all); }
     cell.addEventListener('pointerdown',e=>{ cell._touch=e.pointerType==='touch'; });
     cell.addEventListener('click',()=>{ if(cell._touch && !cell.classList.contains('armed')){ grid.querySelectorAll('.armed').forEach(x=>x.classList.remove('armed')); cell.classList.add('armed'); return; }
       if(player.inv[k]!==id) return; player.inv[k]=null; player.purse+=pr; updateHud(); logMsg('Sold '+ITEMS[id].name+' for '+formatCoin(pr)+'.','#e8c060');
       const t=document.getElementById('item-tip'), t2=document.getElementById('item-tip2'); if(t) t.style.display='none'; if(t2) t2.style.display='none'; sellTo(who,back,o); });
     grid.appendChild(cell); });
   const hint=document.createElement('div'); hint.className='shop-hint'; hint.textContent=matchMedia('(hover:none)').matches?'Tap to inspect, tap again to sell.':'Hover to inspect, click to sell.';
-  box.prepend(hint); box.prepend(grid); GEST_SHOP=true;   // a shop screen: what you buy and sell just changes hands, no flying about
+  box.prepend(hint); box.prepend(grid); GEST_SHOP=true;
+  const JUNK=new Set([...(typeof JUNK_COMMON!=='undefined'?JUNK_COMMON:[]),...(typeof JUNK_FINE!=='undefined'?JUNK_FINE:[])]), junk=goods.filter(({id})=>JUNK.has(id));   // odds and ends from crates and pockets: away in one go
+  if(junk.length){ const price=id=>o&&o.price?o.price(id):Math.max(1,Math.round(PRICES[id]*sellRate())); let n=0, c=0; junk.forEach(({id,k})=>{ const m=stackAt(k); n+=m; c+=price(id)*m; });
+    const jb=document.createElement('button'); jb.className='dlg-opt'; jb.innerHTML='<span>Sell all junk ('+n+' odds and ends)</span><small>+'+formatCoin(c)+'</small>';
+    jb.addEventListener('click',()=>{ let got=0, cnt=0; junk.forEach(({id})=>{ for(let k=player.inv.indexOf(id); k>=0; k=player.inv.indexOf(id)){ player.inv[k]=null; got+=price(id); cnt++; } }); player.purse+=got; updateHud(); logMsg('Sold '+cnt+' odds and ends for '+formatCoin(got)+'.','#e8c060'); sellTo(who,back,o); });
+    box.insertBefore(jb, hint.nextSibling); }   // a shop screen: what you buy and sell just changes hands, no flying about
 }
 function shopFrom(who,stock,disc,greet,back){
   if(Array.isArray(stock) && stock.key!=='gratis'){ const key=stock.key; stock=stock.filter(id=>unWoven(id)!=='bandana'); if(key!==undefined) stock.key=key; }   // only Gratis deals in purple bandanas
@@ -16427,7 +16435,7 @@ const TRAINING={
             lines:r=>["Mother Hild sets down her broom and takes both your hands.", "“A blessing is a gift, child. The candles, the oil, the hours on my knees: those are not. For the chapel roof, you understand.”"] } };
 const TRAIN_MAX=6, trainCost=r=>40*Math.pow(2,r);
 // Maelis threads moonlight into one piece of what you wear: +1 Spell Power on that piece, once per piece, priced by the piece
-const WEAVE_SLOTS=['torso','armor','hands','legs','feet'], WEAVE_TWIN_SLOTS=['head','torso','armor','hands','legs','feet','offhand'],   // only clothes and armour take the thread (twins stay registered so pieces woven earlier still load)
+const WEAVE_SLOTS=['armor','hands','legs','feet'], WEAVE_TWIN_SLOTS=['head','torso','armor','hands','legs','feet','offhand'],   // only clothes and armour take the thread (twins stay registered so pieces woven earlier still load)
       weaveCost=id=>60+Math.round((PRICES[id]||20)/2);
 const isWoven=id=>!!(id && id.startsWith && /^(?:t_)?w_/.test(id));
 const wovenOf=id=> id.startsWith('t_') ? 't_w_'+id.slice(2) : 'w_'+id;
@@ -20951,13 +20959,13 @@ Object.assign(AREAS,{
       { name:'Root Lurker', type:'lurker', i:16, j:7, faction:'bog7', opts:LURK({}) } ],
     entries:{ fromBlack:{i:10,j:1}, fromFen:{i:8,j:8} } },
   reedbank:{ fence:{r:false,l:false}, w:13, h:10, theme:'bog', label:'The Reed Bank', mini:{x:0,y:0}, notches:()=>[], dummy:null,
-    objects:wideObjs('reedbank',()=>[ {type:'teleporter', i:6, j:0, to:'docks', entry:'fromReed'}, {type:'teleporter', i:12, j:5, to:'blackwater', entry:'fromReed'}, {type:'teleporter', i:8, j:9, to:'northroad', entry:'fromReed'},
+    objects:wideObjs('reedbank',()=>[ {type:'teleporter', i:12, j:5, to:'blackwater', entry:'fromReed'}, {type:'teleporter', i:8, j:9, to:'northroad', entry:'fromReed'},
       {type:'pool', i:1, j:2, fp:[4,3], kind:'fen'},
       ...wideDecor(707,13,10,{ways:[[6,1],[11,5],[8,8]],tiles:[[3,7],[8,3]]},[['reeds',12,k=>({dense:k%2===0})],['deadtree',3,{s:0.8}],['bones',2,{noblock:true}]]) ]),
     npcs:()=>[], mobs:()=>[ { name:'Reed Lurker', type:'lurker', i:3, j:7, faction:'bog8', opts:LURK({}) } ],
     entries:{ fromDocks:{i:6,j:1}, fromBlack:{i:11,j:5}, fromRoad:{i:8,j:8} } } });
-// the Blackwater lies out past the Reed Bank, not off the quay
-wrap('docks','objects',l=>[...l,{type:'teleporter', i:7, j:11, to:'reedbank', entry:'fromDocks'}]); Object.assign(AREAS.docks.entries,{ fromBlack:{i:12,j:3}, fromReed:{i:7,j:10} });
+// the fens lie north, off the North Road: nothing runs out to them from the Hollowmere quay
+Object.assign(AREAS.docks.entries,{ fromBlack:{i:12,j:3}, fromReed:{i:7,j:10} });
 wrap('fen','objects',l=>[...l,{type:'teleporter', i:40, j:0, to:'sunkenwood', entry:'fromFen'}]); AREAS.fen.entries.fromSunken={i:40,j:1};
 wrap('northroad','objects',l=>[...l,{type:'teleporter', i:22, j:0, to:'reedbank', entry:'fromRoad'}]); AREAS.northroad.entries.fromReed={i:22,j:1};
 Object.assign(AREA_TIER,{ blackwater:4, sunkenwood:4, reedbank:3 });
@@ -24508,6 +24516,24 @@ function trapsMark(){ const K=trapsSprungToday(); OBJECTS.forEach(o=>{ if(o.type
     crownFoe=key; const h=Math.round(player.maxHp*0.2); player.hp=Math.min(player.maxHp,player.hp+h); updateHud();
     floatText(tileOf(player),'+'+h,'#9ad0e8',true); try{ glowAt&&glowAt(); }catch(e){}
     logMsg('The crown goes cold as river-ice on your brow, and the cold runs down into your wounds and closes them. (Crown of the Drowned King: +'+h+' HP, once a fight)','#9ad0e8'); }catch(e){} },100); }
+// Old Mudmaw is no slow lurker: a quick double swipe, a feinted overhead from the mud, and less give when you stagger him
+{ const L=FOES.lurker, LP=L.pattern, LS=L.stagger, MP=[
+    {wait:1.3, wind:1.00, after:0.35, dir:'left'}, {wait:0.15, wind:0.62, after:0.60, dir:'right'},                 // swipe, and the other claw before you have settled
+    {wait:1.2, wind:1.10, after:0.70, dir:'up', feint:'left'},                                                       // rears as if to swipe, then comes down from above
+    {wait:1.0, wind:0.85, after:0.30, dir:'right'}, {wait:0.15, wind:0.62, after:0.30, dir:'left'}, {wait:0.2, wind:0.70, after:0.90, dir:'up'} ];   // and a three-blow flurry out of the water
+  const big=()=>{ const f=combat.foe; return !!(f && f.type==='lurker' && f.opts && f.opts.big); };
+  Object.defineProperty(L,'pattern',{ get:()=>big()?MP:LP, configurable:true });
+  Object.defineProperty(L,'stagger',{ get:()=>big()?0.85:LS, configurable:true }); }
+// make camp by any campfire: sleep there, and if you fall in a fight you are carried back to that fire, not all the way home
+{ const _cc=campfireCook; campfireCook=function(o){ const r=_cc.apply(this,arguments);
+    try{ if(o && o.type==='campfire' && !combat.active && dlgIsOpen() && !(typeof rainingHere==='function' && rainingHere())){ const box=document.getElementById('dlg-opts');
+        if(box && !box.querySelector('.dlg-opt.makecamp')){ const b=document.createElement('button'); b.className='dlg-opt makecamp'; b.innerHTML='<span>Make camp here and sleep by the fire.</span><small>you will wake here if you fall</small>';
+          b.addEventListener('click',()=>{ CHOICE.campNext=true; closeDialog(); bedChoice(); const t=document.getElementById('dlg-text'); if(t) t.innerHTML='<p>You bank the fire, roll out your cloak beside it and lie down with your pack for a pillow. How long do you sleep?</p>'; });
+          box.insertBefore(b, box.lastChild); } } }catch(e){ console.warn(e); } return r; }; }
+{ const _su=sleepUntil; sleepUntil=function(...a){ const camp=CHOICE.campNext; CHOICE.campNext=false; const r=_su.apply(this,a); if(CHOICE.lastBed) CHOICE.lastBed.camp=!!camp; return r; }; }
+{ const _cn=closeDialog; closeDialog=function(...a){ const r=_cn.apply(this,a); setTimeout(()=>{ if(!dlgIsOpen()) CHOICE.campNext=false; },0); return r; }; }
+{ const _wd=wakeAfterDefeat; wakeAfterDefeat=function(...a){ const r=_wd.apply(this,a); if(CHOICE.lastBed && CHOICE.lastBed.camp){ banner('You wake by your campfire','#e8b070',1800); logMsg('Someone, or something, dragged you back to the ashes of your camp. The fire is out, but you are alive.','#e8b070'); } return r; }; }
+wrap('fenpath','objects',l=>[...l,{type:'campfire', i:1, j:14}]);   // the loggers' fire on the causeway: somewhere dry to sleep before the Drowning Fen
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }
@@ -25043,6 +25069,9 @@ const PT=(()=>{ const KEY='dunhollow.playtest', ON='dunhollow.ptOn', MAX=60000;
       if(still===60) PT.ev('idle',{secs:60});
       if(Math.random()<0.2) PT.ev('pos',{i:player.i, j:player.j, lvl:playerLevel(), hp:player.hp+'/'+player.maxHp, coin:player.purse});
     }catch(e){} },5000); }
+
+// clothing under the armour is purely cosmetic: strip it again once every piece in the game exists (woven, desert and dwarven pieces are made after the first pass)
+for(const id in ITEMS){ const it=ITEMS[id]; if(it && it.slot==='torso'){ delete ITEM_STATS[id]; GEAR_HP[id]=0; } }
 </script>
 </body>
 </html>

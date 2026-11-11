@@ -24635,6 +24635,64 @@ NEAR_NAME.draingrate='a drain grate';
 { const prev=npcHasNews; npcHasNews=function(n){ if(n && n.id==='tuck'){ if(!CHOICE.rats) return '!'; if(CHOICE.rats==='killed') return '?'; } return prev(n); }; }
 JOURNAL.push(['The Rat King', ()=> !CHOICE.rats ? null : CHOICE.rats==='done' ? ['done',"You killed the Rat King under the Lowstreets, a dozen rats with their tails grown into one knot. Tuck paid you, and gave you his gloves."]
   : CHOICE.rats==='killed' ? ['active',"The Rat King is dead. Tell Tuck the Rat-catcher in the Lowstreets."] : ['active',"Something under the Lowstreets is breeding rats as big as cats. Go down the drain grate near Tuck the Rat-catcher and find it."]]);
+// ════════ ABEL'S BELL: the Blackwater's bell rang for the drowned every spring until its clapper went into the water with the last ringer. Find it, ring it after dark, and let them rest ════════
+Object.assign(ITEMS,{ bell_clapper:{ name:"The Bell's Clapper", slot:'misc', read:true, title:'A lump of green bronze on a rotted leather strap',
+  body:["Heavy as a fist, green with a hundred years of water. There is a name scratched into the strap: <i>Abel</i>.","It belongs in the bell on the post at the Blackwater's edge."] } });
+QUEST_ITEMS.add('bell_clapper'); PRICES.bell_clapper=0;
+ITEM_ICON.bell_clapper=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.strokeStyle='#6a4a2a'; g2.lineWidth=2.2; g2.beginPath(); g2.moveTo(20,6); g2.quadraticCurveTo(14,14,20,20); g2.stroke();
+  const gr=g2.createRadialGradient(18,26,1,20,27,8); gr.addColorStop(0,'#8ab89a'); gr.addColorStop(1,'#3a5a46'); g2.fillStyle=gr; g2.beginPath(); g2.ellipse(20,27,6.5,7.5,0,0,Math.PI*2); g2.fill(); g2.restore(); };
+const bellRung=()=>CHOICE.bwbell==='rung'||CHOICE.bwbell==='done';
+// the bell itself, on its rotten post at the water's edge
+OBJ_DRAW.drownbell=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, sw=bellRung()?0:Math.sin(gt*0.6)*0.06, ring=(CHOICE.bellRingT||0)>gt ? Math.sin(gt*18)*0.35*((CHOICE.bellRingT-gt)/3) : 0;
+  g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(x+6,y+2,18,6,0,0,Math.PI*2); g.fill();
+  g.fillStyle='#3a2c1c'; g.fillRect(x-3,y-70,6,70); g.save(); g.translate(x,y-66); g.rotate(-0.12); g.fillRect(-2,-3,26,5); g.restore();   // the post, leaning, and its arm
+  g.save(); g.translate(x+20,y-68); g.rotate(sw+ring);
+  g.strokeStyle='#2a2016'; g.lineWidth=1.5; g.beginPath(); g.moveTo(0,0); g.lineTo(0,6); g.stroke();
+  const gr=g.createLinearGradient(-9,0,9,0); gr.addColorStop(0,'#3e6a52'); gr.addColorStop(0.5,'#7aa88a'); gr.addColorStop(1,'#2e5040'); g.fillStyle=gr;
+  g.beginPath(); g.moveTo(-5,6); g.quadraticCurveTo(-6,14,-10,22); g.lineTo(10,22); g.quadraticCurveTo(6,14,5,6); g.closePath(); g.fill(); g.fillStyle='#1e3428'; g.beginPath(); g.ellipse(0,22,10,2.6,0,0,Math.PI*2); g.fill();
+  if(CHOICE.bwbell==='rung'||CHOICE.bwbell==='done'||hasItem('bell_clapper')&&false){ g.fillStyle='#4a6a50'; g.beginPath(); g.arc(0,21,2.4,0,Math.PI*2); g.fill(); }
+  g.restore();
+  if(ring){ g.save(); g.strokeStyle='rgba(200,230,215,'+Math.min(0.6,Math.abs(ring))+')'; g.lineWidth=1.4; for(let k=1;k<=3;k++){ g.beginPath(); g.arc(x+20,y-50,10+k*12+((gt*40)%12),-0.9,0.9); g.stroke(); g.beginPath(); g.arc(x+20,y-50,10+k*12+((gt*40)%12),Math.PI-0.9,Math.PI+0.9); g.stroke(); } g.restore(); } };
+NEAR_NAME.drownbell='the Blackwater bell';
+wrap('blackwater','objects',l=>[...l.filter(o=>!(o.type==='rune' && o.i===14 && o.j===12)), {type:'drownbell', i:14, j:12}, ...(bellRung()?[{type:'campfire', i:8, j:8}]:[])]);
+// at night the Drowned come up looking for the bell; once it has rung for them, they stay down
+wrap('blackwater','mobs',l=> bellRung() ? l.filter(m=>m.faction!=='drowned3') : l);
+onUse(['drownbell'],o=>{ const B=CHOICE.bwbell, night=nightAmt()>0.5;
+  if(bellRung()){ say('The Blackwater Bell',["The bell hangs still, its clapper back in its throat. Nobody comes up out of the water at night any more. The Blackwater is only a bog now."],[{label:'Leave it.',fn:closeDialog}]); return; }
+  if(!hasItem('bell_clapper')){ say('The Blackwater Bell',["A bell, green with age, hanging from a rotten post at the water's edge. You give it a push and it swings without a sound: there is nothing inside it. Someone took the clapper out, or it went somewhere with the last hand that held it.", B ? "Pell said Old Abel went into the water with it, out past the Blackwater, into the Sunken Wood." : "Somebody rang it for the drowned, once a year, until nobody was left to ring it."],[{label:'Leave it.',fn:closeDialog}]); return; }
+  if(!night){ say('The Blackwater Bell',["You hang the clapper back in the bell's throat on its old strap. It would ring now. But there is nobody to hear it in daylight: the ones it rang for only come up after dark."],[{label:'Wait for night.',fn:closeDialog}]); return; }
+  say('The Blackwater Bell',["You hang the clapper in the bell's throat. Out on the black water, pale shapes have turned towards you.","You take hold of the rope."],[
+    {label:'Ring it.', fn:()=>{ const k=player.inv.indexOf('bell_clapper'); if(k>=0) player.inv[k]=null; CHOICE.bwbell='rung'; CHOICE.bellRingT=gt+3; remember('bwbell','rung',"You rang the drowned bell at night. The Drowned of the Blackwater went down, and stayed down. Tell Pell."); updateHud();
+        try{ SND.fx('bell'); }catch(e){ try{ SND.fx('page'); }catch(e2){} } shake=Math.max(shake,4); slowmo.scale=0.4; slowmo.t=1.2; banner('The bell rings for the drowned','#c8e0d8',2600);
+        mobs.forEach(m=>{ if(m.faction==='drowned3' && !m.dead){ m.hostile=false; m.gone=true; } }); if(combat.active && combat.foe && combat.foe.faction==='drowned3') endCombatSilently();
+        say('The Blackwater Bell',["The note goes out over the water, low and green and very old, and the whole Blackwater goes still to listen.","The pale shapes stop where they stand. One by one they turn their faces up to the sound, and then they are simply not there: only rings on the water, spreading, and then not even those.","You let go of the rope. The bell hums for a long time."],[{label:'Go and tell Pell.',fn:closeDialog}]); }},
+    {label:'Not yet.', fn:closeDialog}]); });
+// Abel's bones, out in the Sunken Wood, the clapper still in his fist
+OBJ_DRAW.abelbones=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y; g.fillStyle='rgba(30,40,30,0.4)'; g.beginPath(); g.ellipse(x,y+1,22,8,0,0,Math.PI*2); g.fill();
+  g.fillStyle='#d8d0b8'; g.beginPath(); g.ellipse(x-10,y-3,5,4,0,0,Math.PI*2); g.fill(); g.fillStyle='#2a2418'; g.fillRect(x-12,y-4,1.6,1.6); g.fillRect(x-9,y-4,1.6,1.6);   // the skull
+  g.strokeStyle='#cfc6ac'; g.lineWidth=2; for(let k=0;k<4;k++){ g.beginPath(); g.moveTo(x-5,y-2+k*1.6); g.quadraticCurveTo(x,y-5+k*1.6,x+5,y-2+k*1.6); g.stroke(); } g.beginPath(); g.moveTo(x+5,y); g.lineTo(x+16,y+3); g.stroke();   // ribs, and an arm flung out
+  if(!CHOICE.bellClapper){ const gr=g.createRadialGradient(x+17,y+2,1,x+18,y+3,5); gr.addColorStop(0,'#8ab89a'); gr.addColorStop(1,'#3a5a46'); g.fillStyle=gr; g.beginPath(); g.ellipse(x+18,y+3,4,4.6,0,0,Math.PI*2); g.fill(); }   // the clapper, still in his hand
+  g.fillStyle='rgba(70,100,60,0.5)'; g.beginPath(); g.ellipse(x+2,y+4,9,2.4,0,0,Math.PI*2); g.fill(); };
+NEAR_NAME.abelbones='old bones';
+wrap('sunkenwood','objects',l=>[...l, {type:'abelbones', i:11, j:7}]);
+onUse(['abelbones'],o=>{ if(CHOICE.bellClapper){ say('Old Bones',["Old Abel, or what the water left of him. You have taken what he was holding. He seems lighter for it."],[{label:'Leave him.',fn:closeDialog}]); return; }
+  say('Old Bones',["A man's bones, half sunk in the moss between two drowned oaks, green with weed. One arm is flung out towards the Blackwater, and the hand is closed round something heavy: a lump of green bronze on a rotted strap.","There is a name scratched into the strap. <i>Abel.</i>"],[
+    {label:'Take the clapper from his hand.', fn:()=>{ if(!giveQuestItem('bell_clapper')) return; CHOICE.bellClapper=1; if(!CHOICE.bwbell) CHOICE.bwbell='asked'; remember('bwbell',CHOICE.bwbell,"You found the drowned bell's clapper in Old Abel's hand. Hang it in the bell at the Blackwater's edge, after dark."); updateHud(); closeDialog(); }},
+    {label:'Leave him be.', fn:closeDialog}]); });
+// Pell knows the story, and pays for the quiet
+{ const P0=TALKERS.pell; TALKERS.pell=()=>{ const N='Pell the Eel-Man', B=CHOICE.bwbell;
+    if(B==='rung'){ say(N,["“I heard it. Gods, I heard it. Sat up in my bed with the hair stood up on my arms. I haven't heard that bell since I was a boy.”","“And then nothing. No splashing. No knocking on the stilts. First quiet night out here in thirty years.”","“Here. Forty copper, it's what I've got. And the fire's yours, any night. I'll keep it lit.”"],[
+        {label:'Take the coin.', fn:()=>{ CHOICE.bwbell='done'; player.purse+=40; remember('bwbell','done',"You rang the drowned bell and laid the Drowned of the Blackwater to rest. Pell paid you, and keeps a fire for you by his hut."); updateHud(); logMsg('Pell gives you 40 copper. His fire by the stilt hut is yours to make camp at.','#e8c060'); say(N,"“Mind the water anyway. It's still deeper than it looks.”",[bye]); }}]); return; }
+    if(!B && !bellRung()){ say(N,["“Mind the water, it's deeper than it looks. Everything here is.” <i>A man in a fen-stained hood, a basket of eels wriggling at his feet.</i>"],[
+        {label:'“Tell me about the bell.”', fn:()=>{ CHOICE.bwbell='asked'; remember('bwbell','asked',"Pell says the drowned bell's clapper went into the water with Old Abel, the last ringer, out towards the Sunken Wood. Find it, and ring the bell after dark."); updateHud();
+          say(N,["“Old Abel rang it. Every spring, for the ones the river took when it moved. Rang it from dusk till they went quiet.”","“Then one spring he went out into the water to ring it closer, he said. Took the clapper with him. Never came back, and neither did the clapper. That was the year they started coming up looking for it.”","“If you found it, and rang it after dark, when they can hear… I'd give a lot to sleep a night through.”"],[{label:'Something else.',fn:P0},bye]); }},
+        {label:'Something else.', fn:P0}, bye]); return; }
+    P0(); }; }
+{ const prev=npcHasNews; npcHasNews=function(n){ if(n && n.id==='pell'){ if(!CHOICE.bwbell) return '!'; if(CHOICE.bwbell==='rung') return '?'; } return prev(n); }; }
+JOURNAL.push(["Abel's Bell", ()=> !CHOICE.bwbell ? null : CHOICE.bwbell==='done' ? ['done',"You rang the Blackwater's drowned bell after dark, and the Drowned went down for good. Pell keeps a fire for you by his stilt hut."]
+  : CHOICE.bwbell==='rung' ? ['active',"The bell has rung and the Drowned are gone. Tell Pell the Eel-Man in the Blackwater."]
+  : hasItem('bell_clapper') ? ['active',"Hang Old Abel's clapper back in the drowned bell at the Blackwater's edge, and ring it after dark, when the Drowned can hear it."]
+  : ['active',"The Blackwater's drowned bell has no clapper. Pell says it went into the water with Old Abel, out towards the Sunken Wood."]]);
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

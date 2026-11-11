@@ -13086,6 +13086,11 @@ function renderMap(cv,V){                             // V: {zoom, px, py, label
   if(V.labels){ c.font=`${Math.max(11,Math.min(18,k*1.4))}px Georgia,serif`; c.textAlign='center'; c.textBaseline='middle';
     ids.forEach(id=>{ const A=AREAS[id], o=L[id], m=P2(o.u+A.w/2,o.v+A.h/2), t=A.under?'':(A.mapLabel!=null?A.mapLabel:(A.label||id)); if(!t) return; const w=c.measureText(t).width+10;
       c.fillStyle='rgba(14,9,4,0.72)'; c.fillRect(m[0]-w/2,m[1]-10,w,20); c.fillStyle=id===areaId?'#fff2c0':'#e8d4a0'; c.fillText(t,m[0],m[1]); }); }
+  if(typeof mapMarks==='function'){ const MK=mapMarks(), R=Math.max(5,Math.min(10,k*1.1));   // who has business for you, and where your quests point
+    ids.forEach(id=>{ const mk=MK[id]; if(!mk || (AREAS[id].maze && !mazeKnown(id))) return; const A=AREAS[id], o=L[id], m0=P2(o.u+A.w/2,o.v+A.h/2), m=[m0[0], m0[1]-(V.labels?R+14:0)];
+      if(mk.goal){ const x=m[0]-(mk.news?R*0.9:0), y=m[1]; c.fillStyle='#e8c060'; c.strokeStyle='#3a2a10'; c.lineWidth=1.5; c.beginPath(); c.moveTo(x,y-R); c.lineTo(x+R*0.75,y); c.lineTo(x,y+R); c.lineTo(x-R*0.75,y); c.closePath(); c.fill(); c.stroke(); }
+      if(mk.news){ const x=m[0]+(mk.goal?R*0.9:0), y=m[1]; c.fillStyle=mk.news==='?'?'#8ad0ff':'#ffd84a'; c.strokeStyle='#2a1a08'; c.lineWidth=1.5; c.beginPath(); c.arc(x,y,R,0,Math.PI*2); c.fill(); c.stroke();
+        c.fillStyle='#2a1a08'; c.font='bold '+Math.round(R*1.5)+'px Georgia,serif'; c.textAlign='center'; c.textBaseline='middle'; c.fillText(mk.news,x,y+1); } }); }
 }
 function updateMinimap(){
   const box=document.getElementById('minimap'); if(!box) return;
@@ -13130,7 +13135,7 @@ function drawBigMap(){ const cv=document.getElementById('bigmap-canvas'); if(!cv
 function openBigMap(){
   let ov=document.getElementById('bigmap');
   if(!ov){ ov=document.createElement('div'); ov.id='bigmap';
-    ov.innerHTML='<div class="bm-panel"><div class="bm-head"><span>Map of the Valley</span><span class="bm-tools"><button data-z="1.25">+</button><button data-z="0.8">−</button><button data-z="0">⌖</button><button class="bm-layer" title="Surface / underground">⇅</button><button class="bm-x">×</button></span></div><canvas id="bigmap-canvas"></canvas><div class="bm-hint">Drag to move · scroll or pinch to zoom · M or Esc to close</div></div>';
+    ov.innerHTML='<div class="bm-panel"><div class="bm-head"><span>Map of the Valley</span><span class="bm-tools"><button data-z="1.25">+</button><button data-z="0.8">−</button><button data-z="0">⌖</button><button class="bm-layer" title="Surface / underground">⇅</button><button class="bm-x">×</button></span></div><canvas id="bigmap-canvas"></canvas><div class="bm-hint"><span style="color:#ffd84a">!</span> new business · <span style="color:#8ad0ff">?</span> something to hand in · <span style="color:#e8c060">◆</span> where a quest points · drag to move · scroll or pinch to zoom · M or Esc to close</div></div>';
     document.body.appendChild(ov); const cv=ov.querySelector('canvas'), ptrs=new Map(); let pinch=0;
     const zoomAt=(f,cx,cy)=>{ const r=cv.getBoundingClientRect(), mx=cx-r.left-r.width/2, my=cy-r.top-r.height/2, nz=Math.max(0.5,Math.min(12,BIGMAP.zoom*f)), ff=nz/BIGMAP.zoom;
       BIGMAP.px=mx-(mx-BIGMAP.px)*ff; BIGMAP.py=my-(my-BIGMAP.py)*ff; BIGMAP.zoom=nz; drawBigMap(); };
@@ -24534,6 +24539,20 @@ function trapsMark(){ const K=trapsSprungToday(); OBJECTS.forEach(o=>{ if(o.type
 { const _cn=closeDialog; closeDialog=function(...a){ const r=_cn.apply(this,a); setTimeout(()=>{ if(!dlgIsOpen()) CHOICE.campNext=false; },0); return r; }; }
 { const _wd=wakeAfterDefeat; wakeAfterDefeat=function(...a){ const r=_wd.apply(this,a); if(CHOICE.lastBed && CHOICE.lastBed.camp){ banner('You wake by your campfire','#e8b070',1800); logMsg('Someone, or something, dragged you back to the ashes of your camp. The fire is out, but you are alive.','#e8b070'); } return r; }; }
 wrap('fenpath','objects',l=>[...l,{type:'campfire', i:1, j:14}]);   // the loggers' fire on the causeway: somewhere dry to sleep before the Drowning Fen
+// ── the map's markers: a gold ! where someone has new business for you, a blue ? where something waits to be handed in, a gold diamond where an open quest points ──
+let MAPMARK_CACHE=null, MAPMARK_T=0;
+function mapAreaNames(){ return Object.keys(AREAS).map(id=>{ const L=(AREAS[id].label||'').split('·').pop().trim().replace(/^The /,''); return [id,L]; }).filter(([id,L])=>L.length>=5 && !AREAS[id].inside && !/^(Farm|Lane)$/.test(L)); }
+function mapMarks(){ const now=performance.now(); if(MAPMARK_CACHE && now-MAPMARK_T<4000) return MAPMARK_CACHE; MAPMARK_T=now; const out={};
+  for(const id of Object.keys(AREAS)){ if(!visitedAreas[id]) continue; let list=[]; try{ list=id===areaId ? NPCS : (AREAS[id].npcs?AREAS[id].npcs():[]); }catch(e){ list=[]; }
+    let news=null; for(const n of list||[]){ let r=null; try{ r=npcHasNews(n); }catch(e){} if(r==='?'){ news='?'; break; } if(r==='!') news='!'; }
+    if(news) (out[id]=out[id]||{}).news=news; }
+  const names=mapAreaNames();
+  for(const [title,fn] of (typeof JOURNAL!=='undefined'?JOURNAL:[])){ let r=null; try{ r=fn(); }catch(e){} if(!r || r[0]!=='active') continue; const txt=String(r[1]||'').replace(/<[^>]+>/g,' ');
+    for(const [id,L] of names){ if(!visitedAreas[id]) continue; if(new RegExp('\\b'+L.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i').test(txt)) (out[id]=out[id]||{}).goal=true; } }
+  // interiors carry their marks out onto the street they open from
+  for(const id of Object.keys(out)){ const A=AREAS[id]; if(!A.inside) continue; const host=Object.keys(AREAS).find(h=>{ try{ return visitedAreas[h] && !AREAS[h].inside && AREAS[h].objects().some(o=>o.inside===id||(o.type==='teleporter'&&o.to===id)); }catch(e){ return false; } });
+    if(host){ const H=(out[host]=out[host]||{}); if(out[id].news==='?' || !H.news) H.news=out[id].news||H.news; H.goal=H.goal||out[id].goal; } }
+  return MAPMARK_CACHE=out; }
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

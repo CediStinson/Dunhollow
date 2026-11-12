@@ -750,7 +750,7 @@ const ITEMS = {
   elf_tunic:   { name:'Leafweave Tunic',    slot:'torso' },
   elf_leggings:{ name:'Elven Leggings',     slot:'legs' },
   elf_boots:   { name:'Soft Elven Boots',   slot:'feet' },
-  elf_cloak:   { name:'Grey-green Cloak',   slot:'armor' },
+  elf_cloak:   { name:'Grey-green Cloak',   slot:'cloak' },
   elf_scale:   { name:'Leaf-scale Cuirass', slot:'armor' },
   elf_circlet: { name:'Silver Circlet',     slot:'head' },
   elf_shirt:        { name:'Nettle-linen Smock', slot:'torso', base:'shirt', col:'#b0b494' },
@@ -788,7 +788,7 @@ const ITEMS = {
           "Do this quietly. If the farmers come asking who sent you, tell them nothing.",
           "— B."] },
 };
-const SLOTS = ['head','torso','armor','hands','legs','feet','weapon','offhand','neck','special'];
+const SLOTS = ['head','torso','armor','cloak','hands','legs','feet','weapon','offhand','neck','special'];
 // what Marta asks for her wares, in copper; she pays two fifths of it for yours
 const PRICES = { shirt:6, trousers:6, boots:14, gloves:12, hood:10, jerkin:35, kettle:30, mail:95, dagger:12, sword:45, morningstar:60, pitchfork:5, shield:28, pelt:20,
   tunic_linen:9, tunic_blue:12, tunic_green:12, tunic_red:14, smock:8, hose_grey:8, breeches:10, riding_boots:24,
@@ -796,7 +796,7 @@ const PRICES = { shirt:6, trousers:6, boots:14, gloves:12, hood:10, jerkin:35, k
   hatchet:14, axe:40, spear:34, mace:55, longsword:80, club:4,
   elf_robe:15, elf_tunic:15, elf_leggings:25, elf_boots:40, elf_cloak:60, elf_scale:160, elf_circlet:55, elf_blade:120, moonbloom:40, elf_tunic_worn:10, elf_leggings_worn:8, elf_boots_worn:12, elf_shirt:6, elf_trousers:6 };
 const SHOP_STOCK = ['apple','bread','potion','tunic_blue','tunic_green','tunic_red','breeches','hood_red','straw_hat','gambeson','studded','gloves','kettle','mail','shield','shield_red','hatchet','spear','sword','axe'];
-const SLOT_NAMES = { food:'Provisions', head:'Head', torso:'Torso', armor:'Armor', hands:'Hands', legs:'Legs', feet:'Feet', weapon:'Weapon', offhand:'Offhand', neck:'Neck', special:'Special' };
+const SLOT_NAMES = { food:'Provisions', head:'Head', torso:'Torso', armor:'Armor', cloak:'Cloak', hands:'Hands', legs:'Legs', feet:'Feet', weapon:'Weapon', offhand:'Offhand', neck:'Neck', special:'Special' };
 // Weapons: how fast you swing, how hard you hit, and whether the swings are heavies
 // Unarmed = fists.
 const WEAPONS = {
@@ -815,7 +815,7 @@ const WEAPONS = {
 };
 const weaponOf = e => (e.type==='wolf') ? {wind:0.35,dmg:9} : WEAPONS[(e.opts && e.opts.equip && e.opts.equip.weapon) || 'fists'] || WEAPONS.fists;
 const INV_SIZE = 30;
-function defaultEquip(){ return { head:null, torso:'shirt', armor:null, hands:null, legs:'trousers', feet:null, weapon:null, offhand:null, neck:null, special:null }; }
+function defaultEquip(){ return { head:null, torso:'shirt', armor:null, cloak:null, hands:null, legs:'trousers', feet:null, weapon:null, offhand:null, neck:null, special:null }; }
 function defaultInv(){
   return Array(INV_SIZE).fill(null);   // the farm gives up its gear reluctantly
 }
@@ -1078,7 +1078,8 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   const E=opts.equip||defaultEquip(opts.gender);     // what is worn, slot by slot
   const ELF_LEG=E.legs==='elf_leggings', DUEL_LEG=E.legs==='duel_legs', DUEL_F=F&&DUEL_LEG, PANTS=E.legs==='trousers'||ELF_LEG||(DUEL_LEG&&!F), ELF_BOOT=E.feet==='elf_boots', DUEL_BOOT=E.feet==='duel_boots', BOOTS=E.feet==='boots'||ELF_BOOT||DUEL_BOOT;
   const STOCK=F&&ELF_LEG, LEG_COVER=!!E.legs&&!STOCK&&!DUEL_F;   // on women the elven leggings are thigh-high stockings on a garter belt
-  const BUST=E.torso==='elf_bustier', ROBE=E.torso==='elf_robe', ETUN=E.torso==='elf_tunic', CLOAK=E.armor==='elf_cloak';
+  const BUST=E.torso==='elf_bustier', ROBE=E.torso==='elf_robe', ETUN=E.torso==='elf_tunic', CLOAK=(E.cloak==='elf_cloak'||E.armor==='elf_cloak') ? 'elf_cloak' : (E.cloak&&CLOAK_LOOK[E.cloak]) ? E.cloak : null;
+  const CKL = CLOAK ? (CLOAK==='elf_cloak' ? {elf:true, hood:true, main:ELFC.cloak, lining:ELFC.lining} : CLOAK_LOOK[CLOAK]) : null;
   // light body hair for men (not elves or goblins): short soft strokes in the hair colour, very low contrast
   const HAIRY=String(opts.race||'').startsWith('dwarf');
   const BH = !F && !/^(elf|goblin)/.test(String(opts.race||'')) ? (()=>{ const hc=HAIR_COLORS[opts.hairColor]||'#3b2417', [r0,g0,b0]=_rgb(hc), L=(0.3*r0+0.59*g0+0.11*b0)/255;
@@ -1152,21 +1153,25 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   const cloakBack=(over)=>{
     const fr=V.turn>-0.25, p2=V.prof, ox=-p2*5.5, CHc=P.chestHW*V.sw+1.6, HW2=P.hipHW*V.sw+7+p2*2, hem=-13, sw2=swing*0.8;
     const pts=[[LN-CHc+ox*0.3,Y.SHOULDER-1.5],[LN+CHc+ox*0.3,Y.SHOULDER-1.5],[LN+CHc+2+ox*0.6,Y.WAIST],[LN+HW2+ox+sw2,hem],[LN+ox*0.5+sw2,hem+1.2],[LN-HW2+ox+sw2,hem],[LN-CHc-2+ox*0.6,Y.WAIST]];
-    const col=fr && !over ? ELFC.lining : ELFC.cloak;
-    blob(pts,5); c.fillStyle=col; c.fill(); c.strokeStyle=tone(ELFC.cloak,-0.55); c.lineWidth=1; c.stroke();
+    const col=fr && !over ? CKL.lining : CKL.main;
+    blob(pts,5); c.fillStyle=col; c.fill(); c.strokeStyle=tone(CKL.main,-0.55); c.lineWidth=1; c.stroke();
     c.save(); blob(pts,5); c.clip();
       const gr=c.createLinearGradient(x+LN-HW2,0,x+LN+HW2,0); gr.addColorStop(0,tone(col,0.16)); gr.addColorStop(0.5,tone(col,0,0)); gr.addColorStop(1,tone(col,-0.3));
       c.fillStyle=gr; c.fillRect(x+LN-HW2-8,B+Y.SHOULDER-4,(HW2+8)*2,70);
       for(let k=-3;k<=3;k++){ c.strokeStyle=tone(col,-0.3,0.6); c.lineWidth=1; c.beginPath(); c.moveTo(x+LN+ox*0.3+k*CHc/3.5,B+Y.SHOULDER+3); c.quadraticCurveTo(x+LN+ox*0.6+k*HW2/3.4,B+Y.WAIST+8,x+LN+ox+sw2+k*HW2/3,B+hem); c.stroke();
         c.strokeStyle=tone(col,0.18,0.4); c.lineWidth=0.5; c.beginPath(); c.moveTo(x+LN+ox*0.3+k*CHc/3.5+1,B+Y.SHOULDER+4); c.quadraticCurveTo(x+LN+ox*0.6+k*HW2/3.4+1,B+Y.WAIST+8,x+LN+ox+sw2+k*HW2/3+1,B+hem); c.stroke(); }
-      if(over){ c.fillStyle=tone(ELFC.trim,-0.2,0.8); c.fillRect(x+LN-HW2-6,B+hem-2.4,(HW2+6)*2,0.9);
+      if(over && CKL.elf){ c.fillStyle=tone(ELFC.trim,-0.2,0.8); c.fillRect(x+LN-HW2-6,B+hem-2.4,(HW2+6)*2,0.9);
         vine(LN-HW2+ox,LN+HW2+ox,hem-4,tone(ELFC.silver,-0.2,0.7)); }
+      if(over && CKL.trim){ c.fillStyle=CKL.trim; c.fillRect(x+LN-HW2-6,B+hem-2.6,(HW2+6)*2,1.4); }
+      if(over && CKL.ermine){ c.fillStyle='#1a1614'; for(let k=-5;k<=5;k++){ const ex=x+LN+ox+k*HW2/5.5, ey=B+hem-1.6; c.beginPath(); c.moveTo(ex-0.7,ey-1); c.lineTo(ex+0.7,ey-1); c.lineTo(ex,ey+1.2); c.closePath(); c.fill(); } }   // ermine tails along the hem
+
     c.restore();
-    if(over){                                           // the hood lies folded between the shoulders
-      const hg=c.createRadialGradient(x+LN-2,B+Y.SHOULDER+1,0,x+LN,B+Y.SHOULDER+3,8); hg.addColorStop(0,tone(ELFC.cloak,0.12)); hg.addColorStop(1,tone(ELFC.cloak,-0.3));
+    if(over && CKL.hood){                               // the hood lies folded between the shoulders
+      const hg=c.createRadialGradient(x+LN-2,B+Y.SHOULDER+1,0,x+LN,B+Y.SHOULDER+3,8); hg.addColorStop(0,tone(CKL.main,0.12)); hg.addColorStop(1,tone(CKL.main,-0.3));
       c.fillStyle=hg; c.beginPath(); c.ellipse(x+LN+ox*0.3,B+Y.SHOULDER+3,7.5,6,0,0,Math.PI*2); c.fill();
-      c.strokeStyle=tone(ELFC.cloak,-0.55); c.lineWidth=0.8; c.stroke();
-      c.strokeStyle=tone(ELFC.cloak,-0.4,0.7); c.beginPath(); c.moveTo(x+LN-4,B+Y.SHOULDER+2); c.quadraticCurveTo(x+LN,B+Y.SHOULDER+7,x+LN+4,B+Y.SHOULDER+2); c.stroke(); }
+      c.strokeStyle=tone(CKL.main,-0.55); c.lineWidth=0.8; c.stroke();
+      c.strokeStyle=tone(CKL.main,-0.4,0.7); c.beginPath(); c.moveTo(x+LN-4,B+Y.SHOULDER+2); c.quadraticCurveTo(x+LN,B+Y.SHOULDER+7,x+LN+4,B+Y.SHOULDER+2); c.stroke(); }
+    if(over && CKL.fur) furCollar(c,x+LN+ox*0.3,B+Y.SHOULDER+1,CHc+4,CKL,false);   // a collar of fur across the shoulders
   };
   if(CLOAK && V.turn>-0.25) cloakBack(false);
   const HD = F ? HEAD_DROP_F : HEAD_DROP;
@@ -1694,7 +1699,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   const CF=CLOTH_F, front=V.turn>-0.25, pr=V.prof;
   // bust: fuller toward the side the body faces (none for men)
   const SHEER = E.torso==='elf_robe' || (F && VR.torso==='necro_bustier');   // starwoven: you see what is under it; the fen-witch's bodice leaves the bust bare                  // starwoven: you see what is under it
-  const ARMOR_TOP = E.armor && E.armor!=='elf_cloak' && E.armor!=='robe';   // an open cloak covers nothing in front
+  const ARMOR_TOP = E.armor && E.armor!=='elf_cloak' && E.armor!=='cowl_black' && E.armor!=='robe';   // an open cloak covers nothing in front
   const bareTop = (!E.torso||SHEER) && !ARMOR_TOP;
   const bR = F ? (front ? (bareTop && !SHEER && pr>0.8 ? 0.4 : 1.5+2.8*pr) : 1.0) : 0, bL = F ? (front ? 1.5*(1-pr) : 0.42) : 0;
   const po = pr*1.6;                                 // chest detail slides with the turn
@@ -3186,9 +3191,11 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
     else {                                    // it falls over both shoulders; a leaf brooch holds it at the throat
       [-1,1].forEach(sd=>{ if(pr>0.8 && sd<0) return; const ex=LN+sd*(CH+2.2);
         const pts=[[LN+sd*(CH-3.6),Y.SHOULDER-2],[ex,Y.SHOULDER+0.2],[ex+sd*0.4,Y.SHOULDER+9],[LN+sd*(CH-0.4),Y.SHOULDER+13],[LN+sd*(CH-2.8),Y.SHOULDER+3]];
-        blob(pts,3); c.fillStyle=tone(ELFC.cloak,sd<0?0.1:-0.12); c.fill(); c.strokeStyle=tone(ELFC.cloak,-0.55); c.lineWidth=0.8; c.stroke(); });
-      c.fillStyle=ELFC.cloak; c.fillRect(x+LN-P.neckW/2-2.8,B+Y.SHOULDER-3.2,P.neckW+5.6,2.6);
-      if(pr<0.9){ const bx=LN+po-(pr>0.3?-1.5:0), by=Y.SHOULDER+1.2;
+        blob(pts,3); c.fillStyle=tone(CKL.main,sd<0?0.1:-0.12); c.fill(); c.strokeStyle=tone(CKL.main,-0.55); c.lineWidth=0.8; c.stroke(); });
+      c.fillStyle=CKL.main; c.fillRect(x+LN-P.neckW/2-2.8,B+Y.SHOULDER-3.2,P.neckW+5.6,2.6);
+      if(CKL.fur) furCollar(c,x+LN+po*0.4,B+Y.SHOULDER-0.5,CH+3.4,CKL,true);
+      if(!CKL.elf && pr<0.9){ const bx=LN+po-(pr>0.3?-1.5:0), by=Y.SHOULDER+(CKL.fur?3.4:1.2); c.fillStyle=CKL.clasp||'#b8a070'; c.beginPath(); c.arc(x+bx,B+by,1.9,0,Math.PI*2); c.fill(); c.strokeStyle=tone(CKL.clasp||'#b8a070',-0.5); c.lineWidth=0.6; c.stroke(); c.fillStyle='rgba(255,255,255,0.6)'; c.beginPath(); c.arc(x+bx-0.6,B+by-0.6,0.6,0,Math.PI*2); c.fill(); }
+      if(CKL.elf && pr<0.9){ const bx=LN+po-(pr>0.3?-1.5:0), by=Y.SHOULDER+1.2;
         c.save(); c.translate(x+bx,B+by); c.rotate(-0.6);
         c.fillStyle=ELFC.leaf; c.beginPath(); c.ellipse(0,0,1.7,3.2,0,0,Math.PI*2); c.fill();
         c.strokeStyle=ELFC.silver; c.lineWidth=0.6; c.stroke(); c.beginPath(); c.moveTo(0,-2.8); c.lineTo(0,2.8); c.stroke();
@@ -3196,7 +3203,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
     }
   }
 
-  if(E.armor==='cowl_black'){                     // a black hooded capelet: over both shoulders, open at the throat, the hood bunched at the nape
+  if(E.armor==='cowl_black'||E.cloak==='cowl_black'){                     // a black hooded capelet: over both shoulders, open at the throat, the hood bunched at the nape
     const K='#1d1c22', sh=Y.SHOULDER, nk=P.neckW/2+1.2, hem=sh+(F?11:12.5), wide=CH+3.2;
     if(front){
       if(pr<0.9){ c.fillStyle=tone(K,-0.3); c.beginPath(); c.ellipse(x+LN-(pr>0.3?po*0.6:0),B+sh-2.6,nk+3.2,3.6,0,Math.PI,0); c.fill(); }   // the hood, rolled up behind the neck
@@ -10048,6 +10055,8 @@ function applySave(sv){
   player.opts.equip = sv.opts.equip ? {...defaultEquip(player.opts.gender), ...sv.opts.equip} : defaultEquip(player.opts.gender);
   if(!sv.opts.equip || !('offhand' in sv.opts.equip)) player.opts.equip.offhand=null;
   if(!('neck' in player.opts.equip)) player.opts.equip.neck=null;
+  if(!('cloak' in player.opts.equip)) player.opts.equip.cloak=null;
+  { const Eq=player.opts.equip; if(Eq.armor && /^(t_|w_)?(elf_cloak|cowl_black)$/.test(Eq.armor) && !Eq.cloak){ Eq.cloak=Eq.armor; Eq.armor=null; } }   // cloaks have their own peg now
   if(!('special' in player.opts.equip)) player.opts.equip.special=null;
   if(player.opts.equip.offhand==='moon_amulet'){ player.opts.equip.neck=player.opts.equip.neck||'moon_amulet'; player.opts.equip.offhand=null; }   // the focus hangs at the neck now
   if(!sv.opts.equip || !('weapon' in sv.opts.equip)) player.opts.equip.weapon='sword';   // saves from before weapons existed
@@ -10764,7 +10773,7 @@ function makeSlot(kind,key){
   el.addEventListener('dblclick',()=>quickMove(slotLoc(el)));
   return el;
 }
-const HIDEABLE=['head','torso','armor','hands','legs','feet','offhand','neck','special'];
+const HIDEABLE=['head','torso','armor','cloak','hands','legs','feet','offhand','neck','special'];
 const isHidden=k=>!!(player.opts && ((player.opts.hide||{})[k] || (k==='head' && player.opts.hideHelm)));
 const EYE_OPEN='<svg viewBox="0 0 16 16" width="11" height="11"><path d="M1 8s2.6-4.5 7-4.5S15 8 15 8s-2.6 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="2.1" fill="currentColor"/></svg>';
 const EYE_SHUT='<svg viewBox="0 0 16 16" width="11" height="11"><path d="M1 8s2.6-4.5 7-4.5S15 8 15 8s-2.6 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2 14L14 2" stroke="currentColor" stroke-width="1.8"/></svg>';
@@ -10778,7 +10787,7 @@ function buildInventoryUI(){
   const L=document.getElementById('eq-left'), Rt=document.getElementById('eq-right');
   window.syncHelmToggle=()=>syncHideEyes();
   ['head','neck','torso','armor','weapon'].forEach(k=>L.appendChild(makeSlot('eq',k)));
-  ['hands','legs','feet','offhand','special'].forEach(k=>Rt.appendChild(makeSlot('eq',k)));
+  ['cloak','hands','legs','feet','offhand','special'].forEach(k=>Rt.appendChild(makeSlot('eq',k)));
   for(let i=0;i<INV_SIZE;i++) invGrid.appendChild(makeSlot('inv',i));
   { const box=document.createElement('div'); box.id='stash-box'; box.innerHTML='<div class="menu-label">The Wheatsheaf Crate</div><div id="stash-grid"></div><div class="stash-help">Double-click moves things between the crate and your pack.</div>';
     const bag=document.querySelector('#inv-overlay .bag'); bag.insertBefore(box,document.getElementById('inv-trash'));
@@ -11608,9 +11617,9 @@ Object.assign(AREAS,{
       return l; },
     npcs:()=>[
       { id:'magistrate', name:'Magistrate Aldous', i:4, j:15, dir:1, opts:{gender:'m',skin:0,hair:4,hairColor:13,beard:4,face:0,equip:{head:null,torso:'tunic_blue',armor:'gambeson',hands:'gloves',legs:'hose_grey',feet:'riding_boots',weapon:null,offhand:null}} },
-      ...(BARON_DOWN() ? [] : [{ id:'steward', name:'Steward Orrin', i:14, j:8, dir:1, opts:{gender:'m',skin:1,hair:1,hairColor:1,beard:2,face:2,equip:{head:null,torso:'tunic_red',armor:'brightmail',hands:'gloves',legs:'hose_grey',feet:'riding_boots',weapon:'longsword',offhand:null}} }]),
-      { id:'kguard1', name:BARON_DOWN()?'Crown Soldier':'Keep Guard', i:13, j:6, dir:1, opts:GUARD({}) },
-      { id:'kguard2', name:BARON_DOWN()?'Crown Soldier':'Keep Guard', i:16, j:6, dir:1, opts:GUARD({skin:3}) },
+      ...(BARON_DOWN() ? [] : [{ id:'steward', name:'Steward Orrin', i:14, j:8, dir:7, opts:{gender:'m',skin:1,hair:1,hairColor:1,beard:2,face:2,equip:{head:null,torso:'tunic_red',armor:'brightmail',hands:'gloves',legs:'hose_grey',feet:'riding_boots',weapon:'longsword',offhand:null}} }]),
+      { id:'kguard1', name:BARON_DOWN()?'Crown Soldier':'Keep Guard', i:13, j:6, dir:7, opts:GUARD({}) },
+      { id:'kguard2', name:BARON_DOWN()?'Crown Soldier':'Keep Guard', i:15, j:6, dir:7, opts:GUARD({skin:3}) },
       { id:'priest', name:'Mother Hild', i:4, j:13, dir:0, opts:{gender:'f',skin:0,hair:0,hairColor:13,face:1,equip:{head:'hood',torso:'smock',armor:null,hands:null,legs:null,feet:'boots',weapon:null,offhand:null}} },
       ...townsfolk(4,6,[[14,20],[14,10],[8,18],[20,18],[24,12],[4,20],[20,6],[8,8]]) ],
     mobs:()=>[], entries:{ fromMarket:{i:14,j:22}, fromChapel:{i:2,j:14} } },
@@ -15154,7 +15163,7 @@ document.getElementById('promo-btn').addEventListener('click',()=>{
 });
 document.getElementById('promo-code').addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter') document.getElementById('promo-btn').click(); });
 function testGobTalk(slot){
-  const SL={head:'Head',neck:'Neck',torso:'Torso',armor:'Armor',hands:'Hands',legs:'Legs',feet:'Feet',weapon:'Weapons',offhand:'Offhand',food:'Food & potions',misc:'Keepsakes & quest items'};
+  const SL={head:'Head',neck:'Neck',torso:'Torso',armor:'Armor',cloak:'Cloaks',hands:'Hands',legs:'Legs',feet:'Feet',weapon:'Weapons',offhand:'Offhand',food:'Food & potions',misc:'Keepsakes & quest items'};
   if(!slot){ say('Gratis the Goblin',["“Everything free! 0 gold, 0 silver, 0 copper! Gratis sells to anyone, even big-folk.”"],[
       ...Object.keys(SL).map(k=>({label:SL[k]+' ('+Object.keys(ITEMS).filter(id=>ITEMS[id].slot===k && !/^[tw]_/.test(id)).length+')', fn:()=>testGobTalk(k)})),
       {label:'Give me 500 copper too.', fn:()=>{ player.purse+=500; updateHud(); testGobTalk(); }},
@@ -17639,7 +17648,7 @@ function tabardGateAsk(){ const N="Baron's Gate Guard";
     {label:"“I'm new. They sent me down with dispatches.”", fn:roll(0.5,["“Dispatches. Nobody tells me anything. In you go.”"],"“Dispatches, without a satchel? Off with you, before I find out where you really got that.”")} ]); }
 { const oT=TALKERS.tollman; TALKERS.tollman=(...a)=>{ if(tabardOn() && !BARON_DOWN()){ say("Toll-keeper Brisk",["“Tabard. Face. Tabard. …On you go.”","“Soldiers don't pay. Even ones that smell like that.”"],[bye]); return; } return oT&&oT(...a); }; }
 // ════════ the Gold Brothers Trading Company: their black banner, their clothes, and burnt-wood shop shields ════════
-Object.assign(ITEMS,{ beret:{ name:'Black Beret', slot:'head', base:'kettle', col:'#1e1d22' }, vest_black:{ name:'Braided Black Waistcoat', slot:'armor' }, cowl_black:{ name:'Black Hooded Capelet', slot:'armor' },
+Object.assign(ITEMS,{ beret:{ name:'Black Beret', slot:'head', base:'kettle', col:'#1e1d22' }, vest_black:{ name:'Braided Black Waistcoat', slot:'armor' }, cowl_black:{ name:'Black Hooded Capelet', slot:'cloak' },
   shirt_white:{ name:'White Linen Shirt', slot:'torso', base:'shirt', col:'#eeebe2' }, breeches_cream:{ name:'Cream Knee-Breeches', slot:'legs', base:'trousers', col:'#e2d6b8' },
   trousers_black:{ name:'Black Trousers', slot:'legs', base:'trousers', col:'#25252b' }, boots_black:{ name:'Black Boots', slot:'feet', base:'boots', col:'#1c1816' } });
 function drawGbtcEmblem(c,cx,cy,s,col){                   // two long bars crossed, each closed with a short cross-bar at both ends, and G·T·B·Co in the four corners
@@ -25029,7 +25038,7 @@ wrap('vm_low','objects',l=>[...l.filter(o=>o.type!=='brazier'), {type:'dpillar',
 const KEEP_OPEN=()=> BARON_DOWN() ? !!CHOICE.ruler : (!!CHOICE.audience || CHOICE.baron==='sold_seal');
 const KEEP_SHUT_MSG=()=> BARON_DOWN() ? "“The keep's sealed for the trial. Nobody in or out.”" : "<i>A guard steps into the gate.</i> “The Baron sees no one without the Steward's leave. Talk to Orrin.”";
 { const _e=enterHouse; enterHouse=function(o){ if(o && o.inside==='keephall' && !KEEP_OPEN()){ say(BARON_DOWN()?'Crown Soldier':'Keep Guard',KEEP_SHUT_MSG(),[bye]); return; } return _e.apply(this,arguments); }; }
-const BARONO=()=>({gender:'m',skin:0,hair:1,hairColor:13,beard:4,face:0,equip:{head:null,torso:'baron_tabard',armor:'vest_black',hands:'gloves',legs:'breeches_cream',feet:'riding_boots',weapon:null,offhand:null}});
+const BARONO=()=>({gender:'m',skin:0,hair:1,hairColor:13,beard:4,face:0,equip:{head:null,torso:'velvet_doublet',armor:'vest_black',cloak:'ermine_mantle',neck:'chain_office',hands:'gloves',legs:'breeches_cream',feet:'riding_boots',weapon:null,offhand:null}});
 AREAS.keephall={ ...INSIDE_BASE, w:16, h:12, theme:'interior', castle:true, dwarf:true, label:"Hollowmere Keep · The Great Hall", mini:{x:0,y:0}, wallSeed:0,
   runners:[[7.3,8.7,2.2,12]],
   objects:()=>{ const down=BARON_DOWN(), l=[ {type:'teleporter', i:8, j:11, to:'keepward', entry:'fromKeepHall'},
@@ -25046,11 +25055,11 @@ AREAS.keephall={ ...INSIDE_BASE, w:16, h:12, theme:'interior', castle:true, dwar
     return l; },
   npcs:()=>{ const down=BARON_DOWN(); if(down) return [
       { id:'crownclerk', name:'Clerk of the Crown', i:13, j:9, dir:3, opts:{gender:'f',skin:1,hair:4,hairColor:3,face:1,equip:{head:null,torso:'tunic_blue',armor:'gambeson',hands:null,legs:'hose_grey',feet:'riding_boots',weapon:null,offhand:null}} },
-      { id:'hallsoldier', name:'Crown Soldier', i:7, j:10, dir:1, opts:GUARD({}) }, { id:'hallsoldier', name:'Crown Soldier', i:9, j:10, dir:1, opts:GUARD({skin:3}) } ];
+      { id:'hallsoldier', name:'Crown Soldier', i:7, j:10, dir:7, opts:GUARD({}) }, { id:'hallsoldier', name:'Crown Soldier', i:9, j:10, dir:7, opts:GUARD({skin:3}) } ];
     return [
       { id:'baron', name:'Bertram, Baron of Hollowmere', i:8, j:1, dir:1, sit:true, opts:BARONO() },
-      { id:'hallguard', name:'Hall Guard', i:6, j:3, dir:1, opts:GUARD({}) }, { id:'hallguard', name:'Hall Guard', i:10, j:3, dir:1, opts:GUARD({skin:3}) },
-      { id:'hallguard', name:'Hall Guard', i:7, j:10, dir:1, opts:GUARD({skin:2}) }, { id:'hallguard', name:'Hall Guard', i:9, j:10, dir:1, opts:GUARD({skin:4}) },
+      { id:'hallguard', name:'Hall Guard', i:6, j:3, dir:7, opts:GUARD({}) }, { id:'hallguard', name:'Hall Guard', i:10, j:3, dir:7, opts:GUARD({skin:3}) },
+      { id:'hallguard', name:'Hall Guard', i:7, j:10, dir:7, opts:GUARD({skin:2}) }, { id:'hallguard', name:'Hall Guard', i:9, j:10, dir:7, opts:GUARD({skin:4}) },
       { id:'scribe', name:'Court Scribe Wennick', i:13, j:9, dir:3, sit:true, opts:{gender:'m',skin:0,hair:3,hairColor:2,beard:0,face:2,equip:{head:'beret',torso:'shirt_white',armor:'gambeson',hands:null,legs:'hose_grey',feet:'riding_boots',weapon:null,offhand:null}} },
       { id:'petitioner', name:'A Kneeling Farmer', i:8, j:5, dir:3, sit:true, opts:{gender:'m',skin:2,hair:2,hairColor:1,beard:3,face:1,equip:{head:null,torso:'smock',armor:null,hands:null,legs:'breeches',feet:'boots',weapon:null,offhand:null}} } ]; },
   mobs:()=>[], entries:{ fromWard:{i:8,j:10}, fromUp:{i:14,j:2} } };
@@ -25097,8 +25106,8 @@ Object.assign(TALKERS,{ baron:baronTalk, scribe:scribeTalk, petitioner:petitione
 { const _k=kguardTalk; kguardTalk=function(){ if(!BARON_DOWN() && KEEP_OPEN()) return say('Keep Guard',"“The Steward says you're expected. Go on in. And wipe your boots.”",[bye]); if(BARON_DOWN() && CHOICE.ruler) return say('Crown Soldier',"“The keep's open to Crown business. Go in if you've got any.”",[bye]); return _k.apply(this,arguments); }; TALKERS.kguard1=kguardTalk; TALKERS.kguard2=kguardTalk; }
 // the strongbox in the solar: the Crown hasn't written it down yet
 onUse(['baronbox'],()=>{ if(CHOICE.baronBox) return pzSay('Empty. Someone has been here before you, and left the lid up.','#c8b890');
-  CHOICE.baronBox=1; player.purse+=120; updateHud(); logMsg('+120 copper from the Baron\'s strongbox.','#e8c060');
-  pzSay("The lock is broken already. Inside, under a false bottom: a fat purse, and a bundle of IOUs from half the guildmasters in Hollowmere. You keep the purse. The IOUs you leave for the Crown.",'#e8d8a8'); });
+  CHOICE.baronBox=1; player.purse+=120; updateHud(); logMsg('+120 copper from the Baron\'s strongbox.','#e8c060'); giveQuestItem('ermine_mantle',true); logMsg("Loot: The Baron's Ermine Mantle",'#8ac070');
+  pzSay("The lock is broken already. Inside, under a false bottom: a fat purse, a bundle of IOUs from half the guildmasters in Hollowmere, and folded on top of it all, his ermine mantle. You keep the purse and the mantle. The IOUs you leave for the Crown.",'#e8d8a8'); });
 // ── drawing it ──
 OBJ_DRAW.baronbox=o=>OBJ_DRAW.strongbox(o);
 OBJ_DRAW.dais=o=>{ const [fw,fh]=o.fp, a=P(o.i,o.j), b=P(o.i+fw,o.j), c=P(o.i+fw,o.j+fh), d=P(o.i,o.j+fh), H=9;   // a low stone dais under the Baron's seat
@@ -25172,6 +25181,52 @@ function paintCastleWalls(){ const {w,h}=ROOM, H=210, down=BARON_DOWN();
         g.fillStyle='#ffb040'; g.beginPath(); g.ellipse(sc.x,sc.y-23,4,7,0,0,Math.PI*2); g.fill(); g.save(); g.globalCompositeOperation='lighter'; glow(sc.x,sc.y-22,34,34,'255,170,80',0.35); g.restore(); } } });
   const oc=WPT('r',0,0); g.fillStyle='#5a544a'; g.fillRect(oc.x-6,oc.y-H,12,H); }
 { const _p=paintInteriorWalls; paintInteriorWalls=function(){ const A=AREAS[areaId]; if(A && A.castle) return paintCastleWalls(); return _p.apply(this,arguments); }; }
+// ════════ CLOAKS: their own peg on the body, worn over whatever armour you have on. Each has its cloth, its lining, a clasp, and some a collar of fur ════════
+var CLOAK_LOOK={
+  wool_cloak:{ main:'#5e4a36', lining:'#7c6a52', clasp:'#9a8a6a', hood:true },
+  fur_cloak:{ main:'#2e4436', lining:'#6a5038', fur:'#8a6644', clasp:'#c8a050' },
+  bear_cloak:{ main:'#3e2c20', lining:'#2e2018', fur:'#4e3626', shaggy:true, clasp:'#a8a090' },
+  ermine_mantle:{ main:'#7a1822', lining:'#e8e0d0', fur:'#f2ece0', ermine:true, trim:'#f2ece0', clasp:'#e0b84a' },
+  cowl_black:{ main:'#1e1d22', lining:'#2e2c32', clasp:'#6a6a70' } };
+delete CLOAK_LOOK.cowl_black;   // the capelet keeps its own drawing
+// a collar of fur over the shoulders: a soft band, tufted at the edge; ermine has its little black tails
+function furCollar(c,cx,cy,hw,K,front){ const col=K.fur, dk=tone(col,-0.35), lt=tone(col,0.18), N=11, sh=K.shaggy?1.35:1;
+  c.save(); c.fillStyle=dk; c.beginPath(); c.ellipse(cx,cy+1.5,hw+1,5*sh,0,0,Math.PI*2); c.fill();
+  for(let k=0;k<N;k++){ const t=k/(N-1), a=Math.PI*(1-t), px=cx+Math.cos(a)*hw, py=cy+(front?-Math.sin(a)*2.2+1.6:Math.sin(a)*1.5)+(k%2)*0.8;
+    c.fillStyle=k%3?col:lt; c.beginPath(); c.arc(px,py,(2.6+(k%2)*0.7)*sh,0,Math.PI*2); c.fill(); }
+  c.strokeStyle=dk; c.lineWidth=0.5; for(let k=0;k<N+4;k++){ const t=(k+0.5)/(N+4), a=Math.PI*(1-t), px=cx+Math.cos(a)*(hw+1.6), py=cy+2.8*sh+(front?0:0.5);   // tufts hanging off the edge
+    c.beginPath(); c.moveTo(px,py-1.4); c.lineTo(px+(k%2?0.6:-0.6),py+1.6*sh); c.stroke(); }
+  if(K.ermine){ c.fillStyle='#1a1614'; for(let k=0;k<6;k++){ const a=Math.PI*(0.12+k*0.15), px=cx+Math.cos(a)*hw*0.85, py=cy+1+(k%2); c.beginPath(); c.moveTo(px-0.6,py-0.9); c.lineTo(px+0.6,py-0.9); c.lineTo(px,py+1.1); c.closePath(); c.fill(); } }
+  c.restore(); }
+Object.assign(ITEMS,{
+  wool_cloak:{ name:"Traveller's Cloak", slot:'cloak', title:"Brown wool, oiled against the rain, a hood that actually stays up. Every road in the valley has had a cloak like this on it." },
+  fur_cloak:{ name:'Fur-collared Cloak', slot:'cloak', title:"Forest-green wool with a collar of fox fur. Warm as a hearth, and it makes people at inns pour your ale a little sooner." },
+  bear_cloak:{ name:'Bearskin Cloak', slot:'cloak', title:"A whole bear's worth of shoulders. Heavy, shaggy, and it smells faintly of the bear, even now." },
+  ermine_mantle:{ name:"The Baron's Ermine Mantle", slot:'cloak', title:"Red velvet to the floor, lined in silk, a collar of ermine with every little black tail still on it. It cost more than Dunhollow pays in a year." },
+  velvet_doublet:{ name:'Velvet Doublet', slot:'torso', base:'shirt', col:'#4a1424' },
+  chain_office:{ name:'Chain of Office', slot:'neck', title:"Heavy gold links and a medallion with a boar's head on it. It pulls at your neck like a bad conscience." } });
+NECK_LOOKS.chain_office={cord:'#d8b048',w:1.4,p:'disc',col:'#e8c050'};
+Object.assign(GEAR_HP,{ wool_cloak:3, fur_cloak:5, bear_cloak:8, ermine_mantle:5 });
+Object.assign(ITEM_STATS,{ wool_cloak:{hp:3}, fur_cloak:{hp:5}, bear_cloak:{hp:8}, ermine_mantle:{hp:5, magic:1}, chain_office:{hp:2} });
+Object.assign(PRICES,{ wool_cloak:30, fur_cloak:70, bear_cloak:110, ermine_mantle:260, velvet_doublet:20, chain_office:120 });
+// the icons: a cloak spread out, its lining showing, a collar of fur where it has one
+{ const _pa=paintItemArtBase; paintItemArtBase=function(g2,id,size){ const K=CLOAK_LOOK[id]; if(!K) return _pa.apply(this,arguments);
+    g2.save(); g2.scale(size/40,size/40);
+    const P2=(pts,fill,edge)=>{ g2.beginPath(); g2.moveTo(pts[0][0],pts[0][1]); pts.slice(1).forEach(q=>g2.lineTo(q[0],q[1])); g2.closePath(); g2.fillStyle=fill; g2.fill(); if(edge){ g2.strokeStyle=edge; g2.lineWidth=1; g2.stroke(); } };
+    P2([[20,4],[27,6],[29,11],[35,36],[5,36],[11,11],[13,6]],K.main,tone(K.main,-0.5));
+    P2([[14,11],[26,11],[29,36],[11,36]],K.lining);
+    g2.strokeStyle=tone(K.main,-0.3); g2.lineWidth=0.8; [8,13,27,32].forEach(xx=>{ g2.beginPath(); g2.moveTo(xx<20?13:27,12); g2.lineTo(xx,35); g2.stroke(); });
+    if(K.trim){ g2.fillStyle=K.trim; g2.fillRect(5,33,30,3); }
+    if(K.fur){ for(let k=0;k<9;k++){ const a=Math.PI*(1-k/8), px=20+Math.cos(a)*9, py=10-Math.sin(a)*3; g2.fillStyle=k%3?K.fur:tone(K.fur,0.2); g2.beginPath(); g2.arc(px,py,3.2*(K.shaggy?1.2:1),0,Math.PI*2); g2.fill(); }
+      if(K.ermine){ g2.fillStyle='#1a1614'; [13,18,23,27].forEach(px=>{ g2.fillRect(px,9,1.2,2.4); }); } }
+    else if(K.hood){ g2.fillStyle=tone(K.main,-0.2); g2.beginPath(); g2.ellipse(20,9,6,4,0,0,Math.PI*2); g2.fill(); }
+    g2.fillStyle=K.clasp; g2.beginPath(); g2.arc(20,13,2,0,Math.PI*2); g2.fill(); g2.restore(); }; }
+Object.keys(CLOAK_LOOK).forEach(id=>{ ITEM_ICON[id]=(g2,i2,size)=>paintItemArtBase(g2,i2,size); });
+// Bess sells the plain cloaks; the Bearskin from the old hunter; the Baron's mantle stays in his solar
+{ const _t=tailorTalk; tailorTalk=function(){ const _sf=shopFrom; shopFrom=function(name,stock,...r){ shopFrom=_sf; return _sf.call(this,name,[...stock,'wool_cloak','fur_cloak'],...r); }; try{ return _t.apply(this,arguments); } finally{ shopFrom=_sf; } }; TALKERS.tailor=tailorTalk; }
+{ const prevH=TALKERS.hunter; TALKERS.hunter=()=>{ if(CHOICE.bearPaid && !CHOICE.bearCloak){ say('Brann the Hunter',["“One more thing. I had Old Brumm's hide off him before the crows did, and my sister tanned it. It's a cloak now, if you want it. You earned the bear. I'll only ask what the tanning cost me.”"],
+      [{label:'Buy the Bearskin Cloak. (-80c)', off:player.purse<80, fn:()=>{ player.purse-=80; updateHud(); CHOICE.bearCloak=1; giveQuestItem('bear_cloak',true); logMsg('Loot: Bearskin Cloak','#8ac070'); say('Brann the Hunter',"“Suits you. You'll smell of bear for a week. Worth it.”",[bye]); }},
+       {label:'“Not now.”', fn:()=>prevH()}]); return; } return prevH(); }; }
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

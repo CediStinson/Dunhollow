@@ -7226,11 +7226,16 @@ const CITY_PAL=[ // plaster, timber, roof, stone
   {pl:'#d4b890',tb:'#3a2818',rf:'#6a3a2a',st:'#7a7064'}, {pl:'#c8c0b0',tb:'#2e2620',rf:'#5a4a40',st:'#6e6a62'} ];
 // the desert's edge: far flat-topped mesas, then dune after dune, all the colours of a loaf crust
 // the high pass: snow peaks far behind, a broken granite ridge, a few wind-bent pines and a bank of scree at its foot
+// a wash of sky behind a back wall, its gradient running up from the wall's own foot (skewed with the edge, so both walls fade alike)
+function edgeWash(a,b,ht,stops,fade){ const dx=b.x-a.x; if(!dx) return; g.save(); g.transform(1,(b.y-a.y)/dx,0,1,a.x,a.y);
+  const gr=g.createLinearGradient(0,-ht,0,0); stops.forEach(([t,c])=>gr.addColorStop(t,c)); g.fillStyle=gr; const x0=Math.min(0,dx), L=Math.abs(dx), f=Math.min(fade||0,L/2);
+  g.fillRect(x0+f,-ht,L-2*f,ht+0.5);
+  if(f) for(let k=0;k<12;k++){ g.globalAlpha=(k+0.5)/12; const sw=f/12; g.fillRect(x0+k*sw,-ht,sw+0.3,ht+0.5); g.fillRect(x0+L-(k+1)*sw-0.3,-ht,sw+0.3,ht+0.5); }   // the ends thin out
+  g.restore(); }
 function paintMountainBackdrop(){
   const {w,h}=ROOM, H=WALL_H, o=P(0,0), rEnd=P(w,0), lEnd=P(0,h);
   DOOR_GAPS=backDoorGaps();
-  const sky=(a,b)=>{ const gr=g.createLinearGradient(0,a.y-H*2.2,0,a.y); gr.addColorStop(0,'rgba(150,170,196,0)'); gr.addColorStop(0.5,'rgba(120,138,160,0.5)'); gr.addColorStop(1,'#3e4448');
-    g.fillStyle=gr; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(b.x,b.y-H*2.2); g.lineTo(a.x,a.y-H*2.2); g.closePath(); g.fill(); };
+  const sky=(a,b)=>edgeWash(a,b,H*2.2,[[0,'rgba(150,170,196,0)'],[0.5,'rgba(120,138,160,0.5)'],[1,'#3e4448']]);
   sky(o,rEnd); sky(lEnd,o);
   const peaks=(axis,len,depth)=>{ const R=(k,s)=>rnd01(k,depth*7+(axis==='r'?1:2),s);   // depth 0: far, pale and blue; 2: near, dark
     const body=['#7c8898','#5a6270','#3e4248'][depth], shade=['#6a7686','#4a505c','#2e3236'][depth], snow=['#e6ecf4','#dfe6ee','#d6dde6'][depth];
@@ -7263,8 +7268,7 @@ function paintMountainBackdrop(){
   if(typeof paintCaveMouths==='function') paintCaveMouths(); }
 function paintSandBackdrop(){
   const {w,h}=ROOM, H=WALL_H, o=P(0,0), rEnd=P(w,0), lEnd=P(0,h);
-  const wash=(a,b)=>{ const gr=g.createLinearGradient(0,a.y-H*1.4,0,a.y); gr.addColorStop(0,'rgba(220,180,130,0)'); gr.addColorStop(0.5,'rgba(196,150,100,0.55)'); gr.addColorStop(1,'#b8895a');
-    g.fillStyle=gr; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(b.x,b.y-H*1.4); g.lineTo(a.x,a.y-H*1.4); g.closePath(); g.fill(); };
+  const wash=(a,b)=>edgeWash(a,b,H*2.3,[[0,'rgba(226,190,150,0)'],[0.35,'rgba(214,172,124,0.42)'],[0.7,'rgba(200,154,104,0.8)'],[1,'#b8895a']]);
   wash(o,rEnd); wash(lEnd,o);
   const edge=(axis,len,fn)=>{ for(let u=-0.6;u<len+0.6;u+=0.25){ if(gapAt(axis,u,1)) continue; fn(axis==='r'?P(u,0):P(0,u),u); } };
   DOOR_GAPS=backDoorGaps();
@@ -7277,11 +7281,11 @@ function paintSandBackdrop(){
       g.fillStyle='rgba(255,220,180,0.25)'; g.beginPath(); g.moveTo(p.x-wd*0.45,y-ht); g.lineTo(p.x+wd*0.45,y-ht); g.lineTo(p.x+wd*0.4,y-ht+8); g.lineTo(p.x-wd*0.42,y-ht+8); g.closePath(); g.fill(); } };
   mesa('r',w); mesa('l',h);
   const dune=(depth,col,lit)=>['r','l'].forEach(axis=>{ const len=axis==='r'?w:h; g.fillStyle=col; g.beginPath(); let first=true, last=null;
-      for(let u=-0.6;u<=len+0.6;u+=0.2){ const p=axis==='r'?P(u,0):P(0,u), hh=(18+depth*14)*(0.6+0.5*Math.sin(u*(0.9-depth*0.15)+depth*2+(axis==='r'?0:1.7))+0.3*Math.sin(u*2.3+depth)), y=p.y-(2-depth)*14-hh;
+      for(let u=0;u<=len+0.6;u+=0.2){ const p=axis==='r'?P(u,0):P(0,u), hh=(18+depth*14)*(0.6+0.5*Math.sin(u*(0.9-depth*0.15)+depth*2+(axis==='r'?0:1.7)*Math.min(1,u/2))+0.3*Math.sin(u*2.3+depth)), y=p.y-(2-depth)*14-hh;
         if(first){ g.moveTo(p.x,p.y); g.lineTo(p.x,y); first=false; } else g.lineTo(p.x,y); last=p; }
       g.lineTo(last.x,last.y); g.closePath(); g.fill();
       g.strokeStyle=lit; g.lineWidth=1.5; g.beginPath(); first=true;
-      for(let u=-0.6;u<=len+0.6;u+=0.2){ const p=axis==='r'?P(u,0):P(0,u), hh=(18+depth*14)*(0.6+0.5*Math.sin(u*(0.9-depth*0.15)+depth*2+(axis==='r'?0:1.7))+0.3*Math.sin(u*2.3+depth)), y=p.y-(2-depth)*14-hh; first?(g.moveTo(p.x,y),first=false):g.lineTo(p.x,y); } g.stroke(); });
+      for(let u=0;u<=len+0.6;u+=0.2){ const p=axis==='r'?P(u,0):P(0,u), hh=(18+depth*14)*(0.6+0.5*Math.sin(u*(0.9-depth*0.15)+depth*2+(axis==='r'?0:1.7)*Math.min(1,u/2))+0.3*Math.sin(u*2.3+depth)), y=p.y-(2-depth)*14-hh; first?(g.moveTo(p.x,y),first=false):g.lineTo(p.x,y); } g.stroke(); });
   dune(0,'#c49662','rgba(255,228,180,0.5)'); dune(1,'#d2a66e','rgba(255,232,190,0.55)'); dune(2,'#ddb47c','rgba(255,238,200,0.6)'); }
 function paintCityBackdrop(){
   const {w,h}=ROOM;
@@ -7539,9 +7543,26 @@ function paintKeep(X,Y,fw,fh){                             // the Baron's keep: 
   paintBuilding(X,Y,{...o,rh:2,door:'l',dt:Math.floor(fw/2)});
   const top=(gi,gj)=>pt(gi,gj,262);
   const poly=(pts,fill)=>{ g.beginPath(); pts.forEach((p2,n)=>n?g.lineTo(p2.x,p2.y):g.moveTo(p2.x,p2.y)); g.closePath(); g.fillStyle=fill; g.fill(); };
-  poly([top(-fw,-fh),top(0,-fh),top(0,0),top(-fw,0)],'#6e6a62');
-  for(let t=0;t<fw;t+=0.5){ const a=pt(-fw+t,0,262), b=pt(-fw+t+0.25,0,262); poly([a,b,{x:b.x,y:b.y-14},{x:a.x,y:a.y-14}],'#9a968c'); }
-  for(let t=0;t<fh;t+=0.5){ const a=pt(0,-fh+t,262), b=pt(0,-fh+t+0.25,262); poly([a,b,{x:b.x,y:b.y-14},{x:a.x,y:a.y-14}],'#6a665e'); }
+  // the roof: a flagged fighting deck sunk behind a parapet walk, merlons on all four sides
+  const merlon=(gi,gj,di,dj,face,cap)=>{ const a=pt(gi,gj,262), b=pt(gi+di*0.26,gj+dj*0.26,262); poly([a,b,{x:b.x,y:b.y-15},{x:a.x,y:a.y-15}],face);
+    const a2=pt(gi+(dj?-0.12:0),gj+(di?-0.12:0),277), b2=pt(gi+di*0.26+(dj?-0.12:0),gj+dj*0.26+(di?-0.12:0),277); poly([{x:a.x,y:a.y-15},{x:b.x,y:b.y-15},b2,a2],cap); };
+  for(let t=0;t<fw;t+=0.5) merlon(-fw+t+0.12,-fh,1,0,'#77736a','#aaa69c');                       // the far sides first, so the deck covers their feet
+  for(let t=0;t<fh;t+=0.5) merlon(-fw,-fh+t+0.12,0,1,'#5e5a53','#aaa69c');
+  poly([top(-fw,-fh),top(0,-fh),top(0,0),top(-fw,0)],'#8c887e');                                // the parapet walk
+  const W=0.55, deck=[pt(-fw+W,-fh+W,254),pt(-W,-fh+W,254),pt(-W,-W,254),pt(-fw+W,-W,254)];
+  poly(deck,'#6a665e'); g.save(); g.clip();
+  g.strokeStyle='rgba(30,28,24,0.28)'; g.lineWidth=1;
+  for(let gi=-fw;gi<=0;gi+=1){ const q0=pt(gi,-fh,254), q1=pt(gi,0,254); g.beginPath(); g.moveTo(q0.x,q0.y); g.lineTo(q1.x,q1.y); g.stroke(); }
+  for(let gj=-fh;gj<=0;gj+=0.5){ const q0=pt(-fw,gj,254), q1=pt(0,gj,254); g.beginPath(); g.moveTo(q0.x,q0.y); g.lineTo(q1.x,q1.y); g.stroke(); }
+  for(let k=0;k<fw*fh*1.2;k++){ const gi=-fw+rnd01(k,1,771)*fw, gj=-fh+rnd01(k,2,772)*fh, q=pt(Math.floor(gi),Math.floor(gj*2)/2,254), q1=pt(Math.floor(gi)+1,Math.floor(gj*2)/2,254), q2=pt(Math.floor(gi)+1,Math.floor(gj*2)/2+0.5,254), q3=pt(Math.floor(gi),Math.floor(gj*2)/2+0.5,254);
+    g.fillStyle=rnd01(k,3,773)<0.5?'rgba(255,250,235,0.07)':'rgba(20,18,14,0.10)'; g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(q1.x,q1.y); g.lineTo(q2.x,q2.y); g.lineTo(q3.x,q3.y); g.closePath(); g.fill(); }   // worn and patched flags
+  { const s0=pt(-fw+W,-fh+W,254), s1=pt(-W,-fh+W,254), s2=pt(-fw+W,-W,254); g.fillStyle='rgba(16,14,10,0.34)';            // the far parapets throw their shade down onto the deck
+    g.beginPath(); g.moveTo(s0.x,s0.y); g.lineTo(s1.x,s1.y); g.lineTo(s1.x-10,s1.y+16); g.lineTo(s0.x,s0.y+22); g.lineTo(s2.x+18,s2.y+2); g.lineTo(s2.x,s2.y); g.closePath(); g.fill(); }
+  g.restore();
+  { const q=pt(-fw*0.5,-fh*0.5,254); g.fillStyle='#3a2a1a'; g.beginPath(); g.moveTo(q.x-22,q.y); g.lineTo(q.x,q.y-11); g.lineTo(q.x+22,q.y); g.lineTo(q.x,q.y+11); g.closePath(); g.fill();   // the stair hatch
+    g.strokeStyle='#1e150c'; g.lineWidth=1.2; g.stroke(); g.strokeStyle='rgba(200,170,120,0.35)'; g.beginPath(); g.moveTo(q.x-11,q.y-5.5); g.lineTo(q.x+11,q.y+5.5); g.moveTo(q.x-11,q.y+5.5); g.lineTo(q.x+11,q.y-5.5); g.stroke(); }
+  for(let t=0;t<fw;t+=0.5) merlon(-fw+t+0.12,0,1,0,'#9a968c','#b6b2a8');
+  for(let t=0;t<fh;t+=0.5) merlon(0,-fh+t+0.12,0,1,'#7c786f','#b6b2a8');
   [[-fw,0],[0,0],[0,-fh]].forEach(([gi,gj])=>{ const q=pt(gi,gj); paintTower(q.x,q.y+10,40,320,'#7a1a1a'); });
   const gate=pt(-fw/2,0); g.fillStyle='#1a1410'; g.beginPath(); g.moveTo(gate.x-40,gate.y+18); g.lineTo(gate.x-40,gate.y-60); g.quadraticCurveTo(gate.x-6,gate.y-110,gate.x+30,gate.y-80); g.lineTo(gate.x+30,gate.y-12); g.closePath(); g.fill();
   [-fw*0.25,-fw*0.75].forEach(gi=>{ const b=pt(gi,0,230); g.fillStyle='#7a1a1a'; g.fillRect(b.x-16,b.y,32,90); drawBaronSigil(g,b.x,b.y+42,26); });
@@ -9432,11 +9453,7 @@ function paintBackdrop(){
   if(AREAS[areaId].mountain){ paintMountainBackdrop(); return; }
   if((AREAS[areaId].theme==='village'||AREAS[areaId].theme==='farm') && !AREAS[areaId].boggy && AREAS[areaId].vista!=='forest'){ paintCountryBackdrop(); return; }
   const {w,h}=ROOM, H=WALL_H, o=P(0,0), rEnd=P(w,0), lEnd=P(0,h);
-  const baseFill=(a,b)=>{
-    const gr=g.createLinearGradient(0,a.y-H,0,a.y);
-    gr.addColorStop(0,'rgba(10,16,9,0.0)'); gr.addColorStop(0.35,'#0c140a'); gr.addColorStop(1,'#101a0c');
-    g.fillStyle=gr; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(b.x,b.y-H); g.lineTo(a.x,a.y-H); g.closePath(); g.fill();
-  };
+  const baseFill=(a,b)=>edgeWash(a,b,H,[[0,'rgba(10,16,9,0)'],[0.35,'#0c140a'],[1,'#101a0c']]);
   baseFill(o,rEnd); baseFill(lEnd,o);
   const conifer=(x,y,ht,wd,col,lit)=>{
     const tiers=4;
@@ -9485,11 +9502,8 @@ function paintBackdrop(){
   }};
   brush('r',w); brush('l',h);
   const mist=(a,b)=>{
-    const gr=g.createLinearGradient(0,a.y-70,0,a.y);
-    const mk=AREAS[areaId].theme==='bog'?2.6:1;
-    const mc=AREAS[areaId].theme==='ash'?'200,90,50':'170,190,160';
-    gr.addColorStop(0,'rgba('+mc+',0)'); gr.addColorStop(0.7,'rgba('+mc+','+(0.10*mk)+')'); gr.addColorStop(1,'rgba('+mc+','+(0.02*mk)+')');
-    g.fillStyle=gr; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(b.x,b.y-70); g.lineTo(a.x,a.y-70); g.closePath(); g.fill();
+    const mk=AREAS[areaId].theme==='bog'?2.6:1, mc=AREAS[areaId].theme==='ash'?'200,90,50':'170,190,160';
+    edgeWash(a,b,70,[[0,'rgba('+mc+',0)'],[0.7,'rgba('+mc+','+(0.10*mk)+')'],[1,'rgba('+mc+','+(0.02*mk)+')']],90);
   };
   mist(o,rEnd); mist(lEnd,o);
   paintCaveMouths();
@@ -14839,13 +14853,20 @@ function puzAct(o){                                 // you use something in the 
 // ── how the puzzle pieces look ──
 const tileQuad=(i,j,inset=0)=>{ const a=P(i+inset,j+inset), b=P(i+1-inset,j+inset), c=P(i+1-inset,j+1-inset), d=P(i+inset,j+1-inset); return [a,b,c,d]; };
 const fillQuad=(q,col)=>{ g.fillStyle=col; g.beginPath(); q.forEach((p,k)=>k?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); g.fill(); };
+const streamQuad=(o,inset)=>[P(o.i,o.j+inset),P(o.i+1,o.j+inset),P(o.i+1,o.j+1-inset),P(o.i,o.j+1-inset)];   // the stream runs along i: no seams between its tiles, banks only on the two long sides
+function streamBed(o,deep='#16323e',mid='#2c6474',lip='#4e8a96'){ fillQuad(streamQuad(o,0.02),'#2a2a26'); fillQuad(streamQuad(o,0.08),'#3c3a34');
+  const q=streamQuad(o,0.13), a=P(o.i+0.5,o.j+0.13), b0=P(o.i+0.5,o.j+0.87), ax=P(o.i+1,o.j).x-P(o.i,o.j).x, ay=P(o.i+1,o.j).y-P(o.i,o.j).y, L=Math.hypot(ax,ay), nx=-ay/L, ny=ax/L, dn=(b0.x-a.x)*nx+(b0.y-a.y)*ny, gr=g.createLinearGradient(a.x,a.y,a.x+nx*dn,a.y+ny*dn); gr.addColorStop(0,deep); gr.addColorStop(0.45,mid); gr.addColorStop(1,deep); fillQuad(q,gr);
+  g.strokeStyle=lip; g.globalAlpha=0.45; g.lineWidth=1; g.beginPath(); g.moveTo(q[0].x,q[0].y); g.lineTo(q[1].x,q[1].y); g.stroke(); g.globalAlpha=1; }
 const PUZ_DRAW={
   plate:o=>{ const on=OBJECTS.some(b=>b.type==='block'&&b.i===o.i&&b.j===o.j); fillQuad(tileQuad(o.i,o.j,0.12),on?'#7a8a6a':'#8a8478'); fillQuad(tileQuad(o.i,o.j,0.2),on?'#9ab08a':'#a8a294');
     if(!on){ const c=P(o.i+0.5,o.j+0.5); g.save(); g.globalCompositeOperation='lighter'; glow(c.x,c.y,16,8,'240,210,120',0.25+Math.sin(gt*3)*0.08); g.restore(); } },
-  water:o=>{ fillQuad(tileQuad(o.i,o.j),'#24506a'); fillQuad(tileQuad(o.i,o.j,0.08),'#3a7090'); const c=P(o.i+0.5,o.j+0.5), t=(gt*0.6+o.i*0.37)%1;
-    g.strokeStyle=`rgba(200,235,250,${0.35*(1-t)})`; g.lineWidth=1; g.beginPath(); g.ellipse(c.x,c.y,6+t*16,3+t*7,0,0,Math.PI*2); g.stroke(); },
-  ice:o=>{ fillQuad(tileQuad(o.i,o.j),'#a8d0e8'); fillQuad(tileQuad(o.i,o.j,0.1),'#d8eef8'); const c=P(o.i+0.5,o.j+0.5); g.strokeStyle='rgba(255,255,255,0.8)'; g.lineWidth=1; g.beginPath(); g.moveTo(c.x-10,c.y-2); g.lineTo(c.x+4,c.y+3); g.moveTo(c.x-2,c.y-5); g.lineTo(c.x+8,c.y-1); g.stroke(); },
-  filled:o=>{ fillQuad(tileQuad(o.i,o.j),'#24506a'); const c=P(o.i+0.5,o.j+0.5); g.fillStyle='#6a6a62'; g.beginPath(); g.ellipse(c.x,c.y,26,11,0,0,Math.PI*2); g.fill(); g.fillStyle='#8a8a80'; g.beginPath(); g.ellipse(c.x-3,c.y-2,20,8,0,0,Math.PI*2); g.fill(); },
+  water:o=>{ streamBed(o); const c=P(o.i+0.5,o.j+0.5);                                                 // one running stream, not a row of blue tiles: dark banks, deep water, the current sliding along it
+    g.save(); g.beginPath(); streamQuad(o,0.13).forEach((p,k)=>k?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); g.clip();
+    for(let k=0;k<5;k++){ const v=0.2+k*0.15, u=((gt*0.35+k*0.37+o.i*0.21)%1.4)-0.2, a=P(o.i+u,o.j+v), b=P(o.i+u+0.28,o.j+v); g.strokeStyle=`rgba(200,235,245,${0.16+0.1*Math.sin(gt*2+k+o.i)})`; g.lineWidth=1.2; g.lineCap='round'; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); }
+    const t=(gt*0.5+o.i*0.37)%1; g.strokeStyle=`rgba(210,240,250,${0.22*(1-t)})`; g.lineWidth=1; g.beginPath(); g.ellipse(c.x,c.y,5+t*14,2.4+t*6,0,0,Math.PI*2); g.stroke(); g.restore(); },
+  ice:o=>{ streamBed(o,'#9cc4dc','#d4eaf6','#b8dcee'); const c=P(o.i+0.5,o.j+0.5); g.strokeStyle='rgba(255,255,255,0.8)'; g.lineWidth=1; g.beginPath(); g.moveTo(c.x-12,c.y-2); g.lineTo(c.x+4,c.y+3); g.lineTo(c.x+14,c.y+1); g.moveTo(c.x-2,c.y-5); g.lineTo(c.x+8,c.y-1); g.moveTo(c.x-6,c.y+1); g.lineTo(c.x-10,c.y+5); g.stroke();
+    g.fillStyle='rgba(255,255,255,0.35)'; g.beginPath(); g.ellipse(c.x-8,c.y-3,7,2,-0.4,0,Math.PI*2); g.fill(); },
+  filled:o=>{ streamBed(o); const c=P(o.i+0.5,o.j+0.5); g.fillStyle='#6a6a62'; g.beginPath(); g.ellipse(c.x,c.y,26,11,0,0,Math.PI*2); g.fill(); g.fillStyle='#8a8a80'; g.beginPath(); g.ellipse(c.x-3,c.y-2,20,8,0,0,Math.PI*2); g.fill(); },
   block:o=>{ const c=P(o.i+0.5,o.j+0.5), H=34, x=c.x, y=c.y+2;
     g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(x+4,y+2,30,11,0,0,Math.PI*2); g.fill();
     g.fillStyle='#6e6a60'; g.beginPath(); g.moveTo(x-28,y-2); g.lineTo(x,y+12); g.lineTo(x,y+12-H); g.lineTo(x-28,y-2-H); g.closePath(); g.fill();
@@ -14990,11 +15011,11 @@ function backDoorGaps(){ const L=[]; OBJECTS.forEach(o=>{ if(o.type!=='teleporte
 function gapAt(side,u,depth){ return DOOR_GAPS.some(d=>d.side===side && Math.abs(d.u-u) < (d.cave ? (depth===0?1.4:2.4) : depth===3?0.8:1.0)); }
 const WPT=(side,u,hh)=>{ const p= side==='r'?P(u,0):P(0,u); return {x:p.x,y:p.y-hh}; };
 // a forest road running on between the trees: a lighter glade far off, the track narrowing into it
-function paintDoorVistas(){ DOOR_GAPS.forEach(d=>{ if(d.cave) return; const H=WALL_H, top=H*2.1, half=1.5, N=24;
-    for(let n=0;n<N;n++){ const u0=d.u-half+n*(2*half/N), u1=u0+2*half/N+0.02, m=(u0+u1)/2-d.u, k=Math.cos(Math.min(1,Math.abs(m)/half)*Math.PI/2)**1.6;   // soft at the sides
-      const a=WPT(d.side,u0,-3), b=WPT(d.side,u1,-3), gr=g.createLinearGradient(0,a.y-top,0,a.y);
-      gr.addColorStop(0,'rgba(5,8,4,0)'); gr.addColorStop(0.25,'rgba(5,8,4,'+(0.75*k)+')'); gr.addColorStop(1,'rgba(4,6,3,'+(0.97*k)+')');
-      g.fillStyle=gr; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(a.x,a.y-top); g.lineTo(b.x,b.y-top); g.lineTo(b.x,b.y); g.closePath(); g.fill(); } }); }
+function paintDoorVistas(){ DOOR_GAPS.forEach(d=>{ if(d.cave) return; const H=WALL_H, top=H*1.9, half=1.7;   // a way out between the trunks: one soft arch of dark, no seams
+    const a=WPT(d.side,d.u-half,-3), b=WPT(d.side,d.u+half,-3), c={x:(a.x+b.x)/2,y:(a.y+b.y)/2}, hw=Math.abs(b.x-a.x)/2; if(!hw) return;
+    g.save(); g.transform(hw,(b.y-a.y)/(b.x-a.x)*hw,0,top,c.x,c.y);
+    const gr=g.createRadialGradient(0,0,0,0,0,1); gr.addColorStop(0,'rgba(4,6,3,0.97)'); gr.addColorStop(0.45,'rgba(4,7,3,0.86)'); gr.addColorStop(0.78,'rgba(5,8,4,0.4)'); gr.addColorStop(1,'rgba(5,8,4,0)');
+    g.fillStyle=gr; g.fillRect(-1,-1,2,1.01); g.restore(); }); }
 // a cliff of grey stone in the treeline with a black mouth in it
 function paintCaveMouths(){ DOOR_GAPS.forEach(d=>{ if(!d.cave) return; const k=Math.round(d.u*7);
     const pts=[]; for(let t=-2.3;t<=2.31;t+=0.25){ const hh = 30 + (1-Math.abs(t)/2.3)*95 + (rnd01(k,Math.round(t*8),750)-0.5)*18; pts.push(WPT(d.side,d.u+t,Math.max(8,hh))); }
@@ -24709,6 +24730,23 @@ JOURNAL.push(["Abel's Bell", ()=> !CHOICE.bwbell ? null : CHOICE.bwbell==='done'
   : CHOICE.bwbell==='rung' ? ['active',"The bell has rung and the Drowned are gone. Tell Pell the Eel-Man in the Blackwater."]
   : hasItem('bell_clapper') ? ['active',"Hang Old Abel's clapper back in the drowned bell at the Blackwater's edge, and ring it after dark, when the Drowned can hear it."]
   : ['active',"The Blackwater's drowned bell has no clapper. Pell says it went into the water with Old Abel, out towards the Sunken Wood."]]);
+// archive shelves: a tall cabinet against the wall, ledgers and rolled deeds on four boards (they were solid but invisible before)
+OBJ_DRAW.shelf=o=>{ const x0=o.i+0.04, y0=o.j+0.06, w=0.92, d=0.42, H=92; isoBox(x0,y0,w,d,H,'#6a4a2a','#4a321c','#3a2614');
+  const A=P(x0,y0+d), B=P(x0+w,y0+d), at=(t,h)=>({x:A.x+(B.x-A.x)*t, y:A.y+(B.y-A.y)*t-h}), sd=o.i*7+o.j*13;
+  g.fillStyle='#1e140a'; g.beginPath(); [at(0.05,4),at(0.95,4),at(0.95,H-4),at(0.05,H-4)].forEach((q,n)=>n?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.closePath(); g.fill();   // the dark inside
+  for(let r=0;r<4;r++){ const h0=6+r*21; let t=0.07;
+    while(t<0.9){ const k=Math.floor(t*40)+r*11, bw=0.045+rnd01(sd,k,1301)*0.035, bh=11+rnd01(sd,k,1302)*7, lean=rnd01(sd,k,1303)<0.12, scroll=rnd01(sd,k,1304)<0.18;
+      if(rnd01(sd,k,1305)<0.1){ t+=bw; continue; }                                                        // a gap where something was taken out
+      const a=at(t,h0), b=at(t+bw,h0), col=['#7a2e22','#2e4a6a','#3e5a34','#8a6a2a','#5a3a5a','#6a5a48','#a08a5a'][Math.floor(rnd01(sd,k,1306)*7)];
+      if(scroll){ g.fillStyle='#d8c8a0'; g.beginPath(); g.ellipse((a.x+b.x)/2,(a.y+b.y)/2-3,3.2,3,0,0,Math.PI*2); g.fill(); g.strokeStyle='#8a7a54'; g.lineWidth=0.7; g.stroke(); g.fillStyle='#8a2a20'; g.fillRect((a.x+b.x)/2-0.8,(a.y+b.y)/2-6,1.6,6); }
+      else { g.fillStyle=col; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(b.x+(lean?3:0),b.y-bh); g.lineTo(a.x+(lean?3:0),a.y-bh); g.closePath(); g.fill();
+        g.fillStyle='rgba(240,220,160,0.55)'; g.fillRect(a.x+(lean?1.5:0),a.y-bh*0.62,Math.max(1.5,b.x-a.x),1.2); }                                         // a gilt band on the spine
+      t+=bw+0.004; }
+    const s0=at(0.04,h0), s1=at(0.96,h0); g.strokeStyle='#8a6438'; g.lineWidth=2.4; g.beginPath(); g.moveTo(s0.x,s0.y+1); g.lineTo(s1.x,s1.y+1); g.stroke(); } };   // the board they stand on
+NEAR_NAME.shelf='a shelf of ledgers';
+// water never runs out over the edge of the map: every pool is painted inside the floor's own diamond
+{ const pp0=paintPool; paintPool=function(o){ const {w,h}=ROOM, a=P(0,0), b=P(w,0), c=P(w,h), d=P(0,h);
+    g.save(); g.beginPath(); g.moveTo(a.x,a.y-30); g.lineTo(b.x,b.y); g.lineTo(c.x,c.y); g.lineTo(d.x,d.y); g.closePath(); g.clip(); try{ pp0(o); } finally { g.restore(); } }; }
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

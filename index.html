@@ -14367,7 +14367,8 @@ function drawActorBase(e){
     g.translate(s.x,B); g.rotate(dir2*ease*(Math.PI/2)*0.94); g.translate(-s.x,-B);
   }
   if(isP && combat.phase==='down') g.globalAlpha=0.45;
-  if(e.flash>0 && Math.floor(e.flash*22)%2) g.globalAlpha*=0.35;
+  if(e.flash>0 && isP && Math.floor(e.flash*22)%2) g.globalAlpha*=0.35;
+  if(e.flash>0 && !isP && !e.dead){ const gs3=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(s.x,B-48,30,58,'255,240,215',Math.min(0.75,e.flash*2.4)); g.globalCompositeOperation=gs3; }   // a struck foe flares white for a moment
   if(open){ const gs2=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(s.x,B-50,46+Math.sin(gt*14)*6,72,'255,200,70',0.55); g.globalCompositeOperation=gs2; }   // a cheap halo instead of a blurred shadow on every stroke
   if(e.opts && e.opts.ghost){ g.globalAlpha*=0.5+Math.sin(gt*2.2)*0.08; glow(s.x,B-50,40,70,'170,210,255',0.25); }
   if(e.type==='dummy') drawDummy(s.x,B,e);
@@ -25390,6 +25391,38 @@ ITEM_ICON.bearskull_cloak=(g2,id,size)=>{ paintItemArtBase(g2,'bear_cloak',size)
       c.beginPath(); c.moveTo(x+LN-HW-2.4,B+Y.HAIRLINE+1); c.quadraticCurveTo(x+LN,B+Y.HAIRLINE+4,x+LN+HW+2.4,B+Y.HAIRLINE+1); c.quadraticCurveTo(x+LN+HW+1.6,B+Y.CHIN-1,x+LN+HW-1.2,B+Y.CHIN+2.6); c.quadraticCurveTo(x+LN+HW+0.4,B+Y.SHOULDER,x+LN+HW+5,B+Y.SHOULDER+3.4); c.quadraticCurveTo(x+LN,B+Y.SHOULDER+6,x+LN-HW-5,B+Y.SHOULDER+3.4); c.quadraticCurveTo(x+LN-HW-0.4,B+Y.SHOULDER,x+LN-HW+1.2,B+Y.CHIN+2.6); c.quadraticCurveTo(x+LN-HW-1.6,B+Y.CHIN-1,x+LN-HW-2.4,B+Y.HAIRLINE+1); c.closePath(); c.fill();
       c.strokeStyle='rgba(30,20,12,0.5)'; c.lineWidth=0.5; for(let k=0;k<8;k++){ const px=x+LN-HW+k*HW/3.5, py=B+Y.CHIN+(k%2)*2; c.beginPath(); c.moveTo(px,py-4); c.lineTo(px+0.4,py+2); c.stroke(); } }
     c.restore(); return r; }; }
+// ════════ Combat feel: a blow that lands stops the world for a breath, throws him back and leaves a cut in the air ════════
+const HITFX={ slash:null, hurt:0, glint:null };
+{ const _w=woundRaw; woundRaw=function(f,n,label,col){ const h0=f?f.hp:0; const r=_w.apply(this,arguments);
+    try{ if(f && f!==player && HIT_SRC==='melee' && f.hp<h0){ const big=(h0-f.hp)>=(weaponOf(player).dmg||8)*1.5 || f.hp<=0;
+        if(slowmo.t<=0 || slowmo.scale>0.2){ slowmo.scale=0.06; slowmo.t=big?0.12:0.07; }               // hitstop: heavier for a crit or the last blow
+        const d=[f.i-player.i,f.j-player.j], l=Math.hypot(d[0],d[1])||1; if(f.state!=='windup'){ f.ox=d[0]/l*(big?0.32:0.2); f.oy=d[1]/l*(big?0.32:0.2); }   // knocked back a step's worth
+        HITFX.slash={ t:0, dir:playerGuard, big, at:[f.x,f.y] }; } }catch(e){}
+    return r; }; }
+{ const _h=hurtPlayer; hurtPlayer=function(n,label){ const h0=player.hp; const r=_h.apply(this,arguments);
+    try{ if(player.hp<h0 && !combat.practice){ HITFX.hurt=Math.min(1,0.45+(h0-player.hp)/Math.max(20,player.maxHp)*2); if(slowmo.t<=0){ slowmo.scale=0.1; slowmo.t=0.07; } } }catch(e){}
+    return r; }; }
+{ const _b=beginWind; beginWind=function(f,quick){ const r=_b.apply(this,arguments); try{ HITFX.glint={t:0, f}; }catch(e){} return r; }; }   // the steel catches the light as he draws back
+{ const _cs=combatStep; combatStep=function(dt){ _cs.apply(this,arguments);
+    if(HITFX.slash){ HITFX.slash.t+=dt; if(HITFX.slash.t>0.2) HITFX.slash=null; }
+    if(HITFX.glint){ HITFX.glint.t+=dt; if(HITFX.glint.t>0.32) HITFX.glint=null; }
+    HITFX.hurt=Math.max(0,HITFX.hurt-dt*1.8); }; }
+{ const _o=drawCombatOver; drawCombatOver=function(){ _o.apply(this,arguments);
+    const f=combat.foe;
+    if(HITFX.slash && f){ const S=HITFX.slash, q=S.t/0.2, fs=P(f.x+(f.ox||0),f.y+(f.oy||0)), cx=fs.x, cy=fs.y-56;   // a bright crescent across him, the way the blade went
+      const flip = S.dir==='right' ? -1 : 1, R=(S.big?34:28)*(0.85+q*0.3);
+      g.save(); g.globalCompositeOperation='lighter'; g.lineCap='round';
+      for(let k=0;k<2;k++){ g.strokeStyle=k?`rgba(255,255,255,${0.9*(1-q)})`:`rgba(255,200,120,${0.6*(1-q)})`; g.lineWidth=(k?2:6)*(S.big?1.3:1);
+        g.beginPath(); if(S.dir==='up'){ g.moveTo(cx-4,cy-R*0.9); g.quadraticCurveTo(cx+10,cy,cx-2,cy+R*0.8); }
+        else { g.moveTo(cx-flip*R,cy-R*0.6); g.quadraticCurveTo(cx+flip*4,cy-6,cx+flip*R*0.9,cy+R*0.55); } g.stroke(); }
+      g.restore(); }
+    if(HITFX.glint && HITFX.glint.f===f && f && f.state==='windup'){ const q=HITFX.glint.t/0.32, fs=P(f.x+(f.ox||0),f.y+(f.oy||0)), side=f.swingDir==='left'?-1:f.swingDir==='right'?1:0, gx=fs.x+side*22, gy=fs.y-(f.type==='wolf'?50:96), r=10*(1-Math.abs(q*2-1))+2;   // a star of light where the blow will come from
+      g.save(); g.globalCompositeOperation='lighter'; g.strokeStyle=`rgba(255,250,230,${1-q})`; g.lineWidth=1.6;
+      g.beginPath(); g.moveTo(gx-r,gy); g.lineTo(gx+r,gy); g.moveTo(gx,gy-r*1.3); g.lineTo(gx,gy+r*1.3); g.stroke(); glow(gx,gy,r*1.2,r*1.2,'255,240,200',0.7*(1-q)); g.restore(); }
+    if(HITFX.hurt>0 || (combat.active && player.hp>0 && player.hp<player.maxHp*0.3)){     // the edges of sight go red when you are struck, and stay faintly red while you bleed out
+      const W=gc.width, H=gc.height, low=combat.active && player.hp<player.maxHp*0.3 ? 0.22+0.08*Math.sin(gt*5) : 0, a=Math.max(HITFX.hurt*0.4,low);
+      g.save(); g.setTransform(1,0,0,1,0,0); const gr=g.createRadialGradient(W/2,H/2,Math.min(W,H)*0.4,W/2,H/2,Math.max(W,H)*0.72);
+      gr.addColorStop(0,'rgba(120,0,0,0)'); gr.addColorStop(1,`rgba(140,8,4,${a})`); g.fillStyle=gr; g.fillRect(0,0,W,H); g.restore(); } }; }
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

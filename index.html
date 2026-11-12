@@ -14412,6 +14412,7 @@ function drawActorBase(e){
   else if(e.type==='scarab') drawScarab(s.x,B,e,poseFor(e));
   else if(e.type==='ember') drawEmber(s.x,B,e,poseFor(e));
   else if(e.type==='hunger') drawHunger(s.x,B,e,poseFor(e));
+  else if(e.type==='hollow') drawHollow(s.x,B,e,poseFor(e));
   else if(e.type==='gnawer') drawGnawer(s.x,B,e,poseFor(e));
   else if(e.type==='rat') drawRat(s.x,B,e,poseFor(e));
   else if(e.type==='ratking') drawRatKing(s.x,B,e,poseFor(e));
@@ -14426,7 +14427,7 @@ function drawActorBase(e){
   g.restore();
   if(!isP && e.dead) return;
   if(isP && romHush()) return;
-  const ty=B-(e.type==='rat'?40:e.type==='ratking'?66:e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'?66:e.type==='dragon'?300:e.type==='bear'?92:e.type==='troll'?150:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:114)+dwarfDrop(e.opts);
+  const ty=B-(e.type==='rat'?40:e.type==='ratking'?66:e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'?66:e.type==='dragon'?300:e.type==='bear'?92:e.type==='troll'?150:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:e.type==='hollow'?272:114)+dwarfDrop(e.opts);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const deadly=!isP && e.type!=='dummy' && e.hostile!==false && e.tier && typeof foeLevel==='function' && foeLevel(e)-playerLevel()>=3;   // far stronger than you: a skull
   const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  Lv '+(typeof foeLevel==='function'?foeLevel(e):e.tier) : ''), tw=g.measureText(label).width;
@@ -26093,6 +26094,316 @@ const PT=(()=>{ const KEY='dunhollow.playtest', ON='dunhollow.ptOn', MAX=60000;
 
 // clothing under the armour is purely cosmetic: strip it again once every piece in the game exists (woven, desert and dwarven pieces are made after the first pass)
 for(const id in ITEMS){ const it=ITEMS[id]; if(it && it.slot==='torso'){ delete ITEM_STATS[id]; GEAR_HP[id]=0; } }
+
+// ════════ THE VALLEY SEAL: the main road, after the Baron. When the old king raised the boundary stones, the seven peoples of the valley broke a
+//   great bronze seal between them and swore to keep what lay under the stones asleep. The Baron dug, and fed it to keep it quiet. Now nobody does.
+//   Gather the seven wedges (by favour, for coin, or by force), stand before the valley's moot at the stones, set the seal, and go down after the Hollow ════════
+const SEAL_KEYS=['hamond','hollow','dwarves','elves','fen','sand','gold'];
+const SEAL_INFO={
+  hamond:{ who:'Elder Hamond', npc:'elder', name:"Dunhollow's Wedge", col:'#7a5a30', mark:'a goat scratched into the bronze' },
+  hollow:{ who:'Magistrate Aldous', npc:'magistrate', name:"Hollowmere's Wedge", col:'#a83a2a', mark:'a tower inlaid in red enamel' },
+  dwarves:{ who:'Thane Sigrid Varrowborn', npc:'thane', name:"Varrowdeep's Wedge", col:'#d08a3a', mark:'a hammer cut deep, the lines filled with gold' },
+  elves:{ who:'Lady Aerwen', npc:'aerwen', name:"Sylvhaven's Wedge", col:'#c8dcec', mark:'a leaf of moonsilver set into the bronze' },
+  fen:{ who:'Vesna the Grave-Speaker', npc:'vesna', name:"The Fen's Wedge", col:'#7a8a5a', mark:'a heron, green with bog-rust' },
+  sand:{ who:'Kadir the Caravan Master', npc:'kadir', name:"The Sunscar's Wedge", col:'#e8c060', mark:'a sun with a hole in its middle' },
+  gold:{ who:'Alaric Craban', npc:'craban', name:"The Gold Brothers' Wedge", col:'#d8b040', mark:'a coin, stamped over an older mark that has been filed away' } };
+const SEAL=()=>CHOICE.seal||null;
+const sealParts=()=> (SEAL()&&SEAL().parts)||{};
+const sealCount=()=>Object.keys(sealParts()).length;
+const sealBackers=()=>SEAL_KEYS.filter(k=>sealParts()[k]==='favour');
+const RULER_NAME=()=>({voss:'Captain Voss', orrin:'Steward Orrin', guild:'the Guild Council'}[CHOICE.ruler]||'the new ruler');
+Object.assign(ITEMS,{
+  valley_seal:{ name:'The Valley Seal', slot:'misc', title:"Seven wedges of old bronze, fitted together into one round seal the size of a shield-boss. Where they meet, the lines have vanished, as if it had never been broken." },
+  reliquary_key:{ name:"The Baron's Reliquary Key", slot:'misc', title:"A little gold key on a red cord, warm from the magistrate's pocket. It opens the reliquary in the Baron's solar." },
+  warden_mantle:{ name:"The Warden's Mantle", slot:'cloak', title:"Night-blue wool to the ankle, edged in silver thread, a collar of white fox. Seven bronze wedges are worked into the clasp. The valley made it for you." } });
+SEAL_KEYS.forEach(k=>{ const I=SEAL_INFO[k]; ITEMS['seal_'+k]={ name:I.name, slot:'misc', title:`A wedge of old bronze, one seventh of a great round seal, with ${I.mark}. It is warm, and hums very faintly when you hold it near the ground.` }; QUEST_ITEMS.add('seal_'+k); });
+QUEST_ITEMS.add('valley_seal'); QUEST_ITEMS.add('reliquary_key');
+Object.assign(PRICES,{ warden_mantle:400 }); Object.assign(GEAR_HP,{ warden_mantle:10 }); Object.assign(ITEM_STATS,{ warden_mantle:{hp:10, ap:1, magic:1, agi:1} });
+CLOAK_LOOK.warden_mantle={ main:'#1e2a44', lining:'#6a7a98', fur:'#ece8e0', clasp:'#c89a48', trim:'#c8ccd8', collar:'mantle', shape:{hem:-6, flare:8, folds:4} };
+ITEM_ICON.warden_mantle=(g2,i2,size)=>paintItemArtBase(g2,i2,size);
+const wedgeIcon=(col)=>(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.translate(20,22);
+  const gp=g2.createLinearGradient(-12,-12,12,12); gp.addColorStop(0,'#c89a58'); gp.addColorStop(1,'#6a4a22'); g2.fillStyle=gp;
+  g2.beginPath(); g2.moveTo(0,10); g2.arc(0,10,22,-Math.PI/2-0.45,-Math.PI/2+0.45); g2.closePath(); g2.fill(); g2.strokeStyle='#3a2810'; g2.lineWidth=1; g2.stroke();
+  g2.fillStyle=col; g2.beginPath(); g2.arc(0,-4,3.4,0,Math.PI*2); g2.fill(); g2.strokeStyle='rgba(255,240,200,0.5)'; g2.lineWidth=0.7; g2.beginPath(); g2.arc(0,10,18,-Math.PI/2-0.38,-Math.PI/2+0.38); g2.stroke(); g2.restore(); };
+SEAL_KEYS.forEach(k=>{ ITEM_ICON['seal_'+k]=wedgeIcon(SEAL_INFO[k].col); });
+ITEM_ICON.valley_seal=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.translate(20,20);
+  SEAL_KEYS.forEach((k,n)=>{ const a0=-Math.PI/2+n*Math.PI*2/7; g2.fillStyle=n%2?'#a87a40':'#b88a48'; g2.beginPath(); g2.moveTo(0,0); g2.arc(0,0,15,a0,a0+Math.PI*2/7); g2.closePath(); g2.fill();
+    g2.fillStyle=SEAL_INFO[k].col; g2.beginPath(); g2.arc(Math.cos(a0+Math.PI/7)*9,Math.sin(a0+Math.PI/7)*9,2,0,Math.PI*2); g2.fill(); });
+  g2.strokeStyle='#4a3010'; g2.lineWidth=1.2; g2.beginPath(); g2.arc(0,0,15,0,Math.PI*2); g2.stroke(); g2.fillStyle='#e8d8a0'; g2.beginPath(); g2.arc(0,0,2.6,0,Math.PI*2); g2.fill(); g2.restore(); };
+ITEM_ICON.reliquary_key=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.strokeStyle='#a83a2a'; g2.lineWidth=1.4; g2.beginPath(); g2.moveTo(8,8); g2.quadraticCurveTo(14,4,16,12); g2.stroke();
+  g2.strokeStyle='#d8b048'; g2.lineWidth=3; g2.beginPath(); g2.arc(16,15,4.4,0,Math.PI*2); g2.stroke(); g2.beginPath(); g2.moveTo(19,18); g2.lineTo(31,30); g2.moveTo(27,26); g2.lineTo(30,23); g2.moveTo(30,29); g2.lineTo(33,26); g2.stroke(); g2.restore(); };
+function gotPart(k,how){ const S=SEAL(); if(!S || S.parts[k]) return; S.parts[k]=how; giveQuestItem('seal_'+k,true); updateHud();
+  banner('Part of the Valley Seal ('+sealCount()+'/7)','#e8c060',1900); try{ SND.fx('page'); }catch(e){}
+  logMsg('You receive '+SEAL_INFO[k].name+'. '+(sealCount()>=7 ? 'That is all seven. The valley should gather at the Boundary Stones.' : (7-sealCount())+' still to find.'),'#e8c060'); }
+
+// ── Hamond: the ground shakes, and the charter's lead case had something else in it
+function sealIntro(){ const H='Elder Hamond'; shake=Math.max(shake,14); try{ SND.fx('growl',0.5); }catch(e){} banner('The ground shakes','#c8a060',1600);
+  say(H,["<i>As you come in, the floor shivers. The cups on Hamond's shelf chatter against each other. Outside a dog starts to howl, and then every dog in Dunhollow.</i>",
+    "“Again. The third time since they took the Baron. Stand there, you will want to be standing for this.”",
+    "“That charter you dug up under the stones. There was more in the lead case than parchment. Under the lining, this.” <i>He sets down a wedge of old bronze, like a slice cut out of a round loaf, with a goat scratched into it.</i>",
+    "“My grandmother told it as a children's story. When the old king raised the stones, the seven peoples of the valley broke a great seal between them, a wedge each, and swore to keep what was under the stones asleep. The Hollow, she called it. The thing that eats the light.”",
+    "“The Baron was digging under the stones. That was what the writ was for, not our pasture. He found what the old king buried, and he fed it to keep it quiet while he dug. Now nobody feeds it. And it is waking.”",
+    "“Put the seven wedges together at the stones, before the whole valley, and the seal is whole again. Each people still keeps its wedge: Hollowmere, the dwarves under the mountain, the elves, the fen, the sand-folk in the south, and those Gold Brothers, who bought theirs. They will not give them to just anyone.”"],
+    [{label:'“Then I will ask them. Give me the wedge.”', fn:()=>{ CHOICE.seal={ parts:{}, day:Math.floor(dayClock/DAY_LEN) }; gotPart('hamond','favour');
+        say(H,["“Start with the magistrate in Hollowmere: the Baron kept the city's wedge. After that, wherever your feet take you.”",
+          "“And when you have all seven, the valley meets in a moot at the stones, the old way. Every one of them will have a say in whether you are fit to hold the seal. Remember that when you ask. How you get a thing is remembered longer than getting it.”"],[bye]); }},
+     {label:'“Not yet. I need to think.”', fn:()=>say(H,"“Think quickly. The cups are still rattling.”",[bye])}]); }
+{ const _e=elderTalk; elderTalk=function(){ if(CHOICE.epiDone && !SEAL()) return sealIntro(); return _e.apply(this,arguments); }; }
+
+// ── the leaders: each holds a wedge, and each wants something first
+function sealOpt(key,fn){ return {label:'“About the Valley Seal.”', fn}; }
+function hookLeader(id,key,handler){ const prev=TALKERS[id]; if(!prev) return;
+  TALKERS[id]=function(...a){ const S=SEAL(); if(!S || S.parts[key] || (areaId==='stones')) return prev.apply(this,a);
+    return withExtraOpt(()=>prev.apply(this,a), sealOpt(key,()=>handler(()=>TALKERS[id]()))); }; }
+// Hollowmere: the Baron's reliquary in his solar
+hookLeader('magistrate','hollow',back=>{ const A='Magistrate Aldous', S=SEAL();
+  if(hasItem('reliquary_key')){ say(A,"“The reliquary is in the Baron's solar: up the stair from the great hall of the keep. Bring the wedge back with you to the moot, not to me. I do not want to be holding it when the ground opens.”",[{label:'Back.', fn:back}]); return; }
+  if(S.relBroke){ say(A,"“You broke the Baron's reliquary open. I heard. Everyone heard.”",[{label:'Back.', fn:back}]); return; }
+  say(A,["“The city's wedge? It sits in a reliquary in the Baron's solar, in the keep. Bertram prayed to it, I think. Or argued with it.”",
+    `“I have the key off his belt. ${RULER_NAME()} agrees it should go to whoever stands at the moot. Take it, and take the wedge, and do not make me regret this in front of the whole valley.”`],
+    [{label:'Take the key.', fn:()=>{ giveQuestItem('reliquary_key',true); S.relKey=1; logMsg("The magistrate gives you the key to the Baron's reliquary. It is in his solar, upstairs in the keep.",'#c8a0e0'); say(A,"“Upstairs from the great hall. Mind the dogs.”",[{label:'Back.', fn:back}]); }},
+     {label:'Back.', fn:back}]); });
+wrap('keephall_up','objects',l=>[...l,{type:'reliquary', i:8, j:2}]);
+NEAR_NAME.reliquary="the Baron's reliquary";
+OBJ_DRAW.reliquary=o=>{ const q=P(o.i+0.5,o.j+0.5), open=!!sealParts().hollow, x=q.x, y=q.y;
+  g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(x,y+2,16,6,0,0,Math.PI*2); g.fill();
+  g.fillStyle='#4a2a1a'; g.fillRect(x-4,y-26,8,26); g.fillStyle='#6a3a24'; g.fillRect(x-4,y-26,3,26);                    // a little pillar
+  g.fillStyle='#8a6a2a'; g.beginPath(); g.moveTo(x-12,y-30); g.lineTo(x+12,y-30); g.lineTo(x+11,y-44); g.lineTo(x-11,y-44); g.closePath(); g.fill();   // the gilt box
+  g.fillStyle='#c8a048'; g.fillRect(x-12,y-32,24,3); g.fillStyle=open?'#2a1a10':'#a83a2a'; g.fillRect(x-4,y-42,8,8);
+  if(open){ g.strokeStyle='#c8a048'; g.lineWidth=2; g.beginPath(); g.moveTo(x-11,y-44); g.lineTo(x-14,y-56); g.lineTo(x+10,y-56); g.lineTo(x+11,y-44); g.stroke(); }
+  else { g.save(); g.globalCompositeOperation='lighter'; glow(x,y-38,18,14,'255,200,120',0.25+0.1*Math.sin(gt*2)); g.restore(); }
+  g.fillStyle='#c8a048'; g.beginPath(); g.moveTo(x,y-50); g.lineTo(x+3,y-45); g.lineTo(x-3,y-45); g.closePath(); g.fill(); };
+onUse(['reliquary'],o=>{ const S=SEAL();
+  if(sealParts().hollow){ pzSay(S && S.relBroke ? "The reliquary hangs open, its little lock torn out. Nobody has mended it." : "The reliquary stands open and empty. A shape the size of a bronze wedge is pressed into the velvet.",'#d8c8a8'); return; }
+  if(!S){ pzSay("A gilt reliquary on a little pillar, locked. Something inside it hums, very faintly, like a held note.",'#d8c8a8'); return; }
+  if(hasItem('reliquary_key')){ const k=player.inv.indexOf('reliquary_key'); if(k>=0) player.inv[k]=null; pzSay("The little gold key turns. Inside, on red velvet worn bald in the middle, lies a wedge of bronze with a tower inlaid in red.",'#e8d8a8'); gotPart('hollow','favour'); return; }
+  say("The Baron's Reliquary",["A gilt reliquary on a little pillar, locked. Through the keyhole: bronze, and a glint of red enamel. It hums faintly.","The magistrate has the key. Or there is your pommel."],
+    [{label:'Break it open.', fn:()=>{ closeDialog(); S.relBroke=1; shake=Math.max(shake,5); try{ SND.clang(1); }catch(e){} logMsg('Three blows, and the little lock gives. A dog barks downstairs. Someone will have heard that.','#e0a070'); gotPart('hollow','force'); }},
+     {label:'Leave it. Ask the magistrate for the key.', fn:closeDialog}]); });
+// Varrowdeep: the Thane gives the hold's wedge once the deep is quiet again
+hookLeader('thane','dwarves',back=>{ const T='Thane Sigrid Varrowborn';
+  if(vq()==='done'){ say(T,["“The old seal. My grandmother's grandmother broke it with the others and carried our wedge down here. It has hung in the forge-shrine ever since, and every Thane has polished it once a year and hoped it would never be asked for.”",
+      "“You gave the hold back its quiet. The hold gives you this. Bring it back whole, or at least bring it back.”"],
+      [{label:'Take the wedge.', fn:()=>{ gotPart('dwarves','favour'); say(T,"“Go well under the stone, surface-friend.”",[{label:'Back.', fn:back}]); }}]); return; }
+  say(T,["“The seal-wedge? It is the hold's oldest thing. I will not give it to someone the deep still has not heard of.”","“The Lowest Gallery went silent and then went wrong. Settle the quiet in the deep, and we will talk about old bronze.”"],[{label:'Back.', fn:back}]); });
+// Sylvhaven: the elves' wedge is moonsilver, and the Hunger in the Heartwood has been drinking its light
+hookLeader('aerwen','elves',back=>{ const A='Lady Aerwen';
+  if(CHOICE.hwSpirit){ say(A,["“You went down into the Heartwood and put out the Hunger. Did you understand what it was? A splinter of the Hollow, grown up through the roots of our tree. It drank the light out of our wedge for a hundred years.”",
+      "“The light has come back into it.” <i>She opens her hand: bronze, with a leaf of moonsilver set in it, shining.</i> “Carry it to your moot. And tell them the elves of Sylvhaven were the first to give theirs freely. It will annoy the dwarves.”"],
+      [{label:'Take the wedge.', fn:()=>{ gotPart('elves','favour'); say(A,"“Walk in the light.”",[{label:'Back.', fn:back}]); }}]); return; }
+  say(A,["“Our wedge lies at the root of the great tree, where it has always lain. It has gone dark. Something down in the Heartwood has been feeding on its light, and on ours.”","“While that hunger lives, the wedge cannot leave the tree: it would crumble. Free the Heartwood, and it is yours.”"],[{label:'Back.', fn:back}]); });
+// if the haven burned, the elves' wedge lies in the ashes of the Fellings
+wrap('fellings','objects',l=> SEAL() && !sealParts().elves && havenBurnt() ? [...l,{type:'sealash', i:6, j:4, noblock:true}] : l);
+OBJ_DRAW.sealash=o=>{ const q=P(o.i+0.5,o.j+0.5); g.fillStyle='rgba(40,34,30,0.6)'; g.beginPath(); g.ellipse(q.x,q.y,22,8,0,0,Math.PI*2); g.fill(); g.save(); g.globalCompositeOperation='lighter'; glow(q.x,q.y-4,12,6,'210,225,240',0.3+0.15*Math.sin(gt*2)); g.restore(); };
+NEAR_NAME.sealash='a glint in the ashes';
+onUse(['sealash'],o=>{ pzSay("In the ashes where the elves sang, a glint: bronze, a leaf of moonsilver in it, gone black with soot. Nobody is left to ask. You take it.",'#c8c8d0'); gotPart('elves','force'); });
+// the fen: the Barrow-King took it into the mere with him
+hookLeader('vesna','fen',back=>{ const V='Vesna the Grave-Speaker';
+  if(CHOICE.barrow==='done'){ say(V,["“The fen's wedge. Ha. The Barrow-King had it set in his crown, the vain old thing. When you broke him, it came loose and sank, and the dead brought it up to me, because the dead are tidier than people think.”",
+      "“Here. It is cold. Things that have been down there a long time stay cold.”"],[{label:'Take the wedge.', fn:()=>{ gotPart('fen','favour'); say(V,"“And when you go under the stones, say hello to the old ones for me. They will not answer. Say it anyway.”",[{label:'Back.', fn:back}]); }}]); return; }
+  say(V,["“The fen's wedge went down into the barrow with the Barrow-King, a thousand years ago, set in his crown like a jewel. The dead do not give back what they were buried with.”","“Break him, and I will see what the water gives up.”"],[{label:'Back.', fn:back}]); });
+// the Sunscar: the queen of the Hollow Sun wore it as the hole in her sun
+hookLeader('kadir','sand',back=>{ const K='Kadir the Caravan Master';
+  if(PZ().sunboss){ say(K,["“After you came out of the Hollow Sun my outriders went down to see if you had left anything. You had. This was lying in the throne room, in the hole in the middle of the queen's sun-disc, where it had been set to fit.”",
+      "“The caravans owe you their road. Take it. The sand-folk will stand behind you at your moot, and we will shout louder than anyone.”"],[{label:'Take the wedge.', fn:()=>{ gotPart('sand','favour'); say(K,"“Water and shade, friend.”",[{label:'Back.', fn:back}]); }}]); return; }
+  say(K,["“A wedge of bronze, with a sun on it? There is a story of a queen under the Glass Dunes who stole the sun and set a piece of the north in its middle. Nobody who went to look ever came back up.”","“Go down into the Temple of the Hollow Sun. If you come out, I will believe anything you tell me.”"],[{label:'Back.', fn:back}]); });
+// the Gold Brothers: they bought theirs, and they will sell it
+hookLeader('craban','gold',back=>{ const C='Alaric Craban';
+  if(GB_RANK()){ say(C,["“The bronze wedge? Our grandfather bought it from a drunk fen-chief for a barrel of wine and a promise. Best trade the Company ever made, and we have never once found a use for it.”",
+      "“You are family now, more or less. Take it. Have it on the books as a long loan.”"],[{label:'Take the wedge.', fn:()=>{ gotPart('gold','favour'); say(C,"“And mention the Company at your moot. Loudly, if you can.”",[{label:'Back.', fn:back}]); }}]); return; }
+  say(C,["“The bronze wedge. Of course you want it; everyone wants it this month. It is not for sale.” <i>He looks at your purse.</i> “Everything is for sale. Four gold.”"],
+    [{label:'Pay four gold for it.', off:player.purse<400, note:'-4g', fn:()=>{ player.purse-=400; updateHud(); gotPart('gold','coin'); say(C,"“A pleasure. The Company abstains at your moot, of course. We were paid.”",[{label:'Back.', fn:back}]); }},
+     {label:'Slip it off his desk while he counts.', fn:()=>{ closeDialog(); logMsg("Craban turns to his ledger. When he turns back, the wedge is gone, and so are you. He will work it out by evening.",'#e0a070'); gotPart('gold','force'); }},
+     {label:'Back.', fn:back}]); });
+
+// ── the road ahead names the next wedge
+function sealHint(){ const P2=sealParts();
+  const H={ hollow:()=> hasItem('reliquary_key') ? "Open the Baron's reliquary in his solar, upstairs in Hollowmere Keep." : "Ask Magistrate Aldous in the Castle Ward about the Baron's wedge.",
+    dwarves:()=> vq()==='done' ? "Thane Sigrid in Varrowdeep will give you the hold's wedge." : "Thane Sigrid in Varrowdeep keeps the dwarves' wedge: first set right the Quiet in the Deep.",
+    elves:()=> havenBurnt() ? "Sylvhaven is ash. The elves' wedge lies somewhere in the burned Fellings." : CHOICE.hwSpirit ? "Lady Aerwen in Sylvhaven will give you the elves' wedge." : "Lady Aerwen's wedge lies dark at the root of the great tree: free the Heartwood from its Hunger.",
+    fen:()=> CHOICE.barrow==='done' ? "Vesna the Grave-Speaker, in the fen, has the fen's wedge for you." : "Vesna says the fen's wedge went into the barrow with the Barrow-King.",
+    sand:()=> PZ().sunboss ? "Kadir the Caravan Master, in the Sunscar, has the sand-folk's wedge for you." : "Kadir says the Sunscar's wedge is in the Temple of the Hollow Sun, under the Glass Dunes.",
+    gold:()=> GB_RANK() ? "Alaric Craban of the Gold Brothers will give you their wedge." : "Alaric Craban of the Gold Brothers has a wedge, and a price." };
+  const k=['hollow','dwarves','elves','fen','sand','gold'].find(k=>!P2[k]); return k ? H[k]() : ''; }
+{ const _ss=storyStep; storyStep=function(){ const r=_ss.apply(this,arguments); if(!CHOICE.epiDone) return r; const S=SEAL();
+    if(!S) return ['The Shaking Ground',"The ground shook under Dunhollow. Elder Hamond wants to speak with you."];
+    if(S.done) return ['Warden of the Valley',"The seal is whole and the Hollow sleeps. The valley is yours to walk, and its people still have stories."];
+    if(S.opened) return ['The Hollow Beneath',"The tall stone at the boundary has split. Go down under the Old Boundary Stones and put the Hollow back to sleep."];
+    if(sealCount()>=7) return ['The Moot at the Stones',"You hold all seven wedges of the Valley Seal. Go to the Old Boundary Stones, north past the graveyard: the valley has gathered."];
+    return ['The Valley Seal','Gather the seven wedges of the Valley Seal ('+sealCount()+'/7). '+sealHint()]; }; }
+JOURNAL.push(['The Valley Seal', ()=>{ const S=SEAL(); if(!S) return null;
+  const list=SEAL_KEYS.map(k=>(sealParts()[k]?'✓ ':'· ')+SEAL_INFO[k].who+(sealParts()[k]==='force'?' (taken)':sealParts()[k]==='coin'?' (bought)':'')).join('<br>');
+  if(S.done) return ['done',"You set the Valley Seal into the tall stone and went down after the Hollow. It sleeps again. The valley named you its Warden.<br>"+list];
+  return ['active',"When the old king raised the boundary stones, the seven peoples of the valley broke a great seal between them and swore to keep the Hollow asleep. The Baron woke it. Gather the wedges, stand before the moot at the stones, and set the seal.<br>"+list]; }]);
+{ const prev=npcHasNews; npcHasNews=function(n){ const S=SEAL();
+    if(n && S && !S.opened){ if(n.id==='moot_aldous' && sealCount()>=7 && !S.moot) return '!';
+      const k=SEAL_KEYS.find(k=>SEAL_INFO[k].npc===n.id); if(k && !S.parts[k] && k!=='hamond') return '!'; }
+    if(n && n.id==='elder' && CHOICE.epiDone && !S) return '!';
+    return prev(n); }; }
+
+// ── the moot: the valley gathers at the stones
+const MOOT_POS={ hamond:[4,7], hollow:[6,8], dwarves:[3,3], elves:[3,5], fen:[9,5], sand:[9,3], gold:[8,7] };
+const NPC_FIND={};
+let NPC_FINDING=false;
+function findNpc(id){ if(id in NPC_FIND) return NPC_FIND[id]; if(NPC_FINDING) return null; NPC_FINDING=true; let r=null; for(const a in AREAS){ if(a==='stones' || /^hollow/.test(a)) continue; try{ const L=AREAS[a].npcs && AREAS[a].npcs(); const n=Array.isArray(L) && L.find(n=>n && n.id===id); if(n){ r=n; break; } }catch(e){} } NPC_FINDING=false;
+  if(!r && id==='elder' && typeof ROUTINES!=='undefined' && ROUTINES.elder) r={ id, name:ROUTINES.elder.name, opts:ROUTINES.elder.opts };   // folk who keep hours are built by their routine
+  if(!r && id==='vesna') r=VESNA(0,0,0);
+  if(!r && id==='hunter' && typeof ROUTINES!=='undefined' && ROUTINES.hunter) r={ id, name:ROUTINES.hunter.name, opts:ROUTINES.hunter.opts };
+  NPC_FIND[id]=r; return r; }
+function mootNpcs(){ const S=SEAL(); if(!S || sealCount()<7 || S.done) return [];
+  const L=[]; const ids={ hamond:'elder', dwarves:'thane', elves:'aerwen', fen:'vesna', sand:'kadir', gold:'craban' };
+  L.push({ id:'moot_aldous', name:'Magistrate Aldous', i:6, j:8, dir:1, opts:(findNpc('magistrate')||{}).opts||{gender:'m',skin:0,hair:4,hairColor:13,beard:4,face:0,equip:{torso:'tunic_linen',armor:'robe_black',legs:'trousers',feet:'boots'}} });
+  if(S.opened) { const h=findNpc('elder'); if(h) L.push({ id:'moot_hamond', name:'Elder Hamond', i:4, j:7, dir:1, opts:h.opts }); return L; }
+  for(const k in ids){ if(k==='elves' && havenBurnt()) continue; const n=findNpc(ids[k]); if(!n) continue; const [i,j]=MOOT_POS[k]; L.push({ id:'moot_'+k, name:n.name, i, j, dir:i<6?1:3, opts:n.opts }); }
+  if(S.cadoc==='ask') L.push({ id:'moot_cadoc', name:'Ser Cadoc of the Crown', i:5, j:8, dir:1, opts:CADOC_O() });
+  return L; }
+const CADOC_O=()=>({gender:'m',skin:0,hair:1,hairColor:4,beard:2,face:0,equip:{head:null,torso:'tunic_blue',armor:'brightmail',cloak:'duel_shoulder',shoulders:'iron_pauldrons',hands:'gauntlets',legs:'trousers',feet:'plate_boots',weapon:'longsword',offhand:'shield_iron'}});
+wrap('stones','npcs',l=>[...l,...mootNpcs()]);
+const MOOT_SAYS={
+  hamond:{ favour:"“Dunhollow speaks for them. We gave our wedge first, and we would give it again.”" },
+  hollow:{ favour:`“Hollowmere stands with them. ${'{R}'} says so, and so do I.”`, force:"“Hollowmere does not stand with someone who breaks open a dead man's reliquary in his own house. I say it plainly.”" },
+  dwarves:{ favour:"“The hold of Varrowdeep says aye. The deep is quiet because of this one. That is enough.”" },
+  elves:{ favour:"“Sylvhaven gave its wedge freely. The light under our tree came back because of them. Aye.”", force:"" },
+  fen:{ favour:"“The fen says aye. The dead say aye too, for what it is worth. It is worth more than you think.”" },
+  sand:{ favour:"“The caravans say aye! And louder than the dwarves, you will notice.”" },
+  gold:{ favour:"“The Gold Brothers Trading Company is pleased to support the candidate.”", coin:"“The Company abstains. We were paid in full; we have no further interest.”", force:"“The Company notes, for the record, that its wedge was stolen. By the candidate. Off my desk.”" } };
+function mootTalk(){ const A='Magistrate Aldous', S=SEAL();
+  if(S.opened){ say(A,"“Go down. We will hold the stones up here. If something comes up out of that hole that is not you, I would like some warning.”",[bye]); return; }
+  if(S.cadoc==='ask'){ say(A,"“Ser Cadoc has challenged, by the old law. Answer him, or give the seal into his hand.”",[{label:'Answer Ser Cadoc.', fn:cadocFight}, bye]); return; }
+  if(S.cadoc==='won' || S.carried){ sealSetAsk(); return; }
+  const lines=["<i>They have come from every corner of the valley and stand among the old stones in a ring, the way the stones themselves stand. Somebody has lit torches. The ground hums under your feet.</i>",
+    "“The valley is assembled, as it was when these stones were raised. Seven wedges, and one who carries them. The question before the moot: is this one fit to set the seal and hold it after? Each people speaks.”"];
+  SEAL_KEYS.forEach(k=>{ const how=S.parts[k], M=MOOT_SAYS[k]||{}, line=(M[how]||'').replace('{R}',RULER_NAME()); if(line) lines.push('<b>'+SEAL_INFO[k].who+':</b> '+line); });
+  if(havenBurnt()) lines.push("<i>Where the elves of Sylvhaven should stand, there is an empty space. Nobody steps into it.</i>");
+  const ayes=sealBackers().length;
+  if(ayes>=5){ S.carried=1; lines.push(`“${ayes} of seven say aye. The moot is carried.”`); say(A,lines,[{label:'Step up to the tall stone.', fn:sealSetAsk}]); return; }
+  S.cadoc='ask'; lines.push(`“${ayes} of seven. That is not carried.”`,
+    "<i>A knight in the Crown's blue pushes through the ring: tall, grey at the temples, a longsword on his hip.</i> <b>Ser Cadoc of the Crown:</b> “Then by the old law, I challenge. The Crown will not see the seal handed to someone half the valley will not stand behind. Prove it with steel, here, on the stones.”");
+  say(A,lines,[{label:'“I accept.”', fn:cadocFight}, {label:'“Not now.”', fn:()=>{ closeDialog(); NPCS.push(...mootNpcs().filter(n=>n.id==='moot_cadoc' && !NPCS.some(m=>m.id===n.id))); }}]); }
+TALKERS.moot_aldous=mootTalk;
+SEAL_KEYS.forEach(k=>{ TALKERS['moot_'+k]=()=>{ const S=SEAL(), how=S&&S.parts[k], M=MOOT_SAYS[k]||{}; say(SEAL_INFO[k].who,(M[how]||"“Speak to the magistrate. He keeps the moot.”").replace('{R}',RULER_NAME()),[bye]); }; });
+TALKERS.moot_cadoc=()=>say('Ser Cadoc of the Crown',"“No hard feelings. The old law is the old law. When you are ready, tell the magistrate.”",[bye]);
+TALKERS.moot_hamond=()=>say('Elder Hamond',"“Down there? Go on. I am too old for holes in the ground. I will wait here and worry, which I am very good at.”",[bye]);
+function cadocFight(){ const S=SEAL(); closeDialog(); FIGHT_UNDO=()=>{ S.cadoc='ask'; }; S.cadoc='fight';
+  NPCS.splice(0,NPCS.length,...NPCS.filter(n=>n.id!=='moot_cadoc'));
+  MOB_SPAWNS.length=0; MOB_SPAWNS.push({ name:'Ser Cadoc of the Crown', type:'bandit', style:'veteran', i:5, j:8, faction:'cadoc', opts:CADOC_O() });
+  resetMobs(); mobs.forEach(m=>{ m.hostile=true; m.maxHp=Math.max(m.maxHp||0,130); m.hp=m.maxHp; FOOLED[areaId+':'+m.name]=false; }); startCombat(); }
+{ const _v=victory; victory=function(faction){ const r=_v.apply(this,arguments);
+    try{ if(faction==='cadoc' && SEAL()){ SEAL().cadoc='won'; setTimeout(()=>{ say('Ser Cadoc of the Crown',["<i>He is on one knee, his sword out of reach, breathing hard. Then he laughs.</i> “Enough. Enough! I yield. The Crown will hear that the valley chose well, even if half of it did not know it yet.”"],
+          [{label:'Help him up.', fn:()=>{ SEAL().cadocUp=1; sealSetAsk(); }}]); },900); }
+      if(faction==='hollowking' && SEAL()){ SEAL().done=true; SEAL().doneDay=Math.floor(dayClock/DAY_LEN); setTimeout(sealEnding,1600); } }catch(e){ console.error(e); }
+    return r; }; }
+// Ser Cadoc yields; he does not die on the stones
+{ const _fd=foeDown; foeDown=function(f){ const r=_fd.apply(this,arguments); try{ if(f && f.faction==='cadoc'){ f.dead=true; f.yielded=true; } }catch(e){} return r; }; }
+function sealSetAsk(){ say('Magistrate Aldous',["“Then set it. The tall stone, where the moon-shadow ends. The old king's mark is still on it.”","<i>The seven wedges are heavy in your pack, and warm, and they are humming now, all together, one long low note.</i>"],
+  [{label:'Set the seal into the stone.', fn:sealSet}]); }
+function sealSet(){ const S=SEAL(); closeDialog();
+  SEAL_KEYS.forEach(k=>{ const i=player.inv.indexOf('seal_'+k); if(i>=0) player.inv[i]=null; }); giveQuestItem('valley_seal',true);
+  S.moot=Math.floor(dayClock/DAY_LEN); S.opened=1; shake=18; try{ SND.fx('growl',1); }catch(e){} banner('The Hollow wakes','#b08ae0',2400);
+  logMsg('The seven wedges slide together in your hands and the lines between them vanish. You press the seal to the tall stone, and the stone splits from top to bottom. Light goes down into the crack, and something far below breathes in.','#c8a8f0');
+  setTimeout(()=>{ try{ const pos={i:player.i,j:player.j}; switchArea('stones','fromGraves'); player.i=pos.i; player.j=pos.j; player.x=pos.i+0.5; player.y=pos.j+0.5; centerCam(); }catch(e){}
+    const allies=sealBackers().filter(k=>SEAL_ALLY[k]).map(k=>SEAL_ALLY[k]().name);
+    say('Magistrate Aldous',["<i>Where the tall stone stood there is a split in the earth, roots down its sides, and a cold that rolls up out of it like breath.</i>","“It took the seal. It did not take it well. Whatever is down there is awake now, and it knows who brought the seal.”",
+      allies.length ? `“You will not go alone. ${allies.join(', ')}: they have said they are going down with you, and I did not argue.”` : "“Nobody here will go down with you. I am sorry. They gave you their wedges; they did not give you their trust.”"],[bye]); },1800); }
+wrap('stones','objects',l=>{ const S=SEAL(); if(!S || !S.opened) return l;
+  return [...l.filter(o=>!(o.type==='menhir' && o.i===6 && o.j===4)), {type:'roothole', i:6, j:4, noblock:true}, {type:'teleporter', i:6, j:4, to:'hollowstair', entry:'fromStones'}]; });
+AREAS.stones.entries.fromHollow={i:6,j:5};
+
+// ── the Hollow Beneath: three levels down under the stones, in the roots, and the thing at the bottom
+const HOLLOW_LEVELS=['hollowstair','hollowroots','hollowheart'];
+const deepClear=()=>!mobs.some(m=>!m.dead && m.hostile!==false && m.type!=='dummy');
+const deepLocked=()=>pzSay('Roots close across the way down like fingers. Something on this level is still moving.','#c8b0e8');
+AREAS.hollowstair={ ...INSIDE_BASE, w:9, h:12, theme:'interior', cave:true, label:'The Hollow Stair', mini:{x:0,y:0},
+  objects:()=>[ {type:'teleporter', i:4, j:11, to:'stones', entry:'fromHollow'},
+    {type:'teleporter', i:4, j:0, to:'hollowroots', entry:'fromUp', locked:()=>!deepClear() && !(SEAL()||{}).done, onLocked:deepLocked}, {type:'roothole', i:4, j:0, noblock:true},
+    {type:'hfungus', i:1, j:2, noblock:true}, {type:'hfungus', i:7, j:5, noblock:true}, {type:'hfungus', i:1, j:9, noblock:true},
+    {type:'rune', i:0, j:5, text:"Carved into the root-wall, older than the roots: seven figures in a ring around a stone, each holding up a piece of a round thing. In the middle of the stone, a mouth."},
+    {type:'rune', i:8, j:7, text:"A king with a crown of antlers, his hand on the stone. Under him, in letters worn almost smooth: <i>We do not kill it. It cannot be killed. We put it to sleep, and we keep it sleeping, all of us, together.</i>"} ],
+  npcs:()=>[], mobs:()=> SEAL() && SEAL().done ? [] : [
+    { name:'Hollow Rotgnawer', type:'gnawer', i:3, j:4, faction:'hollowdeep', opts:GNAWER() }, { name:'Hungry Rotgnawer', type:'gnawer', i:6, j:3, faction:'hollowdeep', opts:GNAWER() },
+    { name:'Root-bound Husk', type:'husk', i:4, j:6, faction:'hollowdeep', opts:HUSK() } ],
+  entries:{ fromStones:{i:4,j:10}, fromDown:{i:4,j:1} } };
+AREAS.hollowroots={ ...INSIDE_BASE, w:12, h:12, theme:'interior', cave:true, label:'The Roots of the Valley', mini:{x:0,y:0},
+  objects:()=>[ {type:'teleporter', i:6, j:11, to:'hollowstair', entry:'fromDown'},
+    {type:'teleporter', i:6, j:0, to:'hollowheart', entry:'fromUp', locked:()=>!deepClear() && !(SEAL()||{}).done, onLocked:deepLocked}, {type:'roothole', i:6, j:0, noblock:true},
+    {type:'hfungus', i:1, j:1, noblock:true}, {type:'hfungus', i:10, j:3, noblock:true}, {type:'hfungus', i:2, j:9, noblock:true}, {type:'hfungus', i:9, j:9, noblock:true},
+    {type:'menhir', i:2, j:4, v:0}, {type:'menhir', i:9, j:6, v:1},
+    {type:'rune', i:0, j:6, text:"Roots, and in the roots, things the roots have swallowed: a dwarf's pick, an elven lantern, a Hollowmere coin, a heron's skull. Offerings, once. Or meals."},
+    {type:'rune', i:11, j:4, text:"Fresh cuts in the old root: picks and spades, and a surveyor's stake driven into the wood like a nail. The Baron's men came this far. A little further, the cuts stop, and so, you think, did the men."} ],
+  npcs:()=>[], mobs:()=> SEAL() && SEAL().done ? [] : [
+    { name:'Hollow Gloomcaller', type:'gloomcaller', i:3, j:3, faction:'hollowdeep', opts:CALLER() }, { name:'Hollow Thorn-Witch', type:'thornwitch', i:8, j:3, faction:'hollowdeep', opts:WITCH() },
+    { name:'Old Root-bound Husk', type:'husk', i:6, j:5, faction:'hollowdeep', opts:HUSK() }, { name:'Gnawing Rotgnawer', type:'gnawer', i:4, j:7, faction:'hollowdeep', opts:GNAWER() },
+    { name:'Rotgnawer of the Deep', type:'gnawer', i:8, j:7, faction:'hollowdeep', opts:GNAWER() } ],
+  entries:{ fromUp:{i:6,j:10}, fromDown:{i:6,j:1} } };
+const HEART_RING=[0,1,2,3,4,5,6].map(n=>{ const a=-Math.PI/2+n*Math.PI*2/7; return [Math.round(7+Math.cos(a)*4.6), Math.round(6+Math.sin(a)*4.2)]; });
+AREAS.hollowheart={ ...INSIDE_BASE, w:15, h:14, theme:'interior', cave:true, label:'The Hollow Heart', mini:{x:0,y:0},
+  objects:()=>[ {type:'teleporter', i:7, j:13, to:'hollowroots', entry:'fromDown'},
+    ...HEART_RING.map(([i,j],n)=>({type:'menhir', i, j, v:n%4})),
+    {type:'hfungus', i:1, j:1, noblock:true}, {type:'hfungus', i:13, j:1, noblock:true}, {type:'hfungus', i:1, j:12, noblock:true}, {type:'hfungus', i:13, j:12, noblock:true},
+    ...(SEAL() && SEAL().done ? [{type:'sealstone', i:7, j:6}] : []) ],
+  npcs:()=> SEAL() && !SEAL().done ? sealBackers().filter(k=>SEAL_ALLY[k]).map((k,n)=>{ const A=SEAL_ALLY[k](); const spots=[[3,11],[11,11],[2,9],[12,9],[5,12],[9,12],[1,7]]; const [i,j]=spots[n%spots.length]; return { id:'ally_'+k, name:A.name, i, j, dir:i<7?0:6, opts:A.opts }; }) : [],
+  mobs:()=> SEAL() && SEAL().done ? [] : [{ name:'The Hollow', type:'hollow', i:7, j:5, faction:'hollowking', opts:{ spirit:true, equip:{...NOEQ, weapon:'hollow_maw'} } }],
+  entries:{ fromUp:{i:7,j:12} } };
+Object.assign(AREA_TIER,{ hollowstair:5, hollowroots:5, hollowheart:5 });
+NEAR_NAME.sealstone='the Valley Seal';
+OBJ_DRAW.sealstone=o=>{ const q=P(o.i+0.5,o.j+0.5); g.save(); g.globalCompositeOperation='lighter'; glow(q.x,q.y-18,40,30,'255,230,170',0.35+0.08*Math.sin(gt*1.4)); g.restore();
+  g.fillStyle='#8a6a3a'; g.beginPath(); g.ellipse(q.x,q.y-14,14,8,0,0,Math.PI*2); g.fill(); g.strokeStyle='#e8d098'; g.lineWidth=1.2; g.stroke();
+  for(let n=0;n<7;n++){ const a=-Math.PI/2+n*Math.PI*2/7; g.strokeStyle='rgba(60,40,10,0.6)'; g.lineWidth=0.8; g.beginPath(); g.moveTo(q.x,q.y-14); g.lineTo(q.x+Math.cos(a)*14,q.y-14+Math.sin(a)*8); g.stroke(); } };
+onUse(['sealstone'],()=>pzSay('The Valley Seal lies on the root-floor where the Hollow was, whole, warm, faintly shining. Under it, very far down, something sleeps.','#f0e0b0'));
+// the champions who came down with you: one for each people that gave its wedge freely
+const SEAL_ALLY={
+  hamond:()=>({ name:'Brann the Hunter', hit:'Brann looses an arrow', col:'#c8e0a0', opts:(findNpc('hunter')||{}).opts||{gender:'m',skin:2,hair:2,hairColor:4,beard:3,equip:{torso:'tunic_green',armor:'jerkin',legs:'trousers',feet:'boots',weapon:'spear'}} }),
+  hollow:()=>({ name:CHOICE.ruler==='voss'?'Captain Voss':'A Hollowmere Sergeant', hit:'a spear from the city', col:'#f0c0a0', opts:GUARD({}) }),
+  dwarves:()=>({ name:'Gate Guard Orm', hit:"Orm's axe bites", col:'#f0c070', opts:DGUARD('Orm',{hairColor:7}) }),
+  elves:()=>({ name:'Warden Ithrel', hit:"Ithrel's moonlit arrow", col:'#d8e8ff', opts:(findNpc('warden')||{}).opts||ELFO({gender:'m',skin:0,hair:4,hairColor:13,equip:{torso:'elf_tunic',armor:'elf_scale',legs:'elf_leggings',feet:'elf_boots',weapon:'spear'}}) }),
+  fen:()=>({ name:'Vesna the Grave-Speaker', hit:"Vesna's grave-light", col:'#b8f0c8', opts:VESNA(0,0,0).opts }),
+  sand:()=>({ name:"Kadir's Outrider", hit:'a desert lance', col:'#ffe0a0', opts:DESERT({}) }),
+  gold:()=>({ name:'A Gold Brothers Sellsword', hit:'a crossbow bolt', col:'#e8d080', opts:{gender:'m',skin:1,hair:1,hairColor:3,beard:2,face:1,equip:{head:'kettle',torso:'tunic_gold',armor:'gambeson',shoulders:'studded_spaulder',legs:'trousers',feet:'boots',weapon:'sword',offhand:null}} }) };
+// the Hollow itself: the Hunger in the Heartwood was a splinter of it
+Object.assign(WEAPONS,{ hollow_maw:{ wind:0.3, dmg:20, len:28 } });
+const HOL_P1=[{wait:1.1,wind:1.0,after:0.55,dir:'left'},{wait:0.5,wind:0.75,after:0.4,dir:'right'},{wait:1.3,wind:1.15,after:0.7,dir:'up',feint:'left'},{wait:0.8,wind:0.85,after:0.5,dir:'right'}];
+const HOL_P2=[{wait:0.9,wind:0.8,after:0.45,dir:'up'},{wait:0.25,wind:0.6,after:0.35,dir:'left'},{wait:0.0,wind:0.55,after:0.5,dir:'right'},{wait:1.0,wind:0.9,after:0.5,dir:'left',feint:'up'}];
+const HOL_P3=[{wait:0.7,wind:0.7,after:0.35,dir:'right',feint:'left'},{wait:0.15,wind:0.5,after:0.3,dir:'up'},{wait:0.0,wind:0.5,after:0.45,dir:'left'},{wait:0.6,wind:0.62,after:0.4,dir:'right'},{wait:0.1,wind:0.5,after:0.6,dir:'up',feint:'right'}];
+FOES.hollow={ label:'The Hollow', base:520, stagger:0.55, pattern:HOL_P1 };
+SPIRIT_TYPES.add('hollow');
+{ const _rm=resetMobs; resetMobs=function(...a){ const r=_rm.apply(this,a); try{ mobs.forEach(m=>{ if(m.type==='hollow'){ m.maxHp=1000; if(!m.dead) m.hp=1000; } }); }catch(e){} return r; }; }   // a fixed size, whatever the tier sums say
+BEASTS.unshift({ k:'hollow', is:f=>f.type==='hollow', name:'The Hollow', kind:'What the old king put to sleep · under the Boundary Stones',
+  how:'Root-claws from either side and a rake from above, quicker as it wakes; it feints the overhead.', res:'No flesh to bleed and nothing to poison.', aff:'None. It is very old, and very hungry.', ans:'It cannot be killed, only put back to sleep. Those who came down with you will strike when it turns from them.' });
+{ const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); try{ if(areaId==='hollowheart'){ FOES.hollow.pattern=HOL_P1; if(SEAL() && !SEAL().done) setTimeout(()=>{ if(areaId!=='hollowheart') return; banner('The Hollow','#b08ae0',1800);
+          logMsg(sealBackers().length ? 'In the middle of a ring of seven stones, a shape of smoke and root uncurls, antlered, with a cold light where its heart should be. Behind you, the ones who came down with you spread out along the wall.' : 'In the middle of a ring of seven stones, a shape of smoke and root uncurls, antlered, with a cold light where its heart should be. You are alone with it.','#c8a8f0'); },500); } }catch(e){} return r; }; }
+function drawHollow(x,B,e,pose){ g.save(); g.translate(x,B); g.scale(1.35,1.35); g.translate(-x,-B); drawHunger(x,B,e,pose); g.restore();
+  if(!e.dead){ g.save(); g.globalCompositeOperation='lighter'; glow(x,B-150,44,60,'150,110,230',0.18+0.06*Math.sin(gt*1.7)); g.restore(); } }
+{ const _w=woundRaw; woundRaw=function(f,n,label,col){ const r=_w.apply(this,arguments);
+    try{ if(f && f.type==='hollow' && f.hp>0){
+        if(!f.ph2 && f.hp<=f.maxHp*0.6){ f.ph2=1; FOES.hollow.pattern=HOL_P2; f.k=0; f.state='stagger'; f.t=1.0; slowmo.scale=0.3; slowmo.t=0.5; shake=Math.max(shake,10); banner('It opens its eyes','#b08ae0',1600); logMsg('The Hollow shudders. A second ring of cold lights opens down its body. It is quicker now.','#c8a8f0'); }
+        else if(!f.ph3 && f.hp<=f.maxHp*0.3){ f.ph3=1; FOES.hollow.pattern=HOL_P3; f.k=0; f.state='stagger'; f.t=1.0; slowmo.scale=0.3; slowmo.t=0.5; shake=Math.max(shake,12); banner('It is hungry','#e07a9a',1600); logMsg('The light in the stones around you dims as the Hollow drinks it. Hold on.','#e0a0b8'); } } }catch(e){}
+    return r; }; }
+// the champions strike while it is busy with you
+{ let tAcc=0, last=performance.now(); setInterval(()=>{ const now=performance.now(), dt=Math.min(0.5,(now-last)/1000); last=now;
+    try{ if(areaId!=='hollowheart' || !combat.active || combat.phase!=='fight') { tAcc=0; return; } const f=combat.foe; if(!f || f.type!=='hollow' || f.dead) return;
+      const allies=NPCS.filter(n=>/^ally_/.test(n.id)); if(!allies.length) return; tAcc+=dt*slowmo.scale; const every=Math.max(3.2,7.5-allies.length*0.6);
+      if(tAcc<every) return; tAcc=0; const n=allies[Math.floor(Math.random()*allies.length)], A=SEAL_ALLY[n.id.slice(5)](), d=10+Math.floor(Math.random()*6);
+      lunge(n,f); burst(f,n,A.col,10); wound(f,d,A.hit,A.col); }catch(e){} },120); }
+// the end: the seal goes back to sleep with it, and the valley names you
+function sealEnding(){ const S=SEAL(); const L=[];
+  L.push("<i>The Hollow comes apart like smoke in a wind, down into the roots, down into the dark under the dark. The seal in your pack is burning hot. You set it on the root-floor where the thing was, and it sinks a finger's width into the wood and stays there, shining.</i>");
+  L.push("<i>Far below, something breathes out, long and slow, and is still.</i>");
+  const P2=sealParts();
+  L.push(P2.hollow==='force' ? "In Hollowmere the Baron's reliquary still hangs broken in his solar. Nobody has mended it. People say the Warden takes what the Warden wants." : `In Hollowmere ${RULER_NAME()} has the city's arms painted over the keep gate again, with a little bronze wedge under them.`);
+  L.push("Varrowdeep opened the Lowest Gallery again. The miners sing going down now: an old song, with a new verse about a surface-folk who listened to the quiet.");
+  L.push(P2.elves==='force' ? "No songs come out of the ashes of Sylvhaven. The elves who are left know who put the seal back. They do not forgive. They do remember." : "In Sylvhaven the moonbells ring when you walk under the trees. Lady Aerwen has had your name cut into the silver of the Silver Gate, small, near the bottom, where only elves will see it.");
+  L.push("Vesna says the dead of the fen sleep easier now. She says it with a look that suggests she would know.");
+  L.push("Kadir tells it at every caravan fire, a little bigger each time. By spring you will have fought the Hollow with your bare hands.");
+  L.push(P2.gold==='favour' ? "The Gold Brothers struck a token with your face on it, for their best customers. It is a fair likeness." : P2.gold==='coin' ? "The Gold Brothers sent you their bill for the wedge, marked PAID, framed." : "Alaric Craban has hired a man to count everything twice whenever you are in the room.");
+  if(S.cadocUp) L.push("Ser Cadoc rode back to the Crown with a bandaged arm and a letter in your favour. The Crown has not answered. The valley has stopped waiting for it to.");
+  L.push("Old Wenna says she heard the goat on the charter laugh.");
+  L.push("<b>The seal sits whole beneath the Boundary Stones, and the ground has not shaken since. In Dunhollow they call you Warden now, and mean it, mostly.</b>");
+  banner('Warden of the Valley','#f0d890',3200); try{ SND.fx('page'); }catch(e){}
+  const k=player.inv.indexOf('valley_seal'); if(k>=0) player.inv[k]=null;
+  say('The Valley',L,[{label:'Walk back up into the light.', fn:()=>{ closeDialog(); if(!S.mantle){ S.mantle=1; giveQuestItem('warden_mantle',true); player.purse+=500; updateHud(); logMsg("The valley's gift: the Warden's Mantle, and five gold from the Crown, sent ahead with an apology for the delay.",'#f0d890'); }
+      try{ switchArea('stones','fromHollow'); }catch(e){} setTimeout(()=>say('Elder Hamond',["“You came back up. I had a speech ready in case you didn't. It was a good speech. I will save it.”","“The road is yours, Warden. The valley still has stories in it, and some of them want your help.”"],[bye]),700); }}]); }
+// ally champions talk if you speak to them before the fight
+SEAL_KEYS.forEach(k=>{ TALKERS['ally_'+k]=()=>{ const A=SEAL_ALLY[k](); say(A.name,{hamond:"“Same as a bear, this. Watch its shoulders, not its eyes.”",hollow:"“The city sent me. I'd rather be guarding a gate. Let's be quick.”",dwarves:"“Down here is my country. When it turns its back on me, it will learn that.”",elves:"“I will keep my arrows on its heart. Keep its eyes on you.”",fen:"“It smells like the bottom of the barrow. I'm almost nostalgic.”",sand:"“Kadir said, ‘Don't come back without a story.’ This will do.”",gold:"“Paid in advance, double for holes in the ground. Point me at it.”"}[k],[bye]); }; });
 </script>
 </body>
 </html>

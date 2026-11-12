@@ -7228,10 +7228,13 @@ const CITY_PAL=[ // plaster, timber, roof, stone
 // the high pass: snow peaks far behind, a broken granite ridge, a few wind-bent pines and a bank of scree at its foot
 // a wash of sky behind a back wall, its gradient running up from the wall's own foot (skewed with the edge, so both walls fade alike)
 function edgeWash(a,b,ht,stops,fade){ const dx=b.x-a.x; if(!dx) return; g.save(); g.transform(1,(b.y-a.y)/dx,0,1,a.x,a.y);
-  const gr=g.createLinearGradient(0,-ht,0,0); stops.forEach(([t,c])=>gr.addColorStop(t,c)); g.fillStyle=gr; const x0=Math.min(0,dx), L=Math.abs(dx), f=Math.min(fade||0,L/2);
-  g.fillRect(x0+f,-ht,L-2*f,ht+0.5);
-  if(f) for(let k=0;k<12;k++){ g.globalAlpha=(k+0.5)/12; const sw=f/12; g.fillRect(x0+k*sw,-ht,sw+0.3,ht+0.5); g.fillRect(x0+L-(k+1)*sw-0.3,-ht,sw+0.3,ht+0.5); }   // the ends thin out
-  g.restore(); }
+  const x0=Math.min(0,dx), L=Math.abs(dx), fa=Array.isArray(fade)?fade:[fade||0,fade||0], f0=Math.min(fa[0],L/2), f1=Math.min(fa[1],L/2), f=f0+f1;
+  if(!f){ const gr=g.createLinearGradient(0,-ht,0,0); stops.forEach(([t,c])=>gr.addColorStop(t,c)); g.fillStyle=gr; g.fillRect(x0,-ht,L,ht+0.5); g.restore(); return; }
+  const cv=document.createElement('canvas'); cv.width=Math.ceil(L); cv.height=Math.ceil(ht+1); const c=cv.getContext('2d');   // the ends thin out: the wash is masked by a sideways fade
+  const vg=c.createLinearGradient(0,0,0,ht); stops.forEach(([t,col])=>vg.addColorStop(t,col)); c.fillStyle=vg; c.fillRect(0,0,cv.width,cv.height);
+  const hg=c.createLinearGradient(0,0,L,0); hg.addColorStop(0,f0?'rgba(0,0,0,0)':'#000'); hg.addColorStop(f0/L,'#000'); hg.addColorStop(1-f1/L,'#000'); hg.addColorStop(1,f1?'rgba(0,0,0,0)':'#000');
+  c.globalCompositeOperation='destination-in'; c.fillStyle=hg; c.fillRect(0,0,cv.width,cv.height);
+  g.drawImage(cv,x0,-ht); g.restore(); }
 function paintMountainBackdrop(){
   const {w,h}=ROOM, H=WALL_H, o=P(0,0), rEnd=P(w,0), lEnd=P(0,h);
   DOOR_GAPS=backDoorGaps();
@@ -7266,27 +7269,33 @@ function paintMountainBackdrop(){
   ['r','l'].forEach(axis=>{ const len=axis==='r'?w:h; for(let u=-0.2;u<len+0.2;u+=0.22){ if(gapAt(axis,u,3)) continue; const p=axis==='r'?P(u,0):P(0,u), j=rnd01(Math.round(u*20),axis==='r'?13:14,352);   // scree at the foot
       g.fillStyle=['#5e5a56','#77726c','#4a4744','#8c8780'][Math.floor(j*4)]; g.beginPath(); g.ellipse(p.x+(j-0.5)*8,p.y-3-j*4,5+j*6,3+j*2.5,0,0,Math.PI*2); g.fill(); } });
   if(typeof paintCaveMouths==='function') paintCaveMouths(); }
-function paintSandBackdrop(){
+function paintSandBackdrop(){                                  // the desert's edge: a low haze on the horizon, a far range of flat-topped mesas standing on it, then dune after dune
   const {w,h}=ROOM, H=WALL_H, o=P(0,0), rEnd=P(w,0), lEnd=P(0,h);
-  const wash=(a,b)=>edgeWash(a,b,H*2.3,[[0,'rgba(226,190,150,0)'],[0.35,'rgba(214,172,124,0.42)'],[0.7,'rgba(200,154,104,0.8)'],[1,'#b8895a']]);
-  wash(o,rEnd); wash(lEnd,o);
-  const edge=(axis,len,fn)=>{ for(let u=-0.6;u<len+0.6;u+=0.25){ if(gapAt(axis,u,1)) continue; fn(axis==='r'?P(u,0):P(0,u),u); } };
   DOOR_GAPS=backDoorGaps();
-  const mesa=(axis,len)=>{ for(let u=0.5;u<len;u+=3.4+rnd01(Math.round(u*7),3,331)*2){ const p=axis==='r'?P(u,0):P(0,u), j=rnd01(Math.round(u*9),axis==='r'?1:2,332);
-      if(j<0.35) continue; const wd=70+j*90, ht=60+j*50, y=p.y-H*0.55;
-      g.fillStyle='#a8785a'; g.beginPath(); g.moveTo(p.x-wd*0.7,y); g.lineTo(p.x-wd*0.45,y-ht); g.lineTo(p.x+wd*0.45,y-ht); g.lineTo(p.x+wd*0.7,y); g.closePath(); g.fill();
-      g.save(); g.clip(); g.fillStyle='rgba(90,50,30,0.35)'; g.beginPath(); g.moveTo(p.x+wd*0.12,y-ht); g.lineTo(p.x+wd*0.45,y-ht); g.lineTo(p.x+wd*0.7,y); g.lineTo(p.x+wd*0.2,y); g.closePath(); g.fill();   // the shaded side
-        for(let s=1;s<5;s++){ const yy=y-ht*s/5+Math.sin(u*3+s)*2; g.fillStyle=s%2?'rgba(120,70,40,0.28)':'rgba(240,200,160,0.18)'; g.fillRect(p.x-wd,yy-2-(s%2)*2,wd*2,3+(s%2)*2); }   // strata
-        g.strokeStyle='rgba(80,44,26,0.35)'; g.lineWidth=1; for(let c=0;c<4;c++){ const xx=p.x-wd*0.4+c*wd*0.27+(j-0.5)*8; g.beginPath(); g.moveTo(xx,y-ht); g.lineTo(xx+(c-1.5)*4,y); g.stroke(); } g.restore();   // gullies
-      g.fillStyle='rgba(255,220,180,0.25)'; g.beginPath(); g.moveTo(p.x-wd*0.45,y-ht); g.lineTo(p.x+wd*0.45,y-ht); g.lineTo(p.x+wd*0.4,y-ht+8); g.lineTo(p.x-wd*0.42,y-ht+8); g.closePath(); g.fill(); } };
-  mesa('r',w); mesa('l',h);
-  const dune=(depth,col,lit)=>['r','l'].forEach(axis=>{ const len=axis==='r'?w:h; g.fillStyle=col; g.beginPath(); let first=true, last=null;
-      for(let u=0;u<=len+0.6;u+=0.2){ const p=axis==='r'?P(u,0):P(0,u), hh=(18+depth*14)*(0.6+0.5*Math.sin(u*(0.9-depth*0.15)+depth*2+(axis==='r'?0:1.7)*Math.min(1,u/2))+0.3*Math.sin(u*2.3+depth)), y=p.y-(2-depth)*14-hh;
-        if(first){ g.moveTo(p.x,p.y); g.lineTo(p.x,y); first=false; } else g.lineTo(p.x,y); last=p; }
-      g.lineTo(last.x,last.y); g.closePath(); g.fill();
-      g.strokeStyle=lit; g.lineWidth=1.5; g.beginPath(); first=true;
-      for(let u=0;u<=len+0.6;u+=0.2){ const p=axis==='r'?P(u,0):P(0,u), hh=(18+depth*14)*(0.6+0.5*Math.sin(u*(0.9-depth*0.15)+depth*2+(axis==='r'?0:1.7)*Math.min(1,u/2))+0.3*Math.sin(u*2.3+depth)), y=p.y-(2-depth)*14-hh; first?(g.moveTo(p.x,y),first=false):g.lineTo(p.x,y); } g.stroke(); });
-  dune(0,'#c49662','rgba(255,228,180,0.5)'); dune(1,'#d2a66e','rgba(255,232,190,0.55)'); dune(2,'#ddb47c','rgba(255,238,200,0.6)'); }
+  const sm=(e0,e1,x)=>{ const t=Math.max(0,Math.min(1,(x-e0)/(e1-e0))); return t*t*(3-2*t); };
+  const ends=(u,len)=>sm(-0.6,1.4,len-u);                       // every layer sinks into the sand at the far ends: no cut-off edges
+  const wash=(a,b)=>edgeWash(a,b,H*2.4,[[0,'rgba(232,196,150,0)'],[0.5,'rgba(226,186,138,0.22)'],[0.82,'rgba(232,192,140,0.6)'],[1,'rgba(238,204,152,0.85)']],a===o?[0,180]:[180,0]);   // fading out only at the far ends, never at the back corner
+  wash(o,rEnd); wash(lEnd,o);
+  // a layer is one continuous outline along each back edge, filled down to the ground
+  const layer=(axis,len,top,fill,rim)=>{ const pts=[]; for(let u=0;u<=len+0.6001;u+=0.1){ const p=axis==='r'?P(u,0):P(0,u); pts.push({x:p.x,y:p.y,t:p.y-top(u)}); }
+    g.fillStyle=fill; g.beginPath(); g.moveTo(pts[0].x,pts[0].y); pts.forEach(q=>g.lineTo(q.x,q.t)); g.lineTo(pts[pts.length-1].x,pts[pts.length-1].y); g.closePath(); g.fill();
+    if(rim){ g.strokeStyle=rim; g.lineWidth=1.4; g.beginPath(); pts.forEach((q,k)=>k?g.lineTo(q.x,q.t):g.moveTo(q.x,q.t)); g.stroke(); } return pts; };
+  // the far mesas: flat tops, steep sides, a skirt of scree; placed per edge, and kept low near the back corner so both edges meet
+  const mesas=(axis,len,seed)=>{ const L=[]; for(let u=2.2+rnd01(0,seed,340)*1.5,k=0;u<len-0.8;k++){ const r=rnd01(k,seed,341); if(r>0.25) L.push({c:u, hw:0.8+rnd01(k,seed,342)*1.4, ht:30+rnd01(k,seed,343)*40}); u+=3.2+rnd01(k,seed,344)*2.6; } return L; };
+  const range=(M,u,len,base)=>{ let m=0; M.forEach(q=>{ const d=Math.abs(u-q.c); m=Math.max(m, q.ht*(0.7*sm(q.hw+0.22,q.hw,d)+0.3*sm(q.hw+1.1,q.hw+0.15,d))); });   // a sheer cliff over a skirt of scree
+    return (base + m*sm(0.2,1.6,u)) * ends(u,len); };
+  [['r',w,1],['l',h,2]].forEach(([axis,len,sd])=>{ const M=mesas(axis,len,sd), M2=mesas(axis,len,sd+7).map(q=>({...q, ht:q.ht*0.6}));
+    const lift=H*0.62, lift2=H*0.42;
+    const far=layer(axis,len,u=>lift*ends(u,len)+range(M,u,len,0)+6*Math.sin(u*1.3+sd)*sm(0,1.5,u),'#d0a47c','rgba(255,232,200,0.5)');
+    g.save(); g.beginPath(); g.moveTo(far[0].x,far[0].y); far.forEach(q=>g.lineTo(q.x,q.t)); g.lineTo(far[far.length-1].x,far[far.length-1].y); g.closePath(); g.clip();
+      for(let k=1;k<5;k++){ g.strokeStyle=k%2?'rgba(150,96,62,0.22)':'rgba(255,226,190,0.16)'; g.lineWidth=2.2; g.beginPath();   // strata in the mesa faces
+        far.forEach((q,n)=>{ const y=q.y-lift*ends(n*0.1,len)-k*9-Math.sin(n*0.21+k)*1.5; n?g.lineTo(q.x,y):g.moveTo(q.x,y); }); g.stroke(); }
+    g.restore();
+    layer(axis,len,u=>lift2*ends(u,len)+range(M2,u,len,0)+4*Math.sin(u*1.9+sd*2)*sm(0,1.5,u),'#c6976a','rgba(255,228,190,0.45)');
+    // dunes, nearer and nearer, smooth crests catching the light
+    [[0,'#c89a66','rgba(255,228,180,0.5)'],[1,'#d4a870','rgba(255,232,190,0.55)'],[2,'#ddb47c','rgba(255,238,200,0.6)']].forEach(([d,col,lit])=>
+      layer(axis,len,u=>((2-d)*14 + (18+d*14)*(0.6+0.5*Math.sin(u*(0.9-d*0.15)+d*2+(axis==='r'?0:1.7)*sm(0,2,u))+0.3*Math.sin(u*2.3+d)))*ends(u,len),col,lit)); });
+}
 function paintCityBackdrop(){
   const {w,h}=ROOM;
   const row=(axis,len,depth)=>{ for(let u=-0.5;u<len+0.5;u+=0.9+depth*0.5){
@@ -7338,13 +7347,15 @@ function paintBuilding(X,Y,o){
       const posts=Math.max(2,Math.round(len*2)); g.lineWidth=2.6;
       for(let n=0;n<=posts;n++){ const t=n/posts, u=q(t,stoneH), v=q(t,WH); g.beginPath(); g.moveTo(u.x,u.y); g.lineTo(v.x,v.y); g.stroke();
         if(n<posts && (n+o.v)%3===0){ const u2=q((n+1)/posts,WH); g.beginPath(); g.moveTo(u.x,u.y); g.lineTo(u2.x,u2.y); g.stroke(); } } }
-    const win=(t0,t1,h0,h1,lit2)=>{ poly([q(t0,h0),q(t1,h0),q(t1,h1),q(t0,h1)], lit2?'#f0c060':'#1c1814', tone(pal.tb,-0.2),1.4);
+    const win=(t0,t1,h0,h1,lit2)=>{ if(o.slits){ const c=(t0+t1)/2, hw=0.09/Math.max(1,len); t0=c-hw; t1=c+hw; h0+=6; h1-=8; lit2=false; }   // a keep has arrow slits, not cottage windows
+      poly([q(t0,h0),q(t1,h0),q(t1,h1),q(t0,h1)], lit2?'#f0c060':'#1c1814', tone(pal.tb,-0.2),1.4);
       if(lit2){ const gw=g.createRadialGradient(q((t0+t1)/2,(h0+h1)/2).x,q((t0+t1)/2,(h0+h1)/2).y,1,q((t0+t1)/2,(h0+h1)/2).x,q((t0+t1)/2,(h0+h1)/2).y,14); gw.addColorStop(0,'rgba(255,230,160,0.9)'); gw.addColorStop(1,'rgba(255,200,100,0.2)'); poly([q(t0,h0),q(t1,h0),q(t1,h1),q(t0,h1)],gw); }
       g.strokeStyle=tone(pal.tb,-0.3); g.lineWidth=1; const m1=q((t0+t1)/2,h0), m2=q((t0+t1)/2,h1); g.beginPath(); g.moveTo(m1.x,m1.y); g.lineTo(m2.x,m2.y); g.stroke();
       { const c1=q((t0+t1)/2,(h0+h1)/2), c2=q((t0+t1)/2+0.02,(h0+h1)/2); g.strokeStyle=tone(pal.tb,-0.3); g.lineWidth=0.8; g.beginPath(); g.moveTo(q(t0,(h0+h1)/2).x,q(t0,(h0+h1)/2).y); g.lineTo(q(t1,(h0+h1)/2).x,q(t1,(h0+h1)/2).y); g.stroke(); }   // the glazing bar
       poly([q(t0-0.02,h0+1),q(t1+0.02,h0+1),q(t1+0.02,h0-2.5),q(t0-0.02,h0-2.5)],tone(pal.st,k+0.12),tone(pal.st,-0.4,0.6),0.6);   // the sill
       if(h0>WH-30 && rnd01(Math.round(t0*100),o.v+(lit?3:4),236)<0.45 && !o.stone){ poly([q(t0-0.01,h0-2.5),q(t1+0.01,h0-2.5),q(t1+0.01,h0-9),q(t0-0.01,h0-9)],tone('#6a4a2a',k),'rgba(30,18,8,0.6)',0.6);   // a box of flowers
         for(let f=0;f<6;f++){ const u=q(t0+(t1-t0)*(f+0.5)/6,h0+1.5); g.fillStyle=tone('#4a7a34',k); g.beginPath(); g.arc(u.x,u.y,2.4,0,Math.PI*2); g.fill(); g.fillStyle=['#d84a4a','#f0d050','#e8e0f0','#c870c0'][(f+o.v)%4]; g.beginPath(); g.arc(u.x+0.6,u.y-1.6,1.3,0,Math.PI*2); g.fill(); } }
+      if(o.slits) return;
       const s0=q(t0-0.05,h0), s1=q(t0,h1); poly([q(t0-0.055,h0),q(t0-0.005,h0),q(t0-0.005,h1),q(t0-0.055,h1)],tone(o.shut||'#4a6a3a',k)); poly([q(t1+0.005,h0),q(t1+0.055,h0),q(t1+0.055,h1),q(t1+0.005,h1)],tone(o.shut||'#4a6a3a',k)); };
     const nW=Math.max(1,Math.round(len)), doorHere=o.door===(lit?'l':'r');
     const dT = doorHere ? ((o.dt??1)+0.5)/(lit?fw:fh) : -1;
@@ -7539,7 +7550,7 @@ function paintGateDoors(x,y,shut){                 // under the gatehouse arch: 
   const r1=q(0.47,44), r2=q(0.53,44); g.strokeStyle='#8a8a8e'; g.lineWidth=1.6; [r1,r2].forEach(r=>{ g.beginPath(); g.arc(r.x,r.y+4,3.6,0,Math.PI*2); g.stroke(); });   // two iron ring-pulls
 }
 function paintKeep(X,Y,fw,fh){                             // the Baron's keep: a massive stone block with towers at the corners
-  const o={fw,fh,h:260,rh:1,v:2,stone:true,nochim:true,ridge:'i'}, T=TW/2, H2=TH/2, pt=(gi,gj,hh=0)=>({x:X+(gi-gj)*T, y:Y+(gi+gj)*H2-hh});
+  const o={fw,fh,h:260,rh:1,v:2,stone:true,nochim:true,ridge:'i',slits:true}, T=TW/2, H2=TH/2, pt=(gi,gj,hh=0)=>({x:X+(gi-gj)*T, y:Y+(gi+gj)*H2-hh});
   paintBuilding(X,Y,{...o,rh:2,door:'l',dt:Math.floor(fw/2)});
   const top=(gi,gj)=>pt(gi,gj,262);
   const poly=(pts,fill)=>{ g.beginPath(); pts.forEach((p2,n)=>n?g.lineTo(p2.x,p2.y):g.moveTo(p2.x,p2.y)); g.closePath(); g.fillStyle=fill; g.fill(); };
@@ -22251,7 +22262,6 @@ LIGHT_TYPES.molten=[0,0,160,'255,120,40'];
 AREAS.varrowmine.mine=true;
 Object.assign(AREAS.varrowgate,{ runners:[[5.25,6.75,0,12]], wallSeed:0 });
 Object.assign(AREAS.varrowhall,{ runners:[[8.25,9.75,2.6,16]], rings:[[9.5,8.5,1.75]], wallSeed:1 });
-Object.assign(AREAS.varrowmine,{ rails:[['h',7.5,0,13.5],['v',7.5,7.6,14]] });
 Object.assign(AREAS.varrowtomb,{ runners:[[4.25,5.75,0,6.4]], rings:[[5.5,7.5,2.3]], wallSeed:2 });
 wrap('varrowgate','objects',l=>[...l.filter(o=>o.type!=='banner'), {type:'chainlamp', i:3, j:6, noblock:true}, {type:'chainlamp', i:8, j:6, noblock:true}, {type:'chainlamp', i:6, j:9, noblock:true},
   {type:'kegrack', i:9, j:9, fp:[2,1]}, {type:'oreheap', i:1, j:2}]);
@@ -22259,7 +22269,6 @@ wrap('varrowhall','objects',l=>[...l.filter(o=>!['table','bench','barrel','banne
   {type:'dtable', i:11, j:10, fp:[3,1]}, {type:'dtable', i:11, j:12, fp:[3,1]}, {type:'kegrack', i:15, j:12, fp:[2,1]}, {type:'kegrack', i:15, j:14, fp:[2,1]},
   {type:'molten', i:1, j:5, fp:[3,1]}, {type:'hoard', i:16, j:1}, {type:'oreheap', i:7, j:3},
   {type:'chainlamp', i:6, j:8, noblock:true}, {type:'chainlamp', i:12, j:8, noblock:true}, {type:'chainlamp', i:9, j:12, noblock:true}, {type:'chainlamp', i:9, j:5, noblock:true}, {type:'chainlamp', i:3, j:12, noblock:true}]);
-wrap('varrowmine','objects',l=>[...l, {type:'oreheap', i:11, j:8}, {type:'oreheap', i:3, j:8}, {type:'chainlamp', i:4, j:7, noblock:true}, {type:'chainlamp', i:10, j:12, noblock:true}]);
 wrap('varrowtomb','objects',l=>[...l, {type:'hoard', i:2, j:10}, {type:'hoard', i:8, j:10}, {type:'chainlamp', i:5, j:3, noblock:true}]);
 const roadcutterUp=()=>vq()==='asked' && !CHOICE.vqKing;
 FOES.roadcutter={ label:'Roadcutter', base:72, stagger:0.8, pattern:[
@@ -23117,7 +23126,7 @@ function drawTroll(x,B,e,pose){ const pk=pose&&pose.kind, pt=pose?Math.min(1,Mat
 BEASTS.push({ k:'troll', is:f=>f.type==='troll', name:'Cave Trolls', kind:'Under the mountain · the Deep Mines',
   how:'A slow overhead slam, then a sweep and a quick backhand right behind it. Then the slam again.', res:'It guards one side with that great arm. Strike the other.', aff:'Every blow it lands is a heavy one.', ans:'Never stop hitting it: give it a breath and its wounds close. Fire stops the mending.' });
 // it wakes when the Quiet lifts, and comes back every day
-{ const A=AREAS.varrowmine, _m=A.mobs; A.mobs=()=>{ if(!CHOICE.vqQuiet) return _m(); return [ { name:'Cave Troll', type:'troll', i:9, j:10, faction:'mtroll', daily:true, hpMul:2.2, opts:TROLL() } ]; }; }
+// (the cave troll lives in the Lowest Gallery now: see THE DEEP MINES)
 // ════════ THE HOLLOW CHOIR: a hidden tale. At midnight, for a few breaths, a succubus sits in the Dunhollow graveyard ════════
 //   CHOICE.succ : null → 'told' (she told you of the feast; CHOICE.succNight is the night it happens) → 'watched' | 'joined' | 'fought' | 'missed'
 //   CHOICE.succFled : the night she last fled you (she will not come back the same night)      CHOICE.tithe : {hp, ap, sp} what you sold of your blood
@@ -24747,6 +24756,185 @@ NEAR_NAME.shelf='a shelf of ledgers';
 // water never runs out over the edge of the map: every pool is painted inside the floor's own diamond
 { const pp0=paintPool; paintPool=function(o){ const {w,h}=ROOM, a=P(0,0), b=P(w,0), c=P(w,h), d=P(0,h);
     g.save(); g.beginPath(); g.moveTo(a.x,a.y-30); g.lineTo(b.x,b.y); g.lineTo(c.x,c.y); g.lineTo(d.x,d.y); g.closePath(); g.clip(); try{ pp0(o); } finally { g.restore(); } }; }
+// ════════ THE DEEP MINES OF VARROWDEEP: not one room but a working mine. The Mine Head off the Great Hall, a long haulage gallery with the lift shaft off it,
+//   the miners' bunkroom, the Silver Seam, a stope the water got into, and under it all the Lowest Gallery, where the chain was, and the old king's tomb ════════
+const QUIET_KEYS=['vm_gallery:Quiet Miner','vm_shaft:Quiet Miner','vm_seam:Quiet Foreman','vm_flood:Quiet Miner'];
+const QMINER=(o)=>DWARFO({gender:'m', skin:1, hair:2, hairColor:3, beard:5, ghost:true, ...o, equip:{armor:'jerkin', weapon:'hatchet', ...(o.equip||{})}});
+const VM_QUIET=(area,i,j,f,name,type,o)=>()=> CHOICE.vqQuiet ? [] : [ { name, type, i, j, faction:'quiet_'+f, opts:QMINER(o) } ];
+Object.assign(AREAS,{
+  varrowmine: VCAVE('Varrowdeep · The Mine Head',12,10, ()=>[ {type:'teleporter', i:0, j:5, to:'varrowhall', entry:'fromMine'},
+      {type:'teleporter', i:11, j:5, to:'vm_gallery', entry:'fromHead'}, {type:'teleporter', i:3, j:9, to:'vm_bunks', entry:'fromHead'},
+      {type:'orecart', i:7, j:5}, {type:'orecart', i:9, j:6}, {type:'oreheap', i:9, j:8}, {type:'oreheap', i:10, j:7},
+      {type:'pickrack', i:4, j:0, fp:[2,1]}, {type:'crates', i:9, j:1}, {type:'barrels', i:10, j:1}, {type:'crate', i:11, j:2}, {type:'barrel', i:1, j:8},
+      {type:'mineframe', i:6, j:2}, {type:'mineframe', i:2, j:7}, {type:'brazier', i:1, j:2}, {type:'brazier', i:6, j:8}, {type:'rubble', i:11, j:9, noblock:true},
+      {type:'chainlamp', i:4, j:4, noblock:true}, {type:'chainlamp', i:8, j:3, noblock:true}, {type:'milestone', i:2, j:4, t:'DEEP 2'},
+      {type:'rune', i:7, j:0, text:"The foreman's tally slate, chalked in rows: carts up, carts down, by shift and by name. The last nine days are a single word, the same word every day, pressed so hard the chalk broke: <i>QUIET.</i>"} ],
+    ()=>[], { entries:{ fromHall:{i:1,j:5}, fromGallery:{i:10,j:5}, fromBunks:{i:3,j:8}, fromTomb:{i:10,j:5} } }),
+  vm_gallery: VCAVE('Varrowdeep · The Long Gallery',20,5, ()=>[ {type:'teleporter', i:0, j:2, to:'varrowmine', entry:'fromGallery'},
+      {type:'teleporter', i:19, j:2, to:'vm_seam', entry:'fromGallery'}, {type:'teleporter', i:10, j:0, to:'vm_shaft', entry:'fromGallery'},
+      ...[3,7,13,17].map(i=>({type:'gallframe', i, j:0, span:5, noblock:true})),
+      {type:'orecart', i:14, j:2}, {type:'oreheap', i:15, j:4}, {type:'oreheap', i:4, j:0}, {type:'boulder', i:2, j:4, v:1}, {type:'rockridge', i:8, j:4, fp:[2,1], v:2}, {type:'boulder', i:18, j:4, v:2},
+      {type:'rubble', i:5, j:4, noblock:true}, {type:'rubble', i:16, j:0, noblock:true}, {type:'barrel', i:12, j:0},
+      {type:'chainlamp', i:5, j:2, noblock:true}, {type:'chainlamp', i:11, j:3, noblock:true}, {type:'chainlamp', i:16, j:2, noblock:true}, {type:'milestone', i:18, j:0, t:'DEEP 3'} ],
+    ()=>[], { mobs:VM_QUIET('vm_gallery',7,2,'g','Quiet Miner','bandit',{}),
+      entries:{ fromHead:{i:1,j:2}, fromSeam:{i:18,j:2}, fromShaft:{i:10,j:1} } }),
+  vm_bunks: VCAVE("Varrowdeep · The Miners' Bunkroom",9,8, ()=>[ {type:'teleporter', i:3, j:0, to:'varrowmine', entry:'fromBunks'},
+      {type:'bed', i:6, j:1}, {type:'bed', i:6, j:3}, {type:'bed', i:6, j:5}, {type:'footlocker', i:8, j:2}, {type:'footlocker', i:8, j:6},
+      {type:'table', i:2, j:4}, {type:'bench', i:2, j:3}, {type:'bench', i:2, j:5}, {type:'kegrack', i:0, j:1, fp:[1,1]}, {type:'pickrack', i:0, j:6, fp:[1,1]},
+      {type:'brazier', i:4, j:6}, {type:'crate', i:1, j:7, rich:true}, {type:'barrel', i:0, j:4}, {type:'chainlamp', i:4, j:3, noblock:true},
+      {type:'rune', i:5, j:7, look:'letter', text:"A letter on a bunk, half written and weighted with a boot: <i>“Mother, the new seam is the richest in three generations, and Halvard says we will all be paid double by midwinter. Only it is very quiet down here this week. The picks sound wrong. I will write again when”</i>"} ],
+    ()=>[], { entries:{ fromHead:{i:3,j:1} } }),
+  vm_shaft: VCAVE('Varrowdeep · The Lift Shaft',7,10, ()=>[ {type:'teleporter', i:3, j:9, to:'vm_gallery', entry:'fromShaft'},
+      {type:'liftshaft', i:2, j:2, fp:[3,3]}, {type:'pickrack', i:5, j:0, fp:[2,1]}, {type:'bones', i:5, j:4, noblock:true}, {type:'crate', i:0, j:8}, {type:'barrels', i:6, j:8},
+      {type:'rubble', i:0, j:1, noblock:true}, {type:'chainlamp', i:1, j:6, noblock:true}, {type:'gallframe', i:3, j:6, span:1, noblock:true},
+      {type:'rune', i:6, j:6, text:"Chalked on the rock by a shaking hand: <i>“Nine days. The picks have stopped. The lamps go out by themselves. We hear walking below, and nobody below to walk. — Kari”</i>"} ],
+    ()=>[], { mobs:VM_QUIET('vm_shaft',3,6,'w','Quiet Miner','bandit',{gender:'f', skin:2, hair:3, hairColor:6, beard:0, equip:{weapon:'mace'}}),
+      entries:{ fromGallery:{i:3,j:8} } }),
+  vm_seam: VCAVE('Varrowdeep · The Silver Seam',14,12, ()=>[ {type:'teleporter', i:0, j:5, to:'vm_gallery', entry:'fromSeam'},
+      {type:'teleporter', i:6, j:11, to:'vm_flood', entry:'fromSeam'},
+      {type:'oreseam', i:3, j:0, fp:[3,1], v:1}, {type:'oreseam', i:9, j:1, fp:[2,2], v:2}, {type:'oreseam', i:11, j:6, fp:[2,2], v:3}, {type:'oreseam', i:1, j:8, fp:[2,2], v:0}, {type:'oreseam', i:9, j:9, fp:[3,1], v:1},
+      {type:'orecart', i:7, j:5}, {type:'oreheap', i:6, j:2}, {type:'oreheap', i:4, j:9}, {type:'oreheap', i:12, j:3}, {type:'pickrack', i:0, j:1, fp:[1,2]},
+      {type:'mineframe', i:3, j:3}, {type:'mineframe', i:9, j:4}, {type:'rubble', i:13, j:10, noblock:true}, {type:'rubble', i:7, j:1, noblock:true},
+      {type:'chainlamp', i:4, j:5, noblock:true}, {type:'chainlamp', i:9, j:7, noblock:true}, {type:'chainlamp', i:6, j:9, noblock:true}, {type:'milestone', i:1, j:10, t:'DEEP 4'},
+      {type:'rune', i:13, j:1, text:"Cut into the rock in old, deep letters, older than the timbering: <i>“Here Varrow's pick found the silver. Take what the mountain gives. Take nothing it does not.”</i> Under it, newer and in chalk: <i>it gave, it gave, it gave</i>."} ],
+    ()=>[], { mobs:VM_QUIET('vm_seam',6,7,'s','Quiet Foreman','brute',{hair:1, hairColor:12, beard:6, equip:{armor:'mail', head:'kettle', weapon:'axe'}}),
+      entries:{ fromGallery:{i:1,j:5}, fromFlood:{i:6,j:10} } }),
+  vm_flood: VCAVE('Varrowdeep · The Flooded Stope',12,12, ()=>[ {type:'teleporter', i:6, j:0, to:'vm_seam', entry:'fromFlood'},
+      {type:'teleporter', i:0, j:9, to:'vm_low', entry:'fromFlood', locked:()=>!vq(), onLocked:()=>pzSay('A chain as thick as your arm is padlocked across the way down to the lowest gallery. Foreman Halvard has the key.','#c8c0a8')},
+      {type:'pool', i:5, j:3, fp:[7,8], kind:'stope'}, {type:'minepump', i:4, j:5}, {type:'orecart', i:9, j:1}, {type:'boulder', i:1, j:1, v:2}, {type:'boulder', i:11, j:1, v:1}, {type:'rockridge', i:1, j:11, fp:[3,1], v:1},
+      {type:'rubble', i:3, j:2, noblock:true}, {type:'puddle', i:2, j:6, s:1.1, flat:true, noblock:true}, {type:'puddle', i:3, j:10, s:0.8, flat:true, noblock:true}, {type:'barrel', i:0, j:4},
+      {type:'gallframe', i:2, j:0, span:1, noblock:true}, {type:'chainlamp', i:3, j:8, noblock:true}, {type:'chainlamp', i:7, j:2, noblock:true},
+      {type:'rune', i:0, j:6, text:"A depth mark painted on a prop, the lines climbing it a hand apart, each with a date. The water has risen past the last one, and the last date is nine days ago."} ],
+    ()=>[], { mobs:VM_QUIET('vm_flood',2,4,'f','Quiet Miner','bandit',{skin:3, hair:2, hairColor:1, beard:4}),
+      entries:{ fromSeam:{i:6,j:1}, fromLow:{i:1,j:9} } }),
+  vm_low: VCAVE('Varrowdeep · The Lowest Gallery',8,14, ()=>[ {type:'teleporter', i:7, j:3, to:'vm_flood', entry:'fromLow'},
+      {type:'teleporter', i:0, j:11, to:'varrowtomb', entry:'fromMine'},
+      {type:'brokenchain', i:5, j:3, noblock:true}, {type:'bones', i:3, j:7, noblock:true}, {type:'bones', i:5, j:9, noblock:true}, {type:'oreheap', i:6, j:12}, {type:'boulder', i:1, j:2, v:1}, {type:'boulder', i:6, j:6, v:2},
+      {type:'rockridge', i:4, j:13, fp:[3,1], v:3}, {type:'rubble', i:2, j:5, noblock:true}, {type:'gallframe', i:3, j:1, span:1, noblock:true}, {type:'brazier', i:1, j:9}, {type:'brazier', i:1, j:13},
+      {type:'chainlamp', i:4, j:5, noblock:true}, {type:'milestone', i:6, j:1, t:'DEEP 5'},
+      {type:'rune', i:0, j:7, text:"The rough rock stops here, as sharp as a knife cut. Beyond it the wall is dressed smooth and carved with felled trees, row on row of them, and an old king's mark: an axe across a road."} ],
+    ()=>[], { mobs:()=> CHOICE.vqQuiet ? [ { name:'Cave Troll', type:'troll', i:3, j:9, faction:'mtroll', daily:true, hpMul:2.2, opts:TROLL() } ] : [],
+      entries:{ fromFlood:{i:6,j:3}, fromTomb:{i:1,j:11} } }) });
+['varrowmine','vm_gallery','vm_bunks','vm_shaft','vm_seam','vm_flood','vm_low'].forEach(id=>{ AREAS[id].mine=true; AREA_TIER[id]=id==='vm_bunks'?0:5; });
+Object.assign(AREAS.varrowmine,{ rails:[['h',5.5,0,12]] }); Object.assign(AREAS.vm_gallery,{ rails:[['h',2.5,0,20]] }); Object.assign(AREAS.vm_seam,{ rails:[['h',5.5,0,8]] });
+wrap('varrowtomb','objects',l=>l.map(o=>o.type==='teleporter'&&o.to==='varrowmine' ? {...o, to:'vm_low', entry:'fromTomb'} : o));
+// the quiet lifts only when every one of them is laid down, in every gallery
+{ const _v=victory; victory=function(faction){ const r=_v.apply(this,arguments);
+    if(typeof faction==='string' && faction.startsWith('quiet_') && !CHOICE.vqQuiet){ const left=QUIET_KEYS.filter(k=>!defeatedMobs.has(k)).length;
+      if(!left){ CHOICE.vqQuiet=1; logMsg('The last of the quiet miners lowers its axe and fades like breath on cold stone. Somewhere far below, something heavy turns over in its sleep.','#c8c8d8'); }
+      else logMsg(left===1 ? 'It fades. One more of them is still walking somewhere in the galleries.' : 'It fades. The quiet is still in '+left+' more of the galleries.','#c8c8d8'); }
+    return r; }; }
+// names for what you walk up to
+{ const M=AREAS.varrowmine; NEAR_NAME.liftshaft='the lift shaft'; NEAR_NAME.oreseam='a seam of silver'; NEAR_NAME.pickrack='a rack of picks'; NEAR_NAME.minepump='a hand pump'; NEAR_NAME.brokenchain='a broken chain'; }
+onUse(['liftshaft'],()=>pzSay(CHOICE.vqQuiet ? 'The cage hangs where it stuck, halfway down. The draught coming up the shaft is only a draught now.' : 'You lean over the collar. The rope runs down into black, and the cage is stuck halfway. A cold draught comes up, and with it, very faint, the sound of someone walking.','#c8c0a8'));
+onUse(['oreseam'],()=>pzSay('Silver, threaded through the rock in veins as thick as a finger. Picks are still stuck in it where they were dropped.','#d8dce4'));
+onUse(['minepump'],()=>pzSay('You work the handle. It coughs up a gout of black water, and the stope does not notice.','#a8c0c8'));
+// ── drawing them ──
+OBJ_DRAW.gallframe=o=>{ const s=o.span||1, A=P(o.i+0.5,o.j+0.1), B=P(o.i+0.5,o.j+s-0.1), Hh=96;   // a timber set across the whole gallery: two legs and a cap-piece over your head
+  const post=(p,w,col)=>{ g.fillStyle=col; g.fillRect(p.x-w/2,p.y-Hh,w,Hh); g.fillStyle='rgba(0,0,0,0.3)'; g.fillRect(p.x+w/2-2,p.y-Hh,2,Hh); g.fillStyle='rgba(255,220,170,0.08)'; g.fillRect(p.x-w/2,p.y-Hh,1.5,Hh); };
+  post(A,7,'#5a3e22');
+  g.strokeStyle='#3e2a16'; g.lineWidth=8; g.beginPath(); g.moveTo(A.x+5,A.y-Hh+3); g.lineTo(B.x-5,B.y-Hh+3); g.stroke();
+  g.strokeStyle='#6a4a2a'; g.lineWidth=1.6; g.beginPath(); g.moveTo(A.x+5,A.y-Hh-0.5); g.lineTo(B.x-5,B.y-Hh-0.5); g.stroke();
+  [[A,1],[B,-1]].forEach(([p,d])=>{ g.strokeStyle='#4a321c'; g.lineWidth=4; g.beginPath(); g.moveTo(p.x,p.y-Hh+24); g.lineTo(p.x-d*22,p.y-Hh+3+d*11); g.stroke(); });   // the corner braces
+  post(B,8,'#6a4a2a'); };
+OBJ_DRAW.liftshaft=o=>{ const [fw,fh]=o.fp, i0=o.i+0.35, j0=o.j+0.35, i1=o.i+fw-0.35, j1=o.j+fh-0.35, a=P(i0,j0), b=P(i1,j0), c=P(i1,j1), d=P(i0,j1);
+  g.save(); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c.x,c.y); g.lineTo(d.x,d.y); g.closePath(); g.fillStyle='#050403'; g.fill(); g.clip();
+    const sh=(p,q,col)=>{ const gr=g.createLinearGradient(0,Math.min(p.y,q.y),0,Math.min(p.y,q.y)+70); gr.addColorStop(0,col); gr.addColorStop(1,'rgba(5,4,3,0)'); g.fillStyle=gr; g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(q.x,q.y); g.lineTo(q.x,q.y+80); g.lineTo(p.x,p.y+80); g.closePath(); g.fill(); };
+    sh(a,b,'#3a2c1e'); sh(d,a,'#2a2016');                                                          // the shaft's far walls, going down into nothing
+    g.strokeStyle='rgba(90,62,34,0.7)'; g.lineWidth=3; for(let k=1;k<4;k++){ const y=k*16; g.beginPath(); g.moveTo(d.x,d.y+y); g.lineTo(a.x,a.y+y); g.lineTo(b.x,b.y+y); g.stroke(); }   // cribbing down the walls
+    const mc=P((i0+i1)/2,(j0+j1)/2), cy=mc.y+34+Math.sin(gt*0.6)*1.5;                                 // the cage, stuck halfway down
+    g.fillStyle='#1e1a16'; g.fillRect(mc.x-22,cy-14,44,26); g.strokeStyle='#6a625a'; g.lineWidth=1.4; for(let k=0;k<6;k++){ g.beginPath(); g.moveTo(mc.x-20+k*8,cy-14); g.lineTo(mc.x-20+k*8,cy+12); g.stroke(); }
+    g.fillStyle='#4a443e'; g.fillRect(mc.x-24,cy-16,48,4);
+  g.restore();
+  const beam=(x0,y0,w,dd,col1,col2,col3)=>isoBox(x0,y0,w,dd,7,col1,col2,col3);
+  beam(i0-0.2,j0-0.2,i1-i0+0.4,0.2,'#7a5a36','#5a3e22','#4a3220'); beam(i0-0.2,j0,0.2,j1-j0,'#7a5a36','#5a3e22','#4a3220');   // the collar of squared logs round it
+  const m=P((i0+i1)/2,(j0+j1)/2), legA=P(i0-0.15,(j0+j1)/2), legB=P(i1+0.15,(j0+j1)/2), top=154;
+  const leg=(p,dx)=>{ g.strokeStyle='#4a321c'; g.lineWidth=7; g.beginPath(); g.moveTo(p.x-dx,p.y+4); g.lineTo(p.x,p.y-top); g.lineTo(p.x+dx,p.y+4); g.stroke(); g.strokeStyle='#7a5a36'; g.lineWidth=2; g.beginPath(); g.moveTo(p.x-dx-2,p.y+4); g.lineTo(p.x-1,p.y-top); g.stroke(); };
+  leg(legA,26);
+  g.strokeStyle='#3e2a16'; g.lineWidth=9; g.beginPath(); g.moveTo(legA.x,legA.y-top); g.lineTo(legB.x,legB.y-top); g.stroke(); g.strokeStyle='#6a4a2a'; g.lineWidth=2; g.beginPath(); g.moveTo(legA.x,legA.y-top-4); g.lineTo(legB.x,legB.y-top-4); g.stroke();
+  const wc={x:m.x,y:m.y-top+4}, R=19, rot=CHOICE.vqQuiet?gt*0.4:0;                                    // the great wheel the rope runs over
+  g.strokeStyle='#2a2622'; g.lineWidth=4; g.beginPath(); g.ellipse(wc.x,wc.y,R,R,0,0,Math.PI*2); g.stroke(); g.strokeStyle='#5a544c'; g.lineWidth=1.5; g.stroke();
+  for(let k=0;k<6;k++){ const an=rot+k*Math.PI/3; g.strokeStyle='#3a3530'; g.lineWidth=2; g.beginPath(); g.moveTo(wc.x,wc.y); g.lineTo(wc.x+Math.cos(an)*R,wc.y+Math.sin(an)*R); g.stroke(); }
+  g.fillStyle='#6a625a'; g.beginPath(); g.arc(wc.x,wc.y,3.5,0,Math.PI*2); g.fill();
+  g.strokeStyle='#8a7a5e'; g.lineWidth=1.6; g.beginPath(); g.moveTo(wc.x+R,wc.y); g.lineTo(m.x+R*0.4,m.y+20); g.stroke();   // the rope, down into the dark
+  g.beginPath(); g.moveTo(wc.x-R,wc.y); g.quadraticCurveTo(wc.x-R-30,wc.y+80,legA.x-40,legA.y-30); g.stroke();
+  beam(i0-0.2,j1,i1-i0+0.4,0.2,'#8a6a42','#6a4a2a','#4a3220'); beam(i1,j0,0.2,j1-j0,'#8a6a42','#6a4a2a','#4a3220');
+  leg(legB,26);
+  { const wd=P(o.i+0.2,o.j+fh-0.15); g.fillStyle='#3a2a1a'; g.fillRect(wd.x-14,wd.y-26,28,22); g.fillStyle='#5a4a3a'; g.beginPath(); g.ellipse(wd.x,wd.y-15,13,9,0,0,Math.PI*2); g.fill();   // the winch drum and its crank
+    g.strokeStyle='#8a7a5e'; g.lineWidth=1; for(let k=-2;k<=2;k++){ g.beginPath(); g.moveTo(wd.x-12,wd.y-15+k*3); g.lineTo(wd.x+12,wd.y-15+k*3); g.stroke(); }
+    g.strokeStyle='#2a2622'; g.lineWidth=3; g.beginPath(); g.moveTo(wd.x+14,wd.y-15); g.lineTo(wd.x+22,wd.y-26); g.lineTo(wd.x+28,wd.y-22); g.stroke(); } };
+LIGHT_TYPES.liftshaft=null;
+OBJ_DRAW.oreseam=o=>{ drawCrag({...o, dark:true}); const [w,h]=o.fp, q=P(o.i+w/2,o.j+h/2), H=26+20*Math.sqrt(w*h), sd=o.i*31+o.j*17;   // a crag of dark rock with silver running through it
+  g.save(); g.lineCap='round';
+  for(let k=0;k<5;k++){ const x0=q.x+(rnd01(k,sd,971)-0.5)*(w+h)*TW*0.32, y0=q.y-6-rnd01(k,sd,972)*H*0.7; let x=x0, y=y0;
+    g.strokeStyle='rgba(210,216,228,0.9)'; g.lineWidth=1.2+rnd01(k,sd,973)*1.4; g.beginPath(); g.moveTo(x,y);
+    for(let s=0;s<4;s++){ x+=(rnd01(k*5+s,sd,974)-0.3)*14; y+=(rnd01(k*5+s,sd,975)-0.6)*9; g.lineTo(x,y); } g.stroke(); }
+  g.globalCompositeOperation='lighter'; for(let k=0;k<6;k++){ const t=(gt*0.5+k*0.31+sd*0.01)%1; if(t>0.25) continue; const px=q.x+(rnd01(k,sd,976)-0.5)*(w+h)*TW*0.3, py=q.y-8-rnd01(k,sd,977)*H*0.6;
+    g.fillStyle=`rgba(240,245,255,${1-t/0.25})`; g.fillRect(px-0.6,py-4,1.2,8); g.fillRect(px-4,py-0.6,8,1.2); }
+  g.restore();
+  const pk=P(o.i+w*0.3,o.j+h*0.9); g.strokeStyle='#5a3e22'; g.lineWidth=3; g.beginPath(); g.moveTo(pk.x,pk.y-14); g.lineTo(pk.x-14,pk.y+2); g.stroke();   // a pick left stuck in it
+  g.strokeStyle='#6a6660'; g.lineWidth=3; g.beginPath(); g.moveTo(pk.x-6,pk.y-22); g.quadraticCurveTo(pk.x+2,pk.y-16,pk.x+8,pk.y-6); g.stroke(); };
+OBJ_DRAW.pickrack=o=>{ const [fw,fh]=o.fp||[1,1], alongI=fw>=fh, L=alongI?fw:fh, a=alongI?P(o.i+0.1,o.j+0.3):P(o.i+0.3,o.j+0.1), b=alongI?P(o.i+L-0.1,o.j+0.3):P(o.i+0.3,o.j+L-0.1);   // picks and shovels stood against a rail
+  g.strokeStyle='#4a321c'; g.lineWidth=4; [[a,0],[b,0]].forEach(([p])=>{ g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(p.x,p.y-46); g.stroke(); });
+  g.lineWidth=5; g.beginPath(); g.moveTo(a.x,a.y-40); g.lineTo(b.x,b.y-40); g.stroke();
+  const n=L*4; for(let k=0;k<n;k++){ const t=(k+0.5)/n, x=a.x+(b.x-a.x)*t, y=a.y+(b.y-a.y)*t+8, kind=(k+o.i+o.j)%3;
+    g.strokeStyle='#7a5a36'; g.lineWidth=2.4; g.beginPath(); g.moveTo(x-6,y); g.lineTo(x+3,y-58); g.stroke();
+    if(kind===0){ g.strokeStyle='#5e5a54'; g.lineWidth=3; g.beginPath(); g.moveTo(x-8,y-62); g.quadraticCurveTo(x+3,y-66,x+14,y-56); g.stroke(); }
+    else if(kind===1){ g.fillStyle='#6a6660'; g.beginPath(); g.moveTo(x-11,y+2); g.lineTo(x-1,y+2); g.lineTo(x-3,y-12); g.lineTo(x-9,y-12); g.closePath(); g.fill(); }
+    else { g.fillStyle='#4a4440'; g.fillRect(x+1,y-64,7,9); g.fillStyle='#2a2622'; g.fillRect(x+1,y-64,7,2); } } };
+OBJ_DRAW.minepump=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, ph=Math.sin(gt*1.3+o.i)*0.25;   // a dwarf's hand pump: a stave barrel, a handle, a canvas hose to the water
+  g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(x+3,y+2,16,7,0,0,Math.PI*2); g.fill();
+  const bg=g.createLinearGradient(x-12,0,x+12,0); bg.addColorStop(0,'#6a4a2a'); bg.addColorStop(0.5,'#8a6a42'); bg.addColorStop(1,'#4a321c'); g.fillStyle=bg; g.fillRect(x-12,y-34,24,34);
+  g.fillStyle='#5a3e22'; g.beginPath(); g.ellipse(x,y-34,12,5,0,0,Math.PI*2); g.fill(); g.strokeStyle='#2e2a26'; g.lineWidth=2; [-26,-10].forEach(d=>{ g.beginPath(); g.moveTo(x-12,y+d); g.lineTo(x+12,y+d); g.stroke(); });
+  g.strokeStyle='#4a4440'; g.lineWidth=3; g.beginPath(); g.moveTo(x,y-34); g.lineTo(x,y-50); g.stroke();
+  g.strokeStyle='#6a4a2a'; g.lineWidth=3.4; g.beginPath(); g.moveTo(x-18,y-50+ph*20); g.lineTo(x+20,y-50-ph*20); g.stroke();
+  g.strokeStyle='#8a7a5e'; g.lineWidth=4; g.beginPath(); g.moveTo(x+10,y-10); g.quadraticCurveTo(x+40,y+10,x+70,y+14); g.stroke(); };
+OBJ_DRAW.brokenchain=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y;                       // the chain Halvard cut loose, lying where it fell, the padlock still shut on it
+  const link=(lx,ly,an)=>{ g.save(); g.translate(lx,ly); g.rotate(an); g.strokeStyle='#3a3836'; g.lineWidth=3; g.beginPath(); g.ellipse(0,0,6,3.2,0,0,Math.PI*2); g.stroke(); g.strokeStyle='#7a7672'; g.lineWidth=1; g.stroke(); g.restore(); };
+  for(let k=0;k<9;k++) link(x-40+k*9,y-6+Math.sin(k*0.9)*5+k*1.2,k%2?1.2:0.2);
+  for(let k=0;k<5;k++) link(x+30+k*8,y+10-k*3,k%2?1.4:-0.1);
+  g.fillStyle='#4a443e'; g.fillRect(x+16,y-2,12,11); g.strokeStyle='#3a3836'; g.lineWidth=2.4; g.beginPath(); g.arc(x+22,y-3,5,Math.PI,0); g.stroke(); g.fillStyle='#1a1816'; g.fillRect(x+21,y+3,2,4); };
+// water in a stope is black and still, with timber floating in it
+{ const pp=paintPool; paintPool=function(o){ if(o.kind!=='stope') return pp(o);
+    const [fw,fh]=o.fp, ci=o.i+fw/2, cj=o.j+fh/2, N=36, ring=sc=>{ const pts=[]; for(let n=0;n<N;n++){ const an=n/N*Math.PI*2, w=1+(fbm(Math.cos(an)*2+ci,Math.sin(an)*2+cj,19)-0.5)*0.3; pts.push(P(ci+Math.cos(an)*(fw/2+0.1)*w*sc, cj+Math.sin(an)*(fh/2+0.1)*w*sc)); } return pts; };
+    const poly=pts=>{ g.beginPath(); pts.forEach((q,n)=>n?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.closePath(); };
+    poly(ring(1.1)); g.fillStyle='rgba(30,24,18,0.6)'; g.fill();
+    const c0=P(ci,cj), R=(fw+fh)*TW/4; poly(ring(1)); const wg=g.createRadialGradient(c0.x,c0.y,4,c0.x,c0.y,R); wg.addColorStop(0,'#2e3a38'); wg.addColorStop(0.6,'#1a2422'); wg.addColorStop(1,'#0c1210'); g.fillStyle=wg; g.fill();
+    g.strokeStyle='rgba(120,100,70,0.4)'; g.lineWidth=1.4; g.stroke();
+    g.save(); poly(ring(1)); g.clip();
+    g.fillStyle='rgba(255,210,140,0.07)'; for(let k=0;k<5;k++){ const q=P(ci-fw*0.3+rnd01(k,1,981)*fw*0.6, cj-fh*0.3+rnd01(k,2,982)*fh*0.6); g.beginPath(); g.ellipse(q.x,q.y,22+rnd01(k,3,983)*16,2,0,0,Math.PI*2); g.fill(); }   // lamplight on it
+    for(let k=0;k<3;k++){ const q=P(ci-fw*0.25+rnd01(k,4,984)*fw*0.5, cj-fh*0.25+rnd01(k,5,985)*fh*0.5), an=rnd01(k,6,986)*Math.PI;   // floating props
+      g.save(); g.translate(q.x,q.y+Math.sin(gt*0.7+k)*1.2); g.rotate(an*0.3-0.4); g.fillStyle='#4a3420'; g.fillRect(-26,-3,52,6); g.fillStyle='#6a4a2a'; g.fillRect(-26,-3,52,2); g.restore(); }
+    const t=(gt*0.4)%1, dq=P(ci+fw*0.1,cj-fh*0.15); g.strokeStyle=`rgba(200,210,200,${0.3*(1-t)})`; g.lineWidth=1; g.beginPath(); g.ellipse(dq.x,dq.y,4+t*26,2+t*12,0,0,Math.PI*2); g.stroke();   // a drip, spreading
+    g.restore(); }; }
+// a rune stone only where a stone belongs: chalk on a slate in the mines, an open book on a lectern indoors, a carved stele in the dwarf halls
+{ const stone=OBJ_DRAW.rune||PUZ_DRAW.rune;
+  const slate=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y;                                       // a slab of slate wedged against a prop, chalked over
+    g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(x+4,y+2,17,6,0,0,Math.PI*2); g.fill();
+    g.fillStyle='#4a321c'; g.fillRect(x+6,y-56,5,56); g.fillStyle='#6a4a2a'; g.fillRect(x+6,y-56,1.6,56);
+    g.fillStyle='#2e3236'; g.beginPath(); g.moveTo(x-14,y-2); g.lineTo(x-12,y-42); g.lineTo(x+9,y-46); g.lineTo(x+10,y-4); g.closePath(); g.fill();
+    g.strokeStyle='#4a5056'; g.lineWidth=1; g.stroke();
+    g.strokeStyle='rgba(236,232,220,0.8)'; g.lineWidth=0.9; for(let r=0;r<5;r++){ const yy=y-36+r*6.5; g.beginPath(); g.moveTo(x-9,yy+0.4*r); for(let k=0;k<4;k++) g.lineTo(x-9+k*4.6+2,yy-0.5-(k%2)*1.2); g.stroke(); }
+    g.fillStyle='rgba(236,232,220,0.6)'; g.fillRect(x-11,y-4,4,1.6); };
+  const stele=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y;                                      // a squared stone cut with runes that hold a little firelight
+    g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(x+4,y+2,16,6,0,0,Math.PI*2); g.fill();
+    isoBox(o.i+0.3,o.j+0.3,0.4,0.4,6,'#8c8378','#6a645c','#4e4a44');
+    g.fillStyle='#7e766c'; g.fillRect(x-10,y-50,20,46); g.fillStyle='#5e5850'; g.fillRect(x+4,y-50,6,46); g.fillStyle='#a49c90'; g.fillRect(x-11,y-53,22,4); g.fillStyle='#c09a48'; g.fillRect(x-11,y-49,22,1.4);
+    g.save(); g.globalCompositeOperation='lighter'; g.strokeStyle='rgba(255,170,80,0.85)'; g.lineWidth=1; g.beginPath();
+    for(let r=0;r<4;r++){ const yy=y-42+r*9; g.moveTo(x-7,yy); g.lineTo(x-7,yy+6); g.moveTo(x-7,yy+2); g.lineTo(x-3,yy-1); g.moveTo(x-1,yy); g.lineTo(x+2,yy+6); g.moveTo(x+2,yy); g.lineTo(x-1,yy+6); } g.stroke(); g.restore(); };
+  OBJ_DRAW.rune=o=>{ const A=AREAS[areaId]||{};
+    if(o.look==='stone') return stone(o);
+    if(o.look==='letter'){ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y;                              // a letter on the floor, a boot holding it down
+      g.fillStyle='#e8dcc0'; g.beginPath(); g.moveTo(x-14,y-2); g.lineTo(x+4,y-10); g.lineTo(x+16,y-3); g.lineTo(x-2,y+5); g.closePath(); g.fill();
+      g.strokeStyle='rgba(60,40,20,0.55)'; g.lineWidth=0.6; for(let r=0;r<4;r++){ g.beginPath(); g.moveTo(x-9+r*2.6,y-1-r*1.3); g.lineTo(x+3+r*2.6,y+4.5-r*1.3-6); g.stroke(); }
+      g.fillStyle='#3a2a1a'; g.beginPath(); g.ellipse(x+8,y-3,7,3.4,-0.4,0,Math.PI*2); g.fill(); g.fillRect(x+6,y-16,7,13); g.fillStyle='#4a3622'; g.fillRect(x+6,y-16,7,2.4); return; }
+    if(A.mine) return slate(o);
+    if(A.dwarf) return stele(o);
+    if(A.theme==='interior' && !A.cave && OBJ_DRAW.lectern) return OBJ_DRAW.lectern(o);
+    return stone(o); }; }
+// the Lowest Gallery's end is dressed stone: two squat columns frame the old king's door
+wrap('vm_low','objects',l=>[...l.filter(o=>o.type!=='brazier'), {type:'dpillar', i:0, j:9}, {type:'dpillar', i:0, j:13}, {type:'brazier', i:2, j:9}, {type:'brazier', i:2, j:13},
+  {type:'rubble', i:5, j:11, noblock:true}, {type:'bones', i:2, j:3, noblock:true}]);
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

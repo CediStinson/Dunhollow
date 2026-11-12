@@ -2844,7 +2844,8 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       if(Cr){ c.globalCompositeOperation='lighter'; c.strokeStyle='rgba(255,150,60,0.85)'; c.lineWidth=0.6; c.beginPath(); c.moveTo(0,-3.6); c.lineTo(0,-0.6); c.moveTo(-1.2,-2.4); c.lineTo(0,-1.2); c.lineTo(1.2,-2.4); c.stroke(); }
       c.restore(); }); }
   // shoulder pieces worn in their own slot: leather lames, steel, bronze, elven leaves, or a bone cap over one shoulder
-  function drawShoulders(L){ const side=pr>0.8, q3=pr>0.3 && !side, k0=(L.big||1)*(F?0.85:1);
+  function drawShoulders(L){ if(L.kind==='pauldron'){ drawPauldrons(L.pk, pr>0.3 && pr<=0.8 ? 'near' : 'both'); return; }
+    const side=pr>0.8, q3=pr>0.3 && !side, k0=(L.big||1)*(F?0.85:1);
     [-1,1].forEach(sd=>{ if(L.one && sd!==(front?1:-1) && !side) return; if(side && sd<0) return;
       const near = side ? true : q3 ? sd===-1 : true;
       const sx=side ? LN+CH*0.1 : LN+sd*(CH+(sd>0?bR:bL)+(q3?-1.0:0.4))*(q3&&!near?0.86:1), sy=Y.SHOULDER+0.6, k3=(q3&&!near?0.75:1)*k0, tilt=side?0.12:sd*0.3;
@@ -2957,7 +2958,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   // the camera; turning away (NE) it's the screen-right side.
   const nearS = V.turn > -0.25 ? -1 : 1;
   const farDepth = V.prof*0.85;
-  { const HVf=E.armor==='mail' ? ({anvil_plate:'anvil',delver_lamellar:'delver',rune_plate:'rune'})[vA] : null; if(HVf && pr>0.3 && pr<=0.8) drawPauldrons(HVf,'far'); }   // the far shoulder's pad, behind the body
+  { const HVf=E.armor==='mail' ? ({anvil_plate:'anvil',delver_lamellar:'delver',rune_plate:'rune'})[vA] : null; if(HVf && pr>0.3 && pr<=0.8) drawPauldrons(HVf,'far'); { const SLf=E.shoulders && typeof SHOULDER_LOOK!=='undefined' && SHOULDER_LOOK[unWoven(E.shoulders)]; if(SLf && SLf.kind==='pauldron' && SLf.pk!==HVf && pr>0.3 && pr<=0.8) drawPauldrons(SLf.pk,'far'); } }   // the far shoulder's pad, behind the body
   if(V.prof>0.3){ drawArm(-nearS,farDepth); if(E.offhand==='shield' && offHandAt && offHandAt.behind && V.prof>0.6 && V.turn>=-0.2) drawShieldOnArm(c,offHandAt.x,offHandAt.y,V.prof,false); if(E.offhand==='morwen_lantern' && offHandAt && offHandAt.behind && V.prof>0.6) drawLanternInHand(c,offHandAt.x,offHandAt.y); }   // only a true profile hides the shield behind you
   if(E.offhand==='shield' && V.turn<-0.2 && !SHIELD_DRY){                 // walking away, the shield is carried in front of you: behind your body, its back to us
     const k=view+'|'+opts.gender+'|'+(opts.race||'')+'|'+Math.round(swing*2)+'|'+(CUR_POSE?CUR_POSE.kind+(CUR_POSE.dir||''):'');
@@ -25466,17 +25467,23 @@ var SHOULDER_LOOK={
   iron_pauldrons:{ kind:'metal', col:'#9aa0a8', trim:'#5a5e66' },
   bronze_pauldrons:{ kind:'metal', col:'#b8863a', trim:'#6a4a1a', lames:4, big:1.15, rune:'rgba(255,170,80,0.8)' },
   leaf_spaulders:{ kind:'leaf', col:'#5e8068', trim:'#c8d4d8' },
-  bone_pauldron:{ kind:'skull', col:'#d8ccae', trim:'#2a2420', one:true } };
+  bone_pauldron:{ kind:'skull', col:'#d8ccae', trim:'#2a2420', one:true },
+  rune_pauldrons:{ kind:'pauldron', pk:'rune', col:'#2c2e33', trim:'#ffb050', rune:'#ffb060', lames:3 },
+  anvil_pauldrons:{ kind:'pauldron', pk:'anvil', col:'#a2a8b0', trim:'#c8a040', lames:3 },
+  delver_pauldrons:{ kind:'pauldron', pk:'delver', col:'#4c5056', trim:'#b8703a', lames:3 } };
 Object.assign(ITEMS,{
   leather_spaulders:{ name:'Leather Spaulders', slot:'shoulders', title:"Three lames of boiled leather on each shoulder, laced to a yoke. They turn a glancing blow and squeak when it rains." },
   studded_spaulder:{ name:"Sellsword's Spaulder", slot:'shoulders', title:"One heavy spaulder, studded, worn over the shield side and strapped across the chest. The sword arm stays free." },
   iron_pauldrons:{ name:'Iron Pauldrons', slot:'shoulders', title:"Domed steel caps over a pair of lames, the way the Hollowmere guard wear them. Heavy, honest, loud." },
   bronze_pauldrons:{ name:'Varrow Bronze Pauldrons', slot:'shoulders', title:"Dwarf bronze in four deep lames, a rune of warding cut into each cap. It glows faintly when you are angry." },
   leaf_spaulders:{ name:'Leafscale Spaulders', slot:'shoulders', title:"Silver-green leaves of elven steel, overlapping like a wood in autumn. They weigh almost nothing." },
+  rune_pauldrons:{ name:'Runeforged Pauldrons', slot:'shoulders', title:"The pauldrons off the Runeforged Plate, made to be worn on their own: black dwarf steel in three lames, edged in fire-gold, a rune burning in each cap." },
+  anvil_pauldrons:{ name:'Anvil-guard Pauldrons', slot:'shoulders', title:"Bright steel caps in three lames with gilded edges, the kind the forge-guard of Varrowdeep wear on feast days." },
+  delver_pauldrons:{ name:'Delver Pauldrons', slot:'shoulders', title:"Dark iron lames edged in copper, scuffed from a hundred low tunnels. Made for shoulders that brush the rock." },
   bone_pauldron:{ name:'Skull Pauldron', slot:'shoulders', title:"The skull of something with three horns, worn on one shoulder. Vesna says it was a ram. Vesna says a lot of things." } });
-Object.assign(GEAR_HP,{ leather_spaulders:3, studded_spaulder:3, iron_pauldrons:6, bronze_pauldrons:8, leaf_spaulders:4, bone_pauldron:3 });
-Object.assign(ITEM_STATS,{ leather_spaulders:{hp:3, agi:1}, studded_spaulder:{hp:3, ap:1}, iron_pauldrons:{hp:6}, bronze_pauldrons:{hp:8, ap:1}, leaf_spaulders:{hp:4, agi:1, magic:1}, bone_pauldron:{hp:3, magic:2} });
-Object.assign(PRICES,{ leather_spaulders:35, studded_spaulder:48, iron_pauldrons:90, bronze_pauldrons:160, leaf_spaulders:125, bone_pauldron:70 });
+Object.assign(GEAR_HP,{ rune_pauldrons:10, anvil_pauldrons:8, delver_pauldrons:7, leather_spaulders:3, studded_spaulder:3, iron_pauldrons:6, bronze_pauldrons:8, leaf_spaulders:4, bone_pauldron:3 });
+Object.assign(ITEM_STATS,{ rune_pauldrons:{hp:10, ap:2}, anvil_pauldrons:{hp:8, ap:1}, delver_pauldrons:{hp:7, agi:1}, leather_spaulders:{hp:3, agi:1}, studded_spaulder:{hp:3, ap:1}, iron_pauldrons:{hp:6}, bronze_pauldrons:{hp:8, ap:1}, leaf_spaulders:{hp:4, agi:1, magic:1}, bone_pauldron:{hp:3, magic:2} });
+Object.assign(PRICES,{ rune_pauldrons:240, anvil_pauldrons:150, delver_pauldrons:120, leather_spaulders:35, studded_spaulder:48, iron_pauldrons:90, bronze_pauldrons:160, leaf_spaulders:125, bone_pauldron:70 });
 // their icons: the pair laid side by side, or the one piece on its own
 Object.keys(SHOULDER_LOOK).forEach(id=>{ ITEM_ICON[id]=(g2,i2,size)=>{ const L=SHOULDER_LOOK[i2]; g2.save(); g2.scale(size/40,size/40);
   const piece=(cx,cy,k)=>{ g2.save(); g2.translate(cx,cy); g2.scale(k,k);
@@ -25825,7 +25832,7 @@ const VARROW_FOLK=[
   { id:'halvard', name:'Foreman Halvard', i:15, j:8, dir:5, opts:DWARFO({gender:'m', skin:1, hair:2, hairColor:3, beard:7, face:1, equip:{head:'kettle', torso:'tunic_deep', armor:'dwarf_harness', hands:'iron_bracers', feet:'hobnail_boots', weapon:'hatchet'}}) },
   { id:'bodil_h', name:'Envoy Bodil Granitebrow', i:11, j:6, dir:1, when:()=>CHOICE.vqEnd==='atoned', opts:DWARVES.find(d=>d.id==='bodil').opts } ];
 { const B0=DWARVES.find(d=>d.id==='bodil'); wrap('silvergate','npcs',l=>CHOICE.vq==='atoned'||CHOICE.vqEnd==='atoned' ? l.filter(n=>n.id!=='bodil') : l); }
-const VARROW_GEAR=()=>['rune_helm','rune_gauntlets','rune_greaves','rune_boots',...(vq()==='done'?['rune_plate','rune_maul']:[]),'varrow_axe','varrow_helm','varrow_gauntlets',...(vq()==='done'?['varrow_mail']:[]),'axe','mace','mail','helm_full','gauntlets','shield_iron','plate_boots','bronze_pauldrons'].filter(id=>ITEMS[id]&&PRICES[id]);
+const VARROW_GEAR=()=>['rune_helm','rune_gauntlets','rune_greaves','rune_boots',...(vq()==='done'?['rune_plate','rune_maul']:[]),'varrow_axe','varrow_helm','varrow_gauntlets',...(vq()==='done'?['varrow_mail']:[]),'axe','mace','mail','helm_full','gauntlets','shield_iron','plate_boots','bronze_pauldrons','anvil_pauldrons','delver_pauldrons',...(vq()==='done'?['rune_pauldrons']:[])].filter(id=>ITEMS[id]&&PRICES[id]);
 function thaneTalk(){ const T='Thane Sigrid Varrowborn', Q=vq();
   if(!Q) return say(T,["<i>The Thane of Varrowdeep sits on a plain stone chair under the banners of nine kings. She is grey-braided and broad as a door, and she does not get up.</i> “A surface-walker in my hall. The guards say your hands were open. Good. Keep them that way.”",
       "“You come at a poor time. Nine days ago the oldest seam in the deep mines went quiet. Not the picks: the whole of it. Six of my miners went down to see why, and none of them came back up.”"],

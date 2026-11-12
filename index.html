@@ -1152,11 +1152,13 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   // ── elven cloak: the back panel hangs behind the body; from behind it covers it ──
   const cloakBack=(over)=>{                            // the body of the cloak: each has its own length, cut and hem; seen from the front only its inside shows, framed by the lining at the edges
     const SH=CKL.shape||{}, fr=V.turn>-0.25, p2=V.prof, ox=-p2*5.5, CHc=P.chestHW*V.sw+1.6, HW2=P.hipHW*V.sw+(SH.flare??7)+p2*2, hem=SH.hem??-13, sw2=swing*1.5, sway=swing*0.6;
-    const top=[[LN-CHc+ox*0.3,Y.SHOULDER-1.5],[LN+CHc+ox*0.3,Y.SHOULDER-1.5],[LN+CHc+2+ox*0.6,Y.WAIST]], N=SH.rag?9:6, bot=[];
+    const midY=hem<Y.WAIST+6 ? (Y.SHOULDER+hem)/2 : Y.WAIST, top=[[LN-CHc+ox*0.3,Y.SHOULDER-1.5],[LN+CHc+ox*0.3,Y.SHOULDER-1.5],[LN+CHc+2+ox*0.6,midY]], N=SH.rag?9:6, bot=[];
     for(let k=0;k<=N;k++){ const t=k/N, u=1-2*t, xx=LN+ox+sw2*(0.6+0.4*Math.abs(u))+u*HW2+sway*u*0.4;                       // the hem, from the right corner to the left
       let yy=hem+(1-u*u)*(SH.train?4.5:1.2); if(SH.rag) yy+= (k%2 ? -3.2-((k*7)%3) : 1.2);
       bot.push([xx,yy]); }
-    const pts=[...top,...bot,[LN-CHc-2+ox*0.6,Y.WAIST]];
+    const pts=[...top,...bot,[LN-CHc-2+ox*0.6,midY]];
+    if(SH.one){ const osd=fr&&!over?1:-1, HWo=HW2;                                                                      // over one shoulder: pulled to that side, the hem rising toward the bare one
+      pts.forEach(q=>{ const t=(q[0]-LN)/HWo; q[0]=LN+osd*HWo*0.32+(q[0]-LN)*0.66; if(q[1]>Y.SHOULDER+4){ const bare=Math.max(0,-t*osd); q[1]-=bare*(q[1]-Y.SHOULDER-4)*0.62; } }); }
     const path=()=>{ c.beginPath(); c.moveTo(x+pts[0][0],B+pts[0][1]); c.lineTo(x+pts[1][0],B+pts[1][1]); c.quadraticCurveTo(x+pts[2][0]+1,B+pts[2][1],x+bot[0][0],B+bot[0][1]);
       for(let k=1;k<bot.length;k++) SH.rag ? c.lineTo(x+bot[k][0],B+bot[k][1]) : c.quadraticCurveTo(x+(bot[k-1][0]+bot[k][0])/2,B+(bot[k-1][1]+bot[k][1])/2+0.6,x+bot[k][0],B+bot[k][1]);
       const L=pts[pts.length-1]; c.quadraticCurveTo(x+L[0]-1,B+L[1],x+pts[0][0],B+pts[0][1]); c.closePath(); };
@@ -1181,7 +1183,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       c.fillStyle=hg; c.beginPath(); c.ellipse(x+LN+ox*0.3,B+Y.SHOULDER+3,7.5,6,0,0,Math.PI*2); c.fill();
       c.strokeStyle=tone(CKL.main,-0.55); c.lineWidth=0.8; c.stroke();
       c.strokeStyle=tone(CKL.main,-0.4,0.7); c.beginPath(); c.moveTo(x+LN-4,B+Y.SHOULDER+2); c.quadraticCurveTo(x+LN,B+Y.SHOULDER+7,x+LN+4,B+Y.SHOULDER+2); c.stroke(); }
-    if(over && CKL.fur) furCollar(c,x+LN+ox*0.3,B+Y.SHOULDER+1,CHc+4,CKL,false);   // a collar of fur across the shoulders
+    if(over && CKL.fur && !SH.one) furCollar(c,x+LN+ox*0.3,B+Y.SHOULDER+1,CHc+4,CKL,false);   // a collar of fur across the shoulders
   };
   if(CLOAK && V.turn>-0.25) cloakBack(false);
   const HD = F ? HEAD_DROP_F : HEAD_DROP;
@@ -3199,16 +3201,19 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   if(CLOAK){
     if(!front) cloakBack(true);
     else {                                    // it falls over both shoulders; a leaf brooch holds it at the throat
-      [-1,1].forEach(sd=>{ if(pr>0.8 && sd<0) return; const ex=LN+sd*(CH+2.2);
+      const ONE=(CKL.shape||{}).one;
+      [-1,1].forEach(sd=>{ if(pr>0.8 && sd<0) return; if(ONE && sd<0) return; const ex=LN+sd*(CH+2.2);
         const pts=[[LN+sd*(CH-3.6),Y.SHOULDER-2],[ex,Y.SHOULDER+0.2],[ex+sd*0.4,Y.SHOULDER+9],[LN+sd*(CH-0.4),Y.SHOULDER+13],[LN+sd*(CH-2.8),Y.SHOULDER+3]];
         blob(pts,3); c.fillStyle=tone(CKL.main,sd<0?0.1:-0.12); c.fill(); c.strokeStyle=tone(CKL.main,-0.55); c.lineWidth=0.8; c.stroke(); });
       c.fillStyle=CKL.main; c.fillRect(x+LN-P.neckW/2-2.8,B+Y.SHOULDER-3.2,P.neckW+5.6,2.6);
+      if(ONE && pr<0.9){ c.strokeStyle=CKL.strap||tone(CKL.main,-0.4); c.lineWidth=1.8; c.beginPath(); c.moveTo(x+LN+CH-2.4+po*0.3,B+Y.SHOULDER+0.5); c.quadraticCurveTo(x+LN+po,B+Y.SHOULDER+9,x+LN-CH*0.72+po*0.6,B+Y.WAIST+1.5); c.stroke();   // the strap across the chest
+        c.strokeStyle=tone(CKL.strap||CKL.main,0.25,0.5); c.lineWidth=0.5; c.stroke(); }
       if(CKL.paws && pr<0.9) [-1,1].forEach(sd=>{ const s0=LN+sd*(CH-1)+po*0.3, ex=LN+po-sd*2.4, ey=Y.SHOULDER+11;   // the bear's forelegs over your shoulders, paws knotted on your chest
           c.fillStyle=tone(CKL.fur,sd<0?0.05:-0.12); c.beginPath(); c.moveTo(x+s0-sd*1.6,B+Y.SHOULDER); c.quadraticCurveTo(x+s0+sd*0.4,B+Y.SHOULDER+7,x+ex,B+ey-1.6); c.lineTo(x+ex+sd*0.6,B+ey+2.2); c.quadraticCurveTo(x+s0-sd*2.4,B+Y.SHOULDER+8,x+s0-sd*4.4,B+Y.SHOULDER+1); c.closePath(); c.fill();
           c.fillStyle=tone(CKL.fur,-0.3); c.beginPath(); c.ellipse(x+ex,B+ey+0.6,2.4,1.9,0,0,Math.PI*2); c.fill();
           c.strokeStyle='#e8dcc0'; c.lineWidth=0.6; for(let k=-1;k<=1;k++){ c.beginPath(); c.moveTo(x+ex+k*1,B+ey+2); c.lineTo(x+ex+k*1.2,B+ey+3.6); c.stroke(); } });
-      if(CKL.fur) furCollar(c,x+LN+po*0.4,B+Y.SHOULDER-0.5,CH+3.4,CKL,true);
-      if(!CKL.elf && pr<0.9){ const bx=LN+po-(pr>0.3?-1.5:0), by=Y.SHOULDER+(CKL.fur?3.4:1.2); c.fillStyle=CKL.clasp||'#b8a070'; c.beginPath(); c.arc(x+bx,B+by,1.9,0,Math.PI*2); c.fill(); c.strokeStyle=tone(CKL.clasp||'#b8a070',-0.5); c.lineWidth=0.6; c.stroke(); c.fillStyle='rgba(255,255,255,0.6)'; c.beginPath(); c.arc(x+bx-0.6,B+by-0.6,0.6,0,Math.PI*2); c.fill(); }
+      if(CKL.fur && !ONE) furCollar(c,x+LN+po*0.4,B+Y.SHOULDER-0.5,CH+3.4,CKL,true);
+      if(!CKL.elf && pr<0.9){ const bx=ONE ? LN+CH-2.6+po*0.3 : LN+po-(pr>0.3?-1.5:0), by=Y.SHOULDER+(CKL.fur&&!ONE?3.4:1.2); c.fillStyle=CKL.clasp||'#b8a070'; c.beginPath(); c.arc(x+bx,B+by,1.9,0,Math.PI*2); c.fill(); c.strokeStyle=tone(CKL.clasp||'#b8a070',-0.5); c.lineWidth=0.6; c.stroke(); c.fillStyle='rgba(255,255,255,0.6)'; c.beginPath(); c.arc(x+bx-0.6,B+by-0.6,0.6,0,Math.PI*2); c.fill(); }
       if(CKL.elf && pr<0.9){ const bx=LN+po-(pr>0.3?-1.5:0), by=Y.SHOULDER+1.2;
         c.save(); c.translate(x+bx,B+by); c.rotate(-0.6);
         c.fillStyle=ELFC.leaf; c.beginPath(); c.ellipse(0,0,1.7,3.2,0,0,Math.PI*2); c.fill();
@@ -25203,13 +25208,39 @@ var CLOAK_LOOK={
   ermine_mantle:{ main:'#7a1822', lining:'#efe8dc', fur:'#f2ece0', ermine:true, trim:'#f2ece0', clasp:'#e0b84a', shape:{hem:1.5, flare:12, train:true, folds:4} },   // to the floor and trailing
   cowl_black:{ main:'#1e1d22', lining:'#2e2c32', clasp:'#6a6a70' } };
 delete CLOAK_LOOK.cowl_black;   // the capelet keeps its own drawing
+Object.assign(CLOAK_LOOK,{
+  short_cape:{ main:'#8a3a28', lining:'#c8a878', clasp:'#c8a050', shape:{hem:-38, flare:4, folds:2} },                              // a riding cape, to the small of the back
+  hunter_capelet:{ main:'#3e5232', lining:'#6a5a3e', fur:'#5a3e26', collar:'leather', hood:true, clasp:'#a89a70', shape:{hem:-48, flare:2, folds:2} },   // shoulders only, a hood, a leather collar
+  wolf_mantle:{ main:'#5a5650', lining:'#3a342c', fur:'#8a847a', collar:'mantle', clasp:'#b0a890', shape:{hem:-40, flare:3, rag:true, folds:2} },     // a grey wolf's pelt round the shoulders
+  sell_halfcloak:{ main:'#2a3044', lining:'#8a2a2a', strap:'#3a2a1a', clasp:'#b8b8c0', shape:{hem:-14, flare:5, one:true, folds:3} },   // over one shoulder, to the knee on that side
+  duel_shoulder:{ main:'#7a1420', lining:'#d8b050', trim:'#d8b050', strap:'#d8b050', clasp:'#e0b84a', shape:{hem:-36, flare:3, one:true, folds:2} },   // a duellist's short cape, slung over one shoulder
+  raven_cloak:{ main:'#1a1a22', lining:'#3a2a4a', fur:'#1e2028', collar:'feather', clasp:'#8a8aa0', shape:{hem:-10, flare:8, rag:true, folds:3} } });   // black, feathered at the collar, the hem in tatters
+CLOAK_LOOK.fur_cloak.collar='tuft'; CLOAK_LOOK.bear_cloak.collar='tuft';
 // a collar of fur over the shoulders: a soft band, tufted at the edge; ermine has its little black tails
-function furCollar(c,cx,cy,hw,K,front){ const col=K.fur, dk=tone(col,-0.35), lt=tone(col,0.18), N=11, sh=K.shaggy?1.35:1;
-  c.save(); c.fillStyle=dk; c.beginPath(); c.ellipse(cx,cy+1.5,hw+1,5*sh,0,0,Math.PI*2); c.fill();
-  for(let k=0;k<N;k++){ const t=k/(N-1), a=Math.PI*(1-t), px=cx+Math.cos(a)*hw, py=cy+(front?-Math.sin(a)*2.2+1.6:Math.sin(a)*1.5)+(k%2)*0.8;
+function furCollar(c,cx,cy,hw,K,front){ const col=K.fur, dk=tone(col,-0.35), lt=tone(col,0.18), st=K.collar||'tuft', sh=K.shaggy?1.35:1;
+  c.save();
+  if(st==='mantle'){                                                                    // a broad cape of pelt over the shoulders, the hair combed down and ragged at the edge
+    const gr=c.createLinearGradient(cx-hw,0,cx+hw,0); gr.addColorStop(0,lt); gr.addColorStop(0.55,col); gr.addColorStop(1,dk);
+    c.fillStyle=gr; c.beginPath(); c.moveTo(cx-hw-3,cy+7); c.quadraticCurveTo(cx-hw-2,cy-3,cx-hw*0.4,cy-(front?3.4:1.4)); c.quadraticCurveTo(cx,cy-(front?1:3),cx+hw*0.4,cy-(front?3.4:1.4)); c.quadraticCurveTo(cx+hw+2,cy-3,cx+hw+3,cy+7);
+    for(let k=0;k<=12;k++){ const t=k/12, px=cx+hw+3-t*(hw*2+6), py=cy+7+(front?Math.sin(t*Math.PI)*2.4:Math.sin(t*Math.PI)*4)+(k%2?2.4:0); c.lineTo(px,py); } c.closePath(); c.fill();
+    c.strokeStyle=dk; c.lineWidth=0.5; for(let k=0;k<16;k++){ const t=(k+0.5)/16, px=cx-hw-1.5+t*(hw*2+3), py=cy+(front?-1:0.5)+Math.abs(t-0.5)*3; c.beginPath(); c.moveTo(px,py); c.quadraticCurveTo(px+0.6,py+4,px+(t-0.5)*1.6,py+8); c.stroke(); }
+    c.restore(); return; }
+  if(st==='feather'){                                                                   // black feathers, overlapping, a blue-green sheen on the long ones
+    for(let row=0;row<2;row++){ const n=row?9:11, r0=row?hw*0.82:hw+1.2, yy=cy+(row?-0.6:2.2);
+      for(let k=0;k<n;k++){ const t=k/(n-1), a=Math.PI*(1-t), px=cx+Math.cos(a)*r0, py=yy+(front?-Math.sin(a)*(row?2:1.2):Math.sin(a)*1.2), ang=(t-0.5)*1.4;
+        c.save(); c.translate(px,py); c.rotate(ang); c.fillStyle=k%3?col:tone(col,0.22); c.beginPath(); c.ellipse(0,3,1.7,5.2-row,0,0,Math.PI*2); c.fill();
+        c.strokeStyle='rgba(90,140,150,0.45)'; c.lineWidth=0.4; c.beginPath(); c.moveTo(0,-1.4); c.lineTo(0,7.4-row); c.stroke(); c.restore(); } }
+    c.restore(); return; }
+  if(st==='leather'){                                                                   // a rolled collar of oiled leather, stitched
+    c.strokeStyle=col; c.lineWidth=3.4; c.lineCap='round'; c.beginPath(); c.ellipse(cx,cy+1,hw*0.78,front?3.2:2.2,0,front?Math.PI*1.05:0,front?Math.PI*1.95:Math.PI); c.stroke();
+    c.strokeStyle=lt; c.lineWidth=0.5; c.setLineDash([1.2,1.4]); c.stroke(); c.setLineDash([]); c.restore(); return; }
+  c.fillStyle=dk; c.beginPath(); c.ellipse(cx,cy+1.5,hw+1,5*sh,0,0,Math.PI*2); c.fill();                       // tufts: the round pelt collar
+  for(let k=0;k<11;k++){ const t=k/10, a=Math.PI*(1-t), px=cx+Math.cos(a)*hw, py=cy+(front?-Math.sin(a)*2.2+1.6:Math.sin(a)*1.5)+(k%2)*0.8;
     c.fillStyle=k%3?col:lt; c.beginPath(); c.arc(px,py,(2.6+(k%2)*0.7)*sh,0,Math.PI*2); c.fill(); }
-  c.strokeStyle=dk; c.lineWidth=0.5; for(let k=0;k<N+4;k++){ const t=(k+0.5)/(N+4), a=Math.PI*(1-t), px=cx+Math.cos(a)*(hw+1.6), py=cy+2.8*sh+(front?0:0.5);   // tufts hanging off the edge
+  c.strokeStyle=dk; c.lineWidth=0.5; for(let k=0;k<15;k++){ const t=(k+0.5)/15, a=Math.PI*(1-t), px=cx+Math.cos(a)*(hw+1.6), py=cy+2.8*sh+(front?0:0.5);
     c.beginPath(); c.moveTo(px,py-1.4); c.lineTo(px+(k%2?0.6:-0.6),py+1.6*sh); c.stroke(); }
+  if(K.shaggy){ c.strokeStyle=col; c.lineWidth=1.1; c.lineCap='round'; for(let k=0;k<9;k++){ const t=(k+0.5)/9, a=Math.PI*(1-t), px=cx+Math.cos(a)*(hw+0.6), py=cy+3.4*sh;   // long locks hanging off a bear's pelt
+      c.beginPath(); c.moveTo(px,py); c.quadraticCurveTo(px+(k%2?1:-1),py+3,px+(k%2?0.4:-0.4),py+5.5+(k%3)); c.stroke(); } }
   if(K.ermine){ c.fillStyle='#1a1614'; for(let k=0;k<6;k++){ const a=Math.PI*(0.12+k*0.15), px=cx+Math.cos(a)*hw*0.85, py=cy+1+(k%2); c.beginPath(); c.moveTo(px-0.6,py-0.9); c.lineTo(px+0.6,py-0.9); c.lineTo(px,py+1.1); c.closePath(); c.fill(); } }
   c.restore(); }
 Object.assign(ITEMS,{
@@ -25227,17 +25258,41 @@ Object.assign(PRICES,{ wool_cloak:30, fur_cloak:70, bear_cloak:110, ermine_mantl
 { const _pa=paintItemArtBase; paintItemArtBase=function(g2,id,size){ const K=CLOAK_LOOK[id]; if(!K) return _pa.apply(this,arguments);
     g2.save(); g2.scale(size/40,size/40);
     const P2=(pts,fill,edge)=>{ g2.beginPath(); g2.moveTo(pts[0][0],pts[0][1]); pts.slice(1).forEach(q=>g2.lineTo(q[0],q[1])); g2.closePath(); g2.fillStyle=fill; g2.fill(); if(edge){ g2.strokeStyle=edge; g2.lineWidth=1; g2.stroke(); } };
-    P2([[20,4],[27,6],[29,11],[35,36],[5,36],[11,11],[13,6]],K.main,tone(K.main,-0.5));
-    P2([[14,11],[26,11],[29,36],[11,36]],K.lining);
-    g2.strokeStyle=tone(K.main,-0.3); g2.lineWidth=0.8; [8,13,27,32].forEach(xx=>{ g2.beginPath(); g2.moveTo(xx<20?13:27,12); g2.lineTo(xx,35); g2.stroke(); });
-    if(K.trim){ g2.fillStyle=K.trim; g2.fillRect(5,33,30,3); }
-    if(K.fur){ for(let k=0;k<9;k++){ const a=Math.PI*(1-k/8), px=20+Math.cos(a)*9, py=10-Math.sin(a)*3; g2.fillStyle=k%3?K.fur:tone(K.fur,0.2); g2.beginPath(); g2.arc(px,py,3.2*(K.shaggy?1.2:1),0,Math.PI*2); g2.fill(); }
+    const SH=K.shape||{}, hm=SH.hem??-13, by=hm<=-44?21:hm<=-30?26:36, wl=hm<=-44?8:hm<=-30?6:5, wr=40-wl, byL=SH.one?by-9:by;   // short cloaks are drawn short, one-shoulder ones slant
+    P2([[20,4],[27,6],[29,11],[wr,by],[wl,byL],[11,11],[13,6]],K.main,tone(K.main,-0.5));
+    if(SH.one) P2([[17,11],[23,11],[wr-12,by-1],[wl+12,byL+1]],K.lining); else P2([[14,11],[26,11],[wr-6,by],[wl+6,byL]],K.lining);
+    if(SH.one){ g2.strokeStyle=K.strap||'#3a2a1a'; g2.lineWidth=2; g2.beginPath(); g2.moveTo(27,10); g2.lineTo(12,byL-2); g2.stroke(); }
+    g2.strokeStyle=tone(K.main,-0.3); g2.lineWidth=0.8; [0.15,0.3,0.7,0.85].forEach(t=>{ const xx=wl+(wr-wl)*t; g2.beginPath(); g2.moveTo(t<0.5?13:27,12); g2.lineTo(xx,byL+(by-byL)*t-1); g2.stroke(); });
+    if(SH.rag){ g2.fillStyle='#1c1409'; for(let k=0;k<6;k++){ const xx=wl+3+k*(wr-wl-6)/5, yy=byL+(by-byL)*(k/5); g2.beginPath(); g2.moveTo(xx-2,yy+0.5); g2.lineTo(xx,yy-3); g2.lineTo(xx+2,yy+0.5); g2.closePath(); g2.fill(); } }
+    if(K.trim && !SH.one){ g2.fillStyle=K.trim; g2.beginPath(); g2.moveTo(wl,byL-3); g2.lineTo(wr,by-3); g2.lineTo(wr,by); g2.lineTo(wl,byL); g2.closePath(); g2.fill(); }
+    if(K.collar==='feather'){ for(let k=0;k<9;k++){ const a=Math.PI*(1-k/8), px=20+Math.cos(a)*9, py=10-Math.sin(a)*3; g2.save(); g2.translate(px,py); g2.rotate((k/8-0.5)*1.4); g2.fillStyle=k%3?K.fur:'#3a4a52'; g2.beginPath(); g2.ellipse(0,2.5,1.8,4.6,0,0,Math.PI*2); g2.fill(); g2.restore(); } }
+    else if(K.collar==='leather'){ g2.strokeStyle=K.fur; g2.lineWidth=3; g2.beginPath(); g2.ellipse(20,10,8,3,0,0,Math.PI); g2.stroke(); }
+    else if(K.collar==='mantle'){ g2.fillStyle=K.fur; g2.beginPath(); g2.moveTo(8,16); g2.quadraticCurveTo(9,5,20,6); g2.quadraticCurveTo(31,5,32,16); for(let k=0;k<=8;k++) g2.lineTo(32-k*3,16+(k%2?2.4:0)); g2.closePath(); g2.fill(); }
+    else if(K.fur){ for(let k=0;k<9;k++){ const a=Math.PI*(1-k/8), px=20+Math.cos(a)*9, py=10-Math.sin(a)*3; g2.fillStyle=k%3?K.fur:tone(K.fur,0.2); g2.beginPath(); g2.arc(px,py,3.2*(K.shaggy?1.2:1),0,Math.PI*2); g2.fill(); }
       if(K.ermine){ g2.fillStyle='#1a1614'; [13,18,23,27].forEach(px=>{ g2.fillRect(px,9,1.2,2.4); }); } }
     else if(K.hood){ g2.fillStyle=tone(K.main,-0.2); g2.beginPath(); g2.ellipse(20,9,6,4,0,0,Math.PI*2); g2.fill(); }
     g2.fillStyle=K.clasp; g2.beginPath(); g2.arc(20,13,2,0,Math.PI*2); g2.fill(); g2.restore(); }; }
 Object.keys(CLOAK_LOOK).forEach(id=>{ ITEM_ICON[id]=(g2,i2,size)=>paintItemArtBase(g2,i2,size); });
+Object.assign(ITEMS,{
+  short_cape:{ name:'Riding Cape', slot:'cloak', title:"Rust-red wool, cut short so it does not catch in the stirrups. It flaps splendidly at a gallop, or a brisk walk." },
+  hunter_capelet:{ name:"Hunter's Capelet", slot:'cloak', title:"Just the shoulders and a hood, in green that disappears against moss. Nothing to snag on a branch." },
+  wolf_mantle:{ name:'Wolf-pelt Mantle', slot:'cloak', title:"A grey wolf's whole pelt worn round the shoulders, the hair combed down. It still bristles in the cold." },
+  sell_halfcloak:{ name:"Sellsword's Half-cloak", slot:'cloak', title:"Slung over one shoulder and strapped across the chest, so the sword arm stays free. Dark blue outside, the lining red as an argument." },
+  duel_shoulder:{ name:"Duellist's Shoulder Cape", slot:'cloak', title:"A short crimson cape worn over one shoulder, edged in gold. Its whole purpose is to be flicked at people." },
+  raven_cloak:{ name:'Raven-feather Cloak', slot:'cloak', title:"Black wool gone to tatters at the hem, and a collar of raven feathers that shine blue-green when they catch the light. Hedge-witches favour them." } });
+Object.keys(CLOAK_LOOK).forEach(id=>{ ITEM_ICON[id]=(g2,i2,size)=>paintItemArtBase(g2,i2,size); });
+Object.assign(GEAR_HP,{ short_cape:2, hunter_capelet:2, wolf_mantle:4, sell_halfcloak:3, duel_shoulder:2, raven_cloak:4 });
+Object.assign(ITEM_STATS,{ short_cape:{hp:2}, hunter_capelet:{hp:2, agi:1}, wolf_mantle:{hp:4}, sell_halfcloak:{hp:3, ap:1}, duel_shoulder:{hp:2, agi:2}, raven_cloak:{hp:4, magic:2} });
+Object.assign(PRICES,{ short_cape:26, hunter_capelet:34, wolf_mantle:60, sell_halfcloak:75, duel_shoulder:90, raven_cloak:110 });
+// now and then a foe leaves the cloak off its back: the poorer ones plain wool, the dangerous ones something better; hedge-witches their feathers
+const CLOAK_DROPS=[['wool_cloak','short_cape','hunter_capelet'],['fur_cloak','wolf_mantle','sell_halfcloak','short_cape'],['sell_halfcloak','duel_shoulder','raven_cloak','fur_cloak']];
+{ const _v=victory; victory=function(faction){ const dead=(typeof mobs!=='undefined'?mobs:[]).filter(m=>m.hostile && m.dead && (!faction||m.faction===faction) && m.opts && m.opts.gender && !m.opts.beast && !m.opts.ghost && !m.opts.bones && !/^goblin/.test(m.opts.race||'') && ['bandit','brute','mage','duelist'].includes(m.type));
+    const r=_v.apply(this,arguments);
+    dead.forEach(m=>{ if(Math.random() >= (m.daily?0.025:0.05)) return; const t=lootTier(m), pool=m.type==='mage'&&t>0 ? ['raven_cloak','raven_cloak','hunter_capelet'] : CLOAK_DROPS[t], id=pool[Math.floor(Math.random()*pool.length)], f=slotFor(id);
+      if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } });
+    return r; }; }
 // Bess sells the plain cloaks; the Bearskin from the old hunter; the Baron's mantle stays in his solar
-{ const _t=tailorTalk; tailorTalk=function(){ const _sf=shopFrom; shopFrom=function(name,stock,...r){ shopFrom=_sf; return _sf.call(this,name,[...stock,'wool_cloak','fur_cloak'],...r); }; try{ return _t.apply(this,arguments); } finally{ shopFrom=_sf; } }; TALKERS.tailor=tailorTalk; }
+{ const _t=tailorTalk; tailorTalk=function(){ const _sf=shopFrom; shopFrom=function(name,stock,...r){ shopFrom=_sf; return _sf.call(this,name,[...stock,'wool_cloak','short_cape','fur_cloak'],...r); }; try{ return _t.apply(this,arguments); } finally{ shopFrom=_sf; } }; TALKERS.tailor=tailorTalk; }
 { const prevH=TALKERS.hunter; TALKERS.hunter=()=>{ if(CHOICE.bearPaid && !CHOICE.bearCloak){ say('Brann the Hunter',["“One more thing. I had Old Brumm's hide off him before the crows did, and my sister tanned it. It's a cloak now, if you want it. You earned the bear. I'll only ask what the tanning cost me.”"],
       [{label:'Buy the Bearskin Cloak. (-80c)', off:player.purse<80, fn:()=>{ player.purse-=80; updateHud(); CHOICE.bearCloak=1; giveQuestItem('bear_cloak',true); logMsg('Loot: Bearskin Cloak','#8ac070'); say('Brann the Hunter',"“Suits you. You'll smell of bear for a week. Worth it.”",[bye]); }},
        {label:'“Not now.”', fn:()=>prevH()}]); return; } return prevH(); }; }

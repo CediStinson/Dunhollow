@@ -25227,6 +25227,74 @@ Object.keys(CLOAK_LOOK).forEach(id=>{ ITEM_ICON[id]=(g2,i2,size)=>paintItemArtBa
 { const prevH=TALKERS.hunter; TALKERS.hunter=()=>{ if(CHOICE.bearPaid && !CHOICE.bearCloak){ say('Brann the Hunter',["“One more thing. I had Old Brumm's hide off him before the crows did, and my sister tanned it. It's a cloak now, if you want it. You earned the bear. I'll only ask what the tanning cost me.”"],
       [{label:'Buy the Bearskin Cloak. (-80c)', off:player.purse<80, fn:()=>{ player.purse-=80; updateHud(); CHOICE.bearCloak=1; giveQuestItem('bear_cloak',true); logMsg('Loot: Bearskin Cloak','#8ac070'); say('Brann the Hunter',"“Suits you. You'll smell of bear for a week. Worth it.”",[bye]); }},
        {label:'“Not now.”', fn:()=>prevH()}]); return; } return prevH(); }; }
+// ════════ BEARS ON THE ROADS, AND WHAT THEY LEAVE: a brown bear wanders out onto a forest track now and then, the way the wolves do; a dead bear leaves its fur,
+//   and now and then its skull. Bring Brann five furs and a skull and he sews you a cloak with the bear's head for a hood ════════
+Object.assign(ITEMS,{
+  bear_fur:{ name:'Bear Fur', slot:'misc', title:"A heavy brown pelt, coarse on top and soft as a dog's belly underneath. Brann knows what to do with these." },
+  bear_skull:{ name:'Bear Skull', slot:'misc', title:"Broad as a bucket, the teeth still in it. It looks at you even with nothing in the sockets." },
+  bearskull_cloak:{ name:'Bear-skull Cloak', slot:'cloak', title:"Five bears' worth of fur sewn into one cloak, and the skull of the sixth for a hood. Wolves think twice. So do innkeepers." } });
+Object.assign(PRICES,{ bear_fur:14, bear_skull:30, bearskull_cloak:260 });
+Object.assign(GEAR_HP,{ bearskull_cloak:12 }); Object.assign(ITEM_STATS,{ bearskull_cloak:{hp:12, ap:2} });
+CLOAK_LOOK.bearskull_cloak={ main:'#43301f', lining:'#2e2016', fur:'#5a4030', shaggy:true, clasp:'#d8d0bc', skull:true };
+// what a bear leaves
+{ const _v=victory; victory=function(faction){ const bears=(typeof mobs!=='undefined'?mobs:[]).filter(m=>m.hostile && m.type==='bear' && m.dead && (!faction || m.faction===faction));
+    const r=_v.apply(this,arguments);
+    bears.forEach(m=>{ const big=m.faction==='brumm', give=id=>{ const f=slotFor(id); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } else logMsg('Inventory is full.','#e0b070'); };
+      const nf=big?2:(Math.random()<0.75?1:0)+(Math.random()<0.3?1:0); for(let k=0;k<nf;k++) give('bear_fur');
+      if(big || Math.random()<0.22) give('bear_skull'); });
+    return r; }; }
+// now and then a bear on the road: about one day in three on each of these tracks, somewhere along the way
+const BEAR_ROADS=['millroad','wolfwood','southtrail','northroad','kingsroad','varrowpass'];
+const bearDay=a=>{ const d=Math.floor(dayClock/DAY_LEN), h=hsh(d*13+a.length*7, a.charCodeAt(0)*3+a.charCodeAt(a.length-1)); return h%3===0; };
+BEAR_ROADS.forEach(a=>{ if(!AREAS[a]) return; wrap(a,'mobs',l=>{ if(!bearDay(a)) return l; const path=(AREA_PATHS[a]||[])[0]; if(!path) return l;
+    const k=Math.min(path.length-2,Math.max(1,Math.floor(path.length*0.55))), q=path[k], i=Math.max(1,Math.min(AREAS[a].w-2,Math.floor(q[0]))), j=Math.max(1,Math.min(AREAS[a].h-2,Math.floor(q[1])));
+    return [...l,{ name:'Roaming Bear', type:'bear', i, j, faction:'roadbear', daily:true, opts:BEAR() }]; }); });
+RESPAWNS.add('Roaming Bear');
+// Brann's commission
+{ const prevH=TALKERS.hunter; TALKERS.hunter=()=>{ const S=CHOICE.skullCloak, nf=invCount('bear_fur'), sk=hasItem('bear_skull'), B='Brann the Hunter';
+    if(S==='done' || (!S && !CHOICE.bearPaid)) return prevH();   // he offers once Old Brumm is paid for
+    if(!S){ say(B,["“You've the look of somebody who's had a bear in front of them and is still here to talk about it. Here's a thing my grandfather could do, and I can, and nobody else in this valley.”","“Bring me five good bear furs and a bear's skull, the whole top of it with the teeth in. I'll sew you a cloak with the bear's own head for a hood. You'll never be cold, and nothing with four legs will look you in the eye again.”","“Bears wander out onto the tracks now and then: the Mill Track, the Wolfwood, the trail south, the King's Road. Leave the cubs be.”"],
+        [{label:'“Five furs and a skull. I\'ll find them.”', fn:()=>{ remember('skullCloak','asked','Brann will sew a bear-skull cloak from five bear furs and a bear skull.'); say(B,"“Good. Bring them all at once. I don't start a cloak I can't finish.”",[bye]); }},{label:'Something else.', fn:prevH}]); return; }
+    if(S==='asked' && nf>=5 && sk){ say(B,["<i>He spreads the furs on his table one after another and runs his hands against the nap, and nods at each. Then he picks up the skull and turns it to the light.</i>","“Good. A good one. Come back tomorrow.” <i>He grins.</i> “I'm joking. Sit down. I've done this before.”"],
+        [{label:'Hand them over and wait.', fn:()=>{ for(let k=0;k<5;k++){ const q=player.inv.indexOf('bear_fur'); if(q>=0) player.inv[q]=null; } { const q=player.inv.indexOf('bear_skull'); if(q>=0) player.inv[q]=null; }
+            CHOICE.skullCloak='done'; giveQuestItem('bearskull_cloak',true); giveXp(120,"Brann's Bear-skull Cloak"); updateHud(); logMsg('Loot: Bear-skull Cloak','#8ac070');
+            say(B,["<i>It takes him the rest of the day, with an awl and a waxed thread and a great deal of muttering. When he is done he throws it over your shoulders and pulls the hood up, and the skull settles on your head like it was waiting for you.</i>","“There. Now you look like something the wolves tell stories about.”"],[bye]); }}, {label:'Something else.', fn:prevH}]); return; }
+    if(S==='asked'){ return say(B,["“"+(nf>=5?"Five furs, good.":nf+" fur"+(nf===1?"":"s")+" of five.")+" "+(sk?"And a skull.":"And no skull yet: not every bear gives you a good one.")+" Bring me the lot and I'll get my needle.”"],[{label:'Something else.', fn:prevH}, bye]); }
+    return prevH(); }; }
+{ const prev=npcHasNews; npcHasNews=function(n){ if(n.id==='hunter' && CHOICE.skullCloak==='asked' && invCount('bear_fur')>=5 && hasItem('bear_skull')) return '?'; if(n.id==='hunter' && !CHOICE.skullCloak && (CHOICE.bearPaid) ) return prev(n)||'!'; return prev(n); }; }
+JOURNAL.push(["Brann's Bear-skull Cloak", ()=> !CHOICE.skullCloak ? null : CHOICE.skullCloak==='done' ? ['done',"Brann sewed you a cloak from five bear furs, with a bear's skull for a hood."]
+  : ['active',"Brann the Hunter will sew a bear-skull cloak from five bear furs and a bear skull. Bears wander the forest tracks some days. "+"You have "+invCount('bear_fur')+" of 5 furs"+(hasItem('bear_skull')?" and a skull.":", and no skull yet.")]]);
+// the icons: a folded pelt, a skull
+ITEM_ICON.bear_fur=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.fillStyle='#5a4030'; g2.beginPath(); g2.moveTo(6,14); g2.quadraticCurveTo(12,6,20,9); g2.quadraticCurveTo(29,5,34,13); g2.lineTo(36,27); g2.quadraticCurveTo(28,34,20,31); g2.quadraticCurveTo(11,35,4,27); g2.closePath(); g2.fill();
+  g2.strokeStyle='#3a2818'; g2.lineWidth=1.2; g2.stroke(); g2.strokeStyle='#7a5a40'; g2.lineWidth=0.8; for(let k=0;k<14;k++){ const x=7+k*2, y=14+(k%3)*4; g2.beginPath(); g2.moveTo(x,y); g2.lineTo(x+1,y+5); g2.stroke(); }
+  g2.fillStyle='#c8b090'; g2.beginPath(); g2.ellipse(20,27,9,3,0,0,Math.PI*2); g2.fill(); g2.restore(); };
+ITEM_ICON.bear_skull=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); const b='#e6dcc4', d='#2a2218';
+  g2.fillStyle=b; g2.beginPath(); g2.moveTo(5,16); g2.quadraticCurveTo(8,6,20,6); g2.quadraticCurveTo(33,7,35,16); g2.quadraticCurveTo(33,22,27,23); g2.lineTo(26,33); g2.quadraticCurveTo(20,36,14,33); g2.lineTo(13,23); g2.quadraticCurveTo(7,22,5,16); g2.closePath(); g2.fill(); g2.strokeStyle='#8a7e66'; g2.lineWidth=1; g2.stroke();
+  g2.fillStyle=d; [[12,15],[28,15]].forEach(([x,y])=>{ g2.beginPath(); g2.ellipse(x,y,3.6,2.8,0,0,Math.PI*2); g2.fill(); }); g2.beginPath(); g2.ellipse(20,30,2.6,1.8,0,0,Math.PI*2); g2.fill();
+  g2.fillStyle=b; [[15,33],[25,33]].forEach(([x,y])=>{ g2.beginPath(); g2.moveTo(x-1.4,y); g2.lineTo(x+1.4,y); g2.lineTo(x,y+4); g2.closePath(); g2.fill(); g2.strokeStyle='#8a7e66'; g2.stroke(); }); g2.restore(); };
+ITEM_ICON.bearskull_cloak=(g2,id,size)=>{ paintItemArtBase(g2,'bear_cloak',size); g2.save(); g2.translate(size*0.3,-size*0.02); g2.scale(0.4,0.4); ITEM_ICON.bear_skull(g2,'bear_skull',size); g2.restore(); };
+{ const _lk=lootKind; lootKind=function(id){ if(id==='bear_fur') return 'pelt'; return _lk(id); }; }
+// worn: the skull sits on the head like a hood, the snout over your brow, the fur running down behind the ears
+{ const _dh=drawHead; drawHead=function(c,x,B,opts,view=0){ const r=_dh.apply(this,arguments); const E=opts&&opts.equip;
+    if(!E || unWoven(E.cloak||'')!=='bearskull_cloak' || E.head || opts.hideHelm || (opts.hide&&opts.hide.cloak)) return r;
+    const F=opts.gender==='f', P=F?PROP.f:PROP.m, Y=BODY, V=VIEW[view], HW=P.headHW, pr=V.prof, front=V.turn>-0.25, LN=V.lean*1.25, bone='#e2d8c0', bd='#9a8e74', fur='#4e3828', fk='#3a281a';
+    const fx=LN+(front?(pr>0.8?HW*0.55:faceOff(pr)):0), top=Y.SKULL_TOP-2.5, brow=Y.BROW-0.6;
+    c.save();
+    [-1,1].forEach(sd=>{ if(front && pr>0.8 && sd>0) return; c.fillStyle=sd<0?fur:fk; c.beginPath(); c.moveTo(x+LN+sd*(HW-1),B+Y.HAIRLINE-2); c.quadraticCurveTo(x+LN+sd*(HW+3.2),B+Y.CHIN,x+LN+sd*(HW+2.4),B+Y.SHOULDER+2);   // the fur, down behind the ears
+      c.lineTo(x+LN+sd*(HW-1.4),B+Y.SHOULDER+1); c.quadraticCurveTo(x+LN+sd*(HW+0.4),B+Y.CHIN,x+LN+sd*(HW-2.2),B+Y.HAIRLINE+1); c.closePath(); c.fill(); });
+    const dome=()=>{ c.beginPath(); c.ellipse(x+LN,B+top+4.5,HW+2.6,7.2,0,Math.PI,0); c.lineTo(x+LN+HW+2.4,B+Y.HAIRLINE+(front?0.5:3)); c.quadraticCurveTo(x+LN,B+Y.HAIRLINE+(front?-1:5),x+LN-HW-2.4,B+Y.HAIRLINE+(front?0.5:3)); c.closePath(); };
+    [-1,1].forEach(sd=>{ const ex=x+LN+sd*(HW-0.4), ey=B+top+0.5; c.fillStyle=fk; c.beginPath(); c.arc(ex,ey,2.6,0,Math.PI*2); c.fill(); c.fillStyle='#6a4a36'; c.beginPath(); c.arc(ex,ey+0.3,1.3,0,Math.PI*2); c.fill(); });   // the bear's ears
+    dome(); const fg=c.createLinearGradient(x+LN-HW,0,x+LN+HW,0); fg.addColorStop(0,'#6a4c36'); fg.addColorStop(1,fk); c.fillStyle=fg; c.fill();          // the hide over the crown of your head
+    c.strokeStyle='rgba(30,20,12,0.55)'; c.lineWidth=0.5; for(let k=0;k<9;k++){ const t=k/8, px=x+LN-HW-1.6+t*(HW*2+3.2), py=B+top+4+Math.abs(t-0.5)*7; c.beginPath(); c.moveTo(px,py-3); c.lineTo(px+0.4,py+1.6); c.stroke(); }
+    if(front){ const sx=pr>0.8?fx+2.2:fx, w=pr>0.8?3.6:4.8, t0=top+1.2;                                                                   // the bear's skull, its muzzle running down over your brow
+      c.fillStyle=bone; c.beginPath(); c.moveTo(sx-w,B+t0); c.quadraticCurveTo(sx,B+t0-2.4,sx+w,B+t0); c.quadraticCurveTo(sx+w+0.8,B+t0+5,sx+w*0.62,B+brow); c.quadraticCurveTo(sx,B+brow+1.6,sx-w*0.62,B+brow); c.quadraticCurveTo(sx-w-0.8,B+t0+5,sx-w,B+t0); c.closePath(); c.fill(); c.strokeStyle=bd; c.lineWidth=0.6; c.stroke();
+      c.fillStyle='rgba(120,104,76,0.5)'; c.beginPath(); c.ellipse(sx,B+t0+5,w*0.35,3.4,0,0,Math.PI*2); c.fill();
+      c.fillStyle='#1e1810'; if(pr<=0.8) [-1,1].forEach(sd=>{ c.beginPath(); c.ellipse(sx+sd*w*0.58,B+t0+2.2,1.5,1.2,sd*0.3,0,Math.PI*2); c.fill(); });   // the eye sockets
+      c.beginPath(); c.ellipse(sx,B+brow-0.6,1.3,0.9,0,0,Math.PI*2); c.fill();
+      c.fillStyle=bone; [-1,1].forEach(sd=>{ if(pr>0.8 && sd<0) return; const tx=sx+sd*w*0.5; c.beginPath(); c.moveTo(tx-0.8,B+brow+0.3); c.lineTo(tx+0.8,B+brow+0.3); c.lineTo(tx+sd*0.2,B+brow+3.8); c.closePath(); c.fill(); c.strokeStyle=bd; c.lineWidth=0.4; c.stroke(); });   // the canines
+      c.strokeStyle='rgba(60,50,36,0.6)'; c.lineWidth=0.4; c.beginPath(); for(let k=-2;k<=2;k++){ c.moveTo(sx+k*0.9,B+brow+0.4); c.lineTo(sx+k*0.9,B+brow+1.4); } c.stroke(); }
+    else { c.fillStyle=fur; c.beginPath(); c.moveTo(x+LN-HW-2.2,B+Y.HAIRLINE+2); c.quadraticCurveTo(x+LN,B+Y.HAIRLINE+6,x+LN+HW+2.2,B+Y.HAIRLINE+2); c.quadraticCurveTo(x+LN+HW+1.4,B+Y.CHIN-2,x+LN+HW-1.2,B+Y.CHIN+3); c.quadraticCurveTo(x+LN,B+Y.CHIN+7,x+LN-HW+1.2,B+Y.CHIN+3); c.quadraticCurveTo(x+LN-HW-1.4,B+Y.CHIN-2,x+LN-HW-2.2,B+Y.HAIRLINE+2); c.closePath(); c.fill(); }   // from behind: the hide hangs down over your neck
+    c.restore(); return r; }; }
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

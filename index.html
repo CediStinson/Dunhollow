@@ -1153,8 +1153,8 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   const cloakBack=(over)=>{                            // the body of the cloak: each has its own length, cut and hem; seen from the front only its inside shows, framed by the lining at the edges
     const SH=CKL.shape||{}, fr=V.turn>-0.25, p2=V.prof, ox=-p2*5.5, CHc=P.chestHW*V.sw+1.6, HW2=P.hipHW*V.sw+(SH.flare??7)+p2*2, hem=SH.hem??-13, sw2=swing*1.5, sway=swing*0.6;
     const midY=hem<Y.WAIST+6 ? (Y.SHOULDER+hem)/2 : Y.WAIST, top=[[LN-CHc+ox*0.3,Y.SHOULDER-1.5],[LN+CHc+ox*0.3,Y.SHOULDER-1.5],[LN+CHc+2+ox*0.6,midY]], N=SH.rag?9:6, bot=[];
-    for(let k=0;k<=N;k++){ const t=k/N, u=1-2*t, xx=LN+ox+sw2*(0.6+0.4*Math.abs(u))+u*HW2+sway*u*0.4;                       // the hem, from the right corner to the left
-      let yy=hem+(1-u*u)*(SH.train?4.5:1.2); if(SH.rag) yy+= (k%2 ? -3.2-((k*7)%3) : 1.2);
+    for(let k=0;k<=N;k++){ const t=k/N, u=1-2*t; let xx=LN+ox+sw2*(0.6+0.4*Math.abs(u))+u*HW2+sway*u*0.4;                       // the hem, from the right corner to the left
+      let yy=hem+(1-u*u)*(SH.train?4.5:1.2)-(SH.round?Math.pow(Math.abs(u),3)*6:0); if(SH.round) xx-=u*Math.abs(u)*HW2*0.18; if(SH.rag) yy+= (k%2 ? -3.2-((k*7)%3) : 1.2);
       bot.push([xx,yy]); }
     const pts=[...top,...bot,[LN-CHc-2+ox*0.6,midY]];
     if(SH.one){ const osd=fr&&!over?1:-1, HWo=HW2;                                                                      // over one shoulder: pulled to that side, the hem rising toward the bare one
@@ -1180,7 +1180,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
     c.restore();
     if(over && CKL.hood){                               // the hood lies folded between the shoulders
       const hg=c.createRadialGradient(x+LN-2,B+Y.SHOULDER+1,0,x+LN,B+Y.SHOULDER+3,8); hg.addColorStop(0,tone(CKL.main,0.12)); hg.addColorStop(1,tone(CKL.main,-0.3));
-      c.fillStyle=hg; c.beginPath(); c.ellipse(x+LN+ox*0.3,B+Y.SHOULDER+3,7.5,6,0,0,Math.PI*2); c.fill();
+      const hk=CKL.big?1.3:1; c.fillStyle=hg; c.beginPath(); c.ellipse(x+LN+ox*0.3,B+Y.SHOULDER+3*hk,7.5*hk,6*hk,0,0,Math.PI*2); c.fill();
       c.strokeStyle=tone(CKL.main,-0.55); c.lineWidth=0.8; c.stroke();
       c.strokeStyle=tone(CKL.main,-0.4,0.7); c.beginPath(); c.moveTo(x+LN-4,B+Y.SHOULDER+2); c.quadraticCurveTo(x+LN,B+Y.SHOULDER+7,x+LN+4,B+Y.SHOULDER+2); c.stroke(); }
     if(over && CKL.fur && !SH.one) furCollar(c,x+LN+ox*0.3,B+Y.SHOULDER+1,CHc+4,CKL,false);   // a collar of fur across the shoulders
@@ -5397,7 +5397,7 @@ Object.assign(AREAS,{
     ].filter(o=>!o.breakable || !destroyedBreakables.has('clearing:'+o.i+','+o.j)),
     npcs:()=>[
       { id:'hunter', name:'Brann the Hunter', i:6, j:5, dir:1,
-        opts:{gender:'m',skin:3,hair:3,hairColor:5,beard:4,face:1,equip:{head:'hood',torso:'shirt',armor:'studded',hands:'gloves',legs:'breeches',feet:'boots',weapon:'hatchet',offhand:null}} },
+        opts:{gender:'m',skin:3,hair:3,hairColor:5,beard:4,face:1,equip:{head:'hood',torso:'shirt',armor:'studded',cloak:'hunter_capelet',hands:'gloves',legs:'breeches',feet:'boots',weapon:'hatchet',offhand:null}} },
     ],
     mobs:()=>[], entries:{ fromWood:{i:1,j:4}, fromHouse:{i:9,j:4}, fromMere:{i:5,j:1} } },
   lodge:{ ...INSIDE_BASE, w:5, h:5, theme:'interior', label:"Brann's Lodge", mini:{x:0,y:0},
@@ -11533,10 +11533,10 @@ function townsfolk(seed,n,points){                       // passers-by: seeded l
     out.push({ id:'folk', name:F?'Townswoman':'Townsman', i:pt[0], j:pt[1], dir:Math.floor(r(3)*8), wander:points, speed:0.9+r(4)*0.6,
       opts: elf ? ELFO({gender:F?'f':'m',skin:0,hair:F?0:4,hairColor:10+Math.floor(r(5)*3),equip:{head:null,torso:'elf_tunic',armor:'elf_cloak',hands:null,legs:'elf_leggings',feet:'elf_boots',weapon:null,offhand:null}})
         : {gender:F?'f':'m', skin:Math.floor(r(5)*5), hair:Math.floor(r(6)*6), hairColor:Math.floor(r(7)*14), beard:F?0:Math.floor(r(8)*6), face:Math.floor(r(10)*3),
-          equip:{head:heads[Math.floor(r(11)*heads.length)], torso:tops[Math.floor(r(12)*tops.length)], armor:r(13)<0.12?'jerkin':null, hands:null, legs:legs[Math.floor(r(14)*legs.length)], feet:feet[Math.floor(r(15)*feet.length)], weapon:null, offhand:null}} }); }
+          equip:{head:heads[Math.floor(r(11)*heads.length)], torso:tops[Math.floor(r(12)*tops.length)], armor:r(13)<0.12?'jerkin':null, hands:null, legs:legs[Math.floor(r(14)*legs.length)], feet:feet[Math.floor(r(15)*feet.length)], weapon:null, offhand:null, cloak:r(16)<0.14?'wool_cloak':r(16)<0.2?'short_cape':null}} }); }
   return out;
 }
-const GUARD=(o)=>BANDIT({skin:1,hair:0,hairColor:3,beard:1,equip:{head:BARON_DOWN()?'kettle':'coif',torso:BARON_DOWN()?'tunic_red':'baron_tabard',armor:BARON_DOWN()?'brightmail':'blackmail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'spear',offhand:BARON_DOWN()?'shield':'shield_iron'},...o});
+const GUARD=(o)=>BANDIT({skin:1,hair:0,hairColor:3,beard:1,equip:{head:BARON_DOWN()?'kettle':'coif',torso:BARON_DOWN()?'tunic_red':'baron_tabard',armor:BARON_DOWN()?'brightmail':'blackmail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'spear',offhand:BARON_DOWN()?'shield':'shield_iron',cloak:BARON_DOWN()?null:'duel_shoulder'},...o});   // the Baron's men wear his red over one shoulder
 const B=(i,j,fw,fh,v,extra)=>({type:'bldg', i, j, fp:[fw,fh], v, ...extra});
 const streetPts=(list)=>list;
 Object.assign(AREAS,{
@@ -22293,7 +22293,7 @@ AREAS.varrowpass={ fence:{r:false,l:false}, w:10, h:24, theme:'road', mountain:t
 AREA_PATHS.varrowpass=[ [[5.5,23.5],[5,20],[6,16],[4.5,12],[5.5,8],[4.8,4],[5.5,0.5]] ];
 // inside the mountain
 const VCAVE=(label,w,h,objs,npcs,extra)=>({ ...INSIDE_BASE, w, h, theme:'interior', cave:true, dwarf:true, label, mini:{x:0,y:0}, objects:objs, npcs, ...extra });
-const DGUARD=(name,o)=>DWARFO({gender:'m', skin:1, hair:2, hairColor:2, beard:6, face:1, ...o, equip:{head:'varrow_helm', armor:'varrow_mail', hands:'varrow_gauntlets', weapon:'varrow_axe', offhand:'shield', ...(o.equip||{})}});
+const DGUARD=(name,o)=>DWARFO({gender:'m', skin:1, hair:2, hairColor:2, beard:6, face:1, ...o, equip:{head:'varrow_helm', armor:'varrow_mail', cloak:'fur_cloak', hands:'varrow_gauntlets', weapon:'varrow_axe', offhand:'shield', ...(o.equip||{})}});
 Object.assign(AREAS,{
   varrowgate: VCAVE('Varrowdeep · The Gate Hall',12,12, ()=>[ {type:'teleporter', i:6, j:11, to:'varrowpass', entry:'fromGate'}, {type:'teleporter', i:6, j:0, to:'varrowhall', entry:'fromGate'},
       {type:'dpillar', i:2, j:3}, {type:'dpillar', i:9, j:3}, {type:'dpillar', i:2, j:7}, {type:'dpillar', i:9, j:7}, {type:'dkstatue', i:3, j:1, dir:7, name:'Varrow', look:{equip:{weapon:'mace'}}}, {type:'dkstatue', i:9, j:1, dir:7, name:'Hargrim', look:{beard:5, equip:{offhand:'shield', head:'helm_full'}}},
@@ -25209,8 +25209,8 @@ var CLOAK_LOOK={
   cowl_black:{ main:'#1e1d22', lining:'#2e2c32', clasp:'#6a6a70' } };
 delete CLOAK_LOOK.cowl_black;   // the capelet keeps its own drawing
 Object.assign(CLOAK_LOOK,{
-  short_cape:{ main:'#8a3a28', lining:'#c8a878', clasp:'#c8a050', shape:{hem:-38, flare:4, folds:2} },                              // a riding cape, to the small of the back
-  hunter_capelet:{ main:'#3e5232', lining:'#6a5a3e', fur:'#5a3e26', collar:'leather', hood:true, clasp:'#a89a70', shape:{hem:-48, flare:2, folds:2} },   // shoulders only, a hood, a leather collar
+  short_cape:{ main:'#8a3a28', lining:'#c8a878', clasp:'#c8a050', shape:{hem:-36, flare:5, folds:2, round:true} },                              // a riding cape, to the small of the back
+  hunter_capelet:{ main:'#3e5232', lining:'#6a5a3e', fur:'#5a3e26', collar:'leather', hood:true, big:true, clasp:'#a89a70', shape:{hem:-41, flare:3, folds:2, round:true} },   // shoulders only, a hood, a leather collar
   wolf_mantle:{ main:'#5a5650', lining:'#3a342c', fur:'#8a847a', collar:'mantle', clasp:'#b0a890', shape:{hem:-40, flare:3, rag:true, folds:2} },     // a grey wolf's pelt round the shoulders
   sell_halfcloak:{ main:'#2a3044', lining:'#8a2a2a', strap:'#3a2a1a', clasp:'#b8b8c0', shape:{hem:-14, flare:5, one:true, folds:3} },   // over one shoulder, to the knee on that side
   duel_shoulder:{ main:'#7a1420', lining:'#d8b050', trim:'#d8b050', strap:'#d8b050', clasp:'#e0b84a', shape:{hem:-36, flare:3, one:true, folds:2} },   // a duellist's short cape, slung over one shoulder
@@ -25285,11 +25285,21 @@ Object.assign(GEAR_HP,{ short_cape:2, hunter_capelet:2, wolf_mantle:4, sell_half
 Object.assign(ITEM_STATS,{ short_cape:{hp:2}, hunter_capelet:{hp:2, agi:1}, wolf_mantle:{hp:4}, sell_halfcloak:{hp:3, ap:1}, duel_shoulder:{hp:2, agi:2}, raven_cloak:{hp:4, magic:2} });
 Object.assign(PRICES,{ short_cape:26, hunter_capelet:34, wolf_mantle:60, sell_halfcloak:75, duel_shoulder:90, raven_cloak:110 });
 // now and then a foe leaves the cloak off its back: the poorer ones plain wool, the dangerous ones something better; hedge-witches their feathers
-const CLOAK_DROPS=[['wool_cloak','short_cape','hunter_capelet'],['fur_cloak','wolf_mantle','sell_halfcloak','short_cape'],['sell_halfcloak','duel_shoulder','raven_cloak','fur_cloak']];
-{ const _v=victory; victory=function(faction){ const dead=(typeof mobs!=='undefined'?mobs:[]).filter(m=>m.hostile && m.dead && (!faction||m.faction===faction) && m.opts && m.opts.gender && !m.opts.beast && !m.opts.ghost && !m.opts.bones && !/^goblin/.test(m.opts.race||'') && ['bandit','brute','mage','duelist'].includes(m.type));
+// what a foe has on its back: hedge-witches their feathers, a duellist a shoulder cape, captains and chiefs a half-cloak, footpads a riding cape, some of the rest wool or fur
+function cloakForFoe(m,area){ const o=m.opts; if(!o || !o.gender || !o.equip || o.equip.cloak || o.beast || o.ghost || o.bones || /^(goblin|dwarf|elf)/.test(o.race||'')) return null;
+  if(!['bandit','brute','mage','duelist'].includes(m.type)) return null; const A=AREAS[area]||{}; if(A.theme==='sand' || A.volcanic || A.heat) return null;   // nobody wears wool in the desert or by the lava
+  const h=hsh((m.name||'').length*131+(m.name||'').charCodeAt(0)*7, area.length*17+(area.charCodeAt(1)||0))%100, N=m.name||'', t=AREA_TIER[area]||1;
+  if(m.type==='mage') return /witch/i.test(N)||h<60 ? 'raven_cloak' : null;
+  if(m.style==='duelist' || /duel/i.test(N)) return 'duel_shoulder';
+  if(/chief|captain|sergeant|brigand|sellsword|mercenar/i.test(N) || m.type==='brute') return h<70 ? 'sell_halfcloak' : 'fur_cloak';
+  if(/footpad|thief|highway|cutpurse/i.test(N)) return h<55 ? 'short_cape' : null;
+  if(h<30) return (t>=3 ? ['fur_cloak','sell_halfcloak','wool_cloak','wolf_mantle'] : ['wool_cloak','short_cape','hunter_capelet','wolf_mantle'])[h%4];
+  return null; }
+{ const _rm=resetMobs; resetMobs=function(){ const r=_rm.apply(this,arguments); try{ mobs.forEach(m=>{ const ck=cloakForFoe(m,areaId); if(ck) m.opts={...m.opts, equip:{...m.opts.equip, cloak:ck}}; }); }catch(e){} return r; }; }
+// a foe that wore a cloak sometimes leaves it: about one in eight (one in sixteen on the roads, where they come back every day)
+{ const _v=victory; victory=function(faction){ const dead=(typeof mobs!=='undefined'?mobs:[]).filter(m=>m.hostile && m.dead && (!faction||m.faction===faction) && m.opts && m.opts.equip && m.opts.equip.cloak && CLOAK_LOOK[m.opts.equip.cloak]);
     const r=_v.apply(this,arguments);
-    dead.forEach(m=>{ if(Math.random() >= (m.daily?0.025:0.05)) return; const t=lootTier(m), pool=m.type==='mage'&&t>0 ? ['raven_cloak','raven_cloak','hunter_capelet'] : CLOAK_DROPS[t], id=pool[Math.floor(Math.random()*pool.length)], f=slotFor(id);
-      if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } });
+    dead.forEach(m=>{ if(Math.random() >= (m.daily?0.06:0.125)) return; const id=m.opts.equip.cloak, f=slotFor(id); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name+', off its back','#8ac070'); } });
     return r; }; }
 // Bess sells the plain cloaks; the Bearskin from the old hunter; the Baron's mantle stays in his solar
 { const _t=tailorTalk; tailorTalk=function(){ const _sf=shopFrom; shopFrom=function(name,stock,...r){ shopFrom=_sf; return _sf.call(this,name,[...stock,'wool_cloak','short_cape','fur_cloak'],...r); }; try{ return _t.apply(this,arguments); } finally{ shopFrom=_sf; } }; TALKERS.tailor=tailorTalk; }

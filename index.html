@@ -1612,8 +1612,9 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       c.fillStyle=tone(GEAR.mail,-0.55); c.fillRect(x+x0-1.1,B+top+ml-1,aw+2.2,1);
     }
 
-    if(vA==='studded' || vA==='blackmail'){            // a shoulder guard: studded leather cap, or three steel lames
-      const ac=x0+aw/2, ST=vA==='blackmail';
+    const SGK = (vA==='studded' || vA==='blackmail') ? vA : ({brig_spaulders:'blackmail', studded_caps:'studded'})[unWoven(E.shoulders||'')] || null;   // the same guards, worn on their own in the shoulders slot
+    if(SGK){            // a shoulder guard: studded leather cap, or three steel lames
+      const ac=x0+aw/2, ST=SGK==='blackmail';
       if(ST){ for(let k=2;k>=0;k--){ const yy=top-1+k*2.6; c.beginPath(); c.ellipse(x+ac,B+yy+1.8,aw/2+2.2-k*0.3,3,0,Math.PI,Math.PI*2); c.lineTo(x+ac+aw/2+2.2-k*0.3,B+yy+3.2); c.ellipse(x+ac,B+yy+3.2,aw/2+2.2-k*0.3,1.6,0,0,Math.PI); c.closePath();
           const sg=c.createLinearGradient(x+ac-aw/2-2,0,x+ac+aw/2+2,0); sg.addColorStop(0,tone('#aab2ba',0.1-0.2*depth)); sg.addColorStop(1,tone('#5a6068',-0.2*depth)); c.fillStyle=sg; c.fill(); c.strokeStyle='#2a2e34'; c.lineWidth=0.6; c.stroke();
           fs('#d8dce0'); c.beginPath(); c.arc(x+ac,B+yy+3.4,0.5,0,Math.PI*2); c.fill(); } }
@@ -2849,7 +2850,8 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       if(Cr){ c.globalCompositeOperation='lighter'; c.strokeStyle='rgba(255,150,60,0.85)'; c.lineWidth=0.6; c.beginPath(); c.moveTo(0,-3.6); c.lineTo(0,-0.6); c.moveTo(-1.2,-2.4); c.lineTo(0,-1.2); c.lineTo(1.2,-2.4); c.stroke(); }
       c.restore(); }); }
   // shoulder pieces worn in their own slot: leather lames, steel, bronze, elven leaves, or a bone cap over one shoulder
-  function drawShoulders(L){ if(L.kind==='pauldron'){ drawPauldrons(L.pk, pr>0.3 && pr<=0.8 ? 'near' : 'both'); return; }
+  function drawShoulders(L){ if(L.kind==='arm') return;   // drawn with each arm, like the armour they come from
+    if(L.kind==='pauldron'){ drawPauldrons(L.pk, pr>0.3 && pr<=0.8 ? 'near' : 'both'); return; }
     const side=pr>0.8, q3=pr>0.3 && !side, k0=(L.big||1)*(F?0.85:1);
     [-1,1].forEach(sd=>{ if(L.one && sd!==(front?1:-1) && !side) return; if(side && sd<0) return;
       const near = side ? true : q3 ? sd===-1 : true;
@@ -25473,6 +25475,8 @@ var SHOULDER_LOOK={
   bronze_pauldrons:{ kind:'metal', col:'#b8863a', trim:'#6a4a1a', lames:4, big:1.15, rune:'rgba(255,170,80,0.8)' },
   leaf_spaulders:{ kind:'leaf', col:'#5e8068', trim:'#c8d4d8' },
   bone_pauldron:{ kind:'skull', col:'#d8ccae', trim:'#2a2420', one:true },
+  brig_spaulders:{ kind:'arm', col:'#8a929a', trim:'#2a2e34', studs:'#d8dce0', lames:3 },
+  studded_caps:{ kind:'arm', col:'#5a3a22', trim:'#2a1a10', studs:'#c8b070', lames:1 },
   rune_pauldrons:{ kind:'pauldron', pk:'rune', col:'#2c2e33', trim:'#ffb050', rune:'#ffb060', lames:3 },
   anvil_pauldrons:{ kind:'pauldron', pk:'anvil', col:'#a2a8b0', trim:'#c8a040', lames:3 },
   delver_pauldrons:{ kind:'pauldron', pk:'delver', col:'#4c5056', trim:'#b8703a', lames:3 } };
@@ -25482,13 +25486,15 @@ Object.assign(ITEMS,{
   iron_pauldrons:{ name:'Iron Pauldrons', slot:'shoulders', title:"Domed steel caps over a pair of lames, the way the Hollowmere guard wear them. Heavy, honest, loud." },
   bronze_pauldrons:{ name:'Varrow Bronze Pauldrons', slot:'shoulders', title:"Dwarf bronze in four deep lames, a rune of warding cut into each cap. It glows faintly when you are angry." },
   leaf_spaulders:{ name:'Leafscale Spaulders', slot:'shoulders', title:"Silver-green leaves of elven steel, overlapping like a wood in autumn. They weigh almost nothing." },
+  brig_spaulders:{ name:'Brigandine Spaulders', slot:'shoulders', title:"Three steel lames on each shoulder, riveted with bright heads, the way they come on a brigandine. Off the coat they fit over anything." },
+  studded_caps:{ name:'Studded Shoulder Caps', slot:'shoulders', title:"Rounded caps of dark boiled leather with a row of brass studs, cut from a studded jerkin. Light, and they turn a glancing cut." },
   rune_pauldrons:{ name:'Runeforged Pauldrons', slot:'shoulders', title:"The pauldrons off the Runeforged Plate, made to be worn on their own: black dwarf steel in three lames, edged in fire-gold, a rune burning in each cap." },
   anvil_pauldrons:{ name:'Anvil-guard Pauldrons', slot:'shoulders', title:"Bright steel caps in three lames with gilded edges, the kind the forge-guard of Varrowdeep wear on feast days." },
   delver_pauldrons:{ name:'Delver Pauldrons', slot:'shoulders', title:"Dark iron lames edged in copper, scuffed from a hundred low tunnels. Made for shoulders that brush the rock." },
   bone_pauldron:{ name:'Skull Pauldron', slot:'shoulders', title:"The skull of something with three horns, worn on one shoulder. Vesna says it was a ram. Vesna says a lot of things." } });
-Object.assign(GEAR_HP,{ rune_pauldrons:10, anvil_pauldrons:8, delver_pauldrons:7, leather_spaulders:3, studded_spaulder:3, iron_pauldrons:6, bronze_pauldrons:8, leaf_spaulders:4, bone_pauldron:3 });
-Object.assign(ITEM_STATS,{ rune_pauldrons:{hp:10, ap:2}, anvil_pauldrons:{hp:8, ap:1}, delver_pauldrons:{hp:7, agi:1}, leather_spaulders:{hp:3, agi:1}, studded_spaulder:{hp:3, ap:1}, iron_pauldrons:{hp:6}, bronze_pauldrons:{hp:8, ap:1}, leaf_spaulders:{hp:4, agi:1, magic:1}, bone_pauldron:{hp:3, magic:2} });
-Object.assign(PRICES,{ rune_pauldrons:240, anvil_pauldrons:150, delver_pauldrons:120, leather_spaulders:35, studded_spaulder:48, iron_pauldrons:90, bronze_pauldrons:160, leaf_spaulders:125, bone_pauldron:70 });
+Object.assign(GEAR_HP,{ brig_spaulders:6, studded_caps:4, rune_pauldrons:10, anvil_pauldrons:8, delver_pauldrons:7, leather_spaulders:3, studded_spaulder:3, iron_pauldrons:6, bronze_pauldrons:8, leaf_spaulders:4, bone_pauldron:3 });
+Object.assign(ITEM_STATS,{ brig_spaulders:{hp:6, ap:1}, studded_caps:{hp:4, agi:1}, rune_pauldrons:{hp:10, ap:2}, anvil_pauldrons:{hp:8, ap:1}, delver_pauldrons:{hp:7, agi:1}, leather_spaulders:{hp:3, agi:1}, studded_spaulder:{hp:3, ap:1}, iron_pauldrons:{hp:6}, bronze_pauldrons:{hp:8, ap:1}, leaf_spaulders:{hp:4, agi:1, magic:1}, bone_pauldron:{hp:3, magic:2} });
+Object.assign(PRICES,{ brig_spaulders:95, studded_caps:45, rune_pauldrons:240, anvil_pauldrons:150, delver_pauldrons:120, leather_spaulders:35, studded_spaulder:48, iron_pauldrons:90, bronze_pauldrons:160, leaf_spaulders:125, bone_pauldron:70 });
 // their icons: the pair laid side by side, or the one piece on its own
 Object.keys(SHOULDER_LOOK).forEach(id=>{ ITEM_ICON[id]=(g2,i2,size)=>{ const L=SHOULDER_LOOK[i2]; g2.save(); g2.scale(size/40,size/40);
   const piece=(cx,cy,k)=>{ g2.save(); g2.translate(cx,cy); g2.scale(k,k);
@@ -25507,7 +25513,7 @@ Object.keys(SHOULDER_LOOK).forEach(id=>{ ITEM_ICON[id]=(g2,i2,size)=>{ const L=S
   if(L.one) piece(20,24,1.45); else { piece(11,23,1.0); piece(29,23,1.0); }
   g2.restore(); }; });
 // where to buy them: the armourer in Hollowmere, Gorm under the mountain, the elves' weaver, and Vesna for tallies
-{ const _sm=smithTalk; smithTalk=function(){ const _sf=shopFrom; shopFrom=function(name,stock,...r){ shopFrom=_sf; return _sf.call(this,name,[...stock,'leather_spaulders','studded_spaulder','iron_pauldrons'],...r); }; try{ return _sm.apply(this,arguments); } finally{ shopFrom=_sf; } }; }
+{ const _sm=smithTalk; smithTalk=function(){ const _sf=shopFrom; shopFrom=function(name,stock,...r){ shopFrom=_sf; return _sf.call(this,name,[...stock,'leather_spaulders','studded_spaulder','iron_pauldrons','studded_caps','brig_spaulders'],...r); }; try{ return _sm.apply(this,arguments); } finally{ shopFrom=_sf; } }; }
 TALLY_WARES.push(['bone_pauldron',3]);
 // foes wear them too: sergeants and captains steel, the hired swords a spaulder, the dead their bone; some of it comes off when they fall
 function shouldersForFoe(m,area){ const o=m.opts; if(!o || !o.gender || !o.equip || o.equip.shoulders || o.beast || o.ghost || /^(goblin|elf)/.test(o.race||'')) return null;

@@ -25549,7 +25549,10 @@ function mwTalk(back){ const G='Master Smith Gorm', id=player.opts.equip.weapon;
         try{ SND.clang(1); }catch(e){} banner('Masterwork '+MW_ROMAN[r+1],'#e8c060',1600); logMsg(`Gorm reforges your ${nm}: Masterwork ${MW_ROMAN[r+1]} (${eff}).`,'#e8c060');
         say(G,[r===2?"“There. Nine folds of silver, the heat of the deep, the hardness of the worm. It will outlive you. Try not to make that happen soon.”":"“There. Feel the balance? That is what steel is supposed to feel like.”"],[{label:'Back.', fn:back}]); }},
      {label:'Back.', fn:back}]); }
-{ const _g=gormTalk; gormTalk=function(){ const _say=say; say=function(who,lines,opts,...r){ say=_say; if(Array.isArray(opts)) opts=[{label:'“Can you make my weapon better?”', fn:()=>mwTalk(gormTalk)}, ...opts]; return _say.call(this,who,lines,opts,...r); }; try{ return _g.apply(this,arguments); } finally{ say=_say; } }; TALKERS.gorm=gormTalk; }
+// one extra reply, offered the next time someone opens their mouth: used to give people new things to talk about without rewriting them
+function withExtraOpt(fn,opt){ const _sd=showDialog; let used=false; showDialog=function(name,text,opts,...r){ if(!used){ used=true; showDialog=_sd; opts=[opt,...(Array.isArray(opts)?opts:[bye])]; } return _sd.call(this,name,text,opts,...r); };
+  try{ return fn(); } finally{ if(!used) showDialog=_sd; } }
+{ const _g=gormTalk; gormTalk=function(){ return withExtraOpt(()=>_g.apply(this,arguments), {label:'“Can you make my weapon better?”', fn:()=>mwTalk(gormTalk)}); }; TALKERS.gorm=gormTalk; }
 JOURNAL.push(['Masterwork', ()=> !CHOICE.mwTold ? null : (()=>{ const best=Math.max(0,...Object.values(CHOICE.mw||{})); return best>=3 ? ['done',"Gorm reforged a weapon of yours into a Masterwork III. Nothing in the valley holds an edge like it."]
   : ['active',`Master Smith Gorm in Varrowdeep reforges the weapon you hold, three times: silver from the mine seams (one lump a seam a day), then ember cores from the Cinder Deeps, then the scales of the Sunscar worm.`+(best?` Your best so far: Masterwork ${MW_ROMAN[best]}.`:'')]; })()]);
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════

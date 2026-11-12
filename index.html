@@ -788,7 +788,7 @@ const ITEMS = {
           "Do this quietly. If the farmers come asking who sent you, tell them nothing.",
           "— B."] },
 };
-const SLOTS = ['head','torso','armor','cloak','hands','legs','feet','weapon','offhand','neck','special'];
+const SLOTS = ['head','torso','armor','cloak','shoulders','hands','legs','feet','weapon','offhand','neck','special'];
 // what Marta asks for her wares, in copper; she pays two fifths of it for yours
 const PRICES = { shirt:6, trousers:6, boots:14, gloves:12, hood:10, jerkin:35, kettle:30, mail:95, dagger:12, sword:45, morningstar:60, pitchfork:5, shield:28, pelt:20,
   tunic_linen:9, tunic_blue:12, tunic_green:12, tunic_red:14, smock:8, hose_grey:8, breeches:10, riding_boots:24,
@@ -796,7 +796,7 @@ const PRICES = { shirt:6, trousers:6, boots:14, gloves:12, hood:10, jerkin:35, k
   hatchet:14, axe:40, spear:34, mace:55, longsword:80, club:4,
   elf_robe:15, elf_tunic:15, elf_leggings:25, elf_boots:40, elf_cloak:60, elf_scale:160, elf_circlet:55, elf_blade:120, moonbloom:40, elf_tunic_worn:10, elf_leggings_worn:8, elf_boots_worn:12, elf_shirt:6, elf_trousers:6 };
 const SHOP_STOCK = ['apple','bread','potion','tunic_blue','tunic_green','tunic_red','breeches','hood_red','straw_hat','gambeson','studded','gloves','kettle','mail','shield','shield_red','hatchet','spear','sword','axe'];
-const SLOT_NAMES = { food:'Provisions', head:'Head', torso:'Torso', armor:'Armor', cloak:'Cloak', hands:'Hands', legs:'Legs', feet:'Feet', weapon:'Weapon', offhand:'Offhand', neck:'Neck', special:'Special' };
+const SLOT_NAMES = { food:'Provisions', head:'Head', torso:'Torso', armor:'Armor', cloak:'Cloak', shoulders:'Shoulders', hands:'Hands', legs:'Legs', feet:'Feet', weapon:'Weapon', offhand:'Offhand', neck:'Neck', special:'Special' };
 // Weapons: how fast you swing, how hard you hit, and whether the swings are heavies
 // Unarmed = fists.
 const WEAPONS = {
@@ -815,7 +815,7 @@ const WEAPONS = {
 };
 const weaponOf = e => (e.type==='wolf') ? {wind:0.35,dmg:9} : WEAPONS[(e.opts && e.opts.equip && e.opts.equip.weapon) || 'fists'] || WEAPONS.fists;
 const INV_SIZE = 30;
-function defaultEquip(){ return { head:null, torso:'shirt', armor:null, cloak:null, hands:null, legs:'trousers', feet:null, weapon:null, offhand:null, neck:null, special:null }; }
+function defaultEquip(){ return { head:null, torso:'shirt', armor:null, cloak:null, shoulders:null, hands:null, legs:'trousers', feet:null, weapon:null, offhand:null, neck:null, special:null }; }
 function defaultInv(){
   return Array(INV_SIZE).fill(null);   // the farm gives up its gear reluctantly
 }
@@ -2842,6 +2842,37 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       c.fillStyle='rgba(255,255,255,0.2)'; c.beginPath(); c.ellipse(-1.6*k3,-2.6,2.6*k3,1.1,-0.2,0,Math.PI*2); c.fill();
       if(Cr){ c.globalCompositeOperation='lighter'; c.strokeStyle='rgba(255,150,60,0.85)'; c.lineWidth=0.6; c.beginPath(); c.moveTo(0,-3.6); c.lineTo(0,-0.6); c.moveTo(-1.2,-2.4); c.lineTo(0,-1.2); c.lineTo(1.2,-2.4); c.stroke(); }
       c.restore(); }); }
+  // shoulder pieces worn in their own slot: leather lames, steel, bronze, elven leaves, or a bone cap over one shoulder
+  function drawShoulders(L){ const side=pr>0.8, q3=pr>0.3 && !side, k0=(L.big||1)*(F?0.85:1);
+    [-1,1].forEach(sd=>{ if(L.one && sd!==(front?1:-1) && !side) return; if(side && sd<0) return;
+      const near = side ? true : q3 ? sd===-1 : true;
+      const sx=side ? LN+CH*0.1 : LN+sd*(CH+(sd>0?bR:bL)+(q3?-1.0:0.4))*(q3&&!near?0.86:1), sy=Y.SHOULDER+0.6, k3=(q3&&!near?0.75:1)*k0, tilt=side?0.12:sd*0.3;
+      c.save(); c.translate(x+sx,B+sy); c.rotate(tilt);
+      if(L.kind==='leaf'){ const rx=6.6*k3*(side?0.85:1);                                             // a domed cap, then rows of leaf-scales hanging from it like shingles
+        const gp=c.createLinearGradient(-rx,0,rx,0); gp.addColorStop(0,tone(L.col,0.28)); gp.addColorStop(1,tone(L.col,-0.3)); c.fillStyle=gp;
+        c.beginPath(); c.ellipse(0,0.6,rx,4.2*k0,0,Math.PI,0); c.closePath(); c.fill(); c.strokeStyle=L.trim; c.lineWidth=0.5; c.stroke();
+        for(let r=0;r<2;r++){ const n=r?4:5, ww=rx*(r?0.82:1); for(let q=0;q<n;q++){ const lx=-ww+ww*2*(q+0.5)/n, ly=1.2+r*2.6;
+          c.fillStyle=tone(L.col,0.06-r*0.12+(q%2)*0.05); c.beginPath(); c.moveTo(lx-ww/n,ly); c.quadraticCurveTo(lx-ww/n*0.9,ly+2.2,lx,ly+3.4); c.quadraticCurveTo(lx+ww/n*0.9,ly+2.2,lx+ww/n,ly); c.closePath(); c.fill();
+          c.strokeStyle=tone(L.trim,-0.2,0.7); c.lineWidth=0.3; c.stroke(); } }
+        c.fillStyle='rgba(255,255,255,0.22)'; c.beginPath(); c.ellipse(-1.6*k3,-1.6,2.2*k3,0.9,-0.2,0,Math.PI*2); c.fill(); }
+      else if(L.kind==='skull'){ const r=4.4*k3;                                                                   // a skull for a cap, the jaw gone
+        c.fillStyle=L.col; c.beginPath(); c.ellipse(0,-0.4,r,r*0.9,0,Math.PI*1.05,Math.PI*1.95+0.1); c.lineTo(r*0.7,2.4); c.lineTo(-r*0.7,2.4); c.closePath(); c.fill();
+        c.strokeStyle=tone(L.col,-0.5); c.lineWidth=0.5; c.stroke();
+        if(front || side){ c.fillStyle='#1a1410'; [-1,1].forEach(e=>{ c.beginPath(); c.ellipse(e*1.5*k3,0.2,1.0*k3,0.8*k3,0,0,Math.PI*2); c.fill(); }); c.beginPath(); c.moveTo(-0.4,1.4); c.lineTo(0.4,1.4); c.lineTo(0,2.2); c.closePath(); c.fill(); }
+        c.fillStyle=tone(L.col,-0.15); [-2.8,0,2.8].forEach(px=>{ c.beginPath(); c.moveTo(px*k3-0.8,-r*0.75+0.4); c.lineTo(px*k3,-r*0.75-2.6); c.lineTo(px*k3+0.8,-r*0.75+0.4); c.closePath(); c.fill(); });   // three spurs of bone
+        c.strokeStyle=L.trim; c.lineWidth=0.8; c.beginPath(); c.moveTo(-r,2.6); c.lineTo(r,2.6); c.stroke(); }
+      else { const n=L.lames||3;
+        for(let k=0;k<n;k++){ const rx=(6.8-k*0.7)*k3*(side?0.85:1), ry=(3.6-k*0.2)*k0, yy=(n-1-k)*2.5;
+          const gp=c.createLinearGradient(-rx,0,rx,0), sh=L.kind==='metal'?0.34:0.16; gp.addColorStop(0,tone(L.col,sh)); gp.addColorStop(0.5,tone(L.col,0.04)); gp.addColorStop(1,tone(L.col,-0.28));
+          c.fillStyle=gp; c.beginPath(); c.ellipse(0,yy,rx,ry*(k===n-1?1.25:1),0,Math.PI,0); c.lineTo(rx,yy+0.9); c.lineTo(-rx,yy+0.9); c.closePath(); c.fill();
+          c.strokeStyle=tone(L.col,-0.6); c.lineWidth=0.55; c.stroke();
+          if(L.trim){ c.strokeStyle=L.trim; c.lineWidth=0.55; c.beginPath(); c.moveTo(-rx+0.5,yy+0.5); c.lineTo(rx-0.5,yy+0.5); c.stroke(); }
+          if(L.studs){ c.fillStyle=L.studs; for(let q=-2;q<=2;q++){ c.beginPath(); c.arc(q*rx*0.32,yy-0.3,0.42,0,Math.PI*2); c.fill(); } }
+          else if(L.kind==='leather'){ c.strokeStyle=tone(L.col,0.3,0.6); c.lineWidth=0.3; c.setLineDash([0.6,0.6]); c.beginPath(); c.moveTo(-rx+1,yy-0.2); c.lineTo(rx-1,yy-0.2); c.stroke(); c.setLineDash([]); } }
+        if(L.kind==='metal'){ c.fillStyle='rgba(255,255,255,0.22)'; c.beginPath(); c.ellipse(-1.6*k3,-2.4,2.4*k3,1,-0.2,0,Math.PI*2); c.fill(); }
+        if(L.rune){ c.globalCompositeOperation='lighter'; c.strokeStyle=L.rune; c.lineWidth=0.5; c.beginPath(); c.moveTo(-1,-3); c.lineTo(0,-1); c.lineTo(1,-3); c.moveTo(0,-1); c.lineTo(0,0.6); c.stroke(); c.globalCompositeOperation='source-over'; }
+        if(L.strap && !side){ c.strokeStyle=L.strap; c.lineWidth=1.1; c.beginPath(); c.moveTo(-sd*4*k3,-1.6); c.lineTo(-sd*7.5*k3,3); c.stroke(); } }
+      c.restore(); }); }
   function drawBrigandine(){                             // cloth-covered plates riveted in rows, over the mail
     const Bc=ITEMS.blackmail.col, hem=F?-41:-38, hw=F?WA+2.2:HI+1.6, pts=torsoPts(1.6,hem,hw);
     mass(pts,Bc,tone(Bc,-0.55));
@@ -3201,6 +3232,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   if(!posed) drawArm(nearS,0);            // a posed weapon arm is drawn after the head, in front
   if(E.armor==='robe' && vA==='necro_robe') drawNecroShawl();
   { const HVp=E.armor==='mail' ? ({anvil_plate:'anvil',delver_lamellar:'delver',rune_plate:'rune'})[vA] : null; if(HVp) drawPauldrons(HVp, pr>0.3 && pr<=0.8 ? 'near' : 'both'); }
+  { const SLk=E.shoulders && typeof SHOULDER_LOOK!=='undefined' && SHOULDER_LOOK[unWoven(E.shoulders)]; if(SLk) drawShoulders(SLk); }
   if(CLOAK){
     if(!front) cloakBack(true);
     else {                                    // it falls over both shoulders; a leaf brooch holds it at the throat
@@ -10082,6 +10114,7 @@ function applySave(sv){
   if(!sv.opts.equip || !('offhand' in sv.opts.equip)) player.opts.equip.offhand=null;
   if(!('neck' in player.opts.equip)) player.opts.equip.neck=null;
   if(!('cloak' in player.opts.equip)) player.opts.equip.cloak=null;
+  if(!('shoulders' in player.opts.equip)) player.opts.equip.shoulders=null;
   { const Eq=player.opts.equip; if(Eq.armor && /^(t_|w_)?(elf_cloak|cowl_black)$/.test(Eq.armor) && !Eq.cloak){ Eq.cloak=Eq.armor; Eq.armor=null; } }   // cloaks have their own peg now
   if(!('special' in player.opts.equip)) player.opts.equip.special=null;
   if(player.opts.equip.offhand==='moon_amulet'){ player.opts.equip.neck=player.opts.equip.neck||'moon_amulet'; player.opts.equip.offhand=null; }   // the focus hangs at the neck now
@@ -10799,7 +10832,7 @@ function makeSlot(kind,key){
   el.addEventListener('dblclick',()=>quickMove(slotLoc(el)));
   return el;
 }
-const HIDEABLE=['head','torso','armor','cloak','hands','legs','feet','offhand','neck','special'];
+const HIDEABLE=['head','torso','armor','cloak','shoulders','hands','legs','feet','offhand','neck','special'];
 const isHidden=k=>!!(player.opts && ((player.opts.hide||{})[k] || (k==='head' && player.opts.hideHelm)));
 const EYE_OPEN='<svg viewBox="0 0 16 16" width="11" height="11"><path d="M1 8s2.6-4.5 7-4.5S15 8 15 8s-2.6 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="2.1" fill="currentColor"/></svg>';
 const EYE_SHUT='<svg viewBox="0 0 16 16" width="11" height="11"><path d="M1 8s2.6-4.5 7-4.5S15 8 15 8s-2.6 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2 14L14 2" stroke="currentColor" stroke-width="1.8"/></svg>';
@@ -10812,7 +10845,7 @@ function buildInventoryUI(){
   if(invBuilt) return; invBuilt=true;
   const L=document.getElementById('eq-left'), Rt=document.getElementById('eq-right');
   window.syncHelmToggle=()=>syncHideEyes();
-  ['head','neck','torso','armor','weapon'].forEach(k=>L.appendChild(makeSlot('eq',k)));
+  ['head','neck','torso','armor','shoulders','weapon'].forEach(k=>L.appendChild(makeSlot('eq',k)));
   ['cloak','hands','legs','feet','offhand','special'].forEach(k=>Rt.appendChild(makeSlot('eq',k)));
   for(let i=0;i<INV_SIZE;i++) invGrid.appendChild(makeSlot('inv',i));
   { const box=document.createElement('div'); box.id='stash-box'; box.innerHTML='<div class="menu-label">The Wheatsheaf Crate</div><div id="stash-grid"></div><div class="stash-help">Double-click moves things between the crate and your pack.</div>';
@@ -11477,7 +11510,7 @@ function maelisTalk(){                            // she weaves for Silver Leave
   say('Maelis the Weaver',["“Good, you came. The loom has been asking.”"],[
     {label:'“What will you weave for leaves?”', fn:()=>leafTrade(back)},
     {label:'“How do I earn Silver Leaves?”', fn:()=>leafHow(back)},
-    {label:'Worn things, for coin.', fn:()=>shopFrom('Maelis the Weaver',todaysStock('maelisworn',['elf_boots_worn','elf_tunic_worn','elf_leggings_worn','elf_shirt','elf_trousers'].filter(id=>ITEMS[id]&&PRICES[id]),3),disc,[disc<1 ? "“For a friend of Sylvhaven, a friend's price.”" : "“Human coin. For worn things, it will do.”"],back)},
+    {label:'Worn things, for coin.', fn:()=>shopFrom('Maelis the Weaver',todaysStock('maelisworn',['elf_boots_worn','elf_tunic_worn','elf_leggings_worn','elf_shirt','elf_trousers','leaf_spaulders'].filter(id=>ITEMS[id]&&PRICES[id]),3),disc,[disc<1 ? "“For a friend of Sylvhaven, a friend's price.”" : "“Human coin. For worn things, it will do.”"],back)},
     bye]);
 }
 function tirnelTalk(){
@@ -11543,7 +11576,7 @@ function townsfolk(seed,n,points){                       // passers-by: seeded l
           equip:{head:heads[Math.floor(r(11)*heads.length)], torso:tops[Math.floor(r(12)*tops.length)], armor:r(13)<0.12?'jerkin':null, hands:null, legs:legs[Math.floor(r(14)*legs.length)], feet:feet[Math.floor(r(15)*feet.length)], weapon:null, offhand:null, cloak:r(16)<0.14?'wool_cloak':r(16)<0.2?'short_cape':null}} }); }
   return out;
 }
-const GUARD=(o)=>BANDIT({skin:1,hair:0,hairColor:3,beard:1,equip:{head:BARON_DOWN()?'kettle':'coif',torso:BARON_DOWN()?'tunic_red':'baron_tabard',armor:BARON_DOWN()?'brightmail':'blackmail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'spear',offhand:BARON_DOWN()?'shield':'shield_iron',cloak:BARON_DOWN()?null:'duel_shoulder'},...o});   // the Baron's men wear his red over one shoulder
+const GUARD=(o)=>BANDIT({skin:1,hair:0,hairColor:3,beard:1,equip:{head:BARON_DOWN()?'kettle':'coif',torso:BARON_DOWN()?'tunic_red':'baron_tabard',armor:BARON_DOWN()?'brightmail':'blackmail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'spear',offhand:BARON_DOWN()?'shield':'shield_iron',cloak:BARON_DOWN()?null:'duel_shoulder',shoulders:'iron_pauldrons'},...o});   // the Baron's men wear his red over one shoulder
 const B=(i,j,fw,fh,v,extra)=>({type:'bldg', i, j, fp:[fw,fh], v, ...extra});
 const streetPts=(list)=>list;
 Object.assign(AREAS,{
@@ -25423,6 +25456,59 @@ const HITFX={ slash:null, hurt:0, glint:null };
       const W=gc.width, H=gc.height, low=combat.active && player.hp<player.maxHp*0.3 ? 0.22+0.08*Math.sin(gt*5) : 0, a=Math.max(HITFX.hurt*0.4,low);
       g.save(); g.setTransform(1,0,0,1,0,0); const gr=g.createRadialGradient(W/2,H/2,Math.min(W,H)*0.4,W/2,H/2,Math.max(W,H)*0.72);
       gr.addColorStop(0,'rgba(120,0,0,0)'); gr.addColorStop(1,`rgba(140,8,4,${a})`); g.fillStyle=gr; g.fillRect(0,0,W,H); g.restore(); } }; }
+// ════════ SHOULDERS: a slot of their own. Leather lames, a studded spaulder over the sword arm, steel, dwarf bronze, elven leaves, a witch's skull ════════
+var SHOULDER_LOOK={
+  leather_spaulders:{ kind:'leather', col:'#6e4a2c', trim:'#3a2414' },
+  studded_spaulder:{ kind:'leather', col:'#4a3020', trim:'#2a1a10', studs:'#c8b080', one:true, strap:'#2a1a10', big:1.1 },
+  iron_pauldrons:{ kind:'metal', col:'#9aa0a8', trim:'#5a5e66' },
+  bronze_pauldrons:{ kind:'metal', col:'#b8863a', trim:'#6a4a1a', lames:4, big:1.15, rune:'rgba(255,170,80,0.8)' },
+  leaf_spaulders:{ kind:'leaf', col:'#5e8068', trim:'#c8d4d8' },
+  bone_pauldron:{ kind:'skull', col:'#d8ccae', trim:'#2a2420', one:true } };
+Object.assign(ITEMS,{
+  leather_spaulders:{ name:'Leather Spaulders', slot:'shoulders', title:"Three lames of boiled leather on each shoulder, laced to a yoke. They turn a glancing blow and squeak when it rains." },
+  studded_spaulder:{ name:"Sellsword's Spaulder", slot:'shoulders', title:"One heavy spaulder, studded, worn over the shield side and strapped across the chest. The sword arm stays free." },
+  iron_pauldrons:{ name:'Iron Pauldrons', slot:'shoulders', title:"Domed steel caps over a pair of lames, the way the Hollowmere guard wear them. Heavy, honest, loud." },
+  bronze_pauldrons:{ name:'Varrow Bronze Pauldrons', slot:'shoulders', title:"Dwarf bronze in four deep lames, a rune of warding cut into each cap. It glows faintly when you are angry." },
+  leaf_spaulders:{ name:'Leafscale Spaulders', slot:'shoulders', title:"Silver-green leaves of elven steel, overlapping like a wood in autumn. They weigh almost nothing." },
+  bone_pauldron:{ name:'Skull Pauldron', slot:'shoulders', title:"The skull of something with three horns, worn on one shoulder. Vesna says it was a ram. Vesna says a lot of things." } });
+Object.assign(GEAR_HP,{ leather_spaulders:3, studded_spaulder:3, iron_pauldrons:6, bronze_pauldrons:8, leaf_spaulders:4, bone_pauldron:3 });
+Object.assign(ITEM_STATS,{ leather_spaulders:{hp:3, agi:1}, studded_spaulder:{hp:3, ap:1}, iron_pauldrons:{hp:6}, bronze_pauldrons:{hp:8, ap:1}, leaf_spaulders:{hp:4, agi:1, magic:1}, bone_pauldron:{hp:3, magic:2} });
+Object.assign(PRICES,{ leather_spaulders:35, studded_spaulder:48, iron_pauldrons:90, bronze_pauldrons:160, leaf_spaulders:125, bone_pauldron:70 });
+// their icons: the pair laid side by side, or the one piece on its own
+Object.keys(SHOULDER_LOOK).forEach(id=>{ ITEM_ICON[id]=(g2,i2,size)=>{ const L=SHOULDER_LOOK[i2]; g2.save(); g2.scale(size/40,size/40);
+  const piece=(cx,cy,k)=>{ g2.save(); g2.translate(cx,cy); g2.scale(k,k);
+    if(L.kind==='leaf'){ const gp=g2.createLinearGradient(-9,0,9,0); gp.addColorStop(0,tone(L.col,0.3)); gp.addColorStop(1,tone(L.col,-0.3)); g2.fillStyle=gp;
+      g2.beginPath(); g2.ellipse(0,-2,9,7,0,Math.PI,0); g2.closePath(); g2.fill(); g2.strokeStyle=L.trim; g2.lineWidth=0.8; g2.stroke();
+      for(let r=0;r<2;r++){ const n=r?3:4, ww=r?7.5:9; for(let q=0;q<n;q++){ const lx=-ww+ww*2*(q+0.5)/n, ly=-1.4+r*4.2; g2.fillStyle=tone(L.col,0.08-r*0.14+(q%2)*0.06);
+        g2.beginPath(); g2.moveTo(lx-ww/n,ly); g2.quadraticCurveTo(lx-ww/n*0.9,ly+3.6,lx,ly+5.4); g2.quadraticCurveTo(lx+ww/n*0.9,ly+3.6,lx+ww/n,ly); g2.closePath(); g2.fill(); g2.strokeStyle=tone(L.trim,-0.2,0.8); g2.lineWidth=0.5; g2.stroke(); } } }
+    else if(L.kind==='skull'){ g2.fillStyle=L.col; g2.beginPath(); g2.ellipse(0,0,8,7,0,Math.PI,0); g2.lineTo(6,5); g2.lineTo(-6,5); g2.closePath(); g2.fill(); g2.strokeStyle=tone(L.col,-0.5); g2.lineWidth=1; g2.stroke();
+      g2.fillStyle='#1a1410'; [-3,3].forEach(e=>{ g2.beginPath(); g2.ellipse(e,0,1.8,1.5,0,0,Math.PI*2); g2.fill(); }); g2.fillStyle=tone(L.col,-0.15); [-5,0,5].forEach(px=>{ g2.beginPath(); g2.moveTo(px-1.5,-5); g2.lineTo(px,-11); g2.lineTo(px+1.5,-5); g2.closePath(); g2.fill(); }); }
+    else { const n=L.lames||3; for(let k2=0;k2<n;k2++){ const rx=9-k2*1.1, yy=(n-1-k2)*3.6-3; const gp=g2.createLinearGradient(-rx,0,rx,0); gp.addColorStop(0,tone(L.col,0.3)); gp.addColorStop(1,tone(L.col,-0.3)); g2.fillStyle=gp;
+        g2.beginPath(); g2.ellipse(0,yy,rx,5,0,Math.PI,0); g2.lineTo(rx,yy+1.4); g2.lineTo(-rx,yy+1.4); g2.closePath(); g2.fill(); g2.strokeStyle=tone(L.col,-0.6); g2.lineWidth=0.8; g2.stroke();
+        if(L.trim){ g2.strokeStyle=L.trim; g2.beginPath(); g2.moveTo(-rx+1,yy+0.7); g2.lineTo(rx-1,yy+0.7); g2.stroke(); }
+        if(L.studs){ g2.fillStyle=L.studs; for(let q=-2;q<=2;q++){ g2.beginPath(); g2.arc(q*rx*0.32,yy-0.6,0.8,0,Math.PI*2); g2.fill(); } } }
+      if(L.rune){ g2.strokeStyle='#ffb060'; g2.lineWidth=1; g2.beginPath(); g2.moveTo(-2,-8); g2.lineTo(0,-5); g2.lineTo(2,-8); g2.stroke(); } }
+    g2.restore(); };
+  if(L.one) piece(20,24,1.45); else { piece(11,23,1.0); piece(29,23,1.0); }
+  g2.restore(); }; });
+// where to buy them: the armourer in Hollowmere, Gorm under the mountain, the elves' weaver, and Vesna for tallies
+{ const _sm=smithTalk; smithTalk=function(){ const _sf=shopFrom; shopFrom=function(name,stock,...r){ shopFrom=_sf; return _sf.call(this,name,[...stock,'leather_spaulders','studded_spaulder','iron_pauldrons'],...r); }; try{ return _sm.apply(this,arguments); } finally{ shopFrom=_sf; } }; }
+TALLY_WARES.push(['bone_pauldron',3]);
+// foes wear them too: sergeants and captains steel, the hired swords a spaulder, the dead their bone; some of it comes off when they fall
+function shouldersForFoe(m,area){ const o=m.opts; if(!o || !o.gender || !o.equip || o.equip.shoulders || o.beast || o.ghost || /^(goblin|elf)/.test(o.race||'')) return null;
+  const N=m.name||'', h=hsh(N.length*97+(N.charCodeAt(0)||0)*13, area.length*29+(area.charCodeAt(2)||0))%100, t=AREA_TIER[area]||1;
+  if(/^dwarf/.test(o.race||'')) return h<40 ? 'bronze_pauldrons' : null;
+  if(o.bones || m.type==='skeleton') return h<25 ? 'bone_pauldron' : null;
+  if(m.type==='mage') return /witch|grave|bone|necro/i.test(N) && h<50 ? 'bone_pauldron' : null;
+  if(/sergeant|captain|chief|knight|warden/i.test(N)) return h<75 ? 'iron_pauldrons' : 'studded_spaulder';
+  if(/sellsword|mercenar|hired|blade|deserter/i.test(N) || m.type==='brute') return h<55 ? 'studded_spaulder' : h<75 ? 'iron_pauldrons' : null;
+  if(['bandit','duelist'].includes(m.type)) return h<(t>=2?22:12) ? (t>=3 ? 'iron_pauldrons' : 'leather_spaulders') : null;
+  return null; }
+{ const _rm=resetMobs; resetMobs=function(){ const r=_rm.apply(this,arguments); try{ mobs.forEach(m=>{ const sp=shouldersForFoe(m,areaId); if(sp) m.opts={...m.opts, equip:{...m.opts.equip, shoulders:sp}}; }); }catch(e){} return r; }; }
+{ const _v=victory; victory=function(faction){ const dead=(typeof mobs!=='undefined'?mobs:[]).filter(m=>m.hostile && m.dead && (!faction||m.faction===faction) && m.opts && m.opts.equip && SHOULDER_LOOK[m.opts.equip.shoulders]);
+    const r=_v.apply(this,arguments);
+    dead.forEach(m=>{ if(Math.random() >= (m.daily?0.06:0.12)) return; const id=m.opts.equip.shoulders, f=slotFor(id); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } });
+    return r; }; }
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }
@@ -25690,7 +25776,7 @@ const VARROW_FOLK=[
   { id:'halvard', name:'Foreman Halvard', i:15, j:8, dir:5, opts:DWARFO({gender:'m', skin:1, hair:2, hairColor:3, beard:7, face:1, equip:{head:'kettle', torso:'tunic_deep', armor:'dwarf_harness', hands:'iron_bracers', feet:'hobnail_boots', weapon:'hatchet'}}) },
   { id:'bodil_h', name:'Envoy Bodil Granitebrow', i:11, j:6, dir:1, when:()=>CHOICE.vqEnd==='atoned', opts:DWARVES.find(d=>d.id==='bodil').opts } ];
 { const B0=DWARVES.find(d=>d.id==='bodil'); wrap('silvergate','npcs',l=>CHOICE.vq==='atoned'||CHOICE.vqEnd==='atoned' ? l.filter(n=>n.id!=='bodil') : l); }
-const VARROW_GEAR=()=>['rune_helm','rune_gauntlets','rune_greaves','rune_boots',...(vq()==='done'?['rune_plate','rune_maul']:[]),'varrow_axe','varrow_helm','varrow_gauntlets',...(vq()==='done'?['varrow_mail']:[]),'axe','mace','mail','helm_full','gauntlets','shield_iron','plate_boots'].filter(id=>ITEMS[id]&&PRICES[id]);
+const VARROW_GEAR=()=>['rune_helm','rune_gauntlets','rune_greaves','rune_boots',...(vq()==='done'?['rune_plate','rune_maul']:[]),'varrow_axe','varrow_helm','varrow_gauntlets',...(vq()==='done'?['varrow_mail']:[]),'axe','mace','mail','helm_full','gauntlets','shield_iron','plate_boots','bronze_pauldrons'].filter(id=>ITEMS[id]&&PRICES[id]);
 function thaneTalk(){ const T='Thane Sigrid Varrowborn', Q=vq();
   if(!Q) return say(T,["<i>The Thane of Varrowdeep sits on a plain stone chair under the banners of nine kings. She is grey-braided and broad as a door, and she does not get up.</i> “A surface-walker in my hall. The guards say your hands were open. Good. Keep them that way.”",
       "“You come at a poor time. Nine days ago the oldest seam in the deep mines went quiet. Not the picks: the whole of it. Six of my miners went down to see why, and none of them came back up.”"],

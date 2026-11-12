@@ -25509,6 +25509,49 @@ function shouldersForFoe(m,area){ const o=m.opts; if(!o || !o.gender || !o.equip
     const r=_v.apply(this,arguments);
     dead.forEach(m=>{ if(Math.random() >= (m.daily?0.06:0.12)) return; const id=m.opts.equip.shoulders, f=slotFor(id); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } });
     return r; }; }
+// ════════ MASTERWORK: Gorm reforges the weapon in your hand, three times over, with silver out of the Varrow seams, ember cores from the Cinder Deeps
+//   and the scales of the great worm of the Sunscar. Each rank: a twelfth more bite for steel, two more Spell Power for a staff ════════
+Object.assign(ITEMS,{ varrow_silver:{ name:'Lump of Varrow Silver', slot:'misc', title:"Raw silver worked out of the rock with a dropped dwarf pick, dull grey until you scratch it. Gorm can use it." } });
+Object.assign(PRICES,{ varrow_silver:12 });
+ITEM_ICON.varrow_silver=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.fillStyle='#5a5a60'; g2.beginPath(); g2.moveTo(9,26); g2.lineTo(14,13); g2.lineTo(24,10); g2.lineTo(32,18); g2.lineTo(30,29); g2.lineTo(18,32); g2.closePath(); g2.fill(); g2.strokeStyle='#2a2a30'; g2.lineWidth=1; g2.stroke();
+  g2.strokeStyle='#e4e8f0'; g2.lineWidth=1.6; g2.lineCap='round'; g2.beginPath(); g2.moveTo(13,24); g2.quadraticCurveTo(19,18,22,21); g2.quadraticCurveTo(26,24,29,17); g2.moveTo(17,15); g2.lineTo(21,14); g2.stroke(); g2.restore(); };
+const MW_RANKS=[ null, {coin:150, need:[['varrow_silver',3]]}, {coin:320, need:[['varrow_silver',3],['ember_core',2]]}, {coin:640, need:[['varrow_silver',4],['ember_core',2],['worm_scale',2]]} ];
+const MW_ROMAN=['','I','II','III'];
+const mwRank=id=> id && CHOICE.mw ? (CHOICE.mw[unWoven(id)]||0) : 0;
+const mwStaff=id=> !!(WEAPONS[unWoven(id)] && WEAPONS[unWoven(id)].magic);
+function mwApplyStats(){ const M=CHOICE.mw||{}; for(const id in M){ if(!mwStaff(id)) continue; const base=(mwApplyStats.base[id] ??= {...(ITEM_STATS[id]||{})}); ITEM_STATS[id]={...base, magic:(base.magic||0)+2*M[id]}; } }
+mwApplyStats.base={};
+{ const _wd=weaponDmg; weaponDmg=function(id){ const d=_wd.apply(this,arguments); const r=mwRank(id); return r && !mwStaff(id) ? Math.round(d*(1+0.12*r)) : d; }; }
+{ const _ld=applySave; applySave=function(...a){ const r=_ld.apply(this,a); try{ mwApplyStats(); }catch(e){} return r; }; }
+// the name shows the rank wherever the stat panel names your weapon
+{ const _rs=refreshStatPanel; refreshStatPanel=function(){ _rs.apply(this,arguments); try{ const id=player.opts.equip.weapon, r=mwRank(id); if(!r) return; const P2=document.getElementById('stat-panel'); const row=[...P2.querySelectorAll('.stat-row')].find(x=>x.querySelector('b') && x.querySelector('b').textContent==='Weapon');
+    if(row) row.querySelector('span').innerHTML=ITEMS[id].name+` <small style="color:#e8c060">✦ Masterwork ${MW_ROMAN[r]}</small>`; }catch(e){} }; }
+// silver from the seams: one lump from each seam a day
+{ const _o=PUZ_ON.oreseam; onUse(['oreseam'],o=>{ const d=Math.floor(dayClock/DAY_LEN), k=areaId+':'+o.i+','+o.j; CHOICE.seamDay=CHOICE.seamDay||{};
+    if(CHOICE.seamDay[k]===d){ pzSay("You have worked this seam for today. Your arms say so too. The rock will give up more tomorrow.",'#c8ccd4'); return; }
+    if(slotFor('varrow_silver')<0){ pzSay('Your pack is full.','#e0b070'); return; }
+    CHOICE.seamDay[k]=d; const f=slotFor('varrow_silver'); player.inv[f]='varrow_silver'; updateHud();
+    try{ SND.clang(0.5); }catch(e){} floatText([o.i,o.j],'Varrow Silver','#d8dce4',true);
+    pzSay(CHOICE.mwTold ? "You work a lump of silver free with a dropped pick. Gorm will want it." : "Silver, threaded through the rock in veins as thick as a finger. You work a lump of it free with a pick some miner dropped. Silver like this is worth something to a smith.",'#d8dce4'); }); }
+// Gorm: the offer, then the work
+function mwTalk(back){ const G='Master Smith Gorm', id=player.opts.equip.weapon;
+  CHOICE.mwTold=1;
+  if(!id || !WEAPONS[unWoven(id)]){ say(G,"“Put something in your hand first. I do not reforge fists.”",[{label:'Back.', fn:back}]); return; }
+  const r=mwRank(id), nm=ITEMS[id].name;
+  if(r>=3){ say(G,`“Your ${nm} is as good as I can make it. Better than most of what I keep for myself. Do not tell the Thane.”`,[{label:'Back.', fn:back}]); return; }
+  const R=MW_RANKS[r+1], have=R.need.every(([it,n])=>invCount(it)>=n), what=R.need.map(([it,n])=>`${n} ${ITEMS[it].name}${n>1&&!/s$/.test(ITEMS[it].name)?'s':''} (${invCount(it)})`).join(', ');
+  const eff = mwStaff(id) ? '+2 Spell Power' : '+12% damage';
+  say(G,[ r===0 ? `“That ${nm}. Surface steel. It cuts, I suppose. Bring me silver from the seams and I will fold it into the edge, and it will cut like it means it.”` : r===1 ? `“Again? Good. Silver is not enough this time: it wants heat. Ember cores, from the deeps under your city. They burn without air.”` : `“The last fold. For that I need something that has never been struck: the scales of the great worm, out in the Sunscar. Silver, cores, scales. Then we are done.”`,
+      `<i>Masterwork ${MW_ROMAN[r+1]}: ${eff}. He needs ${what}, and ${formatCoin(R.coin)} for the coal.</i>`],
+    [{label:`Reforge the ${nm}. (${formatCoin(R.coin)})`, off:!have || player.purse<R.coin, note:!have?'missing materials':'-'+formatCoin(R.coin), fn:()=>{
+        R.need.forEach(([it,n])=>{ for(let k=0;k<player.inv.length && n>0;k++) if(player.inv[k]===it){ player.inv[k]=null; n--; } });
+        player.purse-=R.coin; (CHOICE.mw=CHOICE.mw||{})[unWoven(id)]=r+1; mwApplyStats(); refreshPlayerHp(); updateHud(); try{ refreshInventory(); }catch(e){}
+        try{ SND.clang(1); }catch(e){} banner('Masterwork '+MW_ROMAN[r+1],'#e8c060',1600); logMsg(`Gorm reforges your ${nm}: Masterwork ${MW_ROMAN[r+1]} (${eff}).`,'#e8c060');
+        say(G,[r===2?"“There. Nine folds of silver, the heat of the deep, the hardness of the worm. It will outlive you. Try not to make that happen soon.”":"“There. Feel the balance? That is what steel is supposed to feel like.”"],[{label:'Back.', fn:back}]); }},
+     {label:'Back.', fn:back}]); }
+{ const _g=gormTalk; gormTalk=function(){ const _say=say; say=function(who,lines,opts,...r){ say=_say; if(Array.isArray(opts)) opts=[{label:'“Can you make my weapon better?”', fn:()=>mwTalk(gormTalk)}, ...opts]; return _say.call(this,who,lines,opts,...r); }; try{ return _g.apply(this,arguments); } finally{ say=_say; } }; TALKERS.gorm=gormTalk; }
+JOURNAL.push(['Masterwork', ()=> !CHOICE.mwTold ? null : (()=>{ const best=Math.max(0,...Object.values(CHOICE.mw||{})); return best>=3 ? ['done',"Gorm reforged a weapon of yours into a Masterwork III. Nothing in the valley holds an edge like it."]
+  : ['active',`Master Smith Gorm in Varrowdeep reforges the weapon you hold, three times: silver from the mine seams (one lump a seam a day), then ember cores from the Cinder Deeps, then the scales of the Sunscar worm.`+(best?` Your best so far: Masterwork ${MW_ROMAN[best]}.`:'')]; })()]);
 // ════════ THE FARM, worked and lived in: a coop for the hens, a pen for the sheep, a kitchen garden with its scarecrow, a block for splitting wood ════════
 const FARM_YARD=[[3.4,1.6,1.1],[7.5,4.6,1.5],[16.6,5.5,1.0]];          // where feet go most: the door, the well, the gate (x, y, reach)
 function farmYard(gx,gy){ let k=0; for(const [x,y,r] of ((AREAS[areaId]&&AREAS[areaId].yard)||FARM_YARD)){ const d=Math.hypot(gx-x,(gy-y)*1.15); k=Math.max(k,1-smooth(r*0.45,r,d)); } return k; }

@@ -13789,26 +13789,28 @@ function mapLayout(){
       const [du,dv]=out(A,t), T=onEdge(A,t,[du,dv]), Bk=onEdge(B,Bk0,[-du,-dv]);
       const cand={u:pos[id].u+T.i+du-Bk.i, v:pos[id].v+T.j+dv-Bk.j};
       // where two doors don't quite agree, a place can land on top of one already drawn: slide it out along its road (or a little aside) until it is clear, and draw the road between
+      const RR=(typeof UCR!=='undefined'&&UCR[t.to])||(typeof OWR!=='undefined'&&OWR[t.to]), BN=new Set([id, ...(RR?Object.values(RR.ex).map(x=>Array.isArray(x)?x[0]:null):[])]);   // a chamber may touch the ones it has doors to
       const hits=(c0)=>Object.keys(pos).some(pid=>{ const P=AREAS[pid], p=pos[pid]; if((P.layer||0)!==(B.layer||0) || P.under || B.under) return false;
-        const m=(B.ucRoom && P.ucRoom && pid!==id) ? 1 : 0;   // under the city, a chamber keeps a step clear of every chamber but the one it opens from
+        const m=((B.ucRoom||B.owRoom) && (P.ucRoom||P.owRoom) && !BN.has(pid)) ? 1 : 0;   // under the city, a chamber keeps a step clear of every chamber but the one it opens from
         return c0.u<p.u+P.w+m && c0.u+B.w+m>p.u && c0.v<p.v+P.h+m && c0.v+B.h+m>p.v; });
       let at=cand, kk=0, pp=0;
-      if(hits(cand) && (A.ucRoom || B.ucRoom)){ for(let k2=1;k2<=40;k2++){ const c1={u:cand.u+k2*du, v:cand.v+k2*dv}; if(!hits(c1)){ at=c1; kk=k2; pp=0; break; } } }   // under the city: stretch the passage out straight, so the doors still face each other
+      if(hits(cand) && (A.ucRoom || B.ucRoom || A.owRoom || B.owRoom)){ for(let k2=1;k2<=40;k2++){ const c1={u:cand.u+k2*du, v:cand.v+k2*dv}; if(!hits(c1)){ at=c1; kk=k2; pp=0; break; } } }   // under the city: stretch the passage out straight, so the doors still face each other
       if(at===cand && hits(cand)){ for(const [k2,p2] of MAP_SLIDES){ const c1={u:cand.u+k2*du+p2*(-dv), v:cand.v+k2*dv+p2*du}; if(!hits(c1)){ at=c1; kk=k2; pp=p2; break; } } }
       pos[t.to]=at; queue.push(t.to);
-      if(kk||pp) MAP_LINKS.push({a:id, ai:[T.i,T.j], b:t.to, bi:[Bk.i,Bk.j], du, dv, grid:!pp && !!(A.ucRoom||B.ucRoom)}); }
+      if(kk||pp) MAP_LINKS.push({a:id, ai:[T.i,T.j], b:t.to, bi:[Bk.i,Bk.j], du, dv, grid:!pp && !!(A.ucRoom||B.ucRoom||A.owRoom||B.owRoom)}); }
     if(!queue.length && typeof MAP_GRIDS!=='undefined'){ const G=MAP_GRIDS.find(G=>!G.ids().some(id=>pos[id])); if(G){ mapGridPlace(G,pos); G.ids().forEach(id=>queue.push(id)); continue; } }   // then the worlds below, chamber by chamber on a grid
-    if(!queue.length && typeof MAP_UNDER!=='undefined' && !pos[MAP_UNDER.root] && AREAS[MAP_UNDER.root]){ pos[MAP_UNDER.root]={u:MAP_UNDER.u,v:MAP_UNDER.v}; queue.push(MAP_UNDER.root); } }   // then the world below, under Hollowmere
+    if(!queue.length && typeof MAP_UNDER!=='undefined' && !pos[MAP_UNDER.root] && AREAS[MAP_UNDER.root]){ pos[MAP_UNDER.root]={u:MAP_UNDER.u,v:MAP_UNDER.v}; queue.push(MAP_UNDER.root); }
+    if(!queue.length && typeof MAP_ROOTS!=='undefined'){ const R=MAP_ROOTS.find(R=>!pos[R.root] && AREAS[R.root]); if(R){ pos[R.root]={u:R.u,v:R.v}; queue.push(R.root); } } }   // then the world below, under Hollowmere
   // under the city, two chambers placed from different sides can still end up with their doors facing across a gap: draw that passage too
-  if(typeof UCR!=='undefined') Object.values(UCR).forEach(r=>['e','s'].forEach(d=>{ const s0=r.ex[d]; if(!s0 || !UCR[s0[0]] || !pos[r.id] || !pos[s0[0]]) return; const A=AREAS[r.id], B=AREAS[s0[0]], pa=pos[r.id], pb=pos[s0[0]];
+  [typeof UCR!=='undefined'?UCR:{}, typeof OWR!=='undefined'?OWR:{}].forEach(UCR=>Object.values(UCR).forEach(r=>['e','s'].forEach(d=>{ const s0=r.ex[d]; if(!Array.isArray(s0) || !UCR[s0[0]] || !pos[r.id] || !pos[s0[0]]) return; const A=AREAS[r.id], B=AREAS[s0[0]], pa=pos[r.id], pb=pos[s0[0]];
     if(MAP_LINKS.some(l=>(l.a===r.id&&l.b===s0[0])||(l.b===r.id&&l.a===s0[0]))) return;
     if(d==='e'){ const ya=pa.v+UCR[r.id].cy, yb=pb.v+UCR[s0[0]].cy, gap=pb.u-(pa.u+A.w); if(ya===yb && gap>0 && gap<=14) MAP_LINKS.push({a:r.id, ai:[A.w-1,UCR[r.id].cy], b:s0[0], bi:[0,UCR[s0[0]].cy], du:1, dv:0, grid:true}); }
-    else { const xa=pa.u+UCR[r.id].cx, xb=pb.u+UCR[s0[0]].cx, gap=pb.v-(pa.v+A.h); if(xa===xb && gap>0 && gap<=14) MAP_LINKS.push({a:r.id, ai:[UCR[r.id].cx,A.h-1], b:s0[0], bi:[UCR[s0[0]].cx,0], du:0, dv:1, grid:true}); } }));
+    else { const xa=pa.u+UCR[r.id].cx, xb=pb.u+UCR[s0[0]].cx, gap=pb.v-(pa.v+A.h); if(xa===xb && gap>0 && gap<=14) MAP_LINKS.push({a:r.id, ai:[UCR[r.id].cx,A.h-1], b:s0[0], bi:[UCR[s0[0]].cx,0], du:0, dv:1, grid:true}); } })));
   return MAP_LAYOUT=pos;
 }
 // an underground of chambers on a grid (the Undercity, the Old Workings): every column shares one centre line and every row another, so a door always meets the door
 //   across from it head on, with a short straight passage drawn between them
-const MAP_GRIDS=[];
+const MAP_GRIDS=[], MAP_ROOTS=[];   // more worlds below, each laid out from its own first chamber
 function mapGridPlace(G,pos){ const R=G.ids().map(id=>({id, A:AREAS[id], c:G.cell(id)})), GAP=2, cw={}, rh={};
   R.forEach(({A,c:[X,Y]})=>{ cw[X]=Math.max(cw[X]||0,A.w); rh[Y]=Math.max(rh[Y]||0,A.h); });
   const xs=Object.keys(cw).map(Number).sort((a,b)=>a-b), ys=Object.keys(rh).map(Number).sort((a,b)=>a-b), cx={}, cy={}; let u=G.u, v=G.v;
@@ -24534,6 +24536,22 @@ function ucMobs(r){ const QF=UC_QF[r.q], all=QF.mobs(), mine=all.filter(m=>ucOfO
     const pool=all.filter(m=>RESPAWNS.has(m.name) && !/Warden|Elemental|Pathfinder/.test(m.name)); if(pool.length){ const t=pool[(r.hs>>>2)%pool.length]; mine.push({...t, faction:'ucw_'+r.id}); if(r.hs%9===0) mine.push({...t, name:t.name.trim()+' ', faction:'ucw_'+r.id}); } }
   return ucPlace(r,mine); }
 function ucNpcs(r){ return ucPlace(r,UC_QF[r.q].npcs().filter(n=>ucOfOld(r.q,n.i,n.j)===r.id)); }
+// ════════ chambers sized to fit each other: every chamber gets a column and a row line (spaced a little unevenly), and its four sides are cut so that wherever two
+//   chambers share a door they meet exactly, and wherever they do not they keep clear. Halls take up most of the length between two places, crossings little ════════
+function chamberFit(R,salt){ const rooms=Object.values(R), at={}; rooms.forEach(r=>at[r.X+','+r.Y]=r);
+  const gx={}, gy={}; rooms.forEach(r=>{ gx[r.X]=gx[r.X]||8+hsh(r.X*7+salt,31)%4; gy[r.Y]=gy[r.Y]||8+hsh(salt,r.Y*11+5)%4; });
+  const opp={n:'s',s:'n',w:'e',e:'w'}, linked=(r,d)=>{ const s=r.ex[d]; return Array.isArray(s) && R[s[0]] ? s[0] : null; };
+  const W={square:3, vault:2.4, cross:1.5, bend:1, end:2, hall:5}, MIN={square:2, vault:2};
+  const natural=(r,d)=>{ const ex=Object.keys(r.ex), k=r.kind, h=r.hs;
+    if(k==='hall'){ const horiz=!!(r.ex.e||r.ex.w), along=horiz?(d==='e'||d==='w'):(d==='n'||d==='s'); return along ? 4 : (d==='n'||d==='w') ? 1 : ((h>>>4)%3===1 ? 1 : 0); }
+    if(k==='square') return 3; if(k==='vault') return d==='n'||d==='w'?3:2; if(k==='cross') return (h>>>3)%2 ? 2 : 1; if(k==='bend') return 1;
+    if(k==='end'){ return d===opp[ex[0]] ? 2+(h%3) : 1; } return 1; };
+  rooms.forEach(r=>{ r.E={}; ['n','s','w','e'].forEach(d=>r.E[d]=natural(r,d)); });
+  rooms.forEach(a=>{ [['e',1,0],['s',0,1]].forEach(([d,dx,dy])=>{ const b=at[(a.X+dx)+','+(a.Y+dy)], o=opp[d], gap=(d==='e'?gx[a.X]:gy[a.Y])-1; if(!b) return;
+      if(linked(a,d)===b.id){ const wa=W[a.kind]||1.5, wb=W[b.kind]||1.5, ma=MIN[a.kind]||1, mb=MIN[b.kind]||1; let ea=Math.round(gap*wa/(wa+wb)); ea=Math.max(ma,Math.min(gap-mb,ea)); a.E[d]=ea; b.E[o]=gap-ea; }
+      else { const half=Math.floor(gap/2); a.E[d]=Math.min(a.E[d],half); b.E[o]=Math.min(b.E[o],gap-1-a.E[d]); } }); });
+  rooms.forEach(r=>{ r.w=r.E.w+r.E.e+1; r.h=r.E.n+r.E.s+1; r.cx=r.E.w; r.cy=r.E.n; r.G=new Uint8Array(r.w*r.h).fill(1); }); }
+chamberFit(UCR,3);
 Object.values(UCR).forEach(r=>{ const QF=UC_QF[r.q], st=ucWalk(r)[0], ent={ start:{i:st[0],j:st[1]} };
   Object.keys(r.ex).forEach(d=>{ const [i,j]=ucIn(r,d); ent['from'+d.toUpperCase()]={i,j}; });
   AREAS[r.id]={ ...INSIDE_BASE, w:r.w, h:r.h, theme:'interior', cave:true, ucRoom:true, layer:-1, label:'The Undercity · '+UC_LABEL[r.q], mapLabel: r.square||UC_OUT[r.id] ? UC_LABEL[r.q] : '', mini:{x:0,y:0}, tier:4,
@@ -27400,6 +27418,7 @@ function owMobs(r){ const out=[], F=OW_FOLK[r.q], h=r.hs;
   else if(!OW_OUT[r.id] && !r.sealed && r.id!==owId(1,0) && r.id!==owId(0,1) && (r.kind==='bend' ? h%4===0 : h%2===0 || r.kind==='end')){
     const a=F[(h>>>2)%F.length](); out.push({...a, faction:'ow_'+r.id, daily:true}); if(h%7===0 && r.kind!=='end') out.push({...F[0](), name:F[0]().name+' ', faction:'ow_'+r.id, daily:true}); }
   return ucPlace(r,out); }
+chamberFit(OWR,9);
 Object.values(OWR).forEach(r=>{ const st=ucWalk(r)[0], ent={ start:{i:st[0],j:st[1]} };
   Object.keys(r.ex).forEach(d=>{ const [i,j]=ucIn(r,d); ent['from'+d.toUpperCase()]={i,j}; });
   const dressed=r.q==='ow_se', rails=r.q==='ow_nw' && (r.kind==='hall'||r.kind==='square') ? (r.w>=r.h ? [['h',r.cy+0.5,0,r.w]] : [['v',r.cx+0.5,0,r.h]]) : null;
@@ -27407,7 +27426,7 @@ Object.values(OWR).forEach(r=>{ const st=ucWalk(r)[0], ent={ start:{i:st[0],j:st
     label:'The Old Workings · '+OW_LABEL[r.q], mapLabel: r.cavern ? OW_LABEL[r.q] : OW_OUT[r.id] ? (r.id===owId(0,0)?'The Lift Foot':r.id===owId(7,0)?'The Old Adit':'The Lowest Grate') : r.sealed ? '' : '',
     mini:{x:0,y:0}, tier:5, ...(rails?{rails}:{}), objects:()=>owObjects(r), npcs:()=>[], mobs:()=>owMobs(r), entries:ent };
   AREA_TIER[r.id]=5; });
-MAP_GRIDS.push({ ids:()=>Object.keys(OWR), cell:id=>[OWR[id].X,OWR[id].Y], links:id=>Object.keys(OWR[id].ex).filter(d=>{ const s=OWR[id].ex[d]; return Array.isArray(s) && OWR[s[0]] && owOpen(id,s[0]); }), u:30, v:-250 });
+MAP_ROOTS.push({ root:owId(0,0), u:30, v:-250 });
 // the ways in: down the rope beside the stuck lift cage; up out of the Delving into the lowest gallery; and the old adit onto the Varrow Pass, nailed shut from inside
 AREAS.vm_shaft.entries.fromWorkings={i:3,j:5};
 AREAS.vm_low.entries.fromWorkings={i:6,j:10};
@@ -27497,6 +27516,8 @@ const owQ=()=>CHOICE.owQ||null;
 { const prev=npcHasNews; npcHasNews=function(n){ const r=prev(n); try{ if(n && n.id==='halvard'){ if(owQ()==='asked' && invCount('pit_token')>=4) return '?'; if(!owQ() && !r && vq()) return '!'; } }catch(e){} return r; }; }
 JOURNAL.push(['The Lost Shift', ()=> !owQ() ? null : owQ()==='done' ? ['done',"You brought the four lost pit-tokens up out of the Old Workings. The board in the mine is full again."]
   : ['active',"Foreman Halvard's grandfather was one of four miners lost in the Old Workings, under the lift shaft. Bring up their four brass pit-tokens, one from the far end of each quarter. ("+invCount('pit_token')+"/4)"]]);
+// a save from before the chambers were resized: if it stands you outside the chamber, or in its wall, you wake in the middle of it
+{ const _ld=applySave; applySave=function(...a){ const r=_ld.apply(this,a); try{ const A=AREAS[areaId]; if(A && (A.ucRoom||A.owRoom) && (player.i>=ROOM.w || player.j>=ROOM.h || player.i<0 || player.j<0 || blocked.has(player.i+','+player.j))){ const e=A.entries.start; player.i=e.i; player.j=e.j; player.x=e.i+0.5; player.y=e.j+0.5; player.path=[]; centerCam(); } }catch(e){} return r; }; }
 </script>
 </body>
 </html>

@@ -1647,7 +1647,8 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       capPath(); c.strokeStyle=tone(M0,-0.6); c.lineWidth=0.55; c.stroke();
     }
 
-    const SGK = (vA==='studded' || vA==='blackmail') ? vA : ({brig_spaulders:'blackmail', studded_caps:'studded', ember_pauldron:'ember'})[unWoven(E.shoulders||'')] || null;   // the same guards, worn on their own in the shoulders slot
+    const ME='shoulders' in E;   /* the player's gear always has a shoulder slot; townsfolk and guards' outfits are written without one */   // on you the brigandine is just the coat: its spaulders are their own piece now (Oswin sells them); guards keep theirs on
+    const SGK = (vA==='studded' || (vA==='blackmail' && !ME)) ? vA : ({brig_spaulders:'blackmail', studded_caps:'studded', ember_pauldron:'ember'})[unWoven(E.shoulders||'')] || null;   // the same guards, worn on their own in the shoulders slot
     if(SGK==='ember' && typeof EMBER_STYLE!=='undefined' && EMBER_STYLE==='coat'){ const ac=x0+aw/2, L=al*0.5;   // variant: a draped half-cape over the shoulder with a single disc of black glass pinned on top
       if(s<0){ const sw2=Math.sin(gt*1.6)*0.4, hw2=aw/2+3.4, yb=top+L;
         const cape=()=>{ c.beginPath(); c.moveTo(x+ac-hw2+0.6,B+top+1); c.quadraticCurveTo(x+ac,B+top-3.2,x+ac+hw2-0.6,B+top+1); c.lineTo(x+ac+hw2+0.8+sw2,B+yb-1.2); const n=5; for(let q=0;q<=n;q++){ const t=q/n, xx=ac+hw2+0.8-t*(hw2*2+1.6)+sw2; c.lineTo(x+xx,B+yb+((q%2)?2.4:-0.6)); } c.closePath(); };
@@ -19147,7 +19148,7 @@ JOURNAL.push(['The Grave-Blade Reforged', ()=> !CHOICE.reforge ? null
     return oV(...a); }; }
 { const oS=TALKERS.smith; TALKERS.smith=(...a)=>{ const O='Oswin the Armourer';
     if(CHOICE.reforge==='asked' && hasItem('rusted_blade')){ say(O,["“Grave-iron. Older than this city. Someone took good steel into the ground with them. The heart's still sound. I can grind it clean and draw a new edge. Twenty-five copper, and come back tomorrow.”"],[
-        {label:'Pay him. (-25c)', off:player.purse<25, note:'-25c', fn:()=>{ player.purse-=25; const k=player.inv.indexOf('rusted_blade'); if(k>=0) player.inv[k]=null; CHOICE.reforgeDay=rfDay(); remember('reforge','smith',"Oswin is grinding the rust off the grave-blade. Back to him tomorrow."); updateHud();
+        {label:'Pay him. (-25c)', off:player.purse<25, note:'-25c', fn:()=>{ player.purse-=25; const k=player.inv.indexOf('rusted_blade'); if(k>=0) player.inv[k]=null; CHOICE.reforgeDay=rfDay(); remember('reforge','smith',"Oswin is grinding the rust off the grave-blade. Back to him tomorrow."); updateHud(); logMsg('Oswin keeps the blade overnight. Collect it from him tomorrow (sleep, or come back after midnight).','#e8c060'); banner('Ready tomorrow','#e8c060',1600);
           say(O,"“Tomorrow. Don't hover.”",[bye]); }},
         {label:'Something else.', fn:()=>oS(...a)}, bye]); return; }
     if(CHOICE.reforge==='smith'){ if(rfDay()<=CHOICE.reforgeDay){ say(O,["“Tomorrow, I said.”"],[{label:'Something else.', fn:()=>oS(...a)},bye]); return; }
@@ -19161,7 +19162,7 @@ const LOGGERS_GONE=()=>['seal','paid','colliers','fought'].includes(CHOICE.fell)
 // the Fellings once the loggers have gone: some days the elves leave something in the old crates (they turn up as chests, freshly filled)
 const FELL_SETTLED=()=>{ const d=Math.floor(dayClock/DAY_LEN); if(CHOICE.fellClearDay==null) CHOICE.fellClearDay=d; return d>CHOICE.fellClearDay; };   // the wood takes a day to notice the loggers have gone
 { const oF=AREAS.fellings.objects; AREAS.fellings.objects=()=>{ const d=Math.floor(dayClock/DAY_LEN), chestDay=LOGGERS_GONE() && FELL_SETTLED() && dayRoll('fellings',3)<0.4;
-    if(chestDay && CHOICE.fellChestDay!==d){ CHOICE.fellChestDay=d; [[1,7],[2,7]].forEach(([i,j])=>{ const k='fellings:'+i+','+j; destroyedBreakables.delete(k); delete OPENED_KIND[k]; }); }
+    // (the crates no longer refill: once broken, they stay broken)
     return oF().map(o=> chestDay && o.breakable && (o.type==='crate'||o.type==='chest') ? {...o, rich:true, keepLook:true} : o); }; }   // fuller, but the same old crates: they don't turn into chests and back
 // squatters: a few days in four, a new little band settles where the last one was cleared out
 const SQUAT={ camp:'bandits', southtrail:'goblins', fellings:'mixed' };

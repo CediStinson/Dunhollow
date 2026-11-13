@@ -13700,8 +13700,10 @@ function banner(t,col='#f0c060',ms=1400){ cbanner.textContent=t; cbanner.style.c
 // ── minimap: every visited room drawn in its real shape, placed exactly where its doors meet ──
 let MAP_LAYOUT=null, MAP_ALL=false;                    // MAP_ALL: while the map is laid out, gated ways count as open
 const MAP_LINKS=[];
+const MAP_SLIDES=(()=>{ const l=[]; for(let k=0;k<=60;k++) for(let p=-30;p<=30;p++) if(k||p) l.push([k,p,k+1.6*Math.abs(p)]); return l.sort((a,b)=>a[2]-b[2]).map(([k,p])=>[k,p]); })();   // ways to slide a place clear: further out along its road first, then aside
 function mapLayout(){
   if(MAP_LAYOUT) return MAP_LAYOUT;
+  MAP_LINKS.length=0;
   const pos={farm:{u:0,v:0}}, queue=['farm'];
   const tps=id=>{ MAP_ALL=true; try{ return AREAS[id].objects().filter(o=>o.type==='teleporter'); } finally{ MAP_ALL=false; } };
   const out=(A,o)=>{ const d=[[o.i,[-1,0]],[A.w-1-o.i,[1,0]],[o.j,[0,-1]],[A.h-1-o.j,[0,1]]]; let b=d[0]; d.forEach(x=>{ if(x[0]<b[0]) b=x; }); return b[1]; };   // the nearest wall
@@ -13711,7 +13713,12 @@ function mapLayout(){
       const B=AREAS[t.to], Bk0=tps(t.to).find(o=>o.to===id); if(!Bk0) continue;
       const [du,dv]=out(A,t), T=onEdge(A,t,[du,dv]), Bk=onEdge(B,Bk0,[-du,-dv]);
       const cand={u:pos[id].u+T.i+du-Bk.i, v:pos[id].v+T.j+dv-Bk.j};
-      pos[t.to]=cand; queue.push(t.to); }
+      // where two doors don't quite agree, a place can land on top of one already drawn: slide it out along its road (or a little aside) until it is clear, and draw the road between
+      const hits=(c0)=>Object.keys(pos).some(pid=>{ const P=AREAS[pid], p=pos[pid]; if((P.layer||0)!==(B.layer||0) || P.under || B.under) return false; return c0.u<p.u+P.w && c0.u+B.w>p.u && c0.v<p.v+P.h && c0.v+B.h>p.v; });
+      let at=cand, kk=0, pp=0;
+      if(hits(cand)){ for(const [k2,p2] of MAP_SLIDES){ const c1={u:cand.u+k2*du+p2*(-dv), v:cand.v+k2*dv+p2*du}; if(!hits(c1)){ at=c1; kk=k2; pp=p2; break; } } }
+      pos[t.to]=at; queue.push(t.to);
+      if(kk||pp) MAP_LINKS.push({a:id, ai:[T.i,T.j], b:t.to, bi:[Bk.i,Bk.j], du, dv}); }
     if(!queue.length && typeof MAP_UNDER!=='undefined' && !pos[MAP_UNDER.root] && AREAS[MAP_UNDER.root]){ pos[MAP_UNDER.root]={u:MAP_UNDER.u,v:MAP_UNDER.v}; queue.push(MAP_UNDER.root); } }   // then the world below, under Hollowmere
   return MAP_LAYOUT=pos;
 }
@@ -13756,11 +13763,19 @@ function renderMap(cv,V){                             // V: {zoom, px, py, label
     A.objects().filter(t=>(t.type==='ucgrate'||t.type==='ucladder') && typeof ucShortOpen==='function' && ucShortOpen(t.q)).forEach(t=>{ const m=P2(o.u+t.i+0.5,o.v+t.j+0.5), R=Math.max(3,Math.min(6,k*0.8)); c.fillStyle='#2a2a30'; c.fillRect(m[0]-R,m[1]-R,R*2,R*2); c.strokeStyle='#d8c890'; c.lineWidth=1.2; c.strokeRect(m[0]-R,m[1]-R,R*2,R*2); c.beginPath(); c.moveTo(m[0],m[1]-R); c.lineTo(m[0],m[1]+R); c.moveTo(m[0]-R,m[1]); c.lineTo(m[0]+R,m[1]); c.stroke(); });   // the shortcut grates you have unbolted
     c.globalAlpha=1;
   });
+  MAP_LINKS.forEach(l=>{ if(!ids.includes(l.a) || !ids.includes(l.b)) return; const pa=L[l.a], pb=L[l.b];   // a track between two doors the map had to pull apart
+    const a=P2(pa.u+l.ai[0]+0.5+l.du*0.5, pa.v+l.ai[1]+0.5+l.dv*0.5), b=P2(pb.u+l.bi[0]+0.5-l.du*0.5, pb.v+l.bi[1]+0.5-l.dv*0.5);
+    c.save(); c.lineCap='round'; c.strokeStyle='rgba(20,12,4,0.7)'; c.lineWidth=Math.max(2.5,k*0.9); c.beginPath(); c.moveTo(a[0],a[1]);
+    if(l.du) c.bezierCurveTo((a[0]+b[0])/2,a[1],(a[0]+b[0])/2,b[1],b[0],b[1]); else c.bezierCurveTo(a[0],(a[1]+b[1])/2,b[0],(a[1]+b[1])/2,b[0],b[1]); c.stroke();
+    c.strokeStyle='#8a7a52'; c.lineWidth=Math.max(1.2,k*0.5); c.setLineDash([Math.max(2,k*0.8),Math.max(2,k*0.5)]); c.stroke(); c.restore(); });
   // you are here
   if(L[areaId] && (AREAS[areaId].layer||0)===LAY && !(AREAS[areaId].maze && !mazeKnown(areaId))){ const o=L[areaId], m=P2(o.u+player.x,o.v+player.y);
     c.fillStyle='#fff'; c.strokeStyle='#8a1a10'; c.lineWidth=2; c.beginPath(); c.arc(m[0],m[1],Math.max(3.5,Math.min(6,k*0.6)),0,Math.PI*2); c.fill(); c.stroke(); }
   if(V.labels){ c.font=`${Math.max(11,Math.min(18,k*1.4))}px Georgia,serif`; c.textAlign='center'; c.textBaseline='middle';
+    const taken=[];   // labels shuffle up or down a step until they don't sit on each other
     ids.forEach(id=>{ const A=AREAS[id], o=L[id], m=P2(o.u+A.w/2,o.v+A.h/2), t=A.under?'':(A.mapLabel!=null?A.mapLabel:(A.label||id)); if(!t) return; const w=c.measureText(t).width+10;
+      const clash=y=>taken.some(r=>Math.abs(r.x-m[0])<(r.w+w)/2+2 && Math.abs(r.y-y)<22); if(clash(m[1])) for(const d of [22,-22,44,-44,66,-66]){ if(!clash(m[1]+d)){ m[1]+=d; break; } }
+      taken.push({x:m[0],y:m[1],w});
       c.fillStyle='rgba(14,9,4,0.72)'; c.fillRect(m[0]-w/2,m[1]-10,w,20); c.fillStyle=id===areaId?'#fff2c0':'#e8d4a0'; c.fillText(t,m[0],m[1]); }); }
   if(typeof mapMarks==='function'){ const MK=mapMarks(), R=Math.max(5,Math.min(10,k*1.1));   // who has business for you, and where your quests point
     ids.forEach(id=>{ const mk=MK[id]; if(!mk || (AREAS[id].maze && !mazeKnown(id))) return; const A=AREAS[id], o=L[id], m0=P2(o.u+A.w/2,o.v+A.h/2), m=[m0[0], m0[1]-(V.labels?R+14:0)];

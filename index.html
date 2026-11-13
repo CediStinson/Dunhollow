@@ -13789,13 +13789,21 @@ function mapLayout(){
       const [du,dv]=out(A,t), T=onEdge(A,t,[du,dv]), Bk=onEdge(B,Bk0,[-du,-dv]);
       const cand={u:pos[id].u+T.i+du-Bk.i, v:pos[id].v+T.j+dv-Bk.j};
       // where two doors don't quite agree, a place can land on top of one already drawn: slide it out along its road (or a little aside) until it is clear, and draw the road between
-      const hits=(c0)=>Object.keys(pos).some(pid=>{ const P=AREAS[pid], p=pos[pid]; if((P.layer||0)!==(B.layer||0) || P.under || B.under) return false; return c0.u<p.u+P.w && c0.u+B.w>p.u && c0.v<p.v+P.h && c0.v+B.h>p.v; });
+      const hits=(c0)=>Object.keys(pos).some(pid=>{ const P=AREAS[pid], p=pos[pid]; if((P.layer||0)!==(B.layer||0) || P.under || B.under) return false;
+        const m=(B.ucRoom && P.ucRoom && pid!==id) ? 1 : 0;   // under the city, a chamber keeps a step clear of every chamber but the one it opens from
+        return c0.u<p.u+P.w+m && c0.u+B.w+m>p.u && c0.v<p.v+P.h+m && c0.v+B.h+m>p.v; });
       let at=cand, kk=0, pp=0;
-      if(hits(cand)){ for(const [k2,p2] of MAP_SLIDES){ const c1={u:cand.u+k2*du+p2*(-dv), v:cand.v+k2*dv+p2*du}; if(!hits(c1)){ at=c1; kk=k2; pp=p2; break; } } }
+      if(hits(cand) && (A.ucRoom || B.ucRoom)){ for(let k2=1;k2<=40;k2++){ const c1={u:cand.u+k2*du, v:cand.v+k2*dv}; if(!hits(c1)){ at=c1; kk=k2; pp=0; break; } } }   // under the city: stretch the passage out straight, so the doors still face each other
+      if(at===cand && hits(cand)){ for(const [k2,p2] of MAP_SLIDES){ const c1={u:cand.u+k2*du+p2*(-dv), v:cand.v+k2*dv+p2*du}; if(!hits(c1)){ at=c1; kk=k2; pp=p2; break; } } }
       pos[t.to]=at; queue.push(t.to);
-      if(kk||pp) MAP_LINKS.push({a:id, ai:[T.i,T.j], b:t.to, bi:[Bk.i,Bk.j], du, dv}); }
+      if(kk||pp) MAP_LINKS.push({a:id, ai:[T.i,T.j], b:t.to, bi:[Bk.i,Bk.j], du, dv, grid:!pp && !!(A.ucRoom||B.ucRoom)}); }
     if(!queue.length && typeof MAP_GRIDS!=='undefined'){ const G=MAP_GRIDS.find(G=>!G.ids().some(id=>pos[id])); if(G){ mapGridPlace(G,pos); G.ids().forEach(id=>queue.push(id)); continue; } }   // then the worlds below, chamber by chamber on a grid
     if(!queue.length && typeof MAP_UNDER!=='undefined' && !pos[MAP_UNDER.root] && AREAS[MAP_UNDER.root]){ pos[MAP_UNDER.root]={u:MAP_UNDER.u,v:MAP_UNDER.v}; queue.push(MAP_UNDER.root); } }   // then the world below, under Hollowmere
+  // under the city, two chambers placed from different sides can still end up with their doors facing across a gap: draw that passage too
+  if(typeof UCR!=='undefined') Object.values(UCR).forEach(r=>['e','s'].forEach(d=>{ const s0=r.ex[d]; if(!s0 || !UCR[s0[0]] || !pos[r.id] || !pos[s0[0]]) return; const A=AREAS[r.id], B=AREAS[s0[0]], pa=pos[r.id], pb=pos[s0[0]];
+    if(MAP_LINKS.some(l=>(l.a===r.id&&l.b===s0[0])||(l.b===r.id&&l.a===s0[0]))) return;
+    if(d==='e'){ const ya=pa.v+UCR[r.id].cy, yb=pb.v+UCR[s0[0]].cy, gap=pb.u-(pa.u+A.w); if(ya===yb && gap>0 && gap<=14) MAP_LINKS.push({a:r.id, ai:[A.w-1,UCR[r.id].cy], b:s0[0], bi:[0,UCR[s0[0]].cy], du:1, dv:0, grid:true}); }
+    else { const xa=pa.u+UCR[r.id].cx, xb=pb.u+UCR[s0[0]].cx, gap=pb.v-(pa.v+A.h); if(xa===xb && gap>0 && gap<=14) MAP_LINKS.push({a:r.id, ai:[UCR[r.id].cx,A.h-1], b:s0[0], bi:[UCR[s0[0]].cx,0], du:0, dv:1, grid:true}); } }));
   return MAP_LAYOUT=pos;
 }
 // an underground of chambers on a grid (the Undercity, the Old Workings): every column shares one centre line and every row another, so a door always meets the door
@@ -24533,7 +24541,7 @@ Object.values(UCR).forEach(r=>{ const QF=UC_QF[r.q], st=ucWalk(r)[0], ent={ star
   AREA_TIER[r.id]=QF.tier; });
 UC_QS.forEach(q=>{ delete AREAS[q]; });
 MAP_UNDER.root=ucId(0,0);
-MAP_GRIDS.push({ ids:()=>Object.keys(UCR), cell:id=>[UCR[id].X,UCR[id].Y], links:id=>Object.keys(UCR[id].ex).filter(d=>UCR[UCR[id].ex[d][0]] && !(UC_TWIST[id] && UC_TWIST[id].kind==='warp' && UC_TWIST[id].d===d)), u:MAP_UNDER.u, v:MAP_UNDER.v });
+
 // the chambers' walkways and the drop round them
 { const _mg=mazeGrid; mazeGrid=function(id){ return UCR[id] ? UCR[id].G : _mg(id); }; }
 mazeBlock=function(){ const G=UCR[areaId] ? UCR[areaId].G : null; if(!G) return; for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++) if(!G[j*ROOM.w+i]) blocked.add(i+','+j); };

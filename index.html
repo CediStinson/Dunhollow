@@ -11248,7 +11248,6 @@ function flash(t){ invMsg.textContent=t; clearTimeout(msgTimer); msgTimer=setTim
 // Can `id` go into `loc`? Returns an error message, or '' when it can.
 function placeError(id,loc){
   if(loc.kind==='stash' && loc.key>=stashCap()) return 'That part of the crate is not yours yet.';
-  if(loc.kind==='stash' && id && ITEMS[id] && ITEMS[id].currency) return 'You keep your '+ITEMS[id].name+' on you.';
   if(!id || loc.kind==='inv' || loc.kind==='stash') return '';
   const it=ITEMS[id];
   if(it.slot!==loc.key) return `${it.name} goes in the ${SLOT_NAMES[it.slot]} slot.`;
@@ -22091,7 +22090,8 @@ ITEM_ICON.grave_tally=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40);
     g2.beginPath(); g2.roundRect?g2.roundRect(-4.5,-14,9,28,3):g2.rect(-4.5,-14,9,28); g2.fill(); g2.stroke();
     g2.strokeStyle='#5a4a6a'; g2.lineWidth=1.4; g2.beginPath(); for(let k=-9;k<=9;k+=4.5){ g2.moveTo(-3,k); g2.lineTo(3,k); } g2.moveTo(-3,10); g2.lineTo(3,-10); g2.stroke(); g2.restore(); });
   g2.restore(); };
-const leaves=()=>invCount('silver_leaf')+(CHOICE.leaves||0), tallies=()=>invCount('grave_tally')+(CHOICE.tallies||0);
+const stashCount=id=>{ const S=stashArr(); let n=0; for(let k=0;k<S.length;k++) if(S[k]===id) n+=stashAt(k); return n; };   // tokens laid by in the vault still count, and are spent after the ones you carry
+const leaves=()=>invCount('silver_leaf')+stashCount('silver_leaf')+(CHOICE.leaves||0), tallies=()=>invCount('grave_tally')+stashCount('grave_tally')+(CHOICE.tallies||0);
 // into the bag, one at a time onto the pile; whatever finds no room waits in CHOICE
 function tokenStow(id,key){ let n=CHOICE[key]||0; if(n<=0) return; let k=slotFor(id); if(k<0) return;
   if(player.inv[k]!==id){ player.inv[k]=id; n--; }
@@ -22099,6 +22099,7 @@ function tokenStow(id,key){ let n=CHOICE[key]||0; if(n<=0) return; let k=slotFor
   CHOICE[key]=n; try{ if(invOverlay.classList.contains('open')) refreshInventory(); }catch(e){} }
 function tokenSpend(id,key,c){ const N=invN(); for(let k=0;k<player.inv.length && c>0;k++){ if(player.inv[k]!==id) continue;
     const have=stackAt(k), take=Math.min(have,c); c-=take; INV_RAW=true; try{ if(take>=have){ player.inv[k]=null; N[k]=0; } else N[k]=(N[k]|0)-take; } finally{ INV_RAW=false; } }
+  { const S=stashArr(), SN=stashN(); for(let k=0;k<S.length && c>0;k++){ if(S[k]!==id) continue; const have=stashAt(k), take=Math.min(have,c); c-=take; if(take>=have){ S[k]=null; SN[k]=0; } else SN[k]=(SN[k]|0)-take; } }
   if(c>0) CHOICE[key]=Math.max(0,(CHOICE[key]||0)-c); try{ if(invOverlay.classList.contains('open')) refreshInventory(); }catch(e){} }
 const stowTokens=()=>{ tokenStow('silver_leaf','leaves'); tokenStow('grave_tally','tallies'); };
 setInterval(()=>{ try{ if(player.opts && running) stowTokens(); }catch(e){} },1500);
@@ -27078,6 +27079,10 @@ for(const id of Object.keys(ITEMS)){ const it=ITEMS[id]; if(id.startsWith('t_') 
   ITEM_STATS['t_'+id]={...(ITEM_STATS[id]||{}), ap:((ITEM_STATS[id]||{}).ap||0)+1};
   if(GEAR_HP[id]) GEAR_HP['t_'+id]=GEAR_HP[id];
   if(PRICES[id]) PRICES['t_'+id]=PRICES[id]+temperCost(id); }
+// ════════ what piles up: hunting drops, gathered materials and the everyday junk you carry to sell ════════
+['wolf_fang','pelt','bear_fur','bear_skull','old_skull','worm_scale','scarab_chitin','varrow_silver','ember_heart','sea_glass','grave_ring',
+ 'bent_spoon','tin_cup','wooden_bowl','old_fork','candle_stub','brass_buttons','clay_pipe','thimble','horn_comb','rusty_key','carved_horse','bone_dice','iron_nails',
+ 'pewter_tankard','silver_spoon','brass_candlestick','green_bottle','old_boot','carved_ox','bog_coins','silver_torc','amber_brooch'].forEach(id=>{ if(ITEMS[id]) ITEMS[id].stack=true; });
 </script>
 </body>
 </html>

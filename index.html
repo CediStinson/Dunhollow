@@ -13840,7 +13840,7 @@ function renderMap(cv,V){                             // V: {zoom, px, py, label
   ids.forEach(id=>{ const A=AREAS[id], o=L[id], cur=id===areaId, notch=A.notches();
     c.globalAlpha=A.under&&!cur?0.6:1; if(A.under) c.setLineDash([4,3]);
     const inN=(i,j)=>notch.some(n=>i>=n.i0&&i<n.i0+(n.w||3)&&j>=n.j0&&j<n.j0+(n.h||3));
-    c.fillStyle=cur?tone(MM_COL[A.mountain?'mountain':A.theme]||'#5a7a3a',0.25):(MM_COL[A.mountain?'mountain':A.theme]||'#5a7a3a');
+    c.fillStyle=A.mapCol ? (cur?tone(A.mapCol,0.3):A.mapCol) : cur?tone(MM_COL[A.mountain?'mountain':A.theme]||'#5a7a3a',0.25):(MM_COL[A.mountain?'mountain':A.theme]||'#5a7a3a');
     const nk=(i,j)=>notch.find(n=>i>=n.i0&&i<n.i0+(n.w||3)&&j>=n.j0&&j<n.j0+(n.h||3));
     const twisted=typeof UC_TWIST!=='undefined' && UC_TWIST[id] && CHOICE.lamp!=='done', base=twisted?(cur?'#8a74b0':'#5a4a7a'):A.under?(cur?'#6a5a4a':'#2a2018'):c.fillStyle;   // a hall that will not keep still shows violet
     const MZ=A.maze?mazeGrid(id):null, KNOWN=!A.maze || mazeKnown(id);
@@ -24565,6 +24565,12 @@ Object.values(UCR).forEach(r=>{ const QF=UC_QF[r.q], st=ucWalk(r)[0], ent={ star
     heat:QF.heat, volcanic:QF.volcanic, objects:()=>ucObjects(r), npcs:()=>ucNpcs(r), mobs:()=>ucMobs(r), entries:ent };
   AREA_TIER[r.id]=QF.tier; });
 UC_QS.forEach(q=>{ delete AREAS[q]; });
+// on the map: each quarter its own shade (the well's sewers blue-grey, the cellars brown, the crypts dark, the Ember Stair rust), and its name only once,
+//   at its way in from above, or else at the chamber nearest its middle
+const UC_MAPCOL={ under_nw:'#4c5866', under_ne:'#665a4a', under_sw:'#403f46', under_se:'#684840' };
+UC_QS.forEach(q=>{ const [QX,QY]=UC_QXY[q], rs=Object.values(UCR).filter(r=>r.q===q), out=rs.find(r=>UC_OUT[r.id]),
+    mid=out || rs.slice().sort((a,b)=>Math.hypot(a.X-QX*6-2.5,a.Y-QY*6-2.5)-Math.hypot(b.X-QX*6-2.5,b.Y-QY*6-2.5))[0];
+  rs.forEach(r=>{ AREAS[r.id].mapCol=UC_MAPCOL[q]; AREAS[r.id].mapLabel = r===mid ? UC_LABEL[q] : ''; }); });
 MAP_UNDER.root=ucId(0,0);
 
 // the chambers' walkways and the drop round them
@@ -27430,7 +27436,8 @@ Object.values(OWR).forEach(r=>{ const st=ucWalk(r)[0], ent={ start:{i:st[0],j:st
   Object.keys(r.ex).forEach(d=>{ const [i,j]=ucIn(r,d); ent['from'+d.toUpperCase()]={i,j}; });
   const dressed=r.q==='ow_se', rails=r.q==='ow_nw' && (r.kind==='hall'||r.kind==='square') ? (r.w>=r.h ? [['h',r.cy+0.5,0,r.w]] : [['v',r.cx+0.5,0,r.h]]) : null;
   AREAS[r.id]={ ...INSIDE_BASE, w:r.w, h:r.h, theme:'interior', cave:true, dwarf:true, mine:!dressed, owRoom:true, crys:r.q==='ow_ne', layer:-2, wallSeed:r.hs%3,
-    label:'The Old Workings · '+OW_LABEL[r.q], mapLabel: r.cavern ? OW_LABEL[r.q] : OW_OUT[r.id] ? (r.id===owId(0,0)?'The Lift Foot':r.id===owId(7,0)?'The Old Adit':'The Lowest Grate') : r.sealed ? '' : '',
+    label:'The Old Workings · '+OW_LABEL[r.q], mapLabel: r.cavern ? OW_LABEL[r.q] : OW_OUT[r.id] ? (r.id===owId(0,0)?'The Lift Foot':r.id===owId(7,0)?'The Old Adit':'The Lowest Grate') : '',
+    mapCol:{ ow_nw:'#655440', ow_ne:'#46605e', ow_sw:'#445468', ow_se:'#726c64' }[r.q],
     mini:{x:0,y:0}, tier:5, ...(rails?{rails}:{}), objects:()=>owObjects(r), npcs:()=>[], mobs:()=>owMobs(r), entries:ent };
   AREA_TIER[r.id]=5; });
 MAP_ROOTS.push({ root:owId(0,0), u:30, v:-250 });
@@ -27525,6 +27532,10 @@ JOURNAL.push(['The Lost Shift', ()=> !owQ() ? null : owQ()==='done' ? ['done',"Y
   : ['active',"Foreman Halvard's grandfather was one of four miners lost in the Old Workings, under the lift shaft. Bring up their four brass pit-tokens, one from the far end of each quarter. ("+invCount('pit_token')+"/4)"]]);
 // a save from before the chambers were resized: if it stands you outside the chamber, or in its wall, you wake in the middle of it
 { const _ld=applySave; applySave=function(...a){ const r=_ld.apply(this,a); try{ const A=AREAS[areaId]; if(A && (A.ucRoom||A.owRoom) && (player.i>=ROOM.w || player.j>=ROOM.h || player.i<0 || player.j<0 || blocked.has(player.i+','+player.j))){ const e=A.entries.start; player.i=e.i; player.j=e.j; player.x=e.i+0.5; player.y=e.j+0.5; player.path=[]; centerCam(); } }catch(e){} return r; }; }
+
+// every quarter keeps its name on the map, even where a twisted hall or a set piece took the chamber it was meant for
+UC_QS.forEach(q=>{ const [QX,QY]=UC_QXY[q], rs=Object.values(UCR).filter(r=>r.q===q); if(rs.some(r=>AREAS[r.id].mapLabel===UC_LABEL[q])) return;
+  const r=rs.filter(r=>!AREAS[r.id].mapLabel).sort((a,b)=>Math.hypot(a.X-QX*6-2.5,a.Y-QY*6-2.5)-Math.hypot(b.X-QX*6-2.5,b.Y-QY*6-2.5))[0]; if(r) AREAS[r.id].mapLabel=UC_LABEL[q]; });
 </script>
 </body>
 </html>

@@ -11466,7 +11466,7 @@ function showDialog(name,text,opts,purse){
   const box=document.getElementById('dlg-opts'); box.innerHTML='';
   opts.forEach(o=>{ const b=document.createElement('button'); b.className='dlg-opt'+(o.off?' off':'');
     b.innerHTML=`<span>${o.label}</span>${o.note?`<small>${o.note}</small>`:''}`;
-    b.addEventListener('click',()=>{ if(!o.off) o.fn(); }); box.appendChild(b); });
+    b.addEventListener('click',()=>{ if(o.off) return; const p0=player.purse, j0=(typeof rwClickStart==='function')?rwClickStart():null; o.fn(); try{ if(j0) rwClickEnd(j0,p0); }catch(e){} }); box.appendChild(b); });   // a choice that finishes a quest paid in gear keeps only part of its coin
   dlgOverlay.classList.add('open');
   try{ VOICE.read(name,text); }catch(e){}                 // read aloud, if voices are on
   try{ gestOnDialog(name,text); }catch(e){}
@@ -27161,6 +27161,12 @@ setInterval(()=>{ try{ if(!running || !player.opts) return; const D=rwDone();
       const both=rnd01(h,2,976)<0.5;
       (CHOICE.rwQ=CHOICE.rwQ||[]).push(both ? {t,a:melee,b:mage} : rwMage() ? {t,b:mage} : {t,a:melee}); }
     rwOffer(); }catch(e){} },1500);
+// ── a quest paid in gear pays less in coin: what a click that finishes such a quest hands over in copper is mostly taken back as the gear ──
+const rwGets=t=>{ if(RW_SKIP.has(t) || (typeof PURSUITS!=='undefined' && PURSUITS.has(t))) return false; const h=[...t].reduce((a,c)=>a*31+c.charCodeAt(0)|0,11); return rnd01(h,1,975)<0.7; };
+function rwClickStart(){ if(!CHOICE.rwSeen) return null; const m={}; for(const [t,f] of JOURNAL){ let r=null; try{ r=f(); }catch(e){} m[t]=r?r[0]:null; } return m; }
+function rwClickEnd(j0,p0){ const gain=player.purse-p0; if(gain<=0) return;
+  for(const [t,f] of JOURNAL){ if(j0[t]==='done' || (CHOICE.rwSeen&&CHOICE.rwSeen[t])) continue; let r=null; try{ r=f(); }catch(e){} if(!r || r[0]!=='done' || !rwGets(t)) continue;
+    const keep=Math.max(1,Math.round(gain*0.3)); player.purse=p0+keep; updateHud(); logMsg('Most of the reward for “'+t+'” comes in kind: you keep '+formatCoin(keep)+', and there is gear for you.','#e8c060'); return; } }
 </script>
 </body>
 </html>

@@ -6892,6 +6892,7 @@ function windowSky(){
   return { top, bot, stars:Math.max(0,(n-0.6)/0.4), key:Math.round(n*10)+'/'+Math.round(dusk*4)+'/'+Math.round(dawn*4) };
 }
 function paintInteriorWalls(){
+  if(AREAS[areaId] && AREAS[areaId].ucq && typeof paintUcWalls==='function') return paintUcWalls(AREAS[areaId].ucq);
   if(AREAS[areaId] && AREAS[areaId].cave){              // rock, with the dark (or daylit) mouths of the passages out
     const {w,h}=ROOM, H=AREAS[areaId].mine?120:150, o=P(0,0), rEnd=P(w,0), lEnd=P(0,h), crys=['cave1','cave2','cave3','cave4'].includes(areaId) || !!AREAS[areaId].crys;
     const VOL=AREAS[areaId].volcanic, TMP=AREAS[areaId].temple; rockFace(o,rEnd,H,VOL?'#3a2c26':TMP?'#a07850':'#57524a',3,crys); rockFace(lEnd,o,H,VOL?'#2e2420':TMP?'#8a6440':'#46423b',7,crys);
@@ -9922,6 +9923,20 @@ function paintGroundTexture(){
           if(d<r-0.32){ const a=Math.atan2(gy-cy,gx-cx), sp=Math.abs(((a/Math.PI*8)%1+1)%1-0.5); if(sp<0.04 && d>0.4) pc=mixC(pc,[186,144,66],0.8); } }); }
       const k=1-0.32*(1-smooth(0,1.3,Math.min(gx,gy)));
       D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
+    if(theme==='interior' && AREAS[areaId] && AREAS[areaId].ucq){                // THE UNDERCITY, by quarter: wet sewer brick with a channel of black water, cellar brick paving with straw, crypt flags with grave slabs
+      const A=AREAS[areaId], q=A.ucq, o=(py*TWp+px)*4, tx=Math.floor(gx), ty=Math.floor(gy), fx=gx-tx, fy=gy-ty, n=fbm(gx*1.1,gy*1.1,141), n2=fbm(gx*6,gy*6,142); let pc;
+      if(q==='under_nw'){ const AL=w>=h, al=AL?gx:gy, ac=AL?gy:gx, mid=(AL?h:w)/2, row=Math.floor(ac*3), bx=al*1.6+(row%2)*0.5, mortar=Math.abs(ac*3-row-0.5)>0.44 || Math.abs(bx-Math.round(bx))<0.05;
+        pc=mixC([98,84,74],[64,57,53],n*0.6+n2*0.4); if(mortar) pc=mixC(pc,[36,34,32],0.7); pc=mixC(pc,[42,64,60],0.3*fbm(gx*2,gy*2,143));
+        const d=Math.abs(ac-mid), cw=Math.min(0.5,(AL?h:w)*0.17);
+        if(d<cw){ pc=mixC([20,30,32],[40,58,56],fbm(al*2.5,ac*7,144)); if(Math.abs(fbm(al*4,ac*12,147)-0.5)<0.03) pc=mixC(pc,[110,130,120],0.5); }
+        else if(d<cw+0.09) pc=mixC([120,112,100],[80,74,68],n2); }
+      else if(q==='under_ne'){ const sx=gx*2, sy=gy*4, row=Math.floor(sy), b=sx+(row%2)*0.5, mortar=Math.abs(sy-row-0.5)>0.42 || Math.abs(b-Math.round(b))<0.045;
+        pc=mixC([132,94,66],[92,66,48],n*0.6+n2*0.4); if(mortar) pc=[60,48,40]; const st=fbm(gx*2.4,gy*2.4,145); if(st>0.68) pc=mixC(pc,[168,146,92],Math.min(0.6,(st-0.68)*4)); }
+      else { pc=mixC([86,84,84],[56,55,58],n*0.7+n2*0.3); if((tx+ty)&1) pc=mixC(pc,[70,69,72],0.35); const e=Math.min(fx,fy,1-fx,1-fy); if(e<0.035) pc=[28,28,30];
+        if(hsh(tx*7+3,ty*13+1)%3===0 && tx>0 && ty>0 && tx<w-1 && ty<h-1 && tx!==A.ucx && ty!==A.ucy && fx>0.16 && fx<0.84 && fy>0.1 && fy<0.9){   // a grave slab let into the floor
+          pc=mixC([112,110,108],[90,88,88],n2); const be=Math.min(fx-0.16,0.84-fx,fy-0.1,0.9-fy); if(be<0.04) pc=[44,44,46];
+          if((Math.abs(fx-0.5)<0.035 && fy>0.24 && fy<0.76) || (Math.abs(fy-0.4)<0.035 && fx>0.32 && fx<0.68)) pc=[52,50,52]; } }
+      const k=1-0.32*(1-smooth(0,1.3,Math.min(gx,gy))); D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
     if(theme==='interior' && AREAS[areaId] && AREAS[areaId].cave && !AREAS[areaId].volcanic){                 // rough cave stone, damp, with a faint green glow in the cracks
       const n=fbm(gx*0.9,gy*0.9,41), n2=fbm(gx*4,gy*4,43), n3=fbm(gx*11,gy*11,44), crack=Math.abs(fbm(gx*1.3,gy*1.3,42)-0.5)<0.012, crack2=Math.abs(fbm(gx*2.7,gy*2.7,46)-0.5)<0.008;
       const MINE=AREAS[areaId].mine, CRYS=['cave1','cave2','cave3','cave4'].includes(areaId);
@@ -24518,6 +24533,10 @@ function ucObjects(r){ const out=[], seed=r.hs, W=ucWalk(r), used=new Set(), tak
   if(r.kind!=='bend'){
     if(r.q==='under_ne' && seed%2) prop(seed%4===1?{type:'crates'}:{type:'barrels'},seed%3);
     if(r.q==='under_sw' && (r.square || seed%3===0)) prop({type:'candlestand'},0);
+    if(r.q==='under_sw' && (r.square || r.kind==='vault' || r.kind==='cross' || r.kind==='end')){ prop({type:'sarcophagus', v:seed%3},1); if(r.square || r.kind==='vault') prop({type:'sarcophagus', v:(seed+1)%3},2); }
+    if(r.q==='under_ne' && (r.kind==='vault' || r.square || (r.kind==='cross' && seed%2===0))) prop({type:'kegrack', fp:[1,1]},(seed>>>3)%2+1);
+    if(r.q==='under_ne' && r.kind==='hall' && seed%2===0) prop({type:'sacks'},1);
+    if(r.q==='under_ne' && (r.kind==='vault' || r.square || r.kind==='cross')){ prop(seed%3?{type:'barrels'}:{type:'crates'},3); if(r.kind!=='cross') prop({type:'sacks'},4); }
     if(hot) prop({type:'ucmark', kind:'brazier'},seed%2);
     else if(r.square || r.kind==='cross' || r.kind==='vault' || (r.kind==='hall' && seed%3===0)) prop({type:'lantern'},(seed>>>2)%2); }
   // the old squares keep their writing
@@ -24570,7 +24589,7 @@ UC_QS.forEach(q=>{ delete AREAS[q]; });
 const UC_MAPCOL={ under_nw:'#4c5866', under_ne:'#665a4a', under_sw:'#403f46', under_se:'#684840' };
 UC_QS.forEach(q=>{ const [QX,QY]=UC_QXY[q], rs=Object.values(UCR).filter(r=>r.q===q), out=rs.find(r=>UC_OUT[r.id]),
     mid=out || rs.slice().sort((a,b)=>Math.hypot(a.X-QX*6-2.5,a.Y-QY*6-2.5)-Math.hypot(b.X-QX*6-2.5,b.Y-QY*6-2.5))[0];
-  rs.forEach(r=>{ AREAS[r.id].mapCol=UC_MAPCOL[q]; AREAS[r.id].mapLabel = r===mid ? UC_LABEL[q] : ''; }); });
+  rs.forEach(r=>{ AREAS[r.id].mapCol=UC_MAPCOL[q]; AREAS[r.id].mapLabel = r===mid ? UC_LABEL[q] : ''; if(q!=='under_se'){ AREAS[r.id].ucq=q; AREAS[r.id].ucx=r.cx; AREAS[r.id].ucy=r.cy; } }); });
 MAP_UNDER.root=ucId(0,0);
 
 // the chambers' walkways and the drop round them
@@ -27536,6 +27555,64 @@ JOURNAL.push(['The Lost Shift', ()=> !owQ() ? null : owQ()==='done' ? ['done',"Y
 // every quarter keeps its name on the map, even where a twisted hall or a set piece took the chamber it was meant for
 UC_QS.forEach(q=>{ const [QX,QY]=UC_QXY[q], rs=Object.values(UCR).filter(r=>r.q===q); if(rs.some(r=>AREAS[r.id].mapLabel===UC_LABEL[q])) return;
   const r=rs.filter(r=>!AREAS[r.id].mapLabel).sort((a,b)=>Math.hypot(a.X-QX*6-2.5,a.Y-QY*6-2.5)-Math.hypot(b.X-QX*6-2.5,b.Y-QY*6-2.5))[0]; if(r) AREAS[r.id].mapLabel=UC_LABEL[q]; });
+// ════════ THE UNDERCITY'S WALLS, by quarter: the sewers a brick barrel-vault, green with slime, with outfalls; the cellars brick with timber posts and a beam;
+//   the crypts dressed stone cut with burial niches, two rows of them, a skull or a bundle of bones or an urn in each ════════
+function paintUcWalls(q){ const {w,h}=ROOM, H=q==='under_sw'?160:150, sd=(areaId.length*31+w*7+h)|0;
+  const C={ under_nw:{base:'#6e5c50', mortar:'rgba(26,22,20,0.55)', rows:15, len:0.5}, under_ne:{base:'#7c5a44', mortar:'rgba(34,24,18,0.55)', rows:14, len:0.5}, under_sw:{base:'#7a787c', mortar:'rgba(24,24,28,0.6)', rows:5, len:1} }[q];
+  const gaps=backDoorGaps(), near=(side,u,r)=>gaps.some(d=>d.side===side && Math.abs(d.u-u)<r);
+  const quad=(side,u0,u1,h0,h1,fill)=>{ const a=WPT(side,u0,h0), b=WPT(side,u1,h0), c=WPT(side,u1,h1), d=WPT(side,u0,h1); g.fillStyle=fill; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c.x,c.y); g.lineTo(d.x,d.y); g.closePath(); g.fill(); };
+  const line=(side,u0,h0,u1,h1)=>{ const a=WPT(side,u0,h0), b=WPT(side,u1,h1); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); };
+  [['r',w,0],['l',h,1]].forEach(([side,len,si])=>{
+    const p0=WPT(side,0,0), gr=g.createLinearGradient(0,p0.y,0,p0.y-H); gr.addColorStop(0,tone(C.base,si?-0.12:0)); gr.addColorStop(0.7,tone(C.base,si?-0.32:-0.22)); gr.addColorStop(1,'#0e0c0a');
+    quad(side,0,len,0,H,gr);
+    // courses of brick or stone, the joints staggered
+    g.save(); g.strokeStyle=C.mortar; g.lineWidth=1; g.beginPath(); const rh=H/C.rows;
+    for(let r=1;r<C.rows;r++) line(side,0,r*rh,len,r*rh);
+    for(let r=0;r<C.rows;r++){ for(let u=(r%2)*C.len/2; u<len; u+=C.len) if(u>0) line(side,u,r*rh,u,(r+1)*rh); }
+    g.stroke(); g.restore();
+    for(let k=0;k<len*6;k++){ const u=rnd01(k,sd+si,1501)*len, hh=rnd01(k,sd+si,1502)*H*0.8; quad(side,u,u+0.18,hh,hh+rh*0.8,`rgba(${q==='under_sw'?'200,200,210':'255,220,190'},${0.04+rnd01(k,sd,1503)*0.05})`); }   // odd lighter bricks
+    if(q==='under_nw'){   // the vault ribs, slime along the foot, an outfall dribbling
+      for(let u=2;u<len;u+=2){ if(near(side,u,1)) continue; quad(side,u-0.09,u+0.09,0,H,'rgba(150,130,110,0.18)'); quad(side,u+0.05,u+0.09,0,H,'rgba(0,0,0,0.25)'); }
+      const sl=g.createLinearGradient(0,p0.y,0,p0.y-40); sl.addColorStop(0,'rgba(60,90,50,0.55)'); sl.addColorStop(1,'rgba(60,90,50,0)'); quad(side,0,len,0,40,sl);
+      for(let u=1.5;u<len-0.5;u+=3.5){ if(near(side,u,1.2)) continue; const c=WPT(side,u,46); g.fillStyle='#120e0c'; g.beginPath(); g.ellipse(c.x,c.y,9,7,0,0,Math.PI*2); g.fill(); g.strokeStyle='#8a7a68'; g.lineWidth=2; g.stroke();
+        const dr=g.createLinearGradient(0,c.y,0,c.y+46); dr.addColorStop(0,'rgba(70,110,90,0.7)'); dr.addColorStop(1,'rgba(70,110,90,0)'); g.fillStyle=dr; g.fillRect(c.x-3,c.y+3,6,44); } }
+    if(q==='under_ne'){   // posts and a beam
+      for(let u=0;u<=len;u+=2){ if(near(side,u,0.8)) continue; quad(side,u-0.07,u+0.07,0,H*0.82,'#4a3220'); quad(side,u+0.03,u+0.07,0,H*0.82,'rgba(0,0,0,0.3)'); }
+      quad(side,0,len,H*0.78,H*0.85,'#4a3220'); quad(side,0,len,H*0.78,H*0.795,'rgba(0,0,0,0.35)');
+      for(let u=0.5;u<len;u+=1.7){ if(near(side,u,1)) continue; const c=WPT(side,u,H*0.6); g.strokeStyle='rgba(220,220,230,0.18)'; g.lineWidth=0.8; g.beginPath(); for(let a=0;a<6;a++){ g.moveTo(c.x,c.y); g.lineTo(c.x+Math.cos(a)*14,c.y+Math.sin(a)*9); } g.stroke(); } }   // old webs in the corners of the beams
+    if(q==='under_sw'){   // burial niches, two rows; a carved pilaster between every pair
+      for(let k=0;k<len;k++){ const u=k+0.5; if(near(side,u,1.3)) continue;
+        [[22,58],[78,114]].forEach(([b0,b1],row)=>{ const a=WPT(side,u-0.36,b0), b=WPT(side,u+0.36,b0), c=WPT(side,u+0.36,b1-10), d=WPT(side,u-0.36,b1-10), top=WPT(side,u,b1);
+          g.fillStyle='#8a888c'; g.beginPath(); g.moveTo(a.x-3,a.y+3); g.lineTo(b.x+3,b.y+3); g.lineTo(c.x+3,c.y); g.quadraticCurveTo(top.x,top.y-14,d.x-3,d.y); g.closePath(); g.fill();   // the cut surround
+          g.fillStyle='#141216'; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c.x,c.y); g.quadraticCurveTo(top.x,top.y-8,d.x,d.y); g.closePath(); g.fill();
+          const m=WPT(side,u,b0+2), what=hsh(k*5+row,sd)%4;
+          if(what===0){ g.fillStyle='#d8d0bc'; g.beginPath(); g.ellipse(m.x,m.y-11,6,5.4,0,0,Math.PI*2); g.fill(); g.fillRect(m.x-3.4,m.y-7,6.8,4); g.fillStyle='#1a1614'; g.beginPath(); g.ellipse(m.x-2.3,m.y-11.5,1.5,1.8,0,0,Math.PI*2); g.ellipse(m.x+2.3,m.y-11.5,1.5,1.8,0,0,Math.PI*2); g.fill(); }   // a skull
+          else if(what===1){ g.strokeStyle='#cfc6b0'; g.lineWidth=2.4; g.lineCap='round'; g.beginPath(); g.moveTo(m.x-10,m.y-3); g.lineTo(m.x+10,m.y-6); g.moveTo(m.x-9,m.y-6); g.lineTo(m.x+9,m.y-2); g.moveTo(m.x-8,m.y-9); g.lineTo(m.x+10,m.y-9); g.stroke(); }   // long bones, stacked
+          else if(what===2){ g.fillStyle='#6a5a48'; g.beginPath(); g.moveTo(m.x-5,m.y); g.quadraticCurveTo(m.x-8,m.y-10,m.x-3,m.y-15); g.lineTo(m.x+3,m.y-15); g.quadraticCurveTo(m.x+8,m.y-10,m.x+5,m.y); g.closePath(); g.fill(); g.fillStyle='rgba(255,230,190,0.18)'; g.fillRect(m.x-3,m.y-13,2,10); }   // an urn
+          else { const lc=WPT(side,u,b0+12); g.fillStyle='#8e8a86'; g.beginPath(); g.moveTo(a.x+2,a.y-1); g.lineTo(b.x-2,b.y-1); g.lineTo(c.x-2,c.y+1); g.lineTo(d.x+2,d.y+1); g.closePath(); g.fill(); g.fillStyle='#4a4648'; g.fillRect(lc.x-5,lc.y-1,10,1.5); g.fillRect(lc.x-1,lc.y-5,2,9); } });   // a sealed niche, a cross on its stone
+        if(k>0 && !near(side,k,1.2)){ quad(side,k-0.06,k+0.06,0,H*0.82,'#8e8c90'); quad(side,k+0.02,k+0.06,0,H*0.82,'rgba(0,0,0,0.3)'); } } }
+    const sh=g.createLinearGradient(0,p0.y-H,0,p0.y); sh.addColorStop(0,'rgba(0,0,0,0.55)'); sh.addColorStop(0.45,'rgba(0,0,0,0.08)'); sh.addColorStop(1,'rgba(0,0,0,0)'); quad(side,0,len,0,H,sh); });
+  // the ways out: a dark arch with a dressed surround
+  gaps.forEach(d=>{ const m0=WPT(d.side,d.u-0.8,0), m1=WPT(d.side,d.u+0.8,0), mt=WPT(d.side,d.u,84);
+    const arch=(dx,dy)=>{ g.beginPath(); g.moveTo(m0.x-dx,m0.y+dy); g.quadraticCurveTo(m0.x-dx,mt.y+10-dy,mt.x,mt.y-dy); g.quadraticCurveTo(m1.x+dx,mt.y+10-dy,m1.x+dx,m1.y+dy); g.closePath(); };
+    g.fillStyle=q==='under_sw'?'#9a989c':q==='under_ne'?'#5a3e28':'#8a7666'; arch(8,1); g.fill();
+    const dk=g.createLinearGradient(0,mt.y,0,m0.y); dk.addColorStop(0,'#030202'); dk.addColorStop(1,'#16120e'); g.fillStyle=dk; arch(0,0); g.fill(); }); }
+// a stone coffin: a plain box under a lid with the dead carved lying on it, hands folded
+OBJ_DRAW.sarcophagus=o=>{ const along=o.j===0, x0=o.i+(along?0.08:0.22), y0=o.j+(along?0.2:0.08), W=along?0.84:0.56, Dd=along?0.56:0.84, Hh=30, col=['#8e8a86','#7a7672','#9a9690'][o.v||0];
+  isoBox(x0,y0,W,Dd,Hh,tone(col,0.12),tone(col,-0.15),tone(col,-0.3));
+  isoBox(x0-0.03,y0-0.03,W+0.06,Dd+0.06,6,tone(col,0.2),tone(col,-0.05),tone(col,-0.2));   // the lid's lip
+  const T=(u,v)=>{ const p=P(x0+u*W,y0+v*Dd); return {x:p.x, y:p.y-Hh-6}; }, ax=along?[[0.18,0.5],[0.85,0.5]]:[[0.5,0.18],[0.5,0.85]];
+  const hd=T(...ax[0]), ft=T(...ax[1]); g.strokeStyle=tone(col,0.32); g.lineWidth=10; g.lineCap='round'; g.beginPath(); g.moveTo(hd.x,hd.y-2); g.lineTo(ft.x,ft.y-2); g.stroke();   // the figure
+  g.strokeStyle=tone(col,-0.1); g.lineWidth=1; g.stroke(); g.fillStyle=tone(col,0.36); g.beginPath(); g.ellipse(hd.x,hd.y-4,6,4.6,0,0,Math.PI*2); g.fill(); g.strokeStyle=tone(col,-0.15); g.stroke();
+  const mid=T(along?0.42:0.5,along?0.5:0.42); g.fillStyle=tone(col,0.1); g.beginPath(); g.ellipse(mid.x,mid.y-4,3.4,2.4,0,0,Math.PI*2); g.fill(); };
+NEAR_NAME.sarcophagus='a stone coffin';
+onUse(['sarcophagus'],o=>pzSay(['A stone coffin. The lid is carved with whoever lies inside: a face worn smooth by a hundred years of other people\'s fingers.','The name on the lid has been chiselled off, carefully, by someone who did not want it remembered.','A carved knight with his hands folded on a sword. Someone has left a copper on his chest.'][(o.i+o.j)%3],'#c8c4cc'));
+// sacks of something long spoiled, against a cellar wall
+OBJ_DRAW.sacks=o=>{ const q=P(o.i+0.5,o.j+0.5); [[-12,4,15,20,'#8a7454'],[10,6,14,18,'#7a6448'],[-1,-6,13,19,'#94805e']].forEach(([dx,dy,rx,ry,c])=>{ const x=q.x+dx, y=q.y+dy;
+    g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(x+2,y+2,rx,rx*0.4,0,0,Math.PI*2); g.fill();
+    g.fillStyle=c; g.beginPath(); g.moveTo(x-rx,y); g.quadraticCurveTo(x-rx*1.05,y-ry*1.2,x-3,y-ry*1.35); g.lineTo(x+3,y-ry*1.35); g.quadraticCurveTo(x+rx*1.05,y-ry*1.2,x+rx,y); g.closePath(); g.fill();
+    g.strokeStyle='rgba(30,20,10,0.5)'; g.lineWidth=1; g.stroke(); g.strokeStyle='#4a3a26'; g.lineWidth=1.6; g.beginPath(); g.moveTo(x-4,y-ry*1.2); g.lineTo(x+4,y-ry*1.2); g.stroke(); }); };
+NEAR_NAME.sacks='old sacks';
 </script>
 </body>
 </html>

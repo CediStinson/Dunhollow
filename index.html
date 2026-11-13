@@ -13710,7 +13710,7 @@ function makeDummy(){
 // calling it here would run before some of the UI elements it touches (banner, minimap) exist
 const RENOWN=['Stranger','Wanderer','Known Face','Respected','Local Hero','Legend of the Valley'];
 let lastRenown=-1;
-function renownDone(){ try{ return JOURNAL.filter(([t,f])=>{ if(t==='The Fallen Oak' || (typeof PURSUITS!=='undefined' && PURSUITS.has(t))) return false; const r=f(); return r && r[0]==='done'; }).length; }catch(e){ return 0; } }
+function renownDone(){ try{ return JOURNAL.filter(([t,f])=>{ if(t==='The Fallen Oak' || t==="Vesna's Night Work" || (typeof PURSUITS!=='undefined' && PURSUITS.has(t))) return false; const r=f(); return r && r[0]==='done'; }).length; }catch(e){ return 0; } }
 const RENOWN_AT=[0,4,10,18,28,40];                   // quests done for each rank: the later ones take real work
 const RENOWN_PERK=['','+4 max health','+8 max health · traders sell to you 10% cheaper','+12 max health · traders pay you a third more for your goods','+16 max health · a free bed at the Wheatsheaf','+20 max health · traders sell to you 20% cheaper · the valley’s thanks'];
 function renownRank(){ const n=renownDone(); let r=0; RENOWN_AT.forEach((a,k)=>{ if(n>=a) r=k; }); return r; }
@@ -22167,16 +22167,47 @@ function leafTrade(back){ tokenShop({ who:'Maelis the Weaver', wares:LEAF_WARES,
 function tallyTrade(back){ tokenShop({ who:'Vesna the Grave-Speaker', wares:TALLY_WARES, count:tallies, pay:c=>tokenSpend('grave_tally','tallies',c), unit:n=>'Grave Tall'+(n===1?'y':'ies'), icon:TALLY_ICON, col:'#c8b8e0', back,
   greet:"“The dead pay their debts. So do I.”", poor:"“You have not earned that. Not yet.”", full:"“Your pack is full.”",
   bought:(nm,c)=>'Vesna gives you '+nm+' for '+c+' Grave Tallies.' }); }
+// ── Vesna's night work: each night one of three jobs, with somewhere to go and a name to it ──
+const VJOB_RESTLESS=['fen','bonewaste'], VJOB_SHADE=['fen','bonewaste','uc_1_7'];
+const VJOB_SHADES=[['The Weeping Bride',"a bride who drowned the night before her wedding, still in her veil"],['Corporal Aske',"a deserter they hanged at the crossroads, still looking for his regiment"],['Old Mother Rook',"a herb-wife buried without her name, and angry about it"],['The Drowned Fiddler',"a fiddler who played at the wrong wake"],['Brother Cael',"a monk who swore he would not stay dead, and meant it"]];
+const VJOB_TXT={
+  restless:{ doneLine:'“Three of them lie still.”', pay:2, ask:N=>["“Three of the restless dead are up tonight in "+AREAS[N.area].label+". Lay them down and come back before the light.”"] },
+  shade:{ doneLine:'“'+'It is done. It will not walk again.'+'”', pay:3, ask:N=>["“One of them has a name tonight: "+N.shade+", "+N.who+". It is in "+AREAS[N.area].label+". It is stronger than the others. Put it to rest.”"] },
+  tithe:{ doneLine:'“Four bones, as you asked.”', pay:1, ask:N=>["“Nothing walks tonight that I need you for. But my work eats bones: four old ones. Bring them before dawn.”"] } };
+function vjobStart(N){ const r=rnd01(N.d,3,941), kind=r<0.45?'restless':r<0.8?'shade':'tithe'; N.on=true; N.n=0; N.kind=kind;
+  if(kind==='restless') N.area=VJOB_RESTLESS[Math.floor(rnd01(N.d,4,942)*VJOB_RESTLESS.length)];
+  if(kind==='shade'){ N.area=VJOB_SHADE[Math.floor(rnd01(N.d,5,943)*VJOB_SHADE.length)]; const S=VJOB_SHADES[Math.floor(rnd01(N.d,6,944)*VJOB_SHADES.length)]; N.shade=S[0]; N.who=S[1]; }
+  say('Vesna the Grave-Speaker',VJOB_TXT[kind].ask(N),[bye]); try{ updateHud(); }catch(e){} }
+const vjobDone=N=> N.kind==='tithe' ? invCount('old_bone')>=4 : N.kind==='shade' ? N.n>=1 : N.n>=3;
+function vjobPay(N){ const T=VJOB_TXT[N.kind||'restless']; N.paid=true;
+  if(N.kind==='tithe'){ for(let k=0;k<4;k++){ const q=player.inv.indexOf('old_bone'); if(q>=0) player.inv[q]=null; } const c=6+Math.floor(Math.random()*6); player.purse+=c; logMsg('Vesna pays '+formatCoin(c)+' besides.','#e8c060'); }
+  if(N.kind==='shade' && Math.random()<0.35) giveQuestItem('grave_ring',true);
+  const S=CHOICE.vstreak=(CHOICE.vstreak&&CHOICE.vstreak.last===N.d-1) ? {last:N.d, n:CHOICE.vstreak.n+1} : {last:N.d, n:1};   // nights in a row
+  const bonus=S.n%3===0?1:0; addTallies(T.pay+bonus, bonus?'a night’s work, and a third night running':'a night’s work');
+  say('Vesna the Grave-Speaker',[N.kind==='shade'?"“Good. I knew "+(N.shade||'it')+" once, a little. Everyone did.”":N.kind==='tithe'?"“Good bones. They will do more good in my hands than in the ground.”":"“Good. They were tired of walking.”", bonus?"“Three nights running. You are getting a taste for it. Here, a little more.”":""].filter(Boolean),[bye]); updateHud(); }
+// tonight's dead: three restless ones, or the named shade, rise where the job sends you
+const vjobMobs=(a,l)=>{ try{ const N=CHOICE.vnight; if(!N || !N.on || N.paid || N.area!==a || N.d!==Math.floor((dayClock+DAY_LEN*0.25)/DAY_LEN)) return l; const A=AREAS[a], P=(fx,fy)=>[Math.max(1,Math.min(A.w-2,Math.floor(A.w*fx))),Math.max(1,Math.min(A.h-2,Math.floor(A.h*fy)))];
+    if(N.kind==='restless') return [...l, ...[[0.22,0.35],[0.5,0.62],[0.78,0.4]].map(([fx,fy],k)=>{ const [i,j]=P(fx,fy); return NIGHT_DEAD('Restless Dead'+' '.repeat(k),i,j,'vrestless'); })];
+    if(N.kind==='shade'){ const [i,j]=P(0.5,0.5); return [...l, { ...NIGHT_DEAD(N.shade,i,j,'vshade'), hpMul:1.7 }]; } }catch(e){} return l; };
+[...new Set([...VJOB_RESTLESS,...VJOB_SHADE])].forEach(a=>{ if(!AREAS[a]) return; const base=AREAS[a].mobs||(()=>[]); AREAS[a].mobs=()=>vjobMobs(a,base()); });
+JOURNAL.push(["Vesna's Night Work", ()=>{ const N=CHOICE.vnight; if(!N || !N.on || N.d!==Math.floor((dayClock+DAY_LEN*0.25)/DAY_LEN)) return null; if(N.paid) return ['done',"Tonight's work for Vesna is done. Ask her again tomorrow night."];
+    const where=N.area?AREAS[N.area].label:'';
+    if(N.kind==='tithe') return ['active',"Bring Vesna four Old Bones before dawn ("+Math.min(4,invCount('old_bone'))+"/4). Skeletons drop them."];
+    if(N.kind==='shade') return ['active', N.n>=1 ? N.shade+" is at rest. Tell Vesna in the graveyard before dawn." : "Put "+N.shade+" to rest in <b>"+where+"</b>, then tell Vesna before dawn. It is stronger than the common dead."];
+    return ['active', N.n>=3 ? "Three lie still. Tell Vesna in the graveyard before dawn." : "Lay three of the restless dead to rest in <b>"+where+"</b> ("+Math.min(3,N.n)+"/3), then tell Vesna before dawn."]; }]);
 const VN=()=>{ const d=Math.floor((dayClock+DAY_LEN*0.25)/DAY_LEN); if(!CHOICE.vnight || CHOICE.vnight.d!==d) CHOICE.vnight={d, n:0, on:false, paid:false}; return CHOICE.vnight; };   // a night counts from dusk to dawn
 { const oldV=TALKERS.vesna; TALKERS.vesna=(...a)=>{ const r=oldV(...a); if(NECRO()<1 && !tallies() && CHOICE.tallies==null) return r;
     const box=document.getElementById('dlg-opts'); if(!dlgOverlay.classList.contains('open') || !box || box.querySelector('.dlg-opt.tally')) return r;
     const V='Vesna the Grave-Speaker', N=VN(), add=(label,fn)=>{ const b=document.createElement('button'); b.className='dlg-opt tally'; b.innerHTML='<span>'+label+'</span>'; b.addEventListener('click',fn); box.insertBefore(b,box.lastElementChild); };
-    if(!N.paid && N.on && N.n>=3) add('“Three of them lie still.”',()=>{ N.paid=true; addTallies(2,'a night’s work'); say(V,"“Good. They were tired of walking.”",[bye]); });
-    else if(!N.paid && !N.on && nightAmt()>0.4) add('“Any work tonight?”',()=>{ N.on=true; N.n=0; say(V,["“Always. Three of the restless dead are up tonight somewhere: the fen, the crypt, the barrow-road. Lay three to rest and come back before the light.”"],[bye]); });
+    if(!N.paid && N.on && vjobDone(N)) add(VJOB_TXT[N.kind||'restless'].doneLine,()=>vjobPay(N));
+    else if(!N.paid && N.on){ if(N.kind==='tithe') add('“About those bones…”',()=>say(V,"“Four. Old ones. You know where the dead keep them.”",[bye])); }
+    else if(!N.paid && !N.on && nightAmt()>0.4) add('“Any work tonight?”',()=>vjobStart(N));
     add('“What will you trade for tallies?”',()=>tallyTrade(()=>TALKERS.vesna()));
     return r; }; }
 { const _fd=foeDown; foeDown=function(f){ const r=_fd.apply(this,arguments);
-    try{ const N=CHOICE.vnight; if(N && N.on && !N.paid && N.d===Math.floor((dayClock+DAY_LEN*0.25)/DAY_LEN) && f && (f.type==='skeleton' || /Dead|Bones|Drowned|Risen|Bell-Ringer/.test(f.name||''))){ N.n++; floatText(tileOf(player),'Laid to rest ('+Math.min(3,N.n)+'/3)','#c8b8e0'); } }catch(e){}
+    try{ const N=CHOICE.vnight; if(N && N.on && !N.paid && N.d===Math.floor((dayClock+DAY_LEN*0.25)/DAY_LEN) && f){
+        if((N.kind||'restless')==='restless' && (N.area?areaId===N.area && /^Restless Dead/.test(f.name||''):(f.type==='skeleton' || /Dead|Bones|Drowned|Risen|Bell-Ringer/.test(f.name||'')))){ N.n++; floatText(tileOf(player),'Laid to rest ('+Math.min(3,N.n)+'/3)','#c8b8e0'); if(N.n===3) logMsg('Three lie still. Back to Vesna in the graveyard before dawn.','#c8b8e0'); }
+        if(N.kind==='shade' && f.name===N.shade){ N.n=1; floatText(tileOf(player),N.shade+' is at rest','#c8b8e0'); logMsg(N.shade+' will not walk again. Vesna will want to hear it.','#c8b8e0'); } } }catch(e){}
     return r; }; }
 // ── Lirael counts leaves, and takes moonbells: four grow somewhere in the elven woods each day ──
 Object.assign(ITEMS,{ moonbell:{ name:'Moonbell', slot:'misc', stack:true, title:'A small white bell-flower that opens at dusk and smells faintly of rain.' } });

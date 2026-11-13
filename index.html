@@ -13639,14 +13639,16 @@ function resetMobs(){
       defeatedMobs.delete(k); delete D[k]; Object.assign(m,{dead:false, gone:false, fade:1, hp:m.maxHp, state:'guard', hostile:!(A.mobsCalm&&A.mobsCalm()), fallT:0, t:0, k:0, flash:0, st:[]}); }); }
   if(!(A.inside && !A.cave && !A.under)){              // nobody lies in wait right at a doorway or beside a townsfolk
     const ents=Object.values(A.entries||{}), tps=OBJECTS.filter(o=>o.type==='teleporter');
-    const tooClose=(i,j)=> NPCS.some(n=>Math.max(Math.abs(n.i-i),Math.abs(n.j-j))<=3) || [...ents,...tps].some(e=>Math.max(Math.abs(e.i-i),Math.abs(e.j-j))<=2);
+    const still=NPCS.filter(n=>!n.wander && !n.path?.length && !n.mule && !n.goto), tooClose=(i,j)=> still.some(n=>Math.max(Math.abs(n.i-i),Math.abs(n.j-j))<=3) || [...ents,...tps].some(e=>Math.max(Math.abs(e.i-i),Math.abs(e.j-j))<=2);   // only people who stand in one place count: a passer-by must not shove a foe across the map
+    const MV=(window.MOB_MOVED=window.MOB_MOVED||{});
     const E0=ents[0], reach=(i,j)=>!E0 || (i===E0.i&&j===E0.j) || !!findPath(E0.i,E0.j,i,j);   // a foe must stand where you can get at it
-    mobs.forEach((m,k)=>{ if(m.dead || m.hostile===false || m.type==='dummy' || (MOB_SPAWNS[k]&&MOB_SPAWNS[k].gate) || (!tooClose(m.i,m.j) && reach(m.i,m.j))) return;   // gate: set to hold a way out on purpose
+    mobs.forEach((m,k)=>{ const mk=areaId+':'+k; if(mk in MV){ const b=MV[mk]; if(b && !m.dead){ m.i=b[0]; m.j=b[1]; m.x=m.i+0.5; m.y=m.j+0.5; m.spawn=[m.i,m.j]; } return; }   // decided once: the same place every time
+      if(m.dead || m.hostile===false || m.type==='dummy' || (MOB_SPAWNS[k]&&MOB_SPAWNS[k].gate) || (!tooClose(m.i,m.j) && reach(m.i,m.j))){ if(!m.dead && m.hostile!==false && m.type!=='dummy') MV[mk]=null; return; }   // gate: set to hold a way out on purpose
       let best=null, bd=1e9; const cand=[];
       for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++){ if(blocked.has(i+','+j) || (A.maze && typeof mazeGrid==='function' && !mazeGrid(areaId)[j*ROOM.w+i]) || inNotch(i,j) || tooClose(i,j) || mobs.some(o=>o!==m && !o.dead && o.i===i && o.j===j)) continue;
         cand.push([Math.abs(i-m.i)+Math.abs(j-m.j),i,j]); }
       cand.sort((a,b)=>a[0]-b[0]); for(const [d,i,j] of cand){ if(reach(i,j)){ bd=d; best=[i,j]; break; } }
-      if(best){ m.i=best[0]; m.j=best[1]; m.x=m.i+0.5; m.y=m.j+0.5; m.spawn=[m.i,m.j]; } }); }
+      MV[mk]=best; if(best){ m.i=best[0]; m.j=best[1]; m.x=m.i+0.5; m.y=m.j+0.5; m.spawn=[m.i,m.j]; } }); }
   const day=Math.floor(dayClock/DAY_LEN);              // now and then a road tough is a hedge-caster instead
   mobs.forEach((m,k)=>{ if(m.dead || !ROAD_TOUGHS.has(m.name) || m.type!=='bandit') return;
     const fr=x=>{ const v=Math.sin(x)*43758.5453; return v-Math.floor(v); }, r=fr(day*12.9898+k*78.233+m.spawn[0]*3.7+m.spawn[1]*1.3+m.name.length); if(r<0.64) return;     // mostly the usual cutthroat
@@ -14052,8 +14054,11 @@ function startCombat(target){
   duelHud.classList.add('open'); document.getElementById('hint').style.display='none';
   nextFoe(true, practice?target:null);
 }
+// who joins a fight already going: the rest of the same band within JOIN_KIN tiles, anything else only if it is right on top of you (within JOIN_ANY)
+const JOIN_KIN=8, JOIN_ANY=3;
+function joins(m,faction){ if(!(m.hostile && !m.dead && !calmThug(m))) return false; const d=cheb(tileOf(m),tileOf(player)); return d<=JOIN_ANY || (faction!=null && m.faction===faction && d<=JOIN_KIN); }
 function nextFoe(first,target){
-  const live=mobs.filter(m=>m.hostile && !m.dead && !calmThug(m)).sort((a,b)=>cheb(tileOf(a),tileOf(player))-cheb(tileOf(b),tileOf(player)));
+  const live=mobs.filter(m=>first ? (m.hostile && !m.dead && !calmThug(m)) : joins(m,combat.lastFaction)).sort((a,b)=>cheb(tileOf(a),tileOf(player))-cheb(tileOf(b),tileOf(player)));
   const foe=target||live[0]; combat.foe=foe;
   if(foe.type==='dummy'){ foe.hp=foe.maxHp; foe.state='guard'; foe.k=0; foe.guardDir='up'; combat.phase='approach'; foe.path=[]; logMsg('Practice: attack the side he is not guarding, or parry his swing.','#8ab0d8'); return; }
   foe.state='guard'; foe.k=0;
@@ -14341,9 +14346,9 @@ function foeDown(f){ SND.fall(); if(f && f.type!=='dummy') SND.pain(f,true);
 }
 function afterFoe(faction){
   if(combat.practice){ endPractice(); return; }
-  if(mobs.some(m=>m.hostile && !m.dead && m.faction===faction)){
-    nextFoe(false);
-  } else victory(faction);
+  if(mobs.some(m=>joins(m,faction))) nextFoe(false);
+  else if(mobs.some(m=>m.hostile && !m.dead && m.faction===faction)) victory(faction,true);   // the rest of the band is far off: the fight ends here, they stay where they are
+  else victory(faction);
 }
 function endPractice(){
   combat.active=false; combat.phase='idle'; combat.foe=null; combat.practice=false;
@@ -14363,7 +14368,7 @@ const LOOT_TIERS=[
   ['jerkin','gambeson','kettle','shield','sword','mace','hood_red','studded','spear','breeches','bandana'],
   ['mail','axe','morningstar','riding_boots','shield_iron','gauntlets','coif','studded','longsword','plate_boots'] ];
 function lootTier(m){ const hp=m.maxHp||0, dmg=(weaponOf(m)||{}).dmg||0; return hp>=80||dmg>=13 ? 2 : hp>=55||dmg>=10 ? 1 : 0; }
-function victory(faction){
+function victory(faction,partial){
   if(faction==='wightguard'){ combat.active=false; combat.phase='idle'; combat.foe=null; duelHud.classList.remove('open'); document.getElementById('hint').style.display='';   // the king's household is down: his ward breaks
     const K=ckKing(); if(K){ K.warded=false; FOES.barrowking.pattern=BK_PAT3; logMsg('The ward breaks like ice on the fen. The Barrow-King howls, and comes for you faster than anything drowned should move.','#ff9a80'); ckResume(K,'The Barrow-King is enraged!'); }
     return; }
@@ -14373,9 +14378,9 @@ function victory(faction){
   setTimeout(()=>{ try{ refreshFoodBar(); }catch(e){} },0);
   combat.active=false; combat.phase='idle'; combat.foe=null;
   duelHud.classList.remove('open'); document.getElementById('hint').style.display='';
-  banner('Victory!');
-  logMsg(faction==='wild'||faction==='wild2' ? 'The wolf is dealt with.' : faction==='grey' ? 'The man in grey will not trouble anyone again.' : faction==='guard' ? 'The stones are Dunhollow\'s again.' : faction==='shade' ? 'The shade comes apart like smoke.' : faction==='trapper' ? 'The trappers will set no more nets.' : faction==='unpaid' ? 'The deserters lie in the road.' : faction==='camp' ? 'The bandit camp falls silent.' : faction==='loggers' ? 'The axes fall silent.' : faction==='thieves' ? 'The alley is quiet again.' : faction==='highway' ? 'The road is safe again, for tonight.' : faction==='lanewolf'||faction==='nightwolf' ? 'The wolf is dealt with.' : faction==='goblins'||faction==='gobwarren' ? 'The goblins stop giggling.' : faction==='cavequeen' ? 'Mother Mogg falls, and the crystal hum grows softer.' : faction==='acolyte' ? 'The acolytes\' fires go out.' : faction==='mist'||faction==='ruin' ? 'The wolves are dealt with.' : faction==='risen' ? 'The bones lie still again. For now.' : 'The farm is yours again, for now.','#d8b24a');
-  mobs.filter(m=>m.hostile && (!faction || m.faction===faction)).forEach(m=>{       // what a foe drops depends on what it was, and how dangerous
+  banner(partial?'Clear!':'Victory!');
+  if(!partial) logMsg(faction==='wild'||faction==='wild2' ? 'The wolf is dealt with.' : faction==='grey' ? 'The man in grey will not trouble anyone again.' : faction==='guard' ? 'The stones are Dunhollow\'s again.' : faction==='shade' ? 'The shade comes apart like smoke.' : faction==='trapper' ? 'The trappers will set no more nets.' : faction==='unpaid' ? 'The deserters lie in the road.' : faction==='camp' ? 'The bandit camp falls silent.' : faction==='loggers' ? 'The axes fall silent.' : faction==='thieves' ? 'The alley is quiet again.' : faction==='highway' ? 'The road is safe again, for tonight.' : faction==='lanewolf'||faction==='nightwolf' ? 'The wolf is dealt with.' : faction==='goblins'||faction==='gobwarren' ? 'The goblins stop giggling.' : faction==='cavequeen' ? 'Mother Mogg falls, and the crystal hum grows softer.' : faction==='acolyte' ? 'The acolytes\' fires go out.' : faction==='mist'||faction==='ruin' ? 'The wolves are dealt with.' : faction==='risen' ? 'The bones lie still again. For now.' : 'The farm is yours again, for now.','#d8b24a');
+  mobs.filter(m=>m.hostile && m.dead && !m.looted && (!faction || m.faction===faction)).forEach(m=>{ m.looted=true;       // what a foe drops depends on what it was, and how dangerous
     if(m.faction==='wight') return;                                                   // the barrow's dead leave nothing but the crown
     if(m.type==='rat'||m.type==='ratking') return;                                     // rats leave their tails (given below), nothing else
     const tier=lootTier(m), free=()=>player.inv.indexOf(null), R=Math.random;
@@ -14399,6 +14404,7 @@ function victory(faction){
     if(m.type==='mage' && R()<0.25) give('mana_potion');                              // casters carry a mana draught now and then
     if(R()<0.35) coin(1,3+tier*3);
   });
+  if(partial){ combat.respawnT=30; setTimeout(()=>{ if(!combat.active) clog.classList.remove('open'); },6000); updateHud(); return; }
   if(faction==='grey'){
     if(!hasItem('seal')) giveQuestItem('seal');
     logMsg('On the man in grey: a folded paper under the Baron\'s own seal.','#e8c060'); CHOICE.greyDead=true;

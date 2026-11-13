@@ -24538,20 +24538,27 @@ function ucMobs(r){ const QF=UC_QF[r.q], all=QF.mobs(), mine=all.filter(m=>ucOfO
 function ucNpcs(r){ return ucPlace(r,UC_QF[r.q].npcs().filter(n=>ucOfOld(r.q,n.i,n.j)===r.id)); }
 // ════════ chambers sized to fit each other: every chamber gets a column and a row line (spaced a little unevenly), and its four sides are cut so that wherever two
 //   chambers share a door they meet exactly, and wherever they do not they keep clear. Halls take up most of the length between two places, crossings little ════════
-function chamberFit(R,salt){ const rooms=Object.values(R), at={}; rooms.forEach(r=>at[r.X+','+r.Y]=r);
+function chamberFit(R,salt,sq){ const rooms=Object.values(R), at={}; rooms.forEach(r=>at[r.X+','+r.Y]=r);
   const gx={}, gy={}; rooms.forEach(r=>{ gx[r.X]=gx[r.X]||8+hsh(r.X*7+salt,31)%4; gy[r.Y]=gy[r.Y]||8+hsh(salt,r.Y*11+5)%4; });
   const opp={n:'s',s:'n',w:'e',e:'w'}, linked=(r,d)=>{ const s=r.ex[d]; return Array.isArray(s) && R[s[0]] ? s[0] : null; };
-  const W={square:3, vault:2.4, cross:1.5, bend:1, end:2, hall:5}, MIN={square:2, vault:2};
-  const natural=(r,d)=>{ const ex=Object.keys(r.ex), k=r.kind, h=r.hs;
-    if(k==='hall'){ const horiz=!!(r.ex.e||r.ex.w), along=horiz?(d==='e'||d==='w'):(d==='n'||d==='s'); return along ? 4 : (d==='n'||d==='w') ? 1 : ((h>>>4)%3===1 ? 1 : 0); }
-    if(k==='square') return 3; if(k==='vault') return d==='n'||d==='w'?3:2; if(k==='cross') return (h>>>3)%2 ? 2 : 1; if(k==='bend') return 1;
-    if(k==='end'){ return d===opp[ex[0]] ? 2+(h%3) : 1; } return 1; };
-  rooms.forEach(r=>{ r.E={}; ['n','s','w','e'].forEach(d=>r.E[d]=natural(r,d)); });
-  rooms.forEach(a=>{ [['e',1,0],['s',0,1]].forEach(([d,dx,dy])=>{ const b=at[(a.X+dx)+','+(a.Y+dy)], o=opp[d], gap=(d==='e'?gx[a.X]:gy[a.Y])-1; if(!b) return;
-      if(linked(a,d)===b.id){ const wa=W[a.kind]||1.5, wb=W[b.kind]||1.5, ma=MIN[a.kind]||1, mb=MIN[b.kind]||1; let ea=Math.round(gap*wa/(wa+wb)); ea=Math.max(ma,Math.min(gap-mb,ea)); a.E[d]=ea; b.E[o]=gap-ea; }
-      else { const half=Math.floor(gap/2); a.E[d]=Math.min(a.E[d],half); b.E[o]=Math.min(b.E[o],gap-1-a.E[d]); } }); });
+  const split=(n,d)=>{ const lo=Math.floor(n/2); return d==='n'||d==='w' ? lo : n-1-lo; };                          // a size of n tiles, cut either side of its door line
+  // the old shapes: crossings, vaults, squares and bends keep their sizes; halls (and the near end of a dead end) stretch to make up the distance
+  const shape=r=>{ const k=r.kind, h=r.hs, ex=Object.keys(r.ex), F={}, flex={};
+    if(k==='square') ['n','s','w','e'].forEach(d=>F[d]=split(sq,d));
+    else if(k==='vault') ['n','s','w','e'].forEach(d=>F[d]=split(6,d));
+    else if(k==='cross'){ const n=4+(h>>>3)%2; ['n','s','w','e'].forEach(d=>F[d]=split(n,d)); }
+    else if(k==='bend') ['n','s','w','e'].forEach(d=>F[d]=1);
+    else if(k==='hall'){ const horiz=!!(r.ex.e||r.ex.w), wd=[2,2,3][(h>>>4)%3]; ['n','s','w','e'].forEach(d=>{ const along=horiz?(d==='e'||d==='w'):(d==='n'||d==='s'); if(along){ F[d]=4; flex[d]=3; } else F[d]=split(wd,d); }); }
+    else { const L=ex[0], wd=r.sealed?4:3; ['n','s','w','e'].forEach(d=>{ if(d===L){ F[d]=2; flex[d]=1; } else if(d===opp[L]) F[d]=1+(h%3); else F[d]=split(wd,d); }); }
+    r.E=F; r.flex=flex; };
+  rooms.forEach(shape);
+  rooms.forEach(a=>{ [['e',1,0],['s',0,1]].forEach(([d,dx,dy])=>{ const b=at[(a.X+dx)+','+(a.Y+dy)], o=opp[d], gap=(d==='e'?gx[a.X]:gy[a.Y])-1; if(!b || linked(a,d)!==b.id) return;
+      const fa=a.flex[d]||0, fb=b.flex[o]||0; if(!fa && !fb) return;                                    // two fixed shapes: they meet where they meet, and the map stretches the passage
+      if(fa && fb){ let ea=Math.round(gap*fa/(fa+fb)); ea=Math.max(2,Math.min(gap-2,ea)); a.E[d]=ea; b.E[o]=gap-ea; }
+      else if(fa) a.E[d]=Math.max(2,Math.min(9,gap-b.E[o]));
+      else b.E[o]=Math.max(2,Math.min(9,gap-a.E[d])); }); });
   rooms.forEach(r=>{ r.w=r.E.w+r.E.e+1; r.h=r.E.n+r.E.s+1; r.cx=r.E.w; r.cy=r.E.n; r.G=new Uint8Array(r.w*r.h).fill(1); }); }
-chamberFit(UCR,3);
+chamberFit(UCR,3,7);
 Object.values(UCR).forEach(r=>{ const QF=UC_QF[r.q], st=ucWalk(r)[0], ent={ start:{i:st[0],j:st[1]} };
   Object.keys(r.ex).forEach(d=>{ const [i,j]=ucIn(r,d); ent['from'+d.toUpperCase()]={i,j}; });
   AREAS[r.id]={ ...INSIDE_BASE, w:r.w, h:r.h, theme:'interior', cave:true, ucRoom:true, layer:-1, label:'The Undercity · '+UC_LABEL[r.q], mapLabel: r.square||UC_OUT[r.id] ? UC_LABEL[r.q] : '', mini:{x:0,y:0}, tier:4,
@@ -27418,7 +27425,7 @@ function owMobs(r){ const out=[], F=OW_FOLK[r.q], h=r.hs;
   else if(!OW_OUT[r.id] && !r.sealed && r.id!==owId(1,0) && r.id!==owId(0,1) && (r.kind==='bend' ? h%4===0 : h%2===0 || r.kind==='end')){
     const a=F[(h>>>2)%F.length](); out.push({...a, faction:'ow_'+r.id, daily:true}); if(h%7===0 && r.kind!=='end') out.push({...F[0](), name:F[0]().name+' ', faction:'ow_'+r.id, daily:true}); }
   return ucPlace(r,out); }
-chamberFit(OWR,9);
+chamberFit(OWR,9,8);
 Object.values(OWR).forEach(r=>{ const st=ucWalk(r)[0], ent={ start:{i:st[0],j:st[1]} };
   Object.keys(r.ex).forEach(d=>{ const [i,j]=ucIn(r,d); ent['from'+d.toUpperCase()]={i,j}; });
   const dressed=r.q==='ow_se', rails=r.q==='ow_nw' && (r.kind==='hall'||r.kind==='square') ? (r.w>=r.h ? [['h',r.cy+0.5,0,r.w]] : [['v',r.cx+0.5,0,r.h]]) : null;

@@ -6893,7 +6893,7 @@ function windowSky(){
 }
 function paintInteriorWalls(){
   if(AREAS[areaId] && AREAS[areaId].cave){              // rock, with the dark (or daylit) mouths of the passages out
-    const {w,h}=ROOM, H=AREAS[areaId].mine?120:150, o=P(0,0), rEnd=P(w,0), lEnd=P(0,h), crys=['cave1','cave2','cave3','cave4'].includes(areaId);
+    const {w,h}=ROOM, H=AREAS[areaId].mine?120:150, o=P(0,0), rEnd=P(w,0), lEnd=P(0,h), crys=['cave1','cave2','cave3','cave4'].includes(areaId) || !!AREAS[areaId].crys;
     const VOL=AREAS[areaId].volcanic, TMP=AREAS[areaId].temple; rockFace(o,rEnd,H,VOL?'#3a2c26':TMP?'#a07850':'#57524a',3,crys); rockFace(lEnd,o,H,VOL?'#2e2420':TMP?'#8a6440':'#46423b',7,crys);
     if(TMP) [[o,rEnd],[lEnd,o]].forEach(([a,b])=>{ const at=(t,h)=>({x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t-h}); g.save(); g.fillStyle='rgba(120,40,24,0.55)'; g.strokeStyle='rgba(60,30,14,0.6)'; g.lineWidth=1;   // a painted band of suns and birds along the walls
       for(let t=0.04;t<0.98;t+=0.07){ const q=at(t,H*0.62), k=Math.round(t*100)%3; g.beginPath(); if(k===0){ g.arc(q.x,q.y,4.5,0,Math.PI*2); g.fill(); for(let r=0;r<8;r++){ const an=r*Math.PI/4; g.moveTo(q.x+Math.cos(an)*6,q.y+Math.sin(an)*6); g.lineTo(q.x+Math.cos(an)*9,q.y+Math.sin(an)*9); } g.stroke(); }
@@ -8948,7 +8948,7 @@ function drawObject(o){
     if(!o.bogmound && !o.lean && ITEMS[o.item] && ((hover && hover.i===o.i && hover.j===o.j) || (player && Math.hypot(player.x-o.i-0.5,player.y-o.j-0.5)<1.6))){ const nm=ITEMS[o.item].name; g.save(); g.font='600 11px Georgia,serif'; g.textAlign='center'; const w=g.measureText(nm).width+12;
       g.fillStyle='rgba(20,14,8,0.72)'; g.fillRect(x-w/2,y-46,w,16); g.strokeStyle='rgba(255,212,110,0.6)'; g.lineWidth=1; g.strokeRect(x-w/2+0.5,y-45.5,w-1,15); g.fillStyle='#f4e2b0'; g.fillText(nm,x,y-34); g.restore(); }
   } else if(o.type==='teleporter'){
-    if(o.treedoor) return;                              // the great tree's door is drawn with the tree
+    if(o.treedoor || o.adit) return;                    // the great tree's door is drawn with the tree; an old adit, as itself
     if(o.to==='hollowrite' && areaId==='graveyard') return;   // the Choir's stair is drawn as itself, a black mouth with steps, not a blue ring
     const pulse=0.75+0.25*Math.sin(gt*2.4);
     g.save(); g.globalCompositeOperation='lighter';
@@ -13794,9 +13794,20 @@ function mapLayout(){
       if(hits(cand)){ for(const [k2,p2] of MAP_SLIDES){ const c1={u:cand.u+k2*du+p2*(-dv), v:cand.v+k2*dv+p2*du}; if(!hits(c1)){ at=c1; kk=k2; pp=p2; break; } } }
       pos[t.to]=at; queue.push(t.to);
       if(kk||pp) MAP_LINKS.push({a:id, ai:[T.i,T.j], b:t.to, bi:[Bk.i,Bk.j], du, dv}); }
+    if(!queue.length && typeof MAP_GRIDS!=='undefined'){ const G=MAP_GRIDS.find(G=>!G.ids().some(id=>pos[id])); if(G){ mapGridPlace(G,pos); G.ids().forEach(id=>queue.push(id)); continue; } }   // then the worlds below, chamber by chamber on a grid
     if(!queue.length && typeof MAP_UNDER!=='undefined' && !pos[MAP_UNDER.root] && AREAS[MAP_UNDER.root]){ pos[MAP_UNDER.root]={u:MAP_UNDER.u,v:MAP_UNDER.v}; queue.push(MAP_UNDER.root); } }   // then the world below, under Hollowmere
   return MAP_LAYOUT=pos;
 }
+// an underground of chambers on a grid (the Undercity, the Old Workings): every column shares one centre line and every row another, so a door always meets the door
+//   across from it head on, with a short straight passage drawn between them
+const MAP_GRIDS=[];
+function mapGridPlace(G,pos){ const R=G.ids().map(id=>({id, A:AREAS[id], c:G.cell(id)})), GAP=2, cw={}, rh={};
+  R.forEach(({A,c:[X,Y]})=>{ cw[X]=Math.max(cw[X]||0,A.w); rh[Y]=Math.max(rh[Y]||0,A.h); });
+  const xs=Object.keys(cw).map(Number).sort((a,b)=>a-b), ys=Object.keys(rh).map(Number).sort((a,b)=>a-b), cx={}, cy={}; let u=G.u, v=G.v;
+  xs.forEach(X=>{ cx[X]=u+Math.floor(cw[X]/2); u+=cw[X]+GAP; }); ys.forEach(Y=>{ cy[Y]=v+Math.floor(rh[Y]/2); v+=rh[Y]+GAP; });
+  const at={}; R.forEach(({id,A,c:[X,Y]})=>{ pos[id]={u:cx[X]-Math.floor(A.w/2), v:cy[Y]-Math.floor(A.h/2)}; at[X+','+Y]=id; });
+  R.forEach(({id,A,c:[X,Y]})=>{ (G.links(id)||[]).forEach(d=>{ if(d!=='e' && d!=='s') return; const to=at[(X+(d==='e'?1:0))+','+(Y+(d==='s'?1:0))]; if(!to) return; const B=AREAS[to];
+      MAP_LINKS.push(d==='e' ? {a:id, ai:[A.w-1,Math.floor(A.h/2)], b:to, bi:[0,Math.floor(B.h/2)], du:1, dv:0, grid:true} : {a:id, ai:[Math.floor(A.w/2),A.h-1], b:to, bi:[Math.floor(B.w/2),0], du:0, dv:1, grid:true}); }); }); }
 const MM_COL={ sand:'#c8a464', ash:'#5a3a30', bog:'#4e5434', farm:'#8a9a4a', road:'#4e6a34', crossroads:'#5a7a3a', village:'#9aa058', wood:'#3a5a2c', fen:'#44583e', elf:'#7a9a5a', mountain:'#9a9c9e' };
 function renderMap(cv,V){                             // V: {zoom, px, py, labels} — zoom/pan on top of fitting the whole explored world
   const c=cv.getContext('2d'), L=mapLayout();
@@ -13814,7 +13825,7 @@ function renderMap(cv,V){                             // V: {zoom, px, py, label
   const P2=(u,v)=>{ const [px,py]=pj(u,v); return [ox+px*k, oy+py*k]; };
   ghost.forEach(id=>{ const A=AREAS[id], o=L[id], q=[P2(o.u,o.v),P2(o.u+A.w,o.v),P2(o.u+A.w,o.v+A.h),P2(o.u,o.v+A.h)]; c.fillStyle='rgba(120,110,90,0.07)'; c.strokeStyle='rgba(200,180,140,0.22)'; c.lineWidth=1;
     c.beginPath(); q.forEach((p2,n)=>n?c.lineTo(p2[0],p2[1]):c.moveTo(p2[0],p2[1])); c.closePath(); c.fill(); c.stroke();
-    if(V.labels && /^Hollowmere/.test(A.label||'')){ const m=P2(o.u+A.w/2,o.v+A.h/2); c.font='italic 12px Georgia,serif'; c.textAlign='center'; c.fillStyle='rgba(220,200,160,0.35)'; c.fillText(A.label.replace('Hollowmere · ',''),m[0],m[1]-14); } });
+    if(V.labels && (LAY===-2 ? /Varrow/ : /^Hollowmere/).test(A.label||'')){ const m=P2(o.u+A.w/2,o.v+A.h/2); c.font='italic 12px Georgia,serif'; c.textAlign='center'; c.fillStyle='rgba(220,200,160,0.35)'; c.fillText(A.label.replace('Hollowmere · ',''),m[0],m[1]-14); } });
   ids.sort((x,y)=>(AREAS[x].under?1:0)-(AREAS[y].under?1:0));   // tunnels last: a dashed shadow crossing over the road above
   ids.forEach(id=>{ const A=AREAS[id], o=L[id], cur=id===areaId, notch=A.notches();
     c.globalAlpha=A.under&&!cur?0.6:1; if(A.under) c.setLineDash([4,3]);
@@ -13840,6 +13851,8 @@ function renderMap(cv,V){                             // V: {zoom, px, py, label
   });
   MAP_LINKS.forEach(l=>{ if(!ids.includes(l.a) || !ids.includes(l.b)) return; const pa=L[l.a], pb=L[l.b];   // a track between two doors the map had to pull apart
     const a=P2(pa.u+l.ai[0]+0.5+l.du*0.5, pa.v+l.ai[1]+0.5+l.dv*0.5), b=P2(pb.u+l.bi[0]+0.5-l.du*0.5, pb.v+l.bi[1]+0.5-l.dv*0.5);
+    if(l.grid){ c.save(); c.lineCap='butt'; c.strokeStyle='rgba(14,9,4,0.85)'; c.lineWidth=Math.max(3,k*1.0); c.beginPath(); c.moveTo(a[0],a[1]); c.lineTo(b[0],b[1]); c.stroke();   // a passage between two chambers
+      c.strokeStyle='#6a5a48'; c.lineWidth=Math.max(1.4,k*0.55); c.stroke(); c.restore(); return; }
     c.save(); c.lineCap='round'; c.strokeStyle='rgba(20,12,4,0.7)'; c.lineWidth=Math.max(2.5,k*0.9); c.beginPath(); c.moveTo(a[0],a[1]);
     if(l.du) c.bezierCurveTo((a[0]+b[0])/2,a[1],(a[0]+b[0])/2,b[1],b[0],b[1]); else c.bezierCurveTo(a[0],(a[1]+b[1])/2,b[0],(a[1]+b[1])/2,b[0],b[1]); c.stroke();
     c.strokeStyle='#8a7a52'; c.lineWidth=Math.max(1.2,k*0.5); c.setLineDash([Math.max(2,k*0.8),Math.max(2,k*0.5)]); c.stroke(); c.restore(); });
@@ -13897,7 +13910,7 @@ function drawBigMap(){ const cv=document.getElementById('bigmap-canvas'); if(!cv
   if(cv.width!==Math.round(r.width*d)||cv.height!==Math.round(r.height*d)){ cv.width=Math.round(r.width*d); cv.height=Math.round(r.height*d); }
   const c=cv.getContext('2d'); c.setTransform(1,0,0,1,0,0); c.fillStyle='#0e0904'; c.fillRect(0,0,cv.width,cv.height);
   renderMap(cv,{zoom:BIGMAP.zoom, px:BIGMAP.px*d, py:BIGMAP.py*d, labels:true});
-  const hd=document.querySelector('#bigmap .bm-head span'); if(hd) hd.textContent=mapLayerShown()<0?'Beneath Hollowmere':'Map of the Valley'; }
+  const hd=document.querySelector('#bigmap .bm-head span'); if(hd) hd.textContent=({'-1':'Beneath Hollowmere','-2':'Beneath Varrowdeep'})[mapLayerShown()]||'Map of the Valley'; }
 function openBigMap(){
   let ov=document.getElementById('bigmap');
   if(!ov){ ov=document.createElement('div'); ov.id='bigmap';
@@ -13916,7 +13929,7 @@ function openBigMap(){
     ov.querySelectorAll('[data-z]').forEach(bt=>bt.addEventListener('click',()=>{ const z=+bt.dataset.z, r=cv.getBoundingClientRect();
       if(!z){ centerBigMap(); drawBigMap(); } else zoomAt(z,r.left+r.width/2,r.top+r.height/2); }));
     ov.querySelector('.bm-x').addEventListener('click',closeBigMap);
-    ov.querySelector('.bm-layer').addEventListener('click',()=>{ const here=(AREAS[areaId].layer||0); BIGMAP.layer = mapLayerShown()===0 ? -1 : 0; if(BIGMAP.layer===here) BIGMAP.layer=null; centerBigMap(); drawBigMap(); });
+    ov.querySelector('.bm-layer').addEventListener('click',()=>{ const here=(AREAS[areaId].layer||0); const LS=[0,-1,-2].filter(l=>!l || Object.keys(AREAS).some(id=>visitedAreas[id] && (AREAS[id].layer||0)===l)); BIGMAP.layer = LS[(LS.indexOf(mapLayerShown())+1)%LS.length]; if(BIGMAP.layer===here) BIGMAP.layer=null; centerBigMap(); drawBigMap(); });
     addEventListener('resize',()=>{ if(BIGMAP.open) drawBigMap(); }); }
   BIGMAP.open=true; BIGMAP.layer=null; ov.classList.add('open'); BIGMAP.zoom=1.6; centerBigMap(); drawBigMap();
 }
@@ -24520,6 +24533,7 @@ Object.values(UCR).forEach(r=>{ const QF=UC_QF[r.q], st=ucWalk(r)[0], ent={ star
   AREA_TIER[r.id]=QF.tier; });
 UC_QS.forEach(q=>{ delete AREAS[q]; });
 MAP_UNDER.root=ucId(0,0);
+MAP_GRIDS.push({ ids:()=>Object.keys(UCR), cell:id=>[UCR[id].X,UCR[id].Y], links:id=>Object.keys(UCR[id].ex).filter(d=>UCR[UCR[id].ex[d][0]] && !(UC_TWIST[id] && UC_TWIST[id].kind==='warp' && UC_TWIST[id].d===d)), u:MAP_UNDER.u, v:MAP_UNDER.v });
 // the chambers' walkways and the drop round them
 { const _mg=mazeGrid; mazeGrid=function(id){ return UCR[id] ? UCR[id].G : _mg(id); }; }
 mazeBlock=function(){ const G=UCR[areaId] ? UCR[areaId].G : null; if(!G) return; for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++) if(!G[j*ROOM.w+i]) blocked.add(i+','+j); };
@@ -27268,6 +27282,213 @@ ITEM_ICON.temple_tablet=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40);
       g.strokeStyle=GD; g.lineWidth=0.8; g.beginPath(); g.moveTo(0,5); g.quadraticCurveTo(-3,0.6,-0.4,-5); g.quadraticCurveTo(0.2,-1.6,1.2,-2.6); g.quadraticCurveTo(3,1.6,0,5); g.stroke();
       glowLine(g,()=>{ g.beginPath(); g.moveTo(0,3.4); g.quadraticCurveTo(-1.2,1,0.2,-1.2); g.quadraticCurveTo(1.6,1.2,0,3.4); },0.5); g.restore(); }); });
 }
+// ════════ THE OLD WORKINGS: under the mines of Varrowdeep, the galleries the dwarves sealed after the Long Fall. Built like the Undercity, chamber by chamber,
+//   in four quarters: the Old Haulage (rails and carts, and goblins who have moved in), the Glimmer Vugs (crystal hollows, and rats as big as dogs), the Drowned Levels
+//   (the water won), and the First King's Delving (dressed stone older than the hall above, and the Lost Shift still walking it).
+//   Its own trouble: rockfalls. Some ways are choked with fallen rock. A miner's pick clears one for good, a shortcut, or a sealed drift nobody has seen in eighty years.
+//   And two old ore-cart lines still run, if you dare ride them in the dark ════════
+const OW_N=4, OW_QS=['ow_nw','ow_ne','ow_sw','ow_se'], OW_QXY={ow_nw:[0,0],ow_ne:[1,0],ow_sw:[0,1],ow_se:[1,1]};
+const owId=(X,Y)=>'ow_'+X+'_'+Y, OWR={}, OW_FALL={}, owKey=(a,b)=>a<b?a+'|'+b:b+'|'+a;
+const OW_LABEL={ ow_nw:'The Old Haulage', ow_ne:'The Glimmer Vugs', ow_sw:'The Drowned Levels', ow_se:"The First King's Delving" };
+const OW_OUT={ [owId(0,0)]:{ n:['vm_shaft','fromWorkings'] },
+  [owId(7,0)]:{ n:['varrowpass','fromAdit'], locked:()=>!CHOICE.owAdit, onLocked:()=>setTimeout(owAditTalk,150) },
+  [owId(7,7)]:{ s:['vm_low','fromWorkings'], locked:()=>!vq(), onLocked:()=>pzSay("A dwarf-forged grate closes the way, locked from the far side. Through the bars: a long gallery, and a broken chain. Foreman Halvard keeps the keys to the lowest gallery.",'#c8c0a8') } };
+const OW_DEEP_LOOT=['varrow_helm','potion','rune_boots','varrow_gauntlets','mana_potion','bronze_pauldrons','iron_bracers','rune_gauntlets','potion','hobnail_boots','rune_helm','shield_iron','rune_greaves','varrow_axe'].filter(id=>ITEMS[id]);
+const owOpen=(a,b)=>{ const k=owKey(a,b); return !OW_FALL[k] || !!(CHOICE.owClear && CHOICE.owClear[k]); };
+(()=>{ const link=new Set(), L=(a,b)=>{ link.add(a+'|'+b); link.add(b+'|'+a); }, tree=new Set();
+  OW_QS.forEach((q,qi)=>{ const [QX,QY]=OW_QXY[q]; let st=(0x3a7c1e5+qi*0x9e3779b1)|0;
+    const rnd=()=>{ st=(st+0x6D2B79F5)|0; let t=Math.imul(st^st>>>15,1|st); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; };
+    const id=(x,y)=>owId(QX*OW_N+x,QY*OW_N+y), seen=new Set(['0,0']), stack=[[0,0]], deg={};
+    while(stack.length){ const [x,y]=stack[stack.length-1], nb=[[1,0],[-1,0],[0,1],[0,-1]].map(([a,b])=>[x+a,y+b]).filter(([a,b])=>a>=0&&b>=0&&a<OW_N&&b<OW_N&&!seen.has(a+','+b));
+      if(!nb.length){ stack.pop(); continue; } const [nx,ny]=nb[Math.floor(rnd()*nb.length)]; seen.add(nx+','+ny); L(id(x,y),id(nx,ny)); tree.add(owKey(id(x,y),id(nx,ny))); stack.push([nx,ny]); }
+  });
+  [[3,1,4,1],[1,3,1,4],[6,3,6,4],[3,6,4,6]].forEach(([a,b,c,d])=>L(owId(a,b),owId(c,d)));   // the old doors between the quarters
+  // the rockfalls: two ways that would have been a short way round, now choked, and one more simply open, a loop. None of them spoils a dead end
+  const deg=id=>[...link].filter(k=>k.startsWith(id+'|')).length;
+  OW_QS.forEach((q,qi)=>{ const [QX,QY]=OW_QXY[q], id=(x,y)=>owId(QX*OW_N+x,QY*OW_N+y); let st=(0x51ed27+qi*0x27d4eb2f)|0;
+    const rnd=()=>{ st=(st+0x6D2B79F5)|0; let t=Math.imul(st^st>>>15,1|st); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; };
+    const extra=[]; for(let y=0;y<OW_N;y++) for(let x=0;x<OW_N;x++) [[1,0],[0,1]].forEach(([a,b])=>{ if(x+a<OW_N && y+b<OW_N && !link.has(id(x,y)+'|'+id(x+a,y+b))) extra.push([id(x,y),id(x+a,y+b)]); });
+    extra.map(e=>[e,rnd()]).sort((a,b)=>a[1]-b[1]).map(e=>e[0]).filter(([a,b])=>deg(a)>=2 && deg(b)>=2 && !OW_OUT[a] && !OW_OUT[b]).slice(0,3).forEach(([a,b],k)=>{ L(a,b); if(k<2) OW_FALL[owKey(a,b)]=1; }); });
+  for(let Y=0;Y<8;Y++) for(let X=0;X<8;X++){ const id=owId(X,Y), q=OW_QS[(X<4?0:1)+(Y<4?0:2)], ex={};
+    Object.entries(UC_DIRS).forEach(([d,[a,b]])=>{ const to=owId(X+a,Y+b); if(link.has(id+'|'+to)) ex[d]=[to,'from'+UC_OPP[d].toUpperCase()]; });
+    const O=OW_OUT[id]; if(O) Object.keys(UC_DIRS).forEach(d=>{ if(O[d]) ex[d]=O[d]; });
+    OWR[id]={ id, X, Y, q, ex, hs:hsh(X*41+17,Y*59+3) }; }
+  // a sealed drift in each quarter: a dead end whose only way in fell long ago
+  OW_QS.forEach(q=>{ const ends=Object.values(OWR).filter(r=>r.q===q && !OW_OUT[r.id] && Object.keys(r.ex).length===1).sort((a,b)=>(a.hs%311)-(b.hs%311));
+    const r=ends[1]||ends[0]; if(!r) return; const [to]=Object.values(r.ex)[0]; OW_FALL[owKey(r.id,to)]=1; r.sealed=true; });
+})();
+// the shape of each chamber, the Undercity's way: drifts long and narrow, crossings, stopes; one great cavern in each quarter
+(()=>{ OW_QS.forEach(q=>{ const c=Object.values(OWR).filter(r=>r.q===q && !OW_OUT[r.id] && Object.keys(r.ex).length>=3).sort((a,b)=>Object.keys(b.ex).length-Object.keys(a.ex).length || (a.hs%97)-(b.hs%97))[0]; if(c) c.cavern=true; });
+  Object.values(OWR).forEach(r=>{ const ex=Object.keys(r.ex), n=ex.length, h=r.hs, has=d=>ex.includes(d), straight=n===2 && ((has('n')&&has('s'))||(has('w')&&has('e')));
+    r.kind = r.cavern ? 'square' : n>=3 ? (h%3===0?'vault':'cross') : n===1 ? 'end' : straight ? 'hall' : 'bend';
+    const L=[9,11,13,10,12,14,8][h%7], Wd=[2,3,2][(h>>>4)%3];
+    if(r.kind==='square'){ r.w=r.h=8; } else if(r.kind==='vault'){ r.w=r.h=6; } else if(r.kind==='cross'){ r.w=r.h=4+(h>>>3)%2; }
+    else if(r.kind==='hall'){ if(has('n')){ r.w=Wd; r.h=L; } else { r.w=L; r.h=Wd; } }
+    else if(r.kind==='bend'){ r.w=r.h=3; }
+    else { const len=r.sealed?5:4+(h%3); if(has('n')||has('s')){ r.w=r.sealed?4:3; r.h=len; } else { r.w=len; r.h=r.sealed?4:3; } }
+    r.cx=Math.floor(r.w/2); r.cy=Math.floor(r.h/2); r.G=new Uint8Array(r.w*r.h).fill(1); }); })();
+// the furthest dead end in each quarter: one of the Lost Shift's pit-tokens lies there
+const OW_TOKEN_ROOM={}; OW_QS.forEach(q=>{ const outs=Object.values(OWR).filter(r=>r.q===q && OW_OUT[r.id]).map(r=>r.id), starts=outs.length ? outs : Object.values(OWR).filter(r=>r.q===q && Object.values(r.ex).some(([to])=>!OWR[to] || OWR[to].q!==q)).map(r=>r.id), dist={}, Q=[...starts]; starts.forEach(s=>dist[s]=0);
+  while(Q.length){ const id=Q.shift(); Object.values(OWR[id].ex).forEach(([to])=>{ if(OWR[to] && OWR[to].q===q && dist[to]==null && !OWR[to].sealed){ dist[to]=dist[id]+1; Q.push(to); } }); }
+  let best=null; Object.values(OWR).forEach(r=>{ if(r.q===q && r.kind==='end' && !r.sealed && dist[r.id]!=null && (best==null || dist[r.id]>dist[best])) best=r.id; }); OW_TOKEN_ROOM[q]=best; });
+// two cart lines: from the Haulage across to the Delving, and from the Vugs down to the Drowned Levels
+const OW_CARTS={}; (()=>{ const pick=(q,not)=>Object.values(OWR).filter(r=>r.q===q && !OW_OUT[r.id] && !r.sealed && r.id!==not && (r.kind==='cross'||r.kind==='vault')).sort((a,b)=>(a.hs%523)-(b.hs%523))[0];
+  [['ow_nw','ow_se'],['ow_ne','ow_sw']].forEach(([qa,qb],k)=>{ const a=pick(qa), b=pick(qb); if(a && b){ OW_CARTS[a.id]={to:b.id, line:k}; OW_CARTS[b.id]={to:a.id, line:k}; } }); })();
+const OW_RUNES={ ow_nw:["Chalked on a prop: <i>CART 14 OFF THE RAILS AGAIN. Whoever greased the points with lard, I know it was you, Bekka.</i>","A tally of carts, shift by shift, in a neat hand. It stops in the middle of a row.","Scratched into the rock, low down, in a goblin hand: a crude pick, a crude crown, and an arrow pointing deeper."],
+  ow_ne:["The rock here is hollow, full of crystal like the inside of a broken geode. Somebody has chipped their initials into every one they could reach.","A survey mark, and under it: <i>Good stone. Bad air. Leave a lamp burning and do not sleep down here.</i>"],
+  ow_sw:["A depth mark painted on the wall. The water stands a hand above the highest line.","Chalk, nearly washed away: <i>pumps failed at the third bell. Up, everyone up, leave the carts.</i>"],
+  ow_se:["The walls are dressed smooth here, older than anything in the hall above, carved with felled trees and a road, row on row.","Cut deep and filled with lead: <i>The first king opened this delving with his own pick. What the mountain gives, take. What it does not, leave.</i>","Forty-one marks in a row, cut fresh. Thirty-seven of them have been crossed through, the way you cross off a man who has come back up."] };
+function owObjects(r){ const out=[], seed=r.hs, W=ucWalk(r), used=new Set(), take=(i,j)=>used.add(i+','+j), solid=new Set();
+  const shut=new Set(Object.keys(r.ex).filter(d=>{ const s=r.ex[d]; return Array.isArray(s) && OWR[s[0]] && !owOpen(r.id,s[0]); }));
+  const keepsWay=(i,j)=>{ solid.add(i+','+j); const ex=Object.keys(r.ex).filter(d=>!shut.has(d)), S=ucEdge(r,ex[0]), seen=new Set([S.join(',')]), Q=[S];
+    while(Q.length){ const [a,b]=Q.shift(); [[1,0],[-1,0],[0,1],[0,-1]].forEach(([c,d])=>{ const x=a+c, y=b+d, k=x+','+y; if(x<0||y<0||x>=r.w||y>=r.h||seen.has(k)||!r.G[y*r.w+x]||solid.has(k)) return; seen.add(k); Q.push([x,y]); }); }
+    const ok=ex.every(d=>seen.has(ucEdge(r,d).join(','))) && W.every(([x,y])=>solid.has(x+','+y) || seen.has(x+','+y));
+    if(!ok) solid.delete(i+','+j); return ok; };
+  const free=(i,j)=>!used.has(i+','+j) && !ucNearDoor(r,i,j);
+  Object.entries(r.ex).forEach(([d,spec])=>{ if(!Array.isArray(spec)) return; const [to,entry]=spec, [i,j]=ucEdge(r,d), O=OW_OUT[r.id];
+    if(OWR[to] && !owOpen(r.id,to)){ out.push({type:'owfall', i, j, to, d}); take(i,j); solid.add(i+','+j); return; }
+    const t={type:'teleporter', i, j, to, entry}; if(O && O[d] && O.locked){ t.locked=O.locked; t.onLocked=O.onLocked; } out.push(t); take(i,j); });
+  const q=r.q, wall=W.filter(([i,j])=>(i===0||j===0) && free(i,j) && !(i===r.cx||j===r.cy));
+  const prop=(t,k)=>{ const c=wall.filter(([i,j])=>!used.has(i+','+j))[k]; if(c && keepsWay(c[0],c[1])){ out.push({...t, i:c[0], j:c[1]}); take(c[0],c[1]); return true; } return false; };
+  W.forEach(([i,j])=>{ if(!free(i,j)) return; const hv=hsh(i*13+seed,j*29+r.Y);
+    if(q==='ow_sw' && hv%3===0) out.push({type:'puddle', i, j, s:0.7+(hv%5)/10, flat:true, noblock:true, dz:-99});
+    else if(hv%11===0) out.push({type:'rubble', i, j, noblock:true, flat:true});
+    else if(q==='ow_se' && hv%9===2) out.push({type:'bones', i, j, noblock:true});
+    else if(q==='ow_ne' && hv%7===3) out.push({type:'owcrystal', i, j, noblock:true, v:hv%3}); });
+  if(r.kind!=='bend'){
+    if(q==='ow_se') prop({type:'brazier'},seed%2); else prop({type:'chainlamp', noblock:true},(seed>>>2)%2);
+    if(q==='ow_nw' && seed%2) prop(seed%4===1?{type:'orecart'}:{type:'oreheap'},1);
+    if(q==='ow_sw' && r.kind!=='hall' && seed%2) prop({type:'minepump'},1);
+    if((q==='ow_nw'||q==='ow_ne') && (r.kind==='square'||r.kind==='vault') && keepsWay(0,0) && keepsWay(1,0) && free(0,0) && free(1,0)){ out.push({type:'oreseam', i:0, j:0, fp:[2,1], v:seed%4}); take(0,0); take(1,0); }
+    if(q==='ow_ne'){ prop({type:'owcrystal', v:seed%3, big:true},2); prop({type:'owcrystal', v:(seed+1)%3, big:true},3); }
+    if(r.kind==='hall' && seed%3===0) prop({type:'mineframe'},0); }
+  // a word on the walls, here and there
+  if((seed%5===0 || r.cavern) && OW_RUNES[q]){ const s=W.find(([i,j])=>free(i,j) && (i===0||j===0) && i!==r.cx && j!==r.cy && keepsWay(i,j)); if(s){ out.push({type:'rune', i:s[0], j:s[1], text:OW_RUNES[q][(seed>>>3)%OW_RUNES[q].length]}); take(...s); } }
+  if(r.id===owId(0,0)){ const s=W.find(([i,j])=>free(i,j) && i!==r.cx && j!==r.cy && keepsWay(i,j));
+    if(s){ out.push({type:'rune', i:s[0], j:s[1], text:"A board nailed to a prop, the paint gone grey: <i>THE OLD WORKINGS. Sealed by order of the Thane, in the year of the Long Fall. Forty-one went down that morning. Thirty-seven came up.</i>"}); take(...s); }
+    prop({type:'pickrack', fp:[1,1]},0); }
+  // dead ends: a pit-token of the Lost Shift, or what the miners left behind; a sealed drift keeps more
+  if(r.kind==='end'){ const s=W.find(([i,j])=>free(i,j)) || [r.cx,r.cy], key=r.id+':'+s[0]+','+s[1], tok=OW_TOKEN_ROOM[q]===r.id;
+    if(!collectedPickups.has(key)) out.push({type:'pickup', i:s[0], j:s[1], item: tok ? 'pit_token' : OW_DEEP_LOOT[(r.X*7+r.Y*3+seed)%OW_DEEP_LOOT.length]}); take(...s);
+    if(r.sealed){ const c=W.find(([i,j])=>free(i,j) && i!==r.cx && j!==r.cy && keepsWay(i,j)); if(c){ out.push({type:'crate', i:c[0], j:c[1], rich:true, keepLook:false}); take(...c); }
+      const c2=W.find(([i,j])=>free(i,j) && (i===0||j===0) && keepsWay(i,j)); if(c2){ out.push({type:'bones', i:c2[0], j:c2[1], noblock:true}); } }
+    else if(seed%2){ const c=W.find(([i,j])=>free(i,j) && i!==r.cx && j!==r.cy && keepsWay(i,j)); if(c){ out.push({type:seed%4===1?'crate':'barrel', i:c[0], j:c[1]}); take(...c); } } }
+  // the cart stations
+  if(OW_CARTS[r.id]){ const s=ucFreeSpots(r,out).find(([i,j])=>keepsWay(i,j)) || W.find(([i,j])=>free(i,j) && keepsWay(i,j)) || W.find(([i,j])=>!used.has(i+','+j) && !Object.keys(r.ex).some(d=>{ const [a,b]=ucEdge(r,d), [c,e]=ucIn(r,d); return (a===i&&b===j)||(c===i&&e===j); }) && keepsWay(i,j)); if(s){ out.push({type:'owcart', i:s[0], j:s[1], to:OW_CARTS[r.id].to}); take(...s); } }
+  return out; }
+// who walks here: goblins have moved into the Haulage, rats the size of dogs nest in the Vugs, lurkers in the flooded levels, and in the Delving the Lost Shift still works
+const OW_FOLK={
+  ow_nw:[ ()=>({name:'Tunnel Goblin', type:'goblin', opts:GOBLIN({skin:21,equip:{head:'hood',torso:'shirt',armor:null,hands:null,legs:'trousers',feet:null,weapon:'hatchet',offhand:null}})}),
+          ()=>({name:'Goblin Rockbiter', type:'goblin', opts:GOBLIN({skin:20,hair:0,equip:{head:'kettle',torso:'smock',armor:'jerkin',hands:null,legs:null,feet:null,weapon:'spear',offhand:null}})}) ],
+  ow_ne:[ ()=>({name:'Vug Rat', type:'rat', opts:RAT()}), ()=>({name:'Fat Vug Rat', type:'rat', opts:RAT(), hpMul:1.4}) ],
+  ow_sw:[ ()=>({name:'Drowned-Level Lurker', type:'lurker', opts:LURK({})}) ],
+  ow_se:[ ()=>({name:'Lost Miner', type:'bandit', opts:QMINER({})}), ()=>({name:'Lost Hewer', type:'brute', opts:QMINER({hair:1, hairColor:12, beard:6, equip:{armor:'mail', head:'kettle', weapon:'axe'}})}) ] };
+['Tunnel Goblin','Goblin Rockbiter','Vug Rat','Fat Vug Rat','Drowned-Level Lurker','Lost Miner','Lost Hewer'].forEach(n=>{ RESPAWNS.add(n); RESPAWNS.add(n+' '); });
+function owMobs(r){ const out=[], F=OW_FOLK[r.q], h=r.hs;
+  if(r.cavern && r.q==='ow_nw') out.push({ name:'Grubnik the Pick-Boss', type:'goblin', hpMul:1.9, faction:'ow_boss_'+r.id, opts:GOBLIN({skin:21,hair:0,equip:{head:'kettle',torso:'smock',armor:'studded',hands:'gloves',legs:'trousers',feet:null,weapon:'axe',offhand:null}}) },
+                                    { ...F[0](), faction:'ow_boss_'+r.id }, { ...F[1](), name:'Goblin Rockbiter ', faction:'ow_boss_'+r.id });
+  else if(r.cavern && r.q==='ow_se') out.push({ name:'The Old One of the Delving', type:'troll', hpMul:2.7, faction:'ow_boss_'+r.id, opts:TROLL() });
+  else if(r.cavern) { const a=F[0](); out.push({...a, faction:'ow_'+r.id, daily:true}, {...F[F.length-1](), name:F[F.length-1]().name+' ', faction:'ow_'+r.id, daily:true}); }
+  else if(!OW_OUT[r.id] && !r.sealed && r.id!==owId(1,0) && r.id!==owId(0,1) && (r.kind==='bend' ? h%4===0 : h%2===0 || r.kind==='end')){
+    const a=F[(h>>>2)%F.length](); out.push({...a, faction:'ow_'+r.id, daily:true}); if(h%7===0 && r.kind!=='end') out.push({...F[0](), name:F[0]().name+' ', faction:'ow_'+r.id, daily:true}); }
+  return ucPlace(r,out); }
+Object.values(OWR).forEach(r=>{ const st=ucWalk(r)[0], ent={ start:{i:st[0],j:st[1]} };
+  Object.keys(r.ex).forEach(d=>{ const [i,j]=ucIn(r,d); ent['from'+d.toUpperCase()]={i,j}; });
+  const dressed=r.q==='ow_se', rails=r.q==='ow_nw' && (r.kind==='hall'||r.kind==='square') ? (r.w>=r.h ? [['h',r.cy+0.5,0,r.w]] : [['v',r.cx+0.5,0,r.h]]) : null;
+  AREAS[r.id]={ ...INSIDE_BASE, w:r.w, h:r.h, theme:'interior', cave:true, dwarf:true, mine:!dressed, owRoom:true, crys:r.q==='ow_ne', layer:-2, wallSeed:r.hs%3,
+    label:'The Old Workings · '+OW_LABEL[r.q], mapLabel: r.cavern ? OW_LABEL[r.q] : OW_OUT[r.id] ? (r.id===owId(0,0)?'The Lift Foot':r.id===owId(7,0)?'The Old Adit':'The Lowest Grate') : r.sealed ? '' : '',
+    mini:{x:0,y:0}, tier:5, ...(rails?{rails}:{}), objects:()=>owObjects(r), npcs:()=>[], mobs:()=>owMobs(r), entries:ent };
+  AREA_TIER[r.id]=5; });
+MAP_GRIDS.push({ ids:()=>Object.keys(OWR), cell:id=>[OWR[id].X,OWR[id].Y], links:id=>Object.keys(OWR[id].ex).filter(d=>{ const s=OWR[id].ex[d]; return Array.isArray(s) && OWR[s[0]] && owOpen(id,s[0]); }), u:30, v:-250 });
+// the ways in: down the rope beside the stuck lift cage; up out of the Delving into the lowest gallery; and the old adit onto the Varrow Pass, nailed shut from inside
+AREAS.vm_shaft.entries.fromWorkings={i:3,j:5};
+AREAS.vm_low.entries.fromWorkings={i:6,j:10};
+wrap('vm_low','objects',l=>[...l, {type:'teleporter', i:7, j:10, to:owId(7,7), entry:'fromS'}]);
+AREAS.varrowpass.entries.fromAdit={i:7,j:11};
+wrap('varrowpass','objects',l=>[...l.filter(o=>!(o.i===9&&o.j===11&&!o.noblock)), {type:'owadit', i:9, j:11},
+  {type:'teleporter', i:8, j:11, to:owId(7,0), entry:'fromN', adit:true, locked:()=>!CHOICE.owAdit, onLocked:()=>pzSay("An old mine adit in the cliff, timbered, and boarded up with planks as thick as your hand. The nails go in from the other side.",'#c8c0a8')}]);
+{ const _l=PUZ_ON.liftshaft; onUse(['liftshaft'],o=>{ say('The Lift Shaft',[CHOICE.vqQuiet ? "The cage hangs where it stuck, halfway down. Beside it a rope ladder, knotted every arm's length, runs down past the cage into the dark." : "You lean over the collar. The rope runs down into black, and the cage is stuck halfway. A cold draught comes up, and with it, very faint, the sound of someone walking. A knotted rope ladder hangs beside the cage.",
+    "Below the cage, past where the lamps were ever hung: the Old Workings, sealed eighty years ago."],
+    [{label:'Climb down the rope ladder.', fn:()=>{ closeDialog(); switchArea(owId(0,0),'fromN'); }}, {label:'Leave it.', fn:closeDialog}]); }); }
+function owAditTalk(){ say('The Old Adit',["A short drift ends in planks, nailed across from this side and grey with age. Between them: a thin cold line of daylight, and the sound of wind.","Kick them out, and this is a way straight out onto the Varrow Pass, and back in."],
+  [{label:'Kick the planks out.', fn:()=>{ CHOICE.owAdit=true; try{ SND.fx('hit'); }catch(e){} shake=Math.max(shake,5); closeDialog(); logMsg('The old planks give on the third kick. Wind and daylight pour in: the Varrow Pass, right outside.','#c8b890'); try{ autosaveSoon(300); }catch(e){} switchArea(areaId,'fromN'); }},
+   {label:'Leave them.', fn:closeDialog}]); }
+// a rack of picks: take one. A miner's pick clears a rockfall
+onUse(['pickrack'],()=>{ if(hasItem('miner_pick')){ pzSay('A rack of old picks, their hafts dark with hands. You have one already.','#c8c0a8'); return; }
+  const f=player.inv.indexOf(null); if(f<0){ pzSay('A rack of old picks. Your pack is too full to carry one.','#e0b070'); return; }
+  player.inv[f]='miner_pick'; updateHud(); floatText(tileOf(player),"Miner's Pick",'#d8c890',true); logMsg("You take a miner's pick from the rack. With it you could clear a rockfall, given the time.",'#d8c890'); });
+onUse(['owfall'],o=>{ const lab=OWR[o.to] ? (owOpen(areaId,o.to)?'':'') : '';
+  if(!hasItem('miner_pick')) return say('A Rockfall',["The way is choked to the roof with fallen rock and splintered props. Cold air comes through the gaps, so something is open beyond.","You would need a pick, and an hour. There is a rack of them at the foot of the lift."],[bye]);
+  say('A Rockfall',["The way is choked to the roof with fallen rock and splintered props. Cold air comes through the gaps.","With the pick, and an hour's hard work, you could clear it for good."],
+    [{label:'Clear it. (an hour)', fn:()=>{ closeDialog(); const k=owKey(areaId,o.to); (CHOICE.owClear=CHOICE.owClear||{})[k]=1; dayClock+=DAY_LEN/24; MAP_LAYOUT=null;
+        try{ SND.fx('hit'); setTimeout(()=>{ try{ SND.fx('hit'); }catch(e){} },350); }catch(e){} shake=Math.max(shake,7);
+        const pi=player.i, pj=player.j, ent=Object.entries(AREAS[areaId].entries).find(([n,p])=>p.i===pi&&p.j===pj); switchArea(areaId, ent?ent[0]:'start'); player.i=pi; player.j=pj; player.x=pi+0.5; player.y=pj+0.5; centerCam();
+        logMsg(OWR[o.to] && OWR[o.to].sealed ? 'The last stone rolls away, and stale air sighs out of a drift nobody has breathed in eighty years.' : 'An hour of swinging and hauling, and the way is clear. It will stay that way.','#d8c890'); try{ autosaveSoon(300); }catch(e){} }},
+     {label:'Leave it.', fn:closeDialog}]); });
+onUse(['owcart'],o=>{ const R=OWR[o.to]; say('An Ore Cart',["An ore cart on the old rails, its brake chocked with a stone. The rails run off into the dark, downhill.", CHOICE.owRode && CHOICE.owRode[areaId] ? "This line comes out in "+OW_LABEL[R.q].replace(/^The /,'the ')+"." : "Where they go, nobody has said for eighty years."],
+  [{label:'Kick the stone out and ride.', fn:()=>{ closeDialog(); (CHOICE.owRode=CHOICE.owRode||{})[areaId]=1; CHOICE.owRode[o.to]=1; try{ SND.fx('whoosh',0.6); }catch(e){} shake=Math.max(shake,6);
+      logMsg('The cart rattles off downhill, faster and faster, sparks off the wheels, through chamber after chamber in the dark, and fetches up with a bang against an old buffer.','#d8c890'); switchArea(o.to,'start');
+      const c=OBJECTS.find(x=>x.type==='owcart'); if(c){ const nb=[[1,0],[0,1],[-1,0],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]].map(([a,b])=>[c.i+a,c.j+b]).find(([i,j])=>i>=0&&j>=0&&i<ROOM.w&&j<ROOM.h&&!blocked.has(i+','+j)&&!mobAt(i,j)&&!OBJECTS.some(x=>x.type==='teleporter'&&x.i===i&&x.j===j)); if(nb){ player.i=nb[0]; player.j=nb[1]; player.x=nb[0]+0.5; player.y=nb[1]+0.5; centerCam(); } } }},
+   {label:'Leave it.', fn:closeDialog}]); });
+NEAR_NAME.owfall='a rockfall'; NEAR_NAME.owcart='an ore cart'; NEAR_NAME.owadit='an old adit';
+// the look of it
+OBJ_DRAW.owfall=o=>{ const c=P(o.i+0.5,o.j+0.5), sd=o.i*31+o.j*7;
+  g.fillStyle='rgba(0,0,0,0.35)'; g.beginPath(); g.ellipse(c.x+2,c.y+3,40,14,0,0,Math.PI*2); g.fill();
+  g.strokeStyle='#4a3420'; g.lineWidth=5; g.lineCap='round'; g.beginPath(); g.moveTo(c.x-22,c.y-4); g.lineTo(c.x+8,c.y-78); g.moveTo(c.x+20,c.y-2); g.lineTo(c.x-4,c.y-58); g.stroke();   // splintered props
+  for(let k=0;k<22;k++){ const t=k/22, spread=1-t*0.6, x=c.x+(rnd01(k,sd,771)-0.5)*62*spread, y=c.y+4+(rnd01(k,sd,772)-0.5)*12-t*70, r=7+9*rnd01(k,sd,773)*(1-t*0.4), n=5+(k%3), a0=rnd01(k,sd,777)*6.3;   // broken rock, piled to the roof: angular, lit from above left
+    const pts=[]; for(let q=0;q<n;q++){ const an=a0+q/n*Math.PI*2, rr=r*(0.7+0.45*rnd01(k*7+q,sd,778)); pts.push([x+Math.cos(an)*rr*1.15, y+Math.sin(an)*rr*0.8]); }
+    const base=tone('#625a50',-0.3*rnd01(k,sd,774)+t*0.08); g.fillStyle=base; g.beginPath(); pts.forEach(([px,py],q)=>q?g.lineTo(px,py):g.moveTo(px,py)); g.closePath(); g.fill();
+    g.fillStyle='rgba(255,240,215,0.13)'; g.beginPath(); g.moveTo(pts[0][0],pts[0][1]); pts.forEach(([px,py])=>{ if(py<y) g.lineTo(px,py); }); g.lineTo(x,y); g.closePath(); g.fill();   // the upper facets catch the lamp
+    g.strokeStyle='rgba(10,8,6,0.7)'; g.lineWidth=1; g.beginPath(); pts.forEach(([px,py],q)=>q?g.lineTo(px,py):g.moveTo(px,py)); g.closePath(); g.stroke(); }
+  g.fillStyle='rgba(200,190,170,0.15)'; for(let k=0;k<10;k++){ g.fillRect(c.x-26+rnd01(k,sd,775)*52,c.y-4-rnd01(k,sd,776)*20,2,2); } };
+OBJ_DRAW.owcart=o=>{ OBJ_DRAW.orecart(o); const q=P(o.i+0.5,o.j+0.5);
+  g.fillStyle='#3a3836'; g.fillRect(q.x+18,q.y-4,9,6); g.strokeStyle='#8a8478'; g.lineWidth=1; g.strokeRect(q.x+18,q.y-4,9,6);   // the chock stone
+  g.save(); g.font='bold 10px Georgia,serif'; g.textAlign='center'; g.fillStyle='rgba(230,210,160,0.75)'; g.fillText(OW_CARTS[areaId] ? (OW_CARTS[areaId].line? 'LINE II':'LINE I') : '',q.x,q.y-46); g.restore(); };
+OBJ_DRAW.owcrystal=o=>{ const q=P(o.i+0.5,o.j+0.5), s=o.big?1.6:0.8, sd=o.i*13+o.j*7, col=[['120,220,200','#9ae8d8'],['150,170,255','#b8c4ff'],['200,140,255','#d8b0ff']][o.v||0];
+  g.save(); g.globalCompositeOperation='lighter'; glow(q.x,q.y-10*s,26*s,18*s,col[0],0.3+0.06*Math.sin(gt*1.5+sd)); g.restore();
+  for(let k=0;k<5;k++){ const a=-0.9+k*0.45+(rnd01(k,sd,781)-0.5)*0.3, L=(12+14*rnd01(k,sd,782))*s, w=(3+2*rnd01(k,sd,783))*s, bx=q.x+(k-2)*4*s, by=q.y;
+    const tx=bx+Math.sin(a)*L, ty=by-Math.cos(a)*L, nx=Math.cos(a)*w, ny=Math.sin(a)*w;
+    g.fillStyle=col[1]; g.globalAlpha=0.85; g.beginPath(); g.moveTo(bx-nx,by-ny); g.lineTo(tx,ty); g.lineTo(bx+nx,by+ny); g.closePath(); g.fill();
+    g.globalAlpha=0.5; g.fillStyle='#ffffff'; g.beginPath(); g.moveTo(bx-nx*0.3,by-ny*0.3); g.lineTo(tx,ty); g.lineTo(bx,by); g.closePath(); g.fill(); g.globalAlpha=1; } };
+if(typeof LIGHT_TYPES!=='undefined'){ LIGHT_TYPES.owcrystal=[0,-14,70,'120,220,200']; }
+OBJ_DRAW.owadit=o=>{ drawCrag({type:'crag', i:o.i, j:o.j-1, fp:[1,3], v:2}); const a=P(o.i+0.02,o.j+0.15), b=P(o.i+0.02,o.j+0.85), H=74;   // a timbered mouth in the cliff, facing the road
+  g.fillStyle='#0c0a08'; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(b.x,b.y-H); g.lineTo(a.x,a.y-H); g.closePath(); g.fill();
+  g.fillStyle='#5a3e22'; g.fillRect(a.x-4,a.y-H-4,6,H+4); g.fillRect(b.x-3,b.y-H-4,6,H+4); g.strokeStyle='#5a3e22'; g.lineWidth=7; g.beginPath(); g.moveTo(a.x-4,a.y-H-2); g.lineTo(b.x+3,b.y-H-2); g.stroke();
+  if(!CHOICE.owAdit){ g.strokeStyle='#7a6448'; g.lineWidth=6; for(let k=0;k<4;k++){ const t=0.18+k*0.2; g.beginPath(); g.moveTo(a.x,a.y-H*t); g.lineTo(b.x,b.y-H*t-4); g.stroke(); } } };
+// items
+Object.assign(ITEMS,{ miner_pick:{ name:"Miner's Pick", slot:'misc', title:"An old dwarf pick, the haft dark with hands. Clears a rockfall in the Old Workings, given an hour." },
+  pit_token:{ name:'Brass Pit-Token', slot:'misc', stack:true, title:"A miner's brass tag, stamped with a number. Every miner hung one on the board going down, and took it back coming up. These never came up." } });
+Object.assign(PRICES,{ miner_pick:4 });
+ITEM_ICON.miner_pick=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.strokeStyle='#6a4a2a'; g2.lineWidth=3.2; g2.lineCap='round'; g2.beginPath(); g2.moveTo(10,33); g2.lineTo(27,12); g2.stroke();
+  g2.strokeStyle='#3a2414'; g2.lineWidth=1; g2.stroke(); g2.fillStyle='#8a8c92'; g2.strokeStyle='#2a2a30'; g2.lineWidth=1; g2.beginPath(); g2.moveTo(14,6); g2.quadraticCurveTo(26,6,35,16); g2.lineTo(33,18); g2.quadraticCurveTo(27,11,26,12); g2.quadraticCurveTo(22,9,13,9); g2.closePath(); g2.fill(); g2.stroke();
+  g2.strokeStyle='#d8dce4'; g2.lineWidth=0.8; g2.beginPath(); g2.moveTo(16,7.4); g2.quadraticCurveTo(26,7.8,33,15.4); g2.stroke(); g2.restore(); };
+ITEM_ICON.pit_token=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); const gr=g2.createRadialGradient(17,17,1,20,21,13); gr.addColorStop(0,'#f0d080'); gr.addColorStop(0.7,'#b8862e'); gr.addColorStop(1,'#6a4a14');
+  g2.fillStyle=gr; g2.strokeStyle='#4a3010'; g2.lineWidth=1.2; g2.beginPath(); g2.arc(20,22,12,0,Math.PI*2); g2.fill(); g2.stroke();
+  g2.fillStyle='#2a1a08'; g2.beginPath(); g2.arc(20,13,2,0,Math.PI*2); g2.fill(); g2.strokeStyle='#8a6a30'; g2.lineWidth=1.2; g2.beginPath(); g2.arc(20,8,4,0.2,Math.PI-0.2,true); g2.stroke();
+  g2.fillStyle='#4a3010'; g2.font='bold 10px Georgia,serif'; g2.textAlign='center'; g2.textBaseline='middle'; g2.fillText('37',20,24); g2.restore(); };
+// the bosses leave something
+{ const _v=victory; victory=function(faction){ const r=_v.apply(this,arguments); try{
+    if(typeof faction==='string' && faction.startsWith('ow_boss_') && !(CHOICE.owBoss||{})[faction]){ (CHOICE.owBoss=CHOICE.owBoss||{})[faction]=1;
+      const rid=faction.slice(8), troll=!!(OWR[rid] && OWR[rid].q==='ow_se'), id=troll ? 'rune_greaves' : 'varrow_gauntlets', cu=troll?140:60;
+      player.purse+=cu; const f=ITEMS[id]?slotFor(id):-1; if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } logMsg((troll?'In the Old One\'s nest, among gnawed bones: ':'In Grubnik\'s sack: ')+formatCoin(cu)+'.','#e8c060'); updateHud(); } }catch(e){} return r; }; }
+// ════════ THE LOST SHIFT: Foreman Halvard's grandfather was one of the four who never came up ════════
+const owQ=()=>CHOICE.owQ||null;
+{ const prevH=TALKERS.halvard; TALKERS.halvard=(...a)=>{ const r=prevH(...a); const box=document.getElementById('dlg-opts'); if(!box || !dlgIsOpen() || box.querySelector('.dlg-opt.owq')) return r;
+    const H='Foreman Halvard', add=(label,fn)=>{ const b=document.createElement('button'); b.className='dlg-opt owq'; b.innerHTML='<span>'+label+'</span>'; b.addEventListener('click',fn); box.insertBefore(b,box.lastElementChild); };
+    if(!owQ()) add('“What is under the lift shaft?”',()=>say(H,["<i>He is quiet for a moment, turning his kettle-helm round in his hands.</i> “The Old Workings. Sealed in my grandfather's day, after the Long Fall. Forty-one went down that morning. Thirty-seven came up.”",
+        "“My grandfather Oddvar was one of the four. They never found them. Every miner hangs a brass token on the board going down and takes it back coming up. Four tokens never came back to the board.”",
+        "“If you are fool enough to go down there, and I think you are: bring them back. Their tokens. So the board can be full again, and we can sing them up properly.”",
+        "“Take a pick from the rack at the lift foot. The roof has come down in places. And the old cart lines still run, they say, if your nerve does.”"],
+      [{label:'“I will bring them up.”', fn:()=>{ CHOICE.owQ='asked'; closeDialog(); logMsg('New quest: The Lost Shift.','#e8c060'); }}, {label:'“Not now.”', fn:closeDialog}]));
+    else if(owQ()==='asked' && invCount('pit_token')>=4) add('Give him the four pit-tokens.',()=>{ for(let k=0;k<4;k++){ const q=player.inv.indexOf('pit_token'); if(q<0) break; if(stackable('pit_token') && (invN()[q]|0)>0) invN()[q]--; else player.inv[q]=null; } updateHud();
+      say(H,["<i>He takes them one at a time and reads each number aloud. At the third his voice goes. He reads it again.</i> “Thirty-seven. Oddvar.”","<i>He goes to the board by the mine door and hangs all four on their hooks, and stands back, and the whole board is full for the first time in eighty years.</i>",
+        "“Tonight we sing them up. You will be there, surface-walker; you have earned the verse. And take this. It is not enough. It is what we have.”"],
+        [{label:'Take it.', fn:()=>{ CHOICE.owQ='done'; player.purse+=150; updateHud(); giveXp(180,'The Lost Shift'); closeDialog(); }}]); });
+    else if(owQ()==='asked') add('“About the Lost Shift…”',()=>say(H,"“Four brass tokens. They will be where the four went furthest, I would think: the far ends of the old galleries, one in each.” ("+invCount('pit_token')+"/4)",[bye]));
+    return r; }; }
+{ const prev=npcHasNews; npcHasNews=function(n){ const r=prev(n); try{ if(n && n.id==='halvard'){ if(owQ()==='asked' && invCount('pit_token')>=4) return '?'; if(!owQ() && !r && vq()) return '!'; } }catch(e){} return r; }; }
+JOURNAL.push(['The Lost Shift', ()=> !owQ() ? null : owQ()==='done' ? ['done',"You brought the four lost pit-tokens up out of the Old Workings. The board in the mine is full again."]
+  : ['active',"Foreman Halvard's grandfather was one of four miners lost in the Old Workings, under the lift shaft. Bring up their four brass pit-tokens, one from the far end of each quarter. ("+invCount('pit_token')+"/4)"]]);
 </script>
 </body>
 </html>

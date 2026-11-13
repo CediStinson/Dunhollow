@@ -12487,19 +12487,22 @@ const JOURNAL=[
 ];
 function openJournal(){ try{ SND.fx('page'); }catch(e){}
   if(!running) return;
-  const rows=JOURNAL.map(([t,f])=>{ const r=f(); return r && {t,s:r[0],x:r[1]}; }).filter(Boolean);
-  const act=rows.filter(r=>r.s==='active'), done=rows.filter(r=>r.s==='done'), failed=rows.filter(r=>r.s==='failed');
+  const rows=JOURNAL.map(([t,f])=>{ const r=f(); return r && {t,s:r[0],x:String(r[1]||'').replace(/<b>/g,'<strong>').replace(/<\/b>/g,'</strong>')}; }).filter(Boolean);   // bold inside the text stays inline (a <b> here is the entry's title)
+  const purs=rows.filter(r=>PURSUITS.has(r.t)), qrows=rows.filter(r=>!PURSUITS.has(r.t)), act=qrows.filter(r=>r.s==='active'), done=qrows.filter(r=>r.s==='done'), failed=qrows.filter(r=>r.s==='failed');
+  const pli=r=>`<div class="jq ${r.s==='done'?'done':'active'}">${r.s==='active'?`<span class="jt${isTracked(r.t)?'':' off'}" data-q="${r.t.replace(/"/g,'&quot;')}">${isTracked(r.t)?'◉ Followed':'○ Follow'}</span>`:''}<b>${r.t}</b><span>${r.x}</span></div>`;
   const li=r=>`<div class="jq ${r.s}">${r.s==='active'?`<span class="jt${isTracked(r.t)?'':' off'}" data-q="${r.t.replace(/"/g,'&quot;')}">${isTracked(r.t)?'◉ Followed':'○ Follow'}</span>`:''}<b>${r.t}</b><span>${r.x}</span></div>`;
   const rk=renownRank();
   document.getElementById('note-title').innerHTML=player.name+"'s Journal<div style='font-size:11px;letter-spacing:1px;margin-top:4px;color:#8a6a3a'>Renown: "+RENOWN[rk]+(rk<RENOWN_AT.length-1?" ("+renownDone()+"/"+RENOWN_AT[rk+1]+" quests)":"")+" &nbsp;·&nbsp; "+(RENOWN_PERK[rk]||'no favours yet')+" &nbsp;·&nbsp; "+(nightAmt()>0.5?'night':nightAmt()>0.1?'dusk':'day')+"</div>";
   const st=storyStep(); for(let k=act.length-1;k>=0;k--) if(act[k].t===st[0]) act.splice(k,1);
-  document.getElementById('note-body').innerHTML=`<div class="jh">The Road Ahead</div><div class="jq active main"><span class="jt${isTracked(MAIN_Q)?'':' off'}" data-q="${MAIN_Q}">${isTracked(MAIN_Q)?'◉ Followed':'○ Follow'}</span><b>${st[0]}</b><span>${st[1]}</span></div><div class="jh">Open</div>${act.length?act.map(li).join(''):'<i>Nothing pressing. The roads are quiet, for now.</i>'}<div class="jh">Done</div>${done.length?done.map(li).join(''):'<i>Nothing yet.</i>'}${failed.length?`<div class="jh">Failed</div>${failed.map(li).join('')}`:''}`;
-  document.querySelectorAll('#note-body .jt').forEach(el=>el.addEventListener('click',e=>{ e.stopPropagation(); const q=el.dataset.q; CHOICE.untrack={...(CHOICE.untrack||{})}; if(CHOICE.untrack[q]) delete CHOICE.untrack[q]; else CHOICE.untrack[q]=true; openJournal(); updateHud(); }));
+  document.getElementById('note-body').innerHTML=`<div class="jh">The Road Ahead</div><div class="jq active main"><span class="jt${isTracked(MAIN_Q)?'':' off'}" data-q="${MAIN_Q}">${isTracked(MAIN_Q)?'◉ Followed':'○ Follow'}</span><b>${st[0]}</b><span>${st[1]}</span></div><div class="jh">Open</div>${act.length?act.map(li).join(''):'<i>Nothing pressing. The roads are quiet, for now.</i>'}${purs.length?`<div class="jh">Pursuits</div>${purs.map(pli).join('')}`:''}<div class="jh">Done</div>${done.length?done.map(li).join(''):'<i>Nothing yet.</i>'}${failed.length?`<div class="jh">Failed</div>${failed.map(li).join('')}`:''}`;
+  document.querySelectorAll('#note-body .jt').forEach(el=>el.addEventListener('click',e=>{ e.stopPropagation(); const q=el.dataset.q; if(PURSUITS.has(q)){ CHOICE.trackP={...(CHOICE.trackP||{})}; if(CHOICE.trackP[q]) delete CHOICE.trackP[q]; else CHOICE.trackP[q]=true; } else { CHOICE.untrack={...(CHOICE.untrack||{})}; if(CHOICE.untrack[q]) delete CHOICE.untrack[q]; else CHOICE.untrack[q]=true; } openJournal(); updateHud(); }));
   if(typeof bestiaryLink==='function') document.getElementById('note-body').insertAdjacentHTML('beforeend',bestiaryLink());
   noteOverlay.classList.add('open');
 }
 const MAIN_Q='__main';
-const isTracked=t=>!(CHOICE.untrack && CHOICE.untrack[t]);
+// pursuits: things you keep doing, not quests with an end. Their own heading in the journal, not counted for renown, and not followed on screen unless you ask
+const PURSUITS=new Set(['Buried Things','The Favour of Sylvhaven',"Vesna's Tallies",'Masterwork','Beyond Your Level','Sword Techniques',"The Magister's Lessons",'Matters of the Heart']);
+const isTracked=t=>PURSUITS.has(t) ? !!(CHOICE.trackP && CHOICE.trackP[t]) : !(CHOICE.untrack && CHOICE.untrack[t]);
 document.getElementById('jrn-btn').addEventListener('click',openJournal);
 window.addEventListener('keydown',e=>{ if((e.key==='l'||e.key==='L') && running && !(e.target&&e.target.tagName==='INPUT')){ noteOverlay.classList.contains('open') ? closeNote() : openJournal(); } });
 
@@ -13707,7 +13710,7 @@ function makeDummy(){
 // calling it here would run before some of the UI elements it touches (banner, minimap) exist
 const RENOWN=['Stranger','Wanderer','Known Face','Respected','Local Hero','Legend of the Valley'];
 let lastRenown=-1;
-function renownDone(){ try{ return JOURNAL.filter(([t,f])=>{ if(t==='The Fallen Oak') return false; const r=f(); return r && r[0]==='done'; }).length; }catch(e){ return 0; } }
+function renownDone(){ try{ return JOURNAL.filter(([t,f])=>{ if(t==='The Fallen Oak' || (typeof PURSUITS!=='undefined' && PURSUITS.has(t))) return false; const r=f(); return r && r[0]==='done'; }).length; }catch(e){ return 0; } }
 const RENOWN_AT=[0,4,10,18,28,40];                   // quests done for each rank: the later ones take real work
 const RENOWN_PERK=['','+4 max health','+8 max health · traders sell to you 10% cheaper','+12 max health · traders pay you a third more for your goods','+16 max health · a free bed at the Wheatsheaf','+20 max health · traders sell to you 20% cheaper · the valley’s thanks'];
 function renownRank(){ const n=renownDone(); let r=0; RENOWN_AT.forEach((a,k)=>{ if(n>=a) r=k; }); return r; }

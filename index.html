@@ -28481,6 +28481,47 @@ const RC_DROPS=[['duskplum',0.3],['berries',0.18],['mana_potion',0.08],['potion'
     try{ dead.forEach(m=>{ m._rcDrop=true; const got=[]; RC_DROPS.forEach(([id,p])=>{ if(!ITEMS[id] || Math.random()>=p*(m.daily?0.8:1.2)) return; const f=slotFor(id); if(f<0) return; if(player.inv[f]===id && stackable(id)) invN()[f]=(invN()[f]|0)+1; else player.inv[f]=id; got.push(ITEMS[id].name); });
       if(Math.random()<(m.daily?0.03:0.1)){ const id=RC_POD_RICH[Math.floor(Math.random()*RC_POD_RICH.length)], f=id?slotFor(id):-1; if(f>=0){ player.inv[f]=id; got.push(ITEMS[id].name); } }
       if(got.length) logMsg('Loot: '+got.join(', '),'#8ac070'); }); updateHud(); }catch(e){} return r; }; }
+// ════════ THE FALLEN: adventurers who came down after the rot and never went back up. Bones on the floor, a split pack, and beside them what they carried:
+//   a blade, a shield, a mail shirt, a hood. Theirs to leave, yours to take ════════
+const RC_FALLEN_GEAR={ rc_nw:['sword','gambeson','jerkin','hood','boots','gloves','dagger','tunic_green','staff_oak','leather_spaulders'],
+  rc_ne:['mace','studded','kettle','riding_boots','spear','tunic_blue','breeches','raven_cloak','staff_oak'],
+  rc_sw:['axe','mail','coif','shield','gauntlets','hatchet','trousers','iron_pauldrons','tunic_red'],
+  rc_se:['longsword','morningstar','shield_iron','mail','plate_boots','gauntlets','elf_tunic','elf_blade','iron_pauldrons'] };
+const RC_FALLEN_LINES=["The bones of someone who came down here with a pack and a plan. The pack has split. The plan, you suppose, went first.",
+  "A skeleton lying on its side, curled, the way you curl up against the cold. The roots have grown through its ribs.",
+  "Bones, and a little bundle of letters tied with string, too rotten to read. A name on the outside: just the first letter left, an H.",
+  "Whoever this was got this far. Their hand is still reaching for the way on."];
+function rcFallen(r,l){ if(RC_OUT[r.id] || r.cavern || r.nightDrift || r.kind==='bend' || (r.hs>>>7)%3!==1) return l;
+  const pool=(RC_FALLEN_GEAR[r.q]||[]).filter(id=>ITEMS[id]); if(!pool.length) return l;
+  const busy=new Set(l.map(o=>o.i+','+o.j)), W=ucWalk(r).filter(([i,j])=>!busy.has(i+','+j) && !ucNearDoor(r,i,j) && i!==r.cx && j!==r.cy);
+  const connected=(extra)=>{ const solid=new Set(l.filter(o=>!o.noblock && o.type!=='teleporter').map(o=>o.i+','+o.j)); extra.forEach(k=>solid.add(k)); const S=ucWalk(r).find(([a,b])=>!solid.has(a+','+b)); if(!S) return false; const seen=new Set([S.join(',')]), Q=[S];
+    while(Q.length){ const [a,b]=Q.shift(); [[1,0],[-1,0],[0,1],[0,-1]].forEach(([c,d])=>{ const x=a+c, y=b+d, k=x+','+y; if(x<0||y<0||x>=r.w||y>=r.h||seen.has(k)||solid.has(k)) return; seen.add(k); Q.push([x,y]); }); }
+    return ucWalk(r).every(([a,b])=>solid.has(a+','+b)||seen.has(a+','+b)); };
+  for(const [i,j] of W){ const nb=[[1,0],[0,1],[-1,0],[0,-1]].map(([a,b])=>[i+a,j+b]).find(([a,b])=>W.some(([x,y])=>x===a&&y===b)); if(!nb) continue;
+    const g1=pool[(r.hs>>>3)%pool.length], g2=pool[(r.hs>>>9)%pool.length], items=[g1]; if(g2!==g1 && (r.hs>>>11)%2) items.push(g2);
+    const spots=[nb, [[1,0],[0,1],[-1,0],[0,-1]].map(([a,b])=>[i+a,j+b]).find(([a,b])=>(a!==nb[0]||b!==nb[1]) && W.some(([x,y])=>x===a&&y===b))].filter(Boolean).slice(0,items.length);
+    const keys=spots.map(s=>s.join(',')); if(!connected(keys)) continue;
+    const out=[...l, {type:'rcfallen', i, j, noblock:true, v:r.hs%3}]; spots.forEach((s,k)=>{ if(!collectedPickups.has(r.id+':'+s[0]+','+s[1])) out.push({type:'pickup', i:s[0], j:s[1], item:items[k]}); });
+    return out; }
+  return l; }
+Object.values(RCR).forEach(r=>{ const A=AREAS[r.id], o0=A.objects; A.objects=()=>rcFallen(r,o0()); });
+OBJ_DRAW.rcfallen=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, sd=o.i*29+o.j*13, fl=(o.v||0)===1?-1:1;   // a skeleton sprawled on its side, a split pack, roots through the ribs
+  g.save(); g.fillStyle='rgba(0,0,0,0.28)'; g.beginPath(); g.ellipse(x,y+2,44,13,0,0,Math.PI*2); g.fill(); g.restore();
+  g.save(); g.translate(x,y); g.scale(fl*1.55,1.55);
+  g.fillStyle='#5a4228'; g.beginPath(); g.moveTo(10,-2); g.quadraticCurveTo(14,-14,24,-12); g.quadraticCurveTo(30,-6,26,2); g.closePath(); g.fill(); g.strokeStyle='#2e2014'; g.lineWidth=1; g.stroke();   // the split pack
+  g.fillStyle='#3a2a1a'; g.beginPath(); g.moveTo(18,-11); g.lineTo(22,-4); g.lineTo(16,-3); g.closePath(); g.fill();
+  const bone=(x0,y0,x1,y1,w)=>{ g.strokeStyle='#6a6050'; g.lineWidth=w+1.2; g.lineCap='round'; g.beginPath(); g.moveTo(x0,y0+0.8); g.lineTo(x1,y1+0.8); g.stroke(); g.strokeStyle='#d8ceb4'; g.lineWidth=w; g.beginPath(); g.moveTo(x0,y0); g.lineTo(x1,y1); g.stroke(); };
+  bone(-6,-3,6,-2,2.4);   // spine
+  g.strokeStyle='#d0c6aa'; g.lineWidth=1.5; for(let k=0;k<4;k++){ g.beginPath(); g.ellipse(-2+k*2.6,-4,2.2,4.6,0.2,Math.PI*1.1,Math.PI*1.95); g.stroke(); }   // ribs
+  bone(6,-2,14,2,2.2); bone(14,2,22,0,2); bone(5,-1,10,6,2.2); bone(10,6,18,8,2);   // legs
+  bone(-4,-5,-10,-12,1.8); bone(-10,-12,-4,-16,1.6);   // an arm, reaching
+  const sk=g.createRadialGradient(-14,-6,0.5,-12,-4,6); sk.addColorStop(0,'#f0e8d2'); sk.addColorStop(1,'#8a8068'); g.fillStyle=sk; g.beginPath(); g.ellipse(-12,-4,5.4,4.6,-0.2,0,Math.PI*2); g.fill();   // the skull, fallen sideways
+  g.fillStyle='#1a1614'; g.beginPath(); g.ellipse(-13.6,-4.6,1.2,1.4,0,0,Math.PI*2); g.ellipse(-10.6,-5,1.2,1.4,0,0,Math.PI*2); g.fill();
+  g.strokeStyle='#3e2a18'; g.lineWidth=2.4; g.beginPath(); g.moveTo(-8,6); g.quadraticCurveTo(-2,-8,6,-12); g.stroke(); g.strokeStyle='rgba(220,190,140,0.2)'; g.lineWidth=0.8; g.stroke();   // a root grown up through it
+  g.fillStyle='rgba(70,100,40,0.5)'; g.beginPath(); g.ellipse(-4,1,5,1.8,0,0,Math.PI*2); g.fill();
+  g.restore(); };
+NEAR_NAME.rcfallen='the bones of an adventurer';
+onUse(['rcfallen'],o=>pzSay(RC_FALLEN_LINES[(o.i*3+o.j)%RC_FALLEN_LINES.length],'#d8d0bc'));
 </script>
 </body>
 </html>

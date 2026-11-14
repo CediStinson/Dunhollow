@@ -9954,6 +9954,16 @@ function paintGroundTexture(){
           if(fy>0.7 && fy<0.76 && fx>0.3 && fx<0.7 && rnd01(Math.floor(fx*30),tx*7+ty,158)<0.55) pc=mixC(pc,[52,50,52],0.6);
           if(fbm(gx*6,gy*6,159)>0.7) pc=mixC(pc,[70,84,58],0.4); }   // lichen
         const dust=1-smooth(0,1.6,Math.min(gx,gy)); pc=mixC(pc,[120,116,112],dust*0.3); }
+      else if(q.startsWith('rc_')){ const E={rc_nw:[[72,54,36],[40,30,20]], rc_ne:[[58,52,44],[30,28,24]], rc_sw:[[48,38,36],[22,16,18]], rc_se:[[78,64,50],[44,36,28]]}[q];   // the Rootdeep: dark earth with roots running through it, moss, glowing spores or black rot
+        pc=mixC(E[0],E[1],n*0.6+n2*0.4); const gr=0.9+0.2*n3; pc=[pc[0]*gr,pc[1]*gr,pc[2]*gr];
+        const rc=q==='rc_sw'?[36,24,26]:q==='rc_se'?[92,80,66]:[90,64,40], rt=Math.abs(fbm(gx*1.1,gy*1.1,192)-0.5), rt2=Math.abs(fbm(gx*2.4+7,gy*2.4,193)-0.5);
+        if(rt<0.04){ const t=rt/0.04; pc=mixC(rc,[rc[0]*0.55,rc[1]*0.55,rc[2]*0.55],t*t); if(t<0.35 && fbm(gx*1.1-0.05,gy*1.1-0.05,192)>0.5) pc=mixC(pc,[Math.min(255,rc[0]*1.6),Math.min(255,rc[1]*1.55),Math.min(255,rc[2]*1.5)],0.45); }   // a great root, lit along one side
+        else if(rt<0.07) pc=mixC(pc,[14,10,8],0.5*(1-(rt-0.04)/0.03));   // its shadow on the earth
+        else if(rt2<0.016) pc=mixC(pc,rc,0.7*(1-rt2/0.016));   // the little roots
+        if(q!=='rc_sw'){ const ms=fbm(gx*1.5,gy*1.5,194); if(ms>0.6) pc=mixC(pc,[58,80,38],Math.min(0.55,(ms-0.6)*3)); }
+        if(q==='rc_sw'){ const rot=fbm(gx*1.1,gy*1.1,195); if(rot>0.56) pc=mixC(pc,[26,12,30],Math.min(0.75,(rot-0.56)*3.5)); }
+        if(q==='rc_ne' && fbm(gx*6,gy*6,196)>0.8) pc=mixC(pc,[110,210,186],0.45);
+        if(q==='rc_se' && fbm(gx*2,gy*2,197)>0.66) pc=mixC(pc,[132,126,118],0.3); }
       else if(q==='under_se'){ const row=Math.floor(gy*1.4), U=unit(gx*1.4+(row%2)*0.5, gy*1.4, 17, 23, [30,25,24], [72,58,52], 0.08, 0.035); pc=U.c;   // the Ember Stair: blocks of black basalt, fissures with fire in them, ash, soot
         const cr=Math.abs(fbm(gx*0.9,gy*0.9,161)-0.5), on=fbm(gx*0.5,gy*0.5,163)>0.45;
         if(on && cr<0.011) pc=mixC([255,196,90],[255,120,40],cr/0.011); else if(on && cr<0.045) pc=mixC(pc,[150,52,20],0.75*(1-cr/0.045));
@@ -13845,7 +13855,7 @@ function mapLayout(){
       const [du,dv]=out(A,t), T=onEdge(A,t,[du,dv]), Bk=onEdge(B,Bk0,[-du,-dv]);
       const cand={u:pos[id].u+T.i+du-Bk.i, v:pos[id].v+T.j+dv-Bk.j};
       // where two doors don't quite agree, a place can land on top of one already drawn: slide it out along its road (or a little aside) until it is clear, and draw the road between
-      const RR=(typeof UCR!=='undefined'&&UCR[t.to])||(typeof OWR!=='undefined'&&OWR[t.to]), BN=new Set([id, ...(RR?Object.values(RR.ex).map(x=>Array.isArray(x)?x[0]:null):[])]);   // a chamber may touch the ones it has doors to
+      const RR=(typeof UCR!=='undefined'&&UCR[t.to])||(typeof OWR!=='undefined'&&OWR[t.to])||(typeof RCR!=='undefined'&&RCR[t.to]), BN=new Set([id, ...(RR?Object.values(RR.ex).map(x=>Array.isArray(x)?x[0]:null):[])]);   // a chamber may touch the ones it has doors to
       const hits=(c0)=>Object.keys(pos).some(pid=>{ const P=AREAS[pid], p=pos[pid]; if((P.layer||0)!==(B.layer||0) || P.under || B.under) return false;
         const m=((B.ucRoom||B.owRoom) && (P.ucRoom||P.owRoom) && !BN.has(pid)) ? 1 : 0;   // under the city, a chamber keeps a step clear of every chamber but the one it opens from
         return c0.u<p.u+P.w+m && c0.u+B.w+m>p.u && c0.v<p.v+P.h+m && c0.v+B.h+m>p.v; });
@@ -13858,7 +13868,7 @@ function mapLayout(){
     if(!queue.length && typeof MAP_UNDER!=='undefined' && !pos[MAP_UNDER.root] && AREAS[MAP_UNDER.root]){ pos[MAP_UNDER.root]={u:MAP_UNDER.u,v:MAP_UNDER.v}; queue.push(MAP_UNDER.root); }
     if(!queue.length && typeof MAP_ROOTS!=='undefined'){ const R=MAP_ROOTS.find(R=>!pos[R.root] && AREAS[R.root]); if(R){ pos[R.root]={u:R.u,v:R.v}; queue.push(R.root); } } }   // then the world below, under Hollowmere
   // under the city, two chambers placed from different sides can still end up with their doors facing across a gap: draw that passage too
-  [typeof UCR!=='undefined'?UCR:{}, typeof OWR!=='undefined'?OWR:{}].forEach(UCR=>Object.values(UCR).forEach(r=>['e','s'].forEach(d=>{ const s0=r.ex[d]; if(!Array.isArray(s0) || !UCR[s0[0]] || !pos[r.id] || !pos[s0[0]]) return; const A=AREAS[r.id], B=AREAS[s0[0]], pa=pos[r.id], pb=pos[s0[0]];
+  [typeof UCR!=='undefined'?UCR:{}, typeof OWR!=='undefined'?OWR:{}, typeof RCR!=='undefined'?RCR:{}].forEach(UCR=>Object.values(UCR).forEach(r=>['e','s'].forEach(d=>{ const s0=r.ex[d]; if(!Array.isArray(s0) || !UCR[s0[0]] || !pos[r.id] || !pos[s0[0]]) return; const A=AREAS[r.id], B=AREAS[s0[0]], pa=pos[r.id], pb=pos[s0[0]];
     if(MAP_LINKS.some(l=>(l.a===r.id&&l.b===s0[0])||(l.b===r.id&&l.a===s0[0]))) return;
     if(d==='e'){ const ya=pa.v+UCR[r.id].cy, yb=pb.v+UCR[s0[0]].cy, gap=pb.u-(pa.u+A.w); if(ya===yb && gap>0 && gap<=14) MAP_LINKS.push({a:r.id, ai:[A.w-1,UCR[r.id].cy], b:s0[0], bi:[0,UCR[s0[0]].cy], du:1, dv:0, grid:true}); }
     else { const xa=pa.u+UCR[r.id].cx, xb=pb.u+UCR[s0[0]].cx, gap=pb.v-(pa.v+A.h); if(xa===xb && gap>0 && gap<=14) MAP_LINKS.push({a:r.id, ai:[UCR[r.id].cx,A.h-1], b:s0[0], bi:[UCR[s0[0]].cx,0], du:0, dv:1, grid:true}); } })));
@@ -13891,7 +13901,7 @@ function renderMap(cv,V){                             // V: {zoom, px, py, label
   const P2=(u,v)=>{ const [px,py]=pj(u,v); return [ox+px*k, oy+py*k]; };
   ghost.forEach(id=>{ const A=AREAS[id], o=L[id], q=[P2(o.u,o.v),P2(o.u+A.w,o.v),P2(o.u+A.w,o.v+A.h),P2(o.u,o.v+A.h)]; c.fillStyle='rgba(120,110,90,0.07)'; c.strokeStyle='rgba(200,180,140,0.22)'; c.lineWidth=1;
     c.beginPath(); q.forEach((p2,n)=>n?c.lineTo(p2[0],p2[1]):c.moveTo(p2[0],p2[1])); c.closePath(); c.fill(); c.stroke();
-    if(V.labels && (LAY===-2 ? /Varrow/ : /^Hollowmere/).test(A.label||'')){ const m=P2(o.u+A.w/2,o.v+A.h/2); c.font='italic 12px Georgia,serif'; c.textAlign='center'; c.fillStyle='rgba(220,200,160,0.35)'; c.fillText(A.label.replace('Hollowmere · ',''),m[0],m[1]-14); } });
+    if(V.labels && (LAY===-3 ? /Sylvhaven|Silver Gate|Fellings/ : LAY===-2 ? /Varrow/ : /^Hollowmere/).test(A.label||'')){ const m=P2(o.u+A.w/2,o.v+A.h/2); c.font='italic 12px Georgia,serif'; c.textAlign='center'; c.fillStyle='rgba(220,200,160,0.35)'; c.fillText(A.label.replace('Hollowmere · ',''),m[0],m[1]-14); } });
   ids.sort((x,y)=>(AREAS[x].under?1:0)-(AREAS[y].under?1:0));   // tunnels last: a dashed shadow crossing over the road above
   ids.forEach(id=>{ const A=AREAS[id], o=L[id], cur=id===areaId, notch=A.notches();
     c.globalAlpha=A.under&&!cur?0.6:1; if(A.under) c.setLineDash([4,3]);
@@ -13976,7 +13986,7 @@ function drawBigMap(){ const cv=document.getElementById('bigmap-canvas'); if(!cv
   if(cv.width!==Math.round(r.width*d)||cv.height!==Math.round(r.height*d)){ cv.width=Math.round(r.width*d); cv.height=Math.round(r.height*d); }
   const c=cv.getContext('2d'); c.setTransform(1,0,0,1,0,0); c.fillStyle='#0e0904'; c.fillRect(0,0,cv.width,cv.height);
   renderMap(cv,{zoom:BIGMAP.zoom, px:BIGMAP.px*d, py:BIGMAP.py*d, labels:true});
-  const hd=document.querySelector('#bigmap .bm-head span'); if(hd) hd.textContent=({'-1':'Beneath Hollowmere','-2':'Beneath Varrowdeep'})[mapLayerShown()]||'Map of the Valley'; }
+  const hd=document.querySelector('#bigmap .bm-head span'); if(hd) hd.textContent=({'-1':'Beneath Hollowmere','-2':'Beneath Varrowdeep','-3':'Beneath Sylvhaven'})[mapLayerShown()]||'Map of the Valley'; }
 function openBigMap(){
   let ov=document.getElementById('bigmap');
   if(!ov){ ov=document.createElement('div'); ov.id='bigmap';
@@ -13995,7 +14005,7 @@ function openBigMap(){
     ov.querySelectorAll('[data-z]').forEach(bt=>bt.addEventListener('click',()=>{ const z=+bt.dataset.z, r=cv.getBoundingClientRect();
       if(!z){ centerBigMap(); drawBigMap(); } else zoomAt(z,r.left+r.width/2,r.top+r.height/2); }));
     ov.querySelector('.bm-x').addEventListener('click',closeBigMap);
-    ov.querySelector('.bm-layer').addEventListener('click',()=>{ const here=(AREAS[areaId].layer||0); const LS=[0,-1,-2].filter(l=>!l || Object.keys(AREAS).some(id=>visitedAreas[id] && (AREAS[id].layer||0)===l)); BIGMAP.layer = LS[(LS.indexOf(mapLayerShown())+1)%LS.length]; if(BIGMAP.layer===here) BIGMAP.layer=null; centerBigMap(); drawBigMap(); });
+    ov.querySelector('.bm-layer').addEventListener('click',()=>{ const here=(AREAS[areaId].layer||0); const LS=[0,-1,-2,-3].filter(l=>!l || Object.keys(AREAS).some(id=>visitedAreas[id] && (AREAS[id].layer||0)===l)); BIGMAP.layer = LS[(LS.indexOf(mapLayerShown())+1)%LS.length]; if(BIGMAP.layer===here) BIGMAP.layer=null; centerBigMap(); drawBigMap(); });
     addEventListener('resize',()=>{ if(BIGMAP.open) drawBigMap(); }); }
   BIGMAP.open=true; BIGMAP.layer=null; ov.classList.add('open'); BIGMAP.zoom=1.6; centerBigMap(); drawBigMap();
 }
@@ -15067,6 +15077,7 @@ function drawActorBase(e){
   else if(e.type==='sandworm') drawSandworm(s.x,B,e,poseFor(e));
   else if(e.type==='scarab') drawScarab(s.x,B,e,poseFor(e));
   else if(e.type==='ember') drawEmber(s.x,B,e,poseFor(e));
+  else if(e.type==='rootmother') drawRootMother(s.x,B,e,poseFor(e));
   else if(e.type==='hunger') drawHunger(s.x,B,e,poseFor(e));
   else if(e.type==='hollow') drawHollow(s.x,B,e,poseFor(e));
   else if(e.type==='gnawer') drawGnawer(s.x,B,e,poseFor(e));
@@ -15083,7 +15094,7 @@ function drawActorBase(e){
   g.restore();
   if(!isP && e.dead) return;
   if(isP && romHush()) return;
-  const ty=B-(e.type==='rat'?40:e.type==='ratking'?66:e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'?66:e.type==='dragon'?300:e.type==='bear'?92:e.type==='troll'?150:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:e.type==='hollow'?272:114)+dwarfDrop(e.opts);
+  const ty=B-(e.type==='rat'?40:e.type==='ratking'?66:e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'?66:e.type==='dragon'?300:e.type==='bear'?92:e.type==='troll'?150:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:e.type==='rootmother'?214:e.type==='hollow'?272:114)+dwarfDrop(e.opts);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const deadly=!isP && e.type!=='dummy' && e.hostile!==false && e.tier && typeof foeLevel==='function' && foeLevel(e)-playerLevel()>=3;   // far stronger than you: a skull
   const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  Lv '+(typeof foeLevel==='function'?foeLevel(e):e.tier) : ''), tw=g.measureText(label).width;
@@ -27862,6 +27873,259 @@ OBJ_DRAW.oreseam=o=>{ const [w,h]=o.fp||[1,1], q=P(o.i+w/2,o.j+h/2), sd=o.i*31+o
   g.restore();
   for(let k=0;k<10;k++){ const x=q.x+(R(k,2013)-0.5)*W*2.2, y=q.y+W*0.1+(R(k,2014)-0.5)*8, s=2+R(k,2015)*3; g.fillStyle=tone('#4a4640',-0.1-R(k,2016)*0.3); g.beginPath(); g.moveTo(x-s,y); g.lineTo(x,y-s*0.8); g.lineTo(x+s,y); g.closePath(); g.fill(); }   // chips at its foot
   const pk=P(o.i+w*0.3,o.j+h*0.9); g.strokeStyle='#4a3220'; g.lineWidth=3; g.lineCap='round'; g.beginPath(); g.moveTo(pk.x,pk.y-16); g.lineTo(pk.x-15,pk.y+2); g.stroke(); g.strokeStyle='#6a6c72'; g.lineWidth=2.4; g.beginPath(); g.moveTo(pk.x-5,pk.y-20); g.quadraticCurveTo(pk.x+2,pk.y-18,pk.x+5,pk.y-11); g.stroke(); };
+// ════════ THE ROOTDEEP: under Sylvhaven the great tree's roots go down further than anyone has walked, and the rot the Hunger left behind went down with them.
+//   Built like the Undercity, chamber by chamber, four reaches: the Taproot Halls (under the tree, where the elves still keep a watch), the Fungal Deeps (glowing caps
+//   taller than a man), the Rot Warrens (black sap, husks growing in cocoons) and the Heartroot, where the Rot-Mother sits on the tree's oldest root and feeds.
+//   Its own trouble: the roots are alive. Some ways are woven shut by day and open at night; others the other way round. A drift you could not reach at noon is open at midnight ════════
+const RC_N=4, RC_QS=['rc_nw','rc_ne','rc_sw','rc_se'], RC_QXY={rc_nw:[0,0],rc_ne:[1,0],rc_sw:[0,1],rc_se:[1,1]};
+const rcId=(X,Y)=>'rc_'+X+'_'+Y, RCR={}, RC_SHIFT={}, rcKey=(a,b)=>a<b?a+'|'+b:b+'|'+a;
+const RC_LABEL={ rc_nw:'The Taproot Halls', rc_ne:'The Fungal Deeps', rc_sw:'The Rot Warrens', rc_se:'The Heartroot' };
+const RC_OUT={ [rcId(0,0)]:{ n:['sylvhaven','fromRoots'] }, [rcId(7,7)]:{ e:['fellings','fromRoots'] } };
+const rcNight=()=>nightAmt()>0.5;
+const rcOpen=(a,b)=>{ const s=RC_SHIFT[rcKey(a,b)]; if(!s || (typeof MAP_ALL!=='undefined' && MAP_ALL)) return true; return s==='night' ? rcNight() : !rcNight(); };
+(()=>{ const link=new Set(), L=(a,b)=>{ link.add(a+'|'+b); link.add(b+'|'+a); };
+  RC_QS.forEach((q,qi)=>{ const [QX,QY]=RC_QXY[q]; let st=(0x6a09e66+qi*0x3c6ef372)|0;
+    const rnd=()=>{ st=(st+0x6D2B79F5)|0; let t=Math.imul(st^st>>>15,1|st); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; };
+    const id=(x,y)=>rcId(QX*RC_N+x,QY*RC_N+y), seen=new Set(['0,0']), stack=[[0,0]];
+    while(stack.length){ const [x,y]=stack[stack.length-1], nb=[[1,0],[-1,0],[0,1],[0,-1]].map(([a,b])=>[x+a,y+b]).filter(([a,b])=>a>=0&&b>=0&&a<RC_N&&b<RC_N&&!seen.has(a+','+b));
+      if(!nb.length){ stack.pop(); continue; } const [nx,ny]=nb[Math.floor(rnd()*nb.length)]; seen.add(nx+','+ny); L(id(x,y),id(nx,ny)); stack.push([nx,ny]); } });
+  [[3,1,4,1],[1,3,1,4],[6,3,6,4],[3,6,4,6]].forEach(([a,b,c,d])=>L(rcId(a,b),rcId(c,d)));
+  const deg=id=>[...link].filter(k=>k.startsWith(id+'|')).length;
+  RC_QS.forEach((q,qi)=>{ const [QX,QY]=RC_QXY[q], id=(x,y)=>rcId(QX*RC_N+x,QY*RC_N+y); let st=(0x1b873593+qi*0x85ebca6b)|0;
+    const rnd=()=>{ st=(st+0x6D2B79F5)|0; let t=Math.imul(st^st>>>15,1|st); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; };
+    const extra=[]; for(let y=0;y<RC_N;y++) for(let x=0;x<RC_N;x++) [[1,0],[0,1]].forEach(([a,b])=>{ if(x+a<RC_N && y+b<RC_N && !link.has(id(x,y)+'|'+id(x+a,y+b))) extra.push([id(x,y),id(x+a,y+b)]); });
+    extra.map(e=>[e,rnd()]).sort((a,b)=>a[1]-b[1]).map(e=>e[0]).filter(([a,b])=>deg(a)>=2 && deg(b)>=2 && !RC_OUT[a] && !RC_OUT[b]).slice(0,3).forEach(([a,b],k)=>{ L(a,b); if(k<2) RC_SHIFT[rcKey(a,b)]=k?'night':'day'; }); });
+  for(let Y=0;Y<8;Y++) for(let X=0;X<8;X++){ const id=rcId(X,Y), q=RC_QS[(X<4?0:1)+(Y<4?0:2)], ex={};
+    Object.entries(UC_DIRS).forEach(([d,[a,b]])=>{ const to=rcId(X+a,Y+b); if(link.has(id+'|'+to)) ex[d]=[to,'from'+UC_OPP[d].toUpperCase()]; });
+    const O=RC_OUT[id]; if(O) Object.keys(UC_DIRS).forEach(d=>{ if(O[d]) ex[d]=O[d]; });
+    RCR[id]={ id, X, Y, q, ex, hs:hsh(X*43+29,Y*61+11) }; }
+  // a night drift in each reach: a dead end the roots only open after dark
+  RC_QS.forEach(q=>{ const ends=Object.values(RCR).filter(r=>r.q===q && !RC_OUT[r.id] && Object.keys(r.ex).length===1).sort((a,b)=>(a.hs%311)-(b.hs%311));
+    const r=ends.length>1 ? ends[1] : null; if(!r) return; const [to]=Object.values(r.ex)[0]; RC_SHIFT[rcKey(r.id,to)]='night'; r.nightDrift=true; });
+})();
+(()=>{ RC_QS.forEach(q=>{ const c=Object.values(RCR).filter(r=>r.q===q && !RC_OUT[r.id] && Object.keys(r.ex).length>=3).sort((a,b)=>Object.keys(b.ex).length-Object.keys(a.ex).length || (a.hs%97)-(b.hs%97))[0]; if(c) c.cavern=true; });
+  Object.values(RCR).forEach(r=>{ const ex=Object.keys(r.ex), n=ex.length, has=d=>ex.includes(d), straight=n===2 && ((has('n')&&has('s'))||(has('w')&&has('e')));
+    r.kind = r.cavern ? 'square' : n>=3 ? (r.hs%3===0?'vault':'cross') : n===1 ? 'end' : straight ? 'hall' : 'bend'; }); })();
+chamberFit(RCR,17,8);
+const RC_TOKEN_ROOM={}; RC_QS.forEach(q=>{ const outs=Object.values(RCR).filter(r=>r.q===q && RC_OUT[r.id]).map(r=>r.id), starts=outs.length ? outs : Object.values(RCR).filter(r=>r.q===q && Object.values(r.ex).some(([to])=>!RCR[to] || RCR[to].q!==q)).map(r=>r.id), dist={}, Q=[...starts]; starts.forEach(s=>dist[s]=0);
+  while(Q.length){ const id=Q.shift(); Object.values(RCR[id].ex).forEach(([to])=>{ if(RCR[to] && RCR[to].q===q && dist[to]==null && !RCR[to].nightDrift){ dist[to]=dist[id]+1; Q.push(to); } }); }
+  let best=null; Object.values(RCR).forEach(r=>{ if(r.q===q && r.kind==='end' && !r.nightDrift && dist[r.id]!=null && (best==null || dist[r.id]>dist[best])) best=r.id; }); RC_TOKEN_ROOM[q]=best; });
+const RC_DEEP_LOOT=['elf_boots','potion','elf_cloak','mana_potion','moonbell','elf_leggings','amber_brooch','potion','silver_torc','mana_potion','elf_circlet','moonbell'].filter(id=>ITEMS[id]);
+Object.assign(DUNGEON_FINDS,{ rc_nw:['moonbell','potion','horn_comb','silver_spoon','bread','apple'], rc_ne:['moonbell','mana_potion','sea_glass','potion','thimble'], rc_sw:['bone_dice','grave_ring','potion','amber_brooch','mana_potion','rusty_key'], rc_se:['silver_torc','amber_brooch','moonbell','mana_potion','potion','grave_ring'] });
+const RC_RUNES={ rc_nw:["Elven letters, cut into a root and filled with silver: <i>Here the Taproot drinks. Walk softly; she feels your feet.</i>","A watch-post's tally, in a neat elven hand: four nights quiet, then a single word, <i>moving</i>, and nothing after it."],
+  rc_ne:["The caps here glow when you breathe on them. Someone has drawn faces in the spore-dust on the walls, and all the faces are smiling.","Scratched in Common, unsteadily: <i>don't eat them. Tamsin ate one. Tamsin is still laughing.</i>"],
+  rc_sw:["The roots here are black to the heart and weep a sap that will not dry. Where it drips, the earth goes soft and cold.","A cocoon of bark and rot, split down the side. Whatever was in it walked away."],
+  rc_se:["The oldest root of the great tree, thick as a tower, and something has grown into it like a canker. It is warm. It has a pulse.","An elven helm, crushed, half swallowed by a root. The root has grown round it in the shape of a hand."] };
+function rcObjects(r){ const out=[], seed=r.hs, W=ucWalk(r), used=new Set(), take=(i,j)=>used.add(i+','+j), solid=new Set();
+  const shut=new Set(Object.keys(r.ex).filter(d=>{ const s=r.ex[d]; return Array.isArray(s) && RCR[s[0]] && !rcOpen(r.id,s[0]); }));
+  const keepsWay=(i,j)=>{ solid.add(i+','+j); const ex=Object.keys(r.ex).filter(d=>!shut.has(d)); if(!ex.length){ solid.delete(i+','+j); return false; } const S=ucEdge(r,ex[0]), seen=new Set([S.join(',')]), Q=[S];
+    while(Q.length){ const [a,b]=Q.shift(); [[1,0],[-1,0],[0,1],[0,-1]].forEach(([c,d])=>{ const x=a+c, y=b+d, k=x+','+y; if(x<0||y<0||x>=r.w||y>=r.h||seen.has(k)||!r.G[y*r.w+x]||solid.has(k)) return; seen.add(k); Q.push([x,y]); }); }
+    const ok=ex.every(d=>seen.has(ucEdge(r,d).join(','))) && W.every(([x,y])=>solid.has(x+','+y) || seen.has(x+','+y)); if(!ok) solid.delete(i+','+j); return ok; };
+  const free=(i,j)=>!used.has(i+','+j) && !ucNearDoor(r,i,j);
+  Object.entries(r.ex).forEach(([d,spec])=>{ if(!Array.isArray(spec)) return; const [to,entry]=spec, [i,j]=ucEdge(r,d);
+    if(RCR[to] && shut.has(d)){ out.push({type:'rcroots', i, j, to, d, kind:RC_SHIFT[rcKey(r.id,to)]}); take(i,j); solid.add(i+','+j); return; }
+    out.push({type:'teleporter', i, j, to, entry}); take(i,j); });
+  const q=r.q, wall=W.filter(([i,j])=>(i===0||j===0) && free(i,j) && !(i===r.cx||j===r.cy));
+  const prop=(t,k)=>{ const c=wall.filter(([i,j])=>!used.has(i+','+j))[k]; if(c && keepsWay(c[0],c[1])){ out.push({...t, i:c[0], j:c[1]}); take(c[0],c[1]); return true; } return false; };
+  W.forEach(([i,j])=>{ if(!free(i,j)) return; const hv=hsh(i*17+seed,j*31+r.Y);
+    if(hv%6===0) out.push({type:'rcglow', i, j, noblock:true, v:q==='rc_ne'?0:q==='rc_sw'?2:1});
+    else if(q==='rc_sw' && hv%7===1) out.push({type:'blacksap', i, j, noblock:true});
+    else if(hv%11===2) out.push({type:'bones', i, j, noblock:true});
+    else if(hv%13===3) out.push({type:'ucjunk', kind:'web', i, j, noblock:true}); });
+  if(r.kind!=='bend'){
+    if(q==='rc_ne'){ prop({type:'rcshroom', v:seed%3},0); if(r.kind!=='hall') prop({type:'rcshroom', v:(seed+1)%3, small:true},2); }
+    else if(q==='rc_sw' && seed%2) prop({type:'rccocoon', v:seed%2},0);
+    else if(q==='rc_se' && seed%3===0) prop({type:'rccocoon', v:1},1);
+    else if(q==='rc_nw' && (r.kind==='cross'||r.kind==='vault'||seed%3===0)) prop({type:'lantern'},(seed>>>2)%2); }
+  if((seed%5===0 || r.cavern) && RC_RUNES[q]){ const s=W.find(([i,j])=>free(i,j) && (i===0||j===0) && i!==r.cx && j!==r.cy && keepsWay(i,j)); if(s){ out.push({type:'rune', i:s[0], j:s[1], text:RC_RUNES[q][(seed>>>3)%RC_RUNES[q].length]}); take(...s); } }
+  if(r.kind==='end'){ const s=W.find(([i,j])=>free(i,j) && keepsWay(i,j)) || [r.cx,r.cy], key=r.id+':'+s[0]+','+s[1];
+    if(!collectedPickups.has(key)) out.push({type:'pickup', i:s[0], j:s[1], item:RC_DEEP_LOOT[(r.X*7+r.Y*3+seed)%RC_DEEP_LOOT.length]}); take(...s);
+    if(r.nightDrift){ const c=W.find(([i,j])=>free(i,j) && i!==r.cx && j!==r.cy && keepsWay(i,j)); if(c){ out.push({type:'crate', i:c[0], j:c[1], rich:true}); take(...c); } } }
+  dungeonFind(r,out,()=>{ const busy=new Set(out.filter(o=>!o.noblock).map(o=>o.i+','+o.j)); const s=W.slice().reverse().find(([i,j])=>free(i,j) && !busy.has(i+','+j) && i!==r.cx && j!==r.cy && keepsWay(i,j)); if(s) take(...s); return s; });
+  return out; }
+// ── the Rootdeep's creatures: rotgnawers and hollow husks as in the tree above, thorn-witches deeper down, and the rot-shamans, who speak a new tongue:
+//    Rootgrasp (the floor takes your feet: slower to strike), Spore Cloud (it gets into your lungs: poison) and Sap Mend (it heals itself on the tree's blood)
+SKINS[49]='#4e5a3a';
+const ROOTSHAMAN=(o)=>({gender:'m', race:'elf', skin:49, hair:6, hairColor:12, face:1, beard:0, eyeColor:3, shade:'thorn', ...o, equip:{...NOEQ, armor:'robe', head:'hood', weapon:'staff_oak', ...((o&&o.equip)||{})}});
+FOES.rootshaman={ label:'Rot-Shaman', base:48, stagger:1.0, pattern:[{wait:1.2,wind:1.05,after:0.7,dir:'left'},{wait:1.0,wind:0.95,after:0.6,dir:'up'},{wait:1.6,wind:1.3,after:0.8,dir:'right'},{wait:0.9,wind:1.0,after:0.6,dir:'up'}] };
+FOES.rootmother={ label:'The Rot-Mother', base:140, stagger:0.6, pattern:[{wait:1.4,wind:1.25,after:0.8,dir:'left'},{wait:0.6,wind:0.8,after:0.5,dir:'right'},{wait:1.6,wind:1.4,after:0.9,dir:'up'},{wait:0.5,wind:0.7,after:0.6,dir:'left'},{wait:1.2,wind:1.1,after:0.8,dir:'right'}] };
+SPIRIT_TYPES.add('rootshaman'); SPIRIT_TYPES.add('rootmother');
+const ROOT_SPELLS={ left:{ name:'Rootgrasp', col:'#8ab050', rgb:'140,180,80' }, up:{ name:'Spore Cloud', col:'#c8c070', rgb:'200,190,110' }, right:{ name:'Sap Mend', col:'#e0a040', rgb:'230,170,70' } };
+{ const _fs=foeSpell; foeSpell=function(f){ if(f && f.type==='rootshaman') return ROOT_SPELLS[f.swingDir]||ROOT_SPELLS.right; return _fs.apply(this,arguments); }; }
+{ const _fx=foeSpellFx; foeSpellFx=function(f,S){ if(!S || !/^(Rootgrasp|Spore Cloud|Sap Mend)$/.test(S.name)) return _fx.apply(this,arguments);
+    if(S.name==='Rootgrasp'){ addStatus(player,'chill',4,0); floatText([player.i,player.j-0.004],'Rooted!','#8ab050'); if(duel.st==='attack'){ duel.t+=0.45; duel.atkWind+=0.45; } logMsg('Roots burst out of the floor and close round your ankles. Every swing comes slower.','#8ab050'); }
+    else if(S.name==='Spore Cloud'){ addStatus(player,'venom',6,2); floatText([player.i,player.j-0.004],'Spores!','#c8c070'); }
+    else { const h=Math.min(10,f.maxHp-f.hp); if(h>0){ f.hp+=h; floatText([f.i,f.j-0.003],'+'+h,'#e0a040'); logMsg(shortName(f)+' drinks from the root at its feet, and its wounds close.','#e0a040'); } } }; }
+// a staff wards a spell; the Sap Mend heals it even so, when it lands
+{ const prev=impact; impact=function(f){ const hp0=player.hp; const r=prev(f); try{ const hurt=player.hp<hp0 && player.hp>0 && !combat.practice;
+      if(f.type==='rootshaman' && f.swingDir==='right' && !f.dead){ const h=Math.min(6,f.maxHp-f.hp); if(h>0 && !hurt){ f.hp+=h; floatText([f.i,f.j-0.003],'+'+h,'#e0a040'); } }
+      if(hurt && f.type==='rootmother'){ if(Math.random()<0.35) addStatus(player,'venom',6,2); if(Math.random()<0.25){ addStatus(player,'chill',4,0); floatText([player.i,player.j-0.004],'Rooted!','#8ab050'); } } }catch(e){} return r; }; }
+BEASTS.unshift({ k:'rootshaman', is:f=>f.type==='rootshaman', name:'Rot-Shamans', kind:'Made by the Hunger · the Rootdeep', how:"Three spells of the rotten root: Rootgrasp, Spore Cloud and Sap Mend.", res:"Half a spirit: your own spells land softer on it.", aff:"Rootgrasp slows your strikes; the spores poison; and it heals itself on the tree's sap. Kill it quick, or ward the right." },
+  { k:'rootmother', is:f=>f.type==='rootmother', name:'The Rot-Mother', kind:'The rot at the heart of the great tree · the Heartroot', how:"Five lashes of root, quick and slow; she never stops.", res:"Dead wood and black sap: no bleeding.", aff:"Her roots poison and grasp: often you are slowed, often poisoned. Bring cures." });
+function drawRootMother(x,B,e,pose){ const fade=e.dead?Math.max(0,1-(e.fallT||0)/1.4):1; if(fade<=0) return;   // a mass of roots risen out of the floor, a swollen canker of bark, a heart of sick light
+  const k=pose&&pose.kind==='raise'?Math.min(1,pose.t):0, sk=pose&&pose.kind==='strike'?Math.min(1,pose.t):0, t=gt*1.4+(e.id||0), y=B-8-Math.sin(gt*1.2)*3;
+  g.save(); g.globalAlpha*=fade;
+  g.fillStyle='rgba(8,4,10,0.5)'; g.beginPath(); g.ellipse(x,B+3,74,20,0,0,Math.PI*2); g.fill();
+  g.save(); g.globalCompositeOperation='lighter'; glow(x,y-100,110,130,'150,180,60',0.18+0.05*Math.sin(gt*2)); g.restore();
+  for(let r=0;r<9;r++){ const a=-1.4+r*0.35, ex=x+Math.sin(a)*86, ey=B+Math.cos(a)*10, sw=Math.sin(t+r*1.3)*6, lash=(r===2||r===6)?sk*30:0, lift=k*14;   // roots running out across the floor
+    g.strokeStyle=r%2?'#2a1a10':'#3a2616'; g.lineWidth=13-Math.abs(r-4)*1.6; g.lineCap='round'; g.beginPath(); g.moveTo(x+(r-4)*6,y-50); g.bezierCurveTo(x+(r-4)*12,y-24-lift,ex-(r-4)*5+sw+lash,ey-20-lift,ex+lash*1.4,ey-lift*0.3); g.stroke();
+    g.strokeStyle='rgba(200,170,120,0.18)'; g.lineWidth=2; g.stroke(); }
+  const body=()=>{ g.beginPath(); g.moveTo(x-38,y-40); g.bezierCurveTo(x-64,y-90,x-50,y-150,x-20,y-176); g.quadraticCurveTo(x,y-190,x+22,y-176); g.bezierCurveTo(x+52,y-150,x+64,y-90,x+38,y-40); g.quadraticCurveTo(x,y-26,x-38,y-40); g.closePath(); };
+  body(); const bg=g.createLinearGradient(x-60,0,x+60,0); bg.addColorStop(0,'#5a4028'); bg.addColorStop(0.45,'#3a2818'); bg.addColorStop(1,'#140c06'); g.fillStyle=bg; g.fill();
+  g.save(); body(); g.clip();
+  for(let k2=0;k2<18;k2++){ const sx=x-50+k2*6, ph=Math.sin(k2*1.7)*8; g.strokeStyle=k2%3?'rgba(20,12,6,0.5)':'rgba(200,170,120,0.15)'; g.lineWidth=k2%3?2:1.2; g.beginPath(); g.moveTo(sx,y-20); g.bezierCurveTo(sx+ph,y-80,sx-ph,y-130,sx+ph*0.5,y-190); g.stroke(); }   // the grain of the bark, twisting up
+  const hy=y-104, beat=0.75+0.25*Math.abs(Math.sin(gt*2.6));
+  for(let c=0;c<7;c++){ const an=c/7*Math.PI*2+0.3; let px=x, py=hy; g.strokeStyle=`rgba(190,220,80,${0.55*beat})`; g.lineWidth=2.2; g.beginPath(); g.moveTo(px,py); for(let s=0;s<5;s++){ px+=Math.cos(an+Math.sin(s*1.9+c)*0.6)*11; py+=Math.sin(an+Math.sin(s*1.9+c)*0.6)*9; g.lineTo(px,py); } g.stroke(); }   // cracks running out from the heart, lit from inside
+  g.restore();
+  const hg=g.createRadialGradient(x,hy,2,x,hy,26*beat); hg.addColorStop(0,'rgba(250,255,190,0.95)'); hg.addColorStop(0.35,'rgba(170,210,60,0.8)'); hg.addColorStop(1,'rgba(90,120,20,0)'); g.fillStyle=hg; g.beginPath(); g.ellipse(x,hy,26*beat,22*beat,0,0,Math.PI*2); g.fill();
+  g.save(); g.globalCompositeOperation='lighter'; glow(x,hy,60*beat,50*beat,'180,220,70',0.4); g.restore();
+  g.fillStyle='#0a0604'; [[-14,-150],[14,-150]].forEach(([dx,dy])=>{ g.beginPath(); g.ellipse(x+dx,y+dy,6,9,dx<0?0.3:-0.3,0,Math.PI*2); g.fill(); });   // two hollows in the bark, like eyes
+  g.fillStyle='rgba(190,220,80,0.7)'; [[-14,-148],[14,-148]].forEach(([dx,dy])=>{ g.beginPath(); g.arc(x+dx,y+dy,1.8,0,Math.PI*2); g.fill(); });
+  for(let c=0;c<7;c++){ const a=-1.2+c*0.4, L=40+Math.sin(c*2.3)*14+k*10, bx=x+Math.sin(a)*18, by=y-178;   // a crown of thorny roots
+    g.strokeStyle='#2a1a10'; g.lineWidth=5-Math.abs(c-3)*0.6; g.beginPath(); g.moveTo(bx,by); g.quadraticCurveTo(bx+Math.sin(a)*L*0.6,by-L*0.6,bx+Math.sin(a)*L+Math.sin(t+c)*4,by-L); g.stroke(); }
+  for(let d=0;d<4;d++){ const px=x-30+d*20+Math.sin(t*1.3+d)*3, py=y-60-((gt*30+d*20)%40); g.fillStyle='rgba(20,10,20,0.8)'; g.beginPath(); g.ellipse(px,py,2,3,0,0,Math.PI*2); g.fill(); }   // black sap dripping
+  g.restore(); }
+// ── how the Rootdeep looks: dark earth threaded with roots and moss; the walls earth held in a net of roots, tendrils hanging, fungus glowing, sap weeping ──
+function paintRootWalls(q){ const {w,h}=ROOM, H=140, sd=(areaId.length*37+w*7+h*3)|0, gaps=backDoorGaps(), near=(side,u,r)=>gaps.some(d=>d.side===side && Math.abs(d.u-u)<r);
+  const earth={rc_nw:['#4a3826','#2a1e14'], rc_ne:['#3a3228','#1e1a14'], rc_sw:['#2e2420','#120c0c'], rc_se:['#4a3a2e','#221a14']}[q];
+  const quad=(side,u0,u1,h0,h1,fill)=>{ const a=WPT(side,u0,h0), b=WPT(side,u1,h0), c=WPT(side,u1,h1), d=WPT(side,u0,h1); g.fillStyle=fill; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c.x,c.y); g.lineTo(d.x,d.y); g.closePath(); g.fill(); };
+  [['r',w,0],['l',h,1]].forEach(([side,len,si])=>{ const p0=WPT(side,0,0), gr=g.createLinearGradient(0,p0.y,0,p0.y-H); gr.addColorStop(0,tone(earth[0],si?-0.12:0)); gr.addColorStop(0.7,earth[1]); gr.addColorStop(1,'#080604'); quad(side,0,len,0,H,gr);
+    for(let k=0;k<len*30;k++){ const u=rnd01(k,si,2101)*len, hh=rnd01(k,si,2102)*H*0.9, a=WPT(side,u,hh); g.fillStyle=rnd01(k,si,2103)<0.5?'rgba(0,0,0,0.25)':'rgba(255,230,190,0.07)'; g.fillRect(a.x,a.y,2+rnd01(k,si,2104)*3,1.5); }   // the earth: grit and pebbles
+    for(let k=0;k<len*1.3;k++){ const u0=rnd01(k,si,2105)*len, h0=10+rnd01(k,si,2106)*H*0.75, du=(rnd01(k,si,2107)<0.5?-1:1)*(2.5+rnd01(k,si,2107)*3), dh=(rnd01(k,si,2108)-0.5)*40, th=3+rnd01(k,si,2109)*5;   // roots across the wall, crossing and knotting
+      const a=WPT(side,u0,h0), b=WPT(side,Math.max(0,Math.min(len,u0+du)),Math.max(4,Math.min(H-6,h0+dh))), c1=WPT(side,u0+du*0.3,h0+dh*0.9+14), c2=WPT(side,u0+du*0.7,h0+dh*0.1-10);
+      const rc=q==='rc_sw'?'#1a1210':q==='rc_se'?'#6a5a48':'#3e2a18';
+      g.strokeStyle='rgba(0,0,0,0.4)'; g.lineWidth=th+3; g.lineCap='round'; g.beginPath(); g.moveTo(a.x+2,a.y+3); g.bezierCurveTo(c1.x+2,c1.y+3,c2.x+2,c2.y+3,b.x+2,b.y+3); g.stroke();
+      g.strokeStyle=rc; g.lineWidth=th; g.beginPath(); g.moveTo(a.x,a.y); g.bezierCurveTo(c1.x,c1.y,c2.x,c2.y,b.x,b.y); g.stroke();
+      g.strokeStyle=q==='rc_sw'?'rgba(140,90,170,0.25)':'rgba(220,190,140,0.22)'; g.lineWidth=Math.max(1,th*0.25); g.beginPath(); g.moveTo(a.x-th*0.2,a.y-th*0.3); g.bezierCurveTo(c1.x-th*0.2,c1.y-th*0.3,c2.x-th*0.2,c2.y-th*0.3,b.x-th*0.2,b.y-th*0.3); g.stroke(); }
+    for(let k=0;k<len*3;k++){ const u=rnd01(k,si,2110)*len, a=WPT(side,u,H-2), L=20+rnd01(k,si,2111)*55, sw=(rnd01(k,si,2112)-0.5)*10; g.strokeStyle=q==='rc_sw'?'rgba(30,20,24,0.8)':'rgba(70,50,30,0.85)'; g.lineWidth=1.2+rnd01(k,si,2113)*1.6; g.beginPath(); g.moveTo(a.x,a.y); g.quadraticCurveTo(a.x+sw,a.y+L*0.5,a.x+sw*0.4,a.y+L); g.stroke(); }   // tendrils hanging from above
+    if(q!=='rc_sw') for(let k=0;k<len*2;k++){ const u=rnd01(k,si,2114)*len, hh=rnd01(k,si,2115)*40, c=WPT(side,u,hh), r=10+rnd01(k,si,2116)*18; const mg=g.createRadialGradient(c.x,c.y,0,c.x,c.y,r); mg.addColorStop(0,'rgba(70,100,40,0.5)'); mg.addColorStop(1,'rgba(70,100,40,0)'); g.fillStyle=mg; g.beginPath(); g.ellipse(c.x,c.y,r,r*0.6,0,0,Math.PI*2); g.fill(); }   // moss low on the wall
+    if(q==='rc_ne'||q==='rc_nw') for(let k=0;k<len*(q==='rc_ne'?2.5:0.8);k++){ const u=rnd01(k,si,2117)*len; if(near(side,u,0.8)) continue; const c=WPT(side,u,20+rnd01(k,si,2118)*(H-50)), col=q==='rc_ne'?'120,230,200':'210,230,160';   // shelf fungus, glowing
+      for(let m=0;m<3;m++){ const cx=c.x+(m-1)*6, cy=c.y-m*4; g.fillStyle=`rgba(${col},0.75)`; g.beginPath(); g.ellipse(cx,cy,6-m,2.4,0,Math.PI,0); g.fill(); }
+      g.save(); g.globalCompositeOperation='lighter'; glow(c.x,c.y-4,18,12,col,0.28); g.restore(); }
+    if(q==='rc_sw') for(let k=0;k<len*2;k++){ const u=rnd01(k,si,2119)*len, a=WPT(side,u,H*(0.3+0.5*rnd01(k,si,2120))), L=20+rnd01(k,si,2121)*50; const sg=g.createLinearGradient(0,a.y,0,a.y+L); sg.addColorStop(0,'rgba(16,6,20,0.85)'); sg.addColorStop(1,'rgba(16,6,20,0)'); g.fillStyle=sg; g.fillRect(a.x-2,a.y,4,L); g.fillStyle='rgba(150,100,200,0.35)'; g.fillRect(a.x-0.6,a.y,1.2,L*0.6); }   // black sap weeping
+    const sh=g.createLinearGradient(0,p0.y-H,0,p0.y); sh.addColorStop(0,'rgba(0,0,0,0.7)'); sh.addColorStop(0.45,'rgba(0,0,0,0.1)'); sh.addColorStop(1,'rgba(0,0,0,0)'); quad(side,0,len,0,H,sh); });
+  gaps.forEach(d=>{ const m0=WPT(d.side,d.u-0.8,0), m1=WPT(d.side,d.u+0.8,0), mt=WPT(d.side,d.u,80);
+    const arch=(dx,dy)=>{ g.beginPath(); g.moveTo(m0.x-dx,m0.y+dy); g.quadraticCurveTo(m0.x-dx,mt.y+10-dy,mt.x,mt.y-dy); g.quadraticCurveTo(m1.x+dx,mt.y+10-dy,m1.x+dx,m1.y+dy); g.closePath(); };
+    const dk=g.createLinearGradient(0,mt.y,0,m0.y); dk.addColorStop(0,'#020101'); dk.addColorStop(1,'#120c08'); g.fillStyle=dk; arch(0,0); g.fill();
+    g.strokeStyle='#3e2a18'; g.lineWidth=9; g.lineCap='round'; arch(4,0); g.stroke(); g.strokeStyle='rgba(220,190,140,0.2)'; g.lineWidth=2; arch(6,1); g.stroke(); }); }   // a root grown round each way out like a frame
+{ const _pw=paintUcWalls; paintUcWalls=function(q){ if(typeof q==='string' && q.startsWith('rc_')) return paintRootWalls(q); return _pw.apply(this,arguments); }; }
+// props of the Rootdeep
+OBJ_DRAW.rcroots=o=>{ const c=P(o.i+0.5,o.j+0.5), sd=o.i*31+o.j*7;   // a doorway the living roots have woven shut: they stir
+  g.save(); g.fillStyle='rgba(0,0,0,0.35)'; g.filter='blur(3px)'; g.beginPath(); g.ellipse(c.x,c.y+2,38,12,0,0,Math.PI*2); g.fill(); g.restore();
+  for(let k=0;k<11;k++){ const x0=c.x-30+k*6, sw=Math.sin(gt*1.3+k*0.9)*3, H=70+rnd01(k,sd,2201)*30, lean=(rnd01(k,sd,2202)-0.5)*40;
+    g.strokeStyle=k%2?'#2a1a10':'#3e2a18'; g.lineWidth=5+rnd01(k,sd,2203)*5; g.lineCap='round'; g.beginPath(); g.moveTo(x0,c.y+4); g.bezierCurveTo(x0+lean*0.3+sw,c.y-H*0.4,x0-lean*0.6-sw,c.y-H*0.7,x0+lean+sw,c.y-H); g.stroke();
+    g.strokeStyle='rgba(220,190,140,0.18)'; g.lineWidth=1.4; g.stroke(); }
+  for(let k=0;k<6;k++){ const y=c.y-14-k*12, x=c.x-24+Math.sin(k*1.7)*6; g.strokeStyle='#3a2616'; g.lineWidth=4; g.beginPath(); g.moveTo(x,y); g.quadraticCurveTo(c.x,y-8+Math.sin(gt+k)*2,x+48,y+3); g.stroke(); }   // woven across
+  if(o.kind){ g.save(); g.globalCompositeOperation='lighter'; glow(c.x,c.y-40,30,40,o.kind==='night'?'140,170,255':'255,230,150',0.12+0.05*Math.sin(gt*2)); g.restore(); } };
+NEAR_NAME.rcroots='a wall of living roots';
+onUse(['rcroots'],o=>pzSay(o.kind==='night' ? "The roots are woven tight across the way, and they are moving, slowly, like a sleeper's breath. Elven marks on the wall beside them: a crescent moon. They open after dark." : "The roots are woven tight across the way, warm, slowly stirring. Beside them, cut in the wall: a sun. By day this way is open.",'#c8d8a8'));
+OBJ_DRAW.rcglow=o=>{ const q=P(o.i+0.5,o.j+0.5), sd=o.i*11+o.j*5, col=[['120,230,200','#a8f0dc'],['210,230,150','#e8f0b8'],['190,120,230','#dcb0f0']][o.v||0];   // a cluster of little glowing caps
+  g.save(); g.globalCompositeOperation='lighter'; glow(q.x,q.y-6,22,12,col[0],0.22+0.05*Math.sin(gt*1.7+sd)); g.restore();
+  for(let k=0;k<5;k++){ const x=q.x+(rnd01(k,sd,2211)-0.5)*26, y=q.y+(rnd01(k,sd,2212)-0.5)*8, hgt=4+rnd01(k,sd,2213)*7, r=2+rnd01(k,sd,2214)*3;
+    g.strokeStyle='rgba(220,220,200,0.6)'; g.lineWidth=1; g.beginPath(); g.moveTo(x,y); g.lineTo(x,y-hgt); g.stroke(); g.fillStyle=col[1]; g.beginPath(); g.ellipse(x,y-hgt,r,r*0.55,0,Math.PI,0); g.fill(); } };
+if(typeof LIGHT_TYPES!=='undefined'){ LIGHT_TYPES.rcglow=[0,-6,50,'150,220,180']; LIGHT_TYPES.rcshroom=[0,-50,120,'130,220,200']; }
+OBJ_DRAW.rcshroom=o=>{ const q=P(o.i+0.5,o.j+0.5), s=o.small?0.6:1, col=[['#4a8a7a','#9ae8d0','120,230,200'],['#7a5a8a','#d8b0f0','200,150,240'],['#8a7a4a','#f0e0a0','230,210,140']][o.v||0], H=78*s;   // a cap taller than a man, glowing underneath
+  g.save(); g.fillStyle='rgba(0,0,0,0.3)'; g.filter='blur(3px)'; g.beginPath(); g.ellipse(q.x+3,q.y+2,22*s,7*s,0,0,Math.PI*2); g.fill(); g.restore();
+  const st=g.createLinearGradient(q.x-6*s,0,q.x+6*s,0); st.addColorStop(0,'#d8d0bc'); st.addColorStop(1,'#8a8270'); g.fillStyle=st; g.beginPath(); g.moveTo(q.x-6*s,q.y); g.quadraticCurveTo(q.x-3*s,q.y-H*0.5,q.x-4*s,q.y-H); g.lineTo(q.x+4*s,q.y-H); g.quadraticCurveTo(q.x+3*s,q.y-H*0.5,q.x+6*s,q.y); g.closePath(); g.fill();
+  g.save(); g.globalCompositeOperation='lighter'; glow(q.x,q.y-H+4,44*s,22*s,col[2],0.4); g.restore();
+  g.fillStyle=col[1]; g.beginPath(); g.ellipse(q.x,q.y-H+2,30*s,8*s,0,0,Math.PI*2); g.fill();   // the gills, lit
+  g.strokeStyle='rgba(0,0,0,0.25)'; g.lineWidth=0.8; for(let k=-5;k<=5;k++){ g.beginPath(); g.moveTo(q.x,q.y-H+1); g.lineTo(q.x+k*5.6*s,q.y-H+2+Math.abs(k)*0.6*s); g.stroke(); }
+  const cg=g.createRadialGradient(q.x-8*s,q.y-H-14*s,2,q.x,q.y-H-6*s,34*s); cg.addColorStop(0,tone(col[0],0.3)); cg.addColorStop(1,tone(col[0],-0.3)); g.fillStyle=cg; g.beginPath(); g.moveTo(q.x-32*s,q.y-H); g.quadraticCurveTo(q.x-30*s,q.y-H-26*s,q.x,q.y-H-28*s); g.quadraticCurveTo(q.x+30*s,q.y-H-26*s,q.x+32*s,q.y-H); g.quadraticCurveTo(q.x,q.y-H+4*s,q.x-32*s,q.y-H); g.closePath(); g.fill();
+  g.fillStyle='rgba(255,255,240,0.4)'; for(let k=0;k<6;k++){ const a=-2.6+k*0.5; g.beginPath(); g.ellipse(q.x+Math.cos(a)*18*s,q.y-H-14*s+Math.sin(a)*8*s,2.4*s,1.6*s,0,0,Math.PI*2); g.fill(); } };
+OBJ_DRAW.rccocoon=o=>{ const q=P(o.i+0.5,o.j+0.5), split=(o.v||0)===1;   // a husk growing in a cocoon of bark and rot
+  g.save(); g.fillStyle='rgba(0,0,0,0.3)'; g.filter='blur(3px)'; g.beginPath(); g.ellipse(q.x+2,q.y+2,16,6,0,0,Math.PI*2); g.fill(); g.restore();
+  const shape=()=>{ g.beginPath(); g.moveTo(q.x-12,q.y); g.bezierCurveTo(q.x-20,q.y-30,q.x-14,q.y-62,q.x,q.y-70); g.bezierCurveTo(q.x+14,q.y-62,q.x+20,q.y-30,q.x+12,q.y); g.closePath(); };
+  const gr=g.createLinearGradient(q.x-16,0,q.x+16,0); gr.addColorStop(0,'#5a4430'); gr.addColorStop(1,'#1e140c'); g.fillStyle=gr; shape(); g.fill();
+  g.save(); shape(); g.clip(); g.strokeStyle='rgba(20,10,6,0.55)'; g.lineWidth=1.6; for(let k=0;k<8;k++){ g.beginPath(); g.moveTo(q.x-16,q.y-k*9); g.quadraticCurveTo(q.x,q.y-k*9-6+Math.sin(k)*3,q.x+16,q.y-k*9-2); g.stroke(); } g.restore();
+  if(split){ g.fillStyle='#0a0606'; g.beginPath(); g.moveTo(q.x-2,q.y-6); g.quadraticCurveTo(q.x-8,q.y-36,q.x-1,q.y-60); g.quadraticCurveTo(q.x+5,q.y-36,q.x+3,q.y-6); g.closePath(); g.fill(); }
+  else { const b=0.5+0.5*Math.sin(gt*1.8+o.i); g.save(); g.globalCompositeOperation='lighter'; glow(q.x,q.y-34,14,22,'160,200,80',0.12+0.12*b); g.restore(); }
+  g.fillStyle='rgba(16,6,20,0.8)'; g.beginPath(); g.ellipse(q.x+4,q.y+1,8,2.4,0,0,Math.PI*2); g.fill(); };
+NEAR_NAME.rcshroom='a giant mushroom'; NEAR_NAME.rccocoon='a cocoon of bark'; NEAR_NAME.rcglow='glowing caps';
+onUse(['rccocoon'],o=>pzSay((o.v||0)===1 ? "A cocoon of bark and rot, split down the side and empty. Whatever grew in it walked away." : "A cocoon of bark and rot, taller than you. Something inside it shifts when you put your ear to it.",'#c8b8a0'));
+OBJ_DRAW.rcmouth=o=>{ const c=P(o.i+0.5,o.j+0.5);   // a hollow among the great tree's roots, going down
+  g.fillStyle='#050302'; g.beginPath(); g.ellipse(c.x,c.y+4,30,13,0,0,Math.PI*2); g.fill(); const ig=g.createRadialGradient(c.x,c.y+4,2,c.x,c.y+4,30); ig.addColorStop(0,'rgba(0,0,0,0.9)'); ig.addColorStop(1,'rgba(30,20,10,0)'); g.fillStyle=ig; g.beginPath(); g.ellipse(c.x,c.y+4,34,15,0,0,Math.PI*2); g.fill();
+  [[-34,-2,-6,-56,24,-2],[30,0,8,-50,-26,2],[-20,8,0,-40,22,10]].forEach(([x0,y0,mx,my,x1,y1],k)=>{ g.strokeStyle=k===2?'#4a3420':'#5a4028'; g.lineWidth=k===2?9:13; g.lineCap='round'; g.beginPath(); g.moveTo(c.x+x0,c.y+y0); g.quadraticCurveTo(c.x+mx,c.y+my,c.x+x1,c.y+y1); g.stroke(); g.strokeStyle='rgba(230,200,150,0.25)'; g.lineWidth=2.5; g.beginPath(); g.moveTo(c.x+x0-2,c.y+y0-4); g.quadraticCurveTo(c.x+mx,c.y+my-5,c.x+x1-2,c.y+y1-4); g.stroke(); }); };
+NEAR_NAME.rcmouth='a hollow among the roots';
+// the chambers
+Object.values(RCR).forEach(r=>{ const st=ucWalk(r)[0], ent={ start:{i:st[0],j:st[1]} };
+  Object.keys(r.ex).forEach(d=>{ const [i,j]=ucIn(r,d); ent['from'+d.toUpperCase()]={i,j}; });
+  AREAS[r.id]={ ...INSIDE_BASE, w:r.w, h:r.h, theme:'interior', cave:true, rcRoom:true, owRoom:true, layer:-3, ucq:r.q, ucx:r.cx, ucy:r.cy, mapCol:{ rc_nw:'#5a4a30', rc_ne:'#3e5a50', rc_sw:'#3e2e44', rc_se:'#6a5a44' }[r.q],
+    label:'The Rootdeep · '+RC_LABEL[r.q], mapLabel: r.cavern ? RC_LABEL[r.q] : r.id===rcId(0,0) ? 'The Root Hollow' : r.id===rcId(7,7) ? 'The Fellings Stair' : '',
+    mini:{x:0,y:0}, tier:4, objects:()=>rcObjects(r), npcs:()=>rcNpcs(r), mobs:()=>rcMobs(r), entries:ent };
+  AREA_TIER[r.id]=r.q==='rc_se'?5:4; });
+const RC_FOLK={ rc_nw:[ ()=>({name:'Hollow Husk', type:'husk', opts:HUSK()}), ()=>({name:'Rotgnawer', type:'gnawer', opts:GNAWER()}) ],
+  rc_ne:[ ()=>({name:'Rotgnawer', type:'gnawer', opts:GNAWER()}), ()=>({name:'Rot-Shaman', type:'rootshaman', opts:ROOTSHAMAN({})}) ],
+  rc_sw:[ ()=>({name:'Rot-Shaman', type:'rootshaman', opts:ROOTSHAMAN({hair:3})}), ()=>({name:'Hollow Husk', type:'husk', opts:HUSK()}), ()=>({name:'Rotgnawer', type:'gnawer', opts:GNAWER()}) ],
+  rc_se:[ ()=>({name:'Thorn-Witch', type:'thornwitch', opts:WITCH()}), ()=>({name:'Rot-Shaman', type:'rootshaman', opts:ROOTSHAMAN({hair:0})}), ()=>({name:'Hollow Husk', type:'husk', opts:HUSK()}) ] };
+['Hollow Husk','Rotgnawer','Rot-Shaman','Thorn-Witch'].forEach(n=>{ RESPAWNS.add(n); RESPAWNS.add(n+' '); });
+function rcMobs(r){ const out=[], F=RC_FOLK[r.q], h=r.hs;
+  if(r.cavern && r.q==='rc_se'){ if(!CHOICE.rcMother) out.push({ name:'The Rot-Mother', type:'rootmother', hpMul:1, faction:'rc_boss_mother', opts:{...NOEQ_OPTS()} }); }
+  else if(r.cavern && r.q==='rc_nw') out.push({ name:'Husk-Warden', type:'husk', hpMul:2.1, faction:'rc_boss_'+r.id, opts:HUSK() }, { ...F[0](), name:'Hollow Husk ', faction:'rc_boss_'+r.id });
+  else if(r.cavern && r.q==='rc_ne') out.push({ name:'Elder Rot-Shaman', type:'rootshaman', hpMul:2.2, faction:'rc_boss_'+r.id, opts:ROOTSHAMAN({hair:4, hairColor:13, equip:{head:null, armor:'robe_black'}}) }, { ...F[0](), faction:'rc_boss_'+r.id });
+  else if(r.cavern && r.q==='rc_sw') out.push({ name:'Old Blightgnawer', type:'gnawer', hpMul:2.4, faction:'rc_boss_'+r.id, opts:GNAWER() });
+  else if(!RC_OUT[r.id] && !r.nightDrift && r.id!==rcId(1,0) && r.id!==rcId(0,1) && (r.kind==='bend' ? h%4===0 : h%2===0 || r.kind==='end')){
+    const a=F[(h>>>2)%F.length](); out.push({...a, faction:'rc_'+r.id, daily:true}); if(h%7===0 && r.kind!=='end') out.push({...F[0](), name:F[0]().name+' ', faction:'rc_'+r.id, daily:true}); }
+  return ucPlace(r,out); }
+const NOEQ_OPTS=()=>({gender:'m', equip:{...NOEQ}});
+// the elves' watch at the Root Hollow: Faelith, who will not kill, and asks you to
+function rcNpcs(r){ if(r.id!==rcId(0,0) || havenBurnt()) return []; const W=ucWalk(r).filter(([i,j])=>!ucNearDoor(r,i,j)); const s=W[1]||W[0]||[r.cx,r.cy];
+  return [{ id:'faelith', name:'Faelith the Root-Warden', i:s[0], j:s[1], dir:1, opts:ELFO({gender:'f',skin:0,hair:2,hairColor:11,face:2,equip:{head:'elf_circlet',torso:'elf_tunic',armor:'elf_cloak',hands:null,legs:'elf_leggings',feet:'elf_boots',weapon:null,offhand:null}}) }]; }
+const rcQ=()=>CHOICE.rcQ||null;
+TALKERS.faelith=()=>{ const F='Faelith the Root-Warden';
+  if(!rcQ()) return say(F,["<i>An elf in a moss-green cloak sits with her back against a root, a lantern beside her, listening to the dark the way you would listen to a sick child breathing.</i> “Softly. She feels your feet.”",
+      "“The Hunger is gone from the tree, they say in Sylvhaven. They are wrong. It went down. Into the roots. Into the oldest root of all, the Heartroot, and it has grown into it like a canker. We call it the Rot-Mother.”",
+      "“It makes things: gnawers, husks, shamans who speak with the rotten roots. And it feeds on her. On the tree. Every night a little more.”",
+      "“We do not kill. Not even that. So we sit here and watch, and count the nights. But you are not an elf.” <i>She looks at your hands.</i> “The roots move, down there. Some ways open only by day, some only by night. Watch the marks on the walls: a sun, a moon.”"],
+    [{label:'“I will go down to the Heartroot.”', fn:()=>{ CHOICE.rcQ='asked'; closeDialog(); logMsg('New quest: The Rot Below.','#e8c060'); try{ autosaveSoon(300); }catch(e){} }}, {label:'“Not yet.”', fn:closeDialog}]);
+  if(rcQ()==='asked' && CHOICE.rcMother) return say(F,["<i>She is on her feet before you reach her, her hand flat on the root behind her.</i> “I felt it. Like a splinter coming out. She shuddered, all of her, from here to the crown.”",
+      "“There will be a song about you, in Sylvhaven. A short one. We do not sing long songs about killing. But it will be sung.”","<i>She presses a fistful of silver leaves into your hand.</i> “From the tree. And from me.”"],
+    [{label:'Take them.', fn:()=>{ CHOICE.rcQ='done'; addLeaves(14,'the Rot-Mother'); giveXp(240,'The Rot Below'); closeDialog(); }}]);
+  if(rcQ()==='asked') return say(F,"“The Heartroot is the deepest reach, past the warrens and the fungus. Go by day or by night, as the roots let you. And take something for poison. She is all poison.”",[bye]);
+  return say(F,"“The roots are quieter now. Listen: you can hear her drinking again, the way a tree should.”",[bye]); };
+{ const prev=npcHasNews; npcHasNews=function(n){ const r=prev(n); try{ if(n && n.id==='faelith'){ if(!rcQ()) return '!'; if(rcQ()==='asked' && CHOICE.rcMother) return '?'; } }catch(e){} return r; }; }
+JOURNAL.push(['The Rot Below', ()=> !rcQ() ? null : rcQ()==='done' ? ['done',"You went down into the Rootdeep under Sylvhaven and killed the Rot-Mother in the Heartroot. The great tree drinks freely again."]
+  : CHOICE.rcMother ? ['active',"The Rot-Mother is dead. Tell Faelith at the Root Hollow."] : ['active',"Under Sylvhaven, the Hunger's rot has grown into the great tree's oldest root. Find the Rot-Mother in the Heartroot, the deepest reach of the Rootdeep, and kill her. The roots move: some ways open only by day, some only by night."]]);
+{ const _v=victory; victory=function(faction){ const r=_v.apply(this,arguments); try{
+    if(faction==='rc_boss_mother' && !CHOICE.rcMother){ CHOICE.rcMother=true; banner('The Heartroot is free','#e8f0b8',2600); shake=7;
+      logMsg('The Rot-Mother comes apart into black sap and dead wood, and the light in her heart goes out. All round you the roots creak and loosen, like a hand unclenching.','#e8f0b8');
+      const id=ITEMS.elf_scale?'elf_scale':'elf_cloak', f=slotFor(id); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } player.purse+=120; updateHud(); try{ autosaveSoon(300); }catch(e){} }
+    else if(typeof faction==='string' && faction.startsWith('rc_boss_') && !(CHOICE.rcBoss||{})[faction]){ (CHOICE.rcBoss=CHOICE.rcBoss||{})[faction]=1; const id=['elf_boots','elf_leggings','elf_circlet'].filter(x=>ITEMS[x])[Object.keys(CHOICE.rcBoss).length%3]; const f=id?slotFor(id):-1; if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } player.purse+=50; updateHud(); } }catch(e){} return r; }; }
+// the ways in: a hollow among the roots of the great tree in Sylvhaven; a stair of roots up into a stump in the Fellings
+AREAS.sylvhaven.entries.fromRoots={i:5,j:4};
+wrap('sylvhaven','objects',l=>[...l.filter(o=>!(o.i===5&&o.j===3&&!o.noblock)), {type:'rcmouth', i:5, j:3, noblock:true, flat:true, dz:-99}, {type:'teleporter', i:5, j:3, to:rcId(0,0), entry:'fromN', adit:true}]);
+AREAS.fellings.entries.fromRoots={i:11,j:4};
+wrap('fellings','objects',l=>[...l.filter(o=>!(o.i===12&&o.j===4&&!o.noblock)), {type:'teleporter', i:12, j:4, to:rcId(7,7), entry:'fromE', locked:()=>!CHOICE.rcStump, onLocked:()=>pzSay("An old stump, hollow, roots going down into black. They are woven shut from below.",'#c8c0a8')}]);
+{ const _sw=switchArea; switchArea=function(id,entry,...rest){ const r=_sw.call(this,id,entry,...rest); try{ if(id===rcId(7,7) && !CHOICE.rcStump){ CHOICE.rcStump=true; logMsg('A stair of roots climbs from here up into the light: the Fellings, a stump hollowed out from below. The roots part for you.','#c8d8a8'); } }catch(e){} return r; }; }
+// the roots shift as night falls and as day comes, round you if you are down there
+{ let lastNight=null; setInterval(()=>{ try{ if(!running) return; const n=rcNight(); if(lastNight===null){ lastNight=n; return; } if(n===lastNight) return; lastNight=n; MAP_LAYOUT=null;
+    const A=AREAS[areaId]; if(!A || !A.rcRoom || combat.active || dlgIsOpen()) return; const pi=player.i, pj=player.j, ent=Object.entries(A.entries).find(([k,p])=>p.i===pi&&p.j===pj);
+    const b0=banner; banner=()=>{}; try{ switchArea(areaId, ent?ent[0]:'start'); } finally{ banner=b0; } player.i=pi; player.j=pj; player.x=pi+0.5; player.y=pj+0.5; centerCam(); shake=Math.max(shake,5);
+    logMsg(n ? 'All round you the roots creak and slide. Ways that were open close; others unweave themselves. Night has come, up above.' : 'The roots stir and draw back from some ways, and knot across others. Somewhere far above, the sun is up.','#c8d8a8'); }catch(e){} },1500); }
+MAP_ROOTS.push({ root:rcId(0,0), u:-90, v:-260 });
+// ════════ ROOTDEEP SET PIECES: two places in each reach to steer by ════════
+const RC_PIECES={
+  rc_nw:[ { name:"The Wardens' Watch", rune:"An elven watch-post: a bedroll, a rack of spears nobody has carried in years, a lantern kept trimmed. A list of names on a strip of bark. The last three are crossed through.", props:[['tent',{fp:[2,2]}],['rack',{}],['lantern',{}],['lantern',{}]] },
+          { name:'The Moonroot', rune:"A root here takes the moonlight from somewhere far above and keeps it. The caps round it grow white, and the rot will not come near.", props:[['rcglow',{v:1,noblock:true}],['rcglow',{v:1,noblock:true}],['rcglow',{v:1,noblock:true}],['rcglow',{v:1,noblock:true}],['lantern',{}]] } ],
+  rc_ne:[ { name:'The Mushroom Cathedral', rune:"Caps as tall as a chapel roof, their gills lit from inside. The air is sweet and thick. Do not sit down.", props:[['rcshroom',{v:0}],['rcshroom',{v:1}],['rcshroom',{v:2}],['rcglow',{v:0,noblock:true}],['rcglow',{v:0,noblock:true}]] },
+          { name:'The Spore Pit', rune:"Bones under a skin of glowing fur. Whatever lay down here to rest never got up, and the fungus has been eating it, slowly, ever since.", props:[['rcshroom',{v:1,small:true}],['bones',{noblock:true}],['bones',{noblock:true}],['bones',{noblock:true}],['rcglow',{v:0,noblock:true}],['rcglow',{v:0,noblock:true}]] } ],
+  rc_sw:[ { name:'The Black Sap Pool', rune:"The roots weep here into a pool of black sap that swallows the light. Your reflection in it is a little late.", props:[['blacksap',{noblock:true}],['blacksap',{noblock:true}],['blacksap',{noblock:true}],['bones',{noblock:true}],['rccocoon',{v:1}]] },
+          { name:'The Husk Nursery', rune:"Cocoons of bark and rot in rows, like loaves set out to rise. Some are split and empty. Some are not.", props:[['rccocoon',{v:0}],['rccocoon',{v:0}],['rccocoon',{v:1}],['rccocoon',{v:0}],['blacksap',{noblock:true}]] } ],
+  rc_se:[ { name:'The Withered Shrine', rune:"An elven shrine to the tree, cut into her root long ago. The offerings have rotted. Someone has left a fresh flower here anyway.", props:[['altar',{}],['candlestand',{}],['candlestand',{}],['rcglow',{v:1,noblock:true}]] },
+          { name:'The Last Patrol', rune:"Three elven sentinels came down to see what was wrong with the roots. Their bows are still strung. The roots have grown through their cloaks.", props:[['rack',{}],['bones',{noblock:true}],['bones',{noblock:true}],['rccocoon',{v:1}],['lantern',{off:true}]] } ] };
+(()=>{ RC_QS.forEach(q=>{ const used=new Set([...Object.values(RC_TOKEN_ROOM), ...Object.keys(RC_OUT)]);
+    const cand=Object.values(RCR).filter(r=>r.q===q && !used.has(r.id) && !r.cavern && !r.nightDrift && (r.kind==='vault'||r.kind==='cross'||r.kind==='hall')).sort((a,b)=>(b.w*b.h)-(a.w*a.h) || (a.hs%613)-(b.hs%613));
+    RC_PIECES[q].forEach((P0,k)=>{ const r=cand[k]; if(!r || r.piece) return; r.piece=P0.name; const A=AREAS[r.id], o0=A.objects; A.mapLabel=P0.name; A.label='The Rootdeep · '+P0.name;
+      A.objects=()=>{ let l=o0().filter(o=>['teleporter','pickup','rcroots'].includes(o.type)); const sp=ucFreeSpots(r,l); let k2=0;
+        const open=()=>{ const solid=new Set(l.filter(o=>!o.noblock && o.type!=='teleporter').flatMap(o=>{ const [fw,fh]=o.fp||[1,1], t=[]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) t.push((o.i+a)+','+(o.j+b)); return t; })), W=ucWalk(r).filter(([i,j])=>!solid.has(i+','+j)), S=W[0]; if(!S) return false; const seen=new Set([S.join(',')]), Q=[S];
+          while(Q.length){ const [a,b]=Q.shift(); [[1,0],[-1,0],[0,1],[0,-1]].forEach(([c,d])=>{ const x=a+c, y=b+d, kk=x+','+y; if(x<0||y<0||x>=r.w||y>=r.h||seen.has(kk)||solid.has(kk)) return; seen.add(kk); Q.push([x,y]); }); }
+          return seen.size===W.length && l.filter(o=>o.type==='teleporter'||o.type==='pickup').every(o=>[[0,0],[1,0],[-1,0],[0,1],[0,-1]].some(([a,b])=>seen.has((o.i+a)+','+(o.j+b)))); };
+        const anyFree=ucWalk(r).filter(([i,j])=>!ucNearDoor(r,i,j));
+        const add=(t,extra)=>{ const pool=(extra&&extra.noblock) ? anyFree.filter(([i,j])=>!l.some(x=>x.i===i&&x.j===j)) : sp; for(let tries=0; tries<pool.length; tries++){ const s0=pool[(extra&&extra.noblock) ? tries : (k2++)%pool.length]; if(!s0) return; const o={type:t, i:s0[0], j:s0[1], ...(extra||{})}; const [fw,fh]=o.fp||[1,1];
+            if(o.i+fw>r.w || o.j+fh>r.h) continue; let clash=false; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++){ if(ucNearDoor(r,o.i+a,o.j+b) || l.some(x=>!x.noblock && x.i===o.i+a && x.j===o.j+b)) clash=true; } if(clash) continue;
+            if(!o.noblock){ l.push(o); const ok=open(); l.pop(); if(!ok) continue; } if(t==='crate' && o.rich && destroyedBreakables.has(r.id+':'+o.i+','+o.j)) return; l.push(o); return; } };
+        const s1=sp.find(([i,j])=>(i===0||j===0)); if(s1){ l.push({type:'rune', i:s1[0], j:s1[1], text:P0.rune}); }
+        P0.props.forEach(([t,e])=>add(t,e));
+        return l; }; }); }); })();
 </script>
 </body>
 </html>

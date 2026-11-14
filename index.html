@@ -28379,6 +28379,58 @@ const trapHurt=(n,label,col)=>{ player.hp=Math.max(1,player.hp-n); player.flash=
     OBJECTS.forEach(o=>{ if(o.type!=='rcpuff') return; const key=areaId+':'+o.i+','+o.j; if(cheb([o.i,o.j],[player.i,player.j])>1) return; if(RC_TRAP.puff[key] && now-RC_TRAP.puff[key]<9000) return;
       RC_TRAP.puff[key]=now; addStatus(player,'venom',6,2); floatText([player.i,player.j-0.002],'Spores!','#c8c070'); try{ SND.fx('whoosh',0.3); }catch(e){} logMsg('A puffball bursts as you pass, and you breathe in a mouthful of bitter yellow spores.','#c8c070'); });
   }catch(e){} },120); }
+// ════════ FRUITS OF THE DEEP: glowberries on shrubs that grow where the root-light falls, and duskplums hanging from vines down the walls.
+//   Both stack, both heal, and both give back a little mana: the root's own life, eaten ════════
+Object.assign(ITEMS,{ glowberry:{ name:'Glowberries', slot:'food', heal:9, mana:8, stack:true, title:"A handful of pale blue berries that glow faintly in the dark, sweet and cold as snowmelt. They heal a little and bring back a little mana." },
+  duskplum:{ name:'Duskplum', slot:'food', heal:16, mana:14, stack:true, title:"A dark purple plum off a vine that grows down the walls of the Rootdeep, soft and winey. It heals, and gives back some mana." } });
+Object.assign(PRICES,{ glowberry:3, duskplum:6 });
+{ const _eat=eatItem; eatItem=function(k){ const id=player.inv[k], it=id&&ITEMS[id];   // fruit that feeds both body and power
+    if(!it || !(it.heal && it.mana)) return _eat.apply(this,arguments);
+    player.maxMana=player.maxMana||100; const m=player.mana??player.maxMana, h=Math.min(it.heal,hpCap()-player.hp), g=Math.min(it.mana,player.maxMana-m);
+    if(h<=0 && g<=0){ if(typeof flash==='function') flash('You are not hurt, and your mana is full.'); return false; }
+    if(stackable(id) && (invN()[k]|0)>0) invN()[k]--; else player.inv[k]=null; try{ SND.fx('chew'); }catch(e){}
+    if(h>0) player.hp+=h; if(g>0) player.mana=m+g; floatText(tileOf(player),(h>0?'+'+h:'')+(h>0&&g>0?'  ':'')+(g>0?'+'+Math.round(g)+' mana':''),h>0?'#8ad07a':'#8ab0f0');
+    logMsg('You eat the '+it.name.toLowerCase()+'. ('+[h>0?'+'+h+' health':null,g>0?'+'+Math.round(g)+' mana':null].filter(Boolean).join(', ')+')','#c8e0b0');
+    refreshPlayerHp(false); updateHud(); if(invOverlay.classList.contains('open')) refreshInventory(); refreshFoodBar(); return true; }; }
+ITEM_ICON.glowberry=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.save(); g2.globalCompositeOperation='lighter'; const gl=g2.createRadialGradient(20,24,0,20,24,16); gl.addColorStop(0,'rgba(140,210,255,0.45)'); gl.addColorStop(1,'rgba(140,210,255,0)'); g2.fillStyle=gl; g2.fillRect(0,0,40,40); g2.restore();
+  g2.strokeStyle='#4a5a3a'; g2.lineWidth=1.2; g2.beginPath(); g2.moveTo(20,8); g2.quadraticCurveTo(18,16,13,22); g2.moveTo(20,8); g2.quadraticCurveTo(22,16,27,21); g2.moveTo(20,8); g2.lineTo(20,24); g2.stroke();
+  g2.fillStyle='#4a7a3a'; g2.beginPath(); g2.ellipse(24,9,5,2.4,-0.4,0,Math.PI*2); g2.fill();
+  [[13,25,4.2],[20,28,4.6],[27,24,4.2],[17,20,3.6],[23,19,3.6]].forEach(([x,y,r])=>{ const bg=g2.createRadialGradient(x-1.4,y-1.6,0.5,x,y,r); bg.addColorStop(0,'#e8f8ff'); bg.addColorStop(0.5,'#8ac8f0'); bg.addColorStop(1,'#3a6a9a'); g2.fillStyle=bg; g2.beginPath(); g2.arc(x,y,r,0,Math.PI*2); g2.fill(); }); g2.restore(); };
+ITEM_ICON.duskplum=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40);
+  const bg=g2.createRadialGradient(15,17,1,20,23,14); bg.addColorStop(0,'#b88ad0'); bg.addColorStop(0.45,'#5a2a6a'); bg.addColorStop(1,'#24102c'); g2.fillStyle=bg; g2.beginPath(); g2.ellipse(20,24,12,13,0,0,Math.PI*2); g2.fill();
+  g2.strokeStyle='rgba(20,6,24,0.5)'; g2.lineWidth=1; g2.beginPath(); g2.moveTo(20,12); g2.quadraticCurveTo(16,24,20,36); g2.stroke(); g2.fillStyle='rgba(255,240,255,0.35)'; g2.beginPath(); g2.ellipse(15,18,3,4.5,-0.4,0,Math.PI*2); g2.fill();
+  g2.strokeStyle='#4a3a20'; g2.lineWidth=1.8; g2.beginPath(); g2.moveTo(20,12); g2.lineTo(21,6); g2.stroke(); g2.fillStyle='#4a7a3a'; g2.beginPath(); g2.ellipse(25,7,5,2.4,0.3,0,Math.PI*2); g2.fill(); g2.restore(); };
+// the plants, regrowing like the bramble bushes up top
+const DEEP_REGROW=2, deepKey=o=>areaId+':'+o.type+':'+o.i+','+o.j, deepRipe=o=>{ const t=(CHOICE.deepFruit||{})[deepKey(o)]; return t==null ? 1 : Math.min(1,(dayClock-t)/(DAY_LEN*DEEP_REGROW)); };
+OBJ_DRAW.rcberry=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, r=deepRipe(o), sd=o.i*17+o.j*5, sw=Math.sin(gt*1.1+o.i)*0.8;   // a low shrub of dark round leaves on a twist of root, berries of cold light
+  g.save(); g.fillStyle='rgba(0,0,0,0.3)'; g.filter='blur(3px)'; g.beginPath(); g.ellipse(x+2,y+2,22,7,0,0,Math.PI*2); g.fill(); g.restore();
+  g.strokeStyle='#3a2a1a'; g.lineWidth=3; g.lineCap='round'; g.beginPath(); g.moveTo(x-6,y); g.quadraticCurveTo(x-2,y-10,x,y-16); g.moveTo(x+6,y); g.quadraticCurveTo(x+3,y-8,x+2,y-14); g.stroke();
+  for(let k=0;k<16;k++){ const a=rnd01(k,sd,2501)*Math.PI*2, rr=rnd01(k,sd,2502), lx=x+Math.cos(a)*rr*20+sw, ly=y-18+Math.sin(a)*rr*10; g.fillStyle=['#2e4a2a','#3e5e34','#24402a'][k%3]; g.beginPath(); g.ellipse(lx,ly,5,3.4,a,0,Math.PI*2); g.fill(); }
+  if(r>=0.5){ const n=Math.round(9*Math.min(1,(r-0.5)*2)); g.save(); g.globalCompositeOperation='lighter'; glow(x,y-18,30,18,'140,210,255',0.18*r); g.restore();
+    for(let k=0;k<n;k++){ const a=rnd01(k,sd,2503)*Math.PI*2, rr=0.3+0.65*rnd01(k,sd,2504), bx=x+Math.cos(a)*rr*18+sw, by=y-18+Math.sin(a)*rr*9; const bg=g.createRadialGradient(bx-0.8,by-0.9,0.3,bx,by,2.6); bg.addColorStop(0,'#f0faff'); bg.addColorStop(1,r>=1?'#5aa0e0':'#4a6a7a'); g.fillStyle=bg; g.beginPath(); g.arc(bx,by,2.4,0,Math.PI*2); g.fill(); } } };
+if(typeof LIGHT_TYPES!=='undefined') LIGHT_TYPES.rcberry=[0,-18,60,'140,210,255'];
+OBJ_DRAW.rcplum=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, r=deepRipe(o), sd=o.i*29+o.j*13, top=y-110;   // a vine down the wall, leaves, and plums hanging off it
+  g.strokeStyle='#3a2a18'; g.lineWidth=3.2; g.lineCap='round'; g.beginPath(); g.moveTo(x-2,top); g.bezierCurveTo(x+10,top+30,x-12,top+60,x+2,y-8); g.stroke(); g.lineWidth=1.8; g.beginPath(); g.moveTo(x+4,top+20); g.quadraticCurveTo(x+16,top+40,x+12,top+70); g.stroke();
+  for(let k=0;k<12;k++){ const t=k/12, lx=x+Math.sin(t*6+sd)*10, ly=top+8+t*90; g.fillStyle=k%2?'#3e5e34':'#2e4a2a'; g.beginPath(); g.ellipse(lx,ly,5.6,2.8,(k%2?0.6:-0.6),0,Math.PI*2); g.fill(); }
+  if(r>=0.5){ const n=Math.round(5*Math.min(1,(r-0.5)*2)); for(let k=0;k<n;k++){ const t=0.15+k*0.17, px=x+Math.sin(t*6+sd)*10+(k%2?6:-6), py=top+14+t*86+Math.sin(gt*1.3+k)*0.8;
+      g.strokeStyle='#3a2a18'; g.lineWidth=0.8; g.beginPath(); g.moveTo(px,py-6); g.lineTo(px,py-3); g.stroke(); const pg=g.createRadialGradient(px-1.2,py-1,0.4,px,py+0.5,4.4); pg.addColorStop(0,r>=1?'#c89ae0':'#8a7a6a'); pg.addColorStop(0.5,r>=1?'#5a2a6a':'#5a5040'); pg.addColorStop(1,'#24102c'); g.fillStyle=pg; g.beginPath(); g.ellipse(px,py+0.5,3.6,4.2,0,0,Math.PI*2); g.fill(); } } };
+NEAR_NAME.rcberry='a glowberry shrub'; NEAR_NAME.rcplum='a duskplum vine';
+const deepPick=(o,id,what,n0)=>{ const r=deepRipe(o); if(r<1){ const d=Math.ceil((1-r)*DEEP_REGROW); pzSay(r<0.5?'Picked bare. The '+what+' will come again.':'Nearly ripe. '+(d<=1?'By tomorrow.':'In a day or two.'),'#b8c8e0'); return; }
+  const n=n0+(Math.random()<0.5?1:0); let got=0; for(let k=0;k<n;k++){ const f=slotFor(id); if(f<0) break; if(player.inv[f]===id) invN()[f]=(invN()[f]|0)+1; else player.inv[f]=id; got++; }
+  if(!got){ pzSay('Your pack is full.','#e0b070'); return; } (CHOICE.deepFruit=CHOICE.deepFruit||{})[deepKey(o)]=dayClock; try{ SND.fx('bag',0.6); }catch(e){}
+  floatText([o.i,o.j],'+'+got+' '+ITEMS[id].name,'#b8d8f0',true); updateHud(); try{ refreshInventory(); }catch(e){} };
+onUse(['rcberry'],o=>deepPick(o,'glowberry','berries',2));
+onUse(['rcplum'],o=>deepPick(o,'duskplum','plums',1));
+// where they grow: shrubs in about one ordinary chamber in four, vines on the back walls of some others; more in the Taproot Halls and the Fungal Deeps, few in the rot
+{ const _ro=rcObjects; rcObjects=function(r){ const l=_ro(r); try{ if(RC_OUT[r.id] || r.kind==='bend') return l; const odds={rc_nw:0.45,rc_ne:0.4,rc_sw:0.15,rc_se:0.22}[r.q], R=k=>rnd01(k,r.hs,2511);
+    const busy=new Set(l.filter(o=>!o.noblock||o.type==='teleporter'||o.type==='rcthorns').map(o=>o.i+','+o.j)), W=ucWalk(r).filter(([i,j])=>!busy.has(i+','+j) && !ucNearDoor(r,i,j) && i!==r.cx && j!==r.cy);
+    const ok=(i,j)=>{ const solid=new Set(l.filter(o=>!o.noblock && o.type!=='teleporter').map(o=>o.i+','+o.j)); solid.add(i+','+j); const S=ucWalk(r).find(([a,b])=>!solid.has(a+','+b)); if(!S) return false; const seen=new Set([S.join(',')]), Q=[S];
+      while(Q.length){ const [a,b]=Q.shift(); [[1,0],[-1,0],[0,1],[0,-1]].forEach(([c,d])=>{ const x=a+c, y=b+d, k=x+','+y; if(x<0||y<0||x>=r.w||y>=r.h||seen.has(k)||solid.has(k)) return; seen.add(k); Q.push([x,y]); }); }
+      return ucWalk(r).every(([a,b])=>solid.has(a+','+b)||seen.has(a+','+b)); };
+    if(R(1)<odds){ const s=W.find(([i,j])=>(i===0||j===0) && ok(i,j)) || W.find(([i,j])=>ok(i,j)); if(s){ l.push({type:'rcberry', i:s[0], j:s[1]}); busy.add(s.join(',')); } }
+    if(R(2)<odds*0.7){ const s=W.find(([i,j])=>(i===0||j===0) && !busy.has(i+','+j) && ok(i,j)); if(s) l.push({type:'rcplum', i:s[0], j:s[1]}); }
+  }catch(e){} return l; }; }
+['rc_nw','rc_ne','rc_sw','rc_se'].forEach(q=>DUNGEON_FINDS[q].push('glowberry','duskplum'));
 </script>
 </body>
 </html>

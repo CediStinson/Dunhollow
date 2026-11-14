@@ -17537,7 +17537,8 @@ function vesnaFen(){
     : CHOICE.morwen==='done' ? [CHOICE.barrow==='done'?"“You went under the reeds and came back. Bertil's boots on your feet, I see. He would have liked you. He liked anyone who could hit hard.”":"“Under the reeds in the Sunken Hollow, where the lights gather. Mind the old king. He does not like visitors.”"]
     : ["“Yes?”"];
   say(VESNA_N,line,opts); }
-{ const oV=TALKERS.vesna; TALKERS.vesna=function(){ if(NECRO()>=3 && CHOICE.skelArms && CHOICE.golem!=='done') return golemVesna(); return oV.apply(this,arguments); }; }   // the fourth lesson: the Flesh Golem
+const golemReady=()=>NECRO()>=3 && !!CHOICE.skelArms && CHOICE.morwen==='done' && CHOICE.barrow==='done';   // the last thing she teaches: only once you have done all she asked before
+{ const oV=TALKERS.vesna; TALKERS.vesna=function(){ if(CHOICE.golem==='asked' || (golemReady() && CHOICE.golem!=='done')) return golemVesna(); return oV.apply(this,arguments); }; }   // the fourth lesson: the Flesh Golem
 const VESNA_NECRO=TALKERS.vesna;                                                   // her lessons, as they were
 TALKERS.vesna=function(){ if(areaId==='fen') return vesnaFen(); return VESNA_NECRO(); };
 // the two guards at the gate on the King's Road
@@ -28571,6 +28572,9 @@ function drawGolem(x,B,e,pose){ const d=e.dir||0, fl=(d===5||d===6||d===7)?-1:1,
   const staple=(sx,sy,a)=>{ g.save(); g.translate(sx,sy); g.rotate(a||0); g.fillStyle='rgba(120,30,20,0.4)'; g.beginPath(); g.ellipse(-3,1.8,1.6,1.3,0,0,Math.PI*2); g.ellipse(3,1.8,1.6,1.3,0,0,Math.PI*2); g.fill(); g.strokeStyle=IRON; g.lineWidth=1.8; g.beginPath(); g.moveTo(-3,1.5); g.lineTo(-3,-1.5); g.lineTo(3,-1.5); g.lineTo(3,1.5); g.stroke(); g.strokeStyle='rgba(220,220,230,0.55)'; g.lineWidth=0.7; g.beginPath(); g.moveTo(-2.4,-1.9); g.lineTo(2.4,-1.9); g.stroke(); g.restore(); };
   const drip=(dx,dy,len)=>{ g.fillStyle=BLD; g.beginPath(); g.moveTo(dx-1.4,dy); g.quadraticCurveTo(dx-1.6,dy+len*0.7,dx,dy+len); g.quadraticCurveTo(dx+1.6,dy+len*0.7,dx+1.4,dy); g.closePath(); g.fill(); g.fillStyle='rgba(255,200,190,0.45)'; g.beginPath(); g.arc(dx-0.4,dy+len-1.4,0.6,0,Math.PI*2); g.fill(); };
   const wound2=(wx,wy,rx,ry)=>{ g.fillStyle='rgba(140,30,24,0.55)'; g.beginPath(); g.ellipse(wx,wy,rx+2,ry+1.5,0,0,Math.PI*2); g.fill(); g.fillStyle=BLD; g.beginPath(); g.ellipse(wx,wy,rx,ry,0,0,Math.PI*2); g.fill(); g.fillStyle='rgba(255,190,180,0.35)'; g.beginPath(); g.ellipse(wx-rx*0.3,wy-ry*0.3,rx*0.35,ry*0.3,0,0,Math.PI*2); g.fill(); };
+  const bone=(x1,y1,x2,y2,w)=>{ wound2(x1,y1,w*0.9,w*0.7); g.lineCap='round'; g.strokeStyle='#5a4a34'; g.lineWidth=w+1.6; g.beginPath(); g.moveTo(x1,y1); g.lineTo(x2,y2); g.stroke(); g.strokeStyle='#e0d4b0'; g.lineWidth=w; g.stroke();
+    const a=Math.atan2(y2-y1,x2-x1), nx=-Math.sin(a), ny=Math.cos(a); g.fillStyle='#e0d4b0'; g.strokeStyle='#5a4a34'; g.lineWidth=0.8; [1,-1].forEach(k=>{ g.beginPath(); g.arc(x2+nx*k*w*0.42,y2+ny*k*w*0.42,w*0.62,0,Math.PI*2); g.fill(); g.stroke(); });
+    g.strokeStyle='rgba(255,250,235,0.6)'; g.lineWidth=w*0.3; g.beginPath(); g.moveTo(x1+nx*w*0.2,y1+ny*w*0.2); g.lineTo(x2+nx*w*0.2-Math.cos(a)*w*0.5,y2+ny*w*0.2-Math.sin(a)*w*0.5); g.stroke(); g.fillStyle='rgba(120,30,20,0.45)'; g.beginPath(); g.ellipse(x1+(x2-x1)*0.25,y1+(y2-y1)*0.25,w*0.5,w*0.35,0,0,Math.PI*2); g.fill(); };
   const stitch=pts=>{ g.strokeStyle='rgba(130,40,32,0.4)'; g.lineWidth=2.4; g.beginPath(); pts.forEach(([px,py],k)=>k?g.lineTo(px,py):g.moveTo(px,py)); g.stroke(); g.strokeStyle=THR; g.lineWidth=1; g.beginPath(); pts.forEach(([px,py],k)=>k?g.lineTo(px,py):g.moveTo(px,py)); g.stroke();
     for(let k=0;k<pts.length-1;k++){ const [ax,ay]=pts[k],[bx,by]=pts[k+1], L=Math.hypot(bx-ax,by-ay)||1, n=Math.max(1,Math.floor(L/5)); for(let q=0;q<n;q++){ const u=(q+0.5)/n, cx=ax+(bx-ax)*u, cy=ay+(by-ay)*u, nx=-(by-ay)/L*2.6, ny=(bx-ax)/L*2.6; g.beginPath(); g.moveTo(cx-nx,cy-ny); g.lineTo(cx+nx,cy+ny); g.stroke(); } } };
   const limb=(a,b,w0,w1,lit,dark)=>{ beastSeg(a,b,w0+3,w1+3,dark); beastSeg([a[0]-1,a[1]-1],[b[0]-1,b[1]-1],w0-1,w1-1,lit); };   // a dark rim, a lit core: rounder than a flat band
@@ -28584,7 +28588,8 @@ function drawGolem(x,B,e,pose){ const d=e.dir||0, fl=(d===5||d===6||d===7)?-1:1,
     g.strokeStyle='rgba(60,44,20,0.7)'; g.lineWidth=0.9; for(let b=1;b<4;b++){ const p=mix(kneeP,ank,b/4); g.beginPath(); g.moveTo(p[0]-7,p[1]+1); g.lineTo(p[0]+7,p[1]-1.5); g.stroke(); }
     g.fillStyle=far?'#4a3a22':SACKD; g.beginPath(); g.ellipse(ank[0]+s*5,ank[1]+2,11+s*3,5.5,0,0,Math.PI*2); g.fill();
     g.fillStyle='rgba(110,30,20,0.3)'; g.beginPath(); g.ellipse(kneeP[0],kneeP[1]+3,7,3,0,0,Math.PI*2); g.fill();
-    if(!far) staple(hp[0]+sd*2,(hp[1]+kneeP[1])/2,0.3*sd); });
+    if(!far) staple(hp[0]+sd*2,(hp[1]+kneeP[1])/2,0.3*sd);
+    if(!far && sd<0 && !back){ wound2(kneeP[0],kneeP[1]-2,4,3); g.fillStyle='#5a4a34'; g.beginPath(); g.ellipse(kneeP[0],kneeP[1]-2.5,3.8,3.2,0,0,Math.PI*2); g.fill(); g.fillStyle='#e0d4b0'; g.beginPath(); g.ellipse(kneeP[0]-0.4,kneeP[1]-3,3,2.5,0,0,Math.PI*2); g.fill(); } });   // a kneecap through the skin
   // an arm: long, hanging to the knee; the right came off a bigger man than the left
   const arm=(sd)=>{ const big=back?sd===-1:sd===1, far=s>0.3 && sd<0, col=far?FD:(big?FLL:FL), cd=far?FDD:FD, front=sd===1;
     const S0=[sd*tw*0.86+lean*0.4+s*3, sh+9];
@@ -28592,6 +28597,7 @@ function drawGolem(x,B,e,pose){ const d=e.dir||0, fl=(d===5||d===6||d===7)?-1:1,
     if(front && (raise||strike)){ const up=[[tw*0.8,sh-16],[tw*0.45+4,sh-46]], fw=[[tw+16+lean,sh+18],[tw+34+lean,sh+40]];
       if(strike){ const u=Math.min(1,strike*1.5); E=mix(up[0],fw[0],u); W=mix(up[1],fw[1],u); } else { E=mix(E,up[0],raise); W=mix(W,up[1],raise); } }
     limb(S0,E,big?18:15,big?14:12,col,cd); limb(E,W,big?14:12,big?17:14,col,cd);
+    if(!far && big){ const ex2=E[0]+sd*4, ey2=E[1]+2; bone(ex2,ey2,ex2+sd*9,ey2-5,2.8); }
     if(!far){ stitch([[S0[0]-sd*2,S0[1]+6],[E[0]-sd*3,E[1]-6]]); staple(...mix(E,W,0.45),0.6*sd);  g.strokeStyle='rgba(255,236,230,0.2)'; g.lineWidth=1.6; g.beginPath(); g.moveTo(S0[0]-sd*3,S0[1]+2); g.lineTo(E[0]-sd*4,E[1]-4); g.stroke(); }
     // no hands: the right ends in a spiked iron ball, the left in a hook, both strapped onto the stump
     const ad=Math.atan2(W[1]-E[1],W[0]-E[0])-Math.PI/2, ir=far?'#2e3036':'#4a4e56', irl=far?'#50545c':'#9aa0aa';
@@ -28633,6 +28639,9 @@ function drawGolem(x,B,e,pose){ const d=e.dir||0, fl=(d===5||d===6||d===7)?-1:1,
     [[-9,-7],[-9,7],[9,-7],[9,7]].forEach(([sx,sy])=>staple(bx+sx,by+sy,Math.PI/2)); }
   else { stitch([[0,sh-6],[0,hip]]); stitch([[-tw*0.7,sh+4],[tw*0.6,sh+10]]); }               // long seams down the back and across the shoulders
   g.restore();
+  if(!back){ bone(-tw*0.42,sh+1,-tw*0.72-s*2,sh-9,3.4); bone(tw*0.74,mid-3,tw*1.04+s*3,mid-10,3); }
+  else { for(let v=0;v<5;v++){ const vy=sh+2+v*((hip-sh-10)/4); g.fillStyle='#5a4a34'; g.beginPath(); g.ellipse(0,vy,4.4,3,0,0,Math.PI*2); g.fill(); g.fillStyle='#ddd0ac'; g.beginPath(); g.ellipse(0,vy-0.5,3.4,2.2,0,0,Math.PI*2); g.fill(); }   // the spine through the back seam
+    bone(-tw*0.35,sh+6,-tw*0.62,sh-3,3.2); }
   g.fillStyle='#5e4a2c'; g.beginPath(); g.moveTo(-ww-2,hip-8); g.quadraticCurveTo(0,hip-1,ww+2,hip-8); g.lineTo(ww+1,hip-3); g.quadraticCurveTo(0,hip+4,-ww-1,hip-3); g.closePath(); g.fill();   // a rope belt
   if(!back){ g.fillStyle='#4a3a20'; g.beginPath(); g.arc(ww*0.35,hip-3,2.8,0,Math.PI*2); g.fill(); g.strokeStyle='#4a3a20'; g.lineWidth=1.8; g.beginPath(); g.moveTo(ww*0.35,hip-1); g.lineTo(ww*0.42,hip+10); g.moveTo(ww*0.35,hip-1); g.lineTo(ww*0.26,hip+9); g.stroke(); }
   staple(-tw*0.62,sh+2,-0.5); staple(tw*0.58,sh-4,0.4); staple(-tw*0.8,mid,1.0);
@@ -28718,7 +28727,7 @@ function golemVesna(){ const V=VESNA_N, Q=golemQ();
       {label:'“Not now.”', fn:closeDialog}]); return; }
   if(Q==='asked'){ say(V,[gqAll()?"“You have everything. The graveyard in Dunhollow, at night: Tobb's pit. Heart, then staples and thread, then the face. Not the other way round.”":"“Still gathering. You need: "+GQ_TODO().filter(s=>!s.endsWith('✓')).join('; ')+".”","“And when you stitch: the heart first, then shut it, then the face. Remember.”"],[bye]); return; }
   say(V,["“Your golem. Did it kneel? They always do, the good ones, the first time. Then they never kneel again. Do not take it personally.”"],[bye]); }
-{ const prev=npcHasNews; npcHasNews=function(n){ try{ if(n && n.id==='vesna' && NECRO()>=3 && CHOICE.skelArms && !golemQ()) return '!'; }catch(e){} return prev(n); }; }
+{ const prev=npcHasNews; npcHasNews=function(n){ try{ if(n && n.id==='vesna' && golemReady() && !golemQ()) return '!'; }catch(e){} return prev(n); }; }
 // the places: the scarecrow, the reeds, and the pit
 wrap('farm','objects',l=> golemQ()==='asked' && !hasItem('sack_hood') ? [...l,{type:'golemspot', k:'hood', i:2, j:9, noblock:true}] : l);
 wrap('willowpool','objects',l=> golemQ()==='asked' && !hasItem('drowned_line') && nightAmt()>0.5 ? [...l,{type:'golemspot', k:'line', i:8, j:6, noblock:true}] : l);

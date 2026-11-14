@@ -28431,6 +28431,56 @@ onUse(['rcplum'],o=>deepPick(o,'duskplum','plums',1));
     if(R(2)<odds*0.7){ const s=W.find(([i,j])=>(i===0||j===0) && !busy.has(i+','+j) && ok(i,j)); if(s) l.push({type:'rcplum', i:s[0], j:s[1]}); }
   }catch(e){} return l; }; }
 ['rc_nw','rc_ne','rc_sw','rc_se'].forEach(q=>DUNGEON_FINDS[q].push('berries','duskplum'));   // (glowberries stay edible if you already have some)
+// ════════ THE ROOTDEEP KEEPS NO FURNITURE: no lanterns, no chests, no carved stones. Light comes from lightblooms; what the dead and the lost left behind
+//   the roots have grown round, into seed-pods you cut open; the old writing is carved into the roots themselves; and the deep's creatures carry things ════════
+const RC_POD_RICH=['elf_boots','elf_leggings','elf_circlet','elf_cloak','mana_potion','potion','amber_brooch','silver_torc'].filter(id=>ITEMS[id]);
+function rcDress(r,l){ const out=[]; l.forEach(o=>{
+    if(o.type==='lantern'||o.type==='chainlamp') out.push({type:'rclight', i:o.i, j:o.j, v:(o.i*3+o.j)%3});
+    else if(o.type==='pickup') out.push({type:'rcpod', i:o.i, j:o.j, item:o.item});
+    else if(['crate','crates','barrel','barrels','chest'].includes(o.type)){ const key=r.id+':'+o.i+','+o.j; if(o.rich && !collectedPickups.has(key)) out.push({type:'rcpod', i:o.i, j:o.j, rich:true, item:RC_POD_RICH[(r.hs+o.i*7+o.j)%RC_POD_RICH.length]}); }
+    else if(o.type==='rune') out.push({...o, type:'rcrune'});
+    else out.push(o); });
+  return out; }
+Object.values(RCR).forEach(r=>{ const A=AREAS[r.id], o0=A.objects; A.objects=()=>rcDress(r,o0()); });
+onUse(['rcrune'],o=>say('Carved in the Root',o.text,[bye]));
+onUse(['rclight'],()=>pzSay('A lightbloom: a stem of drooping bells that glow with a soft light of their own. The elves planted them down here, long ago, to see by.','#e8f0c8'));
+onUse(['rcpod'],o=>{ const key=areaId+':'+o.i+','+o.j; if(collectedPickups.has(key)) return; const f=slotFor(o.item); if(f<0){ pzSay('Your pack is full.','#e0b070'); return; }
+  collectedPickups.add(key); if(player.inv[f]===o.item && stackable(o.item)) invN()[f]=(invN()[f]|0)+1; else player.inv[f]=o.item; const i=OBJECTS.indexOf(o); if(i>=0) OBJECTS.splice(i,1); blocked.delete(o.i+','+o.j);
+  try{ SND.fx('bag',0.6); }catch(e){} floatText([o.i,o.j],ITEMS[o.item].name,'#d8e8b0',true);
+  logMsg(o.rich ? 'You slit the great pod open. Inside, wrapped in pale threads of root as if the tree had been keeping it safe: '+ITEMS[o.item].name+'.' : 'You cut the pod open. The roots had grown round something: '+ITEMS[o.item].name+'.','#d8e8b0'); updateHud(); try{ autosaveSoon(300); }catch(e){} });
+NEAR_NAME.rclight='a lightbloom'; NEAR_NAME.rcpod='a seed-pod'; NEAR_NAME.rcrune='carving in a root';
+if(typeof LIGHT_TYPES!=='undefined'){ LIGHT_TYPES.rclight=[0,-50,150,'230,240,190']; LIGHT_TYPES.rcpod=[0,-20,50,'200,220,120']; }
+OBJ_DRAW.rclight=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, sd=o.i*31+o.j*7, col=[['240,236,190','#f4f0c8'],['200,240,220','#d8f8ec'],['230,210,250','#ece0fc']][o.v||0], f=0.85+0.15*Math.sin(gt*1.6+sd);   // a lightbloom: stems from a tuft of leaves, each bending under a glowing bell
+  g.save(); g.fillStyle='rgba(0,0,0,0.3)'; g.filter='blur(3px)'; g.beginPath(); g.ellipse(x+2,y+2,16,5,0,0,Math.PI*2); g.fill(); g.restore();
+  g.save(); g.globalCompositeOperation='lighter'; glow(x,y-52,48*f,38*f,col[0],0.32); glow(x,y,34,12,col[0],0.12); g.restore();
+  for(let k=0;k<7;k++){ const a=-1.2+k*0.4; g.fillStyle=k%2?'#2e5a2e':'#3e6e34'; g.beginPath(); g.ellipse(x+Math.sin(a)*9,y-4,4,9,a*0.7,0,Math.PI*2); g.fill(); }   // the leaves at its foot
+  [[-6,66,-0.5],[2,78,0.15],[8,58,0.6]].forEach(([dx,h,lean],k)=>{ const sw=Math.sin(gt*0.9+k+sd)*1.6, tx=x+dx+lean*18+sw, ty=y-h;
+    g.strokeStyle='#4a6a34'; g.lineWidth=1.8; g.lineCap='round'; g.beginPath(); g.moveTo(x+dx*0.3,y-6); g.quadraticCurveTo(x+dx,y-h*0.6,tx,ty); g.quadraticCurveTo(tx+lean*6,ty-4,tx+lean*9,ty+3); g.stroke();
+    const bx=tx+lean*9, by=ty+3; const bg=g.createRadialGradient(bx,by+3,0.5,bx,by+3,7); bg.addColorStop(0,'#ffffff'); bg.addColorStop(0.5,col[1]); bg.addColorStop(1,'rgba(255,255,255,0.2)'); g.fillStyle=bg;
+    g.beginPath(); g.moveTo(bx-5,by+8); g.quadraticCurveTo(bx-5.5,by,bx,by-1); g.quadraticCurveTo(bx+5.5,by,bx+5,by+8); g.quadraticCurveTo(bx,by+6,bx-5,by+8); g.closePath(); g.fill(); }); };
+OBJ_DRAW.rcpod=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, S=o.rich?1.35:1, sd=o.i*19+o.j*11, b=0.6+0.4*Math.sin(gt*1.4+sd);   // a vine curling up out of the earth, and on it a swollen pod, seams glowing, something inside
+  g.save(); g.fillStyle='rgba(0,0,0,0.3)'; g.filter='blur(3px)'; g.beginPath(); g.ellipse(x+2,y+2,16*S,5*S,0,0,Math.PI*2); g.fill(); g.restore();
+  g.strokeStyle='#3e2a18'; g.lineWidth=3.4*S; g.lineCap='round'; g.beginPath(); g.moveTo(x-10*S,y); g.bezierCurveTo(x-14*S,y-22*S,x+8*S,y-30*S,x+2*S,y-44*S); g.stroke(); g.lineWidth=2*S; g.beginPath(); g.moveTo(x+8*S,y); g.quadraticCurveTo(x+12*S,y-14*S,x+4*S,y-22*S); g.stroke();
+  [[-12,-16],[10,-12],[-4,-34]].forEach(([dx,dy],k)=>{ g.fillStyle=k%2?'#3e6e34':'#2e5a2e'; g.beginPath(); g.ellipse(x+dx*S,y+dy*S,5*S,2.6*S,k-0.5,0,Math.PI*2); g.fill(); });
+  const px=x+2*S, py=y-26*S, pg=g.createRadialGradient(px-4*S,py-5*S,1,px,py,12*S); pg.addColorStop(0,o.rich?'#e8d890':'#c8d890'); pg.addColorStop(0.6,o.rich?'#8a7a3a':'#5a7a3a'); pg.addColorStop(1,'#2a3a1a'); g.fillStyle=pg;
+  g.beginPath(); g.moveTo(px,py-14*S); g.bezierCurveTo(px+11*S,py-10*S,px+11*S,py+8*S,px,py+12*S); g.bezierCurveTo(px-11*S,py+8*S,px-11*S,py-10*S,px,py-14*S); g.closePath(); g.fill();
+  g.save(); g.globalCompositeOperation='lighter'; g.strokeStyle=o.rich?`rgba(255,220,120,${0.7*b})`:`rgba(210,240,120,${0.6*b})`; g.lineWidth=1.1; [-4,0,4].forEach(dx=>{ g.beginPath(); g.moveTo(px+dx*0.4*S,py-13*S); g.quadraticCurveTo(px+dx*S*1.6,py,px+dx*0.4*S,py+11*S); g.stroke(); });
+  glow(px,py,18*S,16*S,o.rich?'255,210,110':'200,230,110',0.22*b); g.restore(); };
+OBJ_DRAW.rcrune=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, sd=o.i*13+o.j*17;   // a stump of old root standing out of the floor, the writing cut into it glowing silver
+  g.save(); g.fillStyle='rgba(0,0,0,0.32)'; g.filter='blur(3px)'; g.beginPath(); g.ellipse(x+2,y+2,18,6,0,0,Math.PI*2); g.fill(); g.restore();
+  const bg=g.createLinearGradient(x-12,0,x+12,0); bg.addColorStop(0,'#6a4e32'); bg.addColorStop(1,'#2a1c10'); g.fillStyle=bg; g.beginPath(); g.moveTo(x-12,y); g.quadraticCurveTo(x-14,y-26,x-9,y-44); g.lineTo(x+8,y-48); g.quadraticCurveTo(x+14,y-26,x+12,y); g.closePath(); g.fill();
+  g.strokeStyle='rgba(20,12,6,0.5)'; g.lineWidth=1; for(let k=-2;k<=2;k++){ g.beginPath(); g.moveTo(x+k*4,y-2); g.quadraticCurveTo(x+k*5,y-24,x+k*3.5,y-44); g.stroke(); }
+  g.fillStyle='#4a3420'; g.beginPath(); g.ellipse(x,y-46,9,3.4,-0.2,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(200,170,120,0.4)'; g.lineWidth=0.8; g.beginPath(); g.ellipse(x,y-46,6,2,-0.2,0,Math.PI*2); g.stroke();   // its cut top, rings
+  g.save(); g.globalCompositeOperation='lighter'; g.strokeStyle=`rgba(200,225,255,${0.7+0.2*Math.sin(gt*2+sd)})`; g.lineWidth=1; for(let r=0;r<4;r++){ const yy=y-36+r*8; g.beginPath(); for(let k=0;k<4;k++){ const xx=x-6+k*4; g.moveTo(xx,yy); g.lineTo(xx+(k%2?2:-1),yy+4); } g.stroke(); }
+  glow(x,y-24,14,20,'180,210,255',0.18); g.restore();
+  g.strokeStyle='#3e2a18'; g.lineWidth=3; g.lineCap='round'; [[-12,1],[11,1]].forEach(([dx,s2])=>{ g.beginPath(); g.moveTo(x+dx,y-4); g.quadraticCurveTo(x+dx*1.6,y,x+dx*2,y+3); g.stroke(); }); };   // roots at its foot
+// what the deep's creatures carry
+const RC_DROPS=[['duskplum',0.3],['berries',0.18],['mana_potion',0.08],['potion',0.08],['moonbell',0.06]];
+{ const _v=victory; victory=function(faction){ const dead=(typeof mobs!=='undefined'?mobs:[]).filter(m=>m.hostile && m.dead && !m._rcDrop && (!faction||m.faction===faction) && AREAS[areaId] && AREAS[areaId].rcRoom);
+    const r=_v.apply(this,arguments);
+    try{ dead.forEach(m=>{ m._rcDrop=true; const got=[]; RC_DROPS.forEach(([id,p])=>{ if(!ITEMS[id] || Math.random()>=p*(m.daily?0.8:1.2)) return; const f=slotFor(id); if(f<0) return; if(player.inv[f]===id && stackable(id)) invN()[f]=(invN()[f]|0)+1; else player.inv[f]=id; got.push(ITEMS[id].name); });
+      if(Math.random()<(m.daily?0.03:0.1)){ const id=RC_POD_RICH[Math.floor(Math.random()*RC_POD_RICH.length)], f=id?slotFor(id):-1; if(f>=0){ player.inv[f]=id; got.push(ITEMS[id].name); } }
+      if(got.length) logMsg('Loot: '+got.join(', '),'#8ac070'); }); updateHud(); }catch(e){} return r; }; }
 </script>
 </body>
 </html>

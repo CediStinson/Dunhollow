@@ -4321,7 +4321,7 @@ function drawHead(c, x, B, opts, view=0){
     c.fillStyle=tone(GEAR.hood,-0.55);                                         // the shadowed inside of the hood
     c.beginPath(); c.ellipse(x+hcx,B+hcy,hrx,hry,0,0,Math.PI*2); c.fill();
   }
-  const kettled=EQ.head==='kettle', HKIND=opts.vari&&opts.vari.head, closed=kettled&&(HKIND==='coif'||HKIND==='helm_full'), underHat=fn=>{ if(closed) return; if(!kettled || HKIND==='scarab_circlet' || HKIND==='sun_crown' || HKIND==='magister_circlet' || HKIND==='starfall_diadem' || HKIND==='ember_crown'){ fn(); return; }
+  const kettled=EQ.head==='kettle', HKIND=opts.vari&&opts.vari.head, closed=kettled&&(HKIND==='coif'||HKIND==='helm_full'), underHat=fn=>{ if(closed) return; if(!kettled || HKIND==='scarab_circlet' || HKIND==='sun_crown' || HKIND==='magister_circlet' || HKIND==='starfall_diadem' || HKIND==='ember_crown' || HKIND==='ember_hood'){ fn(); return; }
     c.save(); c.beginPath(); c.rect(x-200,B+(closed?Y.SHOULDER+2:Y.HAIRLINE+1.2),400,300); c.clip(); fn(); c.restore(); };
   if(!hooded && !opts.shell) underHat(()=>drawHair(c,x,B,opts.hair,hair,hairDark,F,P,view,LN,'back'));   // anything hanging behind the skull
   if((EQ.head==='bog_crown'||EQ.head==='king_crown') && typeof drawBogCrown==='function') drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V,'far',EQ.head);   // the far side of a crown sits behind the head
@@ -4664,6 +4664,7 @@ function drawHead(c, x, B, opts, view=0){
 // Headgear is drawn in head space (same LN lean as the face).
 var HG_F=false;   // whether the head being dressed is a woman's (set by the caller)
 function drawHeadgear(c,x,B,kind,P,view,LN){
+  if(kind==='ember_hood'){ drawHeadgear(c,x,B,'ember_crown',P,view,LN); drawEmberVeil(c,x,B,P,view,LN); return; }   // the veiled Crest: the diadem, and a veil hung from it
   if(kind==='obsidian_helm' || kind==='wyrm_helm') kind='kettle';           // re-coloured kettle hats keep the kettle's shape
   const Y=BODY, V=VIEW[view], HW=P.headHW, pr=V.prof, front=V.turn>-0.25;
   const TOP=Y.SKULL_TOP, LINE=Y.HAIRLINE;
@@ -28138,9 +28139,9 @@ const RC_PIECES={
         return l; }; }); }); })();
 
 // ════════ THE CINDER COWL: the Pyromancer's other headpiece, for those who would rather hide their face than crown it. It counts for the set as the Crest does ════════
-ITEMS.ember_hood={ name:'Cinder Cowl', slot:'head', base:'hood', col:'#2c1410', title:"A deep cowl of ember-dark wool, its rim smouldering without burning, and a veil of dark gauze across the mouth. Counts as the Cinder Crest for the Pyromancer's set." };
+ITEMS.ember_hood={ name:'Veiled Cinder Crest', slot:'head', base:'kettle', col:'#1c1412', title:"The Cinder Crest with a veil of dark ember gauze hung from it across the mouth and chin, on fine gold chains, little gold discs at its hem. Counts as the Crest for the Pyromancer's set." };
 ITEM_STATS.ember_hood={...ITEM_STATS.ember_crown}; GEAR_HP.ember_hood=GEAR_HP.ember_crown; PRICES.ember_hood=PRICES.ember_crown;
-if(ITEMS.ember_crown) ITEMS.ember_crown.title=(ITEMS.ember_crown.title||'')+" (Ilka also makes a Cinder Cowl, if you would rather go veiled.)";
+if(ITEMS.ember_crown) ITEMS.ember_crown.title=(ITEMS.ember_crown.title||'')+" (Ilka also makes it with a veil.)";
 { const _sf=shopFrom; shopFrom=function(name,stock,...r){ if(/^Ilka/.test(name||'') && Array.isArray(stock) && !stock.includes('ember_hood')) stock=[...stock,'ember_hood']; return _sf.call(this,name,stock,...r); }; }
 ITEM_ICON.ember_hood=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40);
   g2.fillStyle='#2c1410'; g2.beginPath(); g2.moveTo(8,36); g2.quadraticCurveTo(6,14,20,5); g2.quadraticCurveTo(34,14,32,36); g2.quadraticCurveTo(20,32,8,36); g2.closePath(); g2.fill(); g2.strokeStyle='#120806'; g2.lineWidth=1; g2.stroke();
@@ -28149,6 +28150,22 @@ ITEM_ICON.ember_hood=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40);
   g2.save(); g2.globalCompositeOperation='lighter'; g2.strokeStyle='rgba(255,120,40,0.7)'; g2.lineWidth=2; g2.beginPath(); g2.ellipse(20,21,8,10,0,0,Math.PI*2); g2.stroke(); g2.strokeStyle='rgba(255,210,140,0.9)'; g2.lineWidth=0.7; g2.stroke(); g2.restore();
   g2.fillStyle='#ffb050'; g2.beginPath(); g2.ellipse(17.6,18.5,1,0.6,0,0,Math.PI*2); g2.ellipse(22.4,18.5,1,0.6,0,0,Math.PI*2); g2.fill();
   g2.fillStyle='#d8a442'; g2.beginPath(); g2.moveTo(20,31); g2.lineTo(22,33); g2.lineTo(20,35); g2.lineTo(18,33); g2.closePath(); g2.fill(); g2.restore(); };
+
+// the veil of the Veiled Cinder Crest: dark ember gauze from the bridge of the nose to below the chin, a gold edge, fine chains up to the band, little gold discs along the hem
+function drawEmberVeil(c,x,B,P,view,LN){ const Y=BODY, V=VIEW[view], HW=P.headHW, pr=V.prof, front=V.turn>-0.25, LINE=Y.HAIRLINE; if(!front) return;
+  const side=pr>0.8, cx=LN+(side?HW*0.62:faceOff(pr)*0.8), cy=(LINE+Y.CHIN)/2+0.8, rx=side?HW*0.5:(HW-1.3)*(1-pr*0.35), ry=(Y.CHIN-LINE)/2+1.4, vy=cy-ry*0.05, by=cy+ry+3.2;
+  const L=x+cx-rx-0.6, R=x+cx+rx+0.6, path=()=>{ c.beginPath(); c.moveTo(L,B+vy); c.quadraticCurveTo(x+cx,B+vy+1.4,R,B+vy); c.quadraticCurveTo(R+0.6,B+cy+ry*0.6,x+cx+rx*0.55,B+by-1.2); c.quadraticCurveTo(x+cx,B+by+1.6,x+cx-rx*0.55,B+by-1.2); c.quadraticCurveTo(L-0.6,B+cy+ry*0.6,L,B+vy); c.closePath(); };
+  c.save(); const vg=c.createLinearGradient(0,B+vy,0,B+by); vg.addColorStop(0,'rgba(74,18,12,0.62)'); vg.addColorStop(1,'rgba(36,8,6,0.88)'); c.fillStyle=vg; path(); c.fill();
+  c.save(); path(); c.clip(); c.strokeStyle='rgba(0,0,0,0.28)'; c.lineWidth=0.5; for(let i=-2;i<=2;i++){ c.beginPath(); c.moveTo(x+cx+i*rx*0.36,B+vy+1); c.quadraticCurveTo(x+cx+i*rx*0.44,B+cy+ry*0.5,x+cx+i*rx*0.3,B+by); c.stroke(); }   // the folds of the gauze
+    c.fillStyle='rgba(255,170,110,0.10)'; c.fillRect(L,B+vy,(R-L)*0.4,by-vy); c.restore();
+  c.strokeStyle='#d8a442'; c.lineWidth=0.75; c.beginPath(); c.moveTo(L,B+vy); c.quadraticCurveTo(x+cx,B+vy+1.4,R,B+vy); c.stroke();   // its gold edge
+  c.strokeStyle='rgba(216,164,66,0.85)'; c.lineWidth=0.45; [[L,-1],[R,1]].forEach(([ex,sd])=>{ c.beginPath(); c.moveTo(ex,B+vy); c.quadraticCurveTo(ex+sd*1.4,B+(vy+LINE)/2,ex+sd*0.8,B+LINE+1.2); c.stroke(); });   // fine chains up to the band
+  c.fillStyle='#e0b050'; const n=side?3:5; for(let k=0;k<n;k++){ const t=(k+0.5)/n, px=x+cx-rx*0.55+t*rx*1.1, py=B+by-1.2+Math.sin(t*Math.PI)*2.4; c.beginPath(); c.arc(px,py+0.9,0.75,0,Math.PI*2); c.fill(); }   // little gold discs along the hem
+  c.restore(); }
+ITEM_ICON.ember_hood=(g2,id,size)=>{ (ITEM_ICON.ember_crown||paintItemArt)(g2,'ember_crown',size); g2.save(); g2.scale(size/40,size/40);
+  g2.fillStyle='rgba(60,14,10,0.85)'; g2.beginPath(); g2.moveTo(11,29); g2.quadraticCurveTo(20,31,29,29); g2.quadraticCurveTo(29,35,24,37); g2.quadraticCurveTo(20,39,16,37); g2.quadraticCurveTo(11,35,11,29); g2.closePath(); g2.fill();
+  g2.strokeStyle='#d8a442'; g2.lineWidth=0.9; g2.beginPath(); g2.moveTo(11,29); g2.quadraticCurveTo(20,31,29,29); g2.stroke(); g2.lineWidth=0.6; g2.beginPath(); g2.moveTo(11,29); g2.lineTo(8,24); g2.moveTo(29,29); g2.lineTo(32,24); g2.stroke();
+  g2.fillStyle='#e0b050'; [15,18,20,22,25].forEach((px,k)=>{ g2.beginPath(); g2.arc(px,36.5+Math.sin((k+0.5)/5*Math.PI)*1.6,0.9,0,Math.PI*2); g2.fill(); }); g2.restore(); };
 </script>
 </body>
 </html>

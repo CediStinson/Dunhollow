@@ -4950,6 +4950,15 @@ function drawHeadgear(c,x,B,kind,P,view,LN){
     c.lineCap='round'; c.strokeStyle=tone(H,-0.5); c.lineWidth=4.4; c.beginPath(); c.moveTo(x+tail[0][0],B+tail[0][1]); c.bezierCurveTo(x+tail[1][0],B+tail[1][1],x+tail[2][0],B+tail[2][1],x+tail[3][0],B+tail[3][1]); c.stroke();
     c.strokeStyle=tone(H,0.02); c.lineWidth=3; c.stroke(); c.lineCap='butt';
   }
+  if(kind==='ember_hood'){                        // the Cinder Cowl: a smouldering rim round the face, a veil of dark gauze over mouth and chin, a gold clasp at the throat, fire along the hem
+    if(front && hole){ c.save(); c.globalCompositeOperation='lighter'; c.strokeStyle='rgba(255,100,30,0.28)'; c.lineWidth=2; c.beginPath(); c.ellipse(x+hole.cx,B+hole.cy,hole.rx+1.2,hole.ry+1.2,0,0,Math.PI*2); c.stroke();
+        c.strokeStyle='rgba(255,170,90,0.5)'; c.lineWidth=0.55; c.stroke(); c.restore();
+      if(pr<=0.8){ c.save(); c.beginPath(); c.ellipse(x+hole.cx,B+hole.cy,hole.rx+0.4,hole.ry+0.4,0,0,Math.PI*2); c.clip();   // the veil, from the bridge of the nose down
+        const vy=B+hole.cy-hole.ry*0.05, vg=c.createLinearGradient(0,vy,0,B+hole.cy+hole.ry); vg.addColorStop(0,'rgba(60,14,10,0.55)'); vg.addColorStop(1,'rgba(30,6,6,0.82)'); c.fillStyle=vg; c.fillRect(x+hole.cx-hole.rx-2,vy,hole.rx*2+4,hole.ry*1.2);
+        c.strokeStyle='rgba(216,164,66,0.9)'; c.lineWidth=0.7; c.beginPath(); c.moveTo(x+hole.cx-hole.rx,vy); c.quadraticCurveTo(x+hole.cx,vy+1.6,x+hole.cx+hole.rx,vy); c.stroke();
+        c.strokeStyle='rgba(0,0,0,0.25)'; c.lineWidth=0.5; for(let i=-2;i<=2;i++){ c.beginPath(); c.moveTo(x+hole.cx+i*hole.rx*0.35,vy+1); c.lineTo(x+hole.cx+i*hole.rx*0.42,B+hole.cy+hole.ry); c.stroke(); } c.restore(); } }
+    if(front){ c.fillStyle='#d8a442'; c.beginPath(); c.moveTo(x+LN,B+Y.CHIN+2); c.lineTo(x+LN+2.2,B+Y.CHIN+4.4); c.lineTo(x+LN,B+Y.CHIN+6.8); c.lineTo(x+LN-2.2,B+Y.CHIN+4.4); c.closePath(); c.fill(); c.fillStyle='#ff7a1a'; c.beginPath(); c.arc(x+LN,B+Y.CHIN+4.4,0.9,0,Math.PI*2); c.fill(); }
+    c.save(); c.globalCompositeOperation='lighter'; c.strokeStyle='rgba(255,120,40,0.5)'; c.lineWidth=1.2; c.beginPath(); const hem=Y.SHOULDER+4.5; for(let i=0;i<=6;i++){ const xx=x+LN+CHc-(i/6)*CHc*2; i?c.lineTo(xx,B+hem+(i%2?1.8:0.4)):c.moveTo(xx,B+hem); } c.stroke(); c.restore(); }
   if(!front){                                    // liripipe tail hanging down the back
     c.fillStyle=tone(H,-0.08);
     c.beginPath(); c.moveTo(x+LN-3,B+TOP+2); c.lineTo(x+LN+3,B+TOP+2); c.lineTo(x+LN+0.8,B+Y.SHOULDER+12); c.lineTo(x+LN-0.8,B+Y.SHOULDER+12); c.closePath(); c.fill();
@@ -27221,7 +27230,8 @@ function drawFocusInHand(c,hx,hy,id){ const x=hx, y=hy; c.save();
     for(let k=0;k<3;k++){ const ph=((gt*0.5+k/3)%1); c.fillStyle=`rgba(220,215,200,${0.3*(1-ph)})`; c.beginPath(); c.ellipse(cx+Math.sin(gt+k)*1.2,cy-3-ph*7,1+ph*1.6,0.8+ph,0,0,Math.PI*2); c.fill(); } }   // warm smoke curling up
   c.restore(); }
 // the set bonuses: the Magister's Economy (every third spell free) and Starfall (one spell in four strikes twice)
-const setOn=SET=>{ const E=(player.opts&&player.opts.equip)||{}; return SET.every(id=>Object.values(E).some(v=>v && unWoven(v)===id)); };
+const SET_ALIAS={ ember_crown:['ember_hood'] };   // pieces that stand in for each other in a set
+const setOn=SET=>{ const E=(player.opts&&player.opts.equip)||{}; return SET.every(id=>Object.values(E).some(v=>v && (unWoven(v)===id || (SET_ALIAS[id]||[]).includes(unWoven(v))))); };
 let MAG_N=0, MAG_FREE=false, STAR_ECHO=false;
 { const _sc=spellCost; spellCost=function(S){ return MAG_FREE ? 0 : _sc.apply(this,arguments); }; }
 { const _c=castSpell; castSpell=function(){ const set=setOn(MAGISTER_SET), m0=player.mana; MAG_FREE = set && MAG_N===2; let r; try{ r=_c.apply(this,arguments); } finally{ var wasFree=MAG_FREE; MAG_FREE=false; }
@@ -28126,6 +28136,19 @@ const RC_PIECES={
         const s1=sp.find(([i,j])=>(i===0||j===0)); if(s1){ l.push({type:'rune', i:s1[0], j:s1[1], text:P0.rune}); }
         P0.props.forEach(([t,e])=>add(t,e));
         return l; }; }); }); })();
+
+// ════════ THE CINDER COWL: the Pyromancer's other headpiece, for those who would rather hide their face than crown it. It counts for the set as the Crest does ════════
+ITEMS.ember_hood={ name:'Cinder Cowl', slot:'head', base:'hood', col:'#2c1410', title:"A deep cowl of ember-dark wool, its rim smouldering without burning, and a veil of dark gauze across the mouth. Counts as the Cinder Crest for the Pyromancer's set." };
+ITEM_STATS.ember_hood={...ITEM_STATS.ember_crown}; GEAR_HP.ember_hood=GEAR_HP.ember_crown; PRICES.ember_hood=PRICES.ember_crown;
+if(ITEMS.ember_crown) ITEMS.ember_crown.title=(ITEMS.ember_crown.title||'')+" (Ilka also makes a Cinder Cowl, if you would rather go veiled.)";
+{ const _sf=shopFrom; shopFrom=function(name,stock,...r){ if(/^Ilka/.test(name||'') && Array.isArray(stock) && !stock.includes('ember_hood')) stock=[...stock,'ember_hood']; return _sf.call(this,name,stock,...r); }; }
+ITEM_ICON.ember_hood=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40);
+  g2.fillStyle='#2c1410'; g2.beginPath(); g2.moveTo(8,36); g2.quadraticCurveTo(6,14,20,5); g2.quadraticCurveTo(34,14,32,36); g2.quadraticCurveTo(20,32,8,36); g2.closePath(); g2.fill(); g2.strokeStyle='#120806'; g2.lineWidth=1; g2.stroke();
+  g2.fillStyle='#0c0606'; g2.beginPath(); g2.ellipse(20,21,7,9,0,0,Math.PI*2); g2.fill();
+  g2.fillStyle='rgba(70,16,12,0.85)'; g2.beginPath(); g2.ellipse(20,21,7,9,0,0.05,Math.PI-0.05); g2.fill();
+  g2.save(); g2.globalCompositeOperation='lighter'; g2.strokeStyle='rgba(255,120,40,0.7)'; g2.lineWidth=2; g2.beginPath(); g2.ellipse(20,21,8,10,0,0,Math.PI*2); g2.stroke(); g2.strokeStyle='rgba(255,210,140,0.9)'; g2.lineWidth=0.7; g2.stroke(); g2.restore();
+  g2.fillStyle='#ffb050'; g2.beginPath(); g2.ellipse(17.6,18.5,1,0.6,0,0,Math.PI*2); g2.ellipse(22.4,18.5,1,0.6,0,0,Math.PI*2); g2.fill();
+  g2.fillStyle='#d8a442'; g2.beginPath(); g2.moveTo(20,31); g2.lineTo(22,33); g2.lineTo(20,35); g2.lineTo(18,33); g2.closePath(); g2.fill(); g2.restore(); };
 </script>
 </body>
 </html>

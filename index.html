@@ -4664,7 +4664,7 @@ function drawHead(c, x, B, opts, view=0){
 // Headgear is drawn in head space (same LN lean as the face).
 var HG_F=false;   // whether the head being dressed is a woman's (set by the caller)
 function drawHeadgear(c,x,B,kind,P,view,LN){
-  if(kind==='ember_hood'){ drawHeadgear(c,x,B,'ember_crown',P,view,LN); drawEmberVeil(c,x,B,P,view,LN); return; }   // the veiled Crest: the diadem, and a veil hung from it
+  if(kind==='ember_crown' || kind==='ember_hood'){ drawEmberCrystal(c,x,B,P,view,LN); return; }   // the Pyromancer's headpiece: nothing on the head at all, only a crystal of fire hanging in the air before the brow
   if(kind==='obsidian_helm' || kind==='wyrm_helm') kind='kettle';           // re-coloured kettle hats keep the kettle's shape
   const Y=BODY, V=VIEW[view], HW=P.headHW, pr=V.prof, front=V.turn>-0.25;
   const TOP=Y.SKULL_TOP, LINE=Y.HAIRLINE;
@@ -28142,7 +28142,6 @@ const RC_PIECES={
 ITEMS.ember_hood={ name:'Veiled Cinder Crest', slot:'head', base:'kettle', col:'#1c1412', title:"The Cinder Crest with a veil of dark ember gauze hung from it across the mouth and chin, on fine gold chains, little gold discs at its hem. Counts as the Crest for the Pyromancer's set." };
 ITEM_STATS.ember_hood={...ITEM_STATS.ember_crown}; GEAR_HP.ember_hood=GEAR_HP.ember_crown; PRICES.ember_hood=PRICES.ember_crown;
 if(ITEMS.ember_crown) ITEMS.ember_crown.title=(ITEMS.ember_crown.title||'')+" (Ilka also makes it with a veil.)";
-{ const _sf=shopFrom; shopFrom=function(name,stock,...r){ if(/^Ilka/.test(name||'') && Array.isArray(stock) && !stock.includes('ember_hood')) stock=[...stock,'ember_hood']; return _sf.call(this,name,stock,...r); }; }
 ITEM_ICON.ember_hood=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40);
   g2.fillStyle='#2c1410'; g2.beginPath(); g2.moveTo(8,36); g2.quadraticCurveTo(6,14,20,5); g2.quadraticCurveTo(34,14,32,36); g2.quadraticCurveTo(20,32,8,36); g2.closePath(); g2.fill(); g2.strokeStyle='#120806'; g2.lineWidth=1; g2.stroke();
   g2.fillStyle='#0c0606'; g2.beginPath(); g2.ellipse(20,21,7,9,0,0,Math.PI*2); g2.fill();
@@ -28166,6 +28165,31 @@ ITEM_ICON.ember_hood=(g2,id,size)=>{ (ITEM_ICON.ember_crown||paintItemArt)(g2,'e
   g2.fillStyle='rgba(60,14,10,0.85)'; g2.beginPath(); g2.moveTo(11,29); g2.quadraticCurveTo(20,31,29,29); g2.quadraticCurveTo(29,35,24,37); g2.quadraticCurveTo(20,39,16,37); g2.quadraticCurveTo(11,35,11,29); g2.closePath(); g2.fill();
   g2.strokeStyle='#d8a442'; g2.lineWidth=0.9; g2.beginPath(); g2.moveTo(11,29); g2.quadraticCurveTo(20,31,29,29); g2.stroke(); g2.lineWidth=0.6; g2.beginPath(); g2.moveTo(11,29); g2.lineTo(8,24); g2.moveTo(29,29); g2.lineTo(32,24); g2.stroke();
   g2.fillStyle='#e0b050'; [15,18,20,22,25].forEach((px,k)=>{ g2.beginPath(); g2.arc(px,36.5+Math.sin((k+0.5)/5*Math.PI)*1.6,0.9,0,Math.PI*2); g2.fill(); }); g2.restore(); };
+
+// ════════ THE CINDER CRYSTAL: the Pyromancer's headpiece is no hat at all, but a long crystal of dark fire-glass that hangs in the air a finger's breadth before the brow,
+//   turning slowly, a flame burning inside it and licking from its tip ════════
+ITEMS.ember_crown.name='Cinder Crystal'; ITEMS.ember_crown.title="A long crystal of dark fire-glass that hangs in the air before your brow and goes where you go. A flame burns inside it, and licks from its tip. Nothing touches your head at all.";
+ITEMS.ember_hood.name='Cinder Crystal'; ITEMS.ember_hood.title=ITEMS.ember_crown.title;
+function drawEmberCrystal(c,x,B,P,view,LN){ const Y=BODY, V=VIEW[view], HW=P.headHW, pr=V.prof, front=V.turn>-0.25; if(!front && pr<0.8) return;   // seen from behind, the head hides it
+  const t=(typeof gt!=='undefined'?gt:0), side=pr>0.8, bob=Math.sin(t*2.1)*0.7, cx=x+LN+(side?HW+2.2:faceOff(pr)*0.9), cy=B+Y.HAIRLINE+1.8+bob, h=7.4, w=2.6*(side?0.8:1), turn=Math.sin(t*1.3)*0.35;
+  c.save(); c.globalCompositeOperation='lighter'; const gl=c.createRadialGradient(cx,cy,0,cx,cy,10); gl.addColorStop(0,'rgba(255,150,60,0.45)'); gl.addColorStop(1,'rgba(255,90,20,0)'); c.fillStyle=gl; c.beginPath(); c.ellipse(cx,cy,10,9,0,0,Math.PI*2); c.fill(); c.restore();
+  const top=[cx,cy-h*0.62], bot=[cx,cy+h*0.42], L=[cx-w,cy-h*0.02], R=[cx+w,cy-h*0.06], M=[cx+w*turn,cy-h*0.04];   // a long bipyramid: two facets either side of a turning ridge
+  const face=(pts,col)=>{ c.fillStyle=col; c.beginPath(); pts.forEach((p,k)=>k?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1])); c.closePath(); c.fill(); };
+  face([top,L,M],'#7a2010'); face([top,M,R],'#3a0c06'); face([bot,L,M],'#a8361a'); face([bot,M,R],'#5a1408');
+  c.save(); c.beginPath(); [top,R,bot,L].forEach((p,k)=>k?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1])); c.closePath(); c.clip(); c.globalCompositeOperation='lighter';   // the flame inside, flickering
+  const f=0.8+0.2*Math.sin(t*9)+0.1*Math.sin(t*23), fg=c.createRadialGradient(cx,cy+h*0.05,0,cx,cy,h*0.55*f); fg.addColorStop(0,'rgba(255,240,180,0.95)'); fg.addColorStop(0.4,'rgba(255,150,50,0.7)'); fg.addColorStop(1,'rgba(255,80,20,0)'); c.fillStyle=fg; c.fillRect(cx-w-1,cy-h,w*2+2,h*2); c.restore();
+  c.strokeStyle='rgba(255,210,150,0.55)'; c.lineWidth=0.4; c.beginPath(); c.moveTo(top[0],top[1]); c.lineTo(M[0],M[1]); c.lineTo(bot[0],bot[1]); c.stroke(); c.strokeStyle='rgba(20,4,2,0.6)'; c.beginPath(); [top,R,bot,L].forEach((p,k)=>k?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1])); c.closePath(); c.stroke();
+  c.save(); c.globalCompositeOperation='lighter'; const fl=2.4+1.2*Math.sin(t*11)+0.6*Math.sin(t*17);   // the flame licking from its tip
+  c.fillStyle='rgba(255,140,40,0.75)'; c.beginPath(); c.moveTo(top[0]-1.1,top[1]+0.6); c.quadraticCurveTo(top[0]-1.4+Math.sin(t*7)*0.6,top[1]-fl*0.6,top[0]+Math.sin(t*5)*0.8,top[1]-fl); c.quadraticCurveTo(top[0]+1.4,top[1]-fl*0.5,top[0]+1.1,top[1]+0.6); c.closePath(); c.fill();
+  c.fillStyle='rgba(255,230,160,0.85)'; c.beginPath(); c.ellipse(top[0],top[1]-fl*0.35,0.5,fl*0.3,0,0,Math.PI*2); c.fill();
+  for(let k=0;k<2;k++){ const ph=(t*0.9+k*0.5)%1; c.fillStyle=`rgba(255,180,90,${0.8*(1-ph)})`; c.fillRect(cx+Math.sin(t*3+k*2)*2-0.3,top[1]-fl-ph*7,0.6,0.6); } c.restore(); }   // a spark rising now and then
+ITEM_ICON.ember_crown=ITEM_ICON.ember_hood=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); const cx=20, cy=21;
+  g2.save(); g2.globalCompositeOperation='lighter'; const gl=g2.createRadialGradient(cx,cy,0,cx,cy,16); gl.addColorStop(0,'rgba(255,150,60,0.5)'); gl.addColorStop(1,'rgba(255,90,20,0)'); g2.fillStyle=gl; g2.fillRect(0,0,40,40); g2.restore();
+  const face=(pts,col)=>{ g2.fillStyle=col; g2.beginPath(); pts.forEach((p,k)=>k?g2.lineTo(p[0],p[1]):g2.moveTo(p[0],p[1])); g2.closePath(); g2.fill(); };
+  const top=[20,7], bot=[20,33], L=[13,20], R=[27,19], M=[21.5,19.5]; face([top,L,M],'#7a2010'); face([top,M,R],'#3a0c06'); face([bot,L,M],'#a8361a'); face([bot,M,R],'#5a1408');
+  g2.save(); g2.beginPath(); [top,R,bot,L].forEach((p,k)=>k?g2.lineTo(p[0],p[1]):g2.moveTo(p[0],p[1])); g2.closePath(); g2.clip(); g2.globalCompositeOperation='lighter'; const fg=g2.createRadialGradient(20,21,0,20,20,11); fg.addColorStop(0,'rgba(255,240,180,0.95)'); fg.addColorStop(0.45,'rgba(255,140,40,0.7)'); fg.addColorStop(1,'rgba(255,80,20,0)'); g2.fillStyle=fg; g2.fillRect(0,0,40,40); g2.restore();
+  g2.strokeStyle='rgba(20,4,2,0.7)'; g2.lineWidth=0.8; g2.beginPath(); [top,R,bot,L].forEach((p,k)=>k?g2.lineTo(p[0],p[1]):g2.moveTo(p[0],p[1])); g2.closePath(); g2.stroke();
+  g2.save(); g2.globalCompositeOperation='lighter'; g2.fillStyle='rgba(255,140,40,0.85)'; g2.beginPath(); g2.moveTo(18,8); g2.quadraticCurveTo(17,3,20.5,0.5); g2.quadraticCurveTo(22.5,4,22,8); g2.closePath(); g2.fill(); g2.restore(); g2.restore(); };
 </script>
 </body>
 </html>

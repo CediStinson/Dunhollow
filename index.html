@@ -28618,6 +28618,7 @@ function drawGolem(x,B,e,pose){ const d=e.dir||0, fl=(d===5||d===6||d===7)?-1:1,
   const headPart=()=>{
   // the head: small, sunk low between the shoulders, a sack pulled over it and tied at the neck
   const hx=s*7+lean*0.5, hy=(back?sh-9:sh-5)+(stag?2:0)+(kn?4:0), sg=g.createRadialGradient(hx-4,hy-8,2,hx,hy,18); sg.addColorStop(0,'#c4ac78'); sg.addColorStop(0.7,SACK); sg.addColorStop(1,SACKD);
+  if(e.helm) golemHelmDraw(e.helm,hx,hy,back,d,'far');                                     // the far side of a crown sits behind the head
   if(!back){ const ng=g.createRadialGradient(hx,hy+8,2,hx,hy+10,16); ng.addColorStop(0,FL); ng.addColorStop(1,FD); g.fillStyle=ng; g.beginPath(); g.ellipse(hx,hy+11,15,8,0,0,Math.PI*2); g.fill(); stitch([[hx-12,hy+13],[hx+12,hy+12]]); drip(hx+5,hy+14,6); }   // a bull neck of stitched meat
   if(!back){ g.fillStyle=sg; g.beginPath(); g.moveTo(hx-12,hy+8); g.quadraticCurveTo(hx-15,hy-11,hx-2,hy-15); g.quadraticCurveTo(hx+14,hy-14,hx+13,hy+7); g.quadraticCurveTo(hx,hy+12,hx-12,hy+8); g.closePath(); g.fill(); }
   else { g.fillStyle=sg; g.beginPath(); g.moveTo(hx-12,hy+4); g.quadraticCurveTo(hx-14,hy-12,hx,hy-15); g.quadraticCurveTo(hx+14,hy-12,hx+12,hy+4); g.closePath(); g.fill(); }
@@ -28826,12 +28827,63 @@ setInterval(()=>{ try{ if(CHOICE.golemHelm && !golemHelmOn()) golemHelmHome(); }
     try{ if(invDrag && !was && invDrag.moved && ITEMS[invDrag.id].slot==='head' && golemHelmOn() && invDrag.loc.kind==='inv'){ const sl=document.querySelector('#inv-overlay .golem-slot'); if(sl) sl.classList.add('valid'); } }catch(e2){} return r; }; }
 const GOLEM_HELM_CV={};
 // the real piece, drawn the way it sits on a person, scaled up to the golem's head and set down over the sack
-function golemHelmDraw(id,hx,hy,back,d){ const H=unWoven(id);
-  if(!(ITEMS[H]&&ITEMS[H].base) && H!=='kettle' && H!=='hood'){ let cv=GOLEM_HELM_CV[H];      // pieces drawn their own way on people (bands, crowns): their picture, set on the head
-    if(!cv){ cv=document.createElement('canvas'); cv.width=cv.height=96; try{ drawItemIcon(cv.getContext('2d'),H,96); }catch(e){} GOLEM_HELM_CV[H]=cv; }
-    const S2=H.includes("crown")?36:28; g.save(); if(back) g.filter="brightness(0.45) saturate(0.4)"; g.drawImage(cv,hx-S2/2,hy-S2*(H.includes("crown")?0.86:1.0),S2,S2); g.restore(); return; }
+function golemHelmDraw(id,hx,hy,back,d,part){ const H=unWoven(id);
+  const vw=dirView(d===2?1:d===6?7:(d||0));
+  if(!(ITEMS[H]&&ITEMS[H].base) && H!=='kettle' && H!=='hood'){ g.save(); g.translate(hx,hy-1.2); g.scale(1.18,1.18); try{ golemHeadSpecial(g,0,79,H,vw,part||'near'); }catch(e){ console.error(e); } g.restore(); return; }
+  if(part==='far') return;
   try{ withLook({gender:'m', equip:{head:H}}, o=>{ const kind=(o.vari&&o.vari.head)||o.equip.head; if(!kind) return;
       g.save(); g.translate(hx,hy-1.2); g.scale(1.18,1.18); try{ drawHeadgear(g,0,79,kind,PROP.m,dirView(d===2?1:d===6?7:(d||0)),0); }catch(e){} g.restore(); }); }catch(e){} }
+
+// the pieces people wear drawn their own way (a kerchief, the duellist's band, the elven circlet, the two crowns): the same strokes, for the golem
+function golemHeadSpecial(c,x,B,head,view,part){ const EQ={head}, P=PROP.m, Y=BODY, V=VIEW[view], HW=P.headHW, LN=V.lean*1.25, pr=V.prof, showFace=V.turn>-0.25;
+  if(head==='bog_crown'||head==='king_crown'){ drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V,part,head); return; }
+  if(part!=='near') return;
+  if(EQ.head==='bandana'){                              // a purple kerchief tied over nose and mouth, knotted at the nape
+    const BD='#5e2a6e', top=Y.NOSE-2.6, bot=Y.CHIN+2;
+    if(showFace && V.turn>-0.25){
+      const prof=pr>0.8, off=LN+(prof?HW-0.7:faceOff(pr)), nb=Y.NOSE-2.2, sideY=Y.NOSE+1.6, bot2=Y.CHIN+1.5;
+      const L0=LN-(prof?HW*0.85:HW+0.2), R0=prof?LN+HW+2.4:LN+HW+0.2, tipX=prof?LN+HW+0.8:off, tipY=Y.CHIN+(prof?5:7.5);
+      c.beginPath();
+      if(prof){ c.moveTo(x+L0,B+sideY+0.6); c.quadraticCurveTo(x+LN+HW*0.3,B+sideY-0.6,x+off-0.6,B+nb);     // over the bridge,
+        c.lineTo(x+R0,B+Y.NOSE+0.8);                                                                        // draped off the nose tip
+        c.lineTo(x+R0-0.6,B+bot2); c.quadraticCurveTo(x+tipX+1.5,B+bot2+2,x+tipX,B+tipY); c.quadraticCurveTo(x+LN,B+bot2+1,x+L0+0.5,B+bot2-1.2); }
+      else { c.moveTo(x+L0,B+sideY); c.quadraticCurveTo(x+off-3.5,B+sideY-0.4,x+off-1.6,B+nb+0.5); c.quadraticCurveTo(x+off,B+nb-0.9,x+off+1.6,B+nb+0.5);
+        c.quadraticCurveTo(x+off+3.5,B+sideY-0.4,x+R0,B+sideY);                                            // peaked over the nose, falling away beside it
+        c.lineTo(x+R0-0.5,B+bot2-1); c.quadraticCurveTo(x+off+(R0-off)*0.5,B+bot2+2,x+tipX,B+tipY); c.quadraticCurveTo(x+off-(off-L0)*0.5,B+bot2+2,x+L0+0.5,B+bot2-1); }
+      c.closePath();
+      const bg=c.createLinearGradient(x+L0,0,x+R0,0); bg.addColorStop(0,tone(BD,0.2)); bg.addColorStop(1,tone(BD,-0.3)); c.fillStyle=bg; c.fill();
+      c.strokeStyle=tone(BD,-0.55); c.lineWidth=0.7; c.stroke();
+      c.strokeStyle=tone(BD,-0.35,0.8); c.lineWidth=0.5; [Y.MOUTH-1.2,Y.CHIN-1].forEach(yy=>{ c.beginPath(); c.moveTo(x+L0+1.2,B+yy-0.8); c.quadraticCurveTo(x+(prof?LN+HW:off),B+yy+1.6,x+R0-1.2,B+yy-0.8); c.stroke(); });
+      c.strokeStyle=tone(BD,0.3,0.7); c.beginPath(); c.moveTo(x+off-(prof?0.6:1.6),B+nb+0.8); c.lineTo(x+(prof?R0-0.4:off+1.6),B+(prof?Y.NOSE+1.2:nb+0.8)); c.stroke();
+    } else {
+      c.fillStyle=tone(BD,-0.15); c.fillRect(x+LN-HW,B+top+0.4,HW*2,2.2);
+      c.fillStyle=BD; c.beginPath(); c.ellipse(x+LN,B+top+1.5,1.8,1.6,0,0,Math.PI*2); c.fill();
+      [-1,1].forEach(sd=>{ c.beginPath(); c.moveTo(x+LN,B+top+2); c.quadraticCurveTo(x+LN+sd*2.5,B+top+5,x+LN+sd*1.5,B+top+8); c.lineTo(x+LN+sd*0.4,B+top+7); c.closePath(); c.fill(); });
+    }
+  }
+  if(EQ.head==='duel_band'){                            // the duellist's band: leather across the brow, a leaf of metal over it, the ends knotted behind and hanging
+    const cy=Y.HAIRLINE+1.2, rx=HW+0.5, ry=2.4, Bc=ELFC.br, T0=ELFC.hzt;
+    c.strokeStyle=tone(Bc,-0.5); c.lineWidth=2.1; c.beginPath(); c.ellipse(x+LN,B+cy,rx,ry,0,0.05,Math.PI-0.05); c.stroke();
+    c.strokeStyle=Bc; c.lineWidth=1.5; c.stroke(); c.strokeStyle=tone(Bc,0.3,0.7); c.lineWidth=0.4; c.beginPath(); c.ellipse(x+LN,B+cy-0.5,rx,ry,0,0.3,Math.PI-0.3); c.stroke();
+    if(showFace){ const gx=LN+(pr>0.8 ? HW-1.4 : faceOff(pr)), gy=cy+ry*(pr>0.8?0.2:1);
+      c.save(); c.translate(x+gx,B+gy); c.beginPath(); c.moveTo(0,-5.4); c.quadraticCurveTo(2.3,-2,0,1.2); c.quadraticCurveTo(-2.3,-2,0,-5.4); c.closePath();
+      const lg=c.createLinearGradient(-2,0,2,0); lg.addColorStop(0,tone(T0,0.35)); lg.addColorStop(1,tone(T0,-0.3)); c.fillStyle=lg; c.fill(); c.strokeStyle=tone(T0,-0.5); c.lineWidth=0.4; c.stroke();
+      c.beginPath(); c.moveTo(0,-4.6); c.lineTo(0,0.6); c.stroke(); c.restore(); }
+    else { const kx=LN, ky=cy+ry*0.9; c.fillStyle=tone(Bc,0.05); c.beginPath(); c.ellipse(x+kx,B+ky,1.5,1.2,0,0,Math.PI*2); c.fill();   // the knot behind, and its two tails
+      [-1,1].forEach(sd=>{ c.fillStyle=tone(Bc,sd<0?0.08:-0.1); c.beginPath(); c.moveTo(x+kx+sd*0.4,B+ky+0.6); c.quadraticCurveTo(x+kx+sd*2.4,B+ky+5,x+kx+sd*1.6,B+ky+10); c.lineTo(x+kx+sd*0.6,B+ky+9.4); c.quadraticCurveTo(x+kx+sd*1.2,B+ky+5,x+kx-sd*0.4,B+ky+0.8); c.closePath(); c.fill(); }); }
+    if(showFace && pr>0.8){ const kx=LN-HW+0.4, ky=cy+0.6; [0,1].forEach(q=>{ c.fillStyle=tone(Bc,q?-0.1:0.06); c.beginPath(); c.moveTo(x+kx,B+ky); c.quadraticCurveTo(x+kx-2.2-q,B+ky+4,x+kx-1.4-q*1.6,B+ky+9-q); c.lineTo(x+kx-0.6-q*1.2,B+ky+8.6-q); c.quadraticCurveTo(x+kx-1.2-q,B+ky+4,x+kx+0.6,B+ky+0.4); c.closePath(); c.fill(); }); }
+  }
+  if(EQ.head==='elf_circlet'){                          // a fine silver band across the brow
+    const cy=Y.HAIRLINE+0.6, rx=HW+0.4, ry=2.3;
+    c.strokeStyle=tone(ELFC.silver,-0.45); c.lineWidth=1.7; c.beginPath(); c.ellipse(x+LN,B+cy,rx,ry,0,0.08,Math.PI-0.08); c.stroke();
+    c.strokeStyle=ELFC.silver; c.lineWidth=0.8; c.beginPath(); c.ellipse(x+LN,B+cy-0.2,rx,ry,0,0.25,Math.PI-0.25); c.stroke();
+    if(showFace){ const gx=LN+(pr>0.8 ? HW-1.2 : faceOff(pr)), gy=cy+ry*(pr>0.8?0.2:1)-0.3;
+      c.fillStyle=ELFC.silver; [-1,1].forEach(sd=>{ c.beginPath(); c.ellipse(x+gx+sd*2.1,B+gy-0.4,1.6,0.6,sd*0.5,0,Math.PI*2); c.fill(); });
+      c.fillStyle=ELFC.gem; c.beginPath(); c.arc(x+gx,B+gy,1.25,0,Math.PI*2); c.fill();
+      c.strokeStyle=tone(ELFC.silver,-0.4); c.lineWidth=0.4; c.stroke();
+      c.fillStyle='rgba(255,255,255,0.85)'; c.beginPath(); c.arc(x+gx-0.4,B+gy-0.4,0.4,0,Math.PI*2); c.fill(); }
+  }
+}
 </script>
 </body>
 </html>

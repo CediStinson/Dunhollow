@@ -15101,6 +15101,9 @@ function drawActorBase(e){
   else if(e.type==='troll') drawTroll(s.x,B,e,poseFor(e));
   else if(e.type==='gloomcaller'||e.type==='thornwitch'){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawShadeUnder(s.x,B,e); g.globalAlpha*=0.82; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); g.globalAlpha/=0.82; drawShadeOver(s.x,B,e); }
   else if(e.type==='rotnymph') drawRotNymph(s.x,B,e);
+  else if(e.type==='sporeling') drawSporeling(s.x,B,e,poseFor(e));
+  else if(e.type==='capbrute') drawCapbrute(s.x,B,e,poseFor(e));
+  else if(e.type==='briarling') drawBriarling(s.x,B,e,poseFor(e));
   else if(e.type==='rootshaman'){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); drawShamanBits(s.x,B,e); }
   else if(e.type==='husk'){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); drawHuskBits(s.x,B,e); }
   else if(e.type==='skeleton') drawRisen(s.x,B,e,poseFor(e));
@@ -15108,8 +15111,9 @@ function drawActorBase(e){
   else { const live=(combat.active && (e===combat.foe||isP)) || e.moving, ps=live?poseFor(e):litPose(poseFor(e)), sw=e.moving?Math.sin(gt*10)*5:0; drawLitSprite(s.x,B,()=>drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps),1,live?null:isP?'p':'a:'+(e.id??e.name),(e.dir||0)+'|'+Math.round(sw*4)+'|'+litSig(ps)+'|'+litSig(e.opts)+'|'+(isP?Math.round((player.wet||0)*10):'')); }
   g.restore();
   if(!isP && e.dead) return;
+  if(!isP && e.type==='sporeling' && typeof sporeDormant==='function' && sporeDormant(e)) return;   // a sleeping sporeling is just a mushroom: no name over it
   if(isP && romHush()) return;
-  const ty=B-(e.type==='rat'?40:e.type==='ratking'?66:e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'?66:e.type==='dragon'?300:e.type==='bear'?92:e.type==='troll'?150:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:e.type==='rootmother'?214:e.type==='hollow'?272:114)+dwarfDrop(e.opts);
+  const ty=B-(e.type==='rat'?40:e.type==='ratking'?66:e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'||e.type==='briarling'?66:e.type==='sporeling'?72:e.type==='capbrute'?((e.opts&&e.opts.big)?236:178):e.type==='dragon'?300:e.type==='bear'?92:e.type==='troll'?150:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:e.type==='rootmother'?214:e.type==='hollow'?272:114)+dwarfDrop(e.opts);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const deadly=!isP && e.type!=='dummy' && e.hostile!==false && e.tier && typeof foeLevel==='function' && foeLevel(e)-playerLevel()>=3;   // far stronger than you: a skull
   const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  Lv '+(typeof foeLevel==='function'?foeLevel(e):e.tier) : ''), tw=g.measureText(label).width;
@@ -28259,6 +28263,122 @@ RC_FOLK.rc_sw.push(()=>({name:'Corrupted Nymph', type:'rotnymph', opts:NYMPHO()}
 // and they keep to pairs in some quiet drifts: two sisters, singing together
 { const _rm=rcMobs; rcMobs=function(r){ const l=_rm(r); try{ if(!r.cavern && !RC_OUT[r.id] && !r.nightDrift && r.kind!=='bend' && (r.hs>>>6)%4===1 && !l.some(m=>m.type==='rotnymph')){ const W=ucWalk(r).filter(([i,j])=>!ucNearDoor(r,i,j) && !l.some(m=>m.i===i&&m.j===j)).slice(0,2);
       W.forEach(([i,j],k)=>l.push({name:'Corrupted Nymph'+(k?' ':''), type:'rotnymph', opts:NYMPHO(), faction:'rcn_'+r.id, daily:true, i, j})); } }catch(e){} return l; }; }
+
+// ════════ NEW THINGS IN THE ROOTDEEP: the gnawers and husks give way to the deep's own creatures.
+//   Sporelings: little mushroom folk who stand among the caps looking like caps themselves, until you come close and they stand up.
+//   Cap-brutes: mushroom men twice your height, slow, heavy, and every blow a cloud of spores.
+//   Briarlings: hounds of twisted thorn-vine with a knot of root for a skull; quick, and every bite opens you up.
+//   And the floor itself: thorn-vines lying across the way, hard to see if you are not watching your feet, and puffball clumps that burst as you pass ════════
+Object.assign(WEAPONS,{ spore_fist:{ wind:0.28, dmg:6, len:18 }, cap_club:{ wind:0.42, dmg:12, len:30 }, briar_claw:{ wind:0.3, dmg:8, len:22 } });
+FOES.sporeling={ label:'Sporeling', base:30, stagger:1.0, pattern:[{wait:0.8,wind:0.7,after:0.45,dir:'left'},{wait:0.3,wind:0.55,after:0.35,dir:'right'},{wait:1.0,wind:0.85,after:0.55,dir:'up'}] };
+FOES.capbrute={ label:'Cap-Brute', base:70, stagger:1.3, pattern:[{wait:1.4,wind:1.25,after:0.75,dir:'right'},{wait:1.0,wind:1.1,after:0.7,dir:'left'},{wait:1.7,wind:1.45,after:0.9,dir:'up',feint:'right'}] };
+FOES.briarling={ label:'Briarling', base:44, stagger:0.95, pattern:[{wait:0.8,wind:0.62,after:0.5,dir:'left'},{wait:0.4,wind:0.55,after:0.45,dir:'right'},{wait:1.1,wind:0.8,after:0.6,dir:'up'},{wait:0.5,wind:0.6,after:0.5,dir:'left'}] };
+const SPORELING=(v)=>({spore:true, v:v||0, equip:{...NOEQ, weapon:'spore_fist'}}), CAPBRUTE=(big)=>({big:!!big, equip:{...NOEQ, weapon:'cap_club'}}), BRIAR=(big)=>({big:!!big, equip:{...NOEQ, weapon:'briar_claw'}});
+{ const prev=impact; impact=function(f){ const hp0=player.hp; const r=prev(f); try{ const hurt=player.hp<hp0 && player.hp>0 && !combat.practice;
+      if(hurt && f.type==='sporeling' && Math.random()<0.35) addStatus(player,'venom',5,1);
+      if(hurt && f.type==='capbrute'){ if(Math.random()<0.5){ addStatus(player,'venom',6,2); floatText([player.i,player.j-0.004],'Spores!','#c8c070'); } if(Math.random()<0.25) addStatus(player,'weak',4,0); }
+      if(hurt && f.type==='briarling' && Math.random()<0.5) addStatus(player,'bleed',5,2); }catch(e){} return r; }; }
+BEASTS.unshift({ k:'sporeling', is:f=>f.type==='sporeling', name:'Sporelings', kind:'Mushroom folk · the Rootdeep', how:'Little and quick: a jab either side and a hop from above. They stand among the caps until you come close.', res:'Soft flesh: nothing special.', aff:'Their fists are dusty with spores: sometimes they poison.' },
+  { k:'capbrute', is:f=>f.type==='capbrute', name:'Cap-Brutes', kind:'Mushroom men · the Rootdeep', how:'Slow, heavy swings of a fungus fist; one feints high.', res:'Thick and soft: blows sink in.', aff:'Every hit a cloud of spores: often poisons, sometimes weakens.' },
+  { k:'briarling', is:f=>f.type==='briarling', name:'Briarlings', kind:'Hounds of thorn-vine · the Rootdeep', how:'Quick snaps from either side and a leap from above.', res:'Vine and thorn: nothing to bleed.', aff:'Their thorns open wounds that keep bleeding.' });
+['Sporeling','Sporeling ','Cap-Brute','Cap-Brute ','Briarling','Briarling '].forEach(n=>RESPAWNS.add(n));
+const SPORE_CAPS=[['#8a5a3a','#d8b090'],['#6a4a7a','#c8a8e0'],['#4a7a6a','#a8e0d0']];
+const sporeDormant=e=>!e.dead && !(combat.active && (combat.foe===e || cheb(tileOf(e),tileOf(player))<=3)) && cheb(tileOf(e),tileOf(player))>2;
+function drawSporeling(x,B,e,pose){ const fade=e.dead?Math.max(0,1-(e.fallT||0)/0.7):1; if(fade<=0) return; const v=(e.opts&&e.opts.v)||0, C=SPORE_CAPS[v%3], t=gt*5+(e.id||0);
+  g.save(); g.globalAlpha*=fade;
+  if(sporeDormant(e)){ const q=x, y=B; g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(q,y+1,12,4,0,0,Math.PI*2); g.fill();   // asleep: a squat cap on the floor, like any other
+    g.fillStyle='#d8d0bc'; g.fillRect(q-3,y-10,6,10); const cg=g.createRadialGradient(q-4,y-14,1,q,y-11,13); cg.addColorStop(0,tone(C[0],0.35)); cg.addColorStop(1,tone(C[0],-0.25)); g.fillStyle=cg; g.beginPath(); g.ellipse(q,y-11,13,7,0,Math.PI,0); g.quadraticCurveTo(q,y-8,q-13,y-11); g.fill();
+    g.fillStyle='rgba(255,250,235,0.5)'; [[-5,-14],[3,-15],[7,-12]].forEach(([dx,dy])=>{ g.beginPath(); g.arc(q+dx,y+dy,1.2,0,Math.PI*2); g.fill(); }); g.restore(); return; }
+  const k=pose&&pose.kind==='raise'?Math.min(1,pose.t):0, sk=pose&&pose.kind==='strike'?Math.min(1,pose.t):0, hop=e.moving?Math.abs(Math.sin(t*2))*4:0, fl=(e.dir===5||e.dir===6||e.dir===7)?-1:1, y=B-hop;
+  g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(x,B+1,16,5,0,0,Math.PI*2); g.fill();
+  g.strokeStyle='#bcb29a'; g.lineWidth=3.4; g.lineCap='round'; [-1,1].forEach(sd=>{ g.beginPath(); g.moveTo(x+sd*4,y-12); g.lineTo(x+sd*6,y); g.stroke(); });   // stubby legs
+  const bg=g.createLinearGradient(x-8,0,x+8,0); bg.addColorStop(0,'#ece4d0'); bg.addColorStop(1,'#a8a08a'); g.fillStyle=bg; g.beginPath(); g.moveTo(x-8,y-10); g.quadraticCurveTo(x-10,y-26,x-6,y-36); g.lineTo(x+6,y-36); g.quadraticCurveTo(x+10,y-26,x+8,y-10); g.closePath(); g.fill();   // the stalk body
+  g.strokeStyle='#cfc6ae'; g.lineWidth=3; [-1,1].forEach(sd=>{ const reach=(sd===fl)?sk*10:0, up=k*8; g.beginPath(); g.moveTo(x+sd*7,y-28); g.quadraticCurveTo(x+sd*13,y-24-up,x+sd*(12+reach),y-16-up); g.stroke(); });   // little arms
+  const cy=y-38-k*3, cg=g.createRadialGradient(x-6,cy-8,1,x,cy-3,22); cg.addColorStop(0,tone(C[0],0.4)); cg.addColorStop(1,tone(C[0],-0.3)); g.fillStyle=cg;
+  g.beginPath(); g.moveTo(x-20,cy); g.quadraticCurveTo(x-18,cy-18,x,cy-20); g.quadraticCurveTo(x+18,cy-18,x+20,cy); g.quadraticCurveTo(x,cy+5,x-20,cy); g.closePath(); g.fill();   // the cap
+  g.fillStyle=C[1]; g.beginPath(); g.ellipse(x,cy+1,16,3.4,0,0,Math.PI*2); g.fill();   // gills under it
+  g.fillStyle='rgba(255,250,235,0.55)'; [[-9,-9],[2,-14],[10,-8],[-2,-6]].forEach(([dx,dy])=>{ g.beginPath(); g.arc(x+dx,cy+dy,1.8,0,Math.PI*2); g.fill(); });
+  if(e.dir!==3 && e.dir!==4 && e.dir!==5){ g.save(); g.globalCompositeOperation='lighter'; [[-3.6],[3.6]].forEach(([dx])=>{ g.fillStyle='rgba(220,240,140,0.9)'; g.beginPath(); g.arc(x+dx+fl*1.5,cy+5,1.4,0,Math.PI*2); g.fill(); glow(x+dx+fl*1.5,cy+5,4,3,'200,230,120',0.4); }); g.restore(); }   // eyes in the shade of the cap
+  g.restore(); }
+function drawCapbrute(x,B,e,pose){ const fade=e.dead?Math.max(0,1-(e.fallT||0)/1.0):1; if(fade<=0) return; const S=(e.opts&&e.opts.big)?1.35:1, t=gt*2+(e.id||0);
+  const k=pose&&pose.kind==='raise'?Math.min(1,pose.t):0, sk=pose&&pose.kind==='strike'?Math.min(1,pose.t):0, sw=e.moving?Math.sin(gt*6):0, fl=(e.dir===5||e.dir===6||e.dir===7)?-1:1;
+  g.save(); g.globalAlpha*=fade; g.translate(x,B); g.scale(S,S);
+  g.fillStyle='rgba(0,0,0,0.35)'; g.beginPath(); g.ellipse(0,2,34,10,0,0,Math.PI*2); g.fill();
+  g.fillStyle='#8a8070'; [-1,1].forEach(sd=>{ g.beginPath(); g.ellipse(sd*11+sd*sw*2,-10,8,12,0,0,Math.PI*2); g.fill(); });   // root-feet
+  const bg=g.createLinearGradient(-22,0,22,0); bg.addColorStop(0,'#e0d6be'); bg.addColorStop(0.6,'#b8ae96'); bg.addColorStop(1,'#7a7262'); g.fillStyle=bg;
+  g.beginPath(); g.moveTo(-18,-14); g.bezierCurveTo(-26,-50,-20,-80,-14,-96); g.lineTo(14,-96); g.bezierCurveTo(20,-80,26,-50,18,-14); g.quadraticCurveTo(0,-8,-18,-14); g.closePath(); g.fill();   // a thick stalk body
+  g.strokeStyle='rgba(90,80,64,0.45)'; g.lineWidth=1; for(let q=-2;q<=2;q++){ g.beginPath(); g.moveTo(q*6,-16); g.quadraticCurveTo(q*7,-56,q*5,-94); g.stroke(); }
+  g.fillStyle='rgba(120,150,70,0.5)'; [[-12,-40,5],[10,-60,4],[-6,-74,3]].forEach(([a,b,r])=>{ g.beginPath(); g.ellipse(a,b,r,r*0.7,0,0,Math.PI*2); g.fill(); });   // mould patches
+  [-1,1].forEach(sd=>{ const lash=(sd===fl)?sk*26:0, lift=k*30*(sd===fl?1:0.3);   // arms of knotted fungus, the striking one a club
+    g.strokeStyle='#c8bea6'; g.lineWidth=9; g.lineCap='round'; g.beginPath(); g.moveTo(sd*16,-78); g.quadraticCurveTo(sd*34,-66-lift,sd*(30+lash),-40-lift); g.stroke();
+    g.fillStyle='#b0a690'; g.beginPath(); g.ellipse(sd*(30+lash),-38-lift,9,11,0,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(70,60,50,0.5)'; g.lineWidth=1; g.stroke(); });
+  const cy=-100-k*4; const cg=g.createRadialGradient(-14,cy-18,2,0,cy-8,52); cg.addColorStop(0,'#c86a48'); cg.addColorStop(0.6,'#8a3a2a'); cg.addColorStop(1,'#4a1e16'); g.fillStyle=cg;
+  g.beginPath(); g.moveTo(-50,cy+4); g.quadraticCurveTo(-46,cy-34,0,cy-40); g.quadraticCurveTo(46,cy-34,50,cy+4); g.quadraticCurveTo(0,cy+14,-50,cy+4); g.closePath(); g.fill();   // the great cap, red as a toadstool
+  g.fillStyle='#e8d4b0'; g.beginPath(); g.ellipse(0,cy+6,42,7,0,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(120,90,60,0.4)'; g.lineWidth=0.8; for(let q=-7;q<=7;q++){ g.beginPath(); g.moveTo(0,cy+5); g.lineTo(q*5.6,cy+7+Math.abs(q)*0.4); g.stroke(); }
+  g.fillStyle='rgba(255,248,230,0.85)'; [[-26,-16,4],[-8,-28,5],[14,-24,4],[30,-10,3.5],[2,-12,3],[-36,-4,2.6]].forEach(([dx,dy,r])=>{ g.beginPath(); g.ellipse(dx,cy+dy,r,r*0.7,0,0,Math.PI*2); g.fill(); });
+  if(e.dir!==3 && e.dir!==4 && e.dir!==5){ g.save(); g.globalCompositeOperation='lighter'; [-7,7].forEach(dx=>{ g.fillStyle='rgba(230,240,150,0.95)'; g.beginPath(); g.arc(dx+fl*3,cy+16,2.2,0,Math.PI*2); g.fill(); glow(dx+fl*3,cy+16,7,5,'210,230,120',0.45); }); g.restore(); }
+  g.save(); g.globalCompositeOperation='lighter'; for(let q=0;q<5;q++){ const ph=(t*0.3+q/5)%1; g.fillStyle=`rgba(210,200,120,${0.5*Math.sin(ph*Math.PI)})`; g.beginPath(); g.arc(Math.sin(t+q*2)*30,cy+10+ph*50,1.6,0,Math.PI*2); g.fill(); } g.restore();   // spores sifting down from the gills
+  g.restore(); }
+function drawBriarling(x,B,e,pose){ const fade=e.dead?Math.max(0,1-(e.fallT||0)/0.8):1; if(fade<=0) return; const S=(e.opts&&e.opts.big)?1.4:1;
+  const k=pose&&pose.kind==='raise'?Math.min(1,pose.t):0, lu=pose&&pose.kind==='strike'?Math.min(1,pose.t):0, fl=(e.dir===5||e.dir===6||e.dir===7)?-1:1, t=gt*6+(e.id||0), mv=e.moving?Math.sin(gt*14):0;
+  g.save(); g.globalAlpha*=fade; g.translate(x,B); g.scale(S*fl,S);
+  g.fillStyle='rgba(10,6,4,0.4)'; g.beginPath(); g.ellipse(0,2,30,8,0,0,Math.PI*2); g.fill();
+  const bx=-4+lu*12, by=-28-k*6;
+  [[-14,1],[-6,-1],[8,1],[16,-1]].forEach(([lx,ph])=>{ g.strokeStyle='#2e2416'; g.lineWidth=3.6; g.lineCap='round'; g.beginPath(); g.moveTo(bx+lx,by+6); g.quadraticCurveTo(bx+lx+3*ph+mv*3*ph,by+16,bx+lx+6*ph+mv*4*ph,0); g.stroke(); });   // vine legs
+  for(let s2=0;s2<6;s2++){ const yy=by-4+s2*2.4, w=24-s2*2; g.strokeStyle=s2%2?'#3e3020':'#4e3e26'; g.lineWidth=3.2; g.beginPath(); g.moveTo(bx-w,yy+Math.sin(t*0.5+s2)*1.5); g.bezierCurveTo(bx-w*0.3,yy-6,bx+w*0.3,yy+6,bx+w,yy-Math.sin(t*0.5+s2)*1.5); g.stroke(); }   // a body of twisted vines
+  g.fillStyle='#d8c8a0'; for(let q=0;q<14;q++){ const px=bx-22+q*3.4, py=by-6+((q*7)%5)-2; g.beginPath(); g.moveTo(px,py); g.lineTo(px+1.4,py-5-((q*3)%3)); g.lineTo(px+2.4,py); g.closePath(); g.fill(); }   // thorns along its back
+  g.strokeStyle='#3e3020'; g.lineWidth=2.4; g.beginPath(); g.moveTo(bx-22,by-2); g.quadraticCurveTo(bx-34,by-12+Math.sin(t*0.7)*4,bx-38,by-22); g.stroke();   // a whip of a tail
+  const hx=bx+26, hy=by-6-k*3; g.fillStyle='#4a3a26'; g.beginPath(); g.ellipse(hx,hy,10,8,0.2,0,Math.PI*2); g.fill();   // the skull: a knot of root
+  g.strokeStyle='#2a1e12'; g.lineWidth=1; g.beginPath(); g.ellipse(hx,hy,10,8,0.2,0,Math.PI*2); g.stroke(); g.beginPath(); g.moveTo(hx-6,hy-3); g.quadraticCurveTo(hx,hy-6,hx+6,hy-2); g.stroke();
+  g.fillStyle='#e8dcb8'; for(let q=0;q<4;q++){ g.beginPath(); g.moveTo(hx+3+q*2.2,hy+4); g.lineTo(hx+4+q*2.2,hy+8+lu*2); g.lineTo(hx+5+q*2.2,hy+4); g.closePath(); g.fill(); }   // thorn teeth
+  [[-6,-14],[0,-16],[6,-13]].forEach(([dx,dy])=>{ g.strokeStyle='#3e3020'; g.lineWidth=1.8; g.beginPath(); g.moveTo(hx+dx*0.6,hy-5); g.lineTo(hx+dx,hy+dy); g.stroke(); });   // horns of thorn
+  g.save(); g.globalCompositeOperation='lighter'; g.fillStyle='rgba(200,240,100,0.95)'; g.beginPath(); g.arc(hx+4,hy-1,1.7,0,Math.PI*2); g.fill(); glow(hx+4,hy-1,6,5,'190,230,90',0.5); g.restore();
+  g.restore(); }
+// ── replace the gnawers and husks in the Rootdeep ──
+RC_FOLK.rc_nw=[ ()=>({name:'Cap-Brute', type:'capbrute', opts:CAPBRUTE()}), ()=>({name:'Sporeling', type:'sporeling', opts:SPORELING(0)}), ()=>({name:'Corrupted Nymph', type:'rotnymph', opts:NYMPHO()}) ];
+RC_FOLK.rc_ne=[ ()=>({name:'Sporeling', type:'sporeling', opts:SPORELING(2)}), ()=>({name:'Rot-Shaman', type:'rootshaman', opts:ROOTSHAMAN({})}), ()=>({name:'Corrupted Nymph', type:'rotnymph', opts:NYMPHO()}), ()=>({name:'Cap-Brute', type:'capbrute', opts:CAPBRUTE()}) ];
+RC_FOLK.rc_sw=[ ()=>({name:'Briarling', type:'briarling', opts:BRIAR()}), ()=>({name:'Rot-Shaman', type:'rootshaman', opts:ROOTSHAMAN({hair:3})}), ()=>({name:'Cap-Brute', type:'capbrute', opts:CAPBRUTE()}), ()=>({name:'Corrupted Nymph', type:'rotnymph', opts:NYMPHO()}) ];
+RC_FOLK.rc_se=[ ()=>({name:'Briarling', type:'briarling', opts:BRIAR()}), ()=>({name:'Thorn-Witch', type:'thornwitch', opts:WITCH()}), ()=>({name:'Rot-Shaman', type:'rootshaman', opts:ROOTSHAMAN({hair:0})}), ()=>({name:'Cap-Brute', type:'capbrute', opts:CAPBRUTE()}), ()=>({name:'Corrupted Nymph', type:'rotnymph', opts:NYMPHO()}) ];
+{ const _rm=rcMobs; rcMobs=function(r){ let l=_rm(r);
+    l=l.map(m=>{ if(m.name==='Husk-Warden') return {...m, name:'The Sporemaw', type:'capbrute', hpMul:2.3, opts:CAPBRUTE(true)};   // the reach bosses, too
+      if(m.name==='Old Blightgnawer') return {...m, name:'Old Briarheart', type:'briarling', hpMul:2.4, opts:BRIAR(true)};
+      if(m.type==='husk') return {...m, name:m.name.replace('Hollow Husk','Cap-Brute'), type:'capbrute', opts:CAPBRUTE()};
+      if(m.type==='gnawer') return {...m, name:m.name.replace('Rotgnawer','Briarling'), type:'briarling', opts:BRIAR()};
+      return m; });
+    try{ if(!r.cavern && !RC_OUT[r.id]){ const shrooms=AREAS[r.id].objects().filter(o=>o.type==='rcshroom'); shrooms.slice(0,2).forEach((o,k)=>{   // sporelings among the great caps, looking like little caps themselves
+        const spot=[[1,0],[0,1],[-1,0],[0,-1],[1,1]].map(([a,b])=>[o.i+a,o.j+b]).find(([i,j])=>i>=0&&j>=0&&i<r.w&&j<r.h&&!ucNearDoor(r,i,j)&&!l.some(m=>m.i===i&&m.j===j));
+        if(spot) l.push({name:'Sporeling'+(k?' ':''), type:'sporeling', opts:SPORELING((r.hs+k)%3), faction:'rcs_'+r.id, daily:true, i:spot[0], j:spot[1]}); }); } }catch(e){}
+    return l; }; }
+// ── THORN-VINE TRAPS: a tangle of thorns across a tile, hard to see in the gloom. Walk over it and it bites; after that you can see it ──
+// ── PUFFBALLS: a clump of fat white puffballs; come within arm's reach and one bursts in a cloud of spores ──
+{ const _ro=rcObjects; rcObjects=function(r){ const l=_ro(r); try{ if(RC_OUT[r.id] || r.id===rcId(1,0) || r.id===rcId(0,1)) return l;
+    const busy=new Set(l.filter(o=>!o.noblock||o.type==='teleporter').map(o=>o.i+','+o.j)), W=ucWalk(r).filter(([i,j])=>!busy.has(i+','+j) && !ucNearDoor(r,i,j)), R=k=>rnd01(k,r.hs,2401);
+    const nT=(r.q==='rc_sw'||r.q==='rc_se'?2:1)*(r.kind==='bend'?0:1)+(r.kind==='hall'?1:0); for(let k=0;k<nT && W.length;k++){ if(R(k)<0.45) continue; const s=W.splice(Math.floor(R(k+7)*W.length),1)[0]; l.push({type:'rcthorns', i:s[0], j:s[1], noblock:true, flat:true, dz:-99}); }
+    if(r.kind!=='bend' && R(20)<0.5 && W.length){ const edge=W.filter(([i,j])=>i===0||j===0||i===r.w-1||j===r.h-1); const s=(edge.length?edge:W)[Math.floor(R(21)*(edge.length||W.length))]; if(s) l.push({type:'rcpuff', i:s[0], j:s[1], noblock:true}); }
+  }catch(e){} return l; }; }
+const RC_TRAP={ hit:{}, puff:{} };
+OBJ_DRAW.rcthorns=o=>{ const q=P(o.i+0.5,o.j+0.5), sd=o.i*23+o.j*41, seen=RC_TRAP.hit[areaId+':'+o.i+','+o.j], a=seen?0.9:0.4;   // dim until it has bitten you
+  g.save(); g.globalAlpha=a; g.lineCap='round';
+  for(let k=0;k<5;k++){ const a0=rnd01(k,sd,2411)*Math.PI*2, L=22+rnd01(k,sd,2412)*14, x0=q.x+Math.cos(a0)*L, y0=q.y+Math.sin(a0)*L*0.45, x1=q.x-Math.cos(a0)*L, y1=q.y-Math.sin(a0)*L*0.45, cx=q.x+(rnd01(k,sd,2413)-0.5)*16, cy=q.y+(rnd01(k,sd,2414)-0.5)*7;
+    g.strokeStyle='#241a10'; g.lineWidth=2.2; g.beginPath(); g.moveTo(x0,y0); g.quadraticCurveTo(cx,cy,x1,y1); g.stroke();
+    g.fillStyle='#8a7a5a'; for(let m=1;m<6;m++){ const t=m/6, u=1-t, px=u*u*x0+2*u*t*cx+t*t*x1, py=u*u*y0+2*u*t*cy+t*t*y1; g.beginPath(); g.moveTo(px-1,py); g.lineTo(px+(m%2?2:-2),py-3.4); g.lineTo(px+1,py); g.closePath(); g.fill(); } }
+  if(seen){ g.fillStyle='rgba(150,30,24,0.6)'; for(let k=0;k<4;k++) g.fillRect(q.x-10+rnd01(k,sd,2415)*20,q.y-3+rnd01(k,sd,2416)*6,1.6,1.6); }   // your blood on the thorns
+  g.restore(); };
+OBJ_DRAW.rcpuff=o=>{ const q=P(o.i+0.5,o.j+0.5), sd=o.i*13+o.j*29, key=areaId+':'+o.i+','+o.j, pt=RC_TRAP.puff[key], since=pt?(performance.now()-pt)/1000:99, sq=since<0.4?1-since/0.4:0;
+  g.save(); g.fillStyle='rgba(0,0,0,0.28)'; g.beginPath(); g.ellipse(q.x+2,q.y+2,22,7,0,0,Math.PI*2); g.fill(); g.restore();
+  [[-10,2,8],[2,-2,10],[12,3,7],[-3,6,6]].forEach(([dx,dy,r],k)=>{ const rr=r*(1-sq*0.35*(k===1?1:0.4)), cg=g.createRadialGradient(q.x+dx-rr*0.3,q.y+dy-rr*0.9,1,q.x+dx,q.y+dy-rr*0.6,rr); cg.addColorStop(0,'#f4eee0'); cg.addColorStop(1,'#a8a090');
+    g.fillStyle=cg; g.beginPath(); g.ellipse(q.x+dx,q.y+dy-rr*0.6,rr,rr*0.82,0,0,Math.PI*2); g.fill(); g.fillStyle='rgba(120,110,90,0.5)'; for(let m=0;m<3;m++){ g.beginPath(); g.arc(q.x+dx+(rnd01(m,k,sd)-0.5)*rr,q.y+dy-rr*0.6+(rnd01(m,k+3,sd)-0.5)*rr*0.6,0.8,0,Math.PI*2); g.fill(); } });
+  if(since<2.2){ const t=since/2.2; g.save(); g.globalAlpha=0.7*(1-t); for(let k=0;k<12;k++){ const an=rnd01(k,sd,2421)*Math.PI*2, d=10+t*(38+rnd01(k,sd,2422)*20), r=6+t*14;   // the cloud, rolling out and thinning
+      const cg=g.createRadialGradient(q.x+Math.cos(an)*d,q.y-10-t*14+Math.sin(an)*d*0.45,0,q.x+Math.cos(an)*d,q.y-10-t*14+Math.sin(an)*d*0.45,r); cg.addColorStop(0,'rgba(200,200,110,0.8)'); cg.addColorStop(1,'rgba(200,200,110,0)'); g.fillStyle=cg; g.fillRect(q.x+Math.cos(an)*d-r,q.y-10-t*14+Math.sin(an)*d*0.45-r,r*2,r*2); } g.restore(); } };
+NEAR_NAME.rcpuff='puffballs'; NEAR_NAME.rcthorns='thorns';
+onUse(['rcpuff'],()=>pzSay('A clump of fat white puffballs. They quiver when you breathe near them. Best keep your distance.','#d8d4b0'));
+const trapHurt=(n,label,col)=>{ player.hp=Math.max(1,player.hp-n); player.flash=0.25; floatText(tileOf(player),'-'+n,'#ff9a8a',true); floatText([player.i,player.j-0.002],label,col); shake=Math.max(shake,3); updateHud(); };
+{ let last=''; setInterval(()=>{ try{ if(!running || combat.active || dlgIsOpen() || CS.on) return; const A=AREAS[areaId]; if(!A || !A.rcRoom) return; const here=areaId+':'+player.i+','+player.j, now=performance.now();
+    if(here!==last){ last=here; const th=OBJECTS.find(o=>o.type==='rcthorns' && o.i===player.i && o.j===player.j);
+      if(th && !(RC_TRAP.hit[here] && now-RC_TRAP.hit[here]<2500)){ RC_TRAP.hit[here]=now; trapHurt(6,'Thorns!','#c86050'); addStatus(player,'bleed',4,1); try{ SND.fx('hit'); }catch(e){} logMsg('Thorn-vines lying across the floor bite through your boots. You should watch where you put your feet down here.','#c86050'); } }
+    OBJECTS.forEach(o=>{ if(o.type!=='rcpuff') return; const key=areaId+':'+o.i+','+o.j; if(cheb([o.i,o.j],[player.i,player.j])>1) return; if(RC_TRAP.puff[key] && now-RC_TRAP.puff[key]<9000) return;
+      RC_TRAP.puff[key]=now; addStatus(player,'venom',6,2); floatText([player.i,player.j-0.002],'Spores!','#c8c070'); try{ SND.fx('whoosh',0.3); }catch(e){} logMsg('A puffball bursts as you pass, and you breathe in a mouthful of bitter yellow spores.','#c8c070'); });
+  }catch(e){} },120); }
 </script>
 </body>
 </html>

@@ -24587,6 +24587,7 @@ function ucObjects(r){ const out=[], seed=r.hs, W=ucWalk(r), used=new Set(), tak
     if(page){ const item=WENLO_PAGES[page[0]]; if(!(collectedPickups.has(key) || hasItem(item) || CHOICE.lamp==='hunt' || CHOICE.lamp==='done')) out.push({type:'pickup', i:s[0], j:s[1], item}); take(...s); }
     else if(!collectedPickups.has(key)){ out.push({type:'pickup', i:s[0], j:s[1], item:UC_DEEP_LOOT[(r.X*7+r.Y*3+seed)%UC_DEEP_LOOT.length]}); take(...s); }
     const c=seed%2 ? W.find(([i,j])=>free(i,j) && i!==r.cx && j!==r.cy && keepsWay(i,j)) : null; if(c) { out.push(seed%4===1?{type:'crate', i:c[0], j:c[1]}:{type:'barrel', i:c[0], j:c[1]}); take(...c); } }
+  dungeonFind(r,out,()=>{ const busy=new Set(out.filter(o=>!o.noblock).map(o=>o.i+','+o.j)); const s=W.slice().reverse().find(([i,j])=>free(i,j) && !busy.has(i+','+j) && i!==r.cx && j!==r.cy && keepsWay(i,j)); if(s) take(...s); return s; });
   return out; }
 // who is where: the old quarter's foes and folk go to the chamber over where they stood; some empty crossings get one more of the quarter's own
 function ucPlace(r,list){ const W=ucWalk(r).filter(([i,j])=>!ucNearDoor(r,i,j)), out=[]; let k=0;
@@ -24596,6 +24597,14 @@ function ucMobs(r){ const QF=UC_QF[r.q], all=QF.mobs(), mine=all.filter(m=>ucOfO
     const pool=all.filter(m=>RESPAWNS.has(m.name) && !/Warden|Elemental|Pathfinder/.test(m.name)); if(pool.length){ const t=pool[(r.hs>>>2)%pool.length]; mine.push({...t, faction:'ucw_'+r.id}); if(r.hs%9===0) mine.push({...t, name:t.name.trim()+' ', faction:'ucw_'+r.id}); } }
   return ucPlace(r,mine); }
 function ucNpcs(r){ return ucPlace(r,UC_QF[r.q].npcs().filter(n=>ucOfOld(r.q,n.i,n.j)===r.id)); }
+// small finds in the dungeons: in about one ordinary chamber in three, something somebody dropped or hid, the kind of thing that quarter would hold. Once taken, gone
+const DUNGEON_FINDS={ under_nw:['bog_coins','rusty_key','green_bottle','brass_buttons','potion','old_boot','bone_dice'], under_ne:['pewter_tankard','silver_spoon','brass_candlestick','green_bottle','clay_pipe','potion','bread'],
+  under_sw:['grave_ring','candle_stub','bone_dice','amber_brooch','silver_spoon','mana_potion','horn_comb'], under_se:['ember_core','brass_buttons','silver_torc','potion','iron_nails','mana_potion'],
+  ow_nw:['varrow_silver','iron_nails','clay_pipe','brass_buttons','potion','tin_cup','bread'], ow_ne:['varrow_silver','sea_glass','amber_brooch','mana_potion','silver_torc','thimble'],
+  ow_sw:['bog_coins','rusty_key','green_bottle','varrow_silver','potion','carved_horse'], ow_se:['silver_torc','amber_brooch','varrow_silver','grave_ring','mana_potion','potion'] };
+function dungeonFind(r,out,spot){ const L=(DUNGEON_FINDS[r.q]||[]).filter(id=>ITEMS[id]); if(!L.length || r.kind==='end' || (r.hs>>>5)%3!==0) return; const s=spot(); if(!s) return;
+  const key=areaIdFor(r)+':'+s[0]+','+s[1]; if(collectedPickups.has(key)) return; out.push({type:'pickup', i:s[0], j:s[1], item:L[(r.X*5+r.Y*11+r.hs)%L.length]}); }
+const areaIdFor=r=>r.id;
 // ════════ chambers sized to fit each other: every chamber gets a column and a row line (spaced a little unevenly), and its four sides are cut so that wherever two
 //   chambers share a door they meet exactly, and wherever they do not they keep clear. Halls take up most of the length between two places, crossings little ════════
 function chamberFit(R,salt,sq){ const rooms=Object.values(R), at={}; rooms.forEach(r=>at[r.X+','+r.Y]=r);
@@ -27474,6 +27483,7 @@ function owObjects(r){ const out=[], seed=r.hs, W=ucWalk(r), used=new Set(), tak
     else if(seed%2){ const c=W.find(([i,j])=>free(i,j) && i!==r.cx && j!==r.cy && keepsWay(i,j)); if(c){ out.push({type:seed%4===1?'crate':'barrel', i:c[0], j:c[1]}); take(...c); } } }
   // the cart stations
   if(OW_CARTS[r.id]){ const s=ucFreeSpots(r,out).find(([i,j])=>keepsWay(i,j)) || W.find(([i,j])=>free(i,j) && keepsWay(i,j)) || W.find(([i,j])=>!used.has(i+','+j) && !Object.keys(r.ex).some(d=>{ const [a,b]=ucEdge(r,d), [c,e]=ucIn(r,d); return (a===i&&b===j)||(c===i&&e===j); }) && keepsWay(i,j)); if(s){ out.push({type:'owcart', i:s[0], j:s[1], to:OW_CARTS[r.id].to}); take(...s); } }
+  dungeonFind(r,out,()=>{ const busy=new Set(out.filter(o=>!o.noblock).map(o=>o.i+','+o.j)); const s=W.slice().reverse().find(([i,j])=>free(i,j) && !busy.has(i+','+j) && i!==r.cx && j!==r.cy && keepsWay(i,j)); if(s) take(...s); return s; });
   return out; }
 // who walks here: goblins have moved into the Haulage, rats the size of dogs nest in the Vugs, lurkers in the flooded levels, and in the Delving the Lost Shift still works
 const OW_FOLK={

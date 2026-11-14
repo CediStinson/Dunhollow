@@ -9964,16 +9964,19 @@ function paintGroundTexture(){
           if(fy>0.7 && fy<0.76 && fx>0.3 && fx<0.7 && rnd01(Math.floor(fx*30),tx*7+ty,158)<0.55) pc=mixC(pc,[52,50,52],0.6);
           if(fbm(gx*6,gy*6,159)>0.7) pc=mixC(pc,[70,84,58],0.4); }   // lichen
         const dust=1-smooth(0,1.6,Math.min(gx,gy)); pc=mixC(pc,[120,116,112],dust*0.3); }
-      else if(q.startsWith('rc_')){ const E={rc_nw:[[72,54,36],[40,30,20]], rc_ne:[[58,52,44],[30,28,24]], rc_sw:[[48,38,36],[22,16,18]], rc_se:[[78,64,50],[44,36,28]]}[q];   // the Rootdeep: dark earth with roots running through it, moss, glowing spores or black rot
+      else if(q.startsWith('rc_')){ const E={rc_nw:[[72,54,36],[40,30,20]], rc_ne:[[58,52,44],[30,28,24]], rc_sw:[[48,38,36],[22,16,18]], rc_se:[[78,64,50],[44,36,28]]}[q];   // the Rootdeep: dark earth, a few great roots crossing it, moss, spores or rot
         pc=mixC(E[0],E[1],n*0.6+n2*0.4); const gr=0.9+0.2*n3; pc=[pc[0]*gr,pc[1]*gr,pc[2]*gr];
-        const rc=q==='rc_sw'?[36,24,26]:q==='rc_se'?[92,80,66]:[90,64,40], rt=Math.abs(fbm(gx*1.1,gy*1.1,192)-0.5), rt2=Math.abs(fbm(gx*2.4+7,gy*2.4,193)-0.5);
-        if(rt<0.04){ const t=rt/0.04; pc=mixC(rc,[rc[0]*0.55,rc[1]*0.55,rc[2]*0.55],t*t); if(t<0.35 && fbm(gx*1.1-0.05,gy*1.1-0.05,192)>0.5) pc=mixC(pc,[Math.min(255,rc[0]*1.6),Math.min(255,rc[1]*1.55),Math.min(255,rc[2]*1.5)],0.45); }   // a great root, lit along one side
-        else if(rt<0.07) pc=mixC(pc,[14,10,8],0.5*(1-(rt-0.04)/0.03));   // its shadow on the earth
-        else if(rt2<0.016) pc=mixC(pc,rc,0.7*(1-rt2/0.016));   // the little roots
-        if(q!=='rc_sw'){ const ms=fbm(gx*1.5,gy*1.5,194); if(ms>0.6) pc=mixC(pc,[58,80,38],Math.min(0.55,(ms-0.6)*3)); }
-        if(q==='rc_sw'){ const rot=fbm(gx*1.1,gy*1.1,195); if(rot>0.56) pc=mixC(pc,[26,12,30],Math.min(0.75,(rot-0.56)*3.5)); }
-        if(q==='rc_ne' && fbm(gx*6,gy*6,196)>0.8) pc=mixC(pc,[110,210,186],0.45);
-        if(q==='rc_se' && fbm(gx*2,gy*2,197)>0.66) pc=mixC(pc,[132,126,118],0.3); }
+        if(q!=='rc_sw'){ const ms=fbm(gx*1.5,gy*1.5,194); if(ms>0.62) pc=mixC(pc,[58,80,38],Math.min(0.5,(ms-0.62)*3)); }
+        if(q==='rc_sw'){ const rot=fbm(gx*1.1,gy*1.1,195); if(rot>0.58) pc=mixC(pc,[26,12,30],Math.min(0.7,(rot-0.58)*3.5)); }
+        if(q==='rc_ne' && fbm(gx*6,gy*6,196)>0.82) pc=mixC(pc,[110,210,186],0.4);
+        if(q==='rc_se' && fbm(gx*2,gy*2,197)>0.68) pc=mixC(pc,[132,126,118],0.25);
+        const rc=q==='rc_sw'?[40,26,28]:q==='rc_se'?[96,82,66]:[92,66,42], rt2=Math.abs(fbm(gx*2.4+7,gy*2.4,193)-0.5);
+        if(rt2<0.011 && fbm(gx*0.6,gy*0.6,198)>0.6) pc=mixC(pc,rc,0.6*(1-rt2/0.011));   // here and there, little roots
+        let best=null; (A.rcRoots||[]).forEach(L=>{ for(let k=0;k<L.length-1;k++){ const [x0,y0,w0]=L[k], [x1,y1,w1]=L[k+1], dx=x1-x0, dy=y1-y0, l2=dx*dx+dy*dy||1, tt=Math.max(0,Math.min(1,((gx-x0)*dx+(gy-y0)*dy)/l2)), px=x0+dx*tt, py=y0+dy*tt, d=Math.hypot(gx-px,gy-py), wd=w0+(w1-w0)*tt;
+            if(d<wd+0.16 && (!best || d-wd<best.d-best.w)){ best={d, w:wd, side:(dx*(gy-y0)-dy*(gx-x0))/Math.sqrt(l2), up:-(dx+dy)}; } } });
+        if(best){ const tt=best.d/best.w, lit=(best.side*Math.sign(best.up||1))<0;   // a great root: round, lit along the side towards the lamp, its shadow on the earth on the other
+          if(tt<1){ const bark=fbm(gx*9,gy*9,199); let col=mixC(rc,[rc[0]*0.6,rc[1]*0.6,rc[2]*0.6],tt*tt*0.9); if(lit && tt<0.7) col=mixC(col,[Math.min(255,rc[0]*1.55),Math.min(255,rc[1]*1.5),Math.min(255,rc[2]*1.45)],0.45*(1-tt/0.7)); if(Math.abs(bark-0.5)<0.04) col=mixC(col,[20,14,10],0.5); pc=col; }
+          else if(!lit) pc=mixC(pc,[10,8,6],0.55*(1-(best.d-best.w)/0.16)); } }
       else if(q==='under_se'){ const row=Math.floor(gy*1.4), U=unit(gx*1.4+(row%2)*0.5, gy*1.4, 17, 23, [30,25,24], [72,58,52], 0.08, 0.035); pc=U.c;   // the Ember Stair: blocks of black basalt, fissures with fire in them, ash, soot
         const cr=Math.abs(fbm(gx*0.9,gy*0.9,161)-0.5), on=fbm(gx*0.5,gy*0.5,163)>0.45;
         if(on && cr<0.011) pc=mixC([255,196,90],[255,120,40],cr/0.011); else if(on && cr<0.045) pc=mixC(pc,[150,52,20],0.75*(1-cr/0.045));
@@ -15097,6 +15100,7 @@ function drawActorBase(e){
   else if(e.type==='bear') drawBear(s.x,B,e,poseFor(e));
   else if(e.type==='troll') drawTroll(s.x,B,e,poseFor(e));
   else if(e.type==='gloomcaller'||e.type==='thornwitch'){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawShadeUnder(s.x,B,e); g.globalAlpha*=0.82; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); g.globalAlpha/=0.82; drawShadeOver(s.x,B,e); }
+  else if(e.type==='rootshaman'){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); drawShamanBits(s.x,B,e); }
   else if(e.type==='husk'){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); drawHuskBits(s.x,B,e); }
   else if(e.type==='skeleton') drawRisen(s.x,B,e,poseFor(e));
   else if(e.opts && e.opts.wrapped && !e.dead){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); drawWraps(s.x,B,e); if(e.warded){ g.save(); g.globalCompositeOperation='lighter'; glow(s.x,B-60,60,90,'255,200,90',0.35+Math.sin(gt*4)*0.08); g.restore(); } }
@@ -27947,7 +27951,11 @@ function rcObjects(r){ const out=[], seed=r.hs, W=ucWalk(r), used=new Set(), tak
     if(q==='rc_ne'){ prop({type:'rcshroom', v:seed%3},0); if(r.kind!=='hall') prop({type:'rcshroom', v:(seed+1)%3, small:true},2); }
     else if(q==='rc_sw' && seed%2) prop({type:'rccocoon', v:seed%2},0);
     else if(q==='rc_se' && seed%3===0) prop({type:'rccocoon', v:1},1);
-    else if(q==='rc_nw' && (r.kind==='cross'||r.kind==='vault'||seed%3===0)) prop({type:'lantern'},(seed>>>2)%2); }
+    else if(q==='rc_nw' && (r.kind==='cross'||r.kind==='vault'||seed%3===0)) prop({type:'lantern'},(seed>>>2)%2);
+    if(seed%2===0 || r.kind==='vault' || r.cavern) prop({type:'rcknot', v:seed%3},(seed>>>4)%2+1);
+    if(q!=='rc_ne' && seed%3===1) prop({type:'rcshroom', v:q==='rc_sw'?1:2, small:true},3);
+    if((q==='rc_sw'||q==='rc_se') && r.kind!=='hall' && seed%3===2) prop({type:'rccocoon', v:(seed>>>1)%2},3); }
+  else if(seed%3===0) prop({type:'rcknot', v:seed%3, small:true},0);
   if((seed%5===0 || r.cavern) && RC_RUNES[q]){ const s=W.find(([i,j])=>free(i,j) && (i===0||j===0) && i!==r.cx && j!==r.cy && keepsWay(i,j)); if(s){ out.push({type:'rune', i:s[0], j:s[1], text:RC_RUNES[q][(seed>>>3)%RC_RUNES[q].length]}); take(...s); } }
   if(r.kind==='end'){ const s=W.find(([i,j])=>free(i,j) && keepsWay(i,j)) || [r.cx,r.cy], key=r.id+':'+s[0]+','+s[1];
     if(!collectedPickups.has(key)) out.push({type:'pickup', i:s[0], j:s[1], item:RC_DEEP_LOOT[(r.X*7+r.Y*3+seed)%RC_DEEP_LOOT.length]}); take(...s);
@@ -28058,11 +28066,16 @@ OBJ_DRAW.rcmouth=o=>{ const c=P(o.i+0.5,o.j+0.5);   // a hollow among the great 
   [[-34,-2,-6,-56,24,-2],[30,0,8,-50,-26,2],[-20,8,0,-40,22,10]].forEach(([x0,y0,mx,my,x1,y1],k)=>{ g.strokeStyle=k===2?'#4a3420':'#5a4028'; g.lineWidth=k===2?9:13; g.lineCap='round'; g.beginPath(); g.moveTo(c.x+x0,c.y+y0); g.quadraticCurveTo(c.x+mx,c.y+my,c.x+x1,c.y+y1); g.stroke(); g.strokeStyle='rgba(230,200,150,0.25)'; g.lineWidth=2.5; g.beginPath(); g.moveTo(c.x+x0-2,c.y+y0-4); g.quadraticCurveTo(c.x+mx,c.y+my-5,c.x+x1-2,c.y+y1-4); g.stroke(); }); };
 NEAR_NAME.rcmouth='a hollow among the roots';
 // the chambers
+function rcRootsFor(r){ const out=[], n=(r.cavern?3:1)+(r.hs%3===0?1:0)+(r.w*r.h>20?1:0), R=k=>rnd01(k,r.hs,2301);   // a few great roots out of the back walls, across the floor and away
+  for(let k=0;k<n;k++){ const fromTop=R(k*5)<0.5, a=fromTop?[0.4+R(k*5+1)*(r.w-0.8),0.05]:[0.05,0.4+R(k*5+1)*(r.h-0.8)], b=R(k*5+2)<0.5?[0.4+R(k*5+3)*(r.w-0.8),r.h-0.05]:[r.w-0.05,0.4+R(k*5+3)*(r.h-0.8)], c=[r.w*(0.25+0.5*R(k*5+4)),r.h*(0.25+0.5*R(k*5+6))];
+    const w0=0.2+0.16*R(k*5+7), L=[]; for(let s2=0;s2<=16;s2++){ const t=s2/16, u=1-t; L.push([u*u*a[0]+2*u*t*c[0]+t*t*b[0], u*u*a[1]+2*u*t*c[1]+t*t*b[1], w0*(1-t*0.6)]); } out.push(L);
+    const m=L[7], bb=[m[0]+(R(k*5+8)-0.5)*3, m[1]+(R(k*5+9)-0.2)*2.6], B2=[]; for(let s2=0;s2<=8;s2++){ const t=s2/8; B2.push([m[0]+(bb[0]-m[0])*t+Math.sin(t*3)*0.2, m[1]+(bb[1]-m[1])*t, w0*0.5*(1-t*0.8)]); } out.push(B2); }
+  return out; }
 Object.values(RCR).forEach(r=>{ const st=ucWalk(r)[0], ent={ start:{i:st[0],j:st[1]} };
   Object.keys(r.ex).forEach(d=>{ const [i,j]=ucIn(r,d); ent['from'+d.toUpperCase()]={i,j}; });
   AREAS[r.id]={ ...INSIDE_BASE, w:r.w, h:r.h, theme:'interior', cave:true, rcRoom:true, owRoom:true, layer:-3, ucq:r.q, ucx:r.cx, ucy:r.cy, mapCol:{ rc_nw:'#5a4a30', rc_ne:'#3e5a50', rc_sw:'#3e2e44', rc_se:'#6a5a44' }[r.q],
     label:'The Rootdeep · '+RC_LABEL[r.q], mapLabel: r.cavern ? RC_LABEL[r.q] : r.id===rcId(0,0) ? 'The Root Hollow' : r.id===rcId(7,7) ? 'The Fellings Stair' : '',
-    mini:{x:0,y:0}, tier:4, objects:()=>rcObjects(r), npcs:()=>rcNpcs(r), mobs:()=>rcMobs(r), entries:ent };
+    mini:{x:0,y:0}, tier:4, rcRoots:rcRootsFor(r), objects:()=>rcObjects(r), npcs:()=>rcNpcs(r), mobs:()=>rcMobs(r), entries:ent };
   AREA_TIER[r.id]=r.q==='rc_se'?5:4; });
 const RC_FOLK={ rc_nw:[ ()=>({name:'Hollow Husk', type:'husk', opts:HUSK()}), ()=>({name:'Rotgnawer', type:'gnawer', opts:GNAWER()}) ],
   rc_ne:[ ()=>({name:'Rotgnawer', type:'gnawer', opts:GNAWER()}), ()=>({name:'Rot-Shaman', type:'rootshaman', opts:ROOTSHAMAN({})}) ],
@@ -28190,6 +28203,28 @@ ITEM_ICON.ember_crown=ITEM_ICON.ember_hood=(g2,id,size)=>{ g2.save(); g2.scale(s
   g2.save(); g2.beginPath(); [top,R,bot,L].forEach((p,k)=>k?g2.lineTo(p[0],p[1]):g2.moveTo(p[0],p[1])); g2.closePath(); g2.clip(); g2.globalCompositeOperation='lighter'; const fg=g2.createRadialGradient(20,21,0,20,20,11); fg.addColorStop(0,'rgba(255,240,180,0.95)'); fg.addColorStop(0.45,'rgba(255,140,40,0.7)'); fg.addColorStop(1,'rgba(255,80,20,0)'); g2.fillStyle=fg; g2.fillRect(0,0,40,40); g2.restore();
   g2.strokeStyle='rgba(20,4,2,0.7)'; g2.lineWidth=0.8; g2.beginPath(); [top,R,bot,L].forEach((p,k)=>k?g2.lineTo(p[0],p[1]):g2.moveTo(p[0],p[1])); g2.closePath(); g2.stroke();
   g2.save(); g2.globalCompositeOperation='lighter'; g2.fillStyle='rgba(255,140,40,0.85)'; g2.beginPath(); g2.moveTo(18,8); g2.quadraticCurveTo(17,3,20.5,0.5); g2.quadraticCurveTo(22.5,4,22,8); g2.closePath(); g2.fill(); g2.restore(); g2.restore(); };
+
+// a gnarled knot of root bursting up out of the floor and diving back in
+OBJ_DRAW.rcknot=o=>{ const q=P(o.i+0.5,o.j+0.5), s=o.small?0.65:1, sd=o.i*19+o.j*7, col=['#3e2a18','#2e2018','#4a3a2a'][o.v||0];
+  g.save(); g.fillStyle='rgba(0,0,0,0.32)'; g.filter='blur(3px)'; g.beginPath(); g.ellipse(q.x+3,q.y+2,30*s,9*s,0,0,Math.PI*2); g.fill(); g.restore();
+  for(let k=0;k<4;k++){ const a=(rnd01(k,sd,2311)-0.5)*1.4, x0=q.x-24*s+k*5*s, x1=x0+(26+rnd01(k,sd,2312)*16)*s, hh=(22+rnd01(k,sd,2313)*24)*s, th=(5+rnd01(k,sd,2314)*5)*s;   // loops of root, arching up out of the earth
+    g.lineCap='round'; g.strokeStyle='rgba(0,0,0,0.35)'; g.lineWidth=th+3; g.beginPath(); g.moveTo(x0+2,q.y+3); g.bezierCurveTo(x0+4,q.y-hh+3,x1-6,q.y-hh*0.9+3,x1+2,q.y+3+a*4); g.stroke();
+    g.strokeStyle=col; g.lineWidth=th; g.beginPath(); g.moveTo(x0,q.y); g.bezierCurveTo(x0+2,q.y-hh,x1-8,q.y-hh*0.9,x1,q.y+a*4); g.stroke();
+    g.strokeStyle='rgba(220,190,140,0.22)'; g.lineWidth=Math.max(1,th*0.28); g.beginPath(); g.moveTo(x0-th*0.2,q.y-1); g.bezierCurveTo(x0,q.y-hh-th*0.3,x1-9,q.y-hh*0.9-th*0.3,x1-th*0.3,q.y+a*4-2); g.stroke(); }
+  for(let k=0;k<3;k++){ const x=q.x+(rnd01(k,sd,2315)-0.5)*30*s, y=q.y-(10+rnd01(k,sd,2316)*20)*s; g.fillStyle='rgba(70,100,40,0.55)'; g.beginPath(); g.ellipse(x,y,5*s,2.4*s,0,0,Math.PI*2); g.fill(); } };   // moss on the loops
+NEAR_NAME.rcknot='a knot of roots';
+// the rot-shaman: a mask of bark with the Hunger's light in its eyes, a crown of branching antlers, spores drifting round it
+function drawShamanBits(x,B,e){ if(e.dead) return; const t=gt+(e.id||0), d=e.dir||0, front=d===0||d===1||d===7, side=d===2||d===6, fl=(d===5||d===6||d===7)?-1:1;
+  const ant=(sd)=>{ const bx=x+sd*4, by=B-96; g.strokeStyle='#3a2a1a'; g.lineWidth=2.2; g.lineCap='round'; g.beginPath(); g.moveTo(bx,by); g.quadraticCurveTo(bx+sd*6,by-10,bx+sd*10,by-22); g.stroke();   // an antler of root, branching
+    g.lineWidth=1.5; [[0.35,8,-6],[0.6,12,-4],[0.85,6,-7]].forEach(([tt,dx,dy])=>{ const px=bx+sd*10*tt*0.9, py=by-22*tt; g.beginPath(); g.moveTo(px,py); g.quadraticCurveTo(px+sd*dx*0.5,py+dy*0.3,px+sd*dx,py+dy); g.stroke(); });
+    g.strokeStyle='rgba(220,190,140,0.25)'; g.lineWidth=0.7; g.beginPath(); g.moveTo(bx-sd*0.5,by-1); g.quadraticCurveTo(bx+sd*5.5,by-11,bx+sd*9.5,by-22); g.stroke(); };
+  ant(-1); ant(1);
+  if(front||side){ const sg=(d===1||d===2)?1:(d===6||d===7)?-1:0, prv=(VIEW[d]||{}).prof||0, mx=x+({0:0,1:2.8,2:4.8,6:-4.8,7:-5.2})[d], my=B-82, mw=side?4.6:(d===0?7.8:7.4);   // the bark mask, following the face as it turns
+    const mg=g.createLinearGradient(mx-mw,0,mx+mw,0); mg.addColorStop(0,'#6a4e32'); mg.addColorStop(1,'#2e1e12'); g.fillStyle=mg; g.beginPath(); g.moveTo(mx-mw,my-7); g.quadraticCurveTo(mx,my-10,mx+mw,my-7); g.quadraticCurveTo(mx+mw+0.6,my+2,mx+mw*0.4,my+8); g.quadraticCurveTo(mx,my+10,mx-mw*0.4,my+8); g.quadraticCurveTo(mx-mw-0.6,my+2,mx-mw,my-7); g.closePath(); g.fill();
+    g.strokeStyle='rgba(20,12,6,0.6)'; g.lineWidth=0.7; for(let k=-2;k<=2;k++){ g.beginPath(); g.moveTo(mx+k*mw*0.35,my-8); g.quadraticCurveTo(mx+k*mw*0.42,my,mx+k*mw*0.3,my+8); g.stroke(); }
+    const eye=(ex)=>{ g.fillStyle='#0a0604'; g.beginPath(); g.ellipse(ex,my-2,1.8,1.1,0,0,Math.PI*2); g.fill(); g.save(); g.globalCompositeOperation='lighter'; g.fillStyle=`rgba(190,230,90,${0.75+0.2*Math.sin(t*3)})`; g.beginPath(); g.arc(ex,my-2,0.9,0,Math.PI*2); g.fill(); glow(ex,my-2,5,4,'180,220,80',0.4); g.restore(); };
+    if(side) eye(mx+sg*1.6); else if(sg){ eye(mx-1.8+sg*0.4); eye(mx+2.6+sg*0.4); } else { eye(mx-2.6); eye(mx+2.6); } }
+  g.save(); g.globalCompositeOperation='lighter'; for(let k=0;k<6;k++){ const ph=(t*0.35+k/6)%1, ax=x+Math.sin(t*0.8+k*1.9)*16, ay=B-30-ph*60; g.fillStyle=`rgba(200,210,110,${0.55*Math.sin(ph*Math.PI)})`; g.beginPath(); g.arc(ax,ay,1.3,0,Math.PI*2); g.fill(); } g.restore(); }   // spores drifting up round it
 </script>
 </body>
 </html>

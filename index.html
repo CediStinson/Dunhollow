@@ -14390,10 +14390,11 @@ function partnerTick(f,dt){ const pt=partnerOf(f); if(!pt || combat.practice) re
     if(duel.st==='parry' && duel.parryDir===pt.pdir && clock-duel.parryAt<=windowFor(player)){ floatText(tileOf(player),'Blocked','#a8c8f0'); SND.clang(1); momGain(8); }
     else { hurtPlayer(Math.max(1,Math.round(weaponOf(pt).dmg*0.6)),'From the side!'); if(player.hp<=0) defeat(); } } }
 function hurtPlayer(n,label){
-  if(typeof wardTakes==='function' && wardTakes(n)) return;          // Ice Ward or Bone Shield takes it whole
+  if(typeof wardTakes==='function' && wardTakes(n)) return;          // Ice Ward takes it whole
   const f=combat.foe;
   if(n>0 && f && f.tier) n=Math.round(n*tierDmg(f));                    // tougher kin of the same foe hit harder
   if(n>0 && f && typeof gapIn==='function') n=Math.round(n*gapIn(f));     // and harder still if your gear is not up to where you are
+  if(n>0 && typeof golemTakes==='function'){ n=golemTakes(n); if(n<=0) return; }   // your golem stands in the way first
   const agi=gearSum('agi');
   if(n>0 && agi>0 && !combat.practice && Math.random()<dodgeChance(agi)){ floatText(tileOf(player),'Dodge!','#a8e0ff',true); player.flash=0.15; SND.dodge(); if(player.opts && player.opts.equip.feet==='duel_boots') RIPOSTE_UNTIL=performance.now()+2000; }
   else {
@@ -15099,6 +15100,7 @@ function drawActorBase(e){
   else if(e.type==='dragon') drawDragonFoe(s.x,B,e,poseFor(e));
   else if(e.type==='bear') drawBear(s.x,B,e,poseFor(e));
   else if(e.type==='troll') drawTroll(s.x,B,e,poseFor(e));
+  else if(e.type==='golem') drawGolem(s.x,B,e,poseFor(e));
   else if(e.type==='gloomcaller'||e.type==='thornwitch'){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawShadeUnder(s.x,B,e); g.globalAlpha*=0.82; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); g.globalAlpha/=0.82; drawShadeOver(s.x,B,e); }
   else if(e.type==='rotnymph') drawRotNymph(s.x,B,e);
   else if(e.type==='sporeling') drawSporeling(s.x,B,e,poseFor(e));
@@ -15113,7 +15115,7 @@ function drawActorBase(e){
   if(!isP && e.dead) return;
   if(!isP && e.type==='sporeling' && typeof sporeDormant==='function' && sporeDormant(e)) return;   // a sleeping sporeling is just a mushroom: no name over it
   if(isP && romHush()) return;
-  const ty=B-(e.type==='rat'?40:e.type==='ratking'?66:e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'||e.type==='briarling'?66:e.type==='sporeling'?72:e.type==='capbrute'?((e.opts&&e.opts.big)?236:178):e.type==='dragon'?300:e.type==='bear'?92:e.type==='troll'?150:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:e.type==='rootmother'?214:e.type==='hollow'?272:114)+dwarfDrop(e.opts);
+  const ty=B-(e.type==='rat'?40:e.type==='ratking'?66:e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'||e.type==='briarling'?66:e.type==='sporeling'?72:e.type==='capbrute'?((e.opts&&e.opts.big)?236:178):e.type==='dragon'?300:e.type==='bear'?92:e.type==='troll'||e.type==='golem'?150:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:e.type==='rootmother'?214:e.type==='hollow'?272:114)+dwarfDrop(e.opts);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const deadly=!isP && e.type!=='dummy' && e.hostile!==false && e.tier && typeof foeLevel==='function' && foeLevel(e)-playerLevel()>=3;   // far stronger than you: a skull
   const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  Lv '+(typeof foeLevel==='function'?foeLevel(e):e.tier) : ''), tw=g.measureText(label).width;
@@ -15434,7 +15436,7 @@ function castSpell(){                            // a staff casts the spell for 
     if(!W.magic || !f) return false;
     player.maxMana=100; if(player.mana==null) player.mana=100;
     const SP=spellsFor(), S=SP[playerGuard]||SP.right;
-    if(S===HEX_SPELLS.left && SKEL && !SKEL.crumble){ if(typeof boneShield==='function' && NECRO_EXTRA('boneshield')) return boneShield(f); floatText(tileOf(player),'Already risen','#e8e4d0'); return true; }   // one skeleton at a time; with Bone Shield, calling again throws it in the way
+    if(S===HEX_SPELLS.left && SKEL && !SKEL.crumble){ if(typeof stitchGolem==='function' && NECRO_EXTRA('golem')) return stitchGolem(f); floatText(tileOf(player),'Already risen','#e8e4d0'); return true; }   // one skeleton at a time; with the Flesh Golem, calling again stitches flesh onto it
     if(S.summon && S.summon()){ floatText(tileOf(player),'Already here','#bfe0ff'); return true; }
     if(player.mana<spellCost(S)){ floatText(tileOf(player),'Out of mana','#a8a0c8'); return false; }      // a plain whack with the staff
     player.mana-=spellCost(S); lunge(player,f); duel.caught=false; SND.spell(S.name);
@@ -15456,7 +15458,7 @@ function castSpell(){                            // a staff casts the spell for 
     return true; }
 function drawActorFigure(e){ drawActorBase(e);         // then status pips over the name, and your mana bar
     if(!e.opts && e.type!=='wolf') return; if(e.dead) return;
-    const s=P(e.x+(e.ox||0),e.y+(e.oy||0)), ty=s.y-(e.type==='wolf'?66:e.type==='bear'?92:e.type==='troll'?150:114);
+    const s=P(e.x+(e.ox||0),e.y+(e.oy||0)), ty=s.y-(e.type==='wolf'?66:e.type==='bear'?92:e.type==='troll'||e.type==='golem'?150:114);
     if(e.st && e.st.length){ e.st.forEach((st,k)=>{ const D=STATUS_DEF[st.kind], x=s.x-((e.st.length-1)*9)/2+k*9, y=ty-(e===player&&combat.phase==='fight'?30:12);   // status pips over the name
       g.fillStyle='rgba(12,8,3,0.8)'; g.beginPath(); g.arc(x,y,4.6,0,Math.PI*2); g.fill(); g.fillStyle=D.col; g.beginPath();
       if(st.kind==='bleed'){ g.moveTo(x,y-3.4); g.quadraticCurveTo(x+3,y+0.5,x,y+3); g.quadraticCurveTo(x-3,y+0.5,x,y-3.4); }
@@ -15917,7 +15919,7 @@ function testGobTalk(slot){
       ...Object.keys(SL).map(k=>({label:SL[k]+' ('+Object.keys(ITEMS).filter(id=>ITEMS[id].slot===k && !/^[tw]_/.test(id)).length+')', fn:()=>testGobTalk(k)})),
       {label:'Give me 500 copper too.', fn:()=>{ player.purse+=500; updateHud(); testGobTalk(); }},
       {label:NECRO()>=3&&CHOICE.skelArms?'Necromancer words (all known)':'Teach me all the necromancer\'s words.', off:NECRO()>=3&&CHOICE.skelArms, fn:()=>{ CHOICE.necro=3; CHOICE.necroQ=null; CHOICE.skelArms=true; updateHud();   // for testing: everything Vesna teaches, at once
-        logMsg('Gratis whispers three ugly words in your ear. You know Grave Grasp, Bone Spear and Bone Shield, and how to arm your skeleton. Hold a necromancer\'s staff to use them.','#b8a8e8'); testGobTalk(); }}, bye]); return; }
+        logMsg('Gratis whispers three ugly words in your ear. You know Grave Grasp, Bone Spear and Blood Price, and how to arm your skeleton. Hold a necromancer\'s staff to use them.','#b8a8e8'); testGobTalk(); }}, bye]); return; }
   const ids=Object.keys(ITEMS).filter(id=>ITEMS[id].slot===slot && !/^[tw]_/.test(id)); ids.key='gratis';
   shopFrom('Gratis the Goblin',ids,0,"“"+SL[slot]+"! Take, take. 0g 0s 0c.”",()=>testGobTalk()); }
 TALKERS.testgob=()=>testGobTalk();
@@ -16220,10 +16222,10 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
   if(st.agi) L.push(['Agility','+'+st.agi+' <small>('+Math.round(st.agi*AGI_DODGE*100)+'% dodge)</small>']);
   if(st.ap) L.push(['Attack power','+'+st.ap+' <small>(+'+st.ap*3+'% weapon damage)</small>']);
   if(st.aspd) L.push(['Swing speed','+'+st.aspd+'% <small>(your weapon swings that much faster)</small>']);
-  if(typeof RUNE_SET!=='undefined' && RUNE_SET.includes(unWoven(id))) L.push(['Forge-Heat (all five pieces)','every third blow you land bursts with fire for extra damage']);
-  if(typeof MAGISTER_SET!=='undefined' && MAGISTER_SET.includes(unWoven(id))) L.push(["The Magister's Economy (all five pieces)",'every third spell you cast costs no mana']);
-  if(typeof STARFALL_SET!=='undefined' && STARFALL_SET.includes(unWoven(id))) L.push(['Starfall (all five pieces)','one spell in four strikes twice, the second for half']);
-  if(typeof EMBER_SET!=='undefined' && EMBER_SET.includes(unWoven(id))) L.push(['Kindled (all six pieces)','your spells set foes burning, and a foe that strikes you is sometimes lashed by flame']);
+  if(typeof RUNE_SET!=='undefined' && RUNE_SET.includes(unWoven(id))) L.push(['Forge-Heat (any four pieces)','every third blow you land bursts with fire for extra damage']);
+  if(typeof MAGISTER_SET!=='undefined' && MAGISTER_SET.includes(unWoven(id))) L.push(["The Magister's Economy (any four pieces)",'every third spell you cast costs no mana']);
+  if(typeof STARFALL_SET!=='undefined' && STARFALL_SET.includes(unWoven(id))) L.push(['Starfall (any four pieces)','one spell in four strikes twice, the second for half']);
+  if(typeof EMBER_SET!=='undefined' && EMBER_SET.includes(unWoven(id))) L.push(['Kindled (any four pieces)','your spells set foes burning, and a foe that strikes you is sometimes lashed by flame']);
   if(id==='duel_boots') L.push(['Riposte Step','after you dodge a blow, your next strike within 2 seconds lands 40% harder']);
   if(st.magic) L.push(['Spell power','+'+st.magic+' <small>(+'+st.magic*4+'% spell damage)</small>']);
   if(st.mreg) L.push(['Mana regeneration','+'+st.mreg+' <small>per second in a fight (base 7)</small>']);
@@ -17042,12 +17044,12 @@ function vesnaTalk(){ const n=NECRO(), V='Vesna the Grave-Speaker';
     if(!CHOICE.necroQ){ say(V,["“The last lesson is about the risen. You can raise them; any staff can. But they will not <i>die</i> for you until one of the dead has shown you how.”","“Under this yard is the old crypt. I have the key; Tobb thinks it is lost. Below, there is a man called Corran who has wanted to lie down properly for two hundred years, but the bone-gates will not open for the living.”","“So you will wake him, and he will follow you, and every gate you bring him to will know its own. Get him to the bottom. Keep the restless ones off him.”"],[
         {label:'“Open the crypt.”', fn:()=>{ remember('necroQ','crypt',"Vesna has opened the old crypt under the graveyard. Lead Corran's bones down through the bone-gates to his rest."); logMsg('The crypt gate stands open. Go down.','#b8a8e8'); closeDialog(); }}, bye]); return; }
     if(!CHOICE.cryptDone){ say(V,"“The crypt, at the back of the yard. Corran is waiting for you just inside. Walk slowly: he is old.”",[bye]); return; }
-    say(V,["“You felt him stand, didn't you, when you came near him? And lie down again when you brought him home.”","“He knelt for you. Bones remember who they stood for. Now, when your risen one stands beside you, call it again, and it will throw itself between you and the blow. <b>Bone Shield</b>. It costs you the skeleton. It is worth it.”"],[
-      {label:'Learn Bone Shield.', fn:()=>{ CHOICE.necro=3; CHOICE.necroQ=null; updateHud(); logMsg('You learned Bone Shield: while your skeleton stands, cast Raise Dead again.','#b8a8e8');
+    say(V,["“You felt him stand, didn't you, when you came near him? And lie down again when you brought him home.”","“He knelt for you. Bones remember who they stood for. And he bled for his lord, once, on a field nobody remembers. The dead take payment, and blood is the coin they like best. Give them a little of yours, and they will take it out of your foe with interest: the more you have in you, the more it buys. <b>Blood Price</b>. It costs no breath at all. Only you.”"],[
+      {label:'Learn Blood Price.', fn:()=>{ CHOICE.necro=3; CHOICE.necroQ=null; CHOICE.bloodNote=true; updateHud(); logMsg('You learned Blood Price. Open your spellbook (B) to give it a direction.','#b8a8e8');
         say(V,"“That is all I have. The fen has older dead than these, if you want to see what the words can do: a hag who stole my lantern, and a drowned king under the reeds. Use it kindly. Or at least on people who deserve it.”",[bye]); }}]); return; }
   say(V,[FEN_OPEN()?"“The fen is quieter since you came. I don't know if that is good.”":"“The dead are quieter since you came. They have someone to talk to.”"],[bye]); }
 TALKERS.vesna=vesnaTalk;
-JOURNAL.push(["The Grave-Speaker", ()=> !CHOICE.necro ? null : NECRO()>=3 ? ['done',"Vesna taught you the dead's own words: Grave Grasp, Bone Spear and Bone Shield."]
+JOURNAL.push(["The Grave-Speaker", ()=> !CHOICE.necro ? null : NECRO()>=3 ? ['done',"Vesna taught you the dead's own words: Grave Grasp, Bone Spear and Blood Price."]
   : (CHOICE.necroQ==='listen'||CHOICE.necroQ==='motes') ? ['active',"Sit by three graves in the Dunhollow graveyard at night and keep still until each has spoken. Maren by the east wall wants her blue spool (Bertha at the Wheatsheaf)"+(hasItem('blue_spool')?' ✓':'')+"; Gerrit the miller wants a loaf"+(hasItem('bread')?' ✓':'')+"; the nameless one by the west wall wants her name (Old Wenna)"+(CHOICE.ilseName?' ✓':'')+". ("+(CHOICE.listened||[]).length+"/3)"]
   : NECRO()===0 ? ['active',"Vesna the Grave-Speaker walks the Dunhollow graveyard at night. She offered to teach you words no staff knows by itself."]
   : NECRO()===1 ? ['active', CHOICE.necroQ==='hanged' ? (hasItem('hanged_bones')?"Bring the hanged man's bones to Vesna, with three old bones from men who died badly. ("+invCount('old_bone')+"/3)":"Cut the hanged man down from the gallows on the King's Road at night, for Vesna.") : "You know Grave Grasp. Vesna has the next lesson for you in the graveyard."]
@@ -17535,6 +17537,7 @@ function vesnaFen(){
     : CHOICE.morwen==='done' ? [CHOICE.barrow==='done'?"“You went under the reeds and came back. Bertil's boots on your feet, I see. He would have liked you. He liked anyone who could hit hard.”":"“Under the reeds in the Sunken Hollow, where the lights gather. Mind the old king. He does not like visitors.”"]
     : ["“Yes?”"];
   say(VESNA_N,line,opts); }
+{ const oV=TALKERS.vesna; TALKERS.vesna=function(){ if(NECRO()>=3 && CHOICE.skelArms && CHOICE.golem!=='done') return golemVesna(); return oV.apply(this,arguments); }; }   // the fourth lesson: the Flesh Golem
 const VESNA_NECRO=TALKERS.vesna;                                                   // her lessons, as they were
 TALKERS.vesna=function(){ if(areaId==='fen') return vesnaFen(); return VESNA_NECRO(); };
 // the two guards at the gate on the King's Road
@@ -20126,8 +20129,8 @@ const SPELL_DEF={ fire:SPELLS.left, frost:SPELLS.up, arcane:SPELLS.right, raise:
 Object.entries(SPELL_DEF).forEach(([k,v])=>{ v.id=k; });
 const BOOK_BASE={ mage:{left:'fire', up:'frost', right:'arcane'}, necro:{left:'raise', up:'drain', right:'wither'} };
 function MAGE_EXTRA(id){ return ({ doppel:'right', iceward:'up', kindle:'left' })[id] ? MAGE_KNOWN(({ doppel:'right', iceward:'up', kindle:'left' })[id]) : false; }   // Orvell's three lessons
-function NECRO_EXTRA(id){ const n=NECRO(); return id==='grasp' ? n>=1 : id==='spear' ? n>=2 : id==='boneshield' ? n>=3 : false; }            // Vesna's three lessons
-function bookSpells(sc){ return sc==='necro' ? ['raise','drain','wither',...['grasp','spear'].filter(NECRO_EXTRA)] : ['fire','frost','arcane',...['kindle','iceward','doppel'].filter(MAGE_EXTRA)]; }
+function NECRO_EXTRA(id){ const n=NECRO(); return id==='grasp' ? n>=1 : id==='spear' ? n>=2 : id==='blood' ? n>=3 : id==='golem' ? CHOICE.golem==='done' : false; }            // Vesna's lessons
+function bookSpells(sc){ return sc==='necro' ? ['raise','drain','wither',...['grasp','spear','blood'].filter(NECRO_EXTRA)] : ['fire','frost','arcane',...['kindle','iceward','doppel'].filter(MAGE_EXTRA)]; }
 function BOOK(sc){ const B=CHOICE.book=(CHOICE.book && typeof CHOICE.book==='object')?CHOICE.book:{}; const ok=bookSpells(sc), b=Object.assign({},BOOK_BASE[sc],B[sc]||{});
   ['left','up','right'].forEach(d=>{ if(!ok.includes(b[d])) b[d]=BOOK_BASE[sc][d]; }); B[sc]=b; return b; }
 function PLAYER_BOOK(){ const b=BOOK(SCHOOL()); return { left:SPELL_DEF[b.left], up:SPELL_DEF[b.up], right:SPELL_DEF[b.right] }; }
@@ -20135,17 +20138,12 @@ function manaGain(n){ player.maxMana=100; const m0=player.mana??100; player.mana
 
 // a self-spell (a ward, a double) flies at nobody and wounds nobody
 // staff blows give a little breath back: a caster who fights with the stick between spells is not wasting time
-// wards: Ice Ward and Bone Shield take the next blow whole
+// wards: Ice Ward takes the next blow whole
 function wardTakes(n){ const W=player.ward; if(W && W.t>0 && n>0 && combat.active && !combat.practice){ player.ward=null;
     floatText(tileOf(player),W.kind==='ice'?'Ice Ward!':'Bone Shield!',W.kind==='ice'?'#bfe6ff':'#e8e4d0',true); burst(player,combat.foe||player,W.kind==='ice'?'#d8f0ff':'#e8e4d0',12); shake=Math.max(shake,4);
     if(W.kind==='ice' && combat.foe && !combat.foe.dead){ addStatus(combat.foe,'chill',5,0); floatText(tileOf(combat.foe),'Numbed','#bfe6ff'); }
     return true; }
   return false; }
-function boneShield(f){ const c=12; if((player.mana??0)<c){ floatText(tileOf(player),'Out of mana','#a8a0c8'); return false; }
-  player.mana-=c; lunge(player,f); const w=f && f.state==='windup';
-  if(w){ f.state='stagger'; f.t=1.8; floatText(tileOf(f),'Bone Shield!','#e8e4d0'); logMsg('Your skeleton throws itself into the blow, and comes apart in a shower of bones. The blow goes nowhere.','#e8e4d0'); }
-  else { player.ward={kind:'bone', t:4}; floatText(tileOf(player),'Bone Shield','#e8e4d0'); logMsg('Your skeleton falls apart around you into a cage of bones: the next blow breaks on it.','#e8e4d0'); }
-  shake=Math.max(shake,4); crumbleSkel(); updateHud(); return true; }
 // the double: your own shape in cold light, fighting at your other shoulder until it remembers it is light
 function summonDopp(f){ const m=SPM(), T=Math.round(6.5*m*10)/10, fx=f?f.x-player.x:1, fy=f?f.y-player.y:0, fl=Math.hypot(fx,fy)||1;
   DOPP={ x:player.x, y:player.y, t:T, max:T, dmg:Math.max(3,Math.round(4*m)), cd:0.9, anim:0, a:0, fade:0, dir:player.dir||0, ox:fy/fl*0.95+fx/fl*0.25, oy:-fx/fl*0.95+fy/fl*0.25 };
@@ -20173,15 +20171,15 @@ function bookItems(items){                            // the doppelganger and yo
 
 // ── what the staff tooltips say: your three spells, and what a teacher can still add ──
 const SPELL_TIP=(id,m)=>{ const S=SPELL_DEF[id], d=Math.round((S.dmg||0)*m), c=Math.round(S.cost*(CHOICE.tessLesson && ['fire','frost','arcane','kindle','iceward','doppel'].includes(id)?0.75:1));
-  return S.name+': '+({ fire:d+' damage, then burns', frost:d+' damage, slows his swing', arcane:d+' damage', raise:'a skeleton fights beside you'+(NECRO_EXTRA('boneshield')?' (cast again: Bone Shield)':''), drain:d+' damage, heals you', wither:d+' damage, he hits for half',
-    iceward:'the next blow breaks on it and numbs him', kindle:'a fire that grows each second', doppel:'your double fights beside you', spear:d+' damage, through any guard', grasp:d+' damage, holds him: interrupts his swing' })[id]+' · '+c+' mana'; };
+  return S.name+': '+({ fire:d+' damage, then burns', frost:d+' damage, slows his swing', arcane:d+' damage', raise:'a skeleton fights beside you'+(NECRO_EXTRA('golem')?' (cast again: Flesh Golem)':''), blood:'pay '+(typeof bloodPrice==='function'?bloodPrice():0)+' health: '+Math.round((typeof bloodPrice==='function'?bloodPrice():0)*1.5*m)+' damage, he bleeds', drain:d+' damage, heals you', wither:d+' damage, he hits for half',
+    iceward:'the next blow breaks on it and numbs him', kindle:'a fire that grows each second', doppel:'your double fights beside you', spear:d+' damage, through any guard', grasp:d+' damage, holds him: interrupts his swing' })[id]+' · '+(id==='blood'?'no mana':c+' mana'); };
 function bookTip(id){ const sc=NECRO_STAVES.includes(id)?'necro':['staff_oak','staff_star','staff_cinder','staff_crystal'].includes(id)?'mage':null; if(!sc) return null;
   const m=WEAPONS[id].magic*(1+(typeof gearSum==='function'?gearSum('magic'):0)*0.04), b=BOOK(sc), C=sc==='necro'?'#b8a8e8':'#9adcf0', arrow={left:'◀',up:'▲',right:'▶'};
   const lore=window.itemFlavor && window.itemFlavor(id) ? `<div class="fl lore">${window.itemFlavor(id)}</div>`:'';
   const rows=['left','up','right'].map(d=>arrow[d]+' '+SPELL_TIP(b[d],m)).join('<br>');
-  const extra=sc==='necro' ? ['grasp','spear','boneshield'] : ['doppel','iceward','kindle'], miss=extra.filter(x=>!(sc==='necro'?NECRO_EXTRA(x):MAGE_EXTRA(x))).length;
+  const extra=sc==='necro' ? ['grasp','spear','blood','golem'] : ['doppel','iceward','kindle'], miss=extra.filter(x=>!(sc==='necro'?NECRO_EXTRA(x):MAGE_EXTRA(x))).length;
   const who=sc==='necro' ? "Vesna the Grave-Speaker, in the Dunhollow graveyard at night," : (CHOICE.appr==='taken' ? null : (typeof ORVELL_AT_INN==='function' && ORVELL_AT_INN()) ? "Magister Orvell, at the Wheatsheaf in Dunhollow," : "Magister Orvell, in the Castle Ward of Hollowmere,");
-  return `<div class="fl" style="color:${C}">${rows}</div><small>Spellbook (B) to change them.${miss&&who?` ${who} can teach you ${miss===3?'three more':miss===2?'two more':'one more'}.`:''}</small>`+lore; }
+  return `<div class="fl" style="color:${C}">${rows}</div><small>Spellbook (B) to change them.${miss&&who?` ${who} can teach you ${miss===4?'four more':miss===3?'three more':miss===2?'two more':'one more'}.`:''}</small>`+lore; }
 
 // ── the spellbook page: pick three, one for each side ──
 const bookPanel=document.createElement('div'); bookPanel.id='book-panel';
@@ -20197,7 +20195,7 @@ function closeBook(){ bookPanel.style.display='none'; }
 function renderBook(){ if(BOOK_TAB==='blade') return renderBlade(); const L=bookSchools(), sc=BOOK_TAB, b=BOOK(sc), all=bookSpells(sc), arrow={left:'◀ Left',up:'▲ Up',right:'▶ Right'}, m=SPM();
   const tabs=L.length>1?`<div style="display:flex;gap:6px;margin-bottom:10px">${L.map(x=>`<button data-tab="${x}" style="flex:1;padding:5px;border-radius:6px;border:1px solid ${x===sc?'#c09040':'#5a4020'};background:${x===sc?'#3a2810':'#1a120a'};color:#f0dca0;font:12px Georgia,serif;cursor:pointer">${BOOK_TABNAME[x]}</button>`).join('')}</div>`:'';
   const row=d=>`<div style="margin:6px 0"><div style="font-size:11px;color:#a08050;letter-spacing:1px">${arrow[d]}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px">${all.map(id=>`<button data-slot="${d}" data-spell="${id}" style="padding:4px 8px;border-radius:6px;border:1px solid ${b[d]===id?SPELL_DEF[id].col:'#4a3820'};background:${b[d]===id?'rgba(255,255,255,0.08)':'transparent'};color:${b[d]===id?SPELL_DEF[id].col:'#c8b088'};font:12px Georgia,serif;cursor:pointer">${SPELL_DEF[id].name}</button>`).join('')}</div></div>`;
-  const pas=sc==='necro' && NECRO_EXTRA('boneshield') ? '<div style="margin-top:8px;font-size:12px;color:#e8e4d0">Bone Shield: cast Raise Dead again while your skeleton stands.</div>' : '';
+  const pas=sc==='necro' && NECRO_EXTRA('golem') ? '<div style="margin-top:8px;font-size:12px;color:#e8e4d0">Flesh Golem: cast Raise Dead again while your skeleton stands ('+GOLEM_COST+' mana, a piece of meat or fish and an old bone; once a fight).</div>' : '';
   const sel=['left','up','right'].map(d=>SPELL_TIP(b[d],m)).map(t=>`<div style="font-size:11px;color:#c8b898;margin-top:2px">${t}</div>`).join('');
   bookPanel.innerHTML=`<div style="font-size:11px;letter-spacing:2px;color:#a08050;margin-bottom:8px">SPELLBOOK</div>${tabs}${['left','up','right'].map(row).join('')}${pas}<div style="margin-top:10px;border-top:1px solid #3a2a14;padding-top:6px">${sel}</div><div style="text-align:right;margin-top:10px"><button data-close="1" style="padding:4px 12px;border-radius:6px;border:1px solid #6a5030;background:#2a1e10;color:#d8c090;font:12px Georgia,serif;cursor:pointer">Close</button></div>`; }
 const BOOK_TABNAME={necro:'Necromancer', mage:'Magister', blade:'Sword'};
@@ -23236,9 +23234,9 @@ WEAPON_ART.rune_maul=(c,hx,hy,ang,id,s)=>{ c.save(); c.translate(hx,hy); c.rotat
   c.save(); c.globalCompositeOperation='lighter'; c.strokeStyle='rgba(255,150,60,0.9)'; c.lineWidth=0.9; c.beginPath(); c.moveTo(27.5,-4.5); c.lineTo(27.5,4.5); c.moveTo(25,-1.5); c.lineTo(27.5,1); c.lineTo(30,-1.5); c.stroke();
   const gg=c.createRadialGradient(27.5,0,0,27.5,0,9); gg.addColorStop(0,'rgba(255,140,40,0.35)'); gg.addColorStop(1,'rgba(255,140,40,0)'); c.fillStyle=gg; c.fillRect(18,-9,19,18); c.restore();
   c.restore(); };
-// Forge-Heat: with all five pieces on, every third blow you land bursts with fire
+// Forge-Heat: with any four pieces on, every third blow you land bursts with fire
 let RUNE_HITS=0, RUNE_FIRE=false;
-const runeSetOn=()=>{ const E=(player.opts&&player.opts.equip)||{}; return E.head && unWoven(E.head)==='rune_helm' && E.armor && unWoven(E.armor)==='rune_plate' && E.hands && unWoven(E.hands)==='rune_gauntlets' && E.legs && unWoven(E.legs)==='rune_greaves' && E.feet && unWoven(E.feet)==='rune_boots'; };
+const runeSetOn=()=>setOn(RUNE_SET);   // any four of the five return E.head && unWoven(E.head)==='rune_helm' && E.armor && unWoven(E.armor)==='rune_plate' && E.hands && unWoven(E.hands)==='rune_gauntlets' && E.legs && unWoven(E.legs)==='rune_greaves' && E.feet && unWoven(E.feet)==='rune_boots'; };
 { const _w=wound; wound=function(f,n,label,col){ const r=_w.apply(this,arguments);
     try{ if(!RUNE_FIRE && f && f!==player && HIT_SRC==='melee' && n>0 && !f.warded && f.type!=='dummy' && runeSetOn()){ RUNE_HITS++;
         if(RUNE_HITS>=3 && !f.dead && f.hp>0){ RUNE_HITS=0; const W=WEAPONS[player.opts.equip.weapon]||WEAPONS.fists, extra=Math.max(4,Math.round((W.dmg||6)*0.6+gearSum('ap')*0.3));
@@ -27241,7 +27239,7 @@ function drawFocusInHand(c,hx,hy,id){ const x=hx, y=hy; c.save();
   c.restore(); }
 // the set bonuses: the Magister's Economy (every third spell free) and Starfall (one spell in four strikes twice)
 const SET_ALIAS={ ember_crown:['ember_hood'] };   // pieces that stand in for each other in a set
-const setOn=SET=>{ const E=(player.opts&&player.opts.equip)||{}; return SET.every(id=>Object.values(E).some(v=>v && (unWoven(v)===id || (SET_ALIAS[id]||[]).includes(unWoven(v))))); };
+const setOn=SET=>{ const E=(player.opts&&player.opts.equip)||{}; return SET.filter(id=>Object.values(E).some(v=>v && (unWoven(v)===id || (SET_ALIAS[id]||[]).includes(unWoven(v))))).length>=Math.min(4,SET.length); };   // any four pieces wake the set
 let MAG_N=0, MAG_FREE=false, STAR_ECHO=false;
 { const _sc=spellCost; spellCost=function(S){ return MAG_FREE ? 0 : _sc.apply(this,arguments); }; }
 { const _c=castSpell; castSpell=function(){ const set=setOn(MAGISTER_SET), m0=player.mana; MAG_FREE = set && MAG_N===2; let r; try{ r=_c.apply(this,arguments); } finally{ var wasFree=MAG_FREE; MAG_FREE=false; }
@@ -28513,6 +28511,263 @@ OBJ_DRAW.rcfallen=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, fl=(o.v||0)===1
   g.fillStyle='rgba(70,100,40,0.5)'; g.beginPath(); g.ellipse(x-fl*8,y+3,8,2.6,0,0,Math.PI*2); g.fill(); };
 NEAR_NAME.rcfallen='the bones of an adventurer';
 onUse(['rcfallen'],o=>pzSay(RC_FALLEN_LINES[(o.i*3+o.j)%RC_FALLEN_LINES.length],'#d8d0bc'));
+
+// ════════ THE STITCHED MAN: Vesna's fourth lesson. Your risen skeleton, called a second time, takes on flesh:
+//   a golem of grey meat on old bones, iron staples and a sackcloth face, that stands in front of you and takes the blows you fail to parry.
+//   Its strength is yours: it holds two fifths of your own greatest health, so a grave-speaker in heavy mail stitches a heavy golem.
+//   It costs a great breath of mana, a piece of meat or fish and an old bone; once a fight; after twenty seconds the stitches give.
+//   And Blood Price, the word Corran teaches now in place of the old Bone Shield: pay the dead in your own blood, and they take it out of your foe ════════
+let GOLEM=null, GOLEM_USED=false;
+const GOLEM_COST=60, GOLEM_LIFE=20, GOLEM_FLESH=['raw_meat','cooked_meat','fish_perch','fish_trout','fish_carp','fish_eel','fish_herring','grilled_fish'];
+{ const _s=startCombat; startCombat=function(){ if(!combat.active) GOLEM_USED=false; return _s.apply(this,arguments); }; }   // once a fight
+function golemSlot(f){ const fx=f?f.x-player.x:1, fy=f?f.y-player.y:0, fl=Math.hypot(fx,fy)||1, ax=-fy/fl*0.9+fx/fl*0.4, ay=fx/fl*0.9+fy/fl*0.4, bx=fy/fl*0.9+fx/fl*0.4, by=-fx/fl*0.9+fy/fl*0.4, A=(ax+ay)<=(bx+by);
+  return [player.x+(A?ax:bx), player.y+(A?ay:by)]; }   // a step ahead at your shoulder, on the far side so it never hides you
+function golemFlesh(){ return GOLEM_FLESH.find(id=>invCount(id)>0) || null; }
+function stitchGolem(f){
+  if(GOLEM && !GOLEM.fade){ floatText(tileOf(player),'Already stitched','#c8b8b0'); return true; }
+  if(GOLEM_USED){ floatText(tileOf(player),'The flesh is spent','#c8b8b0'); logMsg('You have stitched one golem this fight already. The dead will not give you twice.','#c8b8b0'); return true; }
+  const fl=golemFlesh(); if(!fl || invCount('old_bone')<1){ floatText(tileOf(player),!fl?'No flesh to stitch':'No bone to stitch','#c8b8b0'); logMsg('A Flesh Golem needs a piece of meat or fish and an old bone from your pack.','#c8b8b0'); return false; }
+  if((player.mana??0)<GOLEM_COST){ floatText(tileOf(player),'Out of mana','#a8a0c8'); return false; }
+  const S=SKEL; player.mana-=GOLEM_COST; player.inv[player.inv.indexOf(fl)]=null; player.inv[player.inv.indexOf('old_bone')]=null; GOLEM_USED=true;
+  const hp=Math.max(8,Math.round(player.maxHp*0.4));
+  const [gx,gy]=golemSlot(f); GOLEM={ x:gx, y:gy, dir:S.dir||0, hp, max:hp, t:GOLEM_LIFE, rise:0, anim:0, cd:1.6, hit:0, fade:0, moving:false, dmg:Math.max(3,Math.round(4*SPM())) };
+  SKEL=null; lunge(player,f); shake=Math.max(shake,5); SND.spell('Raise Dead');
+  try{ burst({x:GOLEM.x,y:GOLEM.y},f||player,'#c8b8a8',16); }catch(e){}
+  floatText(tileOf(player),'Flesh Golem!','#d8c8b8',true);
+  logMsg('Your skeleton kneels, and the meat in your pack crawls up its bones. Staples bite, thread pulls tight, a sackcloth face settles over the skull. It stands, slowly.','#d8c8b8');
+  updateHud(); try{ if(invOverlay.classList.contains('open')) refreshInventory(); refreshFoodBar(); }catch(e){} return true; }
+// the blows you do not parry go into it first; what it cannot hold comes through to you
+function golemTakes(n){ const G=GOLEM; if(!G || G.fade || G.rise<1 || n<=0 || !combat.active || combat.practice) return n;
+  const take=Math.min(n,G.hp); G.hp-=take; G.hit=0.3; G.anim=0; shake=Math.max(shake,4);
+  try{ floatText([Math.floor(G.x),Math.floor(G.y)],'-'+take,'#d8c0b0'); SND.hurt(false); }catch(e){}
+  if(G.hp<=0){ G.fade=1; floatText([Math.floor(G.x),Math.floor(G.y)],'The stitches tear','#c8b8b0'); logMsg('The golem takes one blow too many. The staples spring out and it comes apart in a heap of meat and bone.','#c8b8b0'); }
+  else if(take===n) floatText(tileOf(player),'Golem!','#d8c8b8');
+  return n-take; }
+function golemTick(dt){ const G=GOLEM; if(!G) return; G.hit=Math.max(0,G.hit-dt); G.anim=Math.max(0,G.anim-dt);
+  if(G.fade){ G.fade+=dt; if(G.fade>2.2) GOLEM=null; return; }
+  G.rise=Math.min(1,G.rise+dt/1.6);                                  // slow to stand: a moment before it can take anything
+  if(!combat.active){ G.fade=1; logMsg('With nobody left to stand in front of, the golem sags and sinks back into the earth.','#c8b8b0'); return; }
+  G.t-=dt; if(G.t<=0){ G.fade=1; floatText([Math.floor(G.x),Math.floor(G.y)],'The stitches give','#c8b8b0'); return; }
+  const f=combat.foe; let tx=G.x, ty=G.y;
+  if(f && !f.dead){ const fx=f.x-player.x, fy=f.y-player.y, fl=Math.hypot(fx,fy)||1; [tx,ty]=golemSlot(f); G.dir=dirFromDelta(f.x-G.x,f.y-G.y); }   // a step ahead at your shoulder, on the far side so it never hides you
+  const mx=tx-G.x, my=ty-G.y, md=Math.hypot(mx,my), sp=Math.min(md,dt*(G.rise<1?0:1.6)); if(md>0.001){ G.x+=mx/md*sp; G.y+=my/md*sp; } G.moving=md>0.05 && G.rise>=1;
+  if(f && !f.dead && combat.phase==='fight' && G.rise>=1 && md<0.5){ G.cd-=dt; if(G.cd<=0){ G.cd=2.4; G.anim=0.5; wound(f,G.dmg,'Golem!','#d8c8b8'); } } }
+{ const _bt=bookTick; bookTick=function(dt){ _bt.apply(this,arguments); try{ golemTick(dt); }catch(e){ console.error(e); } }; }
+{ const _bi=bookItems; bookItems=function(items){ _bi.apply(this,arguments); const G=GOLEM; if(!G) return;
+    items.push({d:G.x+G.y+0.012, ax:G.x, ay:G.y, fn:()=>{ const q=P(G.x,G.y), sink=G.fade?Math.min(1,G.fade/2):0, up=Math.min(1,G.rise)*(1-sink);
+      g.save(); g.beginPath(); g.rect(q.x-120,q.y-260,240,262); g.clip();                          // it climbs up out of the ground, and sinks back in
+      g.translate(0,(1-up)*140); if(G.fade) g.globalAlpha*=Math.max(0,1-sink*0.6);
+      const pose=G.anim>0 ? {kind:'strike', t:1-G.anim/0.5} : G.hit>0 ? {kind:'stagger', t:1} : null;
+      try{ drawGolem(q.x,q.y,{dir:G.dir, moving:G.moving, id:7, flash:G.hit},pose); }catch(e){ console.error(e); }
+      g.restore();
+      if(!G.fade && G.rise>=1){ const w=56, by=q.y-170; g.save(); g.fillStyle='rgba(10,8,6,0.75)'; g.fillRect(q.x-w/2-1,by-1,w+2,7);
+        g.fillStyle='#b89a8a'; g.fillRect(q.x-w/2,by,w*Math.max(0,G.hp/G.max),3.4); g.fillStyle='#8a7aa8'; g.fillRect(q.x-w/2,by+3.6,w*Math.max(0,G.t/GOLEM_LIFE),1.6); g.restore(); } }}); }; }
+// the stitched man himself: grey flesh in patches, iron staples, a sack for a face
+function drawGolem(x,B,e,pose){ const d=e.dir||0, fl=(d===5||d===6||d===7)?-1:1, back=(d===3||d===4||d===5), s=(d===2||d===6)?1:(d===0||d===4)?0:0.55;
+  const pk=pose&&pose.kind, pt=pose?Math.min(1,Math.max(0,pose.t||0)):0, raise=pk==='raise'?pt:0, strike=pk==='strike'?pt:0, stag=pk==='stagger'?1:0;
+  const mv=e.moving?Math.sin(gt*5):0, br=Math.sin(gt*1.4+(e.id||0))*1.2, kn=e.dead?Math.min(1,(e.fallT||0)/1.1):0;
+  const FL='#8e887c', FD='#5c564e', FLL='#a8a194', FDD='#3e3a34', SACK='#a48c5c', SACKD='#6a5634', IRON='#4a4c52', THR='#2a1c16';
+  const mix=(a,b,u)=>[a[0]+(b[0]-a[0])*u, a[1]+(b[1]-a[1])*u];
+  const staple=(sx,sy,a)=>{ g.save(); g.translate(sx,sy); g.rotate(a||0); g.strokeStyle=IRON; g.lineWidth=1.8; g.beginPath(); g.moveTo(-3,1.5); g.lineTo(-3,-1.5); g.lineTo(3,-1.5); g.lineTo(3,1.5); g.stroke(); g.strokeStyle='rgba(220,220,230,0.55)'; g.lineWidth=0.7; g.beginPath(); g.moveTo(-2.4,-1.9); g.lineTo(2.4,-1.9); g.stroke(); g.restore(); };
+  const stitch=pts=>{ g.strokeStyle=THR; g.lineWidth=1; g.beginPath(); pts.forEach(([px,py],k)=>k?g.lineTo(px,py):g.moveTo(px,py)); g.stroke();
+    for(let k=0;k<pts.length-1;k++){ const [ax,ay]=pts[k],[bx,by]=pts[k+1], L=Math.hypot(bx-ax,by-ay)||1, n=Math.max(1,Math.floor(L/5)); for(let q=0;q<n;q++){ const u=(q+0.5)/n, cx=ax+(bx-ax)*u, cy=ay+(by-ay)*u, nx=-(by-ay)/L*2.6, ny=(bx-ax)/L*2.6; g.beginPath(); g.moveTo(cx-nx,cy-ny); g.lineTo(cx+nx,cy+ny); g.stroke(); } } };
+  const limb=(a,b,w0,w1,lit,dark)=>{ beastSeg(a,b,w0+3,w1+3,dark); beastSeg([a[0]-1,a[1]-1],[b[0]-1,b[1]-1],w0-1,w1-1,lit); };   // a dark rim, a lit core: rounder than a flat band
+  g.save(); g.translate(x,B);
+  g.fillStyle='rgba(0,0,0,0.34)'; g.beginPath(); g.ellipse(0,1,40,11,0,0,Math.PI*2); g.fill(); g.scale(fl,1);
+  const lean=(stag?-5:0)+strike*12*(1-strike*0.5)-raise*3, hip=-46+kn*20, sh=-108+kn*22+br*0.5, tw=34-s*11, ww=21-s*6;
+  // legs: short, bowed, the shins bound in sacking
+  [-1,1].forEach(sd=>{ const far=s>0.3 && sd<0, col=far?FD:FL, cd=far?FDD:FD, hp=[sd*ww*0.55+s*sd*2, hip-2];
+    let kneeP, ank; if(kn){ kneeP=[sd*ww*0.7+s*10, -8]; ank=[sd*ww*0.6-s*12-2, -5]; } else { kneeP=[sd*(ww*0.68+3)+s*mv*6*sd, -25]; ank=[sd*(ww*0.6)+s*mv*10*sd, -6]; }
+    limb(hp,kneeP,21,15,col,cd); limb(kneeP,ank,15,13,far?SACKD:SACK,far?'#4a3a22':SACKD);
+    g.strokeStyle='rgba(60,44,20,0.7)'; g.lineWidth=0.9; for(let b=1;b<4;b++){ const p=mix(kneeP,ank,b/4); g.beginPath(); g.moveTo(p[0]-7,p[1]+1); g.lineTo(p[0]+7,p[1]-1.5); g.stroke(); }
+    g.fillStyle=far?'#4a3a22':SACKD; g.beginPath(); g.ellipse(ank[0]+s*5,ank[1]+2,11+s*3,5.5,0,0,Math.PI*2); g.fill();
+    if(!far) staple(hp[0]+sd*2,(hp[1]+kneeP[1])/2,0.3*sd); });
+  // an arm: long, hanging to the knee; the right came off a bigger man than the left
+  const arm=(sd)=>{ const big=sd===1, far=s>0.3 && sd<0, col=far?FD:(big?FLL:FL), cd=far?FDD:FD, front=sd===1;
+    const S0=[sd*tw*0.86+lean*0.4+s*3, sh+9];
+    let E=[sd*(tw+9)+lean*0.5+s*5, sh+36], W=[sd*(tw+5)+lean*0.6+s*7+s*mv*8*sd, hip+6];
+    if(front && (raise||strike)){ const up=[[tw*0.8,sh-16],[tw*0.45+4,sh-46]], fw=[[tw+16+lean,sh+18],[tw+34+lean,sh+40]];
+      if(strike){ const u=Math.min(1,strike*1.5); E=mix(up[0],fw[0],u); W=mix(up[1],fw[1],u); } else { E=mix(E,up[0],raise); W=mix(W,up[1],raise); } }
+    limb(S0,E,big?18:15,big?14:12,col,cd); limb(E,W,big?14:12,big?17:14,col,cd);
+    if(!far){ stitch([[S0[0]-sd*2,S0[1]+6],[E[0]-sd*3,E[1]-6]]); staple(...mix(E,W,0.45),0.6*sd); }
+    g.fillStyle=far?'#4a3a22':SACKD; g.beginPath(); g.ellipse(W[0],W[1]+3,big?12:10,big?12.5:10.5,0,0,Math.PI*2); g.fill();      // a fist bound in sacking
+    g.fillStyle=cd; g.beginPath(); g.ellipse(W[0]+sd*2,W[1]+7,big?8:6.5,big?6:5,0,0,Math.PI*2); g.fill();
+    g.strokeStyle=far?'#6a5634':SACK; g.lineWidth=1.8; g.beginPath(); g.moveTo(W[0]-9,W[1]-3); g.lineTo(W[0]+9,W[1]); g.moveTo(W[0]-9,W[1]+3); g.lineTo(W[0]+9,W[1]+6); g.stroke(); };
+  if(s>0.3) arm(-1);                                                                          // the far arm, behind the body
+  // the body: hunched, wide in the shoulder, a hump of meat behind the head
+  g.save(); g.translate(lean*0.5,0);
+  const body=()=>{ g.beginPath(); g.moveTo(-ww,hip+2);
+    g.bezierCurveTo(-ww-7,hip-18,-tw*0.98,sh+32,-tw*0.92,sh+10);
+    g.bezierCurveTo(-tw*1.04,sh-2,-tw*0.76,sh-11,-tw*0.4,sh-12);
+    g.quadraticCurveTo(0,sh-7,tw*0.42,sh-17);
+    g.bezierCurveTo(tw*0.86,sh-17,tw*1.06,sh-2,tw*0.95,sh+10);
+    g.bezierCurveTo(tw*1.0,sh+32,ww+7+s*6,hip-18,ww,hip+2);
+    g.quadraticCurveTo(0,hip+8,-ww,hip+2); g.closePath(); };
+  const bg=g.createLinearGradient(-tw,0,tw,0); bg.addColorStop(0,FD); bg.addColorStop(0.32,FL); bg.addColorStop(0.62,FLL); bg.addColorStop(1,FD);
+  body(); g.fillStyle=bg; g.fill(); g.strokeStyle='rgba(30,26,22,0.55)'; g.lineWidth=1.2; g.stroke();
+  g.save(); body(); g.clip();                                                               // patches of other people
+  const mid=(sh+hip)/2;
+  [[-tw,sh-4,tw*0.95,26,'#9c8a82'],[2,mid-4,tw,24,'#7e8470'],[-tw,mid+6,tw*0.85,22,'#a69e92'],[tw*0.15,sh-12,tw*0.95,22,'#8a7a7c']].forEach(([px,py,pw,ph,c])=>{ g.fillStyle=c; g.globalAlpha*=0.6; g.beginPath(); g.moveTo(px,py); g.lineTo(px+pw,py+3); g.lineTo(px+pw-3,py+ph); g.lineTo(px+2,py+ph-2); g.closePath(); g.fill(); g.globalAlpha/=0.6;
+    g.globalAlpha*=0.7; stitch([[px,py],[px+pw,py+3],[px+pw-3,py+ph],[px+2,py+ph-2],[px,py]]); g.globalAlpha/=0.7; });
+  const shd=g.createLinearGradient(0,sh-16,0,hip+8); shd.addColorStop(0,'rgba(255,248,236,0.12)'); shd.addColorStop(0.5,'rgba(0,0,0,0)'); shd.addColorStop(1,'rgba(20,14,10,0.4)'); g.fillStyle=shd; g.fillRect(-tw*1.3,sh-20,tw*2.6,hip-sh+30);
+  if(!back){ const bx=-tw*0.12+s*6, by=mid+2; g.fillStyle='#2a1e1a'; g.beginPath(); g.ellipse(bx,by,8.5,10.5,0,0,Math.PI*2); g.fill();             // a gap in the belly, and the bones inside
+    g.strokeStyle='#d8ccaa'; g.lineWidth=2; for(let r=0;r<3;r++){ g.beginPath(); g.ellipse(bx,by-6+r*5.2,6.5,2.4,0,Math.PI*0.1,Math.PI*0.9); g.stroke(); }
+    [[-9,-7],[-9,7],[9,-7],[9,7]].forEach(([sx,sy])=>staple(bx+sx,by+sy,Math.PI/2)); }
+  else { stitch([[0,sh-6],[0,hip]]); stitch([[-tw*0.7,sh+4],[tw*0.6,sh+10]]); }               // long seams down the back and across the shoulders
+  g.restore();
+  g.fillStyle='#5e4a2c'; g.beginPath(); g.moveTo(-ww-2,hip-8); g.quadraticCurveTo(0,hip-1,ww+2,hip-8); g.lineTo(ww+1,hip-3); g.quadraticCurveTo(0,hip+4,-ww-1,hip-3); g.closePath(); g.fill();   // a rope belt
+  if(!back){ g.fillStyle='#4a3a20'; g.beginPath(); g.arc(ww*0.35,hip-3,2.8,0,Math.PI*2); g.fill(); g.strokeStyle='#4a3a20'; g.lineWidth=1.8; g.beginPath(); g.moveTo(ww*0.35,hip-1); g.lineTo(ww*0.42,hip+10); g.moveTo(ww*0.35,hip-1); g.lineTo(ww*0.26,hip+9); g.stroke(); }
+  staple(-tw*0.62,sh+2,-0.5); staple(tw*0.58,sh-4,0.4); staple(-tw*0.8,mid,1.0);
+  { const lg=g.createRadialGradient(tw*0.5,sh-15,1,tw*0.55,sh-11,12); lg.addColorStop(0,FLL); lg.addColorStop(1,FL); g.fillStyle=lg; g.beginPath(); g.ellipse(tw*0.55,sh-10,11,7,0.35,Math.PI*0.95,Math.PI*2.05); g.fill(); } stitch([[tw*0.55-10,sh-8],[tw*0.55+9,sh-5]]); staple(tw*0.55,sh-13,0.3);   // a lump of extra shoulder
+  g.restore();
+  // the head: small, sunk low between the shoulders, a sack pulled over it and tied at the neck
+  const hx=s*15+lean*0.9, hy=sh-3+(stag?2:0)+(kn?4:0), sg=g.createRadialGradient(hx-4,hy-8,2,hx,hy,18); sg.addColorStop(0,'#c4ac78'); sg.addColorStop(0.7,SACK); sg.addColorStop(1,SACKD);
+  if(!back){ g.fillStyle=sg; g.beginPath(); g.moveTo(hx-12,hy+8); g.quadraticCurveTo(hx-15,hy-11,hx-2,hy-15); g.quadraticCurveTo(hx+14,hy-14,hx+13,hy+7); g.quadraticCurveTo(hx,hy+12,hx-12,hy+8); g.closePath(); g.fill(); }
+  else { g.fillStyle=sg; g.beginPath(); g.moveTo(hx-12,hy+4); g.quadraticCurveTo(hx-14,hy-12,hx,hy-15); g.quadraticCurveTo(hx+14,hy-12,hx+12,hy+4); g.closePath(); g.fill(); }
+  g.strokeStyle='rgba(80,60,30,0.35)'; g.lineWidth=0.6; for(let q=-10;q<=10;q+=3){ g.beginPath(); g.moveTo(hx+q,hy-13); g.lineTo(hx+q*1.1,hy+8); g.stroke(); } for(let q=-11;q<=6;q+=3.5){ g.beginPath(); g.moveTo(hx-12,hy+q); g.lineTo(hx+12,hy+q); g.stroke(); }   // the weave
+  g.strokeStyle='rgba(40,28,14,0.5)'; g.lineWidth=1; g.beginPath(); g.moveTo(hx-12,hy+8); g.quadraticCurveTo(hx-15,hy-11,hx-2,hy-15); g.quadraticCurveTo(hx+14,hy-14,hx+13,hy+7); g.stroke();
+  if(!back){ const ex=hx+s*5, sq=1-s*0.35;
+    g.strokeStyle='#5a4426'; g.lineWidth=2.4; g.beginPath(); g.moveTo(hx-11,hy+6); g.quadraticCurveTo(hx,hy+10,hx+11,hy+5); g.stroke();   // the cord round its neck
+    [[-5.5,-3,3.6,3],[5,-4,2.8,2.6]].forEach(([ox,oy,rx,ry])=>{ g.fillStyle='#16100c'; g.beginPath(); g.ellipse(ex+ox*sq,hy+oy,rx*sq+0.4,ry,0,0,Math.PI*2); g.fill(); });   // two holes cut uneven
+    g.save(); g.globalCompositeOperation='lighter'; [[-5.5,-3],[5,-4]].forEach(([ox,oy])=>{ g.fillStyle='rgba(170,215,150,0.75)'; g.beginPath(); g.arc(ex+ox*sq+s,hy+oy+0.4,0.9,0,Math.PI*2); g.fill(); glow(ex+ox*sq,hy+oy,4,3.5,'150,200,130',0.16); }); g.restore();
+    stitch([[ex-6*sq,hy+3.5],[ex+6*sq,hy+2.5]]); }                                                                                   // a mouth sewn shut
+  else { g.fillStyle=SACKD; g.beginPath(); g.ellipse(hx,hy+3,4,2.6,0,0,Math.PI*2); g.fill(); g.strokeStyle='#5a4426'; g.lineWidth=2; g.beginPath(); g.moveTo(hx,hy+4); g.lineTo(hx-3,hy+12); g.moveTo(hx,hy+4); g.lineTo(hx+3,hy+11); g.stroke(); }   // the knot behind
+  if(s>0.3) arm(1); else { arm(-1); arm(1); }
+  if(e.flash>0){ g.save(); g.globalCompositeOperation='lighter'; glow(lean*0.5,-80,40,70,'255,230,210',Math.min(0.4,e.flash)); g.restore(); }
+  g.restore(); }
+
+// ── the golem as a foe, for the night it wakes wrong ──
+Object.assign(WEAPONS,{ golem_fist:{ wind:0.4, dmg:14, len:26 } });
+FOES.golem={ label:'Stitched Man', base:120, stagger:1.25, pattern:[{wait:1.5,wind:1.3,after:0.9,dir:'up'},{wait:0.9,wind:1.0,after:0.6,dir:'left'},{wait:0.2,wind:0.7,after:0.9,dir:'right'},{wait:1.4,wind:1.25,after:0.9,dir:'left',feint:'up'}] };
+BEASTS.push({ k:'golem', is:f=>f.type==='golem', name:'The Stitched Man', kind:'Flesh and bone · the Dunhollow graveyard', how:'Slow, heavy fists from overhead and either side; a quick backhand follows the sweep, and one blow from the left is really from above.', res:'Dead meat: it does not flinch much.', aff:'Woken in the wrong order. Beat it down and it will remember who made it.' });
+
+// ── Blood Price: no mana, a little of your own blood; the more of it you have, the more it buys ──
+SPELL_DEF.blood={ id:'blood', name:'Blood Price', col:'#d85050', rgb:'215,80,80', cost:0, dmg:8, fx:f=>{ addStatus(f,'bleed',5,2); floatText(tileOf(f),'Bleeding','#e07070'); } };
+const bloodPrice=()=>Math.max(3,Math.round((player.maxHp||40)*0.12));
+{ const _c=castSpell; castSpell=function(){ let paid=0; try{ const W=WEAPONS[player.opts.equip.weapon]||{}, f=combat.foe;
+      if(W.magic && f){ const SP=spellsFor(), S=SP[playerGuard]||SP.right; if(S && S.id==='blood'){ const c=bloodPrice();
+          if(player.hp<=c+1){ floatText(tileOf(player),'Too little blood','#e07070'); return false; }
+          S.dmg=Math.round(c*1.5); paid=c; } } }catch(e){}
+    const r=_c.apply(this,arguments);
+    if(paid && r){ player.hp=Math.max(1,player.hp-paid); player.flash=0.25; floatText([player.i,player.j-0.003],'-'+paid+' blood','#d85050'); updateHud(); }
+    return r; }; }
+// old saves: whoever learned Bone Shield from Vesna knows Blood Price instead
+setInterval(()=>{ try{ if(!running || CHOICE.bloodNote || NECRO()<3) return; CHOICE.bloodNote=true;
+    logMsg('Vesna\'s third word is Blood Price now, not Bone Shield: pay a little of your own health and the dead take it out of your foe, more the more health you have. Put it in your spellbook (B).','#d89090'); }catch(e){} },3000);
+
+// ── the quest: four things from four places, and a pit in the graveyard ──
+Object.assign(ITEMS,{
+  sack_hood:{ name:"The Scarecrow's Hood", slot:'misc', title:"A sack with two holes cut in it, off the scarecrow in Ada's garden. It has looked out over the cabbages for years. Vesna says that is the right kind of face." },
+  drowned_line:{ name:'A Drowned Gut-Line', slot:'misc', title:"A fisherman's line of gut that lay a year in the Willow Pool and did not rot. Pale, and cold as the water it came out of." },
+  grave_staples:{ name:'Iron Staples', slot:'misc', title:"A fistful of heavy iron staples, square and black, from Oswin's forge. He did not ask what they were for, and you did not say." },
+  bear_heart:{ name:"A Bear's Heart", slot:'misc', title:"The heart of a bear that died fighting. It is heavy, and it is still a little warm." } });
+['sack_hood','drowned_line','grave_staples','bear_heart'].forEach(id=>QUEST_ITEMS.add(id));
+Object.assign(ICON_BONES,{
+  sack_hood(c){ const sg=c.createRadialGradient(17,14,2,20,20,16); sg.addColorStop(0,'#c8b07c'); sg.addColorStop(1,'#7a6438'); c.fillStyle=sg; c.strokeStyle='#4a3a20'; c.lineWidth=1.2;
+    c.beginPath(); c.moveTo(9,31); c.quadraticCurveTo(6,10,19,6); c.quadraticCurveTo(33,7,31,31); c.quadraticCurveTo(20,35,9,31); c.closePath(); c.fill(); c.stroke();
+    c.strokeStyle='rgba(70,50,20,0.35)'; c.lineWidth=0.6; for(let x=10;x<31;x+=3){ c.beginPath(); c.moveTo(x,8); c.lineTo(x,32); c.stroke(); }
+    c.fillStyle='#1a120a'; c.beginPath(); c.ellipse(15,17,3,2.6,0,0,Math.PI*2); c.fill(); c.beginPath(); c.ellipse(24,16,2.4,2.2,0,0,Math.PI*2); c.fill();
+    c.strokeStyle='#2a1c16'; c.lineWidth=1; c.beginPath(); c.moveTo(14,24); c.lineTo(26,23); c.stroke(); for(let x=15;x<26;x+=2.5){ c.beginPath(); c.moveTo(x,22); c.lineTo(x,25.4); c.stroke(); }
+    c.strokeStyle='#5a4426'; c.lineWidth=2; c.beginPath(); c.moveTo(9,29); c.quadraticCurveTo(20,33,31,29); c.stroke(); },
+  drowned_line(c){ c.strokeStyle='#3a4a4a'; c.lineWidth=3.4; c.beginPath(); c.ellipse(20,20,11,9,0.3,0,Math.PI*2); c.stroke(); c.strokeStyle='#c8d8d0'; c.lineWidth=1.4; c.stroke();
+    c.beginPath(); c.ellipse(20,20,7,5.6,0.3,0,Math.PI*2); c.stroke(); c.beginPath(); c.moveTo(28,26); c.quadraticCurveTo(33,31,30,35); c.stroke();
+    c.strokeStyle='#8a9090'; c.lineWidth=1.6; c.beginPath(); c.moveTo(30,35); c.quadraticCurveTo(26,36,27,32); c.stroke(); c.fillStyle='rgba(120,170,160,0.5)'; c.beginPath(); c.ellipse(13,13,3,1.4,-0.5,0,Math.PI*2); c.fill(); },
+  grave_staples(c){ [[9,12,-0.3],[20,9,0.2],[14,22,0.5],[25,21,-0.4],[19,30,0.1]].forEach(([x,y,a])=>{ c.save(); c.translate(x,y); c.rotate(a); c.strokeStyle='#1e1e22'; c.lineWidth=3.6; c.lineCap='square';
+      c.beginPath(); c.moveTo(-5,4); c.lineTo(-5,-2); c.lineTo(5,-2); c.lineTo(5,4); c.stroke(); c.strokeStyle='#6a6c74'; c.lineWidth=2; c.stroke(); c.strokeStyle='rgba(230,230,240,0.6)'; c.lineWidth=0.7; c.beginPath(); c.moveTo(-4,-2.8); c.lineTo(4,-2.8); c.stroke(); c.restore(); }); },
+  bear_heart(c){ const hg=c.createRadialGradient(16,16,2,20,21,15); hg.addColorStop(0,'#c04a40'); hg.addColorStop(0.7,'#7a1e1a'); hg.addColorStop(1,'#4a0e0c'); c.fillStyle=hg; c.strokeStyle='#2a0806'; c.lineWidth=1.2;
+    c.beginPath(); c.moveTo(20,34); c.bezierCurveTo(6,26,6,12,14,10); c.bezierCurveTo(18,9,20,12,20,14); c.bezierCurveTo(21,10,26,8,29,11); c.bezierCurveTo(35,16,32,27,20,34); c.closePath(); c.fill(); c.stroke();
+    c.strokeStyle='#8a3a30'; c.lineWidth=3; c.beginPath(); c.moveTo(17,11); c.lineTo(15,4); c.moveTo(23,11); c.lineTo(25,5); c.stroke();
+    c.strokeStyle='rgba(60,10,8,0.6)'; c.lineWidth=1; c.beginPath(); c.moveTo(20,15); c.quadraticCurveTo(17,22,21,30); c.stroke(); c.fillStyle='rgba(255,210,200,0.45)'; c.beginPath(); c.ellipse(14,17,2.6,1.6,-0.6,0,Math.PI*2); c.fill(); } });
+const golemQ=()=>CHOICE.golem||null;
+const GQ_HAVE=()=>({ hood:hasItem('sack_hood'), line:hasItem('drowned_line'), staples:hasItem('grave_staples'), heart:hasItem('bear_heart'), meat:invCount('raw_meat')>=3 });
+const gqAll=()=>{ const h=GQ_HAVE(); return h.hood && h.line && h.staples && h.heart && h.meat; };
+const GQ_TODO=()=>{ const h=GQ_HAVE(), m=invCount('raw_meat');
+  return [`the sackcloth hood off the scarecrow in Ada's garden, on the farm${h.hood?' ✓':''}`, `a drowned gut-line from the reeds of the Willow Pool, at night${h.line?' ✓':''}`,
+    `a fistful of iron staples from Oswin's forge in Hollowmere${h.staples?' ✓':''}`, `the heart of a bear, from one of the bears that roam the roads${h.heart?' ✓':''}`, `three pieces of raw meat (${Math.min(3,m)}/3)${h.meat?' ✓':''}`]; };
+// Vesna asks, once the dead you raise carry weapons
+function golemVesna(){ const V=VESNA_N, Q=golemQ();
+  if(!Q){ const tank=(player.maxHp||0)>=120;
+    say(V,[tank?"“Look at you. All that iron, all that blood. You are very hard to kill, for a grave-speaker. Good. What I want to teach you takes from that.”":"“Your skeletons carry swords now, and still they fall over. Bones are brave. But bones are thin.”",
+      "“Flesh holds. Old flesh, stitched onto the bones of your risen one, stands in front of you and takes the blows you do not stop. It holds as much of your own strength as you can spare: two parts in five of your whole health. The more you have, the more it holds.”",
+      "“It is called a <b>Flesh Golem</b>. Each one costs a deep breath, a piece of meat or fish and an old bone, and the dead give you only one a fight. The first one is the hard one. You stitch it yourself, with your own hands, in a grave.”"],[
+      {label:'“What do I need?”', fn:()=>{ remember('golem','asked',"Vesna will teach you the Flesh Golem. Bring together a face, a thread, staples, a heart and meat, and stitch the first one yourself in the Dunhollow graveyard at night.");
+        say(V,["“A face first. The scarecrow in Ada's garden, on the farm, has worn the same sack for years, looking out. That is a face that knows how to watch. Take it.”",
+          "“Thread that does not rot: there is a drowned fisherman's line in the reeds of the Willow Pool. Pull it out at night, when the water lets go of things.”",
+          "“Staples, iron, a fistful. Oswin in Hollowmere makes them for coffins. And a heart: a bear's, from a bear that died fighting. You will find bears on the roads. And three pieces of raw meat. It needs something to be made of.”",
+          "“Then go home to the Dunhollow graveyard, at night. Tobb has dug you a pit. Raise your dead in it and stitch. <b>The heart first</b>, into the ribs. Then close it: <b>staples and thread</b>. <b>The face last of all.</b> Put the face on before there is a heart in it, and something else will look out of it, and you will have to beat it down.”"],[bye]); }},
+      {label:'“Not now.”', fn:closeDialog}]); return; }
+  if(Q==='asked'){ say(V,[gqAll()?"“You have everything. The graveyard in Dunhollow, at night: Tobb's pit. Heart, then staples and thread, then the face. Not the other way round.”":"“Still gathering. You need: "+GQ_TODO().filter(s=>!s.endsWith('✓')).join('; ')+".”","“And when you stitch: the heart first, then shut it, then the face. Remember.”"],[bye]); return; }
+  say(V,["“Your golem. Did it kneel? They always do, the good ones, the first time. Then they never kneel again. Do not take it personally.”"],[bye]); }
+{ const prev=npcHasNews; npcHasNews=function(n){ try{ if(n && n.id==='vesna' && NECRO()>=3 && CHOICE.skelArms && !golemQ()) return '!'; }catch(e){} return prev(n); }; }
+// the places: the scarecrow, the reeds, and the pit
+wrap('farm','objects',l=> golemQ()==='asked' && !hasItem('sack_hood') ? [...l,{type:'golemspot', k:'hood', i:2, j:9, noblock:true}] : l);
+wrap('willowpool','objects',l=> golemQ()==='asked' && !hasItem('drowned_line') && nightAmt()>0.5 ? [...l,{type:'golemspot', k:'line', i:8, j:6, noblock:true}] : l);
+wrap('graveyard','objects',l=> golemQ()==='asked' ? [...l,{type:'golemspot', k:'pit', i:5, j:6, noblock:true}] : l);
+NEAR_NAME.golemspot='a marked place';
+OBJ_DRAW.golemspot=o=>{ const q=P(o.i+0.5,o.j+0.5), T=gt;
+  if(o.k==='hood'){ g.save(); g.globalCompositeOperation='lighter'; const y=q.y-78+Math.sin(T*1.8)*3; glow(q.x,y,10,8,'190,170,240',0.5+Math.sin(T*3)*0.12); g.fillStyle='rgba(225,210,255,0.85)'; g.beginPath(); g.arc(q.x,y,1.8,0,Math.PI*2); g.fill(); g.restore(); return; }   // a grave-light over the scarecrow's head
+  if(o.k==='line'){ g.save(); g.strokeStyle='#4a6a3a'; g.lineWidth=1.6; for(let r=0;r<7;r++){ const bx=q.x-12+r*4, h=16+((r*7)%5)*3, sw=Math.sin(T*1.2+r)*2; g.beginPath(); g.moveTo(bx,q.y+2); g.quadraticCurveTo(bx+sw*0.5,q.y-h*0.5,bx+sw,q.y-h); g.stroke(); }
+    g.strokeStyle='rgba(220,235,230,0.85)'; g.lineWidth=0.9; g.beginPath(); g.moveTo(q.x-14,q.y-8); g.quadraticCurveTo(q.x-2,q.y-14+Math.sin(T*2)*1.5,q.x+10,q.y-4); g.quadraticCurveTo(q.x+16,q.y,q.x+20,q.y+3); g.stroke();
+    g.globalCompositeOperation='lighter'; glow(q.x+2,q.y-8,14,8,'170,220,210',0.25+Math.sin(T*2.4)*0.08); g.restore(); return; }
+  // the pit Tobb dug: a dark slot in the turf, the earth heaped beside it, a sack spread for the work
+  const C=(a,b)=>P(o.i+a,o.j+b), c1=C(0.18,0.2), c2=C(0.82,0.2), c3=C(0.82,0.8), c4=C(0.18,0.8);
+  g.save(); g.fillStyle='#2a2018'; g.beginPath(); g.moveTo(c1.x,c1.y); g.lineTo(c2.x,c2.y); g.lineTo(c3.x,c3.y); g.lineTo(c4.x,c4.y); g.closePath(); g.fill();
+  const in1=C(0.26,0.28), in2=C(0.74,0.28), in3=C(0.74,0.72), in4=C(0.26,0.72); g.fillStyle='#120c08'; g.beginPath(); g.moveTo(in1.x,in1.y+3); g.lineTo(in2.x,in2.y+3); g.lineTo(in3.x,in3.y+3); g.lineTo(in4.x,in4.y+3); g.closePath(); g.fill();
+  g.strokeStyle='#4a3a28'; g.lineWidth=2; g.beginPath(); g.moveTo(c4.x,c4.y); g.lineTo(c3.x,c3.y); g.stroke();
+  const m=C(1.0,0.5); g.fillStyle='#4a3a26'; g.beginPath(); g.ellipse(m.x,m.y-3,18,8,0,Math.PI,0); g.fill(); g.fillStyle='#5a4830'; g.beginPath(); g.ellipse(m.x-3,m.y-6,10,4,0,Math.PI,0); g.fill();   // the heap
+  const s=C(0.5,1.05); g.fillStyle='#8a744a'; g.beginPath(); g.moveTo(s.x-16,s.y); g.lineTo(s.x+4,s.y-8); g.lineTo(s.x+20,s.y-1); g.lineTo(s.x,s.y+7); g.closePath(); g.fill(); g.strokeStyle='rgba(60,44,20,0.5)'; g.lineWidth=0.6; g.stroke();
+  [[0.12,0.12],[0.88,0.12],[0.88,0.88],[0.12,0.88]].forEach(([a,b])=>{ const p=C(a,b); g.strokeStyle='#5a4428'; g.lineWidth=2.2; g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(p.x,p.y-9); g.stroke(); });   // four pegs, a cord between them
+  if(nightAmt()>0.5 && gqAll()){ g.globalCompositeOperation='lighter'; glow(q.x,q.y-4,26,12,'180,160,240',0.25+Math.sin(T*2)*0.08); }
+  g.restore(); };
+const gqDrop=k=>{ try{ const x=OBJECTS.findIndex(o=>o.type==='golemspot' && o.k===k); if(x>=0) OBJECTS.splice(x,1); }catch(e){} };
+onUse(['golemspot'],o=>{
+  if(o.k==='hood'){ say('The Scarecrow',["An old sack with two holes cut in it sits on the scarecrow's head, faded to the colour of straw. It has looked out over the cabbages for years.","A grave-light hangs over it, very small. Vesna's doing, or the dead's."],[
+      {label:'Take the hood. Leave it your hat-band in trade.', fn:()=>{ giveQuestItem('sack_hood',true); gqDrop('hood'); logMsg("You take the sackcloth hood. The scarecrow looks out over the cabbages with its bare stick of a head, and does not seem to mind.",'#c8b8a0'); closeDialog(); }}, bye]); return; }
+  if(o.k==='line'){ say('In the Reeds',["Among the reeds by the bank, something pale lies just under the water: a line of gut, wound round and round the stems, still knotted to a rotten float.","The water is very cold when you put your hand in."],[
+      {label:'Pull the line free.', fn:()=>{ giveQuestItem('drowned_line',true); gqDrop('line'); logMsg('The line comes up out of the pool without a fight, cold and whole. A year in the water and it has not rotted at all.','#a8d0c8'); closeDialog(); }}, bye]); return; }
+  golemPit(); });
+// Oswin makes staples, for coffins; he does not ask
+{ const old=TALKERS.smith; if(old) TALKERS.smith=(...a)=>{ const r=old(...a); try{ const box=document.getElementById('dlg-opts');
+    if(golemQ()==='asked' && !hasItem('grave_staples') && dlgOverlay.classList.contains('open') && box && !box.querySelector('.dlg-opt.gstaple')){ const b=document.createElement('button'); b.className='dlg-opt gstaple';
+      b.innerHTML='<span>“I need a fistful of iron staples. Heavy ones.”</span>'; b.addEventListener('click',()=>{
+        say('Oswin the Armourer',["“Coffin staples? I make them for the undertakers by the score.” <i>He looks at your black staff, then at you, and decides not to ask.</i>","“Twelve copper for a fistful.”"],[
+          {label:'Pay 12 copper.', fn:()=>{ if((player.purse||0)<12){ say('Oswin the Armourer',"“Twelve copper. Come back when you have it.”",[bye]); return; } player.purse-=12; giveQuestItem('grave_staples',true); updateHud();
+            say('Oswin the Armourer',"“There. Square heads, black iron, they will hold anything shut.” <i>He wipes his hands on his apron.</i> “Anything.”",[bye]); }}, bye]); });
+      box.insertBefore(b,box.lastElementChild); } }catch(e){} return r; }; }
+// and a bear that dies fighting gives up its heart, to someone who asks for it
+{ const _v=victory; victory=function(faction){ const bears=(typeof mobs!=='undefined'?mobs:[]).filter(m=>m.hostile && m.type==='bear' && m.dead && (!faction || m.faction===faction)), st=mobs.find(m=>m.type==='golem' && m.dead && m.golemRite);
+    const r=_v.apply(this,arguments); bears.forEach(m=>m.gHeart=true);
+    try{ if(bears.length && golemQ()==='asked' && !hasItem('bear_heart')){ giveQuestItem('bear_heart',true); logMsg("You cut out the bear's heart for Vesna. It is heavy, and still warm.",'#d08070'); } }catch(e){}
+    try{ if(st && golemQ()==='asked'){ st.golemRite=false; setTimeout(()=>golemLearn(true),900); } }catch(e){}
+    return r; }; }
+// the rite in the pit
+function golemPit(){ const T='Tobb\'s Pit';
+  if(!gqAll()){ say(T,["A grave-sized pit with the turf cut back neatly, four pegs and a cord round it, a sack spread beside it. Tobb has done this for you.","You still need: "+GQ_TODO().filter(s=>!s.endsWith('✓')).join('; ')+"."],[bye]); return; }
+  if(nightAmt()<=0.5){ say(T,"You have everything. Vesna said at night: the dead do not get up for an audience of sparrows.",[bye]); return; }
+  if(!NECRO_STAVES.includes(player.opts.equip.weapon)){ say(T,"You have everything. But you need a grave-speaker's staff in your hand to call the dead up into it.",[bye]); return; }
+  say(T,["You lay the three pieces of meat in the bottom of the pit, kneel at the edge, and speak the old word into it.","Under the meat, bones stir, find each other, and lie down in the shape of a man. The meat settles on them like snow."],[{label:'Begin.', fn:()=>golemStep([])}]); }
+const GSTEPS={ heart:['Lay the bear\'s heart in its ribs.','You push the heart in under the ribs. It sits there, heavy, and you could swear it gives one slow beat.'],
+  stitch:['Close it up: staples, and the drowned line.','You drive the staples into the grey edges and lace the drowned line through them, pulling it tight. The flesh closes like a purse.'],
+  mask:['Pull the sackcloth hood over its head.','You pull the scarecrow\'s hood down over the skull and tie the cord. Two holes look up at the stars.'] };
+function golemStep(done){ const left=Object.keys(GSTEPS).filter(k=>!done.includes(k));
+  if(!left.length){ const right=done.join()==='heart,stitch,mask'; closeDialog(); if(right) golemLearn(false); else golemWakesWrong(); return; }
+  const said=done.length?GSTEPS[done[done.length-1]][1]:"The shape lies in the pit, waiting. What first?";
+  say('Tobb\'s Pit',said,left.map(k=>({label:GSTEPS[k][0], fn:()=>golemStep([...done,k])}))); }
+function golemWakesWrong(){ const sp=[[5,5],[4,6],[6,6],[5,7],[4,5],[6,5]].find(([i,j])=>!blocked.has(i+','+j) && !(i===player.i&&j===player.j) && !mobAt(i,j)) || [5,6];
+  const hp=Math.round(FOES.golem.base*1.1), m={ id:mobs.length+60, key:'The Stitched Man', name:'The Stitched Man', type:'golem', opts:{beast:true, equip:{...NOEQ, weapon:'golem_fist'}}, faction:'stitched', spawn:sp, i:sp[0], j:sp[1], x:sp[0]+0.5, y:sp[1]+0.5, dir:1, hp, maxHp:hp, path:[], moving:false, dead:false, gone:false, fade:1, flash:0, lunge:null,
+    state:'guard', t:0, k:0, wind:1, quick:false, guardDir:'up', ox:0, oy:0, hostile:true, fallT:0, tier:1, golemRite:true };
+  mobs.push(m); try{ FOOLED[areaId+':'+m.name]=false; }catch(e){} shake=Math.max(shake,6); floatText([sp[0],sp[1]],'!','#c8b8b0');
+  logMsg("The two holes in the sack fill with a light that is not yours. It sits up too fast, turns its sewn face towards you, and climbs out of the pit. Something else is looking out of it: the face went on before the heart.",'#e0a090');
+  const go=()=>{ try{ if(m.dead || !mobs.includes(m)) return; if(CS.on || dlgIsOpen()){ setTimeout(go,400); return; } if(!combat.active) startCombat(); }catch(e){} }; setTimeout(go,500); }
+function golemLearn(fought){ ['sack_hood','drowned_line','grave_staples','bear_heart'].forEach(id=>{ const k=player.inv.indexOf(id); if(k>=0) player.inv[k]=null; });
+  for(let q=0;q<3;q++){ const k=player.inv.indexOf('raw_meat'); if(k>=0) player.inv[k]=null; }
+  CHOICE.golem='done'; gqDrop('pit'); mobs.filter(m=>m.type==='golem').forEach(m=>{ m.gone=true; }); updateHud();
+  say('The Stitched Man',[fought?"It goes down on one knee in the grass and stays there, head bowed, the strange light gone out of the holes in its face. When it looks up again, the light in them is yours.":"It sits up slowly, as if it is very tired. Then it climbs out of the pit, goes down on one knee in the grass, and bows its sewn face to you.",
+    "Then it comes apart, quite gently, and sinks back into the earth. But you know the shape of it now. You could call it up again: your risen dead, a second word, and something from your pack to make it of.",
+    "<i>You learned <b>Flesh Golem</b>: while your skeleton stands, cast Raise Dead again. It costs "+GOLEM_COST+" mana, a piece of meat or fish and an old bone, once a fight. It holds two fifths of your health and takes the blows you do not parry, for "+GOLEM_LIFE+" seconds.</i>"],[bye]);
+  logMsg('You learned Flesh Golem: while your skeleton stands, cast Raise Dead again (needs meat or fish and an old bone).','#d8c8b8'); }
+JOURNAL.push(["The Stitched Man", ()=> !golemQ() ? null : golemQ()==='done' ? ['done',"You stitched your first Flesh Golem in Tobb's pit, and it knelt. While your skeleton stands, cast Raise Dead again to call one: "+GOLEM_COST+" mana, a piece of meat or fish and an old bone, once a fight."]
+  : ['active', (gqAll() ? "You have everything. Go to Tobb's pit in the Dunhollow graveyard at night, with a grave-speaker's staff in hand." : "For Vesna's Flesh Golem, bring together: "+GQ_TODO().join('; ')+". Then stitch it in Tobb's pit in the Dunhollow graveyard, at night.")+" The heart first, then staples and thread, the face last."]]);
 </script>
 </body>
 </html>

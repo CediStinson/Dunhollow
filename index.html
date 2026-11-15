@@ -14799,7 +14799,7 @@ function combatStep(dt){
   document.getElementById('p-atk').classList.toggle('busy',duel.st!=='ready');
   document.getElementById('p-par').classList.toggle('busy',duel.st!=='ready');
 
-  f.t-=dt;
+  f.t-=dt*(typeof foeTimeScale==='function'?foeTimeScale(f):1);   // the Stilled Hour slows him
   if(f.state==='windup' && f.feintAt && f.t<=f.feintAt){ f.feintAt=0; f.swingDir=curStep(f).dir; floatText(tileOf(f),'Feint!','#ffb070');
     teach('feint','A feint',["The arrow <b>changed sides</b> halfway through the swing: that was a <b>feint</b>.","Cunning fighters show you one side, then strike from another. Don't parry at the first sight of the arrow: watch it until the ring is nearly closed."]); }
   if(f.state==='guard' && STYLES[styleOf(f)] && STYLES[styleOf(f)].shifts && f.guardDir){ f.sw=(f.sw??1.4)-dt;
@@ -15101,6 +15101,7 @@ function drawActorBase(e){
   else if(e.type==='bear') drawBear(s.x,B,e,poseFor(e));
   else if(e.type==='troll') drawTroll(s.x,B,e,poseFor(e));
   else if(e.type==='golem') drawGolem(s.x,B,e,poseFor(e));
+  else if(e.echo){ if(!e.dead){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; g.save(); g.globalAlpha*=0.68; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); g.globalCompositeOperation='lighter'; glow(s.x,B-48,26,56,'150,190,255',0.28); g.restore(); } }   // Corvin's echo: an old fight, half there
   else if(e.type==='gloomcaller'||e.type==='thornwitch'){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; drawShadeUnder(s.x,B,e); g.globalAlpha*=0.82; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); g.globalAlpha/=0.82; drawShadeOver(s.x,B,e); }
   else if(e.type==='rotnymph') drawRotNymph(s.x,B,e);
   else if(e.type==='sporeling') drawSporeling(s.x,B,e,poseFor(e));
@@ -20131,7 +20132,7 @@ Object.entries(SPELL_DEF).forEach(([k,v])=>{ v.id=k; });
 const BOOK_BASE={ mage:{left:'fire', up:'frost', right:'arcane'}, necro:{left:'raise', up:'drain', right:'wither'} };
 function MAGE_EXTRA(id){ return ({ doppel:'right', iceward:'up', kindle:'left' })[id] ? MAGE_KNOWN(({ doppel:'right', iceward:'up', kindle:'left' })[id]) : false; }   // Orvell's three lessons
 function NECRO_EXTRA(id){ const n=NECRO(); return id==='grasp' ? n>=1 : id==='spear' ? n>=2 : id==='blood' ? n>=3 : id==='golem' ? CHOICE.golem==='done' : false; }            // Vesna's lessons
-function bookSpells(sc){ return sc==='necro' ? ['raise','drain','wither',...['grasp','spear','blood'].filter(NECRO_EXTRA)] : ['fire','frost','arcane',...['kindle','iceward','doppel'].filter(MAGE_EXTRA)]; }
+function bookSpells(sc){ return sc==='necro' ? ['raise','drain','wither',...['grasp','spear','blood'].filter(NECRO_EXTRA)] : ['fire','frost','arcane',...['kindle','iceward','doppel'].filter(MAGE_EXTRA),...(CHOICE.hourQ==='done'?['hour']:[])]; }
 function BOOK(sc){ const B=CHOICE.book=(CHOICE.book && typeof CHOICE.book==='object')?CHOICE.book:{}; const ok=bookSpells(sc), b=Object.assign({},BOOK_BASE[sc],B[sc]||{});
   ['left','up','right'].forEach(d=>{ if(!ok.includes(b[d])) b[d]=BOOK_BASE[sc][d]; }); B[sc]=b; return b; }
 function PLAYER_BOOK(){ const b=BOOK(SCHOOL()); return { left:SPELL_DEF[b.left], up:SPELL_DEF[b.up], right:SPELL_DEF[b.right] }; }
@@ -20173,7 +20174,7 @@ function bookItems(items){                            // the doppelganger and yo
 // ── what the staff tooltips say: your three spells, and what a teacher can still add ──
 const SPELL_TIP=(id,m)=>{ const S=SPELL_DEF[id], d=Math.round((S.dmg||0)*m), c=Math.round(S.cost*(CHOICE.tessLesson && ['fire','frost','arcane','kindle','iceward','doppel'].includes(id)?0.75:1));
   return S.name+': '+({ fire:d+' damage, then burns', frost:d+' damage, slows his swing', arcane:d+' damage', raise:'a skeleton fights beside you'+(NECRO_EXTRA('golem')?' (cast again: Flesh Golem)':''), blood:'pay '+(typeof bloodPrice==='function'?bloodPrice():0)+' health: '+Math.round((typeof bloodPrice==='function'?bloodPrice():0)*0.7*m)+' damage, he bleeds', drain:d+' damage, heals you', wither:d+' damage, he hits for half',
-    iceward:'the next blow breaks on it and numbs him', kindle:'a fire that grows each second', doppel:'your double fights beside you', spear:d+' damage, through any guard', grasp:d+' damage, holds him: interrupts his swing' })[id]+' · '+(id==='blood'?'no mana':c+' mana'); };
+    iceward:'the next blow breaks on it and numbs him', kindle:'a fire that grows each second', doppel:'your double fights beside you', spear:d+' damage, through any guard', hour:'once a fight: he moves at half speed for a few breaths', grasp:d+' damage, holds him: interrupts his swing' })[id]+' · '+(id==='blood'?'no mana':c+' mana'); };
 function bookTip(id){ const sc=NECRO_STAVES.includes(id)?'necro':['staff_oak','staff_star','staff_cinder','staff_crystal'].includes(id)?'mage':null; if(!sc) return null;
   const m=WEAPONS[id].magic*(1+(typeof gearSum==='function'?gearSum('magic'):0)*0.04), b=BOOK(sc), C=sc==='necro'?'#b8a8e8':'#9adcf0', arrow={left:'◀',up:'▲',right:'▶'};
   const lore=window.itemFlavor && window.itemFlavor(id) ? `<div class="fl lore">${window.itemFlavor(id)}</div>`:'';
@@ -28945,6 +28946,106 @@ bookPanel.addEventListener('click',e=>{ const t=e.target.closest('button'); if(!
 
 // the Stitched Man's blows sound like what they are: iron from above, a hook from the side
 { const prev=impact; impact=function(f){ try{ if(f && f.type==='golem') SND.fx(f.swingDir==='up'?'gclank':'gscrape'); }catch(e){} return prev.apply(this,arguments); }; }
+
+// ════════ SIGNATURE LESSONS: what the golem is to a grave-speaker, these are to the others.
+//   The Stilled Hour (Orvell, after his three lessons): an hourglass filled with three sands, each taken at its own hour; once a fight, your foe's swings crawl for a while.
+//   Blade Dance (Brann, once you know two sword techniques): beat the echoes at three marks an old duellist cut along the roads; then three blows blocked in a row, and your next cut is three ════════
+// ── the Stilled Hour ──
+let HOUR_USED=false, HOUR_UNTIL=0;
+{ const _s=startCombat; startCombat=function(){ if(!combat.active){ HOUR_USED=false; HOUR_UNTIL=0; BD_CHAIN=0; BD_READY=false; } return _s.apply(this,arguments); }; }
+function foeTimeScale(f){ return clock<HOUR_UNTIL ? 0.5 : 1; }
+SPELL_DEF.hour={ id:'hour', name:'Stilled Hour', col:'#c8b8f8', rgb:'200,184,248', cost:40, dmg:0, self:true, fx:()=>{ HOUR_USED=true; HOUR_UNTIL=clock+7; floatText(tileOf(player),'Stilled Hour','#d8c8ff',true);
+  logMsg('You turn the word over like an hourglass. Around your foe the air thickens: every move he makes comes slow, as if through honey.','#c8b8f8'); try{ SND.fx('cast'); }catch(e){} slowmo.scale=0.35; slowmo.t=0.25; } };
+{ const _c=castSpell; castSpell=function(){ try{ const W=WEAPONS[player.opts.equip.weapon]||{}; if(W.magic && combat.foe){ const SP=spellsFor(), S=SP[playerGuard]||SP.right;
+      if(S && S.id==='hour' && HOUR_USED){ floatText(tileOf(player),'Time bends once a fight','#c8b8f8'); return true; } } }catch(e){} return _c.apply(this,arguments); }; }
+{ const _bi=bookItems; bookItems=function(items){ _bi.apply(this,arguments); const f=combat.foe; if(!f || f.dead || clock>=HOUR_UNTIL) return;
+    items.push({d:f.x+f.y+0.03, ax:f.x, ay:f.y, fn:()=>{ const q=P(f.x,f.y), a=Math.min(1,(HOUR_UNTIL-clock)/1.2);
+      g.save(); g.globalCompositeOperation='lighter'; glow(q.x,q.y-50,44,70,'190,170,255',0.22*a);
+      for(let k=0;k<14;k++){ const an=k/14*Math.PI*2+clock*0.4, r=28+Math.sin(k*1.7)*3; g.fillStyle=`rgba(220,205,255,${0.6*a})`; g.beginPath(); g.arc(q.x+Math.cos(an)*r,q.y-8+Math.sin(an)*r*0.35-((clock*12+k*7)%40),1.3,0,Math.PI*2); g.fill(); }   // sand drifting upward, slowly
+      g.restore(); }}); }; }
+const HOUR_SITES={ dawn:{area:'singingdunes', i:14, j:8, from:5, to:8, name:'the Singing Dunes', what:'sand that sings', when:'at dawn'},
+  noon:{area:'saltpan', i:7, j:7, from:11, to:14, name:'the Salt Pan', what:'salt-glass', when:'at noon'},
+  night:{area:'stones', i:6, j:5, from:23, to:26, name:'the Standing Stones', what:'grave-dust from the ring', when:'at midnight'} };
+const hourQ=()=>CHOICE.hourQ||null, hourSands=()=>Array.isArray(CHOICE.hourSands)?CHOICE.hourSands:(CHOICE.hourSands=[]);
+const hourNow=(S)=>{ const h=HOUR(), h2=h<S.from-12?h+24:h; return h2>=S.from && h2<S.to; };
+Object.assign(ITEMS,{ orvell_glass:{ name:"Orvell's Hourglass", slot:'misc', title:"Two bulbs of old glass in a frame of black wood, quite empty. Orvell says it wants three sands, each taken at its own hour." } }); QUEST_ITEMS.add('orvell_glass');
+ICON_BONES.orvell_glass=c=>{ c.fillStyle='#3a2a1a'; c.fillRect(10,6,20,3.5); c.fillRect(10,30.5,20,3.5); c.fillRect(11,9,2.4,22); c.fillRect(26.6,9,2.4,22);
+  c.fillStyle='rgba(200,225,235,0.35)'; c.strokeStyle='rgba(140,170,180,0.9)'; c.lineWidth=1.1; c.beginPath(); c.moveTo(14,9.5); c.quadraticCurveTo(14,19,19.4,20); c.quadraticCurveTo(14,21,14,30.5); c.lineTo(26,30.5); c.quadraticCurveTo(26,21,20.6,20); c.quadraticCurveTo(26,19,26,9.5); c.closePath(); c.fill(); c.stroke();
+  const n=hourSands().length; if(n){ c.fillStyle=['#d8c08a','#e8e4dc','#8a8478'][n-1]||'#d8c08a'; c.beginPath(); c.moveTo(15,30); c.lineTo(25,30); c.lineTo(25,30-n*3); c.quadraticCurveTo(20,30-n*4.5,15,30-n*3); c.closePath(); c.fill(); } };
+Object.entries(HOUR_SITES).forEach(([k,S])=>wrap(S.area,'objects',l=> hourQ()==='asked' && !hourSands().includes(k) ? [...l,{type:'hourspot', k, i:S.i, j:S.j, noblock:true}] : l));
+NEAR_NAME.hourspot='a glimmer in the ground';
+OBJ_DRAW.hourspot=o=>{ const q=P(o.i+0.5,o.j+0.5), S=HOUR_SITES[o.k], on=hourNow(S), T=gt;
+  g.save(); g.fillStyle=o.k==='night'?'rgba(60,54,70,0.5)':'rgba(240,226,190,0.45)'; g.beginPath(); g.ellipse(q.x,q.y,14,5,0,0,Math.PI*2); g.fill();
+  g.globalCompositeOperation='lighter'; glow(q.x,q.y-4,on?20:10,on?10:5,'200,184,248',on?0.35+Math.sin(T*3)*0.1:0.12);
+  if(on) for(let k=0;k<6;k++){ const ph=(T*0.5+k/6)%1; g.fillStyle=`rgba(225,215,255,${0.7*(1-ph)})`; g.beginPath(); g.arc(q.x+Math.sin(k*2.3+T)*9,q.y-ph*26,1.2,0,Math.PI*2); g.fill(); }
+  g.restore(); };
+onUse(['hourspot'],o=>{ const S=HOUR_SITES[o.k];
+  if(!hourNow(S)){ say('A Glimmer',[`Under your hand it is just ${o.k==='night'?'dust':'sand'}. Orvell said ${S.when}; the hour is wrong, and the ground knows it.`],[bye]); return; }
+  say('A Glimmer',[`${S.when[0].toUpperCase()+S.when.slice(1)}, here, the ground shines faintly where it should not. You hold the hourglass over it, and ${S.what} runs up into the glass, against the fall of things, and settles.`],[
+    {label:'Let it fill.', fn:()=>{ hourSands().push(o.k); try{ const x=OBJECTS.findIndex(b=>b.type==='hourspot' && b.k===o.k); if(x>=0) OBJECTS.splice(x,1); }catch(e){} logMsg(`The hourglass takes ${S.what} from ${S.name}. (${hourSands().length}/3)`,'#c8b8f8'); closeDialog(); }}, bye]); });
+{ const oM=mageTalk; mageTalk=function(){ const K=Array.isArray(CHOICE.mageKnown)?CHOICE.mageKnown:[]; if(K.length<3 || CHOICE.mageQ || hourQ()==='done') return oM.apply(this,arguments);
+    const O='Magister Orvell', back={label:'Back.', fn:()=>TALKERS.orvell()};
+    if(!hourQ()){ say(O,["“You have every word I promised. So: one more, which I did not promise, because it is not mine to give. It is time's.”","“Fire burns, frost bites, light lies. None of them touch the one thing a fight is really made of: the moment between his arm going up and coming down. Stretch that moment, and a fool could parry.”",
+        "“Here. My old master's hourglass. Empty. Time will not be poured in: you have to catch it. Sand that sings, from the Singing Dunes, at dawn. Salt-glass from the Salt Pan, at noon. And dust from the ring of the Standing Stones, at midnight. Hold the glass over the ground at the right hour, and the sand will climb into it by itself.”"],[
+        {label:'“Three sands, three hours.”', fn:()=>{ giveQuestItem('orvell_glass',true); remember('hourQ','asked',"Orvell gave you his master's empty hourglass. Fill it at three places, each at its hour: the Singing Dunes at dawn, the Salt Pan at noon, the Standing Stones at midnight."); closeDialog(); }}, back]); return; }
+    const n=hourSands().length;
+    if(n<3){ say(O,[`“${n} of three. `+Object.entries(HOUR_SITES).filter(([k])=>!hourSands().includes(k)).map(([k,S])=>`${S.name[0].toUpperCase()+S.name.slice(1)}, ${S.when}`).join('; ')+".” <i>He taps the glass.</i> “Time is very punctual. Be punctual back.”"],[back]); return; }
+    say(O,["“Full. Look: three colours, and the sand is not falling. It is waiting.”","“Turn it. …Feel that? The candle flame has stopped leaning. Your heartbeat is a drum in a big room. That is <b>the Stilled Hour</b>. Speak it in a fight and for a few breaths everything he does comes slow. Once a fight: time is patient, not generous.”"],[
+      {label:'Learn the Stilled Hour.', fn:()=>{ const k=player.inv.indexOf('orvell_glass'); if(k>=0) player.inv[k]=null; CHOICE.hourQ='done'; updateHud(); logMsg('You learned the Stilled Hour. Open your spellbook (B) to give it a direction. Once a fight, your foe moves at half speed for a few breaths.','#c8b8f8'); try{ SND.fx('quest'); autosaveSoon(300); }catch(e){}
+        say(O,"“Keep the glass. No, I mean it: I have never once been on time, and I am too old to start.”",[back]); }}]); }; }
+{ const prev=npcHasNews; npcHasNews=function(n){ try{ if(n && n.id==='orvell' && CHOICE.appr!=='taken' && (CHOICE.mageKnown||[]).length>=3 && !CHOICE.mageQ){ if(!hourQ()) return '!'; if(hourQ()==='asked' && hourSands().length>=3) return '?'; } }catch(e){} return prev(n); }; }
+JOURNAL.push(["The Stilled Hour", ()=> !hourQ() ? null : hourQ()==='done' ? ['done',"Orvell's hourglass, filled at three hours, taught you the Stilled Hour: once a fight, your foe moves at half speed for a few breaths."]
+  : ['active', hourSands().length>=3 ? "The hourglass is full. Take it back to Orvell." : "Fill Orvell's hourglass: "+Object.entries(HOUR_SITES).map(([k,S])=>`${S.what} from ${S.name} ${S.when}`+(hourSands().includes(k)?' ✓':'')).join('; ')+". ("+hourSands().length+"/3)"]]);
+// ── Blade Dance ──
+let BD_CHAIN=0, BD_READY=false;
+const bladeQ=()=>CHOICE.bladeQ||null, bladeMarks=()=>Array.isArray(CHOICE.bladeMarks)?CHOICE.bladeMarks:(CHOICE.bladeMarks=[]);
+const techCount=()=>Object.values(TECHS).filter(T=>techKnown(T.id)).length;
+const BLADE_SITES={ road:{area:'road', i:12, j:1, name:'the wayside shrine on the Forest Road'}, crossroads:{area:'crossroads', i:6, j:6, name:'the signpost at the Crossroads'}, kingsroad:{area:'kingsroad', i:3, j:13, name:"the old milestone on the King's Road"} };
+Object.entries(BLADE_SITES).forEach(([k,S])=>wrap(S.area,'objects',l=> bladeQ()==='asked' && !bladeMarks().includes(k) ? [...l,{type:'bladespot', k, i:S.i, j:S.j, noblock:true}] : l));
+NEAR_NAME.bladespot='a duellist\'s mark';
+OBJ_DRAW.bladespot=o=>{ const q=P(o.i+0.5,o.j+0.5), T=gt; g.save();
+  g.fillStyle='#6a6458'; g.beginPath(); g.moveTo(q.x-7,q.y+2); g.lineTo(q.x-5,q.y-16); g.quadraticCurveTo(q.x,q.y-20,q.x+5,q.y-16); g.lineTo(q.x+7,q.y+2); g.closePath(); g.fill();   // a knee-high stone
+  g.strokeStyle='#2a2620'; g.lineWidth=1.2; g.beginPath(); g.moveTo(q.x-3,q.y-13); g.lineTo(q.x+3,q.y-5); g.moveTo(q.x+3,q.y-13); g.lineTo(q.x-3,q.y-5); g.moveTo(q.x,q.y-15); g.lineTo(q.x,q.y-3); g.stroke();   // three cuts, crossed
+  g.globalCompositeOperation='lighter'; glow(q.x,q.y-9,10,9,'180,210,255',0.18+Math.sin(T*2)*0.06); g.restore(); };
+Object.assign(WEAPONS,{ echo_blade:{ wind:0.26, dmg:11, len:30 } });
+FOES.echo={ label:'Echo', base:70, stagger:0.9, pattern:[{wait:0.6,wind:0.55,after:0.4,dir:'left'},{wait:0.25,wind:0.5,after:0.4,dir:'right',feint:'left'},{wait:0.9,wind:0.7,after:0.55,dir:'up'},{wait:0.3,wind:0.45,after:0.35,dir:'right'},{wait:0.8,wind:0.65,after:0.5,dir:'left',feint:'up'}] };
+BEASTS.push({ k:'echo', is:f=>f.type==='echo', name:"Corvin's Echoes", kind:'Old fights, still going · the roads', how:'Quick cuts from either side, an overhead blow, and feints: what you see first is not always what comes.', res:'Not there enough to bleed.', aff:'Win cleanly. They only fade when they are beaten.' });
+function bladeEcho(o){ const sp=[[o.i+1,o.j],[o.i,o.j+1],[o.i-1,o.j],[o.i,o.j-1],[o.i+1,o.j+1]].find(([i,j])=>i>=0&&j>=0&&i<ROOM.w&&j<ROOM.h&&!blocked.has(i+','+j)&&!(i===player.i&&j===player.j)&&!mobAt(i,j)) || [o.i,o.j];
+  const n=bladeMarks().length, hp=Math.round(FOES.echo.base*(1+n*0.35)), name="Corvin's Echo";
+  const m={ id:mobs.length+70, key:name+o.k, name, type:'echo', echo:true, echoMark:o.k, opts:{gender:'m',skin:1,hair:3,hairColor:2,beard:2,face:1,equip:{head:null,torso:'shirt',armor:'gambeson',hands:'gloves',legs:'trousers',feet:'boots',weapon:'echo_blade',offhand:null}},
+    faction:'echo', spawn:sp, i:sp[0], j:sp[1], x:sp[0]+0.5, y:sp[1]+0.5, dir:1, hp, maxHp:hp, path:[], moving:false, dead:false, gone:false, fade:1, flash:0, lunge:null, state:'guard', t:0, k:0, wind:1, quick:false, guardDir:'up', ox:0, oy:0, hostile:true, fallT:0, tier:1+n };
+  mobs.push(m); try{ FOOLED[areaId+':'+name]=false; }catch(e){} floatText([sp[0],sp[1]],'⚔','#b8d0ff');
+  logMsg("You lay your blade along the cuts in the stone. The air beside it folds, and a lean man in an old gambeson is standing there, sword already up, as if you had interrupted him mid-fight. Perhaps you have.",'#b8d0ff');
+  const go=()=>{ try{ if(m.dead || !mobs.includes(m)) return; if(CS.on || dlgIsOpen()){ setTimeout(go,400); return; } if(!combat.active) startCombat(); }catch(e){} }; setTimeout(go,450); }
+onUse(['bladespot'],o=>{ const S=BLADE_SITES[o.k];
+  if(!meleeHeld()){ say("A Duellist's Mark",["A knee-high stone with three cuts across it, old and clean. Brann said: lay a blade on it. A staff will not do."],[bye]); return; }
+  if(mobs.some(m=>m.echo && !m.dead)) return;
+  say("A Duellist's Mark",["A knee-high stone with three cuts across it, crossed, old and clean. Something about the air beside it is waiting."],[{label:'Lay your blade on the cuts.', fn:()=>{ closeDialog(); bladeEcho(o); }}, bye]); });
+{ const _v=victory; victory=function(faction){ const ech=(typeof mobs!=='undefined'?mobs:[]).filter(m=>m.echo && m.dead && !m.counted); const r=_v.apply(this,arguments);
+    try{ ech.forEach(m=>{ m.counted=true; m.gone=true; if(!bladeMarks().includes(m.echoMark)){ bladeMarks().push(m.echoMark); const x=OBJECTS.findIndex(b=>b.type==='bladespot' && b.k===m.echoMark); if(x>=0) OBJECTS.splice(x,1);
+          logMsg(`The echo lowers its sword, nods to you once, as to an equal, and is not there. (${bladeMarks().length}/3 marks)`,'#b8d0ff'); } }); }catch(e){} return r; }; }
+function bladeTalk(){ const Bn='Brann the Hunter';
+  if(!bladeQ()){ say(Bn,["“Two techniques, and you use them. Good. Now you fight like someone who's been taught. Next you have to fight like someone who's taught himself.”","“The man who showed me the lunge was a duellist off the long roads. Corvin. Never lost a fight he meant to win, and every time he won one clean, without a scratch, he cut a mark in the nearest stone.”",
+      "“Three of his marks are still about: by the wayside shrine on the Forest Road, at the Crossroads signpost, and on the King's Road by the old milestone. Lay a blade on one. Something of him still answers. Beat all three, and come back.”"],[
+      {label:'“I will find his marks.”', fn:()=>{ remember('bladeQ','asked',"Brann wants you to find three marks the duellist Corvin cut along the roads (the Forest Road wayside shrine, the Crossroads signpost, the King's Road milestone), lay a blade on each, and beat what answers."); closeDialog(); }}, bye]); return; }
+  const n=bladeMarks().length;
+  if(n<3){ say(Bn,`“${n} of three. `+Object.entries(BLADE_SITES).filter(([k])=>!bladeMarks().includes(k)).map(([,S])=>S.name).join('; ')+". A blade in hand, mind. He never answered a stick.”",[bye]); return; }
+  say(Bn,["“All three? Then you've fought him the way I did, more or less. He never let you win. You had to take it.”","“What he did, every fight, was this: block, block, block, wait for the third, and then not one cut but three, before the man had his feet back. <b>Blade Dance</b>. Block three blows in a row without being touched, and your next swing is three.”"],[
+    {label:'Learn Blade Dance.', fn:()=>{ CHOICE.bladeQ='done'; updateHud(); logMsg('You learned Blade Dance: with a blade, block three blows in a row without being hit and your next attack strikes three times.','#f0c060'); try{ banner('Blade Dance','#f0c060',1800); SND.fx('quest'); autosaveSoon(300); }catch(e){}
+      say(Bn,"“Corvin would have liked you. He'd have told you your feet were wrong, but he'd have liked you.”",[bye]); }}, bye]); }
+{ const old=TALKERS.hunter; if(old) TALKERS.hunter=(...a)=>{ const r=old(...a); try{ const box=document.getElementById('dlg-opts');
+    if(techCount()>=2 && bladeQ()!=='done' && dlgOverlay.classList.contains('open') && box && !box.querySelector('.dlg-opt.bladeopt')){ const b=document.createElement('button'); b.className='dlg-opt bladeopt';
+      b.innerHTML='<span>'+(!bladeQ()?'“Who taught you to fight?”':bladeMarks().length>=3?'“I beat all three of Corvin\'s marks.”':'“About Corvin\'s marks.”')+'</span>'; b.addEventListener('click',bladeTalk); box.insertBefore(b,box.lastElementChild); } }catch(e){} return r; }; }
+{ const prev=npcHasNews; npcHasNews=function(n){ try{ if(n && n.id==='hunter' && techCount()>=2){ if(!bladeQ()) return '!'; if(bladeQ()==='asked' && bladeMarks().length>=3) return '?'; } }catch(e){} return prev(n); }; }
+JOURNAL.push(["Blade Dance", ()=> !bladeQ() ? null : bladeQ()==='done' ? ['done',"Brann taught you Corvin's Blade Dance: with a blade, block three blows in a row without being hit, and your next attack strikes three times."]
+  : ['active', bladeMarks().length>=3 ? "You beat all three of Corvin's echoes. Go back to Brann in Hunter's Clearing." : "Lay a blade on Corvin's marks and beat what answers: "+Object.entries(BLADE_SITES).map(([k,S])=>S.name+(bladeMarks().includes(k)?' ✓':'')).join('; ')+". ("+bladeMarks().length+"/3)"]]);
+// the dance itself: three clean blocks, then a cut that is three
+{ const prev=impact; impact=function(f){ const hp0=player.hp, blk=duel.st==='parry' && duel.parryDir===f.swingDir && !foeSpell(f); const r=prev.apply(this,arguments);
+    try{ if(CHOICE.bladeQ==='done' && meleeHeld() && !combat.practice){ if(blk && player.hp>=hp0){ BD_CHAIN++; if(BD_CHAIN>=3 && !BD_READY){ BD_READY=true; floatText(tileOf(player),'Blade Dance!','#f0c060',true); try{ SND.fx('quest'); }catch(e){} } } else { BD_CHAIN=0; } } }catch(e){} return r; }; }
+{ const prev=playerHit; playerHit=function(){ const f=combat.foe, dance=BD_READY && meleeHeld() && f && !f.dead; const r=prev.apply(this,arguments);
+    try{ if(dance){ BD_READY=false; BD_CHAIN=0; const dmg=Math.max(2,Math.round(weaponOf(player).dmg*0.7));
+        [0.12,0.26].forEach((d,k)=>setTimeout(()=>{ try{ if(!combat.active || !f || f.dead || f.hp<=0) return; lunge(player,f); SND.swing(player.opts.equip.weapon); const was=HIT_SRC; HIT_SRC='melee'; try{ wound(f,dmg,k?'Dance!':'Blade','#f0c060'); } finally{ HIT_SRC=was; } if(k===1 && !f.dead){ f.state='stagger'; f.t=Math.max(f.t||0,0.6); } }catch(e){} },d*1000));
+        slowmo.scale=0.45; slowmo.t=0.35; } }catch(e){} return r; }; }
 </script>
 </body>
 </html>

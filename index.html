@@ -348,7 +348,7 @@ html,body{touch-action:none;overscroll-behavior:none;-webkit-tap-highlight-color
 #screen-creator,.inv-panel,#dlg-overlay,.menu-panel,.ctrl-panel{touch-action:pan-y;}
 .slot{touch-action:none;}
 #stash-box{display:none;margin:10px 0 8px;padding-top:8px;border-top:1px dashed rgba(160,120,50,.35)}#inv-overlay.stashing #stash-box{display:block}
-#stash-grid{display:grid;grid-template-columns:repeat(6,46px);gap:5px;margin-top:6px}#stash-grid .slot{width:46px;height:46px;background:#20160a}
+#stash-grid{display:grid;grid-template-columns:repeat(6,46px);gap:5px;margin-top:6px;max-height:255px;overflow-y:auto;padding-right:4px}#stash-grid .slot{width:46px;height:46px;background:#20160a}
 .stash-help{font-size:11px;color:#a08a60;margin-top:5px}
 .hide-eye{position:absolute;top:2px;right:2px;width:17px;height:17px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:4px;border:1px solid rgba(160,120,50,.5);background:rgba(20,14,6,.82);color:#e8c878;cursor:pointer;z-index:2;opacity:.75}
 .hide-eye:hover{opacity:1;border-color:#c09040}.hide-eye.off{color:#a08070;opacity:1;background:rgba(60,20,14,.85)}
@@ -11349,7 +11349,7 @@ setInterval(()=>{ try{ if(player.opts && !invOverlay.classList.contains('open'))
       t[k]=v; N[k]=0; return true; } });
   Object.defineProperty(player,'inv',{ enumerable:true, configurable:true, get(){ if(!P) P=wrapInv(raw); return P; }, set(v){ raw=Array.isArray(v)?v:[]; P=null; } }); })();
 // ── the crate at the Wheatsheaf: things you want to keep but not carry. It is saved with the game.
-const STASH_SIZE=30; let STASH_OPEN=false;
+const STASH_SIZE=60; let STASH_OPEN=false;
 var SELL_RATE=0.25;                      // traders pay a quarter of their own price (the fence a third)
 const stashCap=()=>12+6*(CHOICE.stashUp||0);   // 12 slots to start; Bertha can make room for more
 function stashArr(){ if(!Array.isArray(CHOICE.stash)) CHOICE.stash=Array(STASH_SIZE).fill(null); while(CHOICE.stash.length<STASH_SIZE) CHOICE.stash.push(null); return CHOICE.stash; }
@@ -13605,7 +13605,9 @@ function openInventory(){ try{ SND.fx('bag'); }catch(e){}
 function closeInventory(){ invOverlay.classList.remove('open'); invMsg.textContent=''; if(STASH_OPEN){ STASH_OPEN=false; invOverlay.classList.remove('stashing'); autosaveSoon(200); } }
 function openStash(){ STASH_OPEN=true; stashArr(); openInventory(); if(!invOverlay.classList.contains('open')){ STASH_OPEN=false; return; } invOverlay.classList.add('stashing');
   const cap=stashCap(); document.querySelectorAll('#stash-grid .slot').forEach(el=>{ el.style.display = +el.dataset.key<cap ? '' : 'none'; });
-  const lb=document.querySelector('#stash-box .menu-label'); if(lb) lb.textContent='The Wheatsheaf Crate ('+stashArr().slice(0,cap).filter(Boolean).length+'/'+cap+')'; refreshInventory(); }
+  refreshInventory(); }
+function stashLabel(){ const lb=document.querySelector('#stash-box .menu-label'); if(!lb || !STASH_OPEN) return; const cap=stashCap(); lb.textContent='The Wheatsheaf Crate ('+stashArr().slice(0,cap).filter(Boolean).length+'/'+cap+' spaces used)'; }
+{ const oR=refreshInventory; refreshInventory=function(){ const r=oR.apply(this,arguments); try{ stashLabel(); }catch(e){} return r; }; }
 function toggleInventory(){ invOverlay.classList.contains('open') ? closeInventory() : openInventory(); }
 
 // ── drag & drop (pointer events, so it also works on touch) ──
@@ -17361,10 +17363,11 @@ function trainTalk(id){ const T=TRAINING[id], r=CHOICE[T.key]||0, cost=trainCost
     {label:`Pay ${formatCoin(cost)}. (${T.stat})`, off:player.purse<cost, note:'-'+formatCoin(cost), fn:()=>{ player.purse-=cost; CHOICE[T.key]=r+1; refreshPlayerHp(false); updateHud();
       logMsg(`${T.who}: rank ${r+1}. ${T.stat}.`,'#e8c060'); autosaveSoon(200); trainTalk(id); }},
     {label:'Back.',fn:back}, bye],true); }
-const STASH_UPS=[60,150,300];
+const STASH_UPS=[60,150,300,500,800,1200,1800,2600];   // 12 spaces to start, six more each time, up to 60
 function crateTalk(){ const u=CHOICE.stashUp||0, cost=STASH_UPS[u];
   if(cost==null){ say('Bertha of the Wheatsheaf',"“Your crate's the biggest one in the cellar already. Any bigger and I'd be renting you the cellar.”",[{label:'Back.',fn:TALKERS.bertha},bye]); return; }
-  say('Bertha of the Wheatsheaf',[`“Your crate holds ${stashCap()} things. For ${formatCoin(cost)} I'll knock a second one onto it. Six more spaces.”`],[
+  const how=u<3?"I'll knock another crate onto it":u<5?"I'll put a proper chest down there for you":u<7?"I'll clear you a whole corner of the cellar":"I'll give you the last of the cellar, wine racks and all";
+  say('Bertha of the Wheatsheaf',[`“Your crate holds ${stashCap()} things. For ${formatCoin(cost)} ${how}. Six more spaces.”`],[
     {label:`Pay ${formatCoin(cost)}. (+6 crate spaces)`, off:player.purse<cost, note:'-'+formatCoin(cost), fn:()=>{ player.purse-=cost; CHOICE.stashUp=u+1; updateHud(); logMsg('Your crate at the Wheatsheaf now holds '+stashCap()+' things.','#e8c060'); crateTalk(); }},
     {label:'Back.',fn:TALKERS.bertha}, bye],true); }
 // each of them gets one more line in their usual talk

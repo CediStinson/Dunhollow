@@ -20172,7 +20172,7 @@ function bookItems(items){                            // the doppelganger and yo
 
 // ── what the staff tooltips say: your three spells, and what a teacher can still add ──
 const SPELL_TIP=(id,m)=>{ const S=SPELL_DEF[id], d=Math.round((S.dmg||0)*m), c=Math.round(S.cost*(CHOICE.tessLesson && ['fire','frost','arcane','kindle','iceward','doppel'].includes(id)?0.75:1));
-  return S.name+': '+({ fire:d+' damage, then burns', frost:d+' damage, slows his swing', arcane:d+' damage', raise:'a skeleton fights beside you'+(NECRO_EXTRA('golem')?' (cast again: Flesh Golem)':''), blood:'pay '+(typeof bloodPrice==='function'?bloodPrice():0)+' health: '+Math.round((typeof bloodPrice==='function'?bloodPrice():0)*1.5*m)+' damage, he bleeds', drain:d+' damage, heals you', wither:d+' damage, he hits for half',
+  return S.name+': '+({ fire:d+' damage, then burns', frost:d+' damage, slows his swing', arcane:d+' damage', raise:'a skeleton fights beside you'+(NECRO_EXTRA('golem')?' (cast again: Flesh Golem)':''), blood:'pay '+(typeof bloodPrice==='function'?bloodPrice():0)+' health: '+Math.round((typeof bloodPrice==='function'?bloodPrice():0)*0.7*m)+' damage, he bleeds', drain:d+' damage, heals you', wither:d+' damage, he hits for half',
     iceward:'the next blow breaks on it and numbs him', kindle:'a fire that grows each second', doppel:'your double fights beside you', spear:d+' damage, through any guard', grasp:d+' damage, holds him: interrupts his swing' })[id]+' · '+(id==='blood'?'no mana':c+' mana'); };
 function bookTip(id){ const sc=NECRO_STAVES.includes(id)?'necro':['staff_oak','staff_star','staff_cinder','staff_crystal'].includes(id)?'mage':null; if(!sc) return null;
   const m=WEAPONS[id].magic*(1+(typeof gearSum==='function'?gearSum('magic'):0)*0.04), b=BOOK(sc), C=sc==='necro'?'#b8a8e8':'#9adcf0', arrow={left:'◀',up:'▲',right:'▶'};
@@ -21178,6 +21178,11 @@ const SND=(()=>{
   // ── little moments: cooking, fishing, eating, the journal, quests, clicks ──
   function fx(k,a){ if(!live()) return;
     if(beast(k,a==null?1:a)) return;
+    if(k==='gthud'){ noise(0.28,0.34,'lowpass',260,90,0.7,sfx,{a:0.004,brown:true}); tone('sine',95,45,0.26,0.22,sfx); noise(0.1,0.07,'bandpass',900,500,1,sfx,{a:0.003,at:0.02}); return; }   // a blow sinking into dead meat
+    if(k==='gclank'){ noise(0.2,0.2,'bandpass',1900,900,3,sfx,{a:0.002}); tone('triangle',430,300,0.4,0.07,sfx); tone('sine',100,55,0.22,0.2,sfx); return; }                  // the iron ball landing
+    if(k==='gscrape'){ noise(0.34,0.13,'highpass',2600,1300,0,sfx,{a:0.03}); tone('sawtooth',1350,850,0.2,0.018,sfx); noise(0.08,0.1,'lowpass',400,150,0.7,sfx,{a:0.003,at:0.2,brown:true}); return; }   // the hook dragging through
+    if(k==='grise'){ noise(1.3,0.16,'lowpass',500,170,0.6,sfx,{a:0.45,brown:true}); tone('sine',55,95,1.3,0.12,sfx,{at:0.1}); noise(0.5,0.05,'bandpass',1200,700,1.5,sfx,{a:0.2,at:0.6}); return; }   // meat crawling up bone
+    if(k==='gfall'){ noise(0.45,0.26,'lowpass',320,110,0.7,sfx,{a:0.01,brown:true}); tone('sine',80,40,0.4,0.2,sfx); noise(0.7,0.34,'lowpass',300,70,0.7,sfx,{a:0.01,at:0.85,brown:true}); tone('sine',70,32,0.6,0.26,sfx,{at:0.88}); return; }   // knees, then the rest of it
     if(k==='sizzle'){ noise(1.6,0.12,'highpass',2500,3500,0,sfx,{a:0.05}); for(let q=0;q<14;q++) noise(R(0.005,0.015),R(0.05,0.12),'highpass',R(3000,6000),R(3000,6000),0,sfx,{a:0.001,at:R(0,1.4)}); }
     else if(k==='cast'){ noise(0.25,0.18,'bandpass',900,2600,1.2,sfx,{a:0.03}); tone('sine',900,380,0.12,0.12,sfx,{at:0.55}); noise(0.12,0.06,'bandpass',800,500,1,sfx,{at:0.55,a:0.005}); }   // the swish, the plop of the float
     else if(k==='bite'){ noise(0.35,0.2,'bandpass',1200,400,1,sfx,{a:0.005}); tone('sine',600,250,0.15,0.1); }
@@ -28519,7 +28524,7 @@ onUse(['rcfallen'],o=>pzSay(RC_FALLEN_LINES[(o.i*3+o.j)%RC_FALLEN_LINES.length],
 //   It costs a great breath of mana, a piece of meat or fish and an old bone; once a fight; after twenty seconds the stitches give.
 //   And Blood Price, the word Corran teaches now in place of the old Bone Shield: pay the dead in your own blood, and they take it out of your foe ════════
 let GOLEM=null, GOLEM_USED=false;
-const GOLEM_COST=60, GOLEM_LIFE=20, GOLEM_FLESH=['raw_meat','cooked_meat','fish_perch','fish_trout','fish_carp','fish_eel','fish_herring','grilled_fish'];
+const GOLEM_COST=45, GOLEM_LIFE=20, GOLEM_FLESH=['raw_meat','cooked_meat','fish_perch','fish_trout','fish_carp','fish_eel','fish_herring','grilled_fish'];
 { const _s=startCombat; startCombat=function(){ if(!combat.active) GOLEM_USED=false; return _s.apply(this,arguments); }; }   // once a fight
 function golemSlot(f){ const fx=f?f.x-player.x:1, fy=f?f.y-player.y:0, fl=Math.hypot(fx,fy)||1, ax=-fy/fl*0.9+fx/fl*0.4, ay=fx/fl*0.9+fy/fl*0.4, bx=fy/fl*0.9+fx/fl*0.4, by=-fx/fl*0.9+fy/fl*0.4, A=(ax+ay)<=(bx+by);
   return [player.x+(A?ax:bx), player.y+(A?ay:by)]; }   // a step ahead at your shoulder, on the far side so it never hides you
@@ -28531,8 +28536,8 @@ function stitchGolem(f){
   if((player.mana??0)<GOLEM_COST){ floatText(tileOf(player),'Out of mana','#a8a0c8'); return false; }
   const S=SKEL; player.mana-=GOLEM_COST; player.inv[player.inv.indexOf(fl)]=null; player.inv[player.inv.indexOf('old_bone')]=null; GOLEM_USED=true;
   const hp=Math.max(8,Math.round(player.maxHp*0.4));
-  const [gx,gy]=golemSlot(f); GOLEM={ x:gx, y:gy, dir:S.dir||0, hp, max:hp, t:GOLEM_LIFE, rise:0, anim:0, cd:1.6, hit:0, fade:0, moving:false, dmg:Math.max(3,Math.round(4*SPM())) };
-  SKEL=null; lunge(player,f); shake=Math.max(shake,5); SND.spell('Raise Dead');
+  const [gx,gy]=golemSlot(f); GOLEM={ x:gx, y:gy, dir:S.dir||0, hp, max:hp, t:GOLEM_LIFE, rise:0, anim:0, cd:1.6, hit:0, fade:0, moving:false, dmg:Math.max(5,Math.round(7*SPM())) };
+  SKEL=null; lunge(player,f); shake=Math.max(shake,5); SND.spell('Raise Dead'); try{ SND.fx('grise'); }catch(e){}
   try{ burst({x:GOLEM.x,y:GOLEM.y},f||player,'#c8b8a8',16); }catch(e){}
   floatText(tileOf(player),'Flesh Golem!','#d8c8b8',true);
   logMsg('Your skeleton kneels, and the meat in your pack crawls up its bones. Staples bite, thread pulls tight, a sackcloth face settles over the skull. It stands, slowly.','#d8c8b8');
@@ -28540,26 +28545,26 @@ function stitchGolem(f){
 // the blows you do not parry go into it first; what it cannot hold comes through to you
 function golemTakes(n){ const G=GOLEM; if(!G || G.fade || G.rise<1 || n<=0 || !combat.active || combat.practice) return n;
   const take=Math.min(n,G.hp); G.hp-=take; G.hit=0.3; G.anim=0; shake=Math.max(shake,4);
-  try{ floatText([Math.floor(G.x),Math.floor(G.y)],'-'+take,'#d8c0b0'); SND.hurt(false); }catch(e){}
-  if(G.hp<=0){ G.fade=1; floatText([Math.floor(G.x),Math.floor(G.y)],'The stitches tear','#c8b8b0'); logMsg('The golem takes one blow too many. The staples spring out and it comes apart in a heap of meat and bone.','#c8b8b0'); }
+  try{ floatText([Math.floor(G.x),Math.floor(G.y)],'-'+take,'#d8c0b0'); SND.fx('gthud'); }catch(e){}
+  if(G.hp<=0){ G.fade=0.01; try{ SND.fx('gfall'); }catch(e){} floatText([Math.floor(G.x),Math.floor(G.y)],'The stitches tear','#c8b8b0'); logMsg('The golem takes one blow too many. The staples spring out and it comes apart in a heap of meat and bone.','#c8b8b0'); }
   else if(take===n) floatText(tileOf(player),'Golem!','#d8c8b8');
   return n-take; }
 function golemTick(dt){ const G=GOLEM; if(!G) return; G.hit=Math.max(0,G.hit-dt); G.anim=Math.max(0,G.anim-dt);
-  if(G.fade){ G.fade+=dt; if(G.fade>2.2) GOLEM=null; return; }
+  if(G.fade){ G.fade+=dt; if(G.fade>3) GOLEM=null; return; }
   G.rise=Math.min(1,G.rise+dt/1.6);                                  // slow to stand: a moment before it can take anything
-  if(!combat.active){ G.fade=1; logMsg('With nobody left to stand in front of, the golem sags and sinks back into the earth.','#c8b8b0'); return; }
-  G.t-=dt; if(G.t<=0){ G.fade=1; floatText([Math.floor(G.x),Math.floor(G.y)],'The stitches give','#c8b8b0'); return; }
+  if(!combat.active){ G.fade=0.01; try{ SND.fx('gfall'); }catch(e){} logMsg('With nobody left to stand in front of, the golem sags and sinks back into the earth.','#c8b8b0'); return; }
+  G.t-=dt; if(G.t<=0){ G.fade=0.01; try{ SND.fx('gfall'); }catch(e){} floatText([Math.floor(G.x),Math.floor(G.y)],'The stitches give','#c8b8b0'); return; }
   const f=combat.foe; let tx=G.x, ty=G.y;
   if(f && !f.dead){ const fx=f.x-player.x, fy=f.y-player.y, fl=Math.hypot(fx,fy)||1; [tx,ty]=golemSlot(f); G.dir=dirFromDelta(f.x-G.x,f.y-G.y); }   // a step ahead at your shoulder, on the far side so it never hides you
   const mx=tx-G.x, my=ty-G.y, md=Math.hypot(mx,my), sp=Math.min(md,dt*(G.rise<1?0:1.6)); if(md>0.001){ G.x+=mx/md*sp; G.y+=my/md*sp; } G.moving=md>0.05 && G.rise>=1;
-  if(f && !f.dead && combat.phase==='fight' && G.rise>=1 && md<0.5){ G.cd-=dt; if(G.cd<=0){ G.cd=2.4; G.anim=0.5; G.hook=!G.hook; wound(f,G.dmg,G.hook?'Hook!':'Golem!','#d8c8b8'); } } }
+  if(f && !f.dead && combat.phase==='fight' && G.rise>=1 && md<0.5){ G.cd-=dt; if(G.cd<=0){ G.cd=1.9; G.anim=0.5; G.hook=!G.hook; try{ SND.fx(G.hook?'gscrape':'gclank'); }catch(e){} wound(f,G.dmg,G.hook?'Hook!':'Golem!','#d8c8b8'); } } }
 { const _bt=bookTick; bookTick=function(dt){ _bt.apply(this,arguments); try{ golemTick(dt); }catch(e){ console.error(e); } }; }
 { const _bi=bookItems; bookItems=function(items){ _bi.apply(this,arguments); const G=GOLEM; if(!G) return;
-    items.push({d:G.x+G.y+0.012, ax:G.x, ay:G.y, fn:()=>{ const q=P(G.x,G.y), sink=G.fade?Math.min(1,G.fade/2):0, up=Math.min(1,G.rise)*(1-sink);
+    items.push({d:G.x+G.y+0.012, ax:G.x, ay:G.y, fn:()=>{ const q=P(G.x,G.y), sink=G.fade?Math.max(0,Math.min(1,(G.fade-1.6)/1.4)):0, up=Math.min(1,G.rise)*(1-sink);
       g.save(); g.beginPath(); g.rect(q.x-120,q.y-260,240,262); g.clip();                          // it climbs up out of the ground, and sinks back in
-      g.translate(0,(1-up)*140); if(G.fade) g.globalAlpha*=Math.max(0,1-sink*0.6);
+      g.translate(0,(1-up)*140); if(G.fade) g.globalAlpha*=Math.max(0,1-sink);
       const pose=G.anim>0 ? {kind:'strike', t:1-G.anim/0.5, dir:G.hook?'left':'up'} : G.hit>0 ? {kind:'stagger', t:1} : null;
-      try{ drawGolem(q.x,q.y,{dir:G.dir, moving:G.moving, id:7, flash:G.hit, helm:golemHelmOn()?CHOICE.golemHelm||null:null},pose); }catch(e){ console.error(e); }
+      try{ drawGolem(q.x,q.y,{dir:G.dir, moving:G.moving&&!G.fade, id:7, flash:G.hit, dead:!!G.fade, fallT:G.fade||0, summon:true, helm:golemHelmOn()?CHOICE.golemHelm||null:null},pose); }catch(e){ console.error(e); }
       g.restore();
       if(!G.fade && G.rise>=1){ const w=56, by=q.y-170; g.save(); g.fillStyle='rgba(10,8,6,0.75)'; g.fillRect(q.x-w/2-1,by-1,w+2,7);
         g.fillStyle='#b89a8a'; g.fillRect(q.x-w/2,by,w*Math.max(0,G.hp/G.max),3.4); g.fillStyle='#8a7aa8'; g.fillRect(q.x-w/2,by+3.6,w*Math.max(0,G.t/GOLEM_LIFE),1.6); g.restore(); } }}); }; }
@@ -28582,6 +28587,8 @@ function drawGolem(x,B,e,pose){ const d=e.dir||0, fl=(d===5||d===6||d===7)?-1:1,
   const limb=(a,b,w0,w1,lit,dark)=>{ beastSeg(a,b,w0+3,w1+3,dark); g.beginPath(); g.arc(a[0],a[1],(w0+3)/2,0,Math.PI*2); g.fill(); beastSeg([a[0]-1,a[1]-1],[b[0]-1,b[1]-1],w0-1,w1-1,lit); g.beginPath(); g.arc(a[0]-1,a[1]-1,(w0-1)/2,0,Math.PI*2); g.fill(); };   // a dark rim, a lit core: rounder than a flat band
   g.save(); g.translate(x,B);
   g.fillStyle='rgba(0,0,0,0.34)'; g.beginPath(); g.ellipse(0,1,40,11,0,0,Math.PI*2); g.fill(); g.scale(fl,1);
+  const fall=e.summon&&e.dead?Math.max(0,Math.min(1,((e.fallT||0)-1.1)/0.45)):0;            // your golem, broken: on its knees, then over on its face
+  if(fall){ const ez=fall*fall; g.translate(0,-4); g.rotate((s===1?1.25:0.45)*ez); g.translate(0,4+ez*(s===1?6:14)); if(s!==1) g.scale(1,1-ez*0.18); }
   const lean=(stag?-5:0)+strike*12*(1-strike*0.5)-raise*3, hip=-46+kn*20+bob, sh=-108+kn*22+br*0.5+bob, tw=P?25:34-s*11, ww=P?17:21-s*6, mid=(sh+hip)/2;
   // legs: short, bowed, the shins bound in sacking
   const legsPart=()=>{
@@ -28704,7 +28711,7 @@ const bloodPrice=()=>Math.max(3,Math.round((player.maxHp||40)*0.12));
 { const _c=castSpell; castSpell=function(){ let paid=0; try{ const W=WEAPONS[player.opts.equip.weapon]||{}, f=combat.foe;
       if(W.magic && f){ const SP=spellsFor(), S=SP[playerGuard]||SP.right; if(S && S.id==='blood'){ const c=bloodPrice();
           if(player.hp<=c+1){ floatText(tileOf(player),'Too little blood','#e07070'); return false; }
-          S.dmg=Math.round(c*1.5); paid=c; } } }catch(e){}
+          S.dmg=Math.round(c*0.7); paid=c; } } }catch(e){}
     const r=_c.apply(this,arguments);
     if(paid && r){ player.hp=Math.max(1,player.hp-paid); player.flash=0.25; floatText([player.i,player.j-0.003],'-'+paid+' blood','#d85050'); updateHud(); }
     return r; }; }
@@ -28935,6 +28942,9 @@ bookPanel.addEventListener('click',e=>{ const t=e.target.closest('button'); if(!
   if(t.dataset.deadput){ const k=key(t.dataset.deadput), id=t.dataset.item, at=player.inv.indexOf(id); if(at<0) return;
     const old=CHOICE[k]; player.inv[at]=null; if(old){ const free=player.inv.indexOf(null); player.inv[free>=0?free:at]=old; }     // what it had goes back into your pack
     CHOICE[k]=id; DEAD_PICK=null; renderBook(); updateHud(); try{ autosaveSoon(400); }catch(err){} return; } });
+
+// the Stitched Man's blows sound like what they are: iron from above, a hook from the side
+{ const prev=impact; impact=function(f){ try{ if(f && f.type==='golem') SND.fx(f.swingDir==='up'?'gclank':'gscrape'); }catch(e){} return prev.apply(this,arguments); }; }
 </script>
 </body>
 </html>

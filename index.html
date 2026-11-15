@@ -11532,7 +11532,7 @@ function refreshInventory(){
   refreshStatPanel(); refreshBelt(); refreshEffects();
   if(typeof syncHideEyes==='function') syncHideEyes();
   drawDoll();
-  const sl=document.querySelector('#inv-overlay .skel-slot'); if(sl){ sl.style.display=skelArmsOn()?'':'none'; sl.title=CHOICE.skelWeapon?ITEMS[CHOICE.skelWeapon].name+' (carried by the skeleton you raise, for show)':'Your skeleton\'s weapon: drop any weapon here. It is only for show.'; }   // your skeleton's weapon slot
+  const sl=document.querySelector('#inv-overlay .skel-slot'); if(sl){ sl.style.display='none'; sl.title=CHOICE.skelWeapon?ITEMS[CHOICE.skelWeapon].name+' (carried by the skeleton you raise, for show)':'Your skeleton\'s weapon: drop any weapon here. It is only for show.'; }   // your skeleton's weapon slot
 }
 function refreshStatPanel(){
   const panel=document.getElementById('stat-panel'); if(!panel || !player.opts) return;
@@ -17462,7 +17462,7 @@ wrap('fen','mobs',l=>{ const r=[...l,{ name:'Risen Bones', type:'skeleton', i:8,
   return r; });
 wrap('fen','mobs',l=>[...l,{ name:'Drowned Bones', type:'skeleton', i:33, j:13, faction:'risen', daily:true, opts:RISEN('Drowned Bones') }]);
 // ── arms for the dead: once Vesna allows it, the skeleton you raise can carry a weapon of your choosing (for looks: it hits as hard either way) ──
-const skelArmsOn=()=>!!(CHOICE.skelArms && player.opts && NECRO_STAVES.includes(player.opts.equip.weapon));
+const skelArmsOn=()=>!!CHOICE.skelArms;   // what your dead carry stays theirs, whatever you hold (or take off for a bath)
 SLOT_NAMES.skel='Skeleton';
 { const oG=getAt, oS=setAt, oL=slotLoc, oP=placeError;
   getAt=loc=>loc.kind==='skel' ? (CHOICE.skelWeapon||null) : oG(loc);
@@ -17487,8 +17487,8 @@ const bonesDown=()=>FEN_BONES.filter(k=>(CHOICE.bonesDown||[]).includes(k)).leng
     const n=bonesDown();
     if(n<4){ say(V,`“${n} of four. The rest still walk. Two of them only after dark.”`,[bye]); return; }
     say(V,["“Give me your hand. Close it, so, round nothing, as if round a hilt. Yes, my hands are cold. There. That is how they held them. Now, when you carry a grave-speaker's staff, you can give the dead you raise a weapon of your own choosing. It will not make them hit any harder. The dead do not care about steel. But they look the part, and that matters more than you'd think.”"],[
-      {label:'Learn to arm the dead.', fn:()=>{ CHOICE.skelArms=true; CHOICE.necroQ=null; logMsg("You can now give your skeleton a weapon: hold a necromancer's staff and use the small slot under your weapon in the inventory. It is only for show.",'#b8a8e8'); say(V,"“Pick something with a bit of style. They have been lying in the dark a long time.”",[bye]); }}]); }; }
-JOURNAL.push(["Arms for the Dead", ()=> NECRO()<3 ? null : CHOICE.skelArms ? ['done',"Vesna showed you how to put a weapon back in a dead hand. Hold a necromancer's staff and give your skeleton a weapon in the small slot under your own."]
+      {label:'Learn to arm the dead.', fn:()=>{ CHOICE.skelArms=true; CHOICE.necroQ=null; logMsg("You can now give your skeleton a weapon: open your spellbook (B), Necromancer page, under Your Dead. It is only for show.",'#b8a8e8'); say(V,"“Pick something with a bit of style. They have been lying in the dark a long time.”",[bye]); }}]); }; }
+JOURNAL.push(["Arms for the Dead", ()=> NECRO()<3 ? null : CHOICE.skelArms ? ['done',"Vesna showed you how to put a weapon back in a dead hand. Give your skeleton a weapon in your spellbook (B), on the Necromancer page under Your Dead."]
   : CHOICE.necroQ==='bones' ? ['active', bonesDown()>=4 ? "Four of the fen's risen dead lie still. Go back to Vesna." : "Lay four of the fen's risen dead to rest for Vesna: Risen Bones, Rattling Bones and Restless Bones in the Drowning Fen (the last two walk only at night), and Drowned Bones in the Sunken Hollow. ("+bonesDown()+"/4)"]
   : ['active',"Your skeletons fight with their fists. Vesna, in the fen, may know how to change that."]]);
 // ── Vesna at home: the stilt-hut in the Drowning Fen. Besides her lessons she has an errand of her own,
@@ -28552,13 +28552,13 @@ function golemTick(dt){ const G=GOLEM; if(!G) return; G.hit=Math.max(0,G.hit-dt)
   const f=combat.foe; let tx=G.x, ty=G.y;
   if(f && !f.dead){ const fx=f.x-player.x, fy=f.y-player.y, fl=Math.hypot(fx,fy)||1; [tx,ty]=golemSlot(f); G.dir=dirFromDelta(f.x-G.x,f.y-G.y); }   // a step ahead at your shoulder, on the far side so it never hides you
   const mx=tx-G.x, my=ty-G.y, md=Math.hypot(mx,my), sp=Math.min(md,dt*(G.rise<1?0:1.6)); if(md>0.001){ G.x+=mx/md*sp; G.y+=my/md*sp; } G.moving=md>0.05 && G.rise>=1;
-  if(f && !f.dead && combat.phase==='fight' && G.rise>=1 && md<0.5){ G.cd-=dt; if(G.cd<=0){ G.cd=2.4; G.anim=0.5; wound(f,G.dmg,'Golem!','#d8c8b8'); } } }
+  if(f && !f.dead && combat.phase==='fight' && G.rise>=1 && md<0.5){ G.cd-=dt; if(G.cd<=0){ G.cd=2.4; G.anim=0.5; G.hook=!G.hook; wound(f,G.dmg,G.hook?'Hook!':'Golem!','#d8c8b8'); } } }
 { const _bt=bookTick; bookTick=function(dt){ _bt.apply(this,arguments); try{ golemTick(dt); }catch(e){ console.error(e); } }; }
 { const _bi=bookItems; bookItems=function(items){ _bi.apply(this,arguments); const G=GOLEM; if(!G) return;
     items.push({d:G.x+G.y+0.012, ax:G.x, ay:G.y, fn:()=>{ const q=P(G.x,G.y), sink=G.fade?Math.min(1,G.fade/2):0, up=Math.min(1,G.rise)*(1-sink);
       g.save(); g.beginPath(); g.rect(q.x-120,q.y-260,240,262); g.clip();                          // it climbs up out of the ground, and sinks back in
       g.translate(0,(1-up)*140); if(G.fade) g.globalAlpha*=Math.max(0,1-sink*0.6);
-      const pose=G.anim>0 ? {kind:'strike', t:1-G.anim/0.5} : G.hit>0 ? {kind:'stagger', t:1} : null;
+      const pose=G.anim>0 ? {kind:'strike', t:1-G.anim/0.5, dir:G.hook?'left':'up'} : G.hit>0 ? {kind:'stagger', t:1} : null;
       try{ drawGolem(q.x,q.y,{dir:G.dir, moving:G.moving, id:7, flash:G.hit, helm:golemHelmOn()?CHOICE.golemHelm||null:null},pose); }catch(e){ console.error(e); }
       g.restore();
       if(!G.fade && G.rise>=1){ const w=56, by=q.y-170; g.save(); g.fillStyle='rgba(10,8,6,0.75)'; g.fillRect(q.x-w/2-1,by-1,w+2,7);
@@ -28566,7 +28566,8 @@ function golemTick(dt){ const G=GOLEM; if(!G) return; G.hit=Math.max(0,G.hit-dt)
 // the stitched man himself: grey flesh in patches, iron staples, a sack for a face
 function drawGolem(x,B,e,pose){ const d=e.dir||0, fl=(d===5||d===6||d===7)?-1:1, back=(d===3||d===4||d===5), s=(d===2||d===6)?1:(d===0||d===4)?0:0.55;
   const pk=pose&&pose.kind, pt=pose?Math.min(1,Math.max(0,pose.t||0)):0, raise=pk==='raise'?pt:0, strike=pk==='strike'?pt:0, stag=pk==='stagger'?1:0;
-  const mv=e.moving?Math.sin(gt*5):0, br=Math.sin(gt*1.4+(e.id||0))*1.2, kn=e.dead?Math.min(1,(e.fallT||0)/1.1):0;
+  const P=s===1, hookHit=!!(pose && (pose.kind==='raise'||pose.kind==='strike') && (pose.dir==='left'||pose.dir==='right'));   // P: true profile
+  const mv=e.moving?Math.sin(gt*3.4):0, bob=e.moving?Math.abs(mv)*3:0, br=Math.sin(gt*1.4+(e.id||0))*1.2, kn=e.dead?Math.min(1,(e.fallT||0)/1.1):0;
   const FL='#8c7670', FD='#523e3a', FLL='#a28a82', FDD='#362626', BLD='#7a1410', BLDD='#4a0806', SACK='#a48c5c', SACKD='#6a5634', IRON='#4a4c52', THR='#2a1c16';
   const mix=(a,b,u)=>[a[0]+(b[0]-a[0])*u, a[1]+(b[1]-a[1])*u];
   const staple=(sx,sy,a)=>{ g.save(); g.translate(sx,sy); g.rotate(a||0); g.fillStyle='rgba(120,30,20,0.4)'; g.beginPath(); g.ellipse(-3,1.8,1.6,1.3,0,0,Math.PI*2); g.ellipse(3,1.8,1.6,1.3,0,0,Math.PI*2); g.fill(); g.strokeStyle=IRON; g.lineWidth=1.8; g.beginPath(); g.moveTo(-3,1.5); g.lineTo(-3,-1.5); g.lineTo(3,-1.5); g.lineTo(3,1.5); g.stroke(); g.strokeStyle='rgba(220,220,230,0.55)'; g.lineWidth=0.7; g.beginPath(); g.moveTo(-2.4,-1.9); g.lineTo(2.4,-1.9); g.stroke(); g.restore(); };
@@ -28581,21 +28582,25 @@ function drawGolem(x,B,e,pose){ const d=e.dir||0, fl=(d===5||d===6||d===7)?-1:1,
   const limb=(a,b,w0,w1,lit,dark)=>{ beastSeg(a,b,w0+3,w1+3,dark); g.beginPath(); g.arc(a[0],a[1],(w0+3)/2,0,Math.PI*2); g.fill(); beastSeg([a[0]-1,a[1]-1],[b[0]-1,b[1]-1],w0-1,w1-1,lit); g.beginPath(); g.arc(a[0]-1,a[1]-1,(w0-1)/2,0,Math.PI*2); g.fill(); };   // a dark rim, a lit core: rounder than a flat band
   g.save(); g.translate(x,B);
   g.fillStyle='rgba(0,0,0,0.34)'; g.beginPath(); g.ellipse(0,1,40,11,0,0,Math.PI*2); g.fill(); g.scale(fl,1);
-  const lean=(stag?-5:0)+strike*12*(1-strike*0.5)-raise*3, hip=-46+kn*20, sh=-108+kn*22+br*0.5, tw=34-s*11, ww=21-s*6;
+  const lean=(stag?-5:0)+strike*12*(1-strike*0.5)-raise*3, hip=-46+kn*20+bob, sh=-108+kn*22+br*0.5+bob, tw=P?25:34-s*11, ww=P?17:21-s*6, mid=(sh+hip)/2;
   // legs: short, bowed, the shins bound in sacking
-  [-1,1].forEach(sd=>{ const far=s>0.3 && sd<0, col=far?FD:FL, cd=far?FDD:FD, hp=[sd*ww*0.55+s*sd*2, hip-2];
-    let kneeP, ank; if(kn){ kneeP=[sd*ww*0.7+s*10, -8]; ank=[sd*ww*0.6-s*12-2, -5]; } else { kneeP=[sd*(ww*0.68+3)+s*mv*6*sd, -25]; ank=[sd*(ww*0.6)+s*mv*10*sd, -6]; }
+  [-1,1].forEach(sd=>{ const far=s>0.3 && sd<0, col=far?FD:FL, cd=far?FDD:FD, hp=P?[sd*5, hip-2]:[sd*ww*0.55+s*sd*2, hip-2], lift=s<0.3?Math.max(0,sd*mv)*6:0;
+    let kneeP, ank; if(kn){ kneeP=[sd*ww*0.7+s*10, -8]; ank=[sd*ww*0.6-s*12-2, -5]; } else if(P){ kneeP=[sd*5+5+sd*mv*7, -25+Math.max(0,sd*mv)*3]; ank=[sd*5+sd*mv*12, -6+Math.max(0,-sd*mv*-1)*0-Math.max(0,sd*mv)*2]; } else { kneeP=[sd*(ww*0.68+3)+s*mv*6*sd, -25-lift*0.6]; ank=[sd*(ww*0.6)+s*mv*10*sd, -6-lift]; }
     limb(hp,kneeP,21,15,col,cd); limb(kneeP,ank,15,13,far?SACKD:SACK,far?'#4a3a22':SACKD);
     g.strokeStyle='rgba(60,44,20,0.7)'; g.lineWidth=0.9; for(let b=1;b<4;b++){ const p=mix(kneeP,ank,b/4); g.beginPath(); g.moveTo(p[0]-7,p[1]+1); g.lineTo(p[0]+7,p[1]-1.5); g.stroke(); }
     g.fillStyle=far?'#4a3a22':SACKD; g.beginPath(); g.ellipse(ank[0]+s*5,ank[1]+2,11+s*3,5.5,0,0,Math.PI*2); g.fill();
     g.fillStyle='rgba(110,30,20,0.3)'; g.beginPath(); g.ellipse(kneeP[0],kneeP[1]+3,7,3,0,0,Math.PI*2); g.fill();
     if(!far && sd>0) staple(hp[0]+sd*2,(hp[1]+kneeP[1])/2,0.3*sd);
     if(!far && sd<0 && !back){ wound2(kneeP[0],kneeP[1]-2,4,3); g.fillStyle='#5a4a34'; g.beginPath(); g.ellipse(kneeP[0],kneeP[1]-2.5,3.8,3.2,0,0,Math.PI*2); g.fill(); g.fillStyle='#e0d4b0'; g.beginPath(); g.ellipse(kneeP[0]-0.4,kneeP[1]-3,3,2.5,0,0,Math.PI*2); g.fill(); } });   // a kneecap through the skin
+  g.save(); g.translate(0,hip); g.rotate(mv*0.045); g.translate(0,-hip);                    // the whole top rolls from side to side as it lumbers
   // an arm: long, hanging to the knee; the right came off a bigger man than the left
-  const arm=(sd)=>{ const big=back?sd===-1:sd===1, far=s>0.3 && sd<0, col=far?FD:(big?FLL:FL), cd=far?FDD:FD, front=sd===1;
-    const S0=[sd*tw*0.86+lean*0.4+s*3, sh+9], S0x=S0[0], S0y=S0[1];
-    let E=[sd*(tw+9)+lean*0.5+s*5, sh+36], W=[sd*(tw+5)+lean*0.6+s*7+s*mv*8*sd, hip+6];
-    if(front && (raise||strike)){ const up=[[tw*0.8,sh-16],[tw*0.45+4,sh-46]], fw=[[tw+16+lean,sh+18],[tw+34+lean,sh+40]];
+  const arm=(sd)=>{ const big=back?sd===-1:sd===1, far=s>0.3 && sd<0, col=far?FD:(big?FLL:FL), cd=far?FDD:FD, active=hookHit?!big:big;
+    const roll=sd*mv*2.2, sw=P?(sd>0?-1:1)*mv*10:0, hang=s<0.3?Math.max(0,-sd*mv)*4:0;          // shoulders roll with the step; the arms swing against the legs
+    const S0=P?[sd*3+3+lean*0.4, sh+9+roll]:[sd*tw*0.86+lean*0.4+s*3, sh+9+roll], S0x=S0[0], S0y=S0[1];
+    let E=P?[sd*2+9+lean*0.5+sw*0.4, sh+36+roll]:[sd*(tw+9)+lean*0.5+s*5, sh+36+roll], W=P?[sd*2+13+lean*0.6+sw, hip+6]:[sd*(tw+5)+lean*0.6+s*7+s*mv*8*sd, hip+6-hang];
+    if(active && (raise||strike)){ const k=P?1:sd, X=v=>P?v:sd*v;
+      const up=hookHit?(P?[[-10,sh+14],[-24,sh+4]]:[[X(tw+14),sh+12],[X(tw+28),sh+2]]):[[X(tw*0.8),sh-16],[X(tw*0.45+4),sh-46]];      // drawn back: the hook out to the side, the ball up over its head
+      const fw=hookHit?(P?[[tw*0.6+lean,sh+22],[tw+20+lean,sh+30]]:[[X(tw*0.5)+lean,sh+24],[-sd*4+lean+6,sh+34]]):[[X(tw+16)+lean,sh+18],[X(tw+34)+lean,sh+40]];   // and through: the hook sweeps across, the ball comes down
       if(strike){ const u=Math.min(1,strike*1.5); E=mix(up[0],fw[0],u); W=mix(up[1],fw[1],u); } else { E=mix(E,up[0],raise); W=mix(W,up[1],raise); } }
     { const r0=big?8.6:7.4, S0=[S0x-sd*2.5,S0y+1], sg=g.createRadialGradient(S0[0]-sd*2,S0[1]-3,1,S0[0],S0[1],r0+2); sg.addColorStop(0,far?FD:FLL); sg.addColorStop(0.7,col); sg.addColorStop(1,cd); g.fillStyle=cd; g.beginPath(); g.ellipse(S0[0],S0[1]+1,r0+1.2,r0+2.2,sd*0.3,0,Math.PI*2); g.fill(); g.fillStyle=sg; g.beginPath(); g.ellipse(S0[0],S0[1],r0,r0+1,sd*0.3,0,Math.PI*2); g.fill(); }   // a round swell of shoulder
     limb(S0,E,big?18:15,big?14:12,col,cd); limb(E,W,big?14:12,big?17:14,col,cd);
@@ -28619,14 +28624,20 @@ function drawGolem(x,B,e,pose){ const d=e.dir||0, fl=(d===5||d===6||d===7)?-1:1,
     g.restore(); };
   const headPart=()=>{
   // the head: small, sunk low between the shoulders, a sack pulled over it and tied at the neck
-  const hx=s*7+lean*0.5, hy=(back?sh-9:sh-5)+(stag?2:0)+(kn?4:0), sg=g.createRadialGradient(hx-4,hy-8,2,hx,hy,18); sg.addColorStop(0,'#c4ac78'); sg.addColorStop(0.7,SACK); sg.addColorStop(1,SACKD);
+  const hx=(P?tw*0.62:s*7)+lean*0.5, hy=(back?sh-9:P?sh+1:sh-5)+(stag?2:0)+(kn?4:0), sg=g.createRadialGradient(hx-4,hy-8,2,hx,hy,18); sg.addColorStop(0,'#c4ac78'); sg.addColorStop(0.7,SACK); sg.addColorStop(1,SACKD);
   if(e.helm) golemHelmDraw(e.helm,hx,hy,back,d,'far');                                     // the far side of a crown sits behind the head
-  if(!back){ const ng=g.createRadialGradient(hx,hy+8,2,hx,hy+10,16); ng.addColorStop(0,FL); ng.addColorStop(1,FD); g.fillStyle=ng; g.beginPath(); g.ellipse(hx,hy+11,15,8,0,0,Math.PI*2); g.fill(); seam([[hx-12,hy+13],[hx+12,hy+12]]); drip(hx+5,hy+14,6); }   // a bull neck of stitched meat
+  if(!back){ const ng=g.createRadialGradient(hx,hy+8,2,hx,hy+10,16); ng.addColorStop(0,FL); ng.addColorStop(1,FD); g.fillStyle=ng; g.beginPath(); g.ellipse(hx-(P?5:0),hy+11,P?12:15,8,0,0,Math.PI*2); g.fill(); seam(P?[[hx-14,hy+12],[hx+6,hy+14]]:[[hx-12,hy+13],[hx+12,hy+12]]); drip(hx+5,hy+14,6); }   // a bull neck of stitched meat
   if(!back){ g.fillStyle=sg; g.beginPath(); g.moveTo(hx-12,hy+8); g.quadraticCurveTo(hx-15,hy-11,hx-2,hy-15); g.quadraticCurveTo(hx+14,hy-14,hx+13,hy+7); g.quadraticCurveTo(hx,hy+12,hx-12,hy+8); g.closePath(); g.fill(); }
   else { g.fillStyle=sg; g.beginPath(); g.moveTo(hx-12,hy+4); g.quadraticCurveTo(hx-14,hy-12,hx,hy-15); g.quadraticCurveTo(hx+14,hy-12,hx+12,hy+4); g.closePath(); g.fill(); }
   g.strokeStyle='rgba(80,60,30,0.35)'; g.lineWidth=0.6; for(let q=-10;q<=10;q+=3){ g.beginPath(); g.moveTo(hx+q,hy-13); g.lineTo(hx+q*1.1,hy+8); g.stroke(); } for(let q=-11;q<=6;q+=3.5){ g.beginPath(); g.moveTo(hx-12,hy+q); g.lineTo(hx+12,hy+q); g.stroke(); }   // the weave
   g.strokeStyle='rgba(40,28,14,0.5)'; g.lineWidth=1; g.beginPath(); g.moveTo(hx-12,hy+8); g.quadraticCurveTo(hx-15,hy-11,hx-2,hy-15); g.quadraticCurveTo(hx+14,hy-14,hx+13,hy+7); g.stroke();
-  if(!back){ const ex=hx+s*5, sq=1-s*0.35;
+  if(!back && P){ const ex=hx+7;                                                            // in profile: one eye hole near the front edge, the sewn mouth at the edge, the knot behind
+    g.strokeStyle='#5a4426'; g.lineWidth=2.4; g.beginPath(); g.moveTo(hx-11,hy+6); g.quadraticCurveTo(hx,hy+10,hx+12,hy+5); g.stroke();
+    g.fillStyle=SACKD; g.beginPath(); g.ellipse(hx-11,hy+4,3,2.2,0,0,Math.PI*2); g.fill(); g.strokeStyle='#5a4426'; g.lineWidth=1.8; g.beginPath(); g.moveTo(hx-11,hy+5); g.lineTo(hx-15,hy+12); g.stroke();
+    g.fillStyle='#16100c'; g.beginPath(); g.ellipse(ex,hy-3.5,2.4,2.8,0,0,Math.PI*2); g.fill();
+    g.save(); g.globalCompositeOperation='lighter'; g.fillStyle='rgba(170,215,150,0.75)'; g.beginPath(); g.arc(ex+0.6,hy-3.1,0.9,0,Math.PI*2); g.fill(); glow(ex,hy-3.5,4,3.5,'150,200,130',0.16); g.restore();
+    stitch([[hx+8,hy+3],[hx+12.5,hy+2.4]]); }
+  else if(!back){ const ex=hx+s*5, sq=1-s*0.35;
     g.strokeStyle='#5a4426'; g.lineWidth=2.4; g.beginPath(); g.moveTo(hx-11,hy+6); g.quadraticCurveTo(hx,hy+10,hx+11,hy+5); g.stroke();   // the cord round its neck
     [[-5.5,-3,3.6,3],[5,-4,2.8,2.6]].forEach(([ox,oy,rx,ry])=>{ g.fillStyle='#16100c'; g.beginPath(); g.ellipse(ex+ox*sq,hy+oy,rx*sq+0.4,ry,0,0,Math.PI*2); g.fill(); });   // two holes cut uneven
     g.save(); g.globalCompositeOperation='lighter'; [[-5.5,-3],[5,-4]].forEach(([ox,oy])=>{ g.fillStyle='rgba(170,215,150,0.75)'; g.beginPath(); g.arc(ex+ox*sq+s,hy+oy+0.4,0.9,0,Math.PI*2); g.fill(); glow(ex+ox*sq,hy+oy,4,3.5,'150,200,130',0.16); }); g.restore();
@@ -28636,10 +28647,14 @@ function drawGolem(x,B,e,pose){ const d=e.dir||0, fl=(d===5||d===6||d===7)?-1:1,
   if(e.helm) golemHelmDraw(e.helm,hx,hy,back,d);
   };
   if(back) headPart();                                                                       // from behind, the head sits beyond the hump: the body covers all but its crown
-  if(s>0.3) arm(-1);                                                                          // the far arm, behind the body
+  const hookFront=s>0.3 && !P && hookHit && !back;                                           // a hook swinging across comes round in front of the body
+  if(s>0.3 && !hookFront) arm(-1);                                                            // the far arm, behind the body
   // the body: hunched, wide in the shoulder, a hump of meat behind the head
   g.save(); g.translate(lean*0.5,0);
   const body=()=>{ g.beginPath(); g.moveTo(-ww,hip+2);
+    if(P){ g.bezierCurveTo(-ww-7,hip-20,-tw*1.08,sh+30,-tw*0.98,sh+4); g.bezierCurveTo(-tw*0.92,sh-16,-tw*0.15,sh-20,tw*0.25,sh-10);   // the back, rising into the hump
+      g.bezierCurveTo(tw*0.75,sh-4,tw*1.0,sh+14,tw*0.92,sh+28); g.bezierCurveTo(tw*1.22,mid+6,ww+10,hip-10,ww+2,hip+2);                // the chest, and the belly hanging forward
+      g.quadraticCurveTo(0,hip+8,-ww,hip+2); g.closePath(); return; }
     g.bezierCurveTo(-ww-7,hip-18,-tw*0.98,sh+32,-tw*0.92,sh+10);
     g.bezierCurveTo(-tw*1.04,sh-2,-tw*0.76,sh-11,-tw*0.4,sh-12);
     g.quadraticCurveTo(0,sh-4,tw*0.4,sh-12);
@@ -28649,27 +28664,29 @@ function drawGolem(x,B,e,pose){ const d=e.dir||0, fl=(d===5||d===6||d===7)?-1:1,
   const bg=g.createLinearGradient(-tw,0,tw,0); bg.addColorStop(0,FD); bg.addColorStop(0.32,FL); bg.addColorStop(0.62,FLL); bg.addColorStop(1,FD);
   body(); g.fillStyle=bg; g.fill(); g.strokeStyle='rgba(50,16,14,0.6)'; g.lineWidth=1.2; g.stroke();
   g.save(); body(); g.clip();                                                               // patches of other people
-  const mid=(sh+hip)/2;
   [[-tw,sh-4,tw*0.95,26,'#84504a'],[2,mid-4,tw,24,'#76626e']].forEach(([px,py,pw,ph,c])=>{ g.fillStyle=c; g.globalAlpha*=0.75; g.beginPath(); g.moveTo(px,py); g.lineTo(px+pw,py+3); g.lineTo(px+pw-3,py+ph); g.lineTo(px+2,py+ph-2); g.closePath(); g.fill(); g.globalAlpha/=0.75;
     seam([[px,py],[px+pw,py+3],[px+pw-3,py+ph],[px+2,py+ph-2],[px,py]]); });
   const shd=g.createLinearGradient(0,sh-16,0,hip+8); shd.addColorStop(0,'rgba(255,248,236,0.12)'); shd.addColorStop(0.5,'rgba(0,0,0,0)'); shd.addColorStop(1,'rgba(20,14,10,0.4)'); g.fillStyle=shd; g.fillRect(-tw*1.3,sh-20,tw*2.6,hip-sh+30);
   wound2(tw*0.45,mid+10,3,2.2); wound2(-tw*0.55,sh+14,2.2,1.7); drip(-tw*0.55,sh+15,5);
   g.strokeStyle='rgba(255,236,230,0.22)'; g.lineWidth=2; g.beginPath(); g.moveTo(-tw*0.75,sh+2); g.quadraticCurveTo(-tw*0.5,sh-8,-tw*0.15,sh-8); g.moveTo(tw*0.25,sh-10); g.quadraticCurveTo(tw*0.6,sh-12,tw*0.8,sh-2); g.stroke();   // a wet sheen
-  if(!back){ const bx=-tw*0.12+s*6, by=mid+2; wound2(bx,by,11,13); g.fillStyle='#1e0c0a'; g.beginPath(); g.ellipse(bx,by,8,10,0,0,Math.PI*2); g.fill(); drip(bx+3,by+11,9);             // a gap in the belly, and the bones inside
-    g.strokeStyle='#d8ccaa'; g.lineWidth=2; for(let r=0;r<3;r++){ g.beginPath(); g.ellipse(bx,by-6+r*5.2,6.5,2.4,0,Math.PI*0.1,Math.PI*0.9); g.stroke(); }
-    [[-9,-7],[9,7]].forEach(([sx,sy])=>staple(bx+sx,by+sy,Math.PI/2)); stitch([[bx,by+12],[bx+1,hip-6]]); }
+  if(!back){ const bx=P?tw*0.62:-tw*0.12+s*6, by=mid+2, rx=P?5.5:8; wound2(bx,by,rx+3,13); g.fillStyle='#1e0c0a'; g.beginPath(); g.ellipse(bx,by,rx,10,0,0,Math.PI*2); g.fill(); drip(bx+3,by+11,9);             // a gap in the belly, and the bones inside
+    g.strokeStyle='#d8ccaa'; g.lineWidth=2; for(let r=0;r<3;r++){ g.beginPath(); g.ellipse(bx,by-6+r*5.2,rx-1.5,2.4,0,Math.PI*0.1,Math.PI*0.9); g.stroke(); }
+    [[-rx-1,-7],[rx+1,7]].forEach(([sx,sy])=>staple(bx+sx,by+sy,Math.PI/2)); stitch([[bx,by+12],[bx+1,hip-6]]); }
   else { stitch([[0,sh-6],[0,hip]]); seam([[-tw*0.7,sh+4],[tw*0.6,sh+10]]); }               // long seams down the back and across the shoulders
   g.restore();
-  if(!back){ bone(-tw*0.42,sh+1,-tw*0.72-s*2,sh-9,3.4); bone(tw*0.74,mid-3,tw*1.04+s*3,mid-10,3); }
+  if(P){ bone(tw*0.35,sh+3,tw*0.62,sh-6,3.2); bone(-tw*0.2,mid-3,-tw*0.55,mid-10,3);       // in profile: a collarbone at the front, a rib out of the flank, the spine along the hump
+    for(let v=0;v<5;v++){ const u=v/4, vx=-tw*(0.95-0.1*u)+lean*0.5, vy=sh+2+u*(mid-sh+8); g.fillStyle='#5a4a34'; g.beginPath(); g.ellipse(vx,vy,3.4,2.6,0,0,Math.PI*2); g.fill(); g.fillStyle='#ddd0ac'; g.beginPath(); g.ellipse(vx,vy-0.4,2.5,1.8,0,0,Math.PI*2); g.fill(); } }
+  else if(!back){ bone(-tw*0.42,sh+1,-tw*0.72-s*2,sh-9,3.4); bone(tw*0.74,mid-3,tw*1.04+s*3,mid-10,3); }
   else { for(let v=0;v<5;v++){ const vy=sh+2+v*((hip-sh-10)/4); g.fillStyle='#5a4a34'; g.beginPath(); g.ellipse(0,vy,4.4,3,0,0,Math.PI*2); g.fill(); g.fillStyle='#ddd0ac'; g.beginPath(); g.ellipse(0,vy-0.5,3.4,2.2,0,0,Math.PI*2); g.fill(); }   // the spine through the back seam
     bone(-tw*0.35,sh+6,-tw*0.62,sh-3,3.2); }
   g.fillStyle='#5e4a2c'; g.beginPath(); g.moveTo(-ww-2,hip-8); g.quadraticCurveTo(0,hip-1,ww+2,hip-8); g.lineTo(ww+1,hip-3); g.quadraticCurveTo(0,hip+4,-ww-1,hip-3); g.closePath(); g.fill();   // a rope belt
   if(!back){ g.fillStyle='#4a3a20'; g.beginPath(); g.arc(ww*0.35,hip-3,2.8,0,Math.PI*2); g.fill(); g.strokeStyle='#4a3a20'; g.lineWidth=1.8; g.beginPath(); g.moveTo(ww*0.35,hip-1); g.lineTo(ww*0.42,hip+10); g.moveTo(ww*0.35,hip-1); g.lineTo(ww*0.26,hip+9); g.stroke(); }
-  staple(tw*0.58,sh-4,0.4);
+  if(!P) staple(tw*0.58,sh-4,0.4);
   g.restore();
   if(!back) headPart();
-  if(s>0.3) arm(1); else { arm(-1); arm(1); }
+  if(s>0.3){ arm(1); if(hookFront) arm(-1); } else { arm(-1); arm(1); }
   if(e.flash>0){ g.save(); g.globalCompositeOperation='lighter'; glow(lean*0.5,-80,40,70,'255,230,210',Math.min(0.4,e.flash)); g.restore(); }
+  g.restore();
   g.restore(); }
 
 // ── the golem as a foe, for the night it wakes wrong ──
@@ -28806,7 +28823,7 @@ JOURNAL.push(["The Stitched Man", ()=> !golemQ() ? null : golemQ()==='done' ? ['
   : ['active', (gqAll() ? "You have everything. Go to Tobb's pit in the Dunhollow graveyard at night, with a grave-speaker's staff in hand." : "For Vesna's Flesh Golem, bring together: "+GQ_TODO().join('; ')+". Then stitch it in Tobb's pit in the Dunhollow graveyard, at night.")+" The heart first, then staples and thread, the face last."]]);
 
 // ── a helmet for the golem: like the skeleton's weapon, a slot of its own beside it, once you know the golem and hold a grave-speaker's staff ──
-const golemHelmOn=()=>!!(CHOICE.golem==='done' && player.opts && NECRO_STAVES.includes(player.opts.equip.weapon));
+const golemHelmOn=()=>CHOICE.golem==='done';
 SLOT_NAMES.golem='Golem';
 { const oG=getAt, oS=setAt, oL=slotLoc, oP=placeError;
   getAt=loc=>loc.kind==='golem' ? (CHOICE.golemHelm||null) : oG(loc);
@@ -28823,7 +28840,7 @@ setInterval(()=>{ try{ if(CHOICE.golemHelm && !golemHelmOn()) golemHelmHome(); }
 { const oR=refreshInventory; refreshInventory=function(){ golemHelmHome(); let sl=document.querySelector('#inv-overlay .golem-slot');
     if(!sl){ const sk=document.querySelector('#inv-overlay .skel-slot'); if(sk){ sl=makeSlot('golem','head'); sl.classList.add('skel-slot','golem-slot'); const l=document.createElement('div'); l.className='lbl'; l.textContent='Golem'; sl.appendChild(l); sk.after(sl); } }
     const r=oR.apply(this,arguments);
-    if(sl){ sl.style.display=golemHelmOn()?'':'none'; sl.title=CHOICE.golemHelm?ITEMS[CHOICE.golemHelm].name+' (worn by the golem you stitch, for show)':'Your golem\'s helmet: drop anything for the head here. It is only for show.'; }
+    if(sl){ sl.style.display='none'; sl.title=CHOICE.golemHelm?ITEMS[CHOICE.golemHelm].name+' (worn by the golem you stitch, for show)':'Your golem\'s helmet: drop anything for the head here. It is only for show.'; }
     return r; }; }
 { const oM=onDragMove; onDragMove=function(e){ const was=invDrag&&invDrag.moved; const r=oM.apply(this,arguments);
     try{ if(invDrag && !was && invDrag.moved && ITEMS[invDrag.id].slot==='head' && golemHelmOn() && invDrag.loc.kind==='inv'){ const sl=document.querySelector('#inv-overlay .golem-slot'); if(sl) sl.classList.add('valid'); } }catch(e2){} return r; }; }
@@ -28888,6 +28905,32 @@ function golemHeadSpecial(c,x,B,head,view,part){ const EQ={head}, P=PROP.m, Y=BO
       c.fillStyle='rgba(255,255,255,0.85)'; c.beginPath(); c.arc(x+gx-0.4,B+gy-0.4,0.4,0,Math.PI*2); c.fill(); }
   }
 }
+
+// ── Your Dead: on the Necromancer page of the spellbook, what your skeleton carries and what your golem wears, picked from your pack ──
+let DEAD_PICK=null;   // 'skel' | 'golem' while choosing
+function deadSection(){ if(!CHOICE.skelArms && CHOICE.golem!=='done') return '';
+  const row=(k,label,cur,ok)=>{ if(!ok) return ''; const nm=cur?ITEMS[cur].name:'nothing';
+    let h=`<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><canvas data-deadicon="${cur||''}" width="64" height="64" style="width:32px;height:32px;border:1px dashed #6a5030;border-radius:6px;background:#1a120a"></canvas>
+      <div style="flex:1;font-size:12px"><div style="color:#a08050;font-size:11px">${label}</div><div style="color:${cur?'#e8e0c8':'#8a7858'}">${nm}</div></div>
+      <button data-dead="${k}" style="padding:3px 8px;border-radius:6px;border:1px solid #6a5030;background:#2a1e10;color:#d8c090;font:11px Georgia,serif;cursor:pointer">Change</button>
+      ${cur?`<button data-deadoff="${k}" style="padding:3px 8px;border-radius:6px;border:1px solid #5a4020;background:#1a120a;color:#c8b088;font:11px Georgia,serif;cursor:pointer">Take back</button>`:''}</div>`;
+    if(DEAD_PICK===k){ const want=k==='skel'?'weapon':'head', ids=[...new Set(player.inv.filter(id=>id && ITEMS[id] && ITEMS[id].slot===want))];
+      h+=`<div style="display:flex;flex-wrap:wrap;gap:4px;margin:5px 0 0 40px">${ids.length?ids.map(id=>`<button data-deadput="${k}" data-item="${id}" style="padding:3px 7px;border-radius:6px;border:1px solid #4a3820;background:transparent;color:#c8b088;font:11px Georgia,serif;cursor:pointer">${ITEMS[id].name}</button>`).join(''):`<span style="font-size:11px;color:#8a7858">Nothing ${k==='skel'?'to hold':'for a head'} in your pack.</span>`}</div>`; }
+    return h; };
+  return `<div style="margin-top:10px;border-top:1px solid #3a2a14;padding-top:6px"><div style="font-size:11px;letter-spacing:2px;color:#a08050">YOUR DEAD</div>`+
+    row('skel',"Your skeleton's weapon",CHOICE.skelWeapon,CHOICE.skelArms)+row('golem',"Your golem's helmet",CHOICE.golemHelm,CHOICE.golem==='done')+
+    `<div style="font-size:10px;color:#8a7858;margin-top:4px">Only for show. They keep them, whatever you hold.</div></div>`; }
+{ const oR=renderBook; renderBook=function(){ const r=oR.apply(this,arguments); try{ if(BOOK_TAB==='necro'){ const sec=deadSection(); if(sec){ const sel=bookPanel.querySelector('[data-close]'); const holder=document.createElement('div'); holder.innerHTML=sec;
+        const tgt=sel?sel.parentElement:null; if(tgt) bookPanel.insertBefore(holder,tgt); else bookPanel.appendChild(holder);
+        holder.querySelectorAll('canvas[data-deadicon]').forEach(cv=>{ const id=cv.dataset.deadicon; if(id) try{ drawItemIcon(cv.getContext('2d'),id,64); }catch(e){} }); } } }catch(e){ console.error(e); } return r; }; }
+bookPanel.addEventListener('click',e=>{ const t=e.target.closest('button'); if(!t) return;
+  const key=k=>k==='skel'?'skelWeapon':'golemHelm';
+  if(t.dataset.dead){ DEAD_PICK=DEAD_PICK===t.dataset.dead?null:t.dataset.dead; renderBook(); return; }
+  if(t.dataset.deadoff){ const k=key(t.dataset.deadoff), free=player.inv.indexOf(null); if(free<0){ flash('Make room in your pack first.'); return; }
+    player.inv[free]=CHOICE[k]; CHOICE[k]=null; DEAD_PICK=null; renderBook(); updateHud(); try{ autosaveSoon(400); }catch(err){} return; }
+  if(t.dataset.deadput){ const k=key(t.dataset.deadput), id=t.dataset.item, at=player.inv.indexOf(id); if(at<0) return;
+    const old=CHOICE[k]; player.inv[at]=null; if(old){ const free=player.inv.indexOf(null); player.inv[free>=0?free:at]=old; }     // what it had goes back into your pack
+    CHOICE[k]=id; DEAD_PICK=null; renderBook(); updateHud(); try{ autosaveSoon(400); }catch(err){} return; } });
 </script>
 </body>
 </html>

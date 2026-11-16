@@ -15322,7 +15322,7 @@ const SKEL_HEAP=[   // per group: centre, then how it lies in the heap: tipped o
   [-16,-44,1.5,  0,-95, 50,  -19,-2,5],      // 5 the weapon arm and what it holds (the same hand as yours)
   [ 0,-79,0,    25,  0, 70,    7,-11,11] ];  // 6 neck and skull, rolled onto one cheek
 function drawSkelFig(x0,y0,o){
-  const B='#ad9c72', D='#3e3426', PI2=Math.PI*2, d=o.dir||0, view=dirView(d), A=VIEW[view].ang*Math.PI/180, ca=Math.cos(A), sa=Math.sin(A);
+  const B=o.charred?'#4c4844':'#ad9c72', D=o.charred?'#0c0a09':'#3e3426', PI2=Math.PI*2, d=o.dir||0, view=dirView(d), A=VIEW[view].ang*Math.PI/180, ca=Math.cos(A), sa=Math.sin(A);
   const k=o.k||0, stand=!!o.stand, bob=stand?Math.sin(gt*2.2)*0.6:0, sw=stand?Math.sin(gt*3)*0.8:0, emerge=o.emerge??1;
   const E=t=>t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2, prog=i=>o.pile?0:clamp01((o.asm-0.25-i*0.07)/0.33), GE=[0,1,2,3,4,5,6].map(i=>E(prog(i)));
   const rx=(p,t,c)=>{ const y=p[1]-c[1], z=p[2]-c[2]; return [p[0], c[1]+y*Math.cos(t)-z*Math.sin(t), c[2]+y*Math.sin(t)+z*Math.cos(t)]; };
@@ -17490,9 +17490,18 @@ function drawWraps(x,B,e){ const sd=(e.id||0)*7.3; g.save(); g.lineCap='round';
   for(let k=0;k<3;k++){ const ax=x+(k-1)*7, ay=B-(70-k*18), sw=Math.sin(gt*2+sd+k)*5; g.beginPath(); g.moveTo(ax,ay); g.quadraticCurveTo(ax+8+sw,ay+5,ax+14+sw*1.5,ay+12+Math.cos(gt*1.7+k)*2); g.stroke(); }   // loose ends
   g.restore(); }
 function drawRisen0(x,B,e,pose){
-  if(e.dead){ const t=e.fallT||0; drawSkelFig(x,B,{asm:Math.max(0.25,1-t*1.4), emerge:1, dir:e.dir||0, weapon:e.opts.equip.weapon}); return; }      // it comes apart and lies there in a heap
+  if(e.dead){ const t=e.fallT||0; drawSkelFig(x,B,{asm:Math.max(0.25,1-t*1.4), emerge:1, dir:e.dir||0, weapon:e.opts.equip.weapon, charred:!!e.opts.charred}); if(e.opts.charred) charredGlow(x,B,e,Math.max(0,1-t*0.8)); return; }      // it comes apart and lies there in a heap
   const k=pose&&pose.kind==='raise'?-0.45*Math.min(1,pose.t):pose&&pose.kind==='strike'?Math.max(0,1-Math.min(1,pose.t)*0.6):0;
-  drawSkelFig(x,B,{asm:1, stand:true, dir:e.dir||0, moving:!!e.moving, walk:gt*9+(e.id||0), k, weapon:e.opts.equip.weapon}); }
+  drawSkelFig(x,B,{asm:1, stand:true, dir:e.dir||0, moving:!!e.moving, walk:gt*9+(e.id||0), k, weapon:e.opts.equip.weapon, charred:!!e.opts.charred}); if(e.opts.charred) charredGlow(x,B,e,1); }
+// the burned dead: embers still alive in the cracks of the bone, smouldering, and ash coming off them as they move
+function charredGlow(x,B,e,a){ if(a<=0) return; const T=gt+(e.id||0)*1.7, bob=Math.sin(gt*2.2)*0.6;
+  g.save(); [[-4,-77],[3,-72],[-7,-60],[6,-57],[-2,-50],[5,-44],[-6,-34],[3,-24],[-4,-12],[5,-6]].forEach(([dx,dy],k)=>{ g.fillStyle=`rgba(${186+k%3*12},${182+k%3*10},${176+k%3*8},${0.6*a})`; g.beginPath(); g.ellipse(x+dx,B+dy+bob,2.2,1.3,k*0.7,0,Math.PI*2); g.fill(); });   // pale ash caked on the charcoal
+  g.globalCompositeOperation='lighter';
+  [[-3,-74,1.4],[4,-70,1.0],[-6,-56,1.2],[5,-52,1.3],[0,-46,1.0],[-4,-38,1.1],[6,-30,0.9],[-5,-16,0.9],[4,-10,1.0]].forEach(([dx,dy,r],k)=>{ const f=0.45+0.55*Math.abs(Math.sin(T*(1.6+k*0.37)+k*2.1));
+    glow(x+dx,B+dy+bob,9*r,7*r,'255,110,30',0.45*a*f); g.fillStyle=`rgba(255,${150+Math.round(60*f)},70,${0.85*a*f})`; g.beginPath(); g.arc(x+dx,B+dy+bob,0.9*r+0.5*f,0,Math.PI*2); g.fill(); });   // ember-bright cracks
+  g.globalCompositeOperation='source-over';
+  for(let k=0;k<6;k++){ const ph=(T*0.35+k/6)%1; g.fillStyle=`rgba(120,114,108,${0.55*a*(1-ph)})`; g.beginPath(); g.arc(x+Math.sin(k*2.3+T*0.8)*9+ph*4,B-30-k*7-ph*34,1+ph*1.3,0,Math.PI*2); g.fill(); }   // ash drifting up off it
+  g.restore(); }
 wrap('fen','mobs',l=>{ const r=[...l,{ name:'Risen Bones', type:'skeleton', i:8, j:13, faction:'risen', daily:true, opts:RISEN('Risen Bones') }];
   if(nightAmt()>0.5) r.push({ name:'Rattling Bones', type:'skeleton', i:13, j:13, faction:'risen', daily:true, opts:RISEN('Rattling Bones') },{ name:'Restless Bones', type:'skeleton', i:20, j:18, faction:'risen', daily:true, opts:RISEN('Restless Bones') });   // more of them walk at night
   return r; });
@@ -22004,7 +22013,7 @@ Object.entries(UNDER_Q).forEach(([id,Q],qi)=>{ const room=(cx,cy)=>[2*cx+1,2*cy+
       return l; },
     npcs:()=>[],
     mobs:()=>(UNDER_MOBS[id]||[]).map(([name,type,[cx,cy,a,b],fac],k)=>{ const [i0,j0]=room(cx,cy), i=i0+a, j=j0+b, faction='und_'+id+'_'+(fac||k);
-      if(type==='skeleton') return { name, type, i, j, faction, opts:UNDER_DEAD(name) };
+      if(type==='skeleton') return { name, type, i, j, faction, opts:UNDER_DEAD(name,/Cistern/.test(name)?{charred:true}:{}) };   // by the stair to the Cinder Deeps, the dead were burned
       if(type==='lurker') return { name, type, i, j, faction, opts:LURK({}) };
       if(type==='bandit') return { name, type, i, j, faction, style:name.endsWith(' ')?undefined:'duelist', opts:BANDIT({skin:name.endsWith(' ')?3:1,hair:2,equip:{torso:'shirt',hands:null,legs:'trousers',feet:'boots',offhand:null,head:name.endsWith(' ')?'bandana':'hood',weapon:name.endsWith(' ')?'sword':'dagger',armor:name.endsWith(' ')?'studded':'jerkin'}}) };
       if(type==='ghost') return { name, type:'bandit', i, j, faction, opts:{gender:'m',skin:0,hair:1,hairColor:13,beard:5,face:1,ghost:true,equip:{head:'hood',torso:'shirt',armor:'robe',hands:null,legs:'trousers',feet:null,weapon:'mace',offhand:null}} };

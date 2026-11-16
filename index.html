@@ -28130,10 +28130,19 @@ OBJ_DRAW.rccocoon=o=>{ const q=P(o.i+0.5,o.j+0.5), split=(o.v||0)===1;   // a hu
   g.fillStyle='rgba(16,6,20,0.8)'; g.beginPath(); g.ellipse(q.x+4,q.y+1,8,2.4,0,0,Math.PI*2); g.fill(); };
 NEAR_NAME.rcshroom='a giant mushroom'; NEAR_NAME.rccocoon='a cocoon of bark'; NEAR_NAME.rcglow='glowing caps';
 onUse(['rccocoon'],o=>pzSay((o.v||0)===1 ? "A cocoon of bark and rot, split down the side and empty. Whatever grew in it walked away." : "A cocoon of bark and rot, taller than you. Something inside it shifts when you put your ear to it.",'#c8b8a0'));
-OBJ_DRAW.rcmouth=o=>{ const c=P(o.i+0.5,o.j+0.5);   // a hollow among the great tree's roots, going down
-  g.fillStyle='#050302'; g.beginPath(); g.ellipse(c.x,c.y+4,30,13,0,0,Math.PI*2); g.fill(); const ig=g.createRadialGradient(c.x,c.y+4,2,c.x,c.y+4,30); ig.addColorStop(0,'rgba(0,0,0,0.9)'); ig.addColorStop(1,'rgba(30,20,10,0)'); g.fillStyle=ig; g.beginPath(); g.ellipse(c.x,c.y+4,34,15,0,0,Math.PI*2); g.fill();
-  [[-34,-2,-6,-56,24,-2],[30,0,8,-50,-26,2],[-20,8,0,-40,22,10]].forEach(([x0,y0,mx,my,x1,y1],k)=>{ g.strokeStyle=k===2?'#4a3420':'#5a4028'; g.lineWidth=k===2?9:13; g.lineCap='round'; g.beginPath(); g.moveTo(c.x+x0,c.y+y0); g.quadraticCurveTo(c.x+mx,c.y+my,c.x+x1,c.y+y1); g.stroke(); g.strokeStyle='rgba(230,200,150,0.25)'; g.lineWidth=2.5; g.beginPath(); g.moveTo(c.x+x0-2,c.y+y0-4); g.quadraticCurveTo(c.x+mx,c.y+my-5,c.x+x1-2,c.y+y1-4); g.stroke(); }); };
-NEAR_NAME.rcmouth='a hollow among the roots';
+const rcMouthDraw=o=>{ const c=P(o.i+0.5,o.j+0.1), x=c.x+30, y=c.y-12, T=gt;   // an arched hollow in the great tree's trunk, between two of her roots, going down
+  const arch=(w,h)=>{ g.beginPath(); g.moveTo(x-w,y); g.lineTo(x-w,y-h*0.55); g.quadraticCurveTo(x-w,y-h,x,y-h); g.quadraticCurveTo(x+w,y-h,x+w,y-h*0.55); g.lineTo(x+w,y); g.closePath(); };
+  g.save(); g.fillStyle='#3a2a1a'; arch(26,78); g.fill();                                                       // the bark lip round the opening
+  const dg=g.createLinearGradient(0,y-70,0,y); dg.addColorStop(0,'#0a0604'); dg.addColorStop(1,'#020101'); g.fillStyle=dg; arch(19,68); g.fill();   // the dark inside
+  g.globalCompositeOperation='lighter'; glow(x,y-8,22,14,'150,200,120',0.22+0.08*Math.sin(T*1.3)); g.globalCompositeOperation='source-over';   // a faint green light from the roots far below
+  g.strokeStyle='#5a4028'; g.lineCap='round';
+  [[-30,6,-24,-30,-16,-62],[30,6,24,-30,16,-62],[-34,8,-14,4,-2,-2],[34,8,16,6,4,0]].forEach(([x0,y0,mx,my,x1,y1],k)=>{ g.lineWidth=k<2?10:8; g.beginPath(); g.moveTo(x+x0,y+y0); g.quadraticCurveTo(x+mx,y+my,x+x1,y+y1); g.stroke();
+    g.strokeStyle='rgba(230,200,150,0.22)'; g.lineWidth=2.4; g.beginPath(); g.moveTo(x+x0-2,y+y0-3); g.quadraticCurveTo(x+mx-2,y+my-3,x+x1-2,y+y1-3); g.stroke(); g.strokeStyle='#5a4028'; });   // roots framing it and running out over the ground
+  g.restore(); };
+// the hollow is cut into the great tree's trunk, so it is drawn with her (right after the trunk), not on its own
+OBJ_DRAW.rcmouth=o=>{ if(!OBJECTS.some(t=>t.type==='worldtree')) rcMouthDraw(o); };
+{ const _wt=OBJ_DRAW.worldtree; OBJ_DRAW.worldtree=o=>{ _wt(o); try{ const m=OBJECTS.find(t=>t.type==='rcmouth'); if(m){ const ga=g.globalAlpha; g.globalAlpha=ga*(o.fT??1); rcMouthDraw(m); g.globalAlpha=ga; } }catch(e){} }; }
+NEAR_NAME.rcmouth='a hollow in the great tree\'s roots';
 // the chambers
 function rcRootsFor(r){ const out=[], n=(r.cavern?3:1)+(r.hs%3===0?1:0)+(r.w*r.h>20?1:0), R=k=>rnd01(k,r.hs,2301);   // a few great roots out of the back walls, across the floor and away
   for(let k=0;k<n;k++){ const fromTop=R(k*5)<0.5, a=fromTop?[0.4+R(k*5+1)*(r.w-0.8),0.05]:[0.05,0.4+R(k*5+1)*(r.h-0.8)], b=R(k*5+2)<0.5?[0.4+R(k*5+3)*(r.w-0.8),r.h-0.05]:[r.w-0.05,0.4+R(k*5+3)*(r.h-0.8)], c=[r.w*(0.25+0.5*R(k*5+4)),r.h*(0.25+0.5*R(k*5+6))];
@@ -28184,8 +28193,8 @@ JOURNAL.push(['The Rot Below', ()=> !rcQ() ? null : rcQ()==='done' ? ['done',"Yo
       const id=ITEMS.elf_scale?'elf_scale':'elf_cloak', f=slotFor(id); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } player.purse+=120; updateHud(); try{ autosaveSoon(300); }catch(e){} }
     else if(typeof faction==='string' && faction.startsWith('rc_boss_') && !(CHOICE.rcBoss||{})[faction]){ (CHOICE.rcBoss=CHOICE.rcBoss||{})[faction]=1; const id=['elf_boots','elf_leggings','elf_circlet'].filter(x=>ITEMS[x])[Object.keys(CHOICE.rcBoss).length%3]; const f=id?slotFor(id):-1; if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } player.purse+=50; updateHud(); } }catch(e){} return r; }; }
 // the ways in: a hollow among the roots of the great tree in Sylvhaven; a stair of roots up into a stump in the Fellings
-AREAS.sylvhaven.entries.fromRoots={i:5,j:4};
-wrap('sylvhaven','objects',l=>[...l.filter(o=>!(o.i===5&&o.j===3&&!o.noblock)), {type:'rcmouth', i:5, j:3, noblock:true, flat:true, dz:-99}, {type:'teleporter', i:5, j:3, to:rcId(0,0), entry:'fromN', adit:true}]);
+AREAS.sylvhaven.entries.fromRoots={i:7,j:11};
+wrap('sylvhaven','objects',l=>[...l.filter(o=>!(o.i===7&&o.j===10&&!o.noblock)), {type:'rcmouth', i:7, j:10, noblock:true}, {type:'teleporter', i:7, j:10, to:rcId(0,0), entry:'fromN', adit:true}]);   // the way down is through the great tree herself: a hollow between her roots
 AREAS.fellings.entries.fromRoots={i:11,j:4};
 wrap('fellings','objects',l=>[...l.filter(o=>!(o.i===12&&o.j===4&&!o.noblock)), {type:'teleporter', i:12, j:4, to:rcId(7,7), entry:'fromE', locked:()=>!CHOICE.rcStump, onLocked:()=>pzSay("An old stump, hollow, roots going down into black. They are woven shut from below.",'#c8c0a8')}]);
 { const _sw=switchArea; switchArea=function(id,entry,...rest){ const r=_sw.call(this,id,entry,...rest); try{ if(id===rcId(7,7) && !CHOICE.rcStump){ CHOICE.rcStump=true; logMsg('A stair of roots climbs from here up into the light: the Fellings, a stump hollowed out from below. The roots part for you.','#c8d8a8'); } }catch(e){} return r; }; }

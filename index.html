@@ -1833,7 +1833,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   // ── women: short torn skirt, rope belt, fitted top with a scooped neckline ──
   const CF=CLOTH_F, front=V.turn>-0.25, pr=V.prof;
   // bust: fuller toward the side the body faces (none for men)
-  const SHEER = E.torso==='elf_robe' || (F && VR.torso==='necro_bustier');   // starwoven: you see what is under it; the fen-witch's bodice leaves the bust bare                  // starwoven: you see what is under it
+  const SHEER = E.torso==='elf_robe' || (F && VR.torso==='necro_bustier') || (typeof LING_TORSO!=='undefined' && LING_TORSO.has(E.torso));   // starwoven: you see what is under it; the fen-witch's bodice leaves the bust bare                  // starwoven: you see what is under it
   const ARMOR_TOP = E.armor && E.armor!=='elf_cloak' && E.armor!=='cowl_black' && E.armor!=='robe';   // an open cloak covers nothing in front
   const bareTop = (!E.torso||SHEER) && !ARMOR_TOP;
   const bR = F ? (front ? (bareTop && !SHEER && pr>0.8 ? 0.4 : 1.5+2.8*pr) : 1.0) : 0, bL = F ? (front ? 1.5*(1-pr) : 0.42) : 0;
@@ -2841,6 +2841,38 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   }
   // the moonlace bustier: sheer beige lace on a frame of satin seams — underwired cups with a keyhole, cut-outs at the waist,
   // a ruffled peplum and garter tabs. On a man the same cloth is cut as a fitted elven waistcoat.
+  // Maelis's night-things: they frame the body and leave the bust bare
+  function drawLingerie(id){ const sd=Y.SHOULDER, cx=LN+po, prof=pr>0.8, U=F?sd+12.6:sd+11, W0=Y.WAIST, bx=(k,t)=>cx+k*(F?4.6:3.4)*(1-pr*0.5)+(prof?pr*1.2:0);
+    c.save(); c.lineCap='round'; c.lineJoin='round';
+    const strap=(pts,col,w)=>{ c.strokeStyle=tone(col,-0.45,0.8); c.lineWidth=w+0.4; c.beginPath(); pts.forEach(([a,b2],k)=>k?c.lineTo(x+a,B+b2):c.moveTo(x+a,B+b2)); c.stroke(); c.strokeStyle=col; c.lineWidth=w; c.stroke(); };
+    if(id==='lace_underbust'){ const BG='#1c1418', top=U;   // a black satin corset from under the bust to the hips, laced in red, two thin straps up over the shoulders
+      const body=front ? [[LN-CH+0.8,top+0.8],[cx-2.2,top-0.6],[cx,top+1],[cx+2.2,top-0.6],[LN+CH-0.8,top+0.8],[LN+WA+0.9,W0-1],[LN+WA+1.2,W0+4.5],[cx,W0+6.6],[LN-WA-1.2,W0+4.5],[LN-WA-0.9,W0-1]]
+                       : [[LN-CH+0.5,top],[LN+CH-0.5,top],[LN+WA+0.9,W0-1],[LN+WA+1.2,W0+4.5],[LN-WA-1.2,W0+4.5],[LN-WA-0.9,W0-1]];
+      mass(body,BG,tone(BG,-0.5)); c.save(); path(body); c.clip(); litFill(body,'#2c2028',top,W0+6);
+        c.strokeStyle='rgba(120,100,110,0.35)'; c.lineWidth=0.35; for(let k=-2;k<=2;k++){ const xx=cx+k*WA*0.45; c.beginPath(); c.moveTo(x+xx,B+top+1); c.lineTo(x+xx,B+W0+5); c.stroke(); } c.restore();   // the boning
+      if(!prof){ c.strokeStyle='#b0242a'; c.lineWidth=0.4; const lx=front?cx:LN; for(let yy=top+2; yy<W0+4; yy+=1.9){ c.beginPath(); c.moveTo(x+lx-1.1,B+yy); c.lineTo(x+lx+1.1,B+yy+1.9); c.moveTo(x+lx+1.1,B+yy); c.lineTo(x+lx-1.1,B+yy+1.9); c.stroke(); } }   // the lacing
+      [-1,1].forEach(k=>{ if(prof && k<0) return; strap([[LN+k*(CH-1.6),top+0.6],[LN+k*(CH-0.6),sd+5],[LN+k*CH*0.62,sd+0.2]],'#2a1e24',0.6); }); }
+    else if(id==='chain_harness'){ const SV='#d4d8de';   // silver chains: a collar, chains down round the bust, a ring at the breastbone, a band round the ribs
+      c.strokeStyle=SV; c.lineWidth=0.45;
+      const chain=pts=>{ strap(pts,SV,0.45); c.fillStyle='#f4f6f8'; pts.forEach(([a,b2])=>{ c.beginPath(); c.arc(x+a,B+b2,0.35,0,Math.PI*2); c.fill(); }); };
+      chain([[LN-3.4+po,sd-1.6],[cx,sd-0.4],[LN+3.4+po,sd-1.6]]);   // the collar
+      if(front && !prof){ chain([[cx,sd-0.4],[cx,sd+9]]); [-1,1].forEach(k=>{ chain([[cx,sd+9],[bx(k)+k*(F?4.6:3),sd+(F?7:6)],[LN+k*(CH-0.4),sd+0.6]]); chain([[cx,sd+9],[bx(k)+k*(F?3.6:2.4),U+0.4],[LN+k*(CH-0.6),U+1.6]]); });
+        c.strokeStyle=SV; c.lineWidth=0.6; c.beginPath(); c.arc(x+cx,B+sd+9,1.1,0,Math.PI*2); c.stroke(); chain([[LN-WA-0.6,W0-2],[cx,W0-1.2],[LN+WA+0.6,W0-2]]); chain([[cx,sd+10.1],[cx,W0-1.2]]); }
+      else if(!front){ chain([[LN,sd-0.6],[LN,W0-1]]); chain([[LN-CH+0.6,U+1.6],[LN+CH-0.6,U+1.6]]); chain([[LN-WA-0.6,W0-2],[LN+WA+0.6,W0-2]]); }
+      else { chain([[LN+CH-0.4,sd+0.6],[LN+CH*0.4,U+0.8]]); chain([[LN-WA,W0-2],[LN+WA+0.6,W0-2]]); } }
+    else if(id==='sheer_shrug'){ const SH='rgba(196,170,226,0.42)', ED='rgba(150,120,190,0.8)';   // a gossamer shrug: sheer over the shoulders and upper back, open all down the front
+      const pts=front ? [[LN-CH-1.4,sd+1],[LN-CH*0.5,sd-1.4],[LN-CH*0.2,sd+3],[LN-CH+0.6,sd+11],[LN-CH-1.6,sd+9]] : [[LN-CH-1.4,sd+1],[LN+CH+1.4,sd+1],[LN+CH+1.6,sd+11],[LN-CH-1.6,sd+11]];
+      const draw=P2=>{ c.fillStyle=SH; path(P2); c.fill(); c.strokeStyle=ED; c.lineWidth=0.4; c.stroke(); };
+      draw(pts); if(front) draw(pts.map(([a,b2])=>[2*LN-a,b2]));
+      if(front && !prof){ c.strokeStyle=ED; c.lineWidth=0.35; [-1,1].forEach(k=>{ c.beginPath(); c.moveTo(x+LN+k*CH*0.2,B+sd+3); c.quadraticCurveTo(x+cx+k*1.2,B+sd+7,x+cx+k*0.6,B+sd+9.5); c.stroke(); }); c.fillStyle='#b896e0'; c.beginPath(); c.arc(x+cx,B+sd+9.6,0.7,0,Math.PI*2); c.fill(); } }   // a single tie at the breastbone, untied
+    else if(id==='open_bralette'){ const RD='#6a1428';   // an open-cup bralette: the wired frame of a bra in wine silk, nothing in the cups
+      if(front && !prof && F){ [-1,1].forEach(k=>{ const ox=bx(k); strap([[ox-k*3.6,U-0.2],[ox,U+0.8],[ox+k*3.8,U-0.6],[ox+k*4.2,sd+6]],RD,0.7); strap([[ox+k*4.2,sd+6],[ox+k*1.2,sd+2.2],[LN+k*CH*0.62,sd+0.2]],RD,0.55); });
+        strap([[bx(-1)+3.6,U-0.2],[cx,U-1.2],[bx(1)-3.6,U-0.2]],RD,0.55); c.fillStyle='#e8c060'; c.beginPath(); c.arc(x+cx,B+U-1.2,0.55,0,Math.PI*2); c.fill();   // a little gold bead where the cups meet
+        strap([[LN-CH+0.6,U+1.4],[bx(-1)-3.6,U-0.2]],RD,0.7); strap([[bx(1)+3.8,U-0.6],[LN+CH-0.6,U+1.4]],RD,0.7); }
+      else if(!front){ strap([[LN-CH+0.5,U+1.4],[LN+CH-0.5,U+1.4]],RD,0.8); [-1,1].forEach(k=>strap([[LN+k*CH*0.62,sd+0.2],[LN+k*(CH-1.4),U+1.4]],RD,0.55)); }
+      else if(front && !prof){ strap([[LN-CH+0.6,U+1.4],[cx,U+0.6],[LN+CH-0.6,U+1.4]],RD,0.8); [-1,1].forEach(k=>strap([[LN+k*CH*0.62,sd+0.2],[bx(k)+k*1.6,U+0.9]],RD,0.55)); }   // on a man: the band under the chest and its two straps
+      else { strap([[LN+CH-0.6,U+1.4],[LN+CH*0.3,U+0.4]],RD,0.7); strap([[LN+CH*0.62,sd+0.2],[LN+CH*0.6,sd+6]],RD,0.55); } }
+    c.restore(); }
   function drawElfBustier(){
     const NB=vT==='necro_bustier', BG=ELFC.bust||'#b3a283', SAT=NB?'#3a3a30':tone(BG,0.32), LACE=tone(BG,0.06), sd=Y.SHOULDER, prof=pr>0.8, cx=LN+po;
     const necroBits=(y0,y1)=>{ if(!NB) return;                                         // the fen-witch's bodice: frayed, laced with cord, muddy
@@ -3726,6 +3758,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   else if(ETUN) drawElfTunic();
   else if(ROBE) sheerLayer(0.58,drawElfRobe);
   else if(BUST) drawElfBustier();
+  else if(typeof LING_TORSO!=='undefined' && LING_TORSO.has(E.torso)) drawLingerie(E.torso);
   if(vA==='gambeson') drawGambeson();
   else if(E.armor==='jerkin'){ if(vA==='smith_apron') drawApron(); else { drawJerkin(); if(vA==='studded'||vA==='dwarf_harness') drawStuds(); if(vA==='dwarf_harness') drawBelt(Y.WAIST-3.6,Math.max(WA,HI)+1.4,{col:'#3a2414',h:4.4,metal:'#a4a8ae',studs:true}); } }
   else if(E.armor==='mail'){ const HV=vA==='anvil_plate'?'anvil':vA==='delver_lamellar'?'delver':vA==='rune_plate'?'rune':null;
@@ -12194,12 +12227,21 @@ function aerwenTalk(){
   opts.push(bye);
   say('Lady Aerwen',[greet],opts);
 }
+const LING_TORSO=new Set(['lace_underbust','chain_harness','sheer_shrug','open_bralette']);
+Object.assign(ITEMS,{ lace_underbust:{ name:'Midnight Underbust', slot:'torso', title:"Black satin boned from the hips to just under the bust, laced up the front in red. It holds you in and covers nothing above." },
+  chain_harness:{ name:'Silver Chain Harness', slot:'torso', title:"Fine silver chains: a collar, a ring at the breastbone, chains that go round rather than over, a band about the ribs. Maelis made it from her loom's spare wire, she says." },
+  sheer_shrug:{ name:'Gossamer Shrug', slot:'torso', title:"Lilac gossamer over the shoulders and down the back, open all the way down the front, with a single tie nobody ever ties." },
+  open_bralette:{ name:'Open-Cup Bralette', slot:'torso', title:"The wired frame of a bralette in wine-red silk, with a gold bead at the front. The cups were left out on purpose." } });
+Object.assign(PRICES,{ lace_underbust:60, chain_harness:85, sheer_shrug:45, open_bralette:55 });
+function maelisNight(back){ const disc = player.opts.race==='elf' || CHOICE.pact || hasItem('leaf') ? 0.8 : 1;
+  shopFrom('Maelis the Weaver',[...LING_TORSO],disc,["<i>She draws a curtain across the back of the tent and lifts a lid.</i> “Night-things. For coin, not leaves: I make them when the loom is bored. Elves don't believe in modesty, only in grace. Neither do these.”"],back); }
 function maelisTalk(){                            // she weaves for Silver Leaves (see SILVER LEAVES below); coin buys only worn things
   const disc = player.opts.race==='elf' || CHOICE.pact || hasItem('leaf') ? 0.8 : 1;   // the leaf speaks for you
   const back=()=>TALKERS.maelis();
   say('Maelis the Weaver',["“Good, you came. The loom has been asking.”"],[
     {label:'“What will you weave for leaves?”', fn:()=>leafTrade(back)},
     {label:'“How do I earn Silver Leaves?”', fn:()=>leafHow(back)},
+    {label:'“Anything for the night?”', fn:()=>maelisNight(back)},
     {label:'Worn things, for coin.', fn:()=>shopFrom('Maelis the Weaver',todaysStock('maelisworn',['elf_boots_worn','elf_tunic_worn','elf_leggings_worn','elf_shirt','elf_trousers','leaf_spaulders','moonweave_gloves'].filter(id=>ITEMS[id]&&PRICES[id]),3),disc,[disc<1 ? "“For a friend of Sylvhaven, a friend's price.”" : "“Human coin. For worn things, it will do.”"],back)},
     bye]);
 }
@@ -16563,6 +16605,19 @@ function paintIconExtras(g2,id,size){
     g2.save(); g2.scale(size/40,size/40);
     try{ f(g2,(x,y,rx,ry,c)=>{ g2.beginPath(); g2.ellipse(x,y,rx,ry,0,0,Math.PI*2); g2.fillStyle=c; g2.fill(); }); } finally{ g2.restore(); } }
 
+// their icons, on a 40-square
+{ const ln=(g2,col,w,pts)=>{ g2.strokeStyle=col; g2.lineWidth=w; g2.lineCap='round'; g2.lineJoin='round'; g2.beginPath(); pts.forEach(([x,y],k)=>k?g2.lineTo(x,y):g2.moveTo(x,y)); g2.stroke(); };
+  ICON_EXTRA.lace_underbust=(g2,E)=>{ g2.beginPath(); g2.moveTo(9,17); g2.quadraticCurveTo(14,15,20,18); g2.quadraticCurveTo(26,15,31,17); g2.lineTo(29,34); g2.quadraticCurveTo(20,37,11,34); g2.closePath(); g2.fillStyle='#1c1418'; g2.fill(); g2.strokeStyle='#4a3a44'; g2.lineWidth=0.8; g2.stroke();
+    ln(g2,'#2c2028',0.6,[[14,18],[14,34]]); ln(g2,'#2c2028',0.6,[[26,18],[26,34]]); for(let y=19;y<33;y+=3) ln(g2,'#c02a30',0.8,[[18.5,y],[21.5,y+3]]), ln(g2,'#c02a30',0.8,[[21.5,y],[18.5,y+3]]);
+    ln(g2,'#2a1e24',1,[[11.5,17],[13,5]]); ln(g2,'#2a1e24',1,[[28.5,17],[27,5]]); };
+  ICON_EXTRA.chain_harness=(g2,E)=>{ const ch=pts=>{ ln(g2,'#6a7078',1.6,pts); ln(g2,'#dfe3e8',1,pts); };
+    ch([[12,6],[20,10],[28,6]]); ch([[20,10],[20,20]]); ch([[20,20],[10,15],[9,8]]); ch([[20,20],[30,15],[31,8]]); ch([[20,20],[11,27],[9,30]]); ch([[20,20],[29,27],[31,30]]); ch([[8,32],[20,34],[32,32]]); ch([[20,22],[20,34]]);
+    g2.strokeStyle='#eef1f4'; g2.lineWidth=1.4; g2.beginPath(); g2.arc(20,20,2.4,0,Math.PI*2); g2.stroke(); };
+  ICON_EXTRA.sheer_shrug=(g2,E)=>{ [[1,6],[-1,34]].forEach(([k,x0])=>{ g2.beginPath(); g2.moveTo(20-k*3,7); g2.quadraticCurveTo(20-k*12,5,20-k*17,12); g2.lineTo(20-k*16,24); g2.lineTo(20-k*11,22); g2.quadraticCurveTo(20-k*9,14,20-k*3,7); g2.fillStyle='rgba(196,170,226,0.65)'; g2.fill(); g2.strokeStyle='#9678be'; g2.lineWidth=0.9; g2.stroke(); });
+    ln(g2,'rgba(150,120,190,0.6)',0.6,[[17,7],[23,7]]); E(20,24,1.4,1.4,'#b896e0'); ln(g2,'#b896e0',0.7,[[19,25],[17,31]]); ln(g2,'#b896e0',0.7,[[21,25],[23,31]]); };
+  ICON_EXTRA.open_bralette=(g2,E)=>{ const R='#7a1a30'; [-1,1].forEach(k=>{ ln(g2,R,1.6,[[20-k*1.5,22],[20-k*7,26],[20-k*13,22],[20-k*13.5,16],[20-k*10,6]]); ln(g2,R,1.6,[[20-k*13,22],[20-k*17,25]]); });
+    ln(g2,R,1.2,[[18.5,22],[20,20.5],[21.5,22]]); E(20,20.5,1.3,1.3,'#e8c060'); };
+}
 
 // ── the fallen oak across the causeway ──
 function drawFellTree(o){ const a=P(o.i+0.2,o.j+0.55), b=P(o.i+o.fp[0]-0.1,o.j+0.45), R=13;

@@ -15282,8 +15282,8 @@ function skelTick(dt){                              // your risen skeleton: clim
     skelReactTick(S,dt); if(S.react && !combat.active) return;
     if(!combat.active && combat.phase==='down'){ crumbleSkel(); return; }          // you fell: so does it
     if(combat.active) S.fought=true;
-    else if(S.fought){ S.fought=false; S.t=Math.max(S.t,12); S.max=Math.max(S.max,S.t); logMsg('Your skeleton rattles along behind you until the magic runs out.','#e8e4d0'); }
-    S.t-=dt*(combat.active?1:0.5);                                                   // between fights the magic drains slower
+    else if(S.fought){ S.fought=false; logMsg('Your skeleton rattles along behind you. Its magic only wears down in a fight.','#e8e4d0'); }
+    if(combat.active) S.t-=dt;                                                       // between fights it keeps: the magic only wears down while it fights
     if(S.t<=0){ crumbleSkel(); return; }
     const f=combat.active?combat.foe:null; let tx=S.x, ty=S.y;
     if(S.asm>=1){
@@ -15295,7 +15295,8 @@ function skelTick(dt){                              // your risen skeleton: clim
     if(f && !f.dead) S.dir=dirFromDelta(f.x-S.x,f.y-S.y); else if(S.moving && md>0.08) S.dir=dirFromDelta(mx,my);   // faces its foe, or the way it walks
     if(f && !f.dead && combat.phase==='fight' && S.asm>=1 && md<0.5){ S.cd-=dt; if(S.cd<=0){ S.cd=1.5; S.anim=0.3; wound(f,S.dmg||3,'Bones!','#e8e4d0'); } } }
 // it comes along through doors and gates
-function skelFollowArea(){ FSKEL=null; if(SKEL){ if(SKEL.crumble) SKEL=null; else { SKEL.x=player.x+0.7; SKEL.y=player.y+0.35; } } }   // the risen one follows you through doors
+function skelFollowArea(){ FSKEL=null; if(SKEL){ if(SKEL.crumble) SKEL=null; else { SKEL.x=player.x+0.7; SKEL.y=player.y+0.35; } }
+  if(typeof GOLEM!=='undefined' && GOLEM){ if(GOLEM.fade) GOLEM=null; else { GOLEM.x=player.x-0.7; GOLEM.y=player.y+0.35; } } }   // and the golem too   // the risen one follows you through doors
 // the skeleton as a little model of bones in 3D (x across, y up the screen, z toward you when it faces south), so it can turn to all eight facings like anyone else
 // and its pieces can lie in a real heap on the ground: each group of bones has a resting place in the heap, and flies up into place (or back down) bone by bone
 const SKEL_HEAP=[   // per group: centre, then how it lies in the heap: tipped over x, tipped over z, turned, and where (in degrees and px)
@@ -20217,7 +20218,7 @@ function closeBook(){ bookPanel.style.display='none'; }
 function renderBook(){ if(BOOK_TAB==='blade') return renderBlade(); const L=bookSchools(), sc=BOOK_TAB, b=BOOK(sc), all=bookSpells(sc), arrow={left:'◀ Left',up:'▲ Up',right:'▶ Right'}, m=SPM();
   const tabs=L.length>1?`<div style="display:flex;gap:6px;margin-bottom:10px">${L.map(x=>`<button data-tab="${x}" style="flex:1;padding:5px;border-radius:6px;border:1px solid ${x===sc?'#c09040':'#5a4020'};background:${x===sc?'#3a2810':'#1a120a'};color:#f0dca0;font:12px Georgia,serif;cursor:pointer">${BOOK_TABNAME[x]}</button>`).join('')}</div>`:'';
   const row=d=>`<div style="margin:6px 0"><div style="font-size:11px;color:#a08050;letter-spacing:1px">${arrow[d]}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px">${all.map(id=>`<button data-slot="${d}" data-spell="${id}" style="padding:4px 8px;border-radius:6px;border:1px solid ${b[d]===id?SPELL_DEF[id].col:'#4a3820'};background:${b[d]===id?'rgba(255,255,255,0.08)':'transparent'};color:${b[d]===id?SPELL_DEF[id].col:'#c8b088'};font:12px Georgia,serif;cursor:pointer">${SPELL_DEF[id].name}</button>`).join('')}</div></div>`;
-  const pas=sc==='necro' && NECRO_EXTRA('golem') ? '<div style="margin-top:8px;font-size:12px;color:#e8e4d0">Flesh Golem: cast Raise Dead again while your skeleton stands ('+GOLEM_COST+' mana, a piece of meat or fish and an old bone; once a fight).</div>' : '';
+  const pas=sc==='necro' && NECRO_EXTRA('golem') ? '<div style="margin-top:8px;font-size:12px;color:#e8e4d0">Flesh Golem: cast Raise Dead again while your skeleton stands ('+GOLEM_COST+' mana, a piece of meat or fish and an old bone; once a fight). It takes every blow you fail to parry. Your dead follow you between fights; their time only runs in a fight.</div>' : '';
   const sel=['left','up','right'].map(d=>SPELL_TIP(b[d],m)).map(t=>`<div style="font-size:11px;color:#c8b898;margin-top:2px">${t}</div>`).join('');
   bookPanel.innerHTML=`<div style="font-size:11px;letter-spacing:2px;color:#a08050;margin-bottom:8px">SPELLBOOK</div>${tabs}${['left','up','right'].map(row).join('')}${pas}<div style="margin-top:10px;border-top:1px solid #3a2a14;padding-top:6px">${sel}</div><div style="text-align:right;margin-top:10px"><button data-close="1" style="padding:4px 12px;border-radius:6px;border:1px solid #6a5030;background:#2a1e10;color:#d8c090;font:12px Georgia,serif;cursor:pointer">Close</button></div>`; }
 const BOOK_TABNAME={necro:'Necromancer', mage:'Magister', blade:'Sword'};
@@ -28573,7 +28574,11 @@ function golemTakes(n){ const G=GOLEM; if(!G || G.fade || G.rise<1 || n<=0 || !c
 function golemTick(dt){ const G=GOLEM; if(!G) return; G.hit=Math.max(0,G.hit-dt); G.anim=Math.max(0,G.anim-dt);
   if(G.fade){ G.fade+=dt; if(G.fade>3) GOLEM=null; return; }
   G.rise=Math.min(1,G.rise+dt/1.6);                                  // slow to stand: a moment before it can take anything
-  if(!combat.active){ G.fade=0.01; try{ SND.fx('gfall'); }catch(e){} logMsg('With nobody left to stand in front of, the golem sags and sinks back into the earth.','#c8b8b0'); return; }
+  if(!combat.active && combat.phase==='down'){ G.fade=0.01; try{ SND.fx('gfall'); }catch(e){} return; }                  // you fell: so does it
+  if(!combat.active){ if(G.rise<1) return; const dx=G.x-player.x, dy=G.y-player.y, d=Math.hypot(dx,dy)||1;              // between fights it lumbers after you, a step behind, on the other side from the skeleton
+    const C=[[player.x-1.0,player.y-0.25],[player.x-0.25,player.y-1.0],[player.x-0.8,player.y-0.8]].filter(([x,y])=>!blocked.has(Math.floor(x)+','+Math.floor(y)) && x>=0 && y>=0);   // always on the far side of you from the camera, so it never hides you
+    const best=C.sort((p1,p2)=>Math.hypot(p1[0]-G.x,p1[1]-G.y)-Math.hypot(p2[0]-G.x,p2[1]-G.y))[0]||[player.x+dx/d*1.15,player.y+dy/d*1.15]; let tx=G.x, ty=G.y; if(Math.hypot(best[0]-G.x,best[1]-G.y)>0.35){ tx=best[0]; ty=best[1]; } const mx=tx-G.x, my=ty-G.y, md=Math.hypot(mx,my), sp=Math.min(md,dt*Math.max(2,md*2.6));
+    if(md>0.001){ G.x+=mx/md*sp; G.y+=my/md*sp; } G.moving=md>0.04; if(G.moving && md>0.08) G.dir=dirFromDelta(mx,my); return; }
   G.t-=dt; if(G.t<=0){ G.fade=0.01; try{ SND.fx('gfall'); }catch(e){} floatText([Math.floor(G.x),Math.floor(G.y)],'The stitches give','#c8b8b0'); return; }
   const f=combat.foe; let tx=G.x, ty=G.y;
   if(f && !f.dead){ const fx=f.x-player.x, fy=f.y-player.y, fl=Math.hypot(fx,fy)||1; [tx,ty]=golemSlot(f); G.dir=dirFromDelta(f.x-G.x,f.y-G.y); }   // a step ahead at your shoulder, on the far side so it never hides you
@@ -28587,7 +28592,7 @@ function golemTick(dt){ const G=GOLEM; if(!G) return; G.hit=Math.max(0,G.hit-dt)
       const pose=G.anim>0 ? {kind:'strike', t:1-G.anim/0.5, dir:G.hook?'left':'up'} : G.hit>0 ? {kind:'stagger', t:1} : null;
       try{ drawGolem(q.x,q.y,{dir:G.dir, moving:G.moving&&!G.fade, id:7, flash:G.hit, dead:!!G.fade, fallT:G.fade||0, summon:true, helm:golemHelmOn()?CHOICE.golemHelm||null:null},pose); }catch(e){ console.error(e); }
       g.restore();
-      if(!G.fade && G.rise>=1){ const w=56, by=q.y-170; g.save(); g.fillStyle='rgba(10,8,6,0.75)'; g.fillRect(q.x-w/2-1,by-1,w+2,7);
+      if(!G.fade && G.rise>=1 && combat.active){ const w=56, by=q.y-170; g.save(); g.fillStyle='rgba(10,8,6,0.75)'; g.fillRect(q.x-w/2-1,by-1,w+2,7);
         g.fillStyle='#b89a8a'; g.fillRect(q.x-w/2,by,w*Math.max(0,G.hp/G.max),3.4); g.fillStyle='#8a7aa8'; g.fillRect(q.x-w/2,by+3.6,w*Math.max(0,G.t/GOLEM_LIFE),1.6); g.restore(); } }}); }; }
 // the stitched man himself: grey flesh in patches, iron staples, a sack for a face
 function drawGolem(x,B,e,pose){ const d=e.dir||0, fl=(d===5||d===6||d===7)?-1:1, back=(d===3||d===4||d===5), s=(d===2||d===6)?1:(d===0||d===4)?0:0.55;
@@ -28849,7 +28854,7 @@ function golemLearn(fought){ ['sack_hood','drowned_line','grave_staples','bear_h
   CHOICE.golem='done'; gqDrop('pit'); mobs.filter(m=>m.type==='golem').forEach(m=>{ m.gone=true; }); updateHud();
   say('The Stitched Man',[fought?"It goes down on one knee in the grass and stays there, head bowed, the strange light gone out of the holes in its face. When it looks up again, the light in them is yours.":"It sits up slowly, as if it is very tired. Then it climbs out of the pit, goes down on one knee in the grass, and bows its sewn face to you.",
     "Then it comes apart, quite gently, and sinks back into the earth. But you know the shape of it now. You could call it up again: your risen dead, a second word, and something from your pack to make it of.",
-    "<i>You learned <b>Flesh Golem</b>: while your skeleton stands, cast Raise Dead again. It costs "+GOLEM_COST+" mana, a piece of meat or fish and an old bone, once a fight. It holds two fifths of your health and takes the blows you do not parry, for "+GOLEM_LIFE+" seconds.</i>"],[bye]);
+    "<i>You learned <b>Flesh Golem</b>: while your skeleton stands, cast Raise Dead again. It costs "+GOLEM_COST+" mana, a piece of meat or fish and an old bone, once a fight. It holds two fifths of your health. Any blow you fail to parry lands on it instead of you; a blow you parry hurts no one. It fights for "+GOLEM_LIFE+" seconds, and between fights it follows you: its time and health only wear down in a fight.</i>"],[bye]);
   logMsg('You learned Flesh Golem: while your skeleton stands, cast Raise Dead again (needs meat or fish and an old bone).','#d8c8b8'); }
 JOURNAL.push(["The Stitched Man", ()=> !golemQ() ? null : golemQ()==='done' ? ['done',"You stitched your first Flesh Golem in Tobb's pit, and it knelt. While your skeleton stands, cast Raise Dead again to call one: "+GOLEM_COST+" mana, a piece of meat or fish and an old bone, once a fight."]
   : ['active', (gqAll() ? "You have everything. Go to Tobb's pit in the Dunhollow graveyard at night, with a grave-speaker's staff in hand." : "For Vesna's Flesh Golem, bring together: "+GQ_TODO().join('; ')+". Then stitch it in Tobb's pit in the Dunhollow graveyard, at night.")+" The heart first, then staples and thread, the face last."]]);

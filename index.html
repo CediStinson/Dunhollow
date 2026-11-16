@@ -424,6 +424,15 @@ html,body{touch-action:none;overscroll-behavior:none;-webkit-tap-highlight-color
 #story-hud .sq.side b{color:#d8c088;}
 #story-hud .sq-more{pointer-events:auto;cursor:pointer;display:inline-block;margin-top:3px;font:600 10px 'Segoe UI',system-ui,sans-serif;color:#c8a860;background:rgba(60,40,15,0.6);border:1px solid rgba(150,110,40,0.5);border-radius:4px;padding:1px 7px;user-select:none;}
 #story-hud .sq-more:hover{color:#f0dca0;}
+#clue-hud{position:absolute;left:14px;display:none;max-width:360px;padding:5px 9px 6px;border-radius:5px;background:rgba(22,14,4,0.7);border:1px solid rgba(170,130,60,0.55);color:#f0e2b8;font:italic 12px Georgia,serif;text-shadow:0 1px 2px #000;}
+#clue-hud .ch{display:flex;justify-content:space-between;align-items:center;font:600 10px 'Segoe UI',system-ui,sans-serif;letter-spacing:1px;text-transform:uppercase;color:#c8a050;margin-bottom:3px;font-style:normal;}
+#clue-hud .ch span{cursor:pointer;color:#a88a50;text-transform:none;letter-spacing:0;font-weight:500;} #clue-hud .ch span:hover{color:#f0dca0;}
+#clue-hud .cl{position:relative;padding:3px 18px 4px 0;border-bottom:1px dashed rgba(160,120,50,0.3);line-height:1.35;} #clue-hud .cl:last-child{border-bottom:0;}
+#clue-hud .cl.new{animation:clueIn 1.6s ease-out;} @keyframes clueIn{0%{background:rgba(240,200,90,0.35);}100%{background:transparent;}}
+#clue-hud .cx{position:absolute;right:0;top:2px;cursor:pointer;font:700 12px 'Segoe UI',system-ui,sans-serif;font-style:normal;color:#a88a50;padding:0 3px;border-radius:3px;} #clue-hud .cx:hover{color:#fff;background:rgba(160,60,40,0.6);}
+#clue-hud .cmore{font:500 10px 'Segoe UI',system-ui,sans-serif;font-style:normal;color:#a88a50;cursor:pointer;margin-top:2px;} #clue-hud .cmore:hover{color:#f0dca0;}
+.jclue{padding:4px 0 5px;border-bottom:1px dashed rgba(120,90,40,0.3);font:italic 13px/1.4 Georgia,serif;} .jclue.off{opacity:0.55;} .jclue .jp{float:right;cursor:pointer;font:600 10px 'Segoe UI',system-ui,sans-serif;font-style:normal;color:#8a6a2a;border:1px solid rgba(138,106,42,0.5);border-radius:3px;padding:0 5px;margin-left:6px;} .jclue .jd{font:10px 'Segoe UI',system-ui,sans-serif;color:#9a8a6a;font-style:normal;margin-right:4px;}
+
 .jq .jt{float:right;cursor:pointer;font:600 10px 'Segoe UI',system-ui,sans-serif;padding:2px 7px;border-radius:4px;border:1px solid rgba(120,80,30,0.45);color:#6a4a1a;background:rgba(200,160,80,0.18);user-select:none;}
 .jq .jt.off{color:#9a8a6a;background:transparent;border-style:dashed;}
 .jh{font-variant:small-caps;letter-spacing:2px;color:#7a5a2a;margin:14px 0 6px;font-size:13px;}
@@ -12831,7 +12840,7 @@ const MAIN_Q='__main';
 // pursuits: things you keep doing, not quests with an end. Their own heading in the journal, not counted for renown, and not followed on screen unless you ask
 const PURSUITS=new Set(['Buried Things','The Favour of Sylvhaven',"Vesna's Tallies",'Masterwork','Beyond Your Level','Sword Techniques',"The Magister's Lessons",'Matters of the Heart']);
 const isTracked=t=>PURSUITS.has(t) ? !!(CHOICE.trackP && CHOICE.trackP[t]) : !(CHOICE.untrack && CHOICE.untrack[t]);
-document.getElementById('jrn-btn').addEventListener('click',openJournal);
+document.getElementById('jrn-btn').addEventListener('click',()=>openJournal());   // by name, so later wraps (clues) apply
 window.addEventListener('keydown',e=>{ if((e.key==='l'||e.key==='L') && running && !(e.target&&e.target.tagName==='INPUT')){ noteOverlay.classList.contains('open') ? closeNote() : openJournal(); } });
 
 Object.assign(AREAS,{
@@ -29781,6 +29790,40 @@ function styleShop(kind){ closeDialog(); const old=document.getElementById('styl
     if(kind==='barber') CHOICE.freeCut=false; else CHOICE.freeInk=false; updateHud(); try{ refreshPlayerHp(false); autosaveSoon(200); }catch(e){}
     logMsg(kind==='barber'?(c?`Nitch snips, hums and steps back. ${formatCoin(c)}.`:'Nitch snips, hums and steps back. “On the house.”'):(c?`Bulga wipes the needle on his apron. ${formatCoin(c)}.`:'Bulga wipes the needle on his apron. “Free, like I said.”'),'#e8c060'); el.remove(); };
   build(); }
+
+// ════════ CLUES: what people tell you to do stays pinned on screen until you click it away; every clue is kept in the journal ════════
+{ const esc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const isClue=m=>m && !/^\s*(You\b|“|")/.test(m);                    // instructions and directions, not "you did it" lines or quoted remarks
+  const clues=()=>CHOICE.clues||(CHOICE.clues=[]);
+  let freshK=null;
+  const oldRemember=remember;
+  remember=function(k,v,msg){ const was=CHOICE[k]; oldRemember(k,v,msg);
+    if(was!==v || msg){ const L=clues(); for(let n=L.length-1;n>=0;n--) if(L[n].k===k && !(msg && L[n].t===msg)) L[n].off=true;   // the matter moved on: its old clue unpins itself
+      if(isClue(msg)){ const old=L.findIndex(c=>c.k===k && c.t===msg); if(old>=0) L.splice(old,1);
+        L.unshift({k, t:msg, d:Math.floor(dayClock/DAY_LEN)+1, off:false}); if(L.length>60) L.length=60; freshK=k; } }
+    try{ drawClues(); }catch(e){} };
+  let box=null;
+  function drawClues(){ if(typeof running==='undefined' || !running) return;
+    const story=document.getElementById('story-hud'); if(!story) return;
+    if(!box){ box=document.createElement('div'); box.id='clue-hud'; story.parentNode.appendChild(box);
+      box.addEventListener('click',e=>{ const t=e.target; if(!t || !t.dataset) return; e.stopPropagation();
+        if(t.classList.contains('cx')){ const c=clues()[+t.dataset.i]; if(c) c.off=true; try{ SND.fx('page'); }catch(_){} drawClues(); }
+        else if(t.dataset.all){ clues().forEach(c=>c.off=true); drawClues(); }
+        else if(t.dataset.jr){ openJournal(); } }); }
+    const words=t=>String(t).toLowerCase().match(/[a-z']{4,}/g)||[], seen=new Set(story.style.display==='none'?[]:words(story.textContent));
+    const repeats=c=>{ const w=words(c.t); return w.length && w.filter(x=>seen.has(x)).length/w.length>0.6; };   // the quest list on screen already says it
+    const on=clues().map((c,i)=>({...c,i})).filter(c=>!c.off && !repeats(c)), show=on.slice(0,3);
+    const html=show.length ? `<div class="ch">Clues${on.length>1?'<span data-all="1">clear all</span>':''}</div>`+show.map(c=>`<div class="cl${c.k===freshK?' new':''}">${esc(c.t)}<span class="cx" data-i="${c.i}" title="Got it">×</span></div>`).join('')+(on.length>3?`<div class="cmore" data-jr="1">+${on.length-3} more in the journal</div>`:'') : '';
+    if(box.innerHTML!==html) box.innerHTML=html; freshK=null;
+    box.style.display=show.length?'block':'none';
+    const top=(story.style.display==='none'?story.offsetTop:story.offsetTop+story.offsetHeight+6); box.style.top=top+'px'; }
+  window.drawClues=drawClues;
+  const oldU=updateHud; updateHud=function(...a){ const r=oldU.apply(this,a); try{ drawClues(); }catch(e){} return r; };
+  const oldJ=openJournal; openJournal=function(...a){ const r=oldJ.apply(this,a); const body=document.getElementById('note-body'); if(!body || !running) return r;
+    const L=clues(); if(L.length){ body.insertAdjacentHTML('beforeend',`<div class="jh">Clues</div>`+L.map((c,i)=>`<div class="jclue${c.off?' off':''}"><span class="jp" data-ci="${i}">${c.off?'Pin':'Unpin'}</span><span class="jd">Day ${c.d}</span>${esc(c.t)}</div>`).join(''));
+      body.querySelectorAll('.jclue .jp').forEach(el=>el.addEventListener('click',e=>{ e.stopPropagation(); const c=L[+el.dataset.ci]; if(c){ c.off=!c.off; el.textContent=c.off?'Pin':'Unpin'; el.parentNode.classList.toggle('off',c.off); drawClues(); } })); }
+    return r; };
+}
 </script>
 </body>
 </html>

@@ -20232,7 +20232,7 @@ function closeBook(){ bookPanel.style.display='none'; }
 function renderBook(){ if(BOOK_TAB==='blade') return renderBlade(); const L=bookSchools(), sc=BOOK_TAB, b=BOOK(sc), all=bookSpells(sc), arrow={left:'◀ Left',up:'▲ Up',right:'▶ Right'}, m=SPM();
   const tabs=L.length>1?`<div style="display:flex;gap:6px;margin-bottom:10px">${L.map(x=>`<button data-tab="${x}" style="flex:1;padding:5px;border-radius:6px;border:1px solid ${x===sc?'#c09040':'#5a4020'};background:${x===sc?'#3a2810':'#1a120a'};color:#f0dca0;font:12px Georgia,serif;cursor:pointer">${BOOK_TABNAME[x]}</button>`).join('')}</div>`:'';
   const row=d=>`<div style="margin:6px 0"><div style="font-size:11px;color:#a08050;letter-spacing:1px">${arrow[d]}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px">${all.map(id=>`<button data-slot="${d}" data-spell="${id}" style="padding:4px 8px;border-radius:6px;border:1px solid ${b[d]===id?SPELL_DEF[id].col:'#4a3820'};background:${b[d]===id?'rgba(255,255,255,0.08)':'transparent'};color:${b[d]===id?SPELL_DEF[id].col:'#c8b088'};font:12px Georgia,serif;cursor:pointer">${SPELL_DEF[id].name}</button>`).join('')}</div></div>`;
-  const pas=sc==='necro' && NECRO_EXTRA('golem') ? '<div style="margin-top:8px;font-size:12px;color:#e8e4d0">Flesh Golem: cast Raise Dead again while your skeleton stands ('+GOLEM_COST+' mana, a piece of meat or fish and an old bone; once a fight). It takes every blow you fail to parry. Your dead follow you between fights; their time only runs in a fight.</div>' : '';
+  const pas=sc==='necro' && NECRO_EXTRA('golem') ? '<div style="margin-top:8px;font-size:12px;color:#e8e4d0">Flesh Golem: cast Raise Dead again while your skeleton stands ('+GOLEM_COST+' mana and one of Vesna\'s stitching bundles, or a piece of meat or fish and an old bone; once a fight). It takes every blow you fail to parry. Your dead follow you between fights; their time only runs in a fight.</div>' : '';
   const sel=['left','up','right'].map(d=>SPELL_TIP(b[d],m)).map(t=>`<div style="font-size:11px;color:#c8b898;margin-top:2px">${t}</div>`).join('');
   bookPanel.innerHTML=`<div style="font-size:11px;letter-spacing:2px;color:#a08050;margin-bottom:8px">SPELLBOOK</div>${tabs}${['left','up','right'].map(row).join('')}${pas}<div style="margin-top:10px;border-top:1px solid #3a2a14;padding-top:6px">${sel}</div><div style="text-align:right;margin-top:10px"><button data-close="1" style="padding:4px 12px;border-radius:6px;border:1px solid #6a5030;background:#2a1e10;color:#d8c090;font:12px Georgia,serif;cursor:pointer">Close</button></div>`; }
 const BOOK_TABNAME={necro:'Necromancer', mage:'Magister', blade:'Sword'};
@@ -28569,9 +28569,9 @@ function golemFlesh(){ return GOLEM_FLESH.find(id=>invCount(id)>0) || null; }
 function stitchGolem(f){
   if(GOLEM && !GOLEM.fade){ floatText(tileOf(player),'Already stitched','#c8b8b0'); return true; }
   if(GOLEM_USED){ floatText(tileOf(player),'The flesh is spent','#c8b8b0'); logMsg('You have stitched one golem this fight already. The dead will not give you twice.','#c8b8b0'); return true; }
-  const fl=golemFlesh(); if(!fl || invCount('old_bone')<1){ floatText(tileOf(player),!fl?'No flesh to stitch':'No bone to stitch','#c8b8b0'); logMsg('A Flesh Golem needs a piece of meat or fish and an old bone from your pack.','#c8b8b0'); return false; }
+  const kit=invCount('grave_thread')>0, fl=kit?null:golemFlesh(); if(!kit && (!fl || invCount('old_bone')<1)){ floatText(tileOf(player),!fl?'No flesh to stitch':'No bone to stitch','#c8b8b0'); logMsg('A Flesh Golem needs a stitching bundle from Vesna, or a piece of meat or fish and an old bone from your pack.','#c8b8b0'); return false; }
   if((player.mana??0)<GOLEM_COST){ floatText(tileOf(player),'Out of mana','#a8a0c8'); return false; }
-  const S=SKEL; player.mana-=GOLEM_COST; player.inv[player.inv.indexOf(fl)]=null; player.inv[player.inv.indexOf('old_bone')]=null; GOLEM_USED=true;
+  const S=SKEL; player.mana-=GOLEM_COST; if(kit) player.inv[player.inv.indexOf('grave_thread')]=null; else { player.inv[player.inv.indexOf(fl)]=null; player.inv[player.inv.indexOf('old_bone')]=null; } GOLEM_USED=true;
   const hp=Math.max(8,Math.round(player.maxHp*0.4));
   const [gx,gy]=golemSlot(f); GOLEM={ x:gx, y:gy, dir:(S&&S.dir)||0, hp, max:hp, t:GOLEM_LIFE, rise:0, anim:0, cd:1.6, hit:0, fade:0, moving:false, dmg:Math.max(5,Math.round(7*SPM())) };
   lunge(player,f);   // the skeleton stays on its feet: the golem rises beside it shake=Math.max(shake,5); SND.spell('Raise Dead'); try{ SND.fx('grise'); }catch(e){}
@@ -28878,11 +28878,30 @@ function golemLearn(fought){ ['sack_hood','drowned_line','grave_staples','bear_h
   CHOICE.golem='done'; gqDrop('pit'); mobs.filter(m=>m.type==='golem').forEach(m=>{ m.gone=true; }); updateHud();
   say('The Stitched Man',[fought?"It goes down on one knee in the grass and stays there, head bowed, the strange light gone out of the holes in its face. When it looks up again, the light in them is yours.":"It sits up slowly, as if it is very tired. Then it climbs out of the pit, goes down on one knee in the grass, and bows its sewn face to you.",
     "Then it comes apart, quite gently, and sinks back into the earth. But you know the shape of it now. You could call it up again: your risen dead, a second word, and something from your pack to make it of.",
-    "<i>You learned <b>Flesh Golem</b>: while your skeleton stands, cast Raise Dead again. It costs "+GOLEM_COST+" mana, a piece of meat or fish and an old bone, once a fight. It holds two fifths of your health. Any blow you fail to parry lands on it instead of you; a blow you parry hurts no one. It fights for "+GOLEM_LIFE+" seconds, and between fights it follows you: its time and health only wear down in a fight.</i>"],[bye]);
-  logMsg('You learned Flesh Golem: while your skeleton stands, cast Raise Dead again (needs meat or fish and an old bone).','#d8c8b8'); }
+    "<i>You learned <b>Flesh Golem</b>: while your skeleton stands, cast Raise Dead again. It costs "+GOLEM_COST+" mana and one of Vesna's stitching bundles (or a piece of meat or fish and an old bone), once a fight. Vesna sells the bundles, and has put three in your pack to start. It holds two fifths of your health. Any blow you fail to parry lands on it instead of you; a blow you parry hurts no one. It fights for "+GOLEM_LIFE+" seconds, and between fights it follows you: its time and health only wear down in a fight.</i>"],[bye]);
+  for(let q=0;q<3;q++){ const k=slotFor('grave_thread'); if(k>=0) player.inv[k]='grave_thread'; }
+  logMsg('You learned Flesh Golem: while your skeleton stands, cast Raise Dead again (needs a stitching bundle, or meat or fish and an old bone). Vesna gave you three bundles.','#d8c8b8'); }
 JOURNAL.push(["The Stitched Man", ()=> !golemQ() ? null : golemQ()==='done' ? ['done',"You stitched your first Flesh Golem in Tobb's pit, and it knelt. While your skeleton stands, cast Raise Dead again to call one: "+GOLEM_COST+" mana, a piece of meat or fish and an old bone, once a fight."]
   : ['active', (gqAll() ? "You have everything. Go to Tobb's pit in the Dunhollow graveyard at night, with a grave-speaker's staff in hand." : "For Vesna's Flesh Golem, bring together: "+GQ_TODO().join('; ')+". Then stitch it in Tobb's pit in the Dunhollow graveyard, at night.")+" The heart first, then staples and thread, the face last."]]);
 
+// ── Vesna's stitching bundles: cured flesh, a bone needle and waxed grave-thread in one wrap, so a golem need not cost you your supper and your bones ──
+Object.assign(ITEMS,{ grave_thread:{ name:'Stitching Bundle', slot:'misc', stack:true, stackMax:10, title:"A strip of salted flesh, a bone needle and a hank of waxed grave-thread, rolled up in sackcloth by Vesna. Enough for one Flesh Golem." } });
+PRICES.grave_thread=8;
+ICON_BONES.grave_thread=c=>{ c.fillStyle='#b8a074'; c.strokeStyle='#5a4628'; c.lineWidth=1.2; c.beginPath(); c.roundRect(7,14,26,14,6); c.fill(); c.stroke();   // the sackcloth roll
+  c.strokeStyle='rgba(90,70,40,0.6)'; c.lineWidth=0.7; [12,18,24,28].forEach(x=>{ c.beginPath(); c.moveTo(x,15); c.lineTo(x,27); c.stroke(); });
+  c.fillStyle='#9a4a40'; c.beginPath(); c.ellipse(10,21,3,5,0,0,Math.PI*2); c.fill();   // the flesh showing at the end
+  c.strokeStyle='#2a2420'; c.lineWidth=1.6; c.beginPath(); c.moveTo(14,14); c.quadraticCurveTo(20,30,27,14); c.stroke();   // the thread binding it
+  c.strokeStyle='#e8e0cc'; c.lineWidth=1.8; c.lineCap='round'; c.beginPath(); c.moveTo(22,9); c.lineTo(34,31); c.stroke(); c.fillStyle='#e8e0cc'; c.beginPath(); c.arc(22.6,10,1.6,0,Math.PI*2); c.fill(); };   // the bone needle
+const THREAD_PRICE=15, THREAD_FIVE=60;
+function threadShop(){ const V='Vesna the Grave-Speaker', back=()=>TALKERS.vesna(), room=n=>{ let ok=0; for(let q=0;q<n;q++){ const k=slotFor('grave_thread'); if(k<0) break; player.inv[k]='grave_thread'; ok++; } return ok; },
+    buy=(n,cost)=>{ if(player.purse<cost) return; const got=room(n); if(!got){ logMsg('Your pack is full.','#c8b8b0'); return; } player.purse-=Math.round(cost*got/n); updateHud(); try{ if(invOverlay.classList.contains('open')) refreshInventory(); autosaveSoon(200); }catch(e){}
+      logMsg(`You buy ${got} stitching bundle${got>1?'s':''}.`,'#d8c8b8'); threadShop(); };
+  say(V,["<i>She has them ready in a basket under the table: rolls of sackcloth tied with black thread.</i> “Salt flesh, a bone needle, grave-thread waxed so it does not rot. One roll, one golem. I make them while you are out getting killed.”",`<i>You carry ${invCount('grave_thread')}.</i>`],[
+    {label:`One bundle. (${formatCoin(THREAD_PRICE)})`, off:player.purse<THREAD_PRICE, fn:()=>buy(1,THREAD_PRICE)},
+    {label:`Five bundles. (${formatCoin(THREAD_FIVE)})`, off:player.purse<THREAD_FIVE, fn:()=>buy(5,THREAD_FIVE)},
+    {label:'Back.', fn:back}, bye],true); }
+{ const oldV=TALKERS.vesna; TALKERS.vesna=(...a)=>{ const r=oldV(...a); try{ if(CHOICE.golem!=='done') return r; const box=document.getElementById('dlg-opts');
+    if(dlgOverlay.classList.contains('open') && box && !box.querySelector('.dlg-opt.threadopt')){ const b=document.createElement('button'); b.className='dlg-opt threadopt'; b.innerHTML='<span>“I need stitching for my golems.”</span>'; b.addEventListener('click',threadShop); box.insertBefore(b,box.lastElementChild); } }catch(e){} return r; }; }
 // ── a helmet for the golem: like the skeleton's weapon, a slot of its own beside it, once you know the golem and hold a grave-speaker's staff ──
 const golemHelmOn=()=>CHOICE.golem==='done';
 SLOT_NAMES.golem='Golem';

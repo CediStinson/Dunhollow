@@ -29824,6 +29824,158 @@ function styleShop(kind){ closeDialog(); const old=document.getElementById('styl
       body.querySelectorAll('.jclue .jp').forEach(el=>el.addEventListener('click',e=>{ e.stopPropagation(); const c=L[+el.dataset.ci]; if(c){ c.off=!c.off; el.textContent=c.off?'Pin':'Unpin'; el.parentNode.classList.toggle('off',c.off); drawClues(); } })); }
     return r; };
 }
+
+// ════════ THE LONG ROADS: travel stretches between the regions, so the valley feels as wide as it is ════════
+//   Forest Road → Hedgerow Way → The Long Meadow → King's Road (Hollowmere)     Bandit Camp → The Scrublands → The Dry Wash (desert)
+//   Boundary Stones → Greywater Heath → Fen Causeway                           Logging Road → The Foothills → Varrow Pass
+//   Crossroads → The Alder Brook → Mill Track
+{ const along=(pts,t)=>{ for(let k=1;k<pts.length;k++){ const [x0,y0]=pts[k-1],[x1,y1]=pts[k]; if((t-y0)*(t-y1)<=0 && y0!==y1) return x0+(x1-x0)*(t-y0)/(y1-y0); } return pts[0][0]; };   // x of a north–south road at row t
+  const acrossY=(pts,t)=>{ for(let k=1;k<pts.length;k++){ const [x0,y0]=pts[k-1],[x1,y1]=pts[k]; if((t-x0)*(t-x1)<=0 && x0!==x1) return y0+(y1-y0)*(t-x0)/(x1-x0); } return pts[0][1]; };
+  const R=(a,b,k)=>rnd01(a,b,k);
+  const BASE={ fence:{r:false,l:false}, mini:{x:0,y:0}, notches:()=>[], dummy:null };
+  const tree=(i,j,sp,s)=>({type:'tree', i, j, sp, v:(i*3+j)%3, s, ox:(R(i,j,5)-0.5)*0.5, oy:(R(i,j,6)-0.5)*0.4});
+  const P_HEDGE=[[6.5,56.5],[5.2,50],[7.4,43],[8.2,36],[6.0,29],[4.4,22],[5.6,15],[7.8,8],[6.5,-0.5]];
+  const P_MEAD=[[4.5,12.5],[6,8.5],[12,6.6],[20,7.4],[28,5.6],[36,6.8],[44,5],[50,3.2],[51.5,-0.5]];
+  const P_SCRUB=[[6.5,-0.5],[5.4,7],[7.2,15],[8.4,23],[6.2,31],[4.6,39],[5.8,46],[6.5,52.5]];
+  const P_HEATH=[[2.5,14.5],[5,10.5],[12,8.4],[20,6.2],[28,7.8],[36,5.4],[42,3.6],[45.5,-0.5]];
+  const P_FOOT=[[6.5,52.5],[7.6,45],[5.4,38],[3.8,31],[5.6,24],[8.2,17],[7.0,9],[5.5,-0.5]];
+  const P_BROOK=[[-0.5,5.5],[8,4.6],[16,5.8],[24,4.4],[32,5.6],[40,4.6],[49.5,4.5]];
+  Object.assign(AREA_PATHS,{ hedgerow:[P_HEDGE], longmeadow:[P_MEAD, [[24,6.4],[24.5,9.5]]], scrubland:[P_SCRUB], heath:[P_HEATH], foothills:[P_FOOT], alderbrook:[P_BROOK] });
+
+  OBJ_DRAW.hawhedge=o=>{ const q=P(o.i+0.5,o.j+0.5), sd=(o.i*7+o.j*13)%5;   // a clump of hawthorn hedge: lumpy leaf masses, darker beneath, white may-blossom on top
+    drawCached('haw'+sd,q.x,q.y,84,70,42,56,(X,Y)=>{ const L=[[-22,-8,13],[-8,-14,15],[8,-12,15],[22,-6,12],[-14,-22,11],[2,-26,12],[16,-20,11]];
+      g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(X+2,Y+2,34,9,0,0,Math.PI*2); g.fill();
+      L.forEach(([dx,dy,r],k)=>{ const rr=r*(0.88+((sd+k)%3)*0.08); g.fillStyle=['#2e4a1e','#36521f','#2a4419'][k%3]; g.beginPath(); g.arc(X+dx,Y+dy+3,rr,0,Math.PI*2); g.fill(); });
+      L.forEach(([dx,dy,r],k)=>{ const rr=r*(0.8+((sd+k)%3)*0.07), gr=g.createRadialGradient(X+dx-rr*0.4,Y+dy-rr*0.5,1,X+dx,Y+dy,rr); gr.addColorStop(0,'#86a84e'); gr.addColorStop(0.6,'#557a2e'); gr.addColorStop(1,'#34521e'); g.fillStyle=gr; g.beginPath(); g.arc(X+dx,Y+dy,rr,0,Math.PI*2); g.fill(); });
+      for(let k=0;k<34;k++){ const a=(k*2.399)%(Math.PI*2), r=(k*7%23), x=X+Math.cos(a)*r*1.2, y=Y-14+Math.sin(a)*r*0.55; g.fillStyle=k%4?'rgba(160,190,100,0.55)':'rgba(20,40,12,0.5)'; g.beginPath(); g.ellipse(x,y,2.2,1.4,a,0,Math.PI*2); g.fill(); }   // leaf texture
+      for(let k=0;k<(sd%2?16:9);k++){ const a=(k*1.7+sd)%(Math.PI*2), r=6+(k*5%18), x=X+Math.cos(a)*r*1.1, y=Y-22+Math.sin(a)*r*0.4; g.fillStyle='#f4f0e6'; g.beginPath(); g.arc(x,y,1.5,0,Math.PI*2); g.fill(); g.fillStyle='#e8c8a0'; g.beginPath(); g.arc(x,y,0.5,0,Math.PI*2); g.fill(); } }); };
+  Object.assign(AREAS,{
+  // ── Hedgerow Way: a sunken lane between hawthorn hedges and pasture, the first day out of the woods toward the city ──
+  hedgerow:{ ...BASE, w:12, h:56, theme:'road', label:'Hedgerow Way', dens:0.75,
+    objects:()=>{ const l=[ {type:'teleporter', i:6, j:55, to:'road', entry:'fromCity'}, {type:'teleporter', i:6, j:0, to:'longmeadow', entry:'fromHedge'},
+        {type:'milestone', i:Math.round(along(P_HEDGE,48))+2, j:48, t:'HOL 6'}, {type:'milestone', i:Math.round(along(P_HEDGE,12))-2, j:12, t:'HOL 5'},
+        {type:'wayshrine', i:Math.round(along(P_HEDGE,40))-3, j:40}, {type:'signpost', i:Math.round(along(P_HEDGE,53))+2, j:53},
+        {type:'cart', i:Math.round(along(P_HEDGE,24))+2, j:24}, {type:'barrel', i:Math.round(along(P_HEDGE,24))+3, j:25},
+        {type:'campfire', i:Math.round(along(P_HEDGE,30))-3, j:30}, {type:'logseat', i:Math.round(along(P_HEDGE,30))-4, j:31}, {type:'logseat', i:Math.round(along(P_HEDGE,30))-2, j:31, r:1},
+        {type:'haystack', i:10, j:18}, {type:'haystack', i:9, j:16}, {type:'stooks', i:10, j:14, noblock:true}, {type:'stooks', i:9, j:20, noblock:true}, {type:'fieldshelter', i:1, j:6},
+        {type:'stile', i:Math.round(along(P_HEDGE,35))+2, j:35, noblock:true}, {type:'stile', i:Math.round(along(P_HEDGE,9))-2, j:9, noblock:true} ];
+      for(let j=32;j<=45;j++){ const x=along(P_HEDGE,j); if(j!==35) l.push({type:'hawhedge', i:Math.round(x)+2, j}); if(j!==38 && j!==39) l.push({type:'hawhedge', i:Math.round(x)-2, j}); }   // the sunken stretch, hedged both sides
+      for(let k=0;k<10;k++){ const j=4+k*5, x=along(P_HEDGE,j), s=k%2?1:-1; l.push({type:'berrybush', i:Math.round(x)+s*3, j}); }
+      for(let k=0;k<14;k++){ const j=2+k*4, x=along(P_HEDGE,j); l.push({type:k%3?'foxglove':'flowerbed', i:Math.round(x)+(k%2?2:-2), j:j+1, dx:0, noblock:true}); }
+      return l; },
+    npcs:()=> encounter('drover',0.55) ? [{ id:'drover', name:'Hamm the Drover', i:Math.round(along(P_HEDGE,20))+1, j:20, dir:6, wander:[[6,10],[6,44],[5,22]], speed:0.6, named:true, opts:{gender:'m',skin:2,hair:3,hairColor:5,beard:2,face:1,equip:{head:'straw_hat',torso:'smock',armor:null,hands:null,legs:'breeches',feet:'boots',weapon:null,offhand:null}} }] : [],
+    mobs:()=> nightAmt()>0.55 ? [{ name:'Hedge Wolf', type:'wolf', i:9, j:27, faction:'hedgewolf', daily:true, coat:'#6e6458' }, { name:'Hedge Wolf', type:'wolf', i:10, j:29, faction:'hedgewolf', daily:true, coat:'#5e5448' }] : [],
+    entries:{ fromForestRoad:{i:6,j:54}, fromMeadow:{i:6,j:1} } },
+
+  // ── The Long Meadow: open grassland under a big sky, with the Halfway Lantern inn at its middle ──
+  longmeadow:{ ...BASE, w:56, h:12, theme:'road', label:'The Long Meadow', dens:0.22,
+    objects:()=>{ const l=[ {type:'teleporter', i:4, j:11, to:'hedgerow', entry:'fromMeadow'}, {type:'teleporter', i:51, j:0, to:'kingsroad', entry:'fromRoad'},
+        B(22,10,4,2,2,{h:78,rh:44,door:'u',dt:1,sign:'🏮'}), {type:'banner', i:26, j:9}, {type:'lamp', i:21, j:9}, {type:'lamp', i:27, j:8},
+        {type:'pen', part:'back', i:29, j:8, fp:[2,2], noblock:true, dz:9.6}, {type:'pen', part:'front', i:29, j:8, fp:[2,2], noblock:true, dz:12.8}, {type:'trough', i:31, j:9},
+        {type:'washline', i:18, j:9, noblock:true}, {type:'kegrack', i:19, j:10, fp:[2,1]}, {type:'bench', i:25, j:7}, {type:'campfire', i:33, j:3},
+        {type:'milestone', i:12, j:Math.round(acrossY(P_MEAD,12))-2, t:'HOL 4'}, {type:'milestone', i:44, j:Math.round(acrossY(P_MEAD,44))+2, t:'HOL 3½'},
+        {type:'menhir', i:40, j:9, v:1}, {type:'cairn', i:8, j:2}, {type:'haystack', i:14, j:9}, {type:'haystack', i:46, j:9}, {type:'stooks', i:16, j:10, noblock:true}, {type:'stooks', i:48, j:10, noblock:true} ];
+      for(let k=0;k<22;k++){ const i=2+k*2.4|0, j=(k*7)%11; if(Math.abs(j-acrossY(P_MEAD,i))>1.6) l.push({type:k%4?'flowerbed':'foxglove', i, j, dx:0, noblock:true, ...(k%4?{cols:[['#f2ede0','#e8d060','#f0f0f0'],['#c8a0e0','#f2ede0','#e8a0b0'],['#e8d060','#f2ede0','#e88a60']][k%3]}:{})}); }
+      return l; },
+    npcs:()=>[{ id:'halfwayinn', name:'Marta of the Halfway Lantern', i:24, j:8, dir:1, opts:{gender:'f',skin:1,hair:2,hairColor:6,face:1,equip:{head:null,torso:'tunic_red',armor:null,hands:null,legs:'hose_grey',feet:'boots',weapon:null,offhand:null}} },
+      ...(encounter('pedlar2',0.5) ? [{ id:'meadowpedlar', name:'A Travelling Tinker', i:34, j:4, dir:7, named:true, opts:{gender:'m',skin:3,hair:1,hairColor:2,beard:3,face:2,equip:{head:'hood',torso:'tunic_blue',armor:null,hands:'gloves',legs:'trousers',feet:'boots',weapon:null,offhand:null}} }] : [])],
+    mobs:()=> nightAmt()>0.55 ? [{ name:'Meadow Highwayman', type:'bandit', i:47, j:7, faction:'meadowhw', daily:true, opts:BANDIT({skin:1,hair:2,hairColor:3,beard:2,equip:{head:'bandana'}}) }] : [],
+    entries:{ fromHedge:{i:4,j:10}, fromKings:{i:51,j:1} } },
+
+  // ── The Scrublands: the woods thin to thorn and dry grass, then to clay and sand ──
+  scrubland:{ ...BASE, w:12, h:52, theme:'sand', sandKind:'clay', label:'The Scrublands', scrub:gy=>Math.max(0,Math.min(1,1.25-gy/40)),
+    objects:()=>{ const l=[ {type:'teleporter', i:6, j:0, to:'camp', entry:'fromWash'}, {type:'teleporter', i:6, j:51, to:'drywash', entry:'fromPits'},
+        {type:'oldwell', i:Math.round(along(P_SCRUB,27))+3, j:27}, {type:'tent', i:Math.round(along(P_SCRUB,30))-4, j:29, fp:[2,2]}, {type:'campfire', i:Math.round(along(P_SCRUB,30))-2, j:32},
+        {type:'ruin', i:1, j:38, v:1}, {type:'ruin', i:10, j:44, v:0}, {type:'cart', i:Math.round(along(P_SCRUB,20))-3, j:20}, {type:'bones', i:9, j:36, noblock:true}, {type:'bones', i:2, j:47, noblock:true},
+        {type:'cairn', i:Math.round(along(P_SCRUB,42))+2, j:42}, {type:'signpost', i:Math.round(along(P_SCRUB,4))+2, j:4} ];
+      for(let j=1;j<16;j+=1) for(const s of [-1,1]){ const x=along(P_SCRUB,j)+s*(3+R(j,s,7)*3); if(R(j,s,8)<0.55-j*0.025 && x>0 && x<11) l.push(tree(Math.round(x),j, R(j,s,9)<0.5?'oak':'pine', 0.75+R(j,s,10)*0.4-j*0.015)); }   // the last of the trees
+      for(let j=10;j<44;j+=3){ const s=(j%2?1:-1), x=along(P_SCRUB,j)+s*(3+R(j,1,11)*2.5); if(x>0&&x<11) l.push({type:'deadtree', i:Math.round(x), j, s:0.6+R(j,2,12)*0.5}); }
+      for(let j=18;j<50;j+=4){ const s=(j%8?1:-1), x=along(P_SCRUB,j)+s*(3+R(j,3,13)*3); if(x>0&&x<11) l.push({type:'sandrock', i:Math.round(x), j, v:j%5}); }
+      return l; },
+    npcs:()=> encounter('nomad',0.6) ? [{ id:'scrubnomad', name:'Yusra the Water-Seller', i:Math.round(along(P_SCRUB,30))-3, j:31, dir:1, named:true, opts:{gender:'f',skin:4,hair:1,hairColor:1,face:2,equip:{head:'hood',torso:'tunic_blue',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}} }] : [],
+    mobs:()=>[ { name:'Scrub Jackal', type:'wolf', i:9, j:23, faction:'scrubjackal', daily:true, coat:'#a88a5a' }, { name:'Scrub Jackal', type:'wolf', i:10, j:25, faction:'scrubjackal', daily:true, coat:'#b8986a' },
+      ...(nightAmt()>0.5?[{ name:'Night Scorpion', type:'scorpion', i:3, j:45, faction:'scorpion', daily:true, opts:SCORP({col:'#5a4a3a'}) }]:[]) ],
+    entries:{ fromCamp:{i:6,j:1}, fromWash:{i:6,j:50} } },
+
+  // ── Greywater Heath: high moor of heather and peat, standing stones, mist in the hollows ──
+  heath:{ ...BASE, w:48, h:14, theme:'road', label:'Greywater Heath', dens:0.12,
+    objects:()=>{ const Y=x=>acrossY(P_HEATH,x), l=[ {type:'teleporter', i:2, j:13, to:'stones', entry:'fromFen'}, {type:'teleporter', i:45, j:0, to:'fenpath', entry:'fromStones'},
+        {type:'fieldshelter', i:38, j:11}, {type:'campfire', i:36, j:10}, {type:'cairn', i:10, j:Math.round(Y(10))-2}, {type:'cairn', i:40, j:Math.round(Y(40))+2, s:0.8},
+        {type:'wayshrine', i:31, j:Math.round(Y(31))+3}, {type:'pool', i:14, j:11, fp:[2,2], kind:'fen'}, {type:'pool', i:25, j:1, fp:[2,1], kind:'fen'} ];
+      [[18,2],[20,1],[22.5,1.6],[23.5,3.8],[21.5,5],[18.8,4.4]].forEach(([i,j],k)=>l.push({type:'menhir', i:Math.round(i), j:Math.round(j), v:k%3}));   // a ring of old stones off the road
+      for(let k=0;k<28;k++){ const i=1+k*1.7|0, s=k%2?1:-1, y=Y(i)+s*(2+R(k,1,14)*4); if(y>0 && y<13) l.push({type:'flowerbed', i, j:Math.round(y), noblock:true, cols:['#8a5aa0','#a878c0','#6e4a88']}); }   // heather
+      for(let k=0;k<12;k++){ const i=3+k*3.8|0, y=Y(i)+(k%2?4:-4); if(y>0&&y<13) l.push({type:k%3?'rocks':'boulder', i, j:Math.round(y), v:k%5, noblock:k%3?true:undefined}); }
+      if(nightAmt()>0.3) for(let k=0;k<9;k++) l.push({type:'groundmist', i:4+k*5, j:1+(k*5)%12, noblock:true, flat:true, dz:-98});
+      return l; },
+    npcs:()=> encounter('shepherd',0.6) ? [{ id:'heathshepherd', name:'Old Gwen the Shepherd', i:37, j:11, dir:6, named:true, opts:{gender:'f',skin:0,hair:3,hairColor:12,face:0,equip:{head:'hood',torso:'smock',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}} }] : [],
+    mobs:()=> nightAmt()>0.55 ? [{ name:'Moor Wolf', type:'wolf', i:26, j:10, faction:'moorwolf', daily:true, coat:'#5a5a62' }, { name:'Moor Wolf', type:'wolf', i:28, j:11, faction:'moorwolf', daily:true, coat:'#4a4a52' }, { name:'Moor Wolf', type:'wolf', i:27, j:12, faction:'moorwolf', daily:true, coat:'#6a6a70' }] : [],
+    entries:{ fromStones:{i:2,j:12}, fromFen:{i:45,j:1} } },
+
+  // ── The Foothills: the road climbs through pine and scree toward the pass, a stream tumbling beside it ──
+  foothills:{ ...BASE, w:12, h:52, theme:'road', label:'The Foothills', dens:0.95,
+    objects:()=>{ const l=[ {type:'teleporter', i:6, j:51, to:'northroad', entry:'fromPass'}, {type:'teleporter', i:5, j:0, to:'varrowpass', entry:'fromRoad'},
+        {type:'brook', i:10, j:0, fp:[1,52], mean:0.9, ph:1.1, br:-9, noblock:true, dz:-99},
+        {type:'fieldshelter', i:1, j:30}, {type:'campfire', i:2, j:33}, {type:'logpile', i:1, j:35}, {type:'felltree', i:Math.round(along(P_FOOT,44))-5, j:44, fp:[3,1]},
+        {type:'wayshrine', i:Math.round(along(P_FOOT,20))-3, j:20}, {type:'cairn', i:Math.round(along(P_FOOT,8))-2, j:8}, {type:'cairn', i:Math.round(along(P_FOOT,26))+2, j:26, s:0.8},
+        {type:'signpost', i:Math.round(along(P_FOOT,48))-2, j:48} ];
+      for(let k=0;k<12;k++){ const j=2+k*4, x=along(P_FOOT,j)+(k%2?2.5:-3); if(x>0&&x<9) l.push({type:k%3===0?'rockridge':'boulder', i:Math.round(x), j, v:k%5, ...(k%3===0?{fp:[2,1]}:{})}); }
+      for(let k=0;k<16;k++){ const j=1+k*3, x=along(P_FOOT,j)+(k%2?3.5:-3.5); if(x>0&&x<9.5) l.push(tree(Math.round(x),j,'pine',0.9+R(k,1,15)*0.6)); }
+      return l; },
+    npcs:()=> encounter('goatherd',0.5) ? [{ id:'goatherd', name:'Brekka the Goatherd', i:2, j:32, dir:1, named:true, opts:{gender:'f',skin:2,hair:1,hairColor:3,face:1,equip:{head:null,torso:'smock',armor:null,hands:'gloves',legs:'breeches',feet:'boots',weapon:null,offhand:null}} }] : [],
+    mobs:()=>[ ...(nightAmt()>0.5?[{ name:'Hill Wolf', type:'wolf', i:7, j:15, faction:'hillwolf', daily:true, coat:'#7a7268' }, { name:'Hill Wolf', type:'wolf', i:8, j:13, faction:'hillwolf', daily:true, coat:'#6a6258' }]:[]) ],
+    entries:{ fromRoad:{i:6,j:50}, fromPass:{i:5,j:1} } },
+
+  // ── The Alder Brook: a green path along the water to the mill, with streams to cross on planks ──
+  alderbrook:{ ...BASE, w:50, h:10, theme:'road', label:'The Alder Brook', dens:0.85,
+    objects:()=>{ const l=[ {type:'teleporter', i:0, j:5, to:'crossroads', entry:'fromVillage'}, {type:'teleporter', i:49, j:4, to:'millroad', entry:'fromCross'},
+        {type:'brook', i:14, j:0, fp:[1,10], mean:0.5, ph:0.3, br:acrossY(P_BROOK,14), noblock:true, dz:-99}, {type:'brook', i:34, j:0, fp:[1,10], mean:0.6, ph:1.4, br:acrossY(P_BROOK,34), noblock:true, dz:-99},
+        {type:'pool', i:22, j:7, fp:[4,2], kind:'fen'}, {type:'heron', i:23, j:8, noblock:true}, {type:'eeltrap', i:26, j:8}, {type:'sunkboat', i:21, j:8},
+        {type:'dragonflies', i:24, j:6, noblock:true}, {type:'dragonflies', i:15, j:3, noblock:true}, {type:'dragonflies', i:35, j:7, noblock:true},
+        {type:'campfire', i:28, j:2}, {type:'logseat', i:27, j:2}, {type:'milestone', i:8, j:Math.round(acrossY(P_BROOK,8))-2, t:'MILL 2'}, {type:'milestone', i:40, j:Math.round(acrossY(P_BROOK,40))+2, t:'MILL 1'} ];
+      for(let k=0;k<14;k++){ const i=3+k*3.4|0, j=acrossY(P_BROOK,i)+(k%2?2.4:-2.6); if(j>0.5 && j<9.5 && Math.abs(i-14)>1 && Math.abs(i-34)>1) l.push({type:'reeds', i, j:Math.round(j), noblock:true}); }
+      return l; },
+    npcs:()=> encounter('fisher',0.6) ? [{ id:'brookfisher', name:'Tam Alder, fishing', i:25, j:6, dir:1, named:true, opts:{gender:'m',skin:1,hair:4,hairColor:8,beard:3,face:0,equip:{head:'straw_hat',torso:'shirt',armor:null,hands:null,legs:'trousers',feet:null,weapon:null,offhand:null}} }] : [],
+    mobs:()=> nightAmt()>0.6 ? [{ name:'Brook Wolf', type:'wolf', i:42, j:2, faction:'brookwolf', daily:true, coat:'#6a6056' }] : [],
+    entries:{ fromCross:{i:1,j:5}, fromMill:{i:48,j:4} } },
+  });
+  Object.assign(AREA_TIER,{ hedgerow:1, longmeadow:2, scrubland:2, heath:3, foothills:3, alderbrook:2 });
+
+  // the old neighbours now open onto the new roads
+  const redoor=(area,to,nto,nentry)=>wrap(area,'objects',l=>l.map(o=>o.type==='teleporter' && o.to===to ? {...o, to:nto, entry:nentry} : o));
+  redoor('road','kingsroad','hedgerow','fromForestRoad');   redoor('kingsroad','road','longmeadow','fromKings');
+  redoor('camp','drywash','scrubland','fromCamp');           redoor('drywash','camp','scrubland','fromWash');
+  redoor('stones','fenpath','heath','fromStones');           redoor('fenpath','stones','heath','fromFen');
+  redoor('northroad','varrowpass','foothills','fromRoad');   redoor('varrowpass','northroad','foothills','fromPass');
+  redoor('crossroads','millroad','alderbrook','fromCross');  redoor('millroad','crossroads','alderbrook','fromMill');
+
+  // animals on the new roads
+  const FA={ hedgerow:[['rabbit',3,26,2],['sheep',10,17,3],['deer',2,46,1]], longmeadow:[['horse',30,9,2],['sheep',10,9,3],['rabbit',40,2,2],['deer',52,8,2]], scrubland:[['rabbit',3,8,1],['lizard',8,34,2],['lizard',3,44,1]],
+    heath:[['sheep',40,11,3],['rabbit',8,9,2],['goat',30,2,1]], foothills:[['goat',1,24,2],['goat',8,6,2],['eagle',4,14,1],['deer',2,44,1]], alderbrook:[['frog',23,6,3],['deer',44,8,1],['rabbit',6,2,2],['fox',38,1,1]] };
+  Object.entries(FA).forEach(([area,list])=>wrap(area,'objects',l=>{ const night=nightAmt(), out=[];
+    list.forEach(([kind,i,j,n],q)=>{ if(DAYTIME_ONLY.has(kind) && night>0.6) return; for(let k=0;k<n;k++){ const sd=(i*31+j*17+k*7+q*13)%97, cols=FAUNA_COL[kind];
+      out.push({type:'animal', kind, i:i+(k%3)-1, j:j+Math.floor(k/3)*(k%2?1:-1), home:[i+0.5,j+0.5], seed:sd, noblock:true, col:cols?cols[(sd+k)%cols.length]:null, st:'idle', tm:0.5+rnd01(sd,k,901)*2, ok:false}); } });
+    return [...l, ...out]; }));
+
+  // people on the road
+  const food=['bread','apple','cheese','ale','stew','potion','water_skin'].filter(id=>ITEMS[id]&&PRICES[id]);
+  TALKERS.halfwayinn=()=>say('Marta of the Halfway Lantern',["“Halfway, love. Halfway from the woods to the walls, whichever way you're walking. Sit, eat, the road will wait.”"],[
+    {label:'“What have you got?”', fn:()=>shopFrom('Marta of the Halfway Lantern',food,1,["“Bread's today's. The stew is… honest.”"],()=>TALKERS.halfwayinn())},
+    {label:'“How far to Hollowmere?”', fn:()=>say('Marta of the Halfway Lantern',["“Up the meadow to the King's Road, then the road runs straight to the gate. Mind the toll-keeper. And after dark, mind the meadow.”"],[{label:'Back.',fn:()=>TALKERS.halfwayinn()},bye])}, bye]);
+  TALKERS.meadowpedlar=()=>say('A Travelling Tinker',["“Pots mended, knives ground, gossip given away free. The gossip's the only thing worth having, mind.”"],[
+    {label:'“Any gossip, then?”', fn:()=>say('A Travelling Tinker',[["“They say folk up in the Varrow Pass hear hammering in the mountain where nobody's digging.”","“There's a well in the Scrublands that never runs dry. Ask the water-seller why; she won't tell you.”","“The heath stones move. Not much. Enough.”"][Math.floor(dayClock/DAY_LEN)%3]],[bye])}, bye]);
+  TALKERS.drover=()=>say('Hamm the Drover',["“Forty head to the city market and every one of them stupider than the last. Mind you don't spook 'em.”"],[bye]);
+  TALKERS.scrubnomad=()=>say('Yusra the Water-Seller',["“Past here the trees give up and the sand begins. Drink before you need to, not after.”"],[
+    ...(food.length?[{label:'Buy provisions.', fn:()=>shopFrom('Yusra the Water-Seller',food.slice(0,4),1.1,["“Sand prices. You'll thank me in the dunes.”"],()=>TALKERS.scrubnomad())}]:[]), bye]);
+  TALKERS.heathshepherd=()=>say('Old Gwen the Shepherd',["“Don't walk into the ring of stones after dark, and don't count them. They don't like being counted.”"],[bye]);
+  TALKERS.goatherd=()=>say('Brekka the Goatherd',["“Up past the cairns it's the pass proper, and cold. The goats know when the snow's coming. So do I. My knee.”"],[bye]);
+  TALKERS.brookfisher=()=>say('Tam Alder, fishing',["“Shh. They're biting. Mill's that way, past the second plank bridge. Shh.”"],[bye]);
+  // the meadow runs west from the hedgerow, so Hollowmere lies north-west and the fen country north-east, each with room of its own
+  { const W=AREAS.longmeadow.w, mir=o=>({...o, i:W-1-o.i-((o.fp?o.fp[0]:1)-1), ...(o.wander?{wander:o.wander.map(([a,b2])=>[W-1-a,b2])}:{})});
+    wrap('longmeadow','objects',l=>l.map(mir)); wrap('longmeadow','npcs',l=>l.map(mir)); wrap('longmeadow','mobs',l=>l.map(mir));
+    Object.values(AREAS.longmeadow.entries).forEach(e=>{ e.i=W-1-e.i; });
+    AREA_PATHS.longmeadow=AREA_PATHS.longmeadow.map(pl=>pl.map(([x,y])=>[W-x,y])); }
+  if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
+}
 </script>
 </body>
 </html>

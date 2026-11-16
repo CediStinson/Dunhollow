@@ -3825,8 +3825,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
     if(E.armor==='mail'){ c.strokeStyle=GEAR.mail; c.lineWidth=aw+1.4; c.beginPath(); c.moveTo(sx,sy); c.lineTo(sx+(ex-sx)*0.8,sy+(ey-sy)*0.8); c.stroke(); }
     c.restore();
     drawWeapon(c,hx,hy,W*Math.PI/180,wid);
-    c.fillStyle=tone(hc,-0.04); c.beginPath(); c.arc(hx,hy,3.1,0,Math.PI*2); c.fill();   // fist over the grip
-    c.strokeStyle=tone(hc,-0.40); c.lineWidth=0.9; c.stroke();
+    gripFingers(c,hx,hy,W*Math.PI/180,hc);   // the fingers wrapped round the grip
   } else if(wid && handAt){
     // at rest: hanging from the hand, swung outward so the blade clears the leg
     const STAFF=String(wid).startsWith('staff_');
@@ -3834,7 +3833,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
     const hax = handAt.x + nearS*(STAFF?2:3.0)*(front?1:0.4);
     STAFF_REST=STAFF; try{ drawWeapon(c,hax,handAt.y,idle*Math.PI/180,wid); } finally{ STAFF_REST=false; }
     const hc = E.hands==='gloves' ? GEAR.glove : skin;
-    c.fillStyle=tone(hc,-0.04); c.beginPath(); c.arc(handAt.x,handAt.y,2.8,0,Math.PI*2); c.fill();
+    gripFingers(c,handAt.x,handAt.y,idle*Math.PI/180,hc);   // the fingers wrapped round the grip, the hand itself left showing
   }
   if(E.offhand==='shield' && offHandAt && (!offHandAt.behind || V.prof<=0.6) && V.turn>=-0.2) drawShieldOnArm(c,offHandAt.x,offHandAt.y,V.prof,false);
   if(EMB_F && front && pr>0.8){ const T=Y.WAIST+2.1, X=u=>x+LN+u, Yv=v=>B+T+v;   // side on, the back half: the string coming down off the hip to a small seat, tucked under the curve behind
@@ -4194,6 +4193,12 @@ function drawCustomBodyDetails(c,b){
 
 // A round shield strapped to the forearm, angled slightly outward.
 let LAST_OFF=null, SHIELD_DRY=false; const SHIELD_POS=new Map(), DRY_CTX=document.createElement('canvas').getContext('2d');   // where the off hand ends up, found once per pose
+// fingers closed round a grip: a short band across the handle, knuckle lines in it, instead of a disc over the whole hand
+function gripFingers(c,hx,hy,ang,hc){ c.save(); c.translate(hx,hy); c.rotate(ang);
+  c.fillStyle=tone(hc,-0.02); c.strokeStyle=tone(hc,-0.42); c.lineWidth=0.6;
+  c.beginPath(); if(c.roundRect) c.roundRect(-1.4,-2.3,2.8,4.6,1.2); else c.rect(-1.4,-2.3,2.8,4.6); c.fill(); c.stroke();
+  c.strokeStyle=tone(hc,-0.3); c.lineWidth=0.4; [-0.75,0.75].forEach(y=>{ c.beginPath(); c.moveTo(-1.1,y); c.lineTo(1.1,y); c.stroke(); });
+  c.restore(); }
 function drawLanternInHand(c,hx,hy){                   // Vesna's lantern hanging from the fist by its bail: iron cage, warm glass, a small flame
   const x=hx, y=hy+2, W=3.4, H=8.2;
   c.save();
@@ -11428,9 +11433,9 @@ function moveItemRaw(from,to){
 // throwing things away: drag onto the bin, then confirm. Story items cannot be thrown away.
 function askDiscard(loc){
   const id=getAt(loc); if(!id) return;
-  if(typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(id) || ITEMS[id].slot==='misc' && ITEMS[id].read){ flash(`You can't throw away ${ITEMS[id].name}. You'll need it.`); return; }
-  clearTimeout(msgTimer); invMsg.innerHTML=`Throw away <b>${ITEMS[id].name}</b> for good?<button class="danger" id="dis-yes">Throw away</button><button id="dis-no">Keep</button>`;
-  document.getElementById('dis-yes').onclick=()=>{ if(getAt(loc)===id){ setAt(loc,null); logMsg('You throw away '+ITEMS[id].name+'.','#a89878'); refreshInventory(); updateHud(); autosaveSoon(200); } invMsg.textContent=''; };
+  const needs=(typeof questsNeeding==='function' && ((typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(id)) || ITEMS[id].read)) ? questsNeeding(id) : [];   // a quest still open that wants this
+  clearTimeout(msgTimer); invMsg.innerHTML=`Throw away <b>${ITEMS[id].name}</b> for good?`+(needs.length?` <span style="color:#e0806a">${needs.map(t=>'“'+t+'”').join(', ')} still ${needs.length>1?'need':'needs'} it: the quest will fail.</span>`:'')+`<button class="danger" id="dis-yes">Throw away</button><button id="dis-no">Keep</button>`;
+  document.getElementById('dis-yes').onclick=()=>{ if(getAt(loc)===id){ if(needs.length){ CHOICE.failedQ={...(CHOICE.failedQ||{})}; needs.forEach(t=>{ CHOICE.failedQ[t]=id; logMsg('Quest failed: '+t+'. You threw away the '+ITEMS[id].name+' it needed.','#e0806a'); }); } setAt(loc,null); logMsg('You throw away '+ITEMS[id].name+'.','#a89878'); refreshInventory(); updateHud(); autosaveSoon(200); } invMsg.textContent=''; };
   document.getElementById('dis-no').onclick=()=>{ invMsg.textContent=''; };
 }
 // provisions: eat or drink to win back health, in or out of a fight
@@ -12384,7 +12389,7 @@ function todaysStock(who,pool,n){
 // selling: any trader buys what is in your pack (not story items), at forty percent of its price
 function sellTo(who,back,o){                     // o (optional): only these items, at this buyer's own price, with his own words
   const goods=player.inv.map((id,k)=>({id,k})).filter(({id,k})=>id && PRICES[id] && !(id==='fishing_rod' && player.inv.indexOf(id)===k) && !(typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(id)) && (ITEMS[id].slot!=='misc' || SELL_MISC.has(id) || (o && o.only && o.only.has(id))) && (!o || !o.only || o.only.has(id)));
-  const grave=!o && typeof VESNA_BUYS!=='undefined' ? [...new Set(player.inv.filter(id=>id && VESNA_BUYS.only.has(id)))].map(id=>ITEMS[id].name.replace(/^(An?|The) /,'').toLowerCase()) : [];   // grave goods: only the grave-speaker deals in those
+  const grave=!o && typeof VESNA_BUYS!=='undefined' ? [...new Set(player.inv.filter(id=>id && VESNA_BUYS.only.has(id) && !SELL_MISC.has(id)))].map(id=>ITEMS[id].name.replace(/^(An?|The) /,'').toLowerCase()) : [];   // grave goods: only the grave-speaker deals in those
   const graveNote=grave.length?`“And that ${grave.join(', ')}: not from me, not at any price. Things off the dead go to the grave-speaker, Vesna. She buys them.”`:'';
   say(who,[goods.length?(o&&o.greet||"“Let us see what you have.” <i>Only what is in your pack can be sold, not what you wear.</i>"):(o&&o.none||"“Nothing in your pack I'd buy.”"), ...(graveNote?[graveNote]:[])],[{label:'Back.',fn:back},bye],true);
   if(!goods.length) return;
@@ -12636,7 +12641,7 @@ const JOURNAL=[
 ];
 function openJournal(){ try{ SND.fx('page'); }catch(e){}
   if(!running) return;
-  const rows=JOURNAL.map(([t,f])=>{ const r=f(); return r && {t,s:r[0],x:String(r[1]||'').replace(/<b>/g,'<strong>').replace(/<\/b>/g,'</strong>')}; }).filter(Boolean);   // bold inside the text stays inline (a <b> here is the entry's title)
+  const rows=JOURNAL.map(([t,f])=>{ const r=qFailWrap(t,f()); return r && {t,s:r[0],x:String(r[1]||'').replace(/<b>/g,'<strong>').replace(/<\/b>/g,'</strong>')}; }).filter(Boolean);   // bold inside the text stays inline (a <b> here is the entry's title)
   const purs=rows.filter(r=>PURSUITS.has(r.t)), qrows=rows.filter(r=>!PURSUITS.has(r.t)), act=qrows.filter(r=>r.s==='active'), done=qrows.filter(r=>r.s==='done'), failed=qrows.filter(r=>r.s==='failed');
   const pli=r=>`<div class="jq ${r.s==='done'?'done':'active'}">${r.s==='active'?`<span class="jt${isTracked(r.t)?'':' off'}" data-q="${r.t.replace(/"/g,'&quot;')}">${isTracked(r.t)?'◉ Followed':'○ Follow'}</span>`:''}<b>${r.t}</b><span>${r.x}</span></div>`;
   const li=r=>`<div class="jq ${r.s}">${r.s==='active'?`<span class="jt${isTracked(r.t)?'':' off'}" data-q="${r.t.replace(/"/g,'&quot;')}">${isTracked(r.t)?'◉ Followed':'○ Follow'}</span>`:''}<b>${r.t}</b><span>${r.x}</span></div>`;
@@ -14611,7 +14616,7 @@ function formatCoin(cu){
   return parts.join(' ');
 }
 let loreNoteGiven=false;
-var SELL_MISC=new Set(['wolf_fang','pelt','bog_coins','silver_torc','amber_brooch','wight_ring']);
+var SELL_MISC=new Set(['wolf_fang','pelt','bog_coins','silver_torc','amber_brooch','wight_ring','rusted_blade','grave_ring']);
 const LOOT_TIERS=[
   ['shirt','trousers','hood','boots','gloves','dagger','club','hatchet','jerkin','hose_grey','smock'],
   ['jerkin','gambeson','kettle','shield','sword','mace','hood_red','studded','spear','breeches','bandana'],
@@ -20362,8 +20367,8 @@ var ITEM_LORE={
   emberstep_boots:"Boots soled with something that is not quite leather and not quite stone. Hot ground does not bother them.",
   old_bone:"A long bone, yellow with age. Somebody's once. Vesna the Grave-Speaker buys these, and does not say why.",
   old_skull:"It grins at you. Vesna would pay a few coppers for it, and give it a good home.",
-  rusted_blade:"A sword left so long in a grave that the rust has eaten through it in places. There is still something in it: Vesna might know what. (No merchant will touch grave goods; Vesna buys them.)",
-  grave_ring:"A ring black with damp, taken from a bone finger. The dead do not need it, Vesna says. Mostly. (No merchant will touch grave goods; Vesna buys them.)",
+  rusted_blade:"A sword left so long in a grave that the rust has eaten through it in places. There is still something in it: Vesna might know what.",
+  grave_ring:"A ring black with damp, taken from a bone finger. The dead do not need it, Vesna says. Mostly.",
   clean_blade:"The grave-blade, scoured of a hundred years of rust. Bright again, and somehow still cold.",
   shovel:"An iron spade with a long ash handle, good for digging and not bad in a fight. The dead in their barrows know the sound of it.",
   baron_tabard:"The Baron's colours, his sigil stitched on the chest. People in the valley look at you differently in it, and not kindly.",
@@ -29419,6 +29424,15 @@ ITEM_ICON.charred_blade=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); dr
         if(R()<0.55) give('ashen_bone'); if(R()<0.18) give('ashen_skull'); if(R()<0.05) give('charred_blade');
         if(R()<0.06) give('ember_core'); }); }catch(e){ console.error(e); }
     return r; }; }
+// ════════ throwing away a quest item: which open quests still need it, and a quest whose item you threw away reads as failed ════════
+const QUEST_ITEM_OF={ smuggler_ledger:"The Rat King's Ledger", mother_seed:"The Mother's Seed" };   // where the quest's words don't name the thing
+const qPlain=t=>String(t||'').replace(/<[^>]+>/g,' ').replace(/[“”‘’"']/g,"'").toLowerCase();
+function questsNeeding(id){ const it=ITEMS[id]; if(!it) return []; const nm=qPlain(it.name).replace(/^(the|an?) /,'').replace(/^'|'$/g,'').trim(), out=[];
+  for(const [t,f] of JOURNAL){ let r=null; try{ r=f(); }catch(e){} if(!r || r[0]!=='active' || (typeof PURSUITS!=='undefined' && PURSUITS.has(t))) continue;
+    if(QUEST_ITEM_OF[id]===t || (nm.length>3 && qPlain(r[1]).includes(nm))) out.push(t); }
+  return out; }
+function qFailWrap(t,r){ try{ const F=CHOICE.failedQ; if(!r || r[0]!=='active' || !F || !F[t] || hasItem(F[t])) return r;
+    return ['failed', String(r[1]||'')+'<br><i>You threw away the '+(ITEMS[F[t]]?ITEMS[F[t]].name:'thing')+' this needed.</i>']; }catch(e){ return r; } }
 </script>
 </body>
 </html>

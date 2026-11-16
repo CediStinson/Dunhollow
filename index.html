@@ -29076,6 +29076,220 @@ JOURNAL.push(["Blade Dance", ()=> !bladeQ() ? null : bladeQ()==='done' ? ['done'
     try{ if(dance){ BD_READY=false; BD_CHAIN=0; const dmg=Math.max(2,Math.round(weaponOf(player).dmg*0.7));
         [0.12,0.26].forEach((d,k)=>setTimeout(()=>{ try{ if(!combat.active || !f || f.dead || f.hp<=0) return; lunge(player,f); SND.swing(player.opts.equip.weapon); const was=HIT_SRC; HIT_SRC='melee'; try{ wound(f,dmg,k?'Dance!':'Blade','#f0c060'); } finally{ HIT_SRC=was; } if(k===1 && !f.dead){ f.state='stagger'; f.t=Math.max(f.t||0,0.6); } }catch(e){} },d*1000));
         slowmo.scale=0.45; slowmo.t=0.35; } }catch(e){} return r; }; }
+
+// ════════ DUNGEON QUESTS: the Undercity, the Varrowdeep and the Rootdeep each get a second story, and the notice boards get daily work down there.
+//   The Rat King's Ledger (Tuck): chalk marks through the drains, a smugglers' cache, a choice. The Deepest Seam: knocking from below the Old Workings, a buried crew, deepsilver for Oswin.
+//   The Mother's Seed (Faelith): bring three dead lightblooms back. And the job boards: clear a nest, fetch a few things, for coin and silver leaves ════════
+const dqRoom=id=>(typeof UCR!=='undefined'&&UCR[id])||(typeof OWR!=='undefined'&&OWR[id])||(typeof RCR!=='undefined'&&RCR[id])||null;
+const DQ_NAME=id=>{ const A=AREAS[id]; return (A&&A.mapLabel&&A.mapLabel!=='?')?A.mapLabel:id; };
+// a quest spot in a dungeon room: on the first free floor tile off the through-ways, steady from visit to visit
+function dqSpot(roomId,make,cond,nth){ wrap(roomId,'objects',l=>{ try{ if(!cond()) return l; const r=dqRoom(roomId); if(!r) return l; const F0=ucFreeSpots(r,l), F=F0.filter(([i,j])=>!l.some(o=>Math.abs(o.i-i)<=0&&Math.abs(o.j-j)<=0)); if(!F.length) F.push(...F0); const p=F[Math.min(F.length-1,nth||0)]||ucWalk(r).find(([i,j])=>!l.some(o=>o.i===i&&o.j===j)); if(!p) return l; return [...l,{...make(), i:p[0], j:p[1], noblock:true}]; }catch(e){ return l; } }); }
+function dqDrop(type,k){ try{ const x=OBJECTS.findIndex(o=>o.type===type && (k==null||o.k===k)); if(x>=0) OBJECTS.splice(x,1); }catch(e){} }
+// foes that step out for a quest, next to a spot, and a fight that starts once any talk is done
+function dqSpawn(o,list){ const out=[]; const free=[[1,0],[0,1],[-1,0],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1],[2,0],[0,2]].map(([a,b])=>[o.i+a,o.j+b]).filter(([i,j])=>i>=0&&j>=0&&i<ROOM.w&&j<ROOM.h&&!blocked.has(i+','+j)&&!(i===player.i&&j===player.j)&&!mobAt(i,j)&&(typeof walkable!=='function'||walkable(i,j)));
+  list.forEach((s,k)=>{ const sp=free[k]||[o.i,o.j], hp=s.hp||Math.round(((FOES[s.type]||{}).base||50)*(s.mult||1));
+    const m={ id:mobs.length+80+k, key:s.name+':'+o.type, name:s.name, type:s.type, opts:s.opts, faction:s.faction, spawn:sp, i:sp[0], j:sp[1], x:sp[0]+0.5, y:sp[1]+0.5, dir:1, hp, maxHp:hp, path:[], moving:false, dead:false, gone:false, fade:1, flash:0, lunge:null,
+      state:'guard', t:0, k:0, wind:1, quick:false, guardDir:'up', ox:0, oy:0, hostile:true, fallT:0, tier:s.tier||2, ...(s.extra||{}) };
+    mobs.push(m); out.push(m); try{ FOOLED[areaId+':'+s.name]=false; }catch(e){} });
+  const go=()=>{ try{ if(out.every(m=>m.dead || !mobs.includes(m))) return; if(CS.on || dlgIsOpen()){ setTimeout(go,400); return; } if(!combat.active) startCombat(); }catch(e){} }; setTimeout(go,450); return out; }
+// the map marks the room a quest is pointing at, once you have been there
+const DQ_TARGETS=[];   // functions returning room ids
+{ const _mm=mapMarks; mapMarks=function(){ const out=_mm.apply(this,arguments); try{ DQ_TARGETS.forEach(fn=>{ (fn()||[]).forEach(id=>{ if(id && visitedAreas[id]) (out[id]=out[id]||{}).goal=true; }); }); }catch(e){} return out; }; }
+const DQ_BIG=(q,k)=>{ g.translate(q.x,q.y); g.scale(k,k); g.translate(-q.x,-q.y); };
+const DQ_GLINT=(q,col,T)=>{ g.save(); g.globalCompositeOperation='lighter'; glow(q.x,q.y-6,14,7,col,0.22+Math.sin(T*2.4)*0.08); g.restore(); };
+function dqVictory(fn){ const _v=victory; victory=function(faction){ const r=_v.apply(this,arguments); try{ fn(faction); }catch(e){ console.error(e); } return r; }; }
+
+// ── 1. THE RAT KING'S LEDGER ──
+const LG_MARKS={ larder:{room:'uc_1_2'}, vault:{room:'uc_1_5'}, chapel:{room:'uc_0_8'} }, LG_CELLAR='uc_11_3';
+const lgQ=()=>CHOICE.ledger||null, lgMarks=()=>Array.isArray(CHOICE.ledgerMarks)?CHOICE.ledgerMarks:(CHOICE.ledgerMarks=[]);
+Object.assign(ITEMS,{ smuggler_ledger:{ name:"The Smugglers' Ledger", slot:'misc', read:true, title:'A fat little book in oilcloth, written in a careful clerk\'s hand',
+  body:["Columns of dates and weights: <i>salt · lamp-oil · Keep brandy (12 casks, unstamped) · elf-silver, 4 torcs, 1 circlet · elf-silver, 9 leaves (pressed)</i>.","Beside each line a mark: a rat with a crown. And down the margin, the names of three men of the city watch, and what they were paid to look elsewhere."] } });
+QUEST_ITEMS.add('smuggler_ledger');
+ICON_BONES.smuggler_ledger=c=>{ c.fillStyle='#4a3a26'; c.strokeStyle='#22180e'; c.lineWidth=1.2; c.beginPath(); c.roundRect(9,7,22,27,2); c.fill(); c.stroke(); c.fillStyle='#6a5236'; c.fillRect(11,9,18,23); c.strokeStyle='#d8c8a0'; c.lineWidth=0.8; for(let y=13;y<30;y+=3){ c.beginPath(); c.moveTo(13,y); c.lineTo(27,y); c.stroke(); }
+  c.fillStyle='#c8b070'; c.beginPath(); c.arc(20,20,3.6,0,Math.PI*2); c.fill(); c.fillStyle='#4a3a26'; c.beginPath(); c.moveTo(17.5,18); c.lineTo(18.5,16); c.lineTo(20,17.5); c.lineTo(21.5,16); c.lineTo(22.5,18); c.closePath(); c.fill(); };
+Object.keys(LG_MARKS).forEach(k=>dqSpot(LG_MARKS[k].room,()=>({type:'chalkmark', k}),()=>lgQ()==='asked' && !lgMarks().includes(k)));
+dqSpot(LG_CELLAR,()=>({type:'lgflag'}),()=>lgQ()==='asked' && lgMarks().length>=3 && !hasItem('smuggler_ledger') && CHOICE.ledgerCache!=='taken');
+NEAR_NAME.chalkmark='a chalk mark'; NEAR_NAME.lgflag='a loose flagstone';
+OBJ_DRAW.chalkmark=o=>{ const q=P(o.i+0.5,o.j+0.5); g.save(); DQ_BIG(q,1.4); g.strokeStyle='rgba(236,232,220,0.85)'; g.lineWidth=1.6; g.lineCap='round';
+  g.beginPath(); g.ellipse(q.x,q.y,10,4.5,0,0,Math.PI*2); g.stroke(); g.beginPath(); g.moveTo(q.x-6,q.y+1); g.lineTo(q.x+5,q.y-1.5); g.moveTo(q.x+5,q.y-1.5); g.lineTo(q.x+2,q.y-3.4); g.moveTo(q.x+5,q.y-1.5); g.lineTo(q.x+1.4,q.y+0.6); g.stroke();   // a circle and an arrow
+  g.beginPath(); g.moveTo(q.x-4,q.y-2.6); g.lineTo(q.x-3,q.y-4.4); g.lineTo(q.x-2,q.y-3); g.lineTo(q.x-1,q.y-4.4); g.lineTo(q.x,q.y-2.6); g.stroke(); g.restore(); DQ_GLINT(q,'230,225,210',gt); };   // and a little crown
+OBJ_DRAW.lgflag=o=>{ const q=P(o.i+0.5,o.j+0.5); g.save(); g.fillStyle='#4a4842'; g.beginPath(); g.moveTo(q.x-16,q.y); g.lineTo(q.x,q.y-8); g.lineTo(q.x+16,q.y); g.lineTo(q.x,q.y+8); g.closePath(); g.fill();
+  g.strokeStyle='#1e1c18'; g.lineWidth=1.4; g.stroke(); g.strokeStyle='rgba(236,232,220,0.8)'; g.lineWidth=1.2; g.beginPath(); g.moveTo(q.x-4,q.y-1); g.lineTo(q.x-3,q.y-3.4); g.lineTo(q.x-1.5,q.y-1.6); g.lineTo(q.x,q.y-3.4); g.lineTo(q.x+1.5,q.y-1.6); g.lineTo(q.x+3,q.y-3.4); g.lineTo(q.x+4,q.y-1); g.stroke(); g.restore(); DQ_GLINT(q,'230,225,210',gt); };
+onUse(['chalkmark'],o=>{ const n=lgMarks().length;
+  say('A Chalk Mark',["Low on the wall, where only someone looking for it would see: a circle in white chalk, an arrow through it, and a little crown over the top. Fresh. The dust under it has been walked through.",n>=2?"This arrow points back the way the others pointed, towards the far side of the drains: the north-east, the counting cellars under the old Exchange.":"Another will be somewhere else down here. Tuck said there were three."],[
+    {label:'Copy it down.', fn:()=>{ lgMarks().push(o.k); dqDrop('chalkmark',o.k); logMsg(`You copy down the smugglers' mark. (${lgMarks().length}/3)`+(lgMarks().length>=3?" All three arrows point to the Counting Cellar, in the north-east of the drains.":''),'#d8d0b8'); closeDialog(); }}, bye]); });
+onUse(['lgflag'],o=>{
+  if(CHOICE.ledgerFight==='won'){ say('A Loose Flagstone',["The flagstone with the chalk crown lifts on a hidden hinge. Under it: a dry hole lined with tarred cloth, a strongbox, and an oilcloth bundle."],[
+      {label:'Take what is there.', fn:()=>{ giveQuestItem('smuggler_ledger',true); player.purse+=25; CHOICE.ledgerCache='taken'; updateHud(); dqDrop('lgflag'); logMsg("You take the smugglers' ledger, and 25 copper from the strongbox. Tuck will want to see the book.",'#d8d0b8'); closeDialog(); }}, bye]); return; }
+  say('A Loose Flagstone',["A flagstone that rocks under your foot, marked with the chalk crown. As you kneel to it, a lantern unshutters at the other end of the cellar."],[
+    {label:'Lift it.', fn:()=>{ closeDialog(); logMsg("“That's ours,” says a voice, and two men step out of the dark with the easy look of people who have done this before.",'#e0b090');
+      dqSpawn(o,[{name:'Smuggler', type:'bandit', faction:'smugglers', opts:BANDIT({skin:2,hair:1,equip:{head:'hood',torso:'shirt',armor:'jerkin',hands:'gloves',legs:'trousers',feet:'boots',weapon:'dagger',offhand:null}}), mult:1.6},
+                 {name:'The Quartermaster', type:'bandit', faction:'smugglers', opts:BANDIT({skin:4,hair:3,beard:3,equip:{head:null,torso:'shirt',armor:'studded',hands:'gloves',legs:'trousers',feet:'boots',weapon:'mace',offhand:null}}), mult:2.4, tier:3}]); }}, bye]); });
+dqVictory(f=>{ if(lgQ()==='asked' && mobs.some(m=>m.faction==='smugglers' && m.dead) && !mobs.some(m=>m.faction==='smugglers' && !m.dead)){ if(CHOICE.ledgerFight!=='won'){ CHOICE.ledgerFight='won'; logMsg('The smugglers are down. The flagstone is yours to lift.','#d8d0b8'); } } });
+function ledgerTalk(){ const T='Tuck the Rat-catcher', Q=lgQ();
+  if(!Q){ say(T,["“Rats are down since you dealt with their king. People aren't. Somebody's using my drains: my traps get sprung by boots, not paws, and there's chalk on the walls I never put there. A circle, an arrow, a little crown.”","“Smugglers. I'd let them be, but they've started leaving their rubbish in my traps. Find their marks, three of them I've seen, and follow where they point. Bring me whatever they're hiding.”"],[
+      {label:'“I will follow their marks.”', fn:()=>{ remember('ledger','asked',"Tuck wants the smugglers in the drains found. Copy their chalk marks (in the Rats' Larder, the Flooded Vault and the Sunken Chapel) and follow where they point."); closeDialog(); }}, bye]); return; }
+  if(Q==='asked'){ if(!hasItem('smuggler_ledger')){ const n=lgMarks().length; say(T,n<3?`“${n} of three marks. The Rats' Larder, the Flooded Vault, the Sunken Chapel: that's where I saw them.”`:"“All three point the same way? Then that's where they keep it. The Counting Cellar, north-east. Go careful: men who chalk crowns on walls carry knives.”",[bye]); return; }
+    say(T,["<i>Tuck turns the pages slowly, mouthing the numbers.</i> “Brandy from the Keep. Salt. And this: elf-silver. Torcs, a circlet, leaves off their tree. And three names from the watch, paid to look the other way.”","“So. You can take this to the watch-captain, and the elves get to know who sold their silver: they pay for that sort of thing, in their own coin. Or we keep it, and the smugglers pay us to keep it. Every week, regular as rats.”"],[
+      {label:'Give the ledger to the watch.', fn:()=>{ const k=player.inv.indexOf('smuggler_ledger'); if(k>=0) player.inv[k]=null; CHOICE.ledger='watch'; player.purse+=30; addLeaves(6,"for the names of the men who sold Sylvhaven's silver"); updateHud();
+        say(T,["“Honest, then. The captain'll hang the three and thank you for it, and the elves have sent you something already: six of their silver leaves, and thirty copper from the watch.”","“The drains'll be quieter. Pity. I was getting used to the company.”"],[bye]); }},
+      {label:'Keep it, and take a cut every week.', fn:()=>{ CHOICE.ledger='cut'; CHOICE.ledgerCut=Math.floor(dayClock/DAY_LEN); player.purse+=40; updateHud();
+        say(T,["“Ha! I'll let them know the book's somewhere safe, and that something comes to us every week. Here's the first of it: forty copper.”","“Come by every seven days. They'll pay. Men like that always pay, until they don't.”"],[bye]); }}, bye]); return; }
+  if(Q==='cut'){ const d=Math.floor(dayClock/DAY_LEN), due=(CHOICE.ledgerCut||0)+7;
+    if(d>=due){ CHOICE.ledgerCut=d; player.purse+=35; updateHud(); say(T,"“The crown-men left their week's money in my third trap, like always. Thirty-five copper for you.” <i>He grins.</i> “Nobody robs a rat-catcher's traps twice.”",[bye]); return; }
+    say(T,`“Their money comes every seven days. Next lot in ${due-d} day${due-d===1?'':'s'}.”`,[bye]); return; }
+  say(T,"“The watch hanged their three. The drains smell of rats again, which is how I like them.”",[bye]); }
+{ const old=TALKERS.tuck; if(old) TALKERS.tuck=(...a)=>{ const r=old(...a); try{ const box=document.getElementById('dlg-opts');
+    if(CHOICE.rats==='done' && (lgQ()!=='watch') && dlgOverlay.classList.contains('open') && box && !box.querySelector('.dlg-opt.lgopt')){ const b=document.createElement('button'); b.className='dlg-opt lgopt';
+      const Q=lgQ(); b.innerHTML='<span>'+(!Q?'“Anything else going on down there?”':Q==='cut'?'“Anything from our crown-wearing friends?”':hasItem('smuggler_ledger')?'“I found what they were hiding.”':'“About the chalk marks.”')+'</span>'; b.addEventListener('click',ledgerTalk); box.insertBefore(b,box.lastElementChild); } }catch(e){} return r; }; }
+{ const prev=npcHasNews; npcHasNews=function(n){ try{ if(n && n.id==='tuck' && CHOICE.rats==='done'){ if(!lgQ()) return '!'; if(lgQ()==='asked' && hasItem('smuggler_ledger')) return '?'; if(lgQ()==='cut' && Math.floor(dayClock/DAY_LEN)>=(CHOICE.ledgerCut||0)+7) return '?'; } }catch(e){} return prev(n); }; }
+DQ_TARGETS.push(()=>lgQ()!=='asked' ? [] : lgMarks().length<3 ? Object.entries(LG_MARKS).filter(([k])=>!lgMarks().includes(k)).map(([,M])=>M.room) : hasItem('smuggler_ledger')?[]:[LG_CELLAR]);
+JOURNAL.push(["The Rat King's Ledger", ()=>{ const Q=lgQ(); if(!Q) return null;
+  if(Q==='watch') return ['done',"You gave the smugglers' ledger to the watch. Three bought men hanged, and Sylvhaven paid you in silver leaves for the names of those who sold its silver."];
+  if(Q==='cut') return ['done',"You kept the smugglers' ledger. Every seven days Tuck has their money for you."];
+  return ['active', hasItem('smuggler_ledger') ? "Take the smugglers' ledger to Tuck in the Lowstreets." : lgMarks().length<3 ? "Copy the smugglers' chalk marks in the drains under Hollowmere: "+[["larder","the Rats' Larder"],["vault","the Flooded Vault"],["chapel","the Sunken Chapel"]].map(([k,n])=>n+(lgMarks().includes(k)?' ✓':'')).join('; ')+". ("+lgMarks().length+"/3)" : "The smugglers' marks all point to the Counting Cellar, in the north-east of the drains. Find what they keep there."]; }]);
+
+// ── 2. THE DEEPEST SEAM ──
+const SM_KNOCKS={ grate:{room:'ow_7_7', n:'three slow, one quick'}, pump:{room:'ow_3_5', n:'two, then two'}, drowned:{room:'ow_1_4', n:'one, a pause, four quick'} }, SM_START='ow_7_6', SM_END='ow_6_4';
+const smQ=()=>CHOICE.seam||null, smKnocks=()=>Array.isArray(CHOICE.seamKnocks)?CHOICE.seamKnocks:(CHOICE.seamKnocks=[]);
+Object.assign(ITEMS,{ deep_ore:{ name:'Deepsilver', slot:'misc', stack:true, stackMax:10, title:"Ore from the deepest seam under the Varrowdeep: grey until it catches the light, then it holds it. Oswin can work it into steel or leather you have already had tempered." } });
+QUEST_ITEMS.add('deep_ore');
+ICON_BONES.deep_ore=c=>{ const gr=c.createLinearGradient(8,10,32,32); gr.addColorStop(0,'#e8eef4'); gr.addColorStop(0.5,'#8a96a4'); gr.addColorStop(1,'#3a4048'); c.fillStyle=gr; c.strokeStyle='#22262c'; c.lineWidth=1.2;
+  c.beginPath(); c.moveTo(10,24); c.lineTo(15,11); c.lineTo(27,9); c.lineTo(32,21); c.lineTo(24,32); c.lineTo(13,31); c.closePath(); c.fill(); c.stroke(); c.strokeStyle='rgba(255,255,255,0.7)'; c.lineWidth=1; c.beginPath(); c.moveTo(15,13); c.lineTo(20,22); c.lineTo(27,11); c.stroke();
+  c.fillStyle='rgba(200,230,255,0.9)'; c.beginPath(); c.arc(22,17,1.4,0,Math.PI*2); c.fill(); };
+dqSpot(SM_START,()=>({type:'seamwall', k:'start'}),()=>!smQ());
+Object.keys(SM_KNOCKS).forEach(k=>dqSpot(SM_KNOCKS[k].room,()=>({type:'seamwall', k}),()=>smQ()==='asked' && !smKnocks().includes(k)));
+dqSpot(SM_END,()=>({type:'seamwall', k:'end'}),()=>smQ()==='asked' && smKnocks().length>=3,1);
+dqSpot(SM_END,()=>({type:'deepvein'}),()=>smQ()==='done',1);
+NEAR_NAME.seamwall='a knocking in the rock'; NEAR_NAME.deepvein='the deep seam';
+OBJ_DRAW.seamwall=o=>{ const q=P(o.i+0.5,o.j+0.5), T=gt, pulse=(T*1.3)%2<0.3; g.save(); DQ_BIG(q,1.7); g.fillStyle='#4a4038'; g.beginPath(); g.moveTo(q.x-14,q.y+3); g.lineTo(q.x-10,q.y-20); g.lineTo(q.x+2,q.y-26); g.lineTo(q.x+14,q.y-14); g.lineTo(q.x+12,q.y+4); g.closePath(); g.fill();
+  g.strokeStyle='#1e1a16'; g.lineWidth=1.3; g.stroke(); g.strokeStyle='#2a2420'; g.beginPath(); g.moveTo(q.x-6,q.y-18); g.lineTo(q.x,q.y-8); g.lineTo(q.x+5,q.y-14); g.moveTo(q.x,q.y-8); g.lineTo(q.x-2,q.y+1); g.stroke();   // a cracked boulder of fallen rock
+  if(pulse){ g.globalCompositeOperation='lighter'; g.strokeStyle='rgba(220,210,180,0.6)'; g.lineWidth=1.2; [10,16].forEach(r=>{ g.beginPath(); g.arc(q.x,q.y-10,r,-0.6,0.6); g.stroke(); }); } g.restore(); };   // the knock, rippling out
+OBJ_DRAW.deepvein=o=>{ const q=P(o.i+0.5,o.j+0.5), T=gt, ready=(Math.floor(dayClock/DAY_LEN)>=(CHOICE.deepMined??-99)+7); g.save(); DQ_BIG(q,1.6);
+  g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(q.x,q.y+2,17,6,0,0,Math.PI*2); g.fill();
+  const F=(pts,c)=>{ g.fillStyle=c; g.beginPath(); pts.forEach(([a,b],k)=>k?g.lineTo(q.x+a,q.y+b):g.moveTo(q.x+a,q.y+b)); g.closePath(); g.fill(); g.strokeStyle='#16140f'; g.lineWidth=1.1; g.stroke(); };
+  F([[-16,2],[-13,-16],[-2,-20],[0,4]],'#4a4640'); F([[0,4],[-2,-20],[10,-24],[16,-10],[13,3]],'#5e5a52'); F([[-13,-16],[-6,-27],[6,-30],[10,-24],[-2,-20]],'#77736a');   // a faceted outcrop: shade, side, top
+  const vc=ready?'#cfe0f0':'#7a8290'; g.strokeStyle=vc; g.lineWidth=2.4; g.lineCap='round'; g.beginPath(); g.moveTo(-14+q.x,q.y-8); g.lineTo(q.x-6,q.y-12); g.lineTo(q.x-1,q.y-9); g.lineTo(q.x+6,q.y-15); g.lineTo(q.x+14,q.y-12); g.stroke();   // the deepsilver vein across it
+  g.lineWidth=1.3; g.beginPath(); g.moveTo(q.x-6,q.y-12); g.lineTo(q.x-8,q.y-19); g.moveTo(q.x+6,q.y-15); g.lineTo(q.x+5,q.y-23); g.stroke();
+  if(ready){ g.globalCompositeOperation='lighter'; glow(q.x,q.y-12,18,12,'190,215,240',0.3+Math.sin(T*2)*0.1); [[-6,-12],[6,-15],[-1,-9],[11,-13]].forEach(([a,b],k)=>{ const tw=0.5+0.5*Math.sin(T*3+k*1.7); g.fillStyle=`rgba(235,245,255,${0.5+tw*0.5})`; g.beginPath(); g.arc(q.x+a,q.y+b,0.8+tw*1.1,0,Math.PI*2); g.fill(); }); }
+  g.restore(); };
+onUse(['seamwall'],o=>{
+  if(o.k==='start'){ say('A Knocking',["Somewhere behind the rockfall, very faint: <i>knock. knock. knock.</i> A pause. <i>Knock.</i> Then nothing, and then again, the same.","It is the old miners' signal. Every miner on the Varrow knows it: <i>we are here, we are alive, dig</i>."],[
+      {label:'Knock back.', fn:()=>{ remember('seam','asked',"Someone is knocking behind the rock in Where the Lost Shift Stopped, deep in the Varrowdeep. Follow the knocking (the Lowest Grate, the Pump House, the Drowned Levels) and answer it each time the way it is knocked."); dqDrop('seamwall','start'); say('A Knocking',"You knock back, three slow and one quick. Silence. Then, much further off and lower down, the knocking starts again: it is moving. Towards the Lowest Grate, the Pump House, the Drowned Levels; the old miners' ways.",[bye]); }}, bye]); return; }
+  if(o.k==='end'){ say('The Last Knock',["Here the knocking is loud, right behind the rock: a dozen hands, all at once. The fall is old and loose. Something heavy is moving on the other side, too, something that is not knocking."],[
+      {label:'Break through.', fn:()=>{ closeDialog(); shake=Math.max(shake,8); logMsg('You heave the loose rock aside. Behind it is a gallery nobody has seen for two hundred years, and in it, between you and the knocking, something wide and grey uncurls from the wall.','#e0c090');
+        dqSpawn(o,[{name:'The Seam-Warden', type:'troll', faction:'seamwarden', opts:TROLL(), mult:2.2, tier:3}]); }}, bye]); return; }
+  const K=SM_KNOCKS[o.k], pats=Object.values(SM_KNOCKS).map(x=>x.n), opts=[...new Set([K.n,...pats])].sort();
+  say('A Knocking',[`Closer now, through the rock: <i>${K.n}</i>. Over and over. Waiting for an answer.`],[...opts.map(p=>({label:'Knock '+p+'.', fn:()=>{
+      if(p!==K.n){ say('A Knocking',"You knock. The knocking stops dead, and does not start again for a long time. Wrong answer: listen again.",[bye]); return; }
+      smKnocks().push(o.k); dqDrop('seamwall',o.k); logMsg(`You answer the knock. It moves on, deeper. (${smKnocks().length}/3)`+(smKnocks().length>=3?' The last of it comes from the First King\'s Delving.':''),'#d8c8a0'); closeDialog(); }})), bye]); });
+dqVictory(()=>{ if(smQ()==='asked' && mobs.some(m=>m.faction==='seamwarden' && m.dead)){ mobs.filter(m=>m.faction==='seamwarden').forEach(m=>m.faction='seamwarden_done'); CHOICE.seam='done'; dqDrop('seamwall','end');
+    for(let k=0;k<2;k++) giveQuestItem('deep_ore',true); addLeaves(4,"from the lost crew's last wages, elf-silver pressed into leaves"); player.purse+=40; updateHud();
+    setTimeout(()=>say('The Lost Shift',["Behind the Warden's body the gallery opens out, and they are there: a dozen miners in leather caps, sitting against the walls as if they had sat down to rest. They are bones, all of them, and have been for two hundred years. And yet you heard them knocking.","On the foreman's knees is a purse of pressed silver leaves, their last wages, still waiting to be paid out, and beside the crew the seam they died digging: grey ore that catches your lamp and holds the light. <b>Deepsilver.</b>","<i>You take two lumps of deepsilver, four silver leaves and 40 copper. The seam is still there: it will give a little more, every week. Oswin will know what to do with it.</i>"],[bye]),700); } });
+onUse(['deepvein'],o=>{ const d=Math.floor(dayClock/DAY_LEN), last=CHOICE.deepMined??-99;
+  if(d<last+7){ say('The Deep Seam',`The deepsilver here has gone dull where you worked it. It will catch the light again in ${last+7-d} day${last+7-d===1?'':'s'}.`,[bye]); return; }
+  say('The Deep Seam',"The lost crew's seam, deep under the First King's Delving. A vein of it has caught the light again since you were last here.",[{label:'Work a lump free.', fn:()=>{ CHOICE.deepMined=d; giveQuestItem('deep_ore',true); logMsg('You work a lump of deepsilver free of the seam.','#c8d8e8'); closeDialog(); }}, bye]); });
+// Oswin works deepsilver into a tempered piece: +2 Attack Power, +1 Spell Power, +5 health, "(deep-tempered)"
+const DEEP_DONE=new Set();
+function deepApply(){ (CHOICE.deepT||[]).forEach(id=>{ if(DEEP_DONE.has(id) || !ITEMS[id]) return; DEEP_DONE.add(id); const st=ITEM_STATS[id]=ITEM_STATS[id]||{}; st.ap=(st.ap||0)+2; st.magic=(st.magic||0)+1; GEAR_HP[id]=(GEAR_HP[id]||0)+5;
+    ITEMS[id]={...ITEMS[id], name:ITEMS[id].name.replace(' (tempered)','').replace(' (woven, tempered)',' (woven)')+' (deep-tempered)'}; }); try{ refreshPlayerHp(false); }catch(e){} }
+setInterval(()=>{ try{ if(running) deepApply(); }catch(e){} },2000);
+function deepTalk(){ const E=player.opts.equip, O='Oswin the Armourer', back=()=>TALKERS.smith(), have=invCount('deep_ore');
+  const pieces=TEMPER_SLOTS.map(sl=>E[sl]).filter(id=>id && isTempered(id));
+  say(O,["<i>He turns the deepsilver over in his fingers, holds it to the forge-light, and goes quiet for a while.</i> “Where did you get this? No: don't tell me. I'll have to go and look.”","“Tempered steel I can make better with it. Once per piece, and it won't come out again. One lump a piece.”"],[
+    ...pieces.map(id=>(CHOICE.deepT||[]).includes(id) ? {label:`${ITEMS[id].name}: already deep-tempered`, off:true, fn:()=>{}} : {label:`Deep-temper the ${ITEMS[id].name}. (+2 Attack Power, +1 Spell Power, +5 health)`, off:have<1, note:have<1?'needs deepsilver':'-1 deepsilver', fn:()=>{
+      const k=player.inv.indexOf('deep_ore'); if(k<0) return; player.inv[k]=null; CHOICE.deepT=[...(CHOICE.deepT||[]),id]; deepApply(); updateHud(); try{ autosaveSoon(200); }catch(e){}
+      logMsg(`Oswin folds deepsilver into your ${ITEMS[id].name}. It is lighter than it was, and it takes the light like water.`,'#c8d8e8'); deepTalk(); }}),
+    ...(pieces.length?[]:[{label:'(Wear a piece he has already tempered.)', off:true, fn:()=>{}}]), {label:'Back.',fn:back}, bye],true); }
+{ const old=TALKERS.smith; if(old) TALKERS.smith=(...a)=>{ const r=old(...a); try{ const box=document.getElementById('dlg-opts');
+    if((invCount('deep_ore')>0 || (CHOICE.deepT||[]).length) && dlgOverlay.classList.contains('open') && box && !box.querySelector('.dlg-opt.deepopt')){ const b=document.createElement('button'); b.className='dlg-opt deepopt';
+      b.innerHTML='<span>Ask Oswin to work deepsilver into your gear</span>'; b.addEventListener('click',deepTalk); box.insertBefore(b,box.lastElementChild); } }catch(e){} return r; }; }
+DQ_TARGETS.push(()=>smQ()!=='asked' ? [] : smKnocks().length<3 ? Object.entries(SM_KNOCKS).filter(([k])=>!smKnocks().includes(k)).map(([,K])=>K.room) : [SM_END]);
+JOURNAL.push(["The Deepest Seam", ()=>{ const Q=smQ(); if(!Q) return null;
+  if(Q==='done') return ['done',"Behind the Seam-Warden lay the lost shift, and the seam they died for: deepsilver. Oswin can work it into tempered gear; the seam under the First King's Delving gives a little more each week."];
+  return ['active', smKnocks().length<3 ? "Follow the miners' knocking down through the Varrowdeep and answer it the way it is knocked: "+[["grate","the Lowest Grate"],["pump","the Pump House"],["drowned","the Drowned Levels"]].map(([k,n])=>n+(smKnocks().includes(k)?' ✓':'')).join('; ')+". ("+smKnocks().length+"/3)" : "The last knocking comes from behind the rockfall in the First King's Delving. Break through."]; }]);
+
+// ── 3. THE MOTHER'S SEED ──
+const SD_BLOOMS={ shrine:{room:'rc_6_4'}, warrens:{room:'rc_2_5'}, nursery:{room:'rc_2_4'} };
+const sdQ=()=>CHOICE.seed||null, sdBlooms=()=>Array.isArray(CHOICE.seedBlooms)?CHOICE.seedBlooms:(CHOICE.seedBlooms=[]);
+Object.assign(ITEMS,{ mother_seed:{ name:"The Mother's Seed", slot:'misc', title:"A seed the size of a plum, warm, faintly glowing gold. Faelith says it is what the Rot-Mother was before the rot found her." } }); QUEST_ITEMS.add('mother_seed');
+ICON_BONES.mother_seed=c=>{ const gl=c.createRadialGradient(20,21,1,20,21,14); gl.addColorStop(0,'rgba(255,248,200,1)'); gl.addColorStop(0.5,'rgba(240,200,90,0.9)'); gl.addColorStop(1,'rgba(200,150,40,0)'); c.fillStyle=gl; c.beginPath(); c.arc(20,21,14,0,Math.PI*2); c.fill();
+  c.fillStyle='#b8862e'; c.strokeStyle='#5a3e10'; c.lineWidth=1.1; c.beginPath(); c.ellipse(20,22,7,9,0.2,0,Math.PI*2); c.fill(); c.stroke(); c.strokeStyle='#6a9a3a'; c.lineWidth=1.6; c.beginPath(); c.moveTo(21,13); c.quadraticCurveTo(24,8,28,9); c.stroke(); };
+Object.keys(SD_BLOOMS).forEach(k=>{ dqSpot(SD_BLOOMS[k].room,()=>({type:'sdbloom', k}),()=>sdQ()==='asked' || sdBlooms().includes(k)); });
+// a bloom brought back fills its room with light: more blooms about it, and the rot's creatures keep away
+Object.keys(SD_BLOOMS).forEach(k=>{ [1,2,3].forEach(n=>dqSpot(SD_BLOOMS[k].room,()=>({type:'sdlight', k, n}),()=>sdBlooms().includes(k),n+1)); wrap(SD_BLOOMS[k].room,'mobs',l=>sdBlooms().includes(k) ? [] : l); });
+NEAR_NAME.sdbloom='a lightbloom';
+OBJ_DRAW.sdbloom=o=>{ const q=P(o.i+0.5,o.j+0.5), T=gt, live=sdBlooms().includes(o.k); g.save(); DQ_BIG(q,1.8);
+  if(!live){ g.lineCap='round'; g.strokeStyle='#1e1812'; g.lineWidth=4.4; g.beginPath(); g.moveTo(q.x,q.y); g.quadraticCurveTo(q.x+6,q.y-16,q.x-1,q.y-24); g.quadraticCurveTo(q.x-5,q.y-27,q.x-8,q.y-22); g.stroke();
+    g.strokeStyle='#7a6a52'; g.lineWidth=2.6; g.stroke();   // a bent, black-veined stalk, its head hanging
+    [[-6,-11,0.9],[5,-15,-0.7]].forEach(([a,b,r])=>{ g.fillStyle='#5a4a38'; g.strokeStyle='#1e1812'; g.lineWidth=0.9; g.beginPath(); g.ellipse(q.x+a,q.y+b,5,2,r,0,Math.PI*2); g.fill(); g.stroke(); });   // curled leaves
+    g.fillStyle='#8a7a62'; g.strokeStyle='#1e1812'; g.lineWidth=1; for(let p=0;p<5;p++){ const an=Math.PI*0.25+p*0.32; g.beginPath(); g.ellipse(q.x-8+Math.cos(an)*3,q.y-20+Math.sin(an)*3.4,3.4,1.5,an,0,Math.PI*2); g.fill(); g.stroke(); }   // the dead petals, drooping
+    g.fillStyle='#3a2e22'; g.beginPath(); g.arc(q.x-8,q.y-21,1.8,0,Math.PI*2); g.fill(); g.fillStyle='rgba(40,30,20,0.35)'; g.beginPath(); g.ellipse(q.x,q.y,9,3.4,0,0,Math.PI*2); g.fill();
+    for(let k=0;k<3;k++){ const ph=(T*0.35+k/3)%1; g.fillStyle=`rgba(120,140,80,${0.45*(1-ph)})`; g.beginPath(); g.arc(q.x-6+k*5,q.y-6-ph*18,1.2,0,Math.PI*2); g.fill(); }   // rot-spores rising off it
+    g.restore(); DQ_GLINT(q,'230,200,120',T); return; }
+  g.strokeStyle='#5a8a3a'; g.lineWidth=2.6; g.lineCap='round'; g.beginPath(); g.moveTo(q.x,q.y); g.quadraticCurveTo(q.x+4,q.y-16,q.x,q.y-30); g.stroke(); g.fillStyle='#6aa040'; [[-7,-14,0.6],[6,-20,-0.6]].forEach(([a,b,r])=>{ g.beginPath(); g.ellipse(q.x+a,q.y+b,6,2.6,r,0,Math.PI*2); g.fill(); });
+  g.globalCompositeOperation='lighter'; glow(q.x,q.y-32,34,28,'255,236,160',0.45+Math.sin(T*1.6)*0.1); g.fillStyle='rgba(255,248,210,0.95)'; for(let p=0;p<6;p++){ const a=p/6*Math.PI*2+T*0.3; g.beginPath(); g.ellipse(q.x+Math.cos(a)*5,q.y-32+Math.sin(a)*2.4,4,2,a,0,Math.PI*2); g.fill(); }
+  for(let k=0;k<5;k++){ const ph=(T*0.4+k/5)%1; g.fillStyle=`rgba(255,240,180,${0.7*(1-ph)})`; g.beginPath(); g.arc(q.x+Math.sin(k*2.1+T)*10,q.y-32-ph*30,1.3,0,Math.PI*2); g.fill(); } g.restore(); };
+OBJ_DRAW.sdlight=o=>{ const q=P(o.i+0.5,o.j+0.5), T=gt+o.n; g.save(); DQ_BIG(q,1.5); g.strokeStyle='#5a8a3a'; g.lineWidth=1.6; g.beginPath(); g.moveTo(q.x,q.y); g.quadraticCurveTo(q.x+2,q.y-8,q.x,q.y-14); g.stroke();
+  g.globalCompositeOperation='lighter'; glow(q.x,q.y-15,16,12,'255,230,150',0.35+Math.sin(T*2)*0.08); g.fillStyle='rgba(255,246,200,0.9)'; g.beginPath(); g.arc(q.x,q.y-15,2.6,0,Math.PI*2); g.fill(); g.restore(); };
+LIGHT_TYPES.sdbloom=[0,-56,120,'255,230,150'];
+onUse(['sdbloom'],o=>{ if(sdBlooms().includes(o.k)){ say('A Lightbloom',"Gold light, warm as a summer evening. The rot has gone back from it in a wide ring, and the little lights have come up all around.",[bye]); return; }
+  if(!hasItem('mother_seed')){ say('A Lightbloom',"A lightbloom, withered black, its head hanging. Faelith's seed would wake it.",[bye]); return; }
+  say('A Lightbloom',["A great lightbloom, dead: the stalk gone black and the head hanging. The seed in your pack is warm against your back, and getting warmer.","Something in the dark at the edge of the room shifts as you step closer. The rot does not want this."],[
+    {label:'Press the seed to its roots.', fn:()=>{ closeDialog(); o.planting=true; logMsg('You press the seed against the black roots. A thread of gold runs up the stalk, and out of the walls the rot comes to put it out.','#f0d890');
+      dqSpawn(o,[{name:'Rot-Guard Sporeling', type:'sporeling', faction:'seedguard', opts:SPORELING(1), mult:1.6},{name:'Rot-Guard Briarling', type:'briarling', faction:'seedguard', opts:BRIAR(false), mult:1.5}]).forEach(m=>m.seedBloom=o.k); }}, bye]); });
+dqVictory(()=>{ const won=mobs.filter(m=>m.faction==='seedguard' && m.dead && m.seedBloom && !m.seedDone); if(!won.length || mobs.some(m=>m.faction==='seedguard' && !m.dead)) return;
+  won.forEach(m=>m.seedDone=true); const k=won[0].seedBloom; if(!sdBlooms().includes(k)){ sdBlooms().push(k); logMsg(`The lightbloom lifts its head, and gold light fills the room. (${sdBlooms().length}/3)`,'#f0d890'); try{ switchArea(areaId,'here'); }catch(e){} } });
+function seedTalk(){ const F='Faelith', Q=sdQ();
+  if(!Q){ say(F,["“The Mother is dead, and the Rootdeep is quieter. Not healed. Where she fed, the lightblooms died, and the rot still sits in those rooms like smoke in a cloth.”","“When she fell, this was left in the black sap. Her seed: what she was before the rot found her. Take it to the dead blooms (in the Withered Shrine, the Rot Warrens and the Husk Nursery) and let it wake them. The rot will fight you for every one.”"],[
+      {label:'“I will wake them.”', fn:()=>{ giveQuestItem('mother_seed',true); remember('seed','asked',"Faelith gave you the Rot-Mother's seed. Wake the dead lightblooms in the Withered Shrine, the Rot Warrens and the Husk Nursery, deep in the Rootdeep."); closeDialog(); }}, bye]); return; }
+  if(Q==='asked'){ const n=sdBlooms().length; if(n<3){ say(F,`“${n} of three. I can feel them from here, a little warmer each time.”`,[bye]); return; }
+    say(F,["“All three. I felt the last one wake from here: like a window opening in a shut house.”","“The tree remembers favours. So do we. Take these, from the Wardens, and this.”"],[
+      {label:'Take her thanks.', fn:()=>{ const k=player.inv.indexOf('mother_seed'); if(k>=0) player.inv[k]=null; CHOICE.seed='done'; addLeaves(10,'for waking the lightblooms of the Rootdeep'); giveQuestItem('duskplum',true); giveQuestItem('duskplum',true); updateHud();
+        say(F,"“Ten leaves, and two duskplums from the first tree that fruited down there again. The Rootdeep is healing. Come and see it, now and then.”",[bye]); }}]); return; }
+  say(F,"“The lightblooms are spreading. In a year, you won't know the place.”",[bye]); }
+{ const old=TALKERS.faelith; if(old) TALKERS.faelith=(...a)=>{ const r=old(...a); try{ const box=document.getElementById('dlg-opts');
+    if(rcQ()==='done' && sdQ()!=='done' && dlgOverlay.classList.contains('open') && box && !box.querySelector('.dlg-opt.sdopt')){ const b=document.createElement('button'); b.className='dlg-opt sdopt';
+      b.innerHTML='<span>'+(!sdQ()?'“Is the Rootdeep healed now?”':sdBlooms().length>=3?'“The lightblooms are awake.”':'“About the dead blooms.”')+'</span>'; b.addEventListener('click',seedTalk); box.insertBefore(b,box.lastElementChild); } }catch(e){} return r; }; }
+{ const prev=npcHasNews; npcHasNews=function(n){ try{ if(n && n.id==='faelith' && rcQ()==='done'){ if(!sdQ()) return '!'; if(sdQ()==='asked' && sdBlooms().length>=3) return '?'; } }catch(e){} return prev(n); }; }
+DQ_TARGETS.push(()=>sdQ()!=='asked' ? [] : Object.entries(SD_BLOOMS).filter(([k])=>!sdBlooms().includes(k)).map(([,B])=>B.room));
+JOURNAL.push(["The Mother's Seed", ()=>{ const Q=sdQ(); if(!Q) return null; if(Q==='done') return ['done',"You woke the dead lightblooms of the Rootdeep with the Rot-Mother's seed. The rooms they light are free of the rot."];
+  return ['active', sdBlooms().length>=3 ? "All three lightblooms are awake. Go back to Faelith in the Root Hollow." : "Wake the dead lightblooms with the Mother's seed: "+[["shrine","the Withered Shrine"],["warrens","the Rot Warrens"],["nursery","the Husk Nursery"]].map(([k,n])=>n+(sdBlooms().includes(k)?' ✓':'')).join('; ')+". ("+sdBlooms().length+"/3)"]; }]);
+
+// ── 4. THE JOB BOARDS: three new notices a day, on the board in Dunhollow and the one in the Hollowmere market ──
+const JOB_POOL=[
+  {id:'lurk_uc', kind:'kill', text:'Sewer lurkers have been dragging off dogs in the Lowstreets. Kill three in the Undercity.', pre:'uc_', types:['lurker'], n:3, pay:30, lv:2},
+  {id:'cut_uc', kind:'kill', text:'Cutthroats in the drains are robbing the night-soil men. Put down four.', pre:'uc_', types:['bandit'], name:/Cutthroat/, n:4, pay:35, lv:2},
+  {id:'dead_uc', kind:'kill', text:'The Undercity dead are walking again. The chapel wants four of them laid down.', pre:'uc_', types:['skeleton'], n:4, pay:35, lv:2},
+  {id:'flame_uc', kind:'kill', text:'Living flames have set fire to a cellar near the Ember Stair. Douse three.', pre:'uc_', types:['ember'], n:3, pay:40, lv:2},
+  {id:'gob_ow', kind:'kill', text:'Goblins are stealing from the Varrow hauliers. Clear four out of the Varrowdeep.', pre:'ow_', types:['goblin'], n:4, pay:40, lv:2},
+  {id:'lurk_ow', kind:'kill', text:'The pumps on the Drowned Levels are choked with lurkers. Kill three.', pre:'ow_', types:['lurker'], n:3, pay:40, lv:2},
+  {id:'spore_rc', kind:'kill', text:'Sporelings are spreading up the Rootdeep stairs. The Wardens ask for five cut down.', pre:'rc_', types:['sporeling'], n:5, pay:40, lv:2},
+  {id:'brute_rc', kind:'kill', text:'Two cap-brutes are blocking the Rootdeep paths. The Wardens will pay to see them gone.', pre:'rc_', types:['capbrute'], n:2, pay:45, lv:3},
+  {id:'tails', kind:'fetch', text:'Tuck is buying rat tails in bulk. Bring five.', item:'rat_tail', n:5, pay:25, lv:1},
+  {id:'bones', kind:'fetch', text:'A grave-speaker wants old bones, no questions asked. Bring three.', item:'old_bone', n:3, pay:25, lv:1},
+  {id:'plums', kind:'fetch', text:'The Wheatsheaf wants duskplums from the Rootdeep for a pie. Bring three.', item:'duskplum', n:3, pay:30, lv:2},
+  {id:'ore', kind:'fetch', text:'A jeweller in the Castle Ward wants deepsilver. Bring one lump.', item:'deep_ore', n:1, pay:60, lv:4, need:()=>CHOICE.seam==='done'} ];
+const jobDay=()=>Math.floor((dayClock+DAY_LEN*0.25)/DAY_LEN);
+const jobsToday=(board)=>{ const d=jobDay(), pool=JOB_POOL.filter(j=>!j.need || j.need()), out=[]; let s=(d*7919+(board==='market'?131:17))>>>0;
+  while(out.length<3 && out.length<pool.length){ s=(s*1103515245+12345)>>>0; const j=pool[s%pool.length]; if(!out.includes(j)) out.push(j); } return out; };
+const jobState=()=>CHOICE.jobs=(CHOICE.jobs && typeof CHOICE.jobs==='object')?CHOICE.jobs:{active:[], done:0, dayTaken:{}};
+const jobProg=j=>{ const S=jobState(), a=S.active.find(x=>x.id===j.id); if(!a) return 0; return j.kind==='kill' ? a.got||0 : Math.min(j.n,invCount(j.item)); };
+const jobLeaves=j=>j.lv;
+dqVictory(()=>{ const S=jobState(); if(!S.active.length) return; mobs.filter(m=>m.dead && !m.jobCounted).forEach(m=>{ m.jobCounted=true;
+    S.active.forEach(a=>{ const j=JOB_POOL.find(x=>x.id===a.id); if(!j || j.kind!=='kill' || !areaId.startsWith(j.pre) || !j.types.includes(m.type) || (j.name && !j.name.test(m.name||''))) return; a.got=Math.min(j.n,(a.got||0)+1); if(a.got===j.n) logMsg('Job done: '+j.text.split('.').slice(-2,-1)[0].trim()+'. Hand it in at a notice board.','#e8c060'); }); }); });
+function jobBoard(board,old){ const S=jobState(), d=jobDay(), T=board==='market'?'The Market Notice Board':'The Notice Board', back=()=>jobBoard(board,old);
+  const today=jobsToday(board), opts=[];
+  S.active.forEach(a=>{ const j=JOB_POOL.find(x=>x.id===a.id); if(!j) return; const p=jobProg(j), ok=p>=j.n;
+    opts.push({label:(ok?'Hand in: ':'Working on: ')+j.text+` (${p}/${j.n})`, off:!ok, note:ok?'+'+formatCoin(j.pay)+', +'+jobLeaves(j)+' leaves':'', fn:()=>{
+      if(j.kind==='fetch'){ for(let q=0;q<j.n;q++){ const k=player.inv.indexOf(j.item); if(k>=0) player.inv[k]=null; } }
+      S.active=S.active.filter(x=>x.id!==j.id); S.done=(S.done||0)+1; player.purse+=j.pay; addLeaves(jobLeaves(j),'for work posted on the board'); updateHud(); try{ autosaveSoon(200); }catch(e){} logMsg('Job paid: '+formatCoin(j.pay)+'.','#e8c060'); back(); }}); });
+  today.forEach(j=>{ if(S.active.some(a=>a.id===j.id)) return; const taken=(S.dayTaken||{})[j.id]===d;
+    opts.push({label:'Take the job: '+j.text, off:taken || S.active.length>=2, note:taken?'done today':S.active.length>=2?'two at a time':'+'+formatCoin(j.pay)+', +'+jobLeaves(j)+' leaves', fn:()=>{ S.active.push({id:j.id, got:0}); S.dayTaken=S.dayTaken||{}; S.dayTaken[j.id]=d; logMsg('You take down the notice: '+j.text,'#e8c060'); back(); }}); });
+  say(T,["Notices pinned three deep, most of them old. The fresh ones are for work below ground: the Undercity, the Varrowdeep, the Rootdeep. The Wardens of Sylvhaven pay in silver leaves.",`<i>New work every morning. Two jobs at a time. Jobs done: ${S.done||0}.</i>`],[...opts, ...(old?[{label:'Read the older notices.', fn:old}]:[]), bye],true); }
+{ const prev=PUZ_ON.noticeboard; onUse(['noticeboard'],o=>{ jobBoard(o.board||'village', o.board==='market'||!prev ? null : ()=>prev(o)); }); }
+wrap('market','objects',l=>[...l,{type:'noticeboard', i:17, j:6, board:'market'}]);
+JOURNAL.push(["Board Work", ()=>{ const S=CHOICE.jobs; if(!S || !S.active || !S.active.length) return null; return ['active', S.active.map(a=>{ const j=JOB_POOL.find(x=>x.id===a.id); return j ? j.text+` (${jobProg(j)}/${j.n})` : ''; }).join('<br>')+'<br><i>Hand jobs in at the notice board in Dunhollow or the Hollowmere market.</i>']; }]);
 </script>
 </body>
 </html>

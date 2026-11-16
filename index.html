@@ -28589,7 +28589,9 @@ function golemTakes(n){ const G=GOLEM; if(!G || G.fade || G.rise<1 || n<=0 || !c
   else if(take===n) floatText(tileOf(player),'Golem!','#d8c8b8');
   return n-take; }
 function golemTick(dt){ const G=GOLEM; if(!G) return; G.hit=Math.max(0,G.hit-dt); G.anim=Math.max(0,G.anim-dt);
-  if(G.fade){ G.fade+=dt; if(G.fade>3) GOLEM=null; return; }
+  if(G.fade){ G.fade+=dt;
+    if(!G.thud && G.fade>=GD_LAND){ G.thud=true; shake=Math.max(shake,6); try{ SND.fx('gthud'); }catch(e){} try{ const fx=G.x+(G.fallSd||1)*1.1, fy=G.y; burst({x:fx,y:fy},{x:fx+(G.fallSd||1)*0.4,y:fy-0.2},'#9a8a74',14); }catch(e){} }   // it hits the ground: a thud and a puff of dust
+    if(G.fade>GD_END) GOLEM=null; return; }
   G.rise=Math.min(1,G.rise+dt/1.6);                                  // slow to stand: a moment before it can take anything
   if(!combat.active && combat.phase==='down'){ G.fade=0.01; try{ SND.fx('gfall'); }catch(e){} return; }                  // you fell: so does it
   if(!combat.active){ if(G.rise<1) return; const dx=G.x-player.x, dy=G.y-player.y, d=Math.hypot(dx,dy)||1;              // between fights it lumbers after you, a step behind, on the other side from the skeleton
@@ -28603,12 +28605,18 @@ function golemTick(dt){ const G=GOLEM; if(!G) return; G.hit=Math.max(0,G.hit-dt)
   const mx=tx-G.x, my=ty-G.y, md=Math.hypot(mx,my), sp=Math.min(md,dt*(G.rise<1?0:1.6)); if(md>0.001){ G.x+=mx/md*sp; G.y+=my/md*sp; } G.moving=md>0.05 && G.rise>=1;
   if(f && !f.dead && combat.phase==='fight' && G.rise>=1 && md<0.5){ G.cd-=dt; if(G.cd<=0){ G.cd=1.9; G.anim=0.5; G.hook=!G.hook; try{ SND.fx(G.hook?'gscrape':'gclank'); }catch(e){} wound(f,G.dmg,G.hook?'Hook!':'Golem!','#d8c8b8'); } } }
 { const _bt=bookTick; bookTick=function(dt){ _bt.apply(this,arguments); try{ golemTick(dt); }catch(e){ console.error(e); } }; }
+// its death: it slumps to its knees, topples over sideways from the feet, hits the ground, lies there, and only then comes apart where it fell
+const GD_KNEEL=0.7, GD_LAND=1.25, GD_FADE=2.3, GD_END=3.2;
 { const _bi=bookItems; bookItems=function(items){ _bi.apply(this,arguments); const G=GOLEM; if(!G) return;
-    items.push({d:G.x+G.y+0.012, ax:G.x, ay:G.y, fn:()=>{ const q=P(G.x,G.y), sink=G.fade?Math.max(0,Math.min(1,(G.fade-1.6)/1.4)):0, up=Math.min(1,G.rise)*(1-sink);
-      g.save(); g.beginPath(); g.rect(q.x-120,q.y-260,240,262); g.clip();                          // it climbs up out of the ground, and sinks back in
-      g.translate(0,(1-up)*140); if(G.fade) g.globalAlpha*=Math.max(0,1-sink);
+    items.push({d:G.x+G.y+0.012, ax:G.x, ay:G.y, fn:()=>{ const q=P(G.x,G.y), F=G.fade||0, up=G.fade?1:Math.min(1,G.rise);
+      g.save(); if(!G.fade){ g.beginPath(); g.rect(q.x-120,q.y-260,240,262); g.clip(); g.translate(0,(1-up)*140); }   // it climbs up out of the ground
+      else { if(!G.fallSd){ const d=G.dir||0; G.fallSd=(d===5||d===6||d===7)?-1:1; }
+        const tp=Math.max(0,Math.min(1,(F-GD_KNEEL)/(GD_LAND-GD_KNEEL))), ang=G.fallSd*1.42*tp*tp, land=F>=GD_LAND?Math.min(1,(F-GD_LAND)/0.18):0;   // speeding up as it goes over
+        { const a0=g.globalAlpha; g.globalAlpha*=1-Math.max(0,Math.min(1,(F-GD_FADE)/(GD_END-GD_FADE))); g.fillStyle='rgba(0,0,0,0.34)'; g.beginPath(); g.ellipse(q.x+G.fallSd*58*tp,q.y+1,40+44*tp,11+3*tp,0,0,Math.PI*2); g.fill(); g.globalAlpha=a0; }   // its shadow stays on the ground, stretching out under the falling body
+        g.translate(q.x,q.y); g.rotate(ang); g.scale(1,1-0.12*land*(1-Math.min(1,(F-GD_LAND-0.18)/0.25)*0.5)); g.translate(-q.x,-q.y-(F<GD_KNEEL?0:6*tp));   // pivoting on its feet; a little squash where it lands
+        g.globalAlpha*=1-Math.max(0,Math.min(1,(F-GD_FADE)/(GD_END-GD_FADE))); }
       const pose=G.anim>0 ? {kind:'strike', t:1-G.anim/0.5, dir:G.hook?'left':'up'} : G.hit>0 ? {kind:'stagger', t:1} : null;
-      try{ drawGolem(q.x,q.y,{dir:G.dir, moving:G.moving&&!G.fade, id:7, flash:G.hit, dead:!!G.fade, fallT:G.fade||0, summon:true, helm:golemHelmOn()?CHOICE.golemHelm||null:null},pose); }catch(e){ console.error(e); }
+      try{ drawGolem(q.x,q.y,{dir:G.dir, moving:G.moving&&!G.fade, id:7, flash:G.hit, dead:!!G.fade, fallT:G.fade?Math.min(1.1,G.fade*1.1/GD_KNEEL)*(1-0.75*Math.max(0,Math.min(1,(G.fade-GD_KNEEL)/(GD_LAND-GD_KNEEL)))):0, noShadow:!!G.fade, summon:true, helm:golemHelmOn()?CHOICE.golemHelm||null:null},pose); }catch(e){ console.error(e); }
       g.restore();
       if(!G.fade && G.rise>=1 && combat.active){ const w=56, by=q.y-170; g.save(); g.fillStyle='rgba(10,8,6,0.75)'; g.fillRect(q.x-w/2-1,by-1,w+2,7);
         g.fillStyle='#b89a8a'; g.fillRect(q.x-w/2,by,w*Math.max(0,G.hp/G.max),3.4); g.fillStyle='#8a7aa8'; g.fillRect(q.x-w/2,by+3.6,w*Math.max(0,G.t/GOLEM_LIFE),1.6); g.restore(); } }}); }; }
@@ -28630,7 +28638,7 @@ function drawGolem(x,B,e,pose){ const d=e.dir||0, fl=(d===5||d===6||d===7)?-1:1,
     for(let k=0;k<pts.length-1;k++){ const [ax,ay]=pts[k],[bx,by]=pts[k+1], L=Math.hypot(bx-ax,by-ay)||1, n=Math.max(1,Math.floor(L/5)); for(let q=0;q<n;q++){ const u=(q+0.5)/n, cx=ax+(bx-ax)*u, cy=ay+(by-ay)*u, nx=-(by-ay)/L*2.6, ny=(bx-ax)/L*2.6; g.beginPath(); g.moveTo(cx-nx,cy-ny); g.lineTo(cx+nx,cy+ny); g.stroke(); } } };
   const limb=(a,b,w0,w1,lit,dark)=>{ beastSeg(a,b,w0+3,w1+3,dark); g.beginPath(); g.arc(a[0],a[1],(w0+3)/2,0,Math.PI*2); g.fill(); beastSeg([a[0]-1,a[1]-1],[b[0]-1,b[1]-1],w0-1,w1-1,lit); g.beginPath(); g.arc(a[0]-1,a[1]-1,(w0-1)/2,0,Math.PI*2); g.fill(); };   // a dark rim, a lit core: rounder than a flat band
   g.save(); g.translate(x,B);
-  g.fillStyle='rgba(0,0,0,0.34)'; g.beginPath(); g.ellipse(0,1,40,11,0,0,Math.PI*2); g.fill(); g.scale(fl,1);
+  if(!e.noShadow){ g.fillStyle='rgba(0,0,0,0.34)'; g.beginPath(); g.ellipse(0,1,40,11,0,0,Math.PI*2); g.fill(); } g.scale(fl,1);
   const fall=e.summon&&e.dead?Math.max(0,Math.min(1,((e.fallT||0)-1.1)/0.45)):0;            // your golem, broken: on its knees, then over on its face
   if(fall){ const ez=fall*fall; g.translate(0,-4); g.rotate((s===1?1.25:0.45)*ez); g.translate(0,4+ez*(s===1?6:14)); if(s!==1) g.scale(1,1-ez*0.18); }
   const lean=(stag?-5:0)+strike*12*(1-strike*0.5)-raise*3, hip=-46+kn*20+bob, sh=-108+kn*22+br*0.5+bob, tw=P?25:34-s*11, ww=P?17:21-s*6, mid=(sh+hip)/2;

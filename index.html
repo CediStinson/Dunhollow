@@ -29368,6 +29368,36 @@ function jobBoard(board,old){ const S=jobState(), d=jobDay(), T=board==='market'
 { const prev=PUZ_ON.noticeboard; onUse(['noticeboard'],o=>{ jobBoard(o.board||'village', o.board==='market'||!prev ? null : ()=>prev(o)); }); }
 wrap('market','objects',l=>[...l,{type:'noticeboard', i:11, j:15, board:'market'}]);   // by the fountain square, clear of the stalls and the smith
 JOURNAL.push(["Board Work", ()=>{ const S=CHOICE.jobs; if(!S || !S.active || !S.active.length) return null; return ['active', S.active.map(a=>{ const j=JOB_POOL.find(x=>x.id===a.id); return j ? j.text+` (${jobProg(j)}/${j.n})` : ''; }).join('<br>')+'<br><i>Hand jobs in at the notice board in Dunhollow or the Hollowmere market.</i>']; }]);
+
+// ════════ what the burned dead leave: ash-black bones and skulls for Vesna, and now and then the blade one of them was burned holding ════════
+Object.assign(ITEMS,{ ashen_bone:{ name:'An Ashen Bone', slot:'misc', stack:true, stackMax:5 }, ashen_skull:{ name:'An Ashen Skull', slot:'misc', stack:true },
+  charred_blade:{ name:'Charred Blade', slot:'weapon' } });
+Object.assign(PRICES,{ ashen_bone:12, ashen_skull:30, charred_blade:70 });
+Object.assign(WEAPONS,{ charred_blade:{ wind:0.18, dmg:11, len:21, burn:0.12 } });
+['ashen_bone','ashen_skull'].forEach(id=>VESNA_BUYS.only.add(id));
+Object.assign(ITEM_LORE||{},{ ashen_bone:"A bone burned black, light as charcoal, still faintly warm. Vesna pays more for these than for the fen's: “Fire-dead remember.” (Only Vesna buys grave goods.)",
+  ashen_skull:"A skull charred black, ash caked in the eye-holes. Something in it still smoulders when you turn it to the light. (Only Vesna buys grave goods.)",
+  charred_blade:"A sword its owner was burned holding. The steel has gone black, and embers still live in the cracks of it: now and then a cut leaves a burn." });
+const ashIcon=(base,c)=>{ ICON_BONES[base](c); c.save(); c.globalCompositeOperation='source-atop'; c.fillStyle='rgba(26,20,16,0.74)'; c.fillRect(0,0,40,40);
+  c.fillStyle='rgba(190,184,176,0.55)'; [[12,26],[25,12],[18,20],[28,24]].forEach(([x,y])=>{ c.beginPath(); c.arc(x,y,1.6,0,Math.PI*2); c.fill(); });   // pale ash on the char
+  c.globalCompositeOperation='lighter'; c.fillStyle='rgba(255,120,40,0.85)'; [[15,23],[23,15],[20,19]].forEach(([x,y])=>{ c.beginPath(); c.arc(x,y,0.9,0,Math.PI*2); c.fill(); }); c.restore(); };   // and an ember or two
+ICON_BONES.ashen_bone=c=>ashIcon('old_bone',c); ICON_BONES.ashen_skull=c=>ashIcon('old_skull',c);
+// the blade: an ordinary sword, the steel burned black along its length, embers in the cracks
+WEAPON_ART.charred_blade=(c,hx,hy,ang,id,s)=>{ drawWeapon(c,hx,hy,ang,'sword',s); c.save(); c.translate(hx,hy); c.rotate(ang); c.scale(s,s); c.lineCap='round';
+  c.strokeStyle='rgba(22,18,16,0.88)'; c.lineWidth=2.2; c.beginPath(); c.moveTo(5,0); c.lineTo(20.5,0); c.stroke();
+  c.strokeStyle='rgba(120,112,104,0.6)'; c.lineWidth=0.5; c.beginPath(); c.moveTo(6,-0.6); c.lineTo(19,-0.6); c.stroke();   // ash along the edge
+  c.globalCompositeOperation='lighter'; const T=(typeof gt==='number'?gt:0); [8,11.5,15,18].forEach((px,k)=>{ const f=0.5+0.5*Math.abs(Math.sin(T*2.1+k*1.9)); c.fillStyle=`rgba(255,${120+Math.round(60*f)},40,${0.9*f})`; c.fillRect(px,-0.4,1.1,0.8); });
+  c.restore(); };
+ITEM_ICON.charred_blade=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); drawWeapon(g2,7,33,-Math.PI/4,'charred_blade',1.3); g2.restore(); };
+// they drop it all instead of the fen's plain bones
+{ const _v=victory; victory=function(faction){ const burned=mobs.filter(m=>m.hostile && m.dead && !m.looted && m.opts && m.opts.charred && (!faction || m.faction===faction));
+    burned.forEach(m=>{ m.opts={...m.opts, charred:true, _ash:true}; m.looted=true; });   // handled here, not by the ordinary skeleton loot
+    const r=_v.apply(this,arguments);
+    try{ const R=Math.random, give=id=>{ const f=slotFor(id); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } else logMsg('Inventory is full.','#e0b070'); };
+      burned.forEach(m=>{ if(R()<0.35){ const c=2+Math.floor(R()*6); player.purse+=c; updateHud(); logMsg('Loot: '+formatCoin(c),'#e8c060'); }
+        if(R()<0.55) give('ashen_bone'); if(R()<0.18) give('ashen_skull'); if(R()<0.05) give('charred_blade');
+        if(R()<0.06) give('ember_core'); }); }catch(e){ console.error(e); }
+    return r; }; }
 </script>
 </body>
 </html>

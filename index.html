@@ -1535,7 +1535,8 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
 
   // ── one arm; `depth` pushes the far arm back behind the torso ──
   const armIn=CH-(F?1.9:2.0), al=Math.abs(Y.SHOULDER-Y.WAIST)+6.3, aw=P.limbW;
-  const SLV = E.torso==='shirt' ? (TUN ? {col:C.shirt,len:0.88,cuff:true,trim:TUNTRIM} : SMOCK ? {col:C.shirt,len:0.62,cuff:true,roll:true} : {col:C.shirt,len:F?0.28:0.46}) : ROBE ? {col:ELFC.robe,len:0.97,bell:true} : ETUN ? {col:ELFC.tunic,len:0.9,cuff:true} : null;     // women's cut: cap sleeves
+  const LGM = !F && typeof LING_TORSO!=='undefined' && LING_TORSO.has(E.torso) ? LING_DYE[lingParts(LING_ALIAS[E.torso]||E.torso)[1]] : null;
+  const SLV = LGM ? {col:/^(lace_underbust|open_bralette)/.test(E.torso)?LGM.LB:LGM.SHIRT, len:0.92, cuff:true, trim:LGM.SV} : E.torso==='shirt' ? (TUN ? {col:C.shirt,len:0.88,cuff:true,trim:TUNTRIM} : SMOCK ? {col:C.shirt,len:0.62,cuff:true,roll:true} : {col:C.shirt,len:F?0.28:0.46}) : ROBE ? {col:ELFC.robe,len:0.97,bell:true} : ETUN ? {col:ELFC.tunic,len:0.9,cuff:true} : null;     // women's cut: cap sleeves
   const sleeveLen = SLV ? al*SLV.len : 0;
   const SH = SLV ? SLV.col : skin;
   const drawArm=(s,depth)=>{
@@ -1833,7 +1834,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   // ── women: short torn skirt, rope belt, fitted top with a scooped neckline ──
   const CF=CLOTH_F, front=V.turn>-0.25, pr=V.prof;
   // bust: fuller toward the side the body faces (none for men)
-  const SHEER = E.torso==='elf_robe' || (F && VR.torso==='necro_bustier') || (typeof LING_TORSO!=='undefined' && LING_TORSO.has(E.torso));   // starwoven: you see what is under it; the fen-witch's bodice leaves the bust bare                  // starwoven: you see what is under it
+  const SHEER = E.torso==='elf_robe' || (F && VR.torso==='necro_bustier') || (F && typeof LING_TORSO!=='undefined' && LING_TORSO.has(E.torso));   // starwoven: you see what is under it; the fen-witch's bodice leaves the bust bare                  // starwoven: you see what is under it
   const ARMOR_TOP = E.armor && E.armor!=='elf_cloak' && E.armor!=='cowl_black' && E.armor!=='robe';   // an open cloak covers nothing in front
   const bareTop = (!E.torso||SHEER) && !ARMOR_TOP;
   const bR = F ? (front ? (bareTop && !SHEER && pr>0.8 ? 0.4 : 1.5+2.8*pr) : 1.0) : 0, bL = F ? (front ? 1.5*(1-pr) : 0.42) : 0;
@@ -2841,178 +2842,117 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   }
   // the moonlace bustier: sheer beige lace on a frame of satin seams — underwired cups with a keyhole, cut-outs at the waist,
   // a ruffled peplum and garter tabs. On a man the same cloth is cut as a fitted elven waistcoat.
-  // Maelis's night-things: they frame the body and leave the bust bare. Black leather tooled in grey, blackened iron, silver and bone-white, detailed like the elven and fen-witch bodices.
-  function drawLingerie(id){ const sd=Y.SHOULDER, cx=LN+po, prof=pr>0.8, U=F?sd+12.6:sd+11, W0=Y.WAIST, bx=k=>cx+k*(F?4.6:3.4)*(1-pr*0.5)+(prof?pr*1.2:0);
-    const [base,dye]=lingParts(id), PL=LING_DYE[dye]||LING_DYE[''], {LB,LE,LH,IR,IL,SV,BONE,TOOL,STITCH,CH2,BOSS,STONE}=PL;
-    c.save(); c.lineCap='round'; c.lineJoin='round';
+  // Maelis's night-things, elven: for her a leaf-panelled bodice, a filigree of fine chain, or a sheer mantle that leaves the bust bare;
+  // for him the same piece cut as a noble elven doublet, an open-throated silk shirt, or a buttoned shirt under the mantle.
+  // Four themes by dye: moon (black, silver, moonstone), oak (tan, gold, amber), wildwood (umber, bronze, acorn), thornrose (oxblood, silver, garnet).
+  function lingKit(id){ const al=LING_ALIAS[id]||id, [base,dye]=lingParts(al), PL=LING_DYE[dye]||LING_DYE[''], M={'':'moon',brn:'oak',dbr:'root',red:'rose'}[dye];
+    const sd=Y.SHOULDER, cx=LN+po, prof=pr>0.8, FR=front&&!prof, U=F?sd+12.6:sd+11, W0=Y.WAIST, bx=k=>cx+k*(F?4.6:3.4)*(1-pr*0.5)+(prof?pr*1.2:0);
+    const {LB,LE,LH,IR,IL,SV,BONE,STONE}=PL;
+    const pth=pts=>{ c.beginPath(); pts.forEach(([a,b2],k)=>k?c.lineTo(x+a,B+b2):c.moveTo(x+a,B+b2)); c.closePath(); };
+    const mss=(pts,fill,edge,w)=>{ pth(pts); c.fillStyle=fill; c.fill(); c.strokeStyle=edge; c.lineWidth=w||0.6; c.lineJoin='round'; c.stroke(); };
     const line=(pts,col,w)=>{ c.strokeStyle=col; c.lineWidth=w; c.beginPath(); pts.forEach(([a,b2],k)=>k?c.lineTo(x+a,B+b2):c.moveTo(x+a,B+b2)); c.stroke(); };
     const dot=(xx,yy,r,col)=>{ c.fillStyle=col; c.beginPath(); c.arc(x+xx,B+yy,r,0,Math.PI*2); c.fill(); };
-    const stud=(xx,yy,r=0.42)=>{ dot(xx,yy,r+0.18,LE); dot(xx,yy,r,IL); dot(xx-r*0.3,yy-r*0.3,r*0.4,'#eef0f2'); };
-    const along=(pts,step,fn)=>{ for(let k=1;k<pts.length;k++){ const [a0,b0]=pts[k-1],[a1,b1]=pts[k], n=Math.max(1,Math.round(Math.hypot(a1-a0,b1-b0)/step)); for(let t=(k>1?1:0);t<=n;t++) fn(a0+(a1-a0)*t/n,b0+(b1-b0)*t/n); } };
-    const strap=(pts,w,studs)=>{ line(pts,LE,w+0.5); line(pts,LB,w); c.setLineDash([0.45,0.55]); line(pts,STITCH,0.22); c.setLineDash([]); if(studs) along(pts,studs,(a,b2)=>stud(a,b2,0.3)); };
-    const ring=(xx,yy,r)=>{ c.strokeStyle=LE; c.lineWidth=0.8; c.beginPath(); c.arc(x+xx,B+yy,r,0,Math.PI*2); c.stroke(); c.strokeStyle=IL; c.lineWidth=0.45; c.stroke(); c.strokeStyle='rgba(255,255,255,0.6)'; c.lineWidth=0.2; c.beginPath(); c.arc(x+xx,B+yy,r,Math.PI*1.1,Math.PI*1.6); c.stroke(); };
-    const buckle=(xx,yy)=>{ c.fillStyle=LE; c.fillRect(x+xx-1,B+yy-0.8,2,1.6); c.strokeStyle=IL; c.lineWidth=0.38; c.strokeRect(x+xx-0.72,B+yy-0.55,1.44,1.1); line([[xx,yy-0.55],[xx,yy+0.55]],IL,0.25); };
-    const chain=(pts,col=IR,hi=IL)=>{ line(pts,LE,0.75); line(pts,col,0.45); along(pts,0.95,(a,b2)=>{ dot(a,b2,0.3,hi); }); };
-    const swag=(x0,x1,y0,dep,fn)=>{ const pts=[]; for(let t=0;t<=1.0001;t+=0.08){ const u=1-t; pts.push([u*u*x0+2*u*t*(x0+x1)/2+t*t*x1, u*u*y0+2*u*t*(y0+dep*2)+t*t*y0]); } fn(pts); return pts; };
-    const gem=(xx,yy,r,col)=>{ c.fillStyle=LE; c.beginPath(); c.moveTo(x+xx,B+yy-r-0.4); c.lineTo(x+xx+r*0.8+0.3,B+yy); c.lineTo(x+xx,B+yy+r+0.5); c.lineTo(x+xx-r*0.8-0.3,B+yy); c.closePath(); c.fill(); c.fillStyle=SV; c.beginPath(); c.moveTo(x+xx,B+yy-r); c.lineTo(x+xx+r*0.8,B+yy); c.lineTo(x+xx,B+yy+r); c.lineTo(x+xx-r*0.8,B+yy); c.closePath(); c.fill(); dot(xx,yy,r*0.5,col); dot(xx-r*0.18,yy-r*0.22,r*0.18,'#ffffff'); };
-    const tooled=(pts,y0,y1)=>{ c.save(); path(pts); c.clip(); c.strokeStyle=TOOL; c.lineWidth=0.3;   // grey filigree tooled into the leather
-      for(let yy=y0, r=0; yy<y1; yy+=2.8, r++) for(let xx=LN-CH-4+(r%2)*1.7; xx<LN+CH+5; xx+=3.4){ c.beginPath(); c.arc(x+xx,B+yy,0.95,Math.PI*0.1,Math.PI*1.5); c.stroke(); c.beginPath(); c.arc(x+xx+1.5,B+yy+1.2,0.45,0,Math.PI*2); c.stroke(); }
+    const along=(pts,step,fn)=>{ let n0=0; for(let k=1;k<pts.length;k++){ const [a0,b0]=pts[k-1],[a1,b1]=pts[k], n=Math.max(1,Math.round(Math.hypot(a1-a0,b1-b0)/step)); for(let t=(k>1?1:0);t<=n;t++) fn(a0+(a1-a0)*t/n,b0+(b1-b0)*t/n,n0++); } };
+    const curve=(x0,y0,qx,qy,x1,y1)=>{ const pts=[]; for(let t=0;t<=1.0001;t+=0.1){ const u=1-t; pts.push([u*u*x0+2*u*t*qx+t*t*x1,u*u*y0+2*u*t*qy+t*t*y1]); } return pts; };
+    const gem=(xx,yy,r,col)=>{ c.fillStyle=LE; c.beginPath(); c.ellipse(x+xx,B+yy,r*0.8+0.25,r+0.3,0,0,Math.PI*2); c.fill(); c.fillStyle=SV; c.beginPath(); c.ellipse(x+xx,B+yy,r*0.8+0.05,r+0.1,0,0,Math.PI*2); c.fill(); c.fillStyle=col; c.beginPath(); c.ellipse(x+xx,B+yy,r*0.6,r*0.78,0,0,Math.PI*2); c.fill(); dot(xx-r*0.2,yy-r*0.3,r*0.2,'rgba(255,255,255,0.85)'); };
+    const drop=(xx,yy,l,col)=>{ line([[xx,yy],[xx,yy+l]],SV,0.2); c.fillStyle=col; c.beginPath(); c.moveTo(x+xx,B+yy+l); c.quadraticCurveTo(x+xx+0.75,B+yy+l+1.3,x+xx,B+yy+l+1.7); c.quadraticCurveTo(x+xx-0.75,B+yy+l+1.3,x+xx,B+yy+l); c.fill(); dot(xx-0.15,yy+l+1,0.15,'rgba(255,255,255,0.8)'); };
+    const crescent=(xx,yy,r,col)=>{ c.save(); c.beginPath(); c.arc(x+xx,B+yy,r,0,Math.PI*2); c.clip(); c.fillStyle=col; c.beginPath(); c.arc(x+xx,B+yy,r,0,Math.PI*2); c.arc(x+xx+r*0.55,B+yy-r*0.3,r*0.85,0,Math.PI*2,true); c.fill('evenodd'); c.restore(); };
+    const oakLeaf=(xx,yy,l,ang,col)=>{ c.save(); c.translate(x+xx,B+yy); c.rotate(ang); c.fillStyle=col; [0.22,0.48,0.72].forEach((t,k)=>{ const w=l*(0.3-k*0.05); [-1,1].forEach(s=>{ c.beginPath(); c.arc(s*w*0.7,l*t,w*0.62,0,Math.PI*2); c.fill(); }); }); c.beginPath(); c.ellipse(0,l*0.5,l*0.17,l*0.45,0,0,Math.PI*2); c.fill(); c.beginPath(); c.arc(0,l*0.9,l*0.14,0,Math.PI*2); c.fill(); c.restore(); };
+    const leafE=(xx,yy,l,w,ang,col)=>{ c.save(); c.translate(x+xx,B+yy); c.rotate(ang); c.fillStyle=col; c.beginPath(); c.moveTo(0,0); c.quadraticCurveTo(w,l*0.45,0,l); c.quadraticCurveTo(-w,l*0.45,0,0); c.fill(); c.restore(); };
+    const acorn=(xx,yy,r)=>{ c.fillStyle=LE; c.beginPath(); c.ellipse(x+xx,B+yy+r*0.9,r*0.75,r*1.05,0,0,Math.PI*2); c.fill(); c.fillStyle='#8a5a2a'; c.beginPath(); c.ellipse(x+xx,B+yy+r*0.9,r*0.6,r*0.9,0,0,Math.PI*2); c.fill(); c.fillStyle=IR; c.beginPath(); c.ellipse(x+xx,B+yy+0.1,r*0.85,r*0.5,0,0,Math.PI*2); c.fill(); c.fillStyle=SV; c.beginPath(); c.ellipse(x+xx-0.2,B+yy-0.05,r*0.4,r*0.18,0,0,Math.PI*2); c.fill(); line([[xx,yy-r*0.4],[xx+0.2,yy-r*0.9]],IR,0.25); };
+    const rosebud=(xx,yy,r)=>{ leafE(xx-r*0.5,yy+r*0.4,r*1.4,r*0.5,-2.2,'#3a4a2a'); leafE(xx+r*0.5,yy+r*0.4,r*1.4,r*0.5,2.2,'#3a4a2a'); dot(xx,yy,r+0.18,LE); dot(xx,yy,r,STONE); c.strokeStyle='rgba(255,190,190,0.55)'; c.lineWidth=0.18; c.beginPath(); for(let t=0;t<8;t+=0.35){ const rr=r*0.85*t/8; c.lineTo(x+xx+Math.cos(t*2.2)*rr,B+yy+Math.sin(t*2.2)*rr); } c.stroke(); };
+    const emblem=(xx,yy,s)=>M==='moon'?(crescent(xx,yy,s*0.9,SV),dot(xx+s*0.55,yy-s*0.15,s*0.22,STONE)):M==='oak'?oakLeaf(xx,yy-s*0.9,s*2,0,SV):M==='root'?acorn(xx,yy-s*0.5,s*0.85):rosebud(xx,yy,s*0.75);
+    const tendril=(x0,y0,x1,y1,col,w,side)=>{ const pts=[]; for(let t=0;t<=1.0001;t+=0.08) pts.push([x0+(x1-x0)*t+Math.sin(t*7)*0.6,y0+(y1-y0)*t]); line(pts,col,w); const [ex,ey]=pts[pts.length-1]; c.strokeStyle=col; c.lineWidth=w; c.beginPath(); for(let a=0;a<5;a+=0.3){ const rr=1.1*(1-a/5); c.lineTo(x+ex+side*(Math.cos(a*1.6)*rr-1.1),B+ey+Math.sin(a*1.6)*rr*(y1<y0?-1:1)); } c.stroke(); };
+    const thornVine=(pts,col,w)=>{ line(pts,col,w); along(pts,1.4,(a,b2,k)=>{ const s=k%2?1:-1; c.fillStyle=col; c.beginPath(); c.moveTo(x+a-0.35,B+b2); c.lineTo(x+a+0.35,B+b2); c.lineTo(x+a+s*0.2,B+b2+s*0.9); c.closePath(); c.fill(); }); };
+    const chainLine=(pts)=>{ if(M==='moon'){ line(pts,LE,0.55); line(pts,IR,0.3); along(pts,0.8,(a,b2)=>dot(a,b2,0.22,SV)); }
+      else if(M==='oak'){ line(pts,LE,0.45); along(pts,1.25,(a,b2,k)=>leafE(a,b2-0.2,1.2,0.5,k%2?0.9:-0.9+Math.PI,k%3?SV:IL)); }
+      else if(M==='root'){ const p2=[], p3=[]; along(pts,0.5,(a,b2,k)=>{ p2.push([a+Math.sin(k*0.9)*0.35,b2+Math.cos(k*0.9)*0.2]); p3.push([a-Math.sin(k*0.9)*0.35,b2-Math.cos(k*0.9)*0.2]); }); line(p2,LE,0.55); line(p2,IR,0.32); line(p3,SV,0.22); along(pts,2.6,(a,b2,k)=>leafE(a,b2,1.3,0.55,k%2?0.8:-0.8,'#5e6a34')); }
+      else { line(pts,LE,0.5); thornVine(pts,SV,0.28); } };
+    const sheen=(pts,y0,y1)=>{ c.save(); pth(pts); c.clip(); const gr=c.createLinearGradient(x+LN-CH,0,x+LN+CH,0); gr.addColorStop(0,'rgba(0,0,0,0.22)'); gr.addColorStop(0.42,'rgba(255,255,255,0.10)'); gr.addColorStop(0.58,'rgba(255,255,255,0.02)'); gr.addColorStop(1,'rgba(0,0,0,0.28)'); c.fillStyle=gr; c.fillRect(x+LN-CH-5,B+y0-2,CH*2+10,y1-y0+6); c.restore(); };
+    const panel=(pts,y0,y1,col,edge)=>{ mss(pts,col||LB,LE); c.save(); pth(pts); c.clip(); litFill(pts,edge||LH,y0,y1); c.restore(); sheen(pts,y0,y1); };
+    const trim=(pts,inset)=>{ c.save(); pth(pts); c.clip(); c.strokeStyle=SV; c.lineWidth=0.3; c.beginPath(); pts.forEach(([a,b2],k)=>{ const dx=(LN-a)*0.06*inset, dy=(sd+20-b2)*0.04*inset; k?c.lineTo(x+a+dx,B+b2+dy):c.moveTo(x+a+dx,B+b2+dy); }); c.closePath(); c.stroke(); c.restore(); };
+    const motifField=(pts,y0,y1,step)=>{ c.save(); pth(pts); c.clip();   // the theme worked sparingly into the cloth
+      for(let yy=y0+1.5, r=0; yy<y1; yy+=step, r++) for(let xx=LN-CH-3+(r%2)*step*0.5; xx<LN+CH+3; xx+=step){
+        if(M==='moon'){ crescent(xx,yy,0.6,'rgba(214,216,224,0.55)'); dot(xx+step*0.5,yy+step*0.4,0.18,'rgba(230,232,240,0.6)'); }
+        else if(M==='oak') oakLeaf(xx,yy,1.5,(r%2?0.5:-0.5),'rgba(226,204,136,0.45)');
+        else if(M==='root'){ line([[xx,yy+step*0.7],[xx+0.4,yy],[xx-0.3,yy-step*0.5]],'rgba(205,178,122,0.38)',0.22); leafE(xx+0.4,yy,1,0.4,0.9,'rgba(205,178,122,0.38)'); }
+        else { dot(xx,yy,0.4,'rgba(176,24,42,0.6)'); line([[xx-1.2,yy+0.8],[xx,yy],[xx+1.2,yy-0.8]],'rgba(214,216,220,0.35)',0.18); } }
       c.restore(); };
-    const lacing=(lx,y0,y1)=>{ for(let yy=y0; yy<y1; yy+=1.75){ line([[lx-1.15,yy],[lx+1.15,yy+1.75]],BONE,0.38); line([[lx+1.15,yy],[lx-1.15,yy+1.75]],'#b8b0a0',0.38); [-1.3,1.3].forEach(d=>{ dot(lx+d,yy,0.36,LE); dot(lx+d,yy,0.24,SV); }); } };
-    const tabs=(xa,xb,yy,len,n)=>{ for(let k=0;k<n;k++){ const t0=xa+(xb-xa)*k/n, t1=xa+(xb-xa)*(k+1)/n, m=(t0+t1)/2, l=len*(0.85+0.15*Math.cos(k*1.7)); const P2=[[t0+0.15,yy],[t1-0.15,yy],[t1-0.3,yy+l-0.6],[m,yy+l],[t0+0.3,yy+l-0.6]];
-      mass(P2,LB,LE); line([[t0+0.5,yy+0.5],[t0+0.6,yy+l-0.9],[m,yy+l-0.5],[t1-0.6,yy+l-0.9],[t1-0.5,yy+0.5]],TOOL,0.22); stud(m,yy+l-1.2,0.28); } };
-    if(dye){ const top=U, nz=k=>((Math.sin(k*12.9898)*43758.5453)%1+1)%1, FR=front&&!prof;
-      const cupBody=(hemY,point)=> lingDedupe(FR ? [[LN-CH-bL+1.3,top-1],[cx-8.6+pr*2,top-0.4],[cx-4.8+pr*2,top+1.2],[cx-1.2,top-0.6],[cx,top+0.2],[cx+1.2,top-0.6],[Math.min(cx+4.8-pr*0.8,LN+CH+Math.min(bR,1.2)-2.4),top+1.2],[Math.min(cx+8.6,LN+CH+Math.min(bR,1.2)-1.5),top-0.4],[LN+CH+Math.min(bR,1.2)-1.3,top-1],[LN+WA+1,W0-1.4],[LN+WA+1.3,hemY],[cx,hemY+(point||0.6)],[LN-WA-1.3,hemY],[LN-WA-1,W0-1.4]]
-        : prof ? [[LN-CH+1,top-0.6],[LN+CH+bR*0.4,top+0.4],[LN+WA+1,W0-1],[LN+WA+1.3,hemY],[LN-WA-1.3,hemY],[LN-WA-1,W0-1]] : [[LN-CH-bL+0.8,top],[LN+CH+bR-0.8,top],[LN+WA+1,W0-1.4],[LN+WA+1.3,hemY],[LN-WA-1.3,hemY],[LN-WA-1,W0-1.4]]);
-      const fillBody=(pts,y0,y1,tool)=>{ mass(pts,LB,LE); c.save(); path(pts); c.clip(); litFill(pts,LH,y0,y1); c.restore(); if(tool) tooled(pts,y0,y1); };
-      const stitchEdge=(pts,dy=0.8)=>{ c.save(); path(pts); c.clip(); c.strokeStyle=STITCH; c.lineWidth=0.25; c.setLineDash([0.45,0.5]); c.beginPath(); pts.forEach(([a,b2],k)=>k?c.lineTo(x+a,B+b2+dy):c.moveTo(x+a,B+b2+dy)); c.stroke(); c.setLineDash([]); c.restore(); };
-      const band=(y0,y1,tool)=>{ const P2=[[LN-WA-1,y0],[LN+WA+1,y0],[LN+WA+1.2,y1],[LN-WA-1.2,y1]]; fillBody(P2,y0,y1,tool); stitchEdge(P2,0.6); return P2; };
-      const mantle=(len,backLen)=> front ? [[LN-CH-1.8,sd+1],[LN-CH*0.5,sd-1.8],[LN-CH*0.18,sd-0.8],[LN-CH*0.35,sd+3],[LN-CH+0.2,sd+len],[LN-CH-2.2,sd+len-0.6]] : [[LN-CH-1.8,sd+1],[LN-CH*0.4,sd-1.6],[LN+CH*0.4,sd-1.6],[LN+CH+1.8,sd+1],[LN+CH+2.2,sd+backLen],[LN-CH-2.2,sd+backLen]];
-      const both=(pts,fn)=>{ fn(pts); if(front) fn(pts.map(([a,b2])=>[2*LN-a,b2])); };
-      const braid=(pts,w)=>{ line(pts,LE,w+0.5); line(pts,LB,w); along(pts,0.7,(a,b2)=>{ c.strokeStyle=LH; c.lineWidth=0.3; c.beginPath(); c.moveTo(x+a-w*0.4,B+b2-0.25); c.lineTo(x+a+w*0.4,B+b2+0.25); c.stroke(); }); };
-      const beadThong=(pts,every=1.3)=>{ line(pts,LE,0.6); line(pts,LH,0.35); let n=0; along(pts,every,(a,b2)=>{ const bone=(n++%3)!==1; c.fillStyle=LE; c.beginPath(); c.ellipse(x+a,B+b2,0.55,0.42,0,0,Math.PI*2); c.fill(); c.fillStyle=bone?BONE:IL; c.beginPath(); c.ellipse(x+a,B+b2,0.42,0.3,0,0,Math.PI*2); c.fill(); }); };
-      const feather=(xx,yy,l)=>{ line([[xx,yy-1.4],[xx,yy]],LE,0.25); c.save(); c.translate(x+xx,B+yy); c.rotate(0.15); c.fillStyle=BONE; c.beginPath(); c.ellipse(0,l*0.5,0.7,l*0.5,0,0,Math.PI*2); c.fill(); c.fillStyle=LB; c.beginPath(); c.ellipse(0,l*0.85,0.62,l*0.18,0,0,Math.PI*2); c.fill(); c.strokeStyle=LE; c.lineWidth=0.18; c.beginPath(); c.moveTo(0,0); c.lineTo(0,l); c.stroke(); c.restore(); dot(xx,yy-1.5,0.35,IL); };
-      const leaf=(xx,yy,l,w,ang,col,edge)=>{ c.save(); c.translate(x+xx,B+yy); c.rotate(ang); c.fillStyle=edge||LE; c.beginPath(); c.moveTo(0,-0.3); c.quadraticCurveTo(w+0.3,l*0.45,0,l+0.4); c.quadraticCurveTo(-w-0.3,l*0.45,0,-0.3); c.fill(); c.fillStyle=col; c.beginPath(); c.moveTo(0,0); c.quadraticCurveTo(w,l*0.45,0,l); c.quadraticCurveTo(-w,l*0.45,0,0); c.fill(); c.strokeStyle=STITCH; c.lineWidth=0.18; c.beginPath(); c.moveTo(0,0.2); c.lineTo(0,l*0.85); c.stroke(); c.restore(); };
-      const fur=(pts)=>{ along(pts,0.6,(a,b2)=>{ const k=a*7.3+b2*3.1; dot(a+(nz(k)-0.5)*0.5,b2+0.5+nz(k+1)*0.5,0.85,'#7a5a38'); }); along(pts,0.6,(a,b2)=>{ const k=a*5.1+b2*2.3; dot(a+(nz(k)-0.5)*0.5,b2+0.2,0.68,nz(k+2)>0.5?'#c8a478':'#b08c60'); dot(a+(nz(k+3)-0.5)*0.6,b2-0.1,0.3,'#e0c49a'); }); };
-      const velvet=(pts,y0,y1)=>{ c.save(); path(pts); c.clip(); const gr=c.createLinearGradient(x+LN-CH,0,x+LN+CH,0); gr.addColorStop(0,'rgba(0,0,0,0.25)'); gr.addColorStop(0.45,'rgba(255,170,170,0.12)'); gr.addColorStop(0.6,'rgba(0,0,0,0)'); gr.addColorStop(1,'rgba(0,0,0,0.3)'); c.fillStyle=gr; c.fillRect(x+LN-CH-4,B+y0-2,CH*2+8,y1-y0+6); c.restore(); };
-      const blackLace=(pts)=>{ along(pts,1.1,(a,b2)=>{ c.fillStyle='#0e0a0c'; c.beginPath(); c.arc(x+a,B+b2,0.75,Math.PI,0); c.fill(); c.fillStyle='rgba(120,30,40,0.6)'; c.beginPath(); c.arc(x+a,B+b2-0.3,0.2,0,Math.PI*2); c.fill(); }); };
-      const rose=(xx,yy,r)=>{ leaf(xx-r*0.9,yy+0.1,r*1.3,r*0.45,-1.9,'#22281e','#0a0c08'); leaf(xx+r*0.9,yy+0.1,r*1.3,r*0.45,1.9,'#22281e','#0a0c08'); dot(xx,yy,r+0.2,'#050304'); dot(xx,yy,r,'#1c1214'); c.strokeStyle='#4a3238'; c.lineWidth=0.22; c.beginPath(); for(let t=0;t<9;t+=0.3){ const rr=r*t/9; c.lineTo(x+xx+Math.cos(t*2)*rr,B+yy+Math.sin(t*2)*rr); } c.stroke(); };
-      const sun=(xx,yy,r)=>{ dot(xx,yy,r+0.25,LE); dot(xx,yy,r,SV); c.strokeStyle=IR; c.lineWidth=0.2; for(let a=0;a<8;a++){ c.beginPath(); c.moveTo(x+xx+Math.cos(a*Math.PI/4)*r*0.45,B+yy+Math.sin(a*Math.PI/4)*r*0.45); c.lineTo(x+xx+Math.cos(a*Math.PI/4)*r*0.9,B+yy+Math.sin(a*Math.PI/4)*r*0.9); c.stroke(); } dot(xx,yy,r*0.35,STONE); };
+    return {pth,mss,al,base,dye,PL,M,sd,cx,prof,FR,U,W0,bx,LB,LE,LH,IR,IL,SV,BONE,STONE,line,dot,along,curve,gem,drop,crescent,oakLeaf,leafE,acorn,rosebud,emblem,tendril,thornVine,chainLine,sheen,panel,trim,motifField}; }
 
-      if(id==='lace_underbust_brn'){   // HUNTRESS CORSET: soft suede, laced up both sides, brass toggles down the front, a fringe at the hem, feathers at the hip
-        const body=cupBody(W0+2.2); fillBody(body,top,W0+3,false);
-        c.save(); path(body); c.clip(); for(let k=0;k<90;k++){ dot(LN-CH-2+nz(k)*(CH*2+4),top+nz(k+50)*(W0+3-top),0.22,nz(k+9)>0.5?'rgba(255,230,190,0.12)':'rgba(40,20,8,0.18)'); } c.restore(); stitchEdge(body);   // the nap of the suede
-        for(let xx=LN-WA-1; xx<=LN+WA+1; xx+=0.55){ const l=2.6+nz(xx*3)*1.6; line([[xx,W0+2.3],[xx+0.25,W0+2.3+l]],LB,0.32); }   // fringe
-        if(FR){ [-1,1].forEach(k=>lacing(LN+k*(WA*0.78),top+1.6,W0+1.4)); line([[cx,top+0.6],[cx,W0+2.6]],LE,0.4); for(let yy=top+2.4; yy<W0+2; yy+=3){ c.fillStyle=LE; c.fillRect(x+cx-1.5,B+yy-0.45,3,0.9); c.fillStyle=SV; c.fillRect(x+cx-1.3,B+yy-0.3,2.6,0.6); dot(cx-1.5,yy,0.3,IL); }
-          feather(LN-WA*0.7,W0+3,3.6); feather(LN-WA*0.45,W0+3.4,3); }
-        else if(!front){ lacing(LN,top+1.2,W0+1.6); } else { lacing(LN+WA*0.5,top+1.4,W0+1.6); feather(LN+WA*0.2,W0+3,3.4); } }
-      else if(id==='chain_harness_brn'){   // ARCHER'S BALDRIC: a broad riveted baldric from the shoulder down between the breasts to the hip, an underbust strap with a brass ring, a hip pouch
-        const RY=top+1.4; band(top+0.4,top+2.6,false); along([[LN-WA-0.6,RY+0.1],[LN+WA+0.6,RY+0.1]],1.6,(a,b2)=>stud(a,b2,0.26));
-        if(FR){ strap([[LN+CH*0.62,sd-0.2],[cx+1,sd+6],[cx,RY],[LN-WA*0.7,W0+1.6]],1.6,1.3); ring(cx,RY,1.1); buckle(LN+CH*0.5,sd+2.6);
-          const px=LN-WA*0.75, py=W0+1.4, pouch=[[px-1.8,py],[px+1.8,py],[px+1.6,py+3.4],[px,py+4],[px-1.6,py+3.4]]; fillBody(pouch,py,py+4,false); stitchEdge(pouch,0.4); line([[px-1.8,py+1],[px,py+1.8],[px+1.8,py+1]],LE,0.35); dot(px,py+1.8,0.4,SV); }
-        else if(!front){ strap([[LN-CH*0.62,sd-0.2],[LN+WA*0.7,W0+1.6]],1.6,1.3); }
-        else { strap([[LN+CH*0.5,sd-0.2],[LN+CH*0.1,RY],[LN-WA*0.3,W0+1.6]],1.6,1.3); } }
-      else if(id==='sheer_shrug_brn'){   // FUR-TRIMMED WRAP: a short leather capelet with a tan fur edge, open at the front, tied at the throat with an antler toggle
-        const pts=mantle(7.6,10); both(pts,P2=>{ fillBody(P2,sd-2,sd+10,false); stitchEdge(P2,0.6); fur(front?[P2[3],P2[4],P2[5]]:[P2[5],P2[4]]); if(front) fur([P2[2],P2[3]]); });
-        if(FR){ line([[LN-CH*0.18,sd-0.6],[cx,sd+0.6],[LN+CH*0.18,sd-0.6]],BONE,0.3); c.save(); c.translate(x+cx,B+sd+1); c.rotate(0.4); c.fillStyle=LE; c.fillRect(-1.7,-0.5,3.4,1); c.fillStyle=BONE; c.beginPath(); c.moveTo(-1.5,-0.25); c.quadraticCurveTo(0,-0.6,1.5,-0.1); c.lineTo(1.4,0.3); c.quadraticCurveTo(0,0,-1.5,0.3); c.fill(); c.restore(); } }
-      else if(id==='open_bralette_brn'){   // BRASS RING HALTER: a strap round the neck down to a brass ring between the breasts, straps under each breast, a laced waist belt with a sun medallion
-        const blt=band(W0-4.4,W0+1.6,true); const RY=sd+(F?8.6:7.4);
-        if(FR){ [-1,1].forEach(k=>{ strap([[LN+k*2.6+po,sd-2.6],[cx+k*1.2,RY-1]],1,0); strap([[cx+k*1.3,RY+0.6],[bx(k)+k*(F?3.8:2.6),U+0.4],[LN+k*(CH-0.4),U-0.4]],0.9,0); }); strap([[cx,RY+1.2],[cx,W0-4.4]],1,1.2); ring(cx,RY,1.3);
-          lacing(cx-WA*0.55,W0-3.8,W0+1); lacing(cx+WA*0.55,W0-3.8,W0+1); sun(cx,W0-1.4,1.5); }
-        else if(!front){ strap([[LN-2.6,sd-2.6],[LN,sd-3.4],[LN+2.6,sd-2.6]],0.9,0); line([[LN,sd-3.2],[LN-0.6,sd+1.4]],LB,0.35); line([[LN,sd-3.2],[LN+0.7,sd+1]],LB,0.35); [-1,1].forEach(k=>strap([[LN+k*(CH-0.4),U-0.4],[LN+k*(CH-0.2),U+0.6]],0.9,0)); lacing(LN,W0-3.8,W0+1); }
-        else { strap([[LN+2,sd-2.6],[LN+CH*0.5,RY],[LN+CH*0.3,W0-4.4]],1,0); } }
-
-      else if(id==='lace_underbust_dbr'){   // BARKCARVED CORSELET: dark leather carved like oak bark, a skirt of leather leaves, bronze leaf clasps, a vine climbing one side
-        const body=cupBody(W0+2); fillBody(body,top,W0+3,false);
-        c.save(); path(body); c.clip(); for(let k=0;k<14;k++){ const xx=LN-CH-1+k*(CH*2+2)/13; c.strokeStyle='rgba(8,4,0,0.55)'; c.lineWidth=0.35; c.beginPath(); for(let yy=top-1; yy<W0+4; yy+=0.8) c.lineTo(x+xx+Math.sin(yy*0.9+k*2.1)*0.45,B+yy); c.stroke(); c.strokeStyle='rgba(150,110,70,0.25)'; c.lineWidth=0.2; c.beginPath(); for(let yy=top-1; yy<W0+4; yy+=0.8) c.lineTo(x+xx+0.45+Math.sin(yy*0.9+k*2.1)*0.45,B+yy); c.stroke(); } c.restore(); stitchEdge(body);
-        for(let k=0;k<(FR?9:prof?5:9);k++){ const xx=LN-WA-0.6+k*(WA*2+1.2)/((FR?9:prof?5:9)-1); leaf(xx,W0+1.8,3+nz(k)*1,0.95,(xx-LN)*0.04,k%2?LB:LH); }
-        if(FR){ line([[cx,top+0.4],[cx,W0+2.4]],LE,0.45); for(let yy=top+2.2; yy<W0+1.5; yy+=3.2){ leaf(cx-0.1,yy-1.1,2.2,0.8,-1.57,SV,LE); leaf(cx+0.1,yy-1.1,2.2,0.8,1.57,IL,LE); }
-          c.strokeStyle=SV; c.lineWidth=0.3; c.beginPath(); for(let yy=W0+1.5; yy>top+1; yy-=0.5) c.lineTo(x+LN+WA*0.55+Math.sin(yy*0.8)*0.9,B+yy); c.stroke(); for(let yy=W0; yy>top+2; yy-=2.2) leaf(LN+WA*0.55+Math.sin(yy*0.8)*0.9,yy,1.4,0.55,yy%4.4>2.2?0.9:-0.9,'#4e5a2e','#1e2410'); }
-        else if(!front){ line([[LN,top+0.4],[LN,W0+2.2]],LE,0.45); for(let yy=top+2.2; yy<W0+1.5; yy+=3.2) dot(LN,yy,0.6,SV); } }
-      else if(id==='chain_harness_dbr'){   // BONE-BEAD HARNESS: a bronze torc, thongs strung with bone beads round the bust, a carved bone talisman at the breastbone, antler tines hanging below
-        const torc=FR?[[LN-3.6+po,sd-1.2],[cx,sd+0.2],[LN+3.6+po,sd-1.2]]:[[LN-3.4,sd-1.6],[LN+3.4,sd-1.6]]; line(torc,LE,1.5); line(torc,IR,1.1); line(torc,SV,0.35);
-        if(FR){ [-1,1].forEach(k=>{ dot(cx+k*1.2,sd+0.3,0.75,LE); dot(cx+k*1.2,sd+0.3,0.55,SV); }); }
-        if(FR){ beadThong([[cx,sd+1],[cx,sd+7.8]]); [-1,1].forEach(k=>{ beadThong([[cx,sd+9],[bx(k)+k*(F?4.6:3),sd+(F?7:6)],[LN+k*(CH-0.6),sd+0.2]]); beadThong([[cx,sd+9],[bx(k)+k*(F?3.6:2.4),U+0.6],[LN+k*(WA+0.6),U+2]]);
-            const ax=bx(k)+k*(F?2:1.4), ay=U+0.9; line([[ax,ay],[ax,ay+1.6]],LE,0.25); c.strokeStyle=BONE; c.lineWidth=0.55; c.beginPath(); c.moveTo(x+ax,B+ay+1.6); c.quadraticCurveTo(x+ax+k*0.8,B+ay+3,x+ax+k*0.4,B+ay+4.6); c.moveTo(x+ax+k*0.5,B+ay+2.8); c.lineTo(x+ax+k*1.5,B+ay+3.4); c.stroke(); });
-          beadThong([[LN-WA-0.6,U+2.2],[cx,U+3],[LN+WA+0.6,U+2.2]],1.1); dot(cx,sd+9,1.6,LE); dot(cx,sd+9,1.35,BONE); c.strokeStyle=LB; c.lineWidth=0.25; c.beginPath(); for(let t=0;t<12;t+=0.3){ c.lineTo(x+cx+Math.cos(t)*t*0.09,B+sd+9+Math.sin(t)*t*0.09); } c.stroke(); }
-        else if(!front){ beadThong([[LN,sd-1],[LN,U+2]]); beadThong([[LN-CH+0.6,U+1.6],[LN+CH-0.6,U+1.6]],1.1); [-1,1].forEach(k=>beadThong([[LN+k*(CH-0.6),sd+0.2],[LN+k*(CH-0.2),U+1.6]])); }
-        else { beadThong([[LN+CH-0.6,sd+0.2],[LN+CH*0.4,U+0.8],[LN-WA*0.2,U+2]]); } }
-      else if(id==='sheer_shrug_dbr'){   // LEAFSCALE MANTLE: rows of overlapping leather leaves over the shoulders, open at the front, pinned with a bronze acorn
-        const pts=mantle(9,12); both(pts,P2=>{ c.save(); path(P2); c.clip(); for(let r=0;r<7;r++) for(let xx=LN-CH-4+(r%2)*1.3; xx<LN+CH+4; xx+=2.6){ leaf(xx,sd-2.6+r*2,2.8,1.25,0,(r+Math.round(xx))%3?LB:LH); } c.restore(); c.strokeStyle=LE; c.lineWidth=0.35; path(P2); c.stroke(); });
-        const hem=front?[pts[4],pts[5]]:[pts[5],pts[4]]; both(hem,H=>along(H,1.3,(a,b2)=>leaf(a,b2-0.4,2.4,1,0,LH)));
-        if(FR){ dot(cx,sd-0.4,1.2,LE); c.fillStyle=IR; c.beginPath(); c.ellipse(x+cx,B+sd,0.8,1.05,0,0,Math.PI*2); c.fill(); c.fillStyle=SV; c.beginPath(); c.ellipse(x+cx,B+sd-0.9,1.05,0.55,0,0,Math.PI*2); c.fill(); line([[cx,sd-1.4],[cx+0.3,sd-2]],LE,0.25); } }
-      else if(id==='open_bralette_dbr'){   // ROOTWOVEN BODICE: braided straps down past the breasts into a basket-woven band, braids crossing to a bronze knot under the bust
-        const wb=band(U+1.4,W0+1.4,false); c.save(); path(wb); c.clip(); for(let yy=U+1.4, r=0; yy<W0+2; yy+=1.3, r++) for(let xx=LN-WA-2+(r%2)*1.3; xx<LN+WA+2; xx+=2.6){ c.fillStyle=LH; c.fillRect(x+xx,B+yy+0.15,1.2,1); c.fillStyle='rgba(0,0,0,0.35)'; c.fillRect(x+xx+1.3,B+yy+0.15,1.2,1); } c.restore(); stitchEdge(wb,0.5);
-        if(FR){ [-1,1].forEach(k=>{ braid([[LN+k*CH*0.62,sd],[bx(k)+k*(F?5.2:3.6),sd+6],[LN+k*(WA+0.4),U+1.6]],1.1); braid([[LN+k*(WA-0.4),U+1.6],[cx+k*1,U-0.4]],0.9); }); dot(cx,U-0.2,1.3,LE); dot(cx,U-0.2,1.05,IR); c.strokeStyle=SV; c.lineWidth=0.3; c.beginPath(); c.ellipse(x+cx,B+U-0.2,0.8,0.45,0.6,0,Math.PI*2); c.ellipse(x+cx,B+U-0.2,0.8,0.45,-0.6,0,Math.PI*2); c.stroke(); }
-        else if(!front){ [-1,1].forEach(k=>braid([[LN+k*CH*0.62,sd],[LN-k*(WA-0.6),U+1.6]],1.1)); }
-        else { braid([[LN+CH*0.5,sd],[LN+CH*0.2,U],[LN-WA*0.3,U+1.6]],1.1); } }
-
-      else if(id==='lace_underbust_red'){   // BLOODROSE CORSET: oxblood velvet with a black lace frill under the bust and at the hem, a silver busk of hooks down the front, a black satin rose
-        const body=cupBody(W0+2.6,2.8); fillBody(body,top,W0+5,false); velvet(body,top,W0+5);
-        if(FR){ blackLace(body.filter(([a,b2])=>b2<top+2)); } else blackLace([body[0],body[1]]);
-        blackLace(FR?[[LN-WA-1.1,W0+2.9],[cx,W0+3.7],[LN+WA+1.1,W0+2.9]].map(([a,b2])=>[a,b2+0.4]):[[LN-WA-1.1,W0+3.2],[LN+WA+1.1,W0+3.2]]);
-        [-1,1].forEach(k=>{ if(prof&&k<0) return; const sx=front?cx+k*WA*0.6:LN+k*WA*0.6; line([[sx,top+1.6],[sx+k*0.4,W0+2.4]],'rgba(0,0,0,0.45)',0.4); });
-        if(FR){ line([[cx,top+0.4],[cx,W0+3]],'#0e0a0c',0.6); for(let yy=top+2.4; yy<W0+2.6; yy+=1.6){ dot(cx-0.55,yy,0.38,LE); dot(cx-0.55,yy,0.26,SV); dot(cx+0.55,yy,0.38,LE); dot(cx+0.55,yy,0.26,SV); } rose(cx,top+0.6,1.2); }
-        else if(!front){ for(let yy=top+1.6; yy<W0+2.4; yy+=1.75){ line([[LN-1.1,yy],[LN+1.1,yy+1.75]],'#0e0a0c',0.42); line([[LN+1.1,yy],[LN-1.1,yy+1.75]],'#0e0a0c',0.42); } c.strokeStyle='#0e0a0c'; c.lineWidth=0.4; c.beginPath(); c.ellipse(x+LN-1,B+W0+2.8,1,0.6,0.3,0,Math.PI*2); c.ellipse(x+LN+1,B+W0+2.8,1,0.6,-0.3,0,Math.PI*2); c.stroke(); } }
-      else if(id==='chain_harness_red'){   // GARNET CASCADE: a black velvet choker with a garnet cameo, tiers of silver chain slung across the chest, a long drop between the breasts, a garnet-studded chain round the ribs
-        if(FR){ [1.4,2.8,4.2].forEach((d,k)=>{ swag(LN-CH+0.6+k*0.3,LN+CH-0.6-k*0.3,sd+0.2,d,pts=>chain(pts,CH2,SV)); gem(cx,sd+0.2+d*2+0.9,0.45+k*0.08,STONE); });
-          chain([[cx,sd+9.8],[cx,sd+(F?12:10.6)]],CH2,SV); gem(cx,sd+(F?13.2:11.8),0.85,STONE);
-          swag(LN-WA-0.6,LN+WA+0.6,U+2,0.6,pts=>chain(pts,CH2,SV)); [-0.6,0,0.6].forEach(t=>dot(cx+t*WA,U+2.4+(t?0:0.6),0.4,STONE)); }
-        else if(!front){ [1.2,2.6].forEach(d=>swag(LN-CH+0.6,LN+CH-0.6,sd+0.4,d,pts=>chain(pts,CH2,SV))); chain([[LN,sd-2],[LN,U+2]],CH2,SV); swag(LN-WA-0.6,LN+WA+0.6,U+2,0.3,pts=>chain(pts,CH2,SV)); }
-        else { chain([[LN+CH-0.6,sd+0.2],[LN+CH*0.3,sd+4]],CH2,SV); chain([[LN-WA,U+2.2],[LN+WA+0.6,U+2.2]],CH2,SV); } }
-      else if(id==='sheer_shrug_red'){   // NIGHTCOURT COLLAR: a tall stiffened collar behind the head, black outside and oxblood within, on a short velvet capelet open at the front
-        const pts=mantle(6.8,9); both(pts,P2=>{ mass(P2,'#0e0a0c',LE); c.save(); path(P2); c.clip(); litFill(P2,'#2a1c20',sd-2,sd+9); c.restore(); stitchEdge(P2,0.5); });
-        if(front){ both([[LN-CH-2,sd+1],[LN-CH-3.4,sd-0.6],[LN-CH-0.8,sd-0.4]],T=>{ mass(T,'#0e0a0c',LE); line([T[0],T[1]],SV,0.2); }); }   // pointed shoulder tips
-        both(front?[pts[3],pts[4],pts[5]]:[pts[5],pts[4]],H=>{ line(H,LB,0.7); line(H,SV,0.18); });
-        if(FR){ [-1,1].forEach(k=>{ dot(LN+k*CH*0.3,sd+0.4,0.75,LE); dot(LN+k*CH*0.3,sd+0.4,0.55,SV); }); swag(LN-CH*0.3,LN+CH*0.3,sd+0.4,1.1,pts2=>chain(pts2,CH2,SV)); gem(cx,sd+3,0.5,STONE); } }
-      else if(id==='open_bralette_red'){   // VELVET WASPIE: a deep velvet cincher with black ribbon lacing up both sides, a bow at the front, slim velvet straps from silver rosettes over the shoulders
-        const P2=[[LN-WA-1.2,U+1.4],[cx-1,U+2.6],[cx,U+2],[cx+1,U+2.6],[LN+WA+1.2,U+1.4],[LN+WA+1.3,W0+2.4],[cx,W0+4],[LN-WA-1.3,W0+2.4]].map(([a,b2])=>FR?[a,b2]:[a,a===cx||Math.abs(a-cx)<1.1?U+1.6:b2]);
-        fillBody(P2,U,W0+4,false); velvet(P2,U,W0+4); blackLace([[LN-WA-1.2,U+1.6],[LN+WA+1.2,U+1.6]].map(([a,b2])=>[a,b2-0.2]));
-        const rib=lx=>{ for(let yy=U+3; yy<W0+2; yy+=1.6){ line([[lx-1,yy],[lx+1,yy+1.6]],'#0e0a0c',0.45); line([[lx+1,yy],[lx-1,yy+1.6]],'#0e0a0c',0.45); [-1.15,1.15].forEach(d=>{ dot(lx+d,yy,0.3,LE); dot(lx+d,yy,0.2,SV); }); } };
-        if(FR){ [-1,1].forEach(k=>{ rib(LN+k*WA*0.62); const rx=LN+k*(WA*0.62); strap([[rx,U+1.8],[bx(k)+k*(F?5.4:3.8),sd+6],[LN+k*CH*0.62,sd]],0.7,0); dot(rx,U+1.8,0.95,LE); dot(rx,U+1.8,0.75,SV); dot(rx,U+1.8,0.3,STONE); });
-          c.fillStyle='#0e0a0c'; [-1,1].forEach(k=>{ c.beginPath(); c.moveTo(x+cx,B+U+3); c.quadraticCurveTo(x+cx+k*2.4,B+U+1.6,x+cx+k*2,B+U+3.8); c.closePath(); c.fill(); }); line([[cx,U+3],[cx-0.8,U+6]],'#0e0a0c',0.4); line([[cx,U+3],[cx+0.9,U+5.6]],'#0e0a0c',0.4); dot(cx,U+3,0.55,'#0e0a0c'); }
-        else if(!front){ rib(LN); [-1,1].forEach(k=>strap([[LN+k*CH*0.62,sd],[LN,sd+7]],0.7,0)); strap([[LN,sd+7],[LN,U+1.6]],0.7,0); ring(LN,sd+7,0.8); }
-        else { rib(LN+WA*0.3); strap([[LN+WA*0.4,U+1.8],[LN+CH*0.6,sd+5],[LN+CH*0.55,sd]],0.7,0); } }
-    }
-    else if(base==='lace_underbust'){ const top=U;   // the Raven Underbust: tooled black leather cupped under each breast, bone lacing through silver eyelets, a skirt of pointed tabs, a silver chain swag with a moonstone over the breastbone
-      const body=front&&!prof ? [[LN-CH-bL+1.3,top-1],[cx-8.6+pr*2,top-0.4],[cx-4.8+pr*2,top+1.2],[cx-1.2,top-0.6],[cx,top+0.2],[cx+1.2,top-0.6],[Math.min(cx+4.8-pr*0.8,LN+CH+Math.min(bR,1.2)-2.4),top+1.2],[Math.min(cx+8.6,LN+CH+Math.min(bR,1.2)-1.5),top-0.4],[LN+CH+Math.min(bR,1.2)-1.3,top-1],[LN+WA+1,W0-1.4],[LN+WA+1.3,W0+3.4],[cx,W0+5.2],[LN-WA-1.3,W0+3.4],[LN-WA-1,W0-1.4]]
-                       : prof ? [[LN-CH+1,top-0.6],[LN+CH+bR*0.4,top+0.4],[LN+WA+1,W0-1],[LN+WA+1.3,W0+3.6],[LN-WA-1.3,W0+3.6],[LN-WA-1,W0-1]]
-                       : [[LN-CH-bL+0.8,top],[LN+CH+bR-0.8,top],[LN+WA+1,W0-1.4],[LN+WA+1.3,W0+3.6],[LN-WA-1.3,W0+3.6],[LN-WA-1,W0-1.4]];
-      lingDedupe(body); tabs(LN-WA-1.1,LN+WA+1.1,W0+2.6,4.2,front&&!prof?6:prof?3:6);
-      mass(body,LB,LE); c.save(); path(body); c.clip(); litFill(body,LH,top,W0+5); c.restore(); tooled(body,top,W0+5);
-      c.strokeStyle=STITCH; c.lineWidth=0.25; c.setLineDash([0.45,0.5]); c.save(); path(body); c.clip(); c.beginPath(); body.forEach(([a,b2],k)=>k?c.lineTo(x+a,B+b2+0.8):c.moveTo(x+a,B+b2+0.8)); c.stroke(); c.restore(); c.setLineDash([]);   // a stitched edge
-      [-1,1].forEach(k=>{ if(prof&&k<0) return; const sx=front?cx+k*WA*0.62:LN+k*WA*0.62; line([[sx,top+1.6],[sx+k*0.4,W0+3]],'rgba(0,0,0,0.5)',0.4); line([[sx+0.3,top+1.6],[sx+k*0.4+0.3,W0+3]],'rgba(120,114,108,0.5)',0.2); });   // the boning
-      if(front && !prof){ lacing(cx,top+1.2,W0+2.6); line([[cx,W0+3],[cx-1.2,W0+6.4],[cx-0.7,W0+8]],BONE,0.32); line([[cx,W0+3],[cx+1.1,W0+6.8]],BONE,0.32); dot(cx-0.7,W0+8,0.35,SV); dot(cx+1.1,W0+6.8,0.35,SV);   // the lace ends, tipped in silver
-        swag(LN-CH+0.6,LN+CH-0.6,sd+0.6,F?3.2:2.6,pts=>chain(pts,CH2,SV)); line([[cx,sd+0.6+(F?3.2:2.6)],[cx,sd+(F?6.6:5.4)]],SV,0.3); gem(cx,sd+(F?7.6:6.4),0.95,STONE);   // a moonstone on a silver chain
-        [-1,1].forEach(k=>buckle(LN+k*(WA+0.5),W0)); }
-      else if(!front){ lacing(LN,top+1,W0+2.6); swag(LN-CH+0.6,LN+CH-0.6,sd+0.4,0.6,pts=>chain(pts,CH2,SV)); }
-      else { buckle(LN+WA*0.6,W0); } }
-    else if(base==='chain_harness'){   // the Knight's Chain Harness: a tooled leather gorget with studs, blackened chains round the bust hung with little steel tags, a studded rib belt with a hem of mail
-      const gor=front&&!prof ? [[LN-3.6+po,sd-2.4],[cx,sd-1.4],[LN+3.6+po,sd-2.4],[LN+4.4+po,sd-0.4],[cx+1.6,sd+1.2],[cx,sd+2.4],[cx-1.6,sd+1.2],[LN-4.4+po,sd-0.4]] : prof ? [[LN-2,sd-2.4],[LN+3.4,sd-2.2],[LN+3.8,sd+0.2],[LN-1.6,sd]] : [[LN-3.6,sd-2.4],[LN+3.6,sd-2.4],[LN+4,sd-0.4],[LN-4,sd-0.4]];
-      mass(gor,LB,LE); tooled(gor,sd-2.6,sd+2.6); along(front&&!prof?[[LN-3.8+po,sd-1.6],[cx,sd-0.6],[LN+3.8+po,sd-1.6]]:[[gor[0][0]+0.6,sd-1.4],[gor[1][0]-0.6,sd-1.4]],1.6,(a,b2)=>stud(a,b2,0.3));
-      const belt=[[LN-WA-1,W0-3.6],[LN+WA+1,W0-3.6],[LN+WA+1.1,W0-0.6],[LN-WA-1.1,W0-0.6]];
-      if(front && !prof){ ring(cx,sd+2.6,0.75); chain([[cx,sd+3.3],[cx,sd+8.3]]); [-1,1].forEach(k=>{ chain([[cx,sd+9],[bx(k)+k*(F?4.6:3),sd+(F?7:6)],[LN+k*(CH-0.4),sd+0.6]]); chain([[cx,sd+9],[bx(k)+k*(F?3.6:2.4),U+0.4],[LN+k*(WA+0.6),W0-3.4]]); stud(LN+k*(CH-0.4),sd+0.6,0.45); });
-        ring(cx,sd+9,1.15); chain([[cx,sd+10.2],[cx,W0-3.6]]); [-1,1].forEach(k=>{ const tx=bx(k)+k*(F?4.1:2.7), ty=(sd+(F?7:6)+U+0.4)/2+0.6; line([[tx,ty-1],[tx,ty]],IR,0.3); gem(tx,ty+0.7,0.55,IR); });   // little steel tags
-        line([[cx,sd+12],[cx,sd+13.2]],IR,0.3); gem(cx,sd+14,0.7,'#3a3c40'); }
-      else if(!front){ chain([[LN,sd-0.4],[LN,W0-3.6]]); chain([[LN-CH+0.6,U+1.6],[LN+CH-0.6,U+1.6]]); ring(LN,U+1.6,0.95); [-1,1].forEach(k=>chain([[LN+k*(CH-0.4),sd+0.6],[LN+k*(WA+0.4),W0-3.4]])); }
-      else { chain([[LN+CH-0.4,sd+0.6],[LN+CH*0.4,U+0.8],[LN+WA*0.3,W0-3.4]]); }
-      mass(belt,LB,LE); c.save(); path(belt); c.clip(); litFill(belt,LH,W0-4,W0); c.restore(); along([[LN-WA-0.4,W0-2.1],[LN+WA+0.4,W0-2.1]],1.5,(a,b2)=>stud(a,b2,0.32)); if(!prof) buckle(front?cx:LN,W0-2.1);
-      for(let xx=LN-WA-0.8; xx<=LN+WA+0.8; xx+=0.9) for(let r=0;r<3;r++){ const yy=W0-0.3+r*0.75, ox=(r%2)*0.45; if(xx+ox>LN+WA+1) continue; c.strokeStyle=r===2?'#3e4044':IL; c.lineWidth=0.22; c.beginPath(); c.arc(x+xx+ox,B+yy,0.36,0,Math.PI*2); c.stroke(); } }   // a hem of mail
-    else if(base==='sheer_shrug'){ const SH=PL.SH, ED=PL.ED;   // the Moonweave Mantle: grey-white gossamer with lace woven through it, a silver-embroidered border hung with pearls, two brooches joined by a chain across the chest
-      const pts=front ? [[LN-CH-1.6,sd+1],[LN-CH*0.5,sd-1.8],[LN-CH*0.18,sd-0.8],[LN-CH*0.35,sd+3.6],[LN-CH+0.4,sd+12.6],[LN-CH-1.4,sd+13.6],[LN-CH-2.2,sd+11]] : [[LN-CH-1.6,sd+1],[LN-CH*0.4,sd-1.6],[LN+CH*0.4,sd-1.6],[LN+CH+1.6,sd+1],[LN+CH+2.2,sd+15],[LN,sd+17],[LN-CH-2.2,sd+15]];
-      const draw=P2=>{ c.fillStyle=SH; path(P2); c.fill(); c.save(); path(P2); c.clip(); c.strokeStyle='rgba(255,255,255,0.4)'; c.lineWidth=0.3;
-          for(let yy=sd-2, r=0; yy<sd+18; yy+=2.4, r++) for(let xx=LN-CH-4+(r%2)*1.5; xx<LN+CH+5; xx+=3){ c.beginPath(); c.arc(x+xx,B+yy,0.85,0,Math.PI*1.6); c.stroke(); c.beginPath(); c.arc(x+xx+1.3,B+yy+1,0.4,0,Math.PI*2); c.stroke(); } c.restore();   // the woven lace
-        c.strokeStyle=ED; c.lineWidth=0.55; path(P2); c.stroke(); c.strokeStyle=SV; c.lineWidth=0.25; c.setLineDash([0.6,0.5]); c.stroke(); c.setLineDash([]);
-        const hem=P2.slice(front?4:4); along(hem,1.4,(a,b2)=>{ line([[a,b2],[a,b2+0.9]],SV,0.18); dot(a,b2+1.2,0.36,'#f2f0ea'); dot(a-0.12,b2+1.08,0.12,'#ffffff'); }); };   // pearl drops
-      draw(pts); if(front) draw(pts.map(([a,b2])=>[2*LN-a,b2]));
-      if(front && !prof){ const y0=sd+0.2; swag(LN-CH*0.42,LN+CH*0.42,y0,1.6,pts2=>chain(pts2,CH2,SV)); swag(LN-CH*0.42,LN+CH*0.42,y0,3.4,pts2=>chain(pts2,CH2,SV));
-        [-1,1].forEach(k=>{ const bxx=LN+k*CH*0.42; dot(bxx,y0,1.15,LE); dot(bxx,y0,0.9,SV); dot(bxx,y0,0.45,STONE); dot(bxx-0.25,y0-0.3,0.18,'#ffffff'); }); gem(cx,y0+4.4,0.6,STONE); }   // two silver brooches, chains slung between
-      else if(!front){ dot(LN,sd-1,0.8,SV); } }
-    else if(base==='open_bralette'){   // the Shieldmaiden's Bodice: studded leather straps cross through a silver knotwork boss between the breasts and run into a tooled corset-belt, laced at the front, with a short skirt of mail
-      const cinch=[[LN-WA-1,W0-5],[LN+WA+1,W0-5],[LN+WA+1.3,W0+2],[LN-WA-1.3,W0+2]];
-      for(let xx=LN-WA-0.9; xx<=LN+WA+0.9; xx+=0.9) for(let r=0;r<4;r++){ const yy=W0+2.4+r*0.75, ox=(r%2)*0.45; if(xx+ox>LN+WA+1.1) continue; c.strokeStyle=r===3?'#3e4044':IL; c.lineWidth=0.22; c.beginPath(); c.arc(x+xx+ox,B+yy,0.36,0,Math.PI*2); c.stroke(); }   // the mail skirt
-      mass(cinch,LB,LE); c.save(); path(cinch); c.clip(); litFill(cinch,LH,W0-5,W0+2); c.restore(); tooled(cinch,W0-5,W0+2);
-      c.setLineDash([0.45,0.5]); [W0-4.3,W0+1.3].forEach(yy=>line([[LN-WA-0.6,yy],[LN+WA+0.6,yy]],STITCH,0.25)); c.setLineDash([]);
-      if(front && !prof){ const RY=sd+(F?9.4:8); lacing(cx,W0-4,W0+1); [-1,1].forEach(k=>{ strap([[LN+k*CH*0.62,sd+0.2],[cx+k*1.4,RY-1]],1.15,1.5); strap([[cx+k*1.4,RY+1],[LN+k*(WA-1.2),W0-4.8]],1.15,1.5); buckle(LN+k*(WA-0.2),W0-1.6); stud(LN+k*CH*0.62,sd+0.4,0.5); });
-        dot(cx,RY,1.9,LE); dot(cx,RY,1.6,BOSS); c.strokeStyle=SV; c.lineWidth=0.35; for(let a=0;a<4;a++){ c.beginPath(); c.ellipse(x+cx,B+RY,1.2,0.5,a*Math.PI/4,0,Math.PI*2); c.stroke(); } dot(cx,RY,0.45,'#e8eaee');   // the knotwork boss
-        line([[cx,RY+1.6],[cx,RY+3]],SV,0.3); gem(cx,RY+3.8,0.6,'#3a3c40'); }
-      else if(!front){ [-1,1].forEach(k=>strap([[LN+k*CH*0.62,sd+0.2],[LN-k*(WA-1.2),W0-4.8]],1.15,1.5)); dot(LN,sd+9.6,1.4,LE); dot(LN,sd+9.6,1.15,BOSS); c.strokeStyle=SV; c.lineWidth=0.3; c.beginPath(); c.arc(x+LN,B+sd+9.6,0.7,0,Math.PI*2); c.stroke(); lacing(LN,W0-4,W0+1); }
-      else { strap([[LN+CH*0.62,sd+0.2],[LN+CH*0.1,U],[LN-WA*0.4,W0-4.8]],1.15,1.5); buckle(LN+WA*0.3,W0-1.6); } }
-    c.restore(); }
-  // what of them sits on the neck: drawn after the neck, so it shows (the Garnet Cascade's choker, the Nightcourt collar)
-  function drawLingerieNeck(id,nw){ if(id!=='chain_harness_red' && id!=='sheer_shrug_red') return; const sd=Y.SHOULDER, cx=LN+po, prof=pr>0.8, PL=LING_DYE[lingParts(id)[1]]||LING_DYE[''];
+  function drawLingerie(id){ const K=lingKit(id), {pth,mss,base,PL,M,sd,cx,prof,FR,U,W0,bx,LB,LE,LH,IR,IL,SV,BONE,STONE,line,dot,along,curve,gem,drop,emblem,tendril,thornVine,chainLine,sheen,panel,trim,motifField,leafE,acorn,rosebud,crescent,oakLeaf}=K;
     c.save(); c.lineCap='round'; c.lineJoin='round';
-    const line=(pts,col,w)=>{ c.strokeStyle=col; c.lineWidth=w; c.beginPath(); pts.forEach(([a,b2],k)=>k?c.lineTo(x+a,B+b2):c.moveTo(x+a,B+b2)); c.stroke(); };
-    if(id==='chain_harness_red'){ const y=sd-2.4, ch=prof?[[LN-nw*0.6,y-0.2],[LN+nw+0.6,y+0.2]]:[[LN-nw-0.5,y-0.3],[cx,y+0.5],[LN+nw+0.5,y-0.3]];
-      line(ch,'#050304',1.6); line(ch,'#1a1216',1.15); line(ch.map(([a,b2])=>[a,b2-0.5]),PL.SV,0.2); line(ch.map(([a,b2])=>[a,b2+0.5]),PL.SV,0.2);
-      if(front && !prof){ c.fillStyle='#050304'; c.beginPath(); c.ellipse(x+cx,B+y+0.6,1.2,1.45,0,0,Math.PI*2); c.fill(); c.fillStyle=PL.SV; c.beginPath(); c.ellipse(x+cx,B+y+0.6,0.98,1.22,0,0,Math.PI*2); c.fill(); c.fillStyle=PL.STONE; c.beginPath(); c.ellipse(x+cx,B+y+0.6,0.72,0.95,0,0,Math.PI*2); c.fill(); c.fillStyle='#ff9aa8'; c.beginPath(); c.arc(x+cx-0.22,B+y+0.25,0.22,0,Math.PI*2); c.fill(); } }
-    else { const w=nw+1.6, nk=front&&!prof ? [[LN-w+po*0.4,sd+0.6],[LN-w-1.8,sd-4.6],[LN-1.4+po,sd-3],[cx,sd+1],[LN+1.4+po,sd-3],[LN+w+1.8,sd-4.6],[LN+w+po*0.4,sd+0.6]]
-        : prof ? [[LN-nw,sd+0.4],[LN-nw-1.6,sd-4.8],[LN+1,sd-4.2],[LN+1.4,sd+0.4]] : [[LN-w,sd+0.4],[LN-w-1.8,sd-4.8],[LN,sd-5.2],[LN+w+1.8,sd-4.8],[LN+w,sd+0.4]];
-      mass(nk,'#0e0a0c','#050304');
-      if(front && !prof){ const inner=[[LN-w-0.8,sd-3.9],[LN-1.6+po,sd-2.5],[cx,sd+0.2],[LN+1.6+po,sd-2.5],[LN+w+0.8,sd-3.9],[LN+w-0.6+po*0.4,sd],[LN-w+0.6+po*0.4,sd]];
-        mass(inner,PL.LB,'#050304'); c.save(); path(inner); c.clip(); const gr=c.createLinearGradient(x+LN-w,0,x+LN+w,0); gr.addColorStop(0,'rgba(0,0,0,0.3)'); gr.addColorStop(0.45,'rgba(255,170,170,0.14)'); gr.addColorStop(1,'rgba(0,0,0,0.3)'); c.fillStyle=gr; c.fillRect(x+LN-w-3,B+sd-6,w*2+6,8);
-        for(let a=-2;a<=2;a++) if(a) line([[LN+a*1.1+po,sd-0.4],[LN+a*2.2+po*0.4,sd-4]],'rgba(0,0,0,0.4)',0.22); c.restore(); }
-      line(front&&!prof?[nk[1],nk[2],nk[3],nk[4],nk[5]]:prof?[nk[1],nk[2]]:[nk[1],nk[2],nk[3]],PL.SV,0.28); }
+    const mantle=()=>{ const SH=PL.SH, ED=PL.ED;   // long and light: down past the elbows in front, to the waist behind
+      const pts=front ? [[LN-CH-1.6,sd+1],[LN-CH*0.5,sd-1.8],[LN-CH*0.2,sd-0.8],[LN-CH*0.38,sd+4],[LN-CH+0.2,sd+15],[LN-CH-1.2,sd+17.5],[LN-CH-2.4,sd+13]] : [[LN-CH-1.6,sd+1],[LN-CH*0.4,sd-1.6],[LN+CH*0.4,sd-1.6],[LN+CH+1.6,sd+1],[LN+CH+2.4,W0-2],[LN+CH*0.4,W0+1],[LN,W0+3],[LN-CH*0.4,W0+1],[LN-CH-2.4,W0-2]];
+      const one=P2=>{ c.fillStyle=SH; pth(P2); c.fill(); motifField(P2,sd-2,W0+3,3.2); c.strokeStyle=ED; c.lineWidth=0.5; pth(P2); c.stroke(); c.save(); pth(P2); c.clip(); c.strokeStyle=SV; c.lineWidth=0.25; c.setLineDash([0.6,0.5]); pth(P2); c.stroke(); c.setLineDash([]); c.restore();
+        const hem=front?[P2[4],P2[5],P2[6]]:P2.slice(4);
+        if(M==='moon') along(hem,1.3,(a,b2)=>{ line([[a,b2],[a,b2+0.8]],SV,0.16); dot(a,b2+1.1,0.34,'#f2f0ea'); });
+        else if(M==='oak') along(hem,1.1,(a,b2,k)=>leafE(a,b2-0.2,1.6,0.6,(k%2?0.3:-0.3),k%3?SV:IL));
+        else if(M==='root') along(hem,1.5,(a,b2,k)=>{ leafE(a,b2-0.3,2.6,0.9,(k%2?0.25:-0.25),'#4e5a2e'); });
+        else along(hem,1.6,(a,b2,k)=>{ c.fillStyle=SH; c.beginPath(); c.arc(x+a,B+b2,0.9,0,Math.PI); c.fill(); c.strokeStyle=ED; c.lineWidth=0.3; c.beginPath(); c.arc(x+a,B+b2,0.9,0,Math.PI); c.stroke(); }); };
+      one(pts); if(front) one(pts.map(([a,b2])=>[2*LN-a,b2]));
+      if(!front && M==='rose') [-1,1].forEach(k=>{ line(curve(LN+k*1.6,sd+1,LN+k*3,W0-4,LN+k*1.2,W0+8),'#0e0a0c',0.8); line(curve(LN+k*1.6,sd+1,LN+k*3,W0-4,LN+k*1.2,W0+8),STONE,0.5); });   // trailing ribbons
+      if(FR){ const y0=sd+0.3; if(M==='rose'){ [-1,1].forEach(k=>rosebud(LN+k*CH*0.44,y0,0.9)); [-1,1].forEach(k=>{ line(curve(LN+k*CH*0.44,y0+0.8,LN+k*CH*0.5,y0+6,LN+k*CH*0.4,y0+10),'#0e0a0c',0.7); line(curve(LN+k*CH*0.44,y0+0.8,LN+k*CH*0.5,y0+6,LN+k*CH*0.4,y0+10),STONE,0.42); }); }
+        else { line(curve(LN-CH*0.42,y0,cx,y0+2.4,LN+CH*0.42,y0),SV,0.25); [-1,1].forEach(k=>{ dot(LN+k*CH*0.42,y0,0.85,LE); dot(LN+k*CH*0.42,y0,0.65,SV); }); emblem(cx,y0+2.6,1.1); } } };
+
+    if(F){
+      if(base==='lace_underbust'){ const top=U;   // the bodice: leaf panels from under the bust, a leaf-tip rising between the breasts, long points at the hips and below the navel
+        const body=lingDedupe(FR ? [[LN-CH-bL+2.2,top+0.2],[Math.min(cx-7+pr*2,cx),top+0.6],[cx-3.6+pr*1.4,top+1.4],[cx-1.1,top-0.2],[cx,sd+8.6],[cx+1.1,top-0.2],[Math.min(cx+3.6,LN+CH+Math.min(bR,1.2)-3.4),top+1.4],[Math.min(cx+7,LN+CH+Math.min(bR,1.2)-1.6),top+0.6],[LN+CH+Math.min(bR,1.2)-2.2,top+0.2],[LN+WA+0.9,W0-2.4],[LN+WA+1.7,W0+4.8],[cx+WA*0.45,W0+2.2],[cx,W0+9.6],[cx-WA*0.45,W0+2.2],[LN-WA-1.7,W0+4.8],[LN-WA-0.9,W0-2.4]]
+          : prof ? [[LN-CH+1.4,top],[LN+CH*0.7+bR*0.3,top+0.6],[LN+WA+1.2,W0-1.6],[LN+WA+1.5,W0+4.6],[LN+WA*0.2,W0+5.6],[LN-WA-1.4,W0+4.4],[LN-WA-1.1,W0-1.6]]
+          : [[LN-CH+0.6,top],[LN+CH-0.6,top],[LN+WA+0.8,W0-1.6],[LN+WA+1.7,W0+4.8],[LN,W0+7.4],[LN-WA-1.7,W0+4.8],[LN-WA-0.8,W0-1.6]]);
+        panel(body,top,W0+9); motifField(body,top,W0+9,3.4); trim(body,1);
+        if(FR){ [-1,1].forEach(k=>line(curve(bx(k)+k*1.6,top+1.4,LN+k*WA*0.7,W0-3,cx+k*WA*0.45,W0+2.2),SV,0.28));   // princess seams in silver thread
+          for(let yy=top+1.4; yy<W0+1.6; yy+=1.5){ line([[cx-0.8,yy],[cx+0.8,yy+1.5]],SV,0.22); line([[cx+0.8,yy],[cx-0.8,yy+1.5]],SV,0.22); }   // a fine cord lacing
+          [-1,1].forEach(k=>{ line(curve(cx,W0+2,cx+k*1.4,W0+4.4,cx+k*0.8,W0+6.4),SV,0.2); leafE(cx+k*0.8,W0+6.3,1.4,0.5,k*0.3,SV); });   // leaf aglets
+          if(M==='moon'){ gem(cx,sd+10.4,0.7,STONE); drop(cx,W0+9.8,1.2,STONE); [-1,1].forEach(k=>crescent(LN+k*WA*0.72,W0-5,1.1,SV)); }
+          else if(M==='oak'){ [-1,1].forEach(k=>{ oakLeaf(LN+k*WA*0.7,W0-6.4,2.6,k*0.4,SV); oakLeaf(LN+k*(WA+1),W0+3.2,1.8,k*0.9,IL); }); gem(cx,sd+10.4,0.6,STONE); drop(cx,W0+9.8,1.1,STONE); }
+          else if(M==='root'){ [-1,1].forEach(k=>{ tendril(LN+k*(WA+0.8),W0+4,LN+k*WA*0.55,top+2.4,SV,0.28,k); line([[LN+k*(WA+1.4),W0+4.6],[LN+k*(WA+1.5),W0+6.4]],SV,0.2); acorn(LN+k*(WA+1.5),W0+6.8,0.7); }); leafE(cx,sd+9.4,2.2,0.8,Math.PI,SV); }
+          else { [-1,1].forEach(k=>thornVine(curve(LN+k*(WA+0.6),W0+3.4,LN+k*WA*0.95,W0-4,bx(k)+k*2.4,top+1.8),SV,0.26)); rosebud(cx,sd+10.2,0.9); [-0.5,0.5].forEach(t=>rosebud(cx+t*WA*1.1,W0+2.6,0.6)); drop(cx,W0+9.8,1.2,STONE); } }
+        else if(!front){ for(let yy=top+1; yy<W0+3; yy+=1.5){ line([[LN-0.8,yy],[LN+0.8,yy+1.5]],SV,0.22); line([[LN+0.8,yy],[LN-0.8,yy+1.5]],SV,0.22); } [-1,1].forEach(k=>line(curve(LN+k*CH*0.5,top+0.6,LN+k*WA*0.8,W0-2,LN+k*(WA+1.2),W0+4.4),SV,0.26)); emblem(LN,W0+5.2,0.8); }
+        else { line(curve(LN+CH*0.3,top+1,LN+WA*0.5,W0-2,LN+WA+1.2,W0+4.4),SV,0.26); emblem(LN+WA*0.3,W0-3,0.9); } }
+      else if(base==='chain_harness'){   // the filigree: fine chains framing the bust from the collar to a jewel at the breastbone, arcs beneath each breast hung with drops, a girdle of the same at the waist
+        const J=sd+(F?8.8:7.6);
+        if(FR){ chainLine([[cx,sd+0.6],[cx,J-1]]); [-1,1].forEach(k=>{ chainLine(curve(LN+k*CH*0.6,sd+0.4,bx(k)+k*(F?6.2:4.4),sd+6,bx(k)+k*(F?5:3.6),U-0.2)); chainLine(curve(cx+k*0.9,J+0.4,bx(k),U+2.4,bx(k)+k*(F?5:3.6),U-0.2)); chainLine(curve(bx(k)+k*(F?5:3.6),U-0.2,LN+k*(WA+0.6),W0-5,LN+k*(WA+0.4),W0-2));
+            [0.25,0.5,0.75].forEach(t=>{ const u=1-t, px=u*u*(cx+k*0.9)+2*u*t*bx(k)+t*t*(bx(k)+k*(F?5:3.6)), py=u*u*(J+0.4)+2*u*t*(U+2.4)+t*t*(U-0.2); M==='oak'?leafE(px,py+0.2,1.6,0.6,0,IL):M==='root'?leafE(px,py+0.2,1.8,0.6,0,'#5e6a34'):drop(px,py,0.8+(t===0.5?0.6:0),M==='moon'?'#e8eef4':STONE); }); });
+          chainLine(curve(LN-WA-0.6,W0-2,cx,W0-0.4,LN+WA+0.6,W0-2)); [-0.5,0,0.5].forEach(t=>{ const px=cx+t*WA*1.3; M==='moon'||M==='rose'?drop(px,W0-0.6+(t?-0.3:0),t?0.8:1.6,STONE):M==='oak'?leafE(px,W0-0.4,2,0.7,0,SV):acorn(px,W0,0.65); });
+          if(M==='moon'){ crescent(cx,J,1.5,SV); gem(cx+0.3,J+0.3,0.55,STONE); } else if(M==='oak'){ oakLeaf(cx,J-1.4,3,0,SV); gem(cx,J+0.3,0.65,STONE); } else if(M==='root'){ acorn(cx,J-0.6,1.1); } else { rosebud(cx,J,1.2); drop(cx,J+1.3,1.4,STONE); } }
+        else if(!front){ chainLine([[LN,sd-0.2],[LN,W0-2]]); [-1,1].forEach(k=>chainLine(curve(LN+k*CH*0.6,sd+0.4,LN+k*CH*0.5,U,LN+k*(WA+0.4),W0-2))); chainLine(curve(LN-CH+0.6,U+1.4,LN,U+2.6,LN+CH-0.6,U+1.4)); chainLine(curve(LN-WA-0.6,W0-2,LN,W0-1,LN+WA+0.6,W0-2)); emblem(LN,U+2.6,0.9); }
+        else { chainLine(curve(LN+CH*0.6,sd+0.4,LN+CH*0.75,sd+6,LN+CH*0.5,U)); chainLine(curve(LN+CH*0.5,U,LN+WA*0.6,W0-4,LN+WA*0.3,W0-2)); chainLine([[LN-WA,W0-2],[LN+WA+0.6,W0-2]]); } }
+      else mantle(); }
+    else {   // ── his cut ──
+      const shirtCol=PL.SHIRT, doublet=base==='lace_underbust', silk=base==='chain_harness';
+      const torso=front ? [[LN-CH+0.2,sd+0.2],[LN-3.2+po,sd-0.6],[cx,sd+(silk?5.6:1.6)],[LN+3.2+po,sd-0.6],[LN+CH-0.2,sd+0.2],[LN+CH+0.2,sd+9],[LN+WA+0.9,W0-1],[LN+WA+1.1,W0+(doublet?4.4:2.6)],[cx,W0+(doublet?8.4:3.2)],[LN-WA-1.1,W0+(doublet?4.4:2.6)],[LN-WA-0.9,W0-1],[LN-CH-0.2,sd+9]]
+                       : [[LN-CH+0.2,sd+0.2],[LN-3.4,sd-0.8],[LN+3.4,sd-0.8],[LN+CH-0.2,sd+0.2],[LN+CH+0.2,sd+9],[LN+WA+0.9,W0-1],[LN+WA+1.1,W0+(doublet?4.4:2.6)],[LN,W0+(doublet?6:3)],[LN-WA-1.1,W0+(doublet?4.4:2.6)],[LN-WA-0.9,W0-1],[LN-CH-0.2,sd+9]];
+      if(doublet){   // a fitted doublet to a point below the belt, a row of theme buttons, the theme embroidered down both fronts and round the hem
+        panel(torso,sd,W0+8); motifField(torso,sd,W0+8,4.2); trim(torso,1);
+        if(FR){ line([[cx,sd+1.6],[cx,W0+8.2]],LE,0.5); for(let yy=sd+3.4; yy<W0+6; yy+=2.6){ M==='moon'?(dot(cx,yy,0.62,LE),dot(cx,yy,0.48,SV),dot(cx,yy,0.2,STONE)):M==='oak'?(dot(cx,yy,0.62,LE),oakLeaf(cx,yy-0.7,1.4,0,SV)):M==='root'?acorn(cx,yy-0.4,0.5):(dot(cx,yy,0.62,LE),dot(cx,yy,0.48,STONE)); }
+          [-1,1].forEach(k=>{ const ed=curve(LN+k*3.4+po,sd-0.2,cx+k*2.6,sd+12,cx+k*1.4,W0+6.8); M==='rose'?thornVine(ed,SV,0.26):M==='root'?tendril(cx+k*2,W0+6,cx+k*3.2,sd+3,SV,0.26,k):line(ed,SV,0.3); if(M==='moon') [0.3,0.6].forEach(t=>crescent(cx+k*(3.2-t),sd+3+t*20,0.7,SV)); if(M==='oak') [0.3,0.6].forEach(t=>oakLeaf(cx+k*(3.4-t),sd+2+t*20,1.8,k*0.5,SV));
+            line([[LN+k*(CH-0.4),sd+0.6],[LN+k*(CH-2.4),sd+0.2]],SV,0.3); });   // shoulder seams
+          line(curve(LN-WA-0.6,W0+1,cx,W0+1.6,LN+WA+0.6,W0+1),'rgba(0,0,0,0.35)',0.5); }
+        else if(!front){ line([[LN,sd-0.6],[LN,W0+5.6]],'rgba(0,0,0,0.35)',0.4); [-1,1].forEach(k=>line(curve(LN+k*CH*0.6,sd+1,LN+k*WA*0.4,W0-4,LN+k*WA*0.6,W0+4),SV,0.26)); emblem(LN,sd+5,1.1); }
+        else { line([[LN+CH*0.5,sd],[LN+CH*0.3,W0+5]],SV,0.28); for(let yy=sd+3.4; yy<W0+5; yy+=2.6) dot(LN+CH*0.38,yy,0.45,SV); } }
+      else {   // a silk shirt, the theme in the buttons: open at the throat with a pendant (the filigree), or buttoned to a mandarin collar under the mantle
+        panel(torso,sd,W0+3,shirtCol,tone(shirtCol,0.1)); c.save(); pth(torso); c.clip(); [-1,1].forEach(k=>{ for(let q=1;q<=3;q++) line([[cx+k*(1.8+q*1.1),sd+2],[cx+k*(1.6+q*1.2),W0+1]],'rgba(0,0,0,0.12)',0.25); }); c.restore();   // pintucks
+        if(FR){ const y0=silk?sd+5.8:sd+1.4; line([[cx+0.4,y0],[cx+0.4,W0+3]],'rgba(0,0,0,0.25)',0.35); for(let yy=y0+1; yy<W0+1; yy+=2.4){ dot(cx+0.9,yy,0.48,LE); dot(cx+0.9,yy,0.36,M==='rose'?STONE:'#f4f2ec'); }
+          if(silk){ [-1,1].forEach(k=>{ const cp=[[LN+k*3.2+po,sd-0.6],[cx+k*0.4,sd+5.8],[cx+k*3.6,sd+3.2]]; mss(cp,shirtCol,tone(shirtCol,-0.45)); line([cp[1],cp[2]],SV,0.2); });   // the collar points, lying open
+            line(curve(LN-2.4+po,sd-0.4,cx,sd+4,LN+2.4+po,sd-0.4),SV,0.22); M==='moon'?(crescent(cx,sd+4.6,1,SV),dot(cx+0.3,sd+4.8,0.3,STONE)):M==='oak'?(oakLeaf(cx,sd+3.8,2,0,SV),gem(cx,sd+5.4,0.4,STONE)):M==='root'?acorn(cx,sd+4.2,0.75):rosebud(cx,sd+4.6,0.8); }
+          const sash=[[LN-WA-1,W0-1.6],[LN+WA+1,W0-1.6],[LN+WA+1.2,W0+1.6],[LN-WA-1.2,W0+1.6]]; panel(sash,W0-2,W0+2,LB,LH); trim(sash,0.6);   // a sash at the waist in the theme's colour
+          [[0.26,0.12,7.4],[0.5,0.62,6.6]].forEach(([a0,a1,l])=>{ const T=[[LN+WA*a0-0.7,W0+1.2],[LN+WA*a0+0.7,W0+1.2],[LN+WA*a1+0.6,W0+l-0.6],[LN+WA*a1,W0+l],[LN+WA*a1-0.6,W0+l-0.6]]; mss(T,LB,LE,0.4); line([[LN+WA*a1-0.5,W0+l-1.2],[LN+WA*a1+0.5,W0+l-1.2]],SV,0.22); }); emblem(LN+WA*0.38,W0-0.2,0.7); }
+        else if(!front){ const sash=[[LN-WA-1,W0-1.6],[LN+WA+1,W0-1.6],[LN+WA+1.2,W0+1.6],[LN-WA-1.2,W0+1.6]]; panel(sash,W0-2,W0+2,LB,LH); line([[LN-CH+1,sd+5],[LN+CH-1,sd+5]],'rgba(0,0,0,0.15)',0.3); }
+        else { const sash=[[LN-WA-1,W0-1.6],[LN+WA+1,W0-1.6],[LN+WA+1.2,W0+1.6],[LN-WA-1.2,W0+1.6]]; panel(sash,W0-2,W0+2,LB,LH); }
+        if(!silk) mantle(); } }
+    c.restore(); }
+
+  // what sits on the neck, drawn after the neck so it shows: her filigree's collar of chain; his standing, open or mandarin collar
+  function drawLingerieNeck(id,nw){ if(!LING_TORSO.has(id)) return; const K=lingKit(id), {pth,mss,base,PL,M,sd,cx,prof,FR,LB,LE,LH,SV,STONE,line,dot,chainLine,emblem,curve}=K;
+    if(F && base!=='chain_harness') return; c.save(); c.lineCap='round'; c.lineJoin='round';
+    if(F){ if(FR) chainLine(curve(LN-nw-0.4,sd-1.6,cx,sd+0.8,LN+nw+0.4,sd-1.6)); else chainLine([[LN-nw-0.4,sd-1.4],[LN+nw+0.4,sd-1.4]]); c.restore(); return; }
+    const col=base==='lace_underbust'?LB:PL.SHIRT, ed=base==='lace_underbust'?LE:tone(PL.SHIRT,-0.5), h=base==='lace_underbust'?3.6:base==='chain_harness'?1.6:2.8, gap=base==='chain_harness'?2.2:base==='lace_underbust'?0.7:0.15;
+    const band=P2=>{ mss(P2,col,ed,0.45); c.save(); pth(P2); c.clip(); c.fillStyle='rgba(255,255,255,0.12)'; c.fillRect(x+LN-nw-3,B+sd-h,nw*2+6,h*0.4); c.restore(); };
+    if(FR){ [-1,1].forEach(k=>{ const P2=[[LN+k*(nw+0.7),sd+0.7],[LN+k*(nw+0.9),sd-h],[cx+k*gap,sd-h+0.9],[cx+k*gap,sd+0.9]]; band(P2); line([P2[1],P2[2]],SV,0.25); });
+      if(base==='lace_underbust') emblem(cx,sd-0.6,0.55); if(base==='sheer_shrug'){ dot(cx,sd-1,0.45,ed); dot(cx,sd-1,0.33,M==='rose'?STONE:'#f4f2ec'); } }
+    else if(!front){ const P2=[[LN-nw-0.7,sd+0.7],[LN-nw-0.9,sd-h],[LN+nw+0.9,sd-h],[LN+nw+0.7,sd+0.7]]; band(P2); line([P2[1],P2[2]],SV,0.25); }
+    else { const P2=[[LN-nw*0.5,sd+0.6],[LN-nw*0.6,sd-h],[LN+nw+0.8,sd-h+0.7],[LN+nw+1,sd+0.8]]; band(P2); line([P2[1],P2[2]],SV,0.25); }
     c.restore(); }
   function drawElfBustier(){
     const NB=vT==='necro_bustier', BG=ELFC.bust||'#b3a283', SAT=NB?'#3a3a30':tone(BG,0.32), LACE=tone(BG,0.06), sd=Y.SHOULDER, prof=pr>0.8, cx=LN+po;
@@ -12369,35 +12309,32 @@ function aerwenTalk(){
   opts.push(bye);
   say('Lady Aerwen',[greet],opts);
 }
-const LING_BASE=['lace_underbust','chain_harness','sheer_shrug','open_bralette'];
+const LING_BASE=['lace_underbust','chain_harness','sheer_shrug'];   // bodice, filigree, mantle (the old open_bralette ids now alias the bodice)
 const LING_DYE={   // '' is the black set; the others dye the leather and change the fittings to match
-  '':  { LB:'#1e1b1a', LE:'#0c0a0a', LH:'#403a36', TOOL:'rgba(150,144,136,0.55)', STITCH:'rgba(170,162,150,0.6)', IR:'#55575c', IL:'#a8acb2', SV:'#d6d8dc', CH2:'#8a8e94', BOSS:'#9a9ea4', BONE:'#ddd6c4', SH:'rgba(234,234,240,0.40)', SHI:'rgba(232,232,238,0.7)', ED:'rgba(214,210,200,0.95)', STONE:'#bcd2e4' },
-  brn: { LB:'#6e4628', LE:'#2a170a', LH:'#8e5e38', TOOL:'rgba(50,28,12,0.5)', STITCH:'rgba(222,196,152,0.65)', IR:'#6a5430', IL:'#c8a860', SV:'#e2cc88', CH2:'#a88a4a', BOSS:'#b8984e', BONE:'#ece0c4', SH:'rgba(196,146,98,0.42)', SHI:'rgba(196,146,98,0.72)', ED:'rgba(140,96,54,0.95)', STONE:'#d88a3a', word:'Tan', note:"Dyed a warm brown and fitted in brass." },
-  dbr: { LB:'#3a2416', LE:'#140a04', LH:'#5c3c26', TOOL:'rgba(160,120,82,0.42)', STITCH:'rgba(196,164,120,0.6)', IR:'#5a4426', IL:'#a88a54', SV:'#cdb27a', CH2:'#8e7444', BOSS:'#9a7e48', BONE:'#dccca8', SH:'rgba(112,76,48,0.44)', SHI:'rgba(112,76,48,0.76)', ED:'rgba(74,48,28,0.95)', STONE:'#c87a2a', word:'Umber', note:"Dyed the brown of old saddles and fitted in dark bronze." },
-  red: { LB:'#561418', LE:'#1e0406', LH:'#7c2228', TOOL:'rgba(20,4,6,0.45)', STITCH:'rgba(206,164,154,0.55)', IR:'#3e3e42', IL:'#a8acb2', SV:'#d6d8dc', CH2:'#7e8288', BOSS:'#9a9ea4', BONE:'#e2d6c6', SH:'rgba(124,22,30,0.40)', SHI:'rgba(124,22,30,0.72)', ED:'rgba(86,14,20,0.95)', STONE:'#b0182a', word:'Oxblood', note:"Dyed the red of dried wine and fitted in dark iron and silver, with a garnet where the moonstone would be." } };
+  '':  { SHIRT:'#e6e6ec', LB:'#1e1b1a', LE:'#0c0a0a', LH:'#403a36', TOOL:'rgba(150,144,136,0.55)', STITCH:'rgba(170,162,150,0.6)', IR:'#55575c', IL:'#a8acb2', SV:'#d6d8dc', CH2:'#8a8e94', BOSS:'#9a9ea4', BONE:'#ddd6c4', SH:'rgba(234,234,240,0.40)', SHI:'rgba(232,232,238,0.7)', ED:'rgba(214,210,200,0.95)', STONE:'#bcd2e4' },
+  brn: { SHIRT:'#efe4cc', LB:'#6e4628', LE:'#2a170a', LH:'#8e5e38', TOOL:'rgba(50,28,12,0.5)', STITCH:'rgba(222,196,152,0.65)', IR:'#6a5430', IL:'#c8a860', SV:'#e2cc88', CH2:'#a88a4a', BOSS:'#b8984e', BONE:'#ece0c4', SH:'rgba(196,146,98,0.42)', SHI:'rgba(196,146,98,0.72)', ED:'rgba(140,96,54,0.95)', STONE:'#d88a3a', word:'Tan', note:"Dyed a warm brown and fitted in brass." },
+  dbr: { SHIRT:'#d4c4a2', LB:'#3a2416', LE:'#140a04', LH:'#5c3c26', TOOL:'rgba(160,120,82,0.42)', STITCH:'rgba(196,164,120,0.6)', IR:'#5a4426', IL:'#a88a54', SV:'#cdb27a', CH2:'#8e7444', BOSS:'#9a7e48', BONE:'#dccca8', SH:'rgba(112,76,48,0.44)', SHI:'rgba(112,76,48,0.76)', ED:'rgba(74,48,28,0.95)', STONE:'#c87a2a', word:'Umber', note:"Dyed the brown of old saddles and fitted in dark bronze." },
+  red: { SHIRT:'#1e1618', LB:'#561418', LE:'#1e0406', LH:'#7c2228', TOOL:'rgba(20,4,6,0.45)', STITCH:'rgba(206,164,154,0.55)', IR:'#3e3e42', IL:'#a8acb2', SV:'#d6d8dc', CH2:'#7e8288', BOSS:'#9a9ea4', BONE:'#e2d6c6', SH:'rgba(124,22,30,0.40)', SHI:'rgba(124,22,30,0.72)', ED:'rgba(86,14,20,0.95)', STONE:'#b0182a', word:'Oxblood', note:"Dyed the red of dried wine and fitted in dark iron and silver, with a garnet where the moonstone would be." } };
 const lingDedupe=pts=>{ for(let k=pts.length-1;k>0;k--){ const [a,b]=pts[k],[c2,d]=pts[k-1]; if(Math.hypot(a-c2,b-d)<1.2) pts.splice(k,1); } return pts; };   // rounded-corner paths draw stray tangents through near-duplicate points
 const lingParts=id=>{ const m=/^(.*)_(brn|dbr|red)$/.exec(id); return m ? [m[1],m[2]] : [id,'']; };
-const LING_TORSO=new Set(LING_BASE.flatMap(b=>Object.keys(LING_DYE).map(k=>k?b+'_'+k:b)));
-Object.assign(ITEMS,{ lace_underbust:{ name:'Raven Underbust', slot:'torso', title:"Supple black leather boned from a point below the waist to just under the bust, laced up the front in bone-white cord through iron eyelets. It holds you in and covers nothing above." },
-  chain_harness:{ name:'Knight\'s Chain Harness', slot:'torso', title:"Blackened iron chain on a leather collar: a ring at the throat, a ring at the breastbone, chains that go round rather than over, a band about the ribs. Maelis had a smith in the Lowstreets make it, and will not say which." },
-  sheer_shrug:{ name:'Moonweave Mantle', slot:'torso', title:"Grey-white gossamer over the shoulders and down the back, pinned at the throat with a silver brooch and open all the way down the front." },
-  open_bralette:{ name:'Shieldmaiden\'s Bodice', slot:'torso', title:"Black leather straps from the shoulders, crossed through an iron ring between the breasts and buckled into a broad waist cincher. Everything it was meant to cover, it goes around." } });
-Object.assign(PRICES,{ lace_underbust:60, chain_harness:85, sheer_shrug:45, open_bralette:55 });
-// the coloured night-things are pieces of their own (ids kept from when they were dyes of the black set)
+const LING_ALIAS={ open_bralette:'lace_underbust', open_bralette_brn:'lace_underbust_brn', open_bralette_dbr:'lace_underbust_dbr', open_bralette_red:'lace_underbust_red' };
+const LING_TORSO=new Set([...LING_BASE.flatMap(b=>Object.keys(LING_DYE).map(k=>k?b+'_'+k:b)),...Object.keys(LING_ALIAS)]);
 Object.assign(ITEMS,{
-  lace_underbust_brn:{ name:'Huntress Corset', slot:'torso', title:"Soft tan suede that stops just under the bust, laced up both sides, three brass toggles down the front and a fringe at the hem that sways when you walk. Two hawk feathers hang at the hip." },
-  chain_harness_brn:{ name:'Archer\'s Baldric', slot:'torso', title:"A broad riveted baldric from the shoulder down between the breasts to the hip, where a little pouch hangs, crossed by an underbust strap through a brass ring. Made for someone who shoots with nothing in the way." },
-  sheer_shrug_brn:{ name:'Fur-Trimmed Wrap', slot:'torso', title:"A short brown leather capelet edged in tawny fur, open all down the front and tied at the throat with an antler toggle. Warm shoulders, nothing else." },
-  open_bralette_brn:{ name:'Brass Ring Halter', slot:'torso', title:"A strap round the neck down to a brass ring between the breasts, straps under each one, and a laced leather waist belt with a brass sun at the front." },
-  lace_underbust_dbr:{ name:'Barkcarved Corselet', slot:'torso', title:"Dark leather carved like old oak bark, cupped under the bust and hemmed with a skirt of leather leaves. Bronze leaf clasps down the front, and a vine climbing one side." },
-  chain_harness_dbr:{ name:'Bone-Bead Harness', slot:'torso', title:"A bronze torc, and thongs strung with bone beads that go round the bust to a carved bone talisman at the breastbone. Two antler tines dangle beneath. The hill-witches wear these at the midsummer fires, Maelis says." },
-  sheer_shrug_dbr:{ name:'Leafscale Mantle', slot:'torso', title:"Rows of dark leather leaves overlapping like scales over the shoulders and down the back, pinned at the throat with a bronze acorn and open at the front." },
-  open_bralette_dbr:{ name:'Rootwoven Bodice', slot:'torso', title:"Braided leather straps from the shoulders down past the breasts into a basket-woven band about the ribs, with two braids meeting at a bronze knot under the bust." },
-  lace_underbust_red:{ name:'Bloodrose Corset', slot:'torso', title:"Oxblood velvet from the hips to just under the bust, edged with black lace above and below, a silver busk of hooks down the front, and a black satin rose where the hooks begin." },
-  chain_harness_red:{ name:'Garnet Cascade', slot:'torso', title:"A black velvet choker with a garnet cameo, three tiers of silver chain slung across the chest, a long garnet drop between the breasts and a garnet-studded chain about the ribs." },
-  sheer_shrug_red:{ name:'Nightcourt Collar', slot:'torso', title:"A short black velvet capelet with pointed shoulders and a flared standing collar lined in oxblood, pinned with two silver brooches and a garnet. Open at the front, as such things are at the night court." },
-  open_bralette_red:{ name:'Velvet Waspie', slot:'torso', title:"A deep oxblood velvet waist cincher edged in black lace, laced up both sides in black ribbon with a bow at the front, and slim velvet straps from silver rosettes up over the shoulders." } });
-Object.assign(PRICES,{ lace_underbust_brn:65, chain_harness_brn:70, sheer_shrug_brn:55, open_bralette_brn:60, lace_underbust_dbr:70, chain_harness_dbr:75, sheer_shrug_dbr:60, open_bralette_dbr:60, lace_underbust_red:80, chain_harness_red:95, sheer_shrug_red:65, open_bralette_red:65 });
+  lace_underbust:{ name:'Moonshadow Bodice', slot:'torso', title:"Black elven silk in leaf-shaped panels, cut from under the bust to long points at the hips, with a leaf-tip rising between the breasts and a moonstone where it ends. Silver crescents in the seams. Cut for a man, it is a high-collared black doublet with moonstone buttons." },
+  chain_harness:{ name:'Moonthread Filigree', slot:'torso', title:"Silver chain as fine as spider-silk: a collar, a crescent at the breastbone, arcs beneath the bust hung with dewdrop beads, and a girdle of the same. Cut for a man, it is a white silk shirt open at the throat, with a crescent on a chain." },
+  sheer_shrug:{ name:'Moonweave Mantle', slot:'torso', title:"Grey-white gossamer starred with silver crescents, long in front and to the waist behind, hemmed with pearls and pinned with a crescent. On a man it goes over a white silk shirt buttoned to a high collar." },
+  lace_underbust_brn:{ name:'Oakleaf Bodice', slot:'torso', title:"Tan silk worked with golden oak leaves, cut from under the bust to leaf points at the hips, with an amber drop beneath the navel. Cut for a man, it is a tan doublet with oak-leaf buttons." },
+  chain_harness_brn:{ name:'Autumn Gold Filigree', slot:'torso', title:"A chain of tiny golden oak leaves over the shoulders and round the bust to an amber at the breastbone, with a girdle of leaves at the waist. Cut for a man, it is a cream silk shirt open at the throat with an oak leaf and amber on a chain." },
+  sheer_shrug_brn:{ name:'Leaf-Fall Shawl', slot:'torso', title:"Amber gauze scattered with embroidered oak leaves and fringed with tiny golden ones, falling long from the shoulders. On a man it goes over a cream silk shirt buttoned to a high collar." },
+  lace_underbust_dbr:{ name:'Wildwood Bodice', slot:'torso', title:"Umber silk with bronze root-tendrils climbing from the hip points, cut from under the bust, with acorns swinging at the hips. Cut for a man, it is an umber doublet with bronze acorn buttons and tendrils down the fronts." },
+  chain_harness_dbr:{ name:'Rootvine Filigree', slot:'torso', title:"Twisted bronze like a living vine, put out leaves as it goes round the bust to an acorn at the breastbone. Cut for a man, it is a linen silk shirt open at the throat with a bronze acorn on a chain." },
+  sheer_shrug_dbr:{ name:'Wildwood Mantle', slot:'torso', title:"Umber gauze with roots stitched up from a hem of leaves, long in front and to the waist behind, pinned with a bronze acorn. On a man it goes over a linen silk shirt buttoned to a high collar." },
+  lace_underbust_red:{ name:'Thornrose Bodice', slot:'torso', title:"Oxblood silk with silver thorn-vines climbing to the bust, cut from under it to long points, with a garnet rosebud between the breasts and a garnet drop below. Cut for a man, it is an oxblood doublet with garnet buttons and thorns down the fronts." },
+  chain_harness_red:{ name:'Thornrose Filigree', slot:'torso', title:"Silver thorn-vine winding round the bust to a garnet rosebud at the breastbone, with garnet drops like dew beneath. Cut for a man, it is a black silk shirt open at the throat with a garnet rose on a chain." },
+  sheer_shrug_red:{ name:'Rosepetal Veil', slot:'torso', title:"Oxblood gauze hemmed in petals, a garnet rose at each shoulder and ribbons trailing down the back. On a man it goes over a black silk shirt buttoned to a high collar." } });
+Object.entries(LING_ALIAS).forEach(([a,b])=>{ ITEMS[a]=Object.assign({},ITEMS[b]); });   // old open-cup pieces become the bodice of their colour
+Object.assign(PRICES,{ lace_underbust:70, chain_harness:90, sheer_shrug:55, lace_underbust_brn:70, chain_harness_brn:90, sheer_shrug_brn:55, lace_underbust_dbr:75, chain_harness_dbr:90, sheer_shrug_dbr:60, lace_underbust_red:80, chain_harness_red:100, sheer_shrug_red:65 });
+Object.entries(LING_ALIAS).forEach(([a,b])=>{ PRICES[a]=PRICES[b]; });
 function maelisNight(back){ const disc = player.opts.race==='elf' || CHOICE.pact || hasItem('leaf') ? 0.8 : 1;
   shopFrom('Maelis the Weaver',LING_BASE.flatMap(b=>Object.keys(LING_DYE).map(k=>k?b+'_'+k:b)),disc,["<i>She draws a curtain across the back of the tent and lifts a lid.</i> “Night-things. For coin, not leaves: I make them when the loom is bored. Elves don't believe in modesty, only in grace. Neither do these.”"],back); }
 function maelisTalk(){                            // she weaves for Silver Leaves (see SILVER LEAVES below); coin buys only worn things
@@ -16770,50 +16707,27 @@ function paintIconExtras(g2,id,size){
     g2.save(); g2.scale(size/40,size/40);
     try{ f(g2,(x,y,rx,ry,c)=>{ g2.beginPath(); g2.ellipse(x,y,rx,ry,0,0,Math.PI*2); g2.fillStyle=c; g2.fill(); }); } finally{ g2.restore(); } }
 
-// their icons, on a 40-square, one set per dye
-const lingIcons=(suf,P)=>{ const ln=(g2,col,w,pts)=>{ g2.strokeStyle=col; g2.lineWidth=w; g2.lineCap='round'; g2.lineJoin='round'; g2.beginPath(); pts.forEach(([x,y],k)=>k?g2.lineTo(x,y):g2.moveTo(x,y)); g2.stroke(); };
-  const {LB,LE,IL,BONE}=P, ring=(g2,x,y,r)=>{ ln(g2,LE,2,[[x+r,y]]); g2.strokeStyle=LE; g2.lineWidth=2; g2.beginPath(); g2.arc(x,y,r,0,Math.PI*2); g2.stroke(); g2.strokeStyle=IL; g2.lineWidth=1.1; g2.stroke(); };
-  const lstrap=(g2,pts,w)=>{ ln(g2,LE,w+1,pts); ln(g2,LB,w,pts); g2.setLineDash([1,1.2]); ln(g2,P.STITCH,0.5,pts); g2.setLineDash([]); };
-  ICON_EXTRA['lace_underbust'+suf]=(g2,E)=>{ g2.beginPath(); g2.moveTo(9,17); g2.quadraticCurveTo(14,15,20,18); g2.quadraticCurveTo(26,15,31,17); g2.lineTo(30,31); g2.lineTo(23,32.5); g2.lineTo(20,37); g2.lineTo(17,32.5); g2.lineTo(10,31); g2.closePath(); g2.fillStyle=LB; g2.fill(); g2.strokeStyle=P.LH; g2.lineWidth=0.8; g2.stroke();
-    for(let y=19;y<31;y+=3){ ln(g2,BONE,0.8,[[18.5,y],[21.5,y+3]]); ln(g2,BONE,0.8,[[21.5,y],[18.5,y+3]]); E(18.2,y,0.5,0.5,IL); E(21.8,y,0.5,0.5,IL); }
-    lstrap(g2,[[12,17],[13,5]],2.2); lstrap(g2,[[28,17],[27,5]],2.2); [[12.6,11],[27.4,11]].forEach(([x,y])=>{ g2.strokeStyle=IL; g2.lineWidth=0.8; g2.strokeRect(x-1.5,y-1.1,3,2.2); }); };
-  ICON_EXTRA['chain_harness'+suf]=(g2,E)=>{ const ch=pts=>{ ln(g2,P.LE,1.8,pts); ln(g2,P.IR,1,pts); g2.setLineDash([0.8,0.9]); ln(g2,IL,1,pts); g2.setLineDash([]); };
-    lstrap(g2,[[12,6],[20,9],[28,6]],2.4); ch([[20,10],[20,20]]); ch([[20,20],[10,15],[9,8]]); ch([[20,20],[30,15],[31,8]]); ch([[20,20],[11,27],[9,30]]); ch([[20,20],[29,27],[31,30]]); ch([[8,32],[20,34],[32,32]]); ch([[20,22],[20,34]]);
-    ring(g2,20,10,1.4); ring(g2,20,20,2.4); };
-  ICON_EXTRA['sheer_shrug'+suf]=(g2,E)=>{ [1,-1].forEach(k=>{ g2.beginPath(); g2.moveTo(20-k*2,7); g2.quadraticCurveTo(20-k*12,5,20-k*17,12); g2.lineTo(20-k*16,27); g2.lineTo(20-k*11,25); g2.quadraticCurveTo(20-k*8,14,20-k*2,7); g2.fillStyle=P.SHI; g2.fill(); g2.strokeStyle=P.ED; g2.lineWidth=0.9; g2.stroke(); });
-    E(20,7.5,2.4,2.4,LE); E(20,7.5,1.8,1.8,IL); E(19.5,7,0.7,0.7,'#f0f0f4'); };
-  ICON_EXTRA['open_bralette'+suf]=(g2,E)=>{ g2.beginPath(); g2.moveTo(9,26); g2.lineTo(31,26); g2.lineTo(31.5,35); g2.lineTo(8.5,35); g2.closePath(); g2.fillStyle=LB; g2.fill(); g2.strokeStyle=P.LH; g2.lineWidth=0.8; g2.stroke();
-    [-1,1].forEach(k=>{ lstrap(g2,[[20-k*9,5],[20-k*1.5,15]],2.4); lstrap(g2,[[20+k*1.5,19],[20+k*8,26]],2.4); }); ring(g2,20,17,2.4);
-    [14,26].forEach(x=>{ g2.strokeStyle=IL; g2.lineWidth=0.8; g2.strokeRect(x-1.6,29.4,3.2,2.4); }); };
-};
-lingIcons('',LING_DYE['']);
+// their icons, on a 40-square: hers, or his cut when a man is looking
 { const ln=(g2,col,w,pts)=>{ g2.strokeStyle=col; g2.lineWidth=w; g2.lineCap='round'; g2.lineJoin='round'; g2.beginPath(); pts.forEach(([x,y],k)=>k?g2.lineTo(x,y):g2.moveTo(x,y)); g2.stroke(); };
-  const poly=(g2,pts,f,e)=>{ g2.beginPath(); pts.forEach(([x,y],k)=>k?g2.lineTo(x,y):g2.moveTo(x,y)); g2.closePath(); g2.fillStyle=f; g2.fill(); if(e){ g2.strokeStyle=e; g2.lineWidth=0.8; g2.stroke(); } };
-  const corset=(g2,P,bot)=>{ g2.beginPath(); g2.moveTo(9,13); g2.quadraticCurveTo(14,11,20,14); g2.quadraticCurveTo(26,11,31,13); g2.lineTo(30,28); g2.lineTo(20,bot||30); g2.lineTo(10,28); g2.closePath(); g2.fillStyle=P.LB; g2.fill(); g2.strokeStyle=P.LE; g2.lineWidth=0.9; g2.stroke(); };
-  const lace=(g2,P,lx,y0,y1,col)=>{ for(let y=y0;y<y1;y+=2.6){ ln(g2,col||P.BONE,0.7,[[lx-1.3,y],[lx+1.3,y+2.6]]); ln(g2,col||P.BONE,0.7,[[lx+1.3,y],[lx-1.3,y+2.6]]); } };
-  const strapI=(g2,P,pts,w,stud)=>{ ln(g2,P.LE,w+1,pts); ln(g2,P.LB,w,pts); if(stud){ for(let k=1;k<pts.length;k++){ const [a,b]=pts[k-1],[c2,d]=pts[k]; for(let t=0.15;t<1;t+=0.22){ g2.fillStyle=P.IL; g2.beginPath(); g2.arc(a+(c2-a)*t,b+(d-b)*t,0.55,0,Math.PI*2); g2.fill(); } } } };
-  const mant=(g2,f,e,short)=>{ [1,-1].forEach(k=>poly(g2,[[20-k*2,7],[20-k*10,5.5],[20-k*17,12],[20-k*16,short?20:27],[20-k*11,short?18:25],[20-k*8,13]],f,e)); };
-  const leafI=(g2,x,y,l,w,a,f,e)=>{ g2.save(); g2.translate(x,y); g2.rotate(a); g2.beginPath(); g2.moveTo(0,0); g2.quadraticCurveTo(w,l/2,0,l); g2.quadraticCurveTo(-w,l/2,0,0); g2.fillStyle=f; g2.fill(); g2.strokeStyle=e; g2.lineWidth=0.6; g2.stroke(); g2.restore(); };
-  const B=LING_DYE.brn, D=LING_DYE.dbr, R=LING_DYE.red;
-  ICON_EXTRA.lace_underbust_brn=(g2,E)=>{ corset(g2,B,29); for(let x=10;x<=30;x+=1.4) ln(g2,B.LB,0.8,[[x,28.5],[x+0.3,34+((x*7)%3)]]); lace(g2,B,13,15,27); lace(g2,B,27,15,27); [17,21,25].forEach(y=>{ g2.fillStyle=B.LE; g2.fillRect(17,y-1,6,2); g2.fillStyle=B.SV; g2.fillRect(17.5,y-0.6,5,1.2); }); leafI(g2,11.5,30,7,1.6,0.15,B.BONE,B.LE); };
-  ICON_EXTRA.chain_harness_brn=(g2,E)=>{ poly(g2,[[7,18],[33,18],[33,23],[7,23]],B.LB,B.LE); strapI(g2,B,[[29,4],[20,20],[12,33]],4,true); g2.strokeStyle=B.LE; g2.lineWidth=2; g2.beginPath(); g2.arc(20,20.5,2.6,0,Math.PI*2); g2.stroke(); g2.strokeStyle=B.SV; g2.lineWidth=1.1; g2.stroke(); poly(g2,[[7,30],[15,30],[14.5,37],[11,38.5],[7.5,37]],B.LH,B.LE); E(11,32.5,0.9,0.9,B.SV); };
-  ICON_EXTRA.sheer_shrug_brn=(g2,E)=>{ mant(g2,B.LB,B.LE,true); for(let k=0;k<14;k++){ const t=k/13, xl=4+t*7, yl=13+t*6; [[xl,yl],[40-xl,yl]].forEach(([x,y])=>{ E(x,y+1,1.6,1.4,'#7a5a38'); E(x-0.3,y+0.5,1.3,1.1,k%2?'#c8a478':'#b08c60'); }); } ln(g2,B.BONE,0.8,[[18,7],[20,10],[22,7]]); g2.fillStyle=B.BONE; g2.beginPath(); g2.ellipse(20,10.5,3,0.9,0.3,0,Math.PI*2); g2.fill(); };
-  ICON_EXTRA.open_bralette_brn=(g2,E)=>{ poly(g2,[[8,25],[32,25],[32.5,35],[7.5,35]],B.LB,B.LE); [-1,1].forEach(k=>{ strapI(g2,B,[[20+k*5,3],[20+k*1.6,13]],2.2); strapI(g2,B,[[20+k*1.6,17],[20+k*9,20],[20+k*13,19]],2); }); strapI(g2,B,[[20,18],[20,25]],2.2); g2.strokeStyle=B.LE; g2.lineWidth=2; g2.beginPath(); g2.arc(20,15,2.7,0,Math.PI*2); g2.stroke(); g2.strokeStyle=B.SV; g2.lineWidth=1.2; g2.stroke(); E(20,30,3,3,B.LE); E(20,30,2.5,2.5,B.SV); E(20,30,1,1,B.STONE); };
-  ICON_EXTRA.lace_underbust_dbr=(g2,E)=>{ corset(g2,D,28); for(let x=11;x<30;x+=2.4) ln(g2,'rgba(8,4,0,0.6)',0.7,[[x,14],[x+0.8,18],[x-0.4,22],[x+0.6,27]]); for(let x=10;x<=30;x+=2.5) leafI(g2,x,27,6,1.6,(x-20)*0.03,x%5<2.5?D.LB:D.LH,D.LE); [17,22].forEach(y=>{ leafI(g2,20,y,3.4,1.2,-1.57,D.SV,D.LE); leafI(g2,20,y,3.4,1.2,1.57,D.IL,D.LE); }); };
-  ICON_EXTRA.chain_harness_dbr=(g2,E)=>{ ln(g2,D.LE,3,[[11,7],[20,10],[29,7]]); ln(g2,D.IR,2,[[11,7],[20,10],[29,7]]); ln(g2,D.SV,0.6,[[11,6.4],[20,9.4],[29,6.4]]);
-    const bead=pts=>{ ln(g2,D.LE,0.8,pts); for(let k=1;k<pts.length;k++){ const [a,b]=pts[k-1],[c2,d]=pts[k]; for(let t=0;t<1;t+=0.25){ E(a+(c2-a)*t,b+(d-b)*t,1.1,0.85,(Math.round(t*4)%3)?D.BONE:D.IL); } } };
-    bead([[20,11],[20,19]]); bead([[20,21],[10,15],[9,9]]); bead([[20,21],[30,15],[31,9]]); bead([[20,21],[11,28],[8,31]]); bead([[20,21],[29,28],[32,31]]); E(20,21,3.2,3.2,D.LE); E(20,21,2.7,2.7,D.BONE); [[13,29],[27,29]].forEach(([x,y])=>{ ln(g2,D.BONE,1.1,[[x,y],[x+(x<20?-1:1),y+4],[x+(x<20?-0.4:0.4),y+7]]); }); };
-  ICON_EXTRA.sheer_shrug_dbr=(g2,E)=>{ [1,-1].forEach(k=>{ g2.save(); g2.beginPath(); [[20-k*2,7],[20-k*10,5.5],[20-k*17,12],[20-k*16,27],[20-k*11,25],[20-k*8,13]].forEach(([x,y],q)=>q?g2.lineTo(x,y):g2.moveTo(x,y)); g2.closePath(); g2.clip(); for(let r=0;r<7;r++) for(let x=0;x<40;x+=3.4) leafI(g2,x+(r%2)*1.7,4+r*3.4,5,2,0,(r+x)%3?D.LB:D.LH,D.LE); g2.restore(); }); E(20,8,2,2.4,D.LE); E(20,8.6,1.5,1.8,D.IR); E(20,6.6,2,1.1,D.SV); };
-  ICON_EXTRA.open_bralette_dbr=(g2,E)=>{ poly(g2,[[8,23],[32,23],[32.5,35],[7.5,35]],D.LB,D.LE); for(let y=24,r=0;y<34;y+=2.5,r++) for(let x=8+(r%2)*2.4;x<32;x+=4.8){ g2.fillStyle=D.LH; g2.fillRect(x,y,2.2,2); g2.fillStyle='rgba(0,0,0,0.35)'; g2.fillRect(x+2.4,y,2.2,2); }
-    const br=pts=>{ ln(g2,D.LE,3,pts); ln(g2,D.LB,2.2,pts); for(let k=1;k<pts.length;k++){ const [a,b]=pts[k-1],[c2,d]=pts[k]; for(let t=0;t<1;t+=0.16) ln(g2,D.LH,0.6,[[a+(c2-a)*t-0.9,b+(d-b)*t-0.5],[a+(c2-a)*t+0.9,b+(d-b)*t+0.5]]); } };
-    br([[12,4],[9,14],[9,23]]); br([[28,4],[31,14],[31,23]]); br([[10,23],[20,19]]); br([[30,23],[20,19]]); E(20,19,2.4,2.4,D.LE); E(20,19,1.9,1.9,D.IR); };
-  ICON_EXTRA.lace_underbust_red=(g2,E)=>{ corset(g2,R,34); for(let x=10;x<=30;x+=2){ g2.fillStyle='#0e0a0c'; g2.beginPath(); g2.arc(x,13.2+Math.abs(20-x)*-0.05,1.3,Math.PI,0); g2.fill(); } ln(g2,'#0e0a0c',1,[[20,15],[20,32]]); for(let y=17;y<31;y+=2.6){ E(18.9,y,0.7,0.7,R.SV); E(21.1,y,0.7,0.7,R.SV); } E(20,15,2.5,2.5,'#050304'); E(20,15,2,2,'#1c1214'); ln(g2,'#4a3238',0.5,[[19,15],[20,14],[21,15.4],[19.8,16]]); };
-  ICON_EXTRA.chain_harness_red=(g2,E)=>{ ln(g2,'#050304',3.2,[[12,5],[20,7],[28,5]]); ln(g2,'#1a1216',2.2,[[12,5],[20,7],[28,5]]); E(20,7.5,2.2,2.7,R.SV); E(20,7.5,1.6,2,R.STONE);
-    const sw=(d)=>{ g2.setLineDash([0.9,0.9]); g2.strokeStyle=R.SV; g2.lineWidth=1.1; g2.beginPath(); g2.moveTo(8,10); g2.quadraticCurveTo(20,10+d*2,32,10); g2.stroke(); g2.setLineDash([]); }; [2.5,5,7.5].forEach((d,k)=>{ sw(d); E(20,10+d+1.6,1+k*0.15,1.3+k*0.15,R.STONE); });
-    g2.setLineDash([0.9,0.9]); ln(g2,R.SV,1,[[20,20],[20,27]]); ln(g2,R.SV,1,[[8,32],[20,34],[32,32]]); g2.setLineDash([]); E(20,29,1.5,2,R.STONE); };
-  ICON_EXTRA.sheer_shrug_red=(g2,E)=>{ mant(g2,'#0e0a0c','#050304',true); [[13,3.5],[27,3.5]].forEach(([x,y],k)=>poly(g2,k?[[22,13],[29,2],[25,4],[21,10]]:[[18,13],[11,2],[15,4],[19,10]],R.LB,'#050304')); ln(g2,R.SV,0.7,[[11,2],[15,4],[19,10]]); ln(g2,R.SV,0.7,[[29,2],[25,4],[21,10]]); E(15,11,1.4,1.4,R.SV); E(25,11,1.4,1.4,R.SV); E(20,14,1.1,1.4,R.STONE); };
-  ICON_EXTRA.open_bralette_red=(g2,E)=>{ poly(g2,[[8,18],[19,20],[20,19],[21,20],[32,18],[32.5,33],[20,36],[7.5,33]],R.LB,R.LE); for(let x=8;x<=32;x+=1.8){ g2.fillStyle='#0e0a0c'; g2.beginPath(); g2.arc(x,18.6,1,Math.PI,0); g2.fill(); } lace(g2,R,13,21,31,'#0e0a0c'); lace(g2,R,27,21,31,'#0e0a0c');
-    strapI(g2,R,[[13,20],[11,4]],1.6); strapI(g2,R,[[27,20],[29,4]],1.6); E(13,20.5,1.6,1.6,R.SV); E(27,20.5,1.6,1.6,R.SV); [-1,1].forEach(k=>poly(g2,[[20,23],[20+k*4,20.5],[20+k*3.4,25]],'#0e0a0c')); E(20,23,1,1,'#0e0a0c'); };
+  const poly=(g2,pts,f,e,w)=>{ g2.beginPath(); pts.forEach(([x,y],k)=>k?g2.lineTo(x,y):g2.moveTo(x,y)); g2.closePath(); g2.fillStyle=f; g2.fill(); if(e){ g2.strokeStyle=e; g2.lineWidth=w||0.8; g2.stroke(); } };
+  const ell=(g2,x,y,rx,ry,col)=>{ g2.fillStyle=col; g2.beginPath(); g2.ellipse(x,y,rx,ry,0,0,Math.PI*2); g2.fill(); };
+  const emblem=(g2,M,P,x,y,s)=>{ if(M==='moon'){ g2.save(); g2.beginPath(); g2.arc(x,y,s,0,Math.PI*2); g2.clip(); g2.fillStyle=P.SV; g2.beginPath(); g2.arc(x,y,s,0,Math.PI*2); g2.arc(x+s*0.55,y-s*0.3,s*0.85,0,Math.PI*2,true); g2.fill('evenodd'); g2.restore(); ell(g2,x+s*0.5,y-s*0.1,s*0.25,s*0.25,P.STONE); }
+    else if(M==='oak'){ g2.fillStyle=P.SV; [0.25,0.5,0.75].forEach((t,k)=>[-1,1].forEach(d=>{ g2.beginPath(); g2.arc(x+d*s*(0.45-k*0.06),y-s+t*s*2,s*0.32,0,Math.PI*2); g2.fill(); })); ell(g2,x,y,s*0.32,s*0.95,P.SV); ell(g2,x,y+s*1.2,s*0.45,s*0.55,P.STONE); }
+    else if(M==='root'){ ell(g2,x,y+s*0.35,s*0.62,s*0.85,'#8a5a2a'); ell(g2,x,y-s*0.35,s*0.75,s*0.42,P.IR); ell(g2,x-s*0.2,y-s*0.45,s*0.3,s*0.14,P.SV); }
+    else { ell(g2,x,y,s*0.8,s*0.8,P.STONE); g2.strokeStyle='rgba(255,190,190,0.7)'; g2.lineWidth=0.5; g2.beginPath(); for(let t=0;t<8;t+=0.4){ const r=s*0.7*t/8; g2.lineTo(x+Math.cos(t*2.2)*r,y+Math.sin(t*2.2)*r); } g2.stroke(); } };
+  const chain=(g2,M,P,pts)=>{ ln(g2,'rgba(0,0,0,0.6)',1.4,pts); if(M==='rose'){ ln(g2,P.SV,0.8,pts); } else { g2.setLineDash([0.9,0.8]); ln(g2,P.SV,1.1,pts); g2.setLineDash([]); } };
+  const motif=(g2,M,P,pts)=>{ g2.save(); g2.beginPath(); pts.forEach(([x,y],k)=>k?g2.lineTo(x,y):g2.moveTo(x,y)); g2.closePath(); g2.clip(); for(let y=4,r=0;y<40;y+=6,r++) for(let x=(r%2)*3;x<40;x+=6){ g2.globalAlpha=0.35; emblem(g2,M,P,x,y,1); g2.globalAlpha=1; } g2.restore(); };
+  const her={
+    lace_underbust:(g2,E,M,P)=>{ const b=[[8,15],[13,17],[18,16],[20,7],[22,16],[27,17],[32,15],[31,27],[34,31],[25,29],[20,38],[15,29],[6,31],[9,27]]; poly(g2,b,P.LB,P.LE,1); motif(g2,M,P,b); ln(g2,P.SV,0.6,[[12,18],[13,26],[15,29]]); ln(g2,P.SV,0.6,[[28,18],[27,26],[25,29]]); for(let y=18;y<28;y+=2.2){ ln(g2,P.SV,0.45,[[19,y],[21,y+2.2]]); ln(g2,P.SV,0.45,[[21,y],[19,y+2.2]]); } emblem(g2,M,P,20,10.5,1.8); },
+    chain_harness:(g2,E,M,P)=>{ chain(g2,M,P,[[11,4],[20,9],[29,4]]); chain(g2,M,P,[[20,9],[20,16]]); [-1,1].forEach(k=>{ chain(g2,M,P,[[20-k*9,4],[20-k*14,12],[20-k*12,21]]); chain(g2,M,P,[[20,18],[20-k*6,24],[20-k*12,21]]); chain(g2,M,P,[[20-k*12,21],[20-k*12,30]]); [0.3,0.65].forEach(t=>ell(g2,20-k*(2+t*9),18+t*6+3,0.9,1.3,M==='moon'?'#e8eef4':M==='root'?'#5e6a34':P.STONE)); }); chain(g2,M,P,[[7,31],[20,33],[33,31]]); emblem(g2,M,P,20,17,2.6); },
+    sheer_shrug:(g2,E,M,P)=>{ [1,-1].forEach(k=>{ const pts=[[20-k*2,6],[20-k*10,5],[20-k*17,11],[20-k*16,33],[20-k*11,30],[20-k*8,13]]; poly(g2,pts,P.SHI,P.ED,0.9); motif(g2,M,P,pts); }); ln(g2,P.SV,0.7,[[13,8],[20,11],[27,8]]); emblem(g2,M,P,20,11.5,2.2); } };
+  const him={
+    lace_underbust:(g2,E,M,P)=>{ const b=[[10,8],[16,6],[20,12],[24,6],[30,8],[33,30],[26,33],[20,38],[14,33],[7,30]]; poly(g2,b,P.LB,P.LE,1); motif(g2,M,P,b); poly(g2,[[14,4],[18,4],[20,10],[16,9]],P.LB,P.LE,0.7); poly(g2,[[26,4],[22,4],[20,10],[24,9]],P.LB,P.LE,0.7); ln(g2,P.SV,0.6,[[20,12],[20,37]]); for(let y=15;y<34;y+=4) ell(g2,20,y,1.1,1.1,P.SV); ln(g2,P.SV,0.6,[[7,30],[14,33],[20,38],[26,33],[33,30]]); },
+    chain_harness:(g2,E,M,P)=>{ const b=[[9,8],[16,6],[20,16],[24,6],[31,8],[34,22],[29,23],[29,34],[11,34],[11,23],[6,22]]; poly(g2,b,P.SHIRT,'#4a4440',0.9); poly(g2,[[16,6],[20,16],[23,11]],P.SHIRT,'#4a4440',0.6); poly(g2,[[24,6],[20,16],[17,11]],P.SHIRT,'#4a4440',0.6); for(let y=19;y<30;y+=3.4) ell(g2,20.6,y,0.8,0.8,'#f4f2ec'); poly(g2,[[11,28],[29,28],[29,32],[11,32]],P.LB,P.LE,0.6); ln(g2,P.SV,0.5,[[16.5,7],[20,13],[23.5,7]]); emblem(g2,M,P,20,13.8,1.6); },
+    sheer_shrug:(g2,E,M,P)=>{ const b=[[9,8],[16,6],[24,6],[31,8],[34,22],[29,23],[29,34],[11,34],[11,23],[6,22]]; poly(g2,b,P.SHIRT,'#4a4440',0.9); poly(g2,[[16,3.5],[24,3.5],[24,7],[16,7]],P.SHIRT,'#4a4440',0.6); for(let y=10;y<32;y+=3.4) ell(g2,20,y,0.7,0.7,P.LE); [1,-1].forEach(k=>poly(g2,[[20-k*4,6],[20-k*11,6],[20-k*16,11],[20-k*15,26],[20-k*11,24],[20-k*9,12]],P.SHI,P.ED,0.8)); emblem(g2,M,P,20,9,1.6); } };
+  const M4={'':'moon',brn:'oak',dbr:'root',red:'rose'};
+  [...LING_TORSO].forEach(id=>{ const al=LING_ALIAS[id]||id, [base,dye]=lingParts(al), P=LING_DYE[dye], M=M4[dye];
+    ICON_EXTRA[id]=(g2,E)=>((typeof iconMale==='function' && iconMale()) ? him : her)[base](g2,E,M,P); });
 }
 
 // ── the fallen oak across the causeway ──

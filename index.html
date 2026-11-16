@@ -16144,7 +16144,7 @@ SPELLS.right.dmg=10; SPELLS.left.dmg=8; SPELLS.up.dmg=7; HEX_SPELLS.up.dmg=8; HE
 let FIGHT_UNDO=null;                      // a scripted fight lost is a fight you can try again
 const QUEST_ITEMS=new Set(['edric_knife','fourage','moonsilver','moonthread','silver_setting','leaf','letter','seal','ledger','journal','trapnote','orrinletters','charter','cartwheel','brooch','strongbox','package','moonbloom','greencrystal']);
 function giveQuestItem(id,keep){                 // story papers always fit: something ordinary is left behind to make room
-  const f=player.inv.indexOf(null);
+  const f=(typeof stackable==='function' && stackable(id)) ? slotFor(id) : player.inv.indexOf(null);   // onto a pile of the same, where there is one
   if(f<0 && (keep || (typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(id)))){   // a full pack: the story item takes the place of the cheapest ordinary thing, which waits until you have room
     const qi=x=>(typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(x)) || (typeof TIED_ON!=='undefined' && TIED_ON.has(x)) || x==='shovel';
     let k=-1, low=1e9; player.inv.forEach((x,i)=>{ if(!x || qi(x) || !ITEMS[x]) return; const v=(PRICES[x]||0)+(ITEMS[x].slot==='misc'?0:5); if(v<low){ low=v; k=i; } });
@@ -17225,7 +17225,7 @@ const tierDmg=f=> 1+(f&&f.type==='barrowking'?0.12:TIER_DMG)*(((f&&f.tier)||1)-1
 Object.assign(ITEMS,{
   fire_blade:  { name:'Fire Blade',          slot:'weapon' },
   emberbrand:  { name:'Emberbrand',          slot:'weapon' },
-  ember_core:  { name:'Ember Core',          slot:'misc' },
+  ember_core:  { name:'Ember Core',          slot:'misc', stack:true },
   ash_mantle:  { name:'Cinderweave Mantle',  slot:'armor', base:'robe',     col:'#4a1e16' },
   cinder_gloves:{ name:'Cinderhide Gloves',  slot:'hands', base:'gloves',   col:'#2e2220' },
   obsidian_helm:{ name:'Obsidian Half-Helm', slot:'head',  base:'kettle',   col:'#2a2528' },
@@ -17353,7 +17353,7 @@ function ilkaTalk(){
   say('Ilka, Spirit of the Forge',["“The Fire Blade, and the three cores. Into the heart of the forge. See the cores melt into the steel like butter.”",
     "“Once. Twice. Hear the valley ring? Dark as old glass now, and fire along its edge.”",
     "“The Emberbrand. Your arm swings it. Your spells feed its flame. And whatever it cuts will burn.”"],
-    [{label:'Take the Emberbrand.', fn:()=>{ let need=3; for(let k=0;k<player.inv.length && need;k++) if(player.inv[k]==='ember_core'){ player.inv[k]=null; need--; }
+    [{label:'Take the Emberbrand.', fn:()=>{ for(let need=3;need>0;need--){ const k=player.inv.indexOf('ember_core'); if(k<0) break; player.inv[k]=null; }
         if(player.opts.equip.weapon==='fire_blade') player.opts.equip.weapon='emberbrand'; else { const k=player.inv.indexOf('fire_blade'); if(k>=0) player.inv[k]='emberbrand'; }
         CHOICE.emberbrand=true; CHOICE.ilka='done'; updateHud(); try{ refreshInventory(); }catch(e){} banner('The Emberbrand','#ffb060',1800); logMsg('You receive the Emberbrand: it grows with Attack Power and Spell Power, and every cut burns.','#ffb060'); closeDialog(); }}]); }
 TALKERS.ilka=ilkaTalk;
@@ -26369,7 +26369,7 @@ function mwTalk(back){ const G='Master Smith Gorm', id=player.opts.equip.weapon;
   say(G,[ r===0 ? `“That ${nm}. Surface steel. It cuts, I suppose. Bring me silver from the seams and I will fold it into the edge, and it will cut like it means it.”` : r===1 ? `“Again? Good. Silver is not enough this time: it wants heat. Ember cores, from the deeps under your city. They burn without air.”` : `“The last fold. For that I need something that has never been struck: the scales of the great worm, out in the Sunscar. Silver, cores, scales. Then we are done.”`,
       `<i>Masterwork ${MW_ROMAN[r+1]}: ${eff}. He needs ${what}, and ${formatCoin(R.coin)} for the coal.</i>`],
     [{label:`Reforge the ${nm}. (${formatCoin(R.coin)})`, off:!have || player.purse<R.coin, note:!have?'missing materials':'-'+formatCoin(R.coin), fn:()=>{
-        R.need.forEach(([it,n])=>{ for(let k=0;k<player.inv.length && n>0;k++) if(player.inv[k]===it){ player.inv[k]=null; n--; } });
+        R.need.forEach(([it,n])=>{ for(;n>0;n--){ const k=player.inv.indexOf(it); if(k<0) break; player.inv[k]=null; } });   // one at a time, so piles count right
         player.purse-=R.coin; (CHOICE.mw=CHOICE.mw||{})[unWoven(id)]=r+1; mwApplyStats(); refreshPlayerHp(); updateHud(); try{ refreshInventory(); }catch(e){}
         try{ SND.clang(1); }catch(e){} banner('Masterwork '+MW_ROMAN[r+1],'#e8c060',1600); logMsg(`Gorm reforges your ${nm}: Masterwork ${MW_ROMAN[r+1]} (${eff}).`,'#e8c060');
         say(G,[r===2?"“There. Nine folds of silver, the heat of the deep, the hardness of the worm. It will outlive you. Try not to make that happen soon.”":"“There. Feel the balance? That is what steel is supposed to feel like.”"],[{label:'Back.', fn:back}]); }},

@@ -28548,8 +28548,12 @@ onUse(['rcfallen'],o=>pzSay(RC_FALLEN_LINES[(o.i*3+o.j)%RC_FALLEN_LINES.length],
 let GOLEM=null, GOLEM_USED=false;
 const GOLEM_COST=45, GOLEM_LIFE=20, GOLEM_FLESH=['raw_meat','cooked_meat','fish_perch','fish_trout','fish_carp','fish_eel','fish_herring','grilled_fish'];
 { const _s=startCombat; startCombat=function(){ if(!combat.active) GOLEM_USED=false; return _s.apply(this,arguments); }; }   // once a fight
-function golemSlot(f){ const fx=f?f.x-player.x:1, fy=f?f.y-player.y:0, fl=Math.hypot(fx,fy)||1, ax=-fy/fl*0.9+fx/fl*0.4, ay=fx/fl*0.9+fy/fl*0.4, bx=fy/fl*0.9+fx/fl*0.4, by=-fx/fl*0.9+fy/fl*0.4, A=(ax+ay)<=(bx+by);
-  return [player.x+(A?ax:bx), player.y+(A?ay:by)]; }   // a step ahead at your shoulder, on the far side so it never hides you
+function golemOthers(){ const L=[]; try{ if(SKEL && !SKEL.crumble) L.push([SKEL.x,SKEL.y]); if(typeof DRAKE!=='undefined' && DRAKE && drakeOn()) L.push([DRAKE.x,DRAKE.y]); if(DOPP && !DOPP.fade) L.push([DOPP.x,DOPP.y]);
+    const w=typeof PUPS!=='undefined' && PUPS.find(q=>q.mode==='comp'); if(w) L.push([w.x,w.y]); }catch(e){} return L; }
+function golemSlot(f){ const fx=f?f.x-player.x:1, fy=f?f.y-player.y:0, fl=Math.hypot(fx,fy)||1, px=-fy/fl, py=fx/fl, ux=fx/fl, uy=fy/fl, O=golemOthers();   // a step ahead at your shoulder: the free one, away from the camera
+  const C=[[0.9,0.4],[-0.9,0.4],[1.7,0.2],[-1.7,0.2],[0.5,0.95],[-0.5,0.95]].map(([k,u])=>[player.x+px*k+ux*u, player.y+py*k+uy*u]).filter(([x,y])=>!blocked.has(Math.floor(x)+','+Math.floor(y)));
+  const score=([x,y])=>{ const near=O.reduce((m,[ox,oy])=>Math.min(m,Math.hypot(x-ox,y-oy)),9); return (near<0.75?100:0)+(x+y-player.x-player.y)*0.5+(GOLEM?Math.hypot(x-GOLEM.x,y-GOLEM.y)*0.15:0); };   // not on top of your other allies; behind you on screen; and do not hop about
+  return (C.sort((p1,p2)=>score(p1)-score(p2))[0])||[player.x+px*0.9+ux*0.4, player.y+py*0.9+uy*0.4]; }
 function golemFlesh(){ return GOLEM_FLESH.find(id=>invCount(id)>0) || null; }
 function stitchGolem(f){
   if(GOLEM && !GOLEM.fade){ floatText(tileOf(player),'Already stitched','#c8b8b0'); return true; }
@@ -28577,7 +28581,8 @@ function golemTick(dt){ const G=GOLEM; if(!G) return; G.hit=Math.max(0,G.hit-dt)
   if(!combat.active && combat.phase==='down'){ G.fade=0.01; try{ SND.fx('gfall'); }catch(e){} return; }                  // you fell: so does it
   if(!combat.active){ if(G.rise<1) return; const dx=G.x-player.x, dy=G.y-player.y, d=Math.hypot(dx,dy)||1;              // between fights it lumbers after you, a step behind, on the other side from the skeleton
     const C=[[player.x-1.0,player.y-0.25],[player.x-0.25,player.y-1.0],[player.x-0.8,player.y-0.8]].filter(([x,y])=>!blocked.has(Math.floor(x)+','+Math.floor(y)) && x>=0 && y>=0);   // always on the far side of you from the camera, so it never hides you
-    const best=C.sort((p1,p2)=>Math.hypot(p1[0]-G.x,p1[1]-G.y)-Math.hypot(p2[0]-G.x,p2[1]-G.y))[0]||[player.x+dx/d*1.15,player.y+dy/d*1.15]; let tx=G.x, ty=G.y; if(Math.hypot(best[0]-G.x,best[1]-G.y)>0.35){ tx=best[0]; ty=best[1]; } const mx=tx-G.x, my=ty-G.y, md=Math.hypot(mx,my), sp=Math.min(md,dt*Math.max(2,md*2.6));
+    const O=golemOthers(), sc=([x,y])=>(O.some(([ox,oy])=>Math.hypot(x-ox,y-oy)<0.75)?100:0)+Math.hypot(x-G.x,y-G.y);
+    const best=C.sort((p1,p2)=>sc(p1)-sc(p2))[0]||[player.x+dx/d*1.15,player.y+dy/d*1.15]; let tx=G.x, ty=G.y; if(Math.hypot(best[0]-G.x,best[1]-G.y)>0.35){ tx=best[0]; ty=best[1]; } const mx=tx-G.x, my=ty-G.y, md=Math.hypot(mx,my), sp=Math.min(md,dt*Math.max(2,md*2.6));
     if(md>0.001){ G.x+=mx/md*sp; G.y+=my/md*sp; } G.moving=md>0.04; if(G.moving && md>0.08) G.dir=dirFromDelta(mx,my); return; }
   G.t-=dt; if(G.t<=0){ G.fade=0.01; try{ SND.fx('gfall'); }catch(e){} floatText([Math.floor(G.x),Math.floor(G.y)],'The stitches give','#c8b8b0'); return; }
   const f=combat.foe; let tx=G.x, ty=G.y;

@@ -1072,7 +1072,7 @@ function drawCharInner(c,x,B,opts,swing=0,dir=0,pose=null){
     const sv={m:{...PROP.m}, f:{...PROP.f}}; ['m','f'].forEach(k=>Object.assign(PROP[k],{limbW:Math.min(PROP[k].limbW,5.8), waistHW:Math.min(PROP[k].waistHW,9.5), chestHW:Math.min(PROP[k].chestHW,12.4)}));   // gaunt in the body; legs left alone so the clothes still fit them
     const pb=CV_BITS, back=[3,4,5].includes(dir); CV_LONGARM=true; CV_BITS=opts.cvBits??0;
     c.save(); c.translate(x,B); c.scale(0.9,1.12); c.translate(-x,-B);
-    try{ if(!back) cvTail(c,x,B,dir,swing,opts); drawCharInner(c,x,B,{...opts,race:'cinderveil_'},swing,dir,pose); if(back) cvTail(c,x,B,dir,swing,opts); }
+    try{ if(!back){ if(opts.cvPack) cvPack(c,x,B,dir,opts); cvTail(c,x,B,dir,swing,opts); } drawCharInner(c,x,B,{...opts,race:'cinderveil_'},swing,dir,pose); if(back){ cvTail(c,x,B,dir,swing,opts); if(opts.cvPack) cvPack(c,x,B,dir,opts); } const nk=unWoven(((opts.equip||{}).neck)||''); if(/^cv_scarf/.test(nk)) cvScarves(c,x,B,dir,nk==='cv_scarf_grey'?'#5a5650':'#7a2a22'); }
     finally{ c.restore(); Object.assign(PROP.m,sv.m); Object.assign(PROP.f,sv.f); CV_LONGARM=false; CV_BITS=pb; } return; }
   if(opts.race==='elf'){ c.save(); c.translate(x,B); c.scale(0.93,1.055); c.translate(-x,-B);
     try{ drawCharInner(c,x,B,{...opts,race:'elf_'},swing,dir,pose); } finally{ c.restore(); } return; }
@@ -1106,7 +1106,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       c.beginPath(); c.moveTo(px,py); c.lineTo(px+Math.cos(a)*L,py+Math.sin(a)*L); c.stroke(); }
     c.restore(); };
   const VR=opts.vari||{}, vT=VR.torso||'', vL=VR.legs||'', vF=VR.feet||'', vA=VR.armor||'', vH=VR.hands||'';
-  const TUN=vT.startsWith('tunic_')||vT==='shirt_white', SMOCK=vT==='smock', HOSE=vL==='hose_grey', BREECH=vL==='breeches'||vL==='breeches_cream', DANDY=vL==='breeches_cream'||vL==='trousers_black', TREWS=false, RIDE=vF==='riding_boots', FUR=false, PLATE=vF==='plate_boots'||/^(anvil|delver)_boots$/.test(vF), RUNE_BOOT=vF==='rune_boots', RUNE_LEG=vL==='rune_greaves'||vL==='ember_breeches', EMBER_LEGS=vL==='ember_breeches', EMBER_BOOT=vF==='ember_sabatons';
+  const TUN=vT.startsWith('tunic_')||vT==='shirt_white', SMOCK=vT==='smock', HOSE=vL==='hose_grey', BREECH=vL==='breeches'||vL==='breeches_cream', DANDY=vL==='breeches_cream'||vL==='trousers_black', TREWS=false, RIDE=vF==='riding_boots'||vF==='cv_wrapboots', WRAPB=vF==='cv_wrapboots', FUR=false, PLATE=vF==='plate_boots'||/^(anvil|delver)_boots$/.test(vF), RUNE_BOOT=vF==='rune_boots', RUNE_LEG=vL==='rune_greaves'||vL==='ember_breeches', EMBER_LEGS=vL==='ember_breeches', EMBER_BOOT=vF==='ember_sabatons';
   const TUNTRIM = vT==='shirt_white' ? '#d8d4ca' : vT==='tunic_linen' ? '#8e3a30' : vT==='tunic_red' ? '#d8b860' : vT==='tunic_blue' ? '#d8c8a0' : '#c8a850';
   let handAt=null, offHandAt=null, CHEEK=null;   // CHEEK: the round seat from behind, when bare                   // where each hand ended up
   // idle: standing with the weight on one leg (hips shift over it, the other foot eases out) and breathing
@@ -1421,7 +1421,12 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       c.restore();
       fs(tone(BC,0.08*dim)); c.beginPath(); c.ellipse(x+cx,B+bootTop,h2+(SLEEK?-0.1:1.5),SLEEK?0.9:1.4,0,0,Math.PI*2); c.fill();   // folded cuff
       c.strokeStyle=tone(BC,-0.5); c.lineWidth=0.7; c.stroke();
-      if(RIDE){                                       // tall riding boot: a folded cuff with a knee flap, strap and buckle at the ankle
+      if(WRAPB){                                      // bound to the knee in cloth strips over a heavy boot, a spur of a heel behind: whatever the leg is, it bends wrong
+        c.save(); blob(boot,1.2); c.clip(); const WR='#6a5e50';
+        for(let yy=bootTop+1; yy<-7; yy+=2.6){ c.fillStyle=tone(WR,((yy*7)%3)*0.05-0.18*depth); c.beginPath(); c.moveTo(x+cx-h2-2,B+yy+1.6); c.lineTo(x+cx+h2+2,B+yy-0.6); c.lineTo(x+cx+h2+2,B+yy+1.4); c.lineTo(x+cx-h2-2,B+yy+3.6); c.closePath(); c.fill(); c.strokeStyle=tone(WR,-0.5,0.7); c.lineWidth=0.35; c.stroke(); }
+        c.restore(); fs(tone(BC,-0.2)); c.beginPath(); c.moveTo(x+cx-h2-(front?0:0.4),B-2.4); c.lineTo(x+cx-h2-3.2+toe*-0.2,B+0.2); c.lineTo(x+cx-h2+0.6,B+0.2); c.closePath(); c.fill();   // the heel-spur
+        fs('#b08a3a'); c.fillRect(x+cx-h2+0.2,B-9.4,h2*2-0.4,0.9);
+      } else if(RIDE){                                       // tall riding boot: a folded cuff with a knee flap, strap and buckle at the ankle
         fs(tone(BC,0.18*dim)); c.beginPath(); c.moveTo(x+cx-h2-0.1,B+bootTop-0.3); c.lineTo(x+cx+h2+0.1,B+bootTop-0.3); c.lineTo(x+cx+h2-0.1,B+bootTop+1.8); c.lineTo(x+cx-h2+0.1,B+bootTop+1.8); c.closePath(); c.fill();
         c.strokeStyle=tone(BC,-0.5); c.lineWidth=0.6; c.stroke();
         fs(tone(BC,0.1*dim)); c.beginPath(); c.moveTo(x+cx-2+toe*0.4,B+bootTop-0.4); c.quadraticCurveTo(x+cx+toe*0.4,B+bootTop-4.4,x+cx+2+toe*0.4,B+bootTop-0.4); c.fill();
@@ -1551,7 +1556,8 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   // ── one arm; `depth` pushes the far arm back behind the torso ──
   const armIn=CH-(F?1.9:2.0), al=(Math.abs(Y.SHOULDER-Y.WAIST)+6.3)*(CV_LONGARM?1.34:1), aw=P.limbW;
   const LGM = !F && typeof LING_TORSO!=='undefined' && LING_TORSO.has(E.torso) ? LING_DYE[lingParts(LING_ALIAS[E.torso]||E.torso)[1]] : null;
-  const SLV = LGM ? {col:/^(lace_underbust|open_bralette)/.test(E.torso)?LGM.LB:tone(LGM.SHIRT,-0.1), len:0.92, cuff:true, trim:LGM.SV} : E.torso==='shirt' ? (TUN ? {col:C.shirt,len:0.88,cuff:true,trim:TUNTRIM} : SMOCK ? {col:C.shirt,len:0.62,cuff:true,roll:true} : {col:C.shirt,len:F?0.28:0.46}) : ROBE ? {col:ELFC.robe,len:0.97,bell:true} : ETUN ? {col:ELFC.tunic,len:0.9,cuff:true} : null;     // women's cut: cap sleeves
+  const CVC = ['cv_duster','cv_duster_rust','cv_duster_red','cv_duster_elder','cv_wrap'].includes((opts.vari||{}).armor||'') ? ITEMS[(opts.vari||{}).armor].col : null;
+  const SLV = CVC ? {col:CVC, len:0.95, cuff:true, trim:(opts.vari||{}).armor==='cv_duster_elder'?'#b08a3a':tone(CVC,-0.35)} : LGM ? {col:/^(lace_underbust|open_bralette)/.test(E.torso)?LGM.LB:tone(LGM.SHIRT,-0.1), len:0.92, cuff:true, trim:LGM.SV} : E.torso==='shirt' ? (TUN ? {col:C.shirt,len:0.88,cuff:true,trim:TUNTRIM} : SMOCK ? {col:C.shirt,len:0.62,cuff:true,roll:true} : {col:C.shirt,len:F?0.28:0.46}) : ROBE ? {col:ELFC.robe,len:0.97,bell:true} : ETUN ? {col:ELFC.tunic,len:0.9,cuff:true} : null;     // women's cut: cap sleeves
   const sleeveLen = SLV ? al*SLV.len : 0;
   const SH = SLV ? SLV.col : skin;
   const drawArm=(s,depth)=>{
@@ -1772,6 +1778,11 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       c.fillStyle=tone(S,0.08-0.2*depth); [0,1].forEach(k=>{ c.fillRect(x+x0-0.4,B+hy+1.2+k*1.8,hw+0.8,1.5); c.strokeStyle='#121316'; c.lineWidth=0.4; c.strokeRect(x+x0-0.4,B+hy+1.2+k*1.8,hw+0.8,1.5); });
       fs(tone(S,0.4)); for(let k=0;k<3;k++){ c.beginPath(); c.arc(x+x0+hw*(0.2+k*0.3),B+hy+1.3,0.5,0,Math.PI*2); c.fill(); }
       if(EMG){ emberEdge(cuff,0.5,depth?0.45:0.9); emberEdge(()=>{ c.beginPath(); c.moveTo(x+x0-0.4,B+hy+4.6); c.lineTo(x+x0+hw+0.4,B+hy+4.6); },0.45,depth?0.4:0.8); }   // the ember gauntlet's edges glow like coals
+    } else if(E.hands==='gloves' && vH==='cv_gauntlets'){     // the Cinderveil's gauntlets: stiff leather to the elbow, three thick fingers and a thumb, brass-capped
+      const G2=GEAR.glove; c.beginPath(); c.moveTo(x+x0-2.4,B+hy-15); c.lineTo(x+x0+hw+2.4,B+hy-15); c.lineTo(x+x0+hw+0.6,B+hy+0.6); c.lineTo(x+x0-0.6,B+hy+0.6); c.closePath();
+      const gg=c.createLinearGradient(x+x0-2,0,x+x0+hw+2,0); gg.addColorStop(0,tone(G2,0.22-0.2*depth)); gg.addColorStop(0.5,tone(G2,-0.05-0.2*depth)); gg.addColorStop(1,tone(G2,-0.4-0.1*depth)); c.fillStyle=gg; c.fill(); c.strokeStyle=tone(G2,-0.65); c.lineWidth=0.6; c.stroke();
+      c.fillStyle='#b08a3a'; c.fillRect(x+x0-2.2,B+hy-15,hw+4.4,0.9); c.fillStyle=tone(G2,-0.5); [-10,-5].forEach(d=>c.fillRect(x+x0-1.4,B+hy+d,hw+2.8,0.6));
+      [0.18,0.5,0.82].forEach((t,i)=>{ const fx2=x+x0+hw*t, fy=B+hy+5.6+(i===1?1:0); c.fillStyle=tone(G2,-0.1-0.2*depth); c.beginPath(); c.ellipse(fx2,fy,hw*0.2,2.6,0,0,Math.PI*2); c.fill(); c.strokeStyle=tone(G2,-0.6); c.lineWidth=0.5; c.stroke(); c.fillStyle='#b08a3a'; c.beginPath(); c.ellipse(fx2,fy+2,hw*0.15,0.9,0,0,Math.PI*2); c.fill(); });
     } else if(E.hands==='gloves' && vH==='gauntlets'){        // steel gauntlet: a flared plate cuff, knuckle plate and rivets
       const G2=GEAR.glove; c.beginPath(); c.moveTo(x+x0-2.2,B+hy-6); c.lineTo(x+x0+hw+2.2,B+hy-6); c.lineTo(x+x0+hw+0.8,B+hy+0.4); c.lineTo(x+x0-0.8,B+hy+0.4); c.closePath();
       const gg=c.createLinearGradient(x+x0-2,0,x+x0+hw+2,0); gg.addColorStop(0,tone(G2,0.35-0.2*depth)); gg.addColorStop(0.5,tone(G2,0.05-0.2*depth)); gg.addColorStop(1,tone(G2,-0.35-0.1*depth));
@@ -2284,6 +2295,47 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   }
 
   // ── armour ──
+  // ── the Cinderveil's coats: long to below the knee (hiding the tail), high collar, deep pockets, patched, the hem ragged; the elder's trimmed in brass and hung with trophies; the thief's short and dark
+  function drawCVCoat(){ const K=vA, J=ITEMS[K].col, sd=Y.SHOULDER, W0=Y.WAIST, SHORT=K==='cv_wrap', ELD=K==='cv_duster_elder', hem=SHORT?Y.KNEE-8:Y.KNEE+9, side=pr>0.75, cx=LN+po*0.9, HW2=(HI+3.6)*(1-pr*0.2);
+    const rag=(x0,x1,y)=>{ const pts=[], n=Math.max(3,Math.round(Math.abs(x1-x0)/1.6)); for(let i=0;i<=n;i++){ const t=i/n; pts.push([x0+(x1-x0)*t, y+(i%2?1.2:0)+((i*7)%3)*0.4]); } return pts; };
+    const panel=(pts)=>{ path(pts,1.2); const g2=c.createLinearGradient(x+LN-CH-4,0,x+LN+CH+4,0); g2.addColorStop(0,tone(J,0.18)); g2.addColorStop(0.5,J); g2.addColorStop(1,tone(J,-0.38)); c.fillStyle=g2; c.fill(); c.strokeStyle=tone(J,-0.6); c.lineWidth=0.9; c.stroke(); };
+    const patch=(px,py,w,h,col)=>{ c.fillStyle=col; c.fillRect(x+px,B+py,w,h); c.strokeStyle='rgba(0,0,0,0.4)'; c.lineWidth=0.35; c.setLineDash([0.6,0.5]); c.strokeRect(x+px+0.3,B+py+0.3,w-0.6,h-0.6); c.setLineDash([]); };
+    const trophies=(xs,y0)=>xs.forEach((tx,i)=>{ c.strokeStyle='#6a5a3a'; c.lineWidth=0.3; c.beginPath(); c.moveTo(x+tx,B+y0); c.lineTo(x+tx,B+y0+2+i%2); c.stroke(); c.fillStyle=['#b08a3a','#e8e0c8','#a8a8a4','#b08a3a'][i%4]; c.beginPath(); if(i%3===0){ c.arc(x+tx,B+y0+3+i%2,1,0,Math.PI*2); } else { c.rect(x+tx-0.6,B+y0+2+i%2,1.2,2.2); } c.fill(); });
+    if(!front){ const L=LN-CH-0.8, R=LN+CH+0.8; panel([[L,sd+0.4],[LN-3,sd-1.6],[LN+3,sd-1.6],[R,sd+0.4],[LN+WA+2,W0],...rag(LN+HW2,LN-HW2,hem).map(([a,b2])=>[a,b2]),[LN-WA-2,W0]]);
+      c.strokeStyle=tone(J,-0.55); c.lineWidth=0.6; c.beginPath(); c.moveTo(x+LN,B+W0+2); c.lineTo(x+LN,B+hem); c.stroke(); c.beginPath(); c.moveTo(x+LN-CH+1,B+sd+6); c.quadraticCurveTo(x+LN,B+sd+8,x+LN+CH-1,B+sd+6); c.stroke();   // the vent and the yoke seam
+      c.fillStyle=tone(J,-0.3); c.beginPath(); c.ellipse(x+LN,B+W0+8,WA*0.8,4,0,0,Math.PI*2); c.fill();   // something under the coat behind, where no man has anything
+      patch(LN+CH*0.3,sd+12,4,3.4,tone(J,0.12)); if(ELD){ c.strokeStyle='#b08a3a'; c.lineWidth=0.9; c.beginPath(); rag(LN+HW2,LN-HW2,hem-1.2).forEach(([a,b2],k)=>k?c.lineTo(x+a,B+b2):c.moveTo(x+a,B+b2)); c.stroke(); }
+      c.fillStyle=tone(J,0.08); path([[LN-4.6,sd-0.6],[LN+4.6,sd-0.6],[LN+4.2,sd-4.6],[LN-4.2,sd-4.6]],1); c.fill(); c.strokeStyle=tone(J,-0.6); c.lineWidth=0.7; c.stroke(); return; }   // the high collar, behind
+    if(side){ const fwd=LN+WA+1.6, bk=LN-WA-1.4;
+      panel([[LN-CH*0.55,sd+0.2],[LN+CH*0.5,sd],[fwd,W0],[fwd+1.2,hem-1],...rag(fwd+1.2,bk-5,hem),[bk-5,hem],[bk-1.6,W0+4],[bk,W0-2]]);
+      c.strokeStyle=tone(J,-0.55); c.lineWidth=0.6; c.beginPath(); c.moveTo(x+fwd-1,B+W0+2); c.lineTo(x+fwd,B+hem-1); c.stroke();
+      patch(LN-1,W0+4,4.2,3.6,tone(J,-0.15)); c.fillStyle=tone(J,0.1); c.fillRect(x+LN-1.2,B+W0+3.2,4.6,1.2);
+      c.fillStyle=tone(J,0.08); path([[LN+2.2,sd-0.6],[LN+5.4,sd-0.2],[LN+5,sd-4.6],[LN+2,sd-4.8]],1); c.fill(); c.strokeStyle=tone(J,-0.6); c.lineWidth=0.7; c.stroke();
+      if(ELD) trophies([LN+0.4,LN+2.4],sd+8); return; }
+    [-1,1].forEach(k=>{ const sh2=LN+k*(CH+0.8), col=[LN+k*3+po,sd-1.6], inner=(t)=>cx+k*(1.8+t*(SHORT?2.6:4.2));   // two front panels, hanging open
+      const pts=[[sh2,sd+0.4],col,[inner(0)+k*0.4,sd+5],[inner(0.35),W0],[inner(1),hem],...rag(inner(1),LN+k*HW2,hem).slice(1),[LN+k*(WA+2.2),W0]];
+      if(k>0) pts.reverse(); panel(pts);
+      c.fillStyle=tone(J,-0.2); const px=LN+k*(WA*0.55+1.6)-2.4; c.fillRect(x+px,B+W0+3,4.8,4.4); c.fillStyle=tone(J,0.12); c.fillRect(x+px-0.2,B+W0+2.6,5.2,1.4); c.strokeStyle=tone(J,-0.55); c.lineWidth=0.4; c.strokeRect(x+px,B+W0+3,4.8,4.4);   // a deep pocket with its flap
+      if(k<0) patch(LN-CH+1,sd+9,3.6,3.2,tone(J,0.14)); else patch(LN+WA*0.4,hem-6,4,3,tone(J,-0.18));
+      if(ELD){ c.strokeStyle='#b08a3a'; c.lineWidth=0.9; c.beginPath(); c.moveTo(x+col[0],B+col[1]); c.lineTo(x+inner(0)+k*0.4,B+sd+5); c.lineTo(x+inner(0.35),B+W0); c.lineTo(x+inner(1),B+hem); c.stroke(); for(let yy=sd+7; yy<W0+2; yy+=3.2){ c.fillStyle='#d8b860'; c.beginPath(); c.arc(x+inner((yy-sd)/(hem-sd))+k*0.9,B+yy,0.6,0,Math.PI*2); c.fill(); } }
+      c.fillStyle=tone(J,0.08); path([[LN+k*2.6+po,sd-0.8],[LN+k*5.6+po*0.6,sd-0.2],[LN+k*5.2+po*0.6,sd-5],[LN+k*2.4+po,sd-4.8]],1); c.fill(); c.strokeStyle=tone(J,-0.6); c.lineWidth=0.7; c.stroke(); });   // the high collar, turned up
+    if(ELD) trophies([LN-CH+2,LN-CH+3.8,LN-CH+5.6,LN+CH-4,LN+CH-2.2],sd+8);
+    if(SHORT){ c.fillStyle='#1a181c'; c.fillRect(x+LN-WA-2,B+W0-1.2,WA*2+4,2.6); [[-0.6],[-0.2],[0.25],[0.6]].forEach(([t])=>{ c.fillStyle='#2e2a30'; c.fillRect(x+LN+t*WA*2-1.4,B+W0-0.6,2.8,3.2); }); }   // a belt of pockets
+  }
+  // ── the tinker's harness: two straps crossed over the chest through a brass gauge, a belt of pouches, a wrench and an oil can
+  function drawCVHarness(){ const sd=Y.SHOULDER, W0=Y.WAIST, LE='#2a1e14', LB='#5a3e26', BRS='#b08a3a', cx=LN+po*0.9, side=pr>0.75;
+    const strap=(pts,w)=>{ c.lineCap='round'; c.strokeStyle=LE; c.lineWidth=w+0.7; c.beginPath(); pts.forEach(([a,b2],k)=>k?c.lineTo(x+a,B+b2):c.moveTo(x+a,B+b2)); c.stroke(); c.strokeStyle=LB; c.lineWidth=w; c.stroke(); };
+    const pouch=(px,py,w,h)=>{ c.fillStyle=LE; c.fillRect(x+px-0.4,B+py-0.4,w+0.8,h+0.8); c.fillStyle=LB; c.fillRect(x+px,B+py,w,h); c.fillStyle=tone(LB,0.15); c.fillRect(x+px,B+py,w,h*0.35); c.fillStyle=BRS; c.fillRect(x+px+w/2-0.4,B+py+h*0.3,0.8,0.8); };
+    if(side){ strap([[LN+CH*0.3,sd],[LN-WA*0.2,W0-1]],1.6); strap([[LN-WA-1,W0+1],[LN+WA+1,W0+1]],2); pouch(LN-1.8,W0+2,3.6,3.4);
+      c.strokeStyle='#8a8e94'; c.lineWidth=1.1; c.beginPath(); c.moveTo(x+LN+WA*0.6,B+W0+2); c.lineTo(x+LN+WA*0.7,B+W0+10); c.stroke(); return; }
+    if(!front){ strap([[LN-CH*0.6,sd],[LN+WA*0.7,W0-1]],1.6); strap([[LN+CH*0.6,sd],[LN-WA*0.7,W0-1]],1.6); strap([[LN-WA-1,W0+1],[LN+WA+1,W0+1]],2); pouch(LN-2.4,W0+2,4.8,4); return; }
+    strap([[LN-CH*0.66+po,sd],[cx,sd+9],[LN+WA*0.8,W0]],1.6); strap([[LN+CH*0.66+po,sd],[cx,sd+9],[LN-WA*0.8,W0]],1.6);
+    c.fillStyle=LE; c.beginPath(); c.arc(x+cx,B+sd+9,2.6,0,Math.PI*2); c.fill(); c.fillStyle=BRS; c.beginPath(); c.arc(x+cx,B+sd+9,2.1,0,Math.PI*2); c.fill(); c.fillStyle='#f0ead8'; c.beginPath(); c.arc(x+cx,B+sd+9,1.5,0,Math.PI*2); c.fill();
+    c.strokeStyle='#b02a22'; c.lineWidth=0.4; c.beginPath(); c.moveTo(x+cx,B+sd+9); c.lineTo(x+cx+1,B+sd+8.2); c.stroke();   // a gauge, needle in the red
+    strap([[LN-WA-1.2,W0+1],[LN+WA+1.2,W0+1]],2.2); [-0.7,-0.25,0.3].forEach(t=>pouch(LN+t*WA*1.6-1.8,W0+2.2,3.6,3.6));
+    c.strokeStyle='#8a8e94'; c.lineWidth=1.2; c.beginPath(); c.moveTo(x+LN+WA*0.82,B+W0+2); c.lineTo(x+LN+WA*0.9,B+W0+10); c.stroke(); c.lineWidth=0.9; c.beginPath(); c.arc(x+LN+WA*0.9,B+W0+11,1.4,-0.3,Math.PI+0.3); c.stroke();   // a wrench
+    c.fillStyle='#6e5420'; c.fillRect(x+LN-WA*0.95-1.2,B+W0+2.4,2.4,3.4); c.fillStyle='#b08a3a'; c.fillRect(x+LN-WA*0.95-0.4,B+W0+1.2,0.8,1.4);   // an oil can
+  }
   function drawApron(){                                  // a smith's apron: a heavy leather bib on a neck strap, tied at the waist, falling to the knee
     const J=GEAR.jerkin, top=Y.SHOULDER+(F?7:4), knee=Y.KNEE+1.5;
     if(!front){ c.strokeStyle=tone(J,-0.3); c.lineWidth=1.6; c.lineCap='round';                       // from behind: the waist strap and its knot, and the neck strap
@@ -3860,7 +3912,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   else if(BUST) drawElfBustier();
   else if(typeof LING_TORSO!=='undefined' && LING_TORSO.has(E.torso)) drawLingerie(E.torso);
   if(vA==='gambeson'||vA==='cv_suit'||vA==='cv_suit_iron') drawGambeson();
-  else if(E.armor==='jerkin'){ if(vA==='smith_apron'||vA==='cv_apron'||vA==='cv_apron_rust') drawApron(); else { drawJerkin(); if(vA==='studded'||vA==='dwarf_harness') drawStuds(); if(vA==='dwarf_harness') drawBelt(Y.WAIST-3.6,Math.max(WA,HI)+1.4,{col:'#3a2414',h:4.4,metal:'#a4a8ae',studs:true}); } }
+  else if(E.armor==='jerkin'){ if(['cv_duster','cv_duster_rust','cv_duster_red','cv_duster_elder','cv_wrap'].includes(vA)) drawCVCoat(); else if(vA==='smith_apron'||vA==='cv_apron'||vA==='cv_apron_rust') drawApron(); else { drawJerkin(); if(vA==='studded'||vA==='dwarf_harness') drawStuds(); if(vA==='dwarf_harness') drawBelt(Y.WAIST-3.6,Math.max(WA,HI)+1.4,{col:'#3a2414',h:4.4,metal:'#a4a8ae',studs:true}); } }
   else if(E.armor==='mail'){ const HV=vA==='anvil_plate'?'anvil':vA==='delver_lamellar'?'delver':vA==='rune_plate'?'rune':null;
     drawMail(vA==='brightmail' ? (F?-29:-27) : HV==='delver' ? Y.KNEE+1.5 : 0); if(vA==='blackmail') drawBrigandine(); if(vA==='brightmail') drawSurcoat(); if(HV) drawHeavyDwarf(HV); }
   else if(E.armor==='elf_scale') drawElfScale();
@@ -3883,6 +3935,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   if(!posed) drawArm(nearS,0);            // a posed weapon arm is drawn after the head, in front
   if(E.armor==='robe' && vA==='necro_robe') drawNecroShawl();
   { const HVp=E.armor==='mail' ? ({anvil_plate:'anvil',delver_lamellar:'delver',rune_plate:'rune'})[vA] : null; if(HVp) drawPauldrons(HVp, pr>0.3 && pr<=0.8 ? 'near' : 'both'); }
+  if(unWoven(E.shoulders||'')==='cv_harness') drawCVHarness();
   { const SLk=E.shoulders && typeof SHOULDER_LOOK!=='undefined' && SHOULDER_LOOK[unWoven(E.shoulders)]; if(SLk) drawShoulders(SLk); }
   if(CLOAK){
     if(!front){ heldOff(); cloakBack(true); }   // from behind the off hand hangs under the cloak: draw what it holds first, so the cloak covers it
@@ -4915,6 +4968,31 @@ function cvFittings(c,x,B,fx,ey,sx,side,bits){
     else if(k===7) [-1.6,0,1.6].forEach((dx,i)=>{ const a=fx+dx*sx; line([[a,ey+6],[a,ey+7.6+i*0.6]],'#6a5a3a',0.25); c.fillStyle=i===1?CU:'#8a8a86'; c.fillRect(x+a-0.7,B+ey+7.6+i*0.6,1.4,1.8); });   // stamped tags
     else if(k===8){ c.fillStyle=IRD; c.fillRect(x+fx-1.6*sx-0.8,B+ey-10,1.6,4.4); c.fillStyle=BRD; c.fillRect(x+fx-1.6*sx-1.1,B+ey-10.4,2.2,0.8); [0,1,2].forEach(i=>{ c.fillStyle=`rgba(200,196,190,${0.45-i*0.12})`; c.beginPath(); c.arc(x+fx-1.6*sx+i*0.8,B+ey-11.6-i*1.8,0.9+i*0.6,0,Math.PI*2); c.fill(); }); }   // a little chimney
   }); }
+// the boiler pack: a riveted boiler on the back, a gauge and a valve, a pipe over the shoulder to the mask, and a little smoke
+function cvPack(c,x,B,dir,opts){ const flip=dirMirrored(dir), v=dirView(dir), s=flip?-1:1, V=VIEW[v], Y=BODY, L=V.lean, sd=Y.SHOULDER;
+  const bx= v===0 ? 0 : v===1 ? -4 : v===2 ? -9 : v===3 ? -3 : 0, front=v<=2, W=v===2?5:8, top=sd-6, bot=Y.WAIST-2;
+  const X=x+s*(L+bx);
+  c.save();
+  const g=c.createLinearGradient(X-W,0,X+W,0); g.addColorStop(0,'#d89a6a'); g.addColorStop(0.45,'#a8603a'); g.addColorStop(1,'#4a2410'); c.fillStyle=g;
+  c.beginPath(); c.ellipse(X,B+bot,W,W*0.4,0,0,Math.PI); c.lineTo(X-W,B+top); c.ellipse(X,B+top,W,W*0.4,0,Math.PI,0,true); c.closePath(); c.fill(); c.strokeStyle='#1a1816'; c.lineWidth=0.9; c.stroke();
+  c.fillStyle='#c88a5a'; c.beginPath(); c.ellipse(X,B+top,W,W*0.4,0,0,Math.PI*2); c.fill(); c.stroke();
+  c.fillStyle='#b08a3a'; [top+4,bot-3].forEach(yy=>c.fillRect(X-W,B+yy,W*2,1.2));
+  c.fillStyle='#1e1c1a'; c.fillRect(X+s*(W*0.3)-1.2,B+top-6,2.4,6); c.fillStyle='#6e5420'; c.fillRect(X+s*(W*0.3)-1.6,B+top-6.6,3.2,1);   // its little chimney
+  [0,1,2].forEach(i=>{ c.fillStyle=`rgba(190,186,180,${0.45-i*0.12})`; c.beginPath(); c.arc(X+s*(W*0.3)+i*1.2,B+top-8.6-i*2.8,1.4+i*0.9,0,Math.PI*2); c.fill(); });
+  if(!front){ c.fillStyle='#1e1c1a'; c.beginPath(); c.arc(X,B+(top+bot)/2,2.6,0,Math.PI*2); c.fill(); c.fillStyle='#f0ead8'; c.beginPath(); c.arc(X,B+(top+bot)/2,2,0,Math.PI*2); c.fill(); c.strokeStyle='#b02a22'; c.lineWidth=0.4; c.beginPath(); c.moveTo(X,B+(top+bot)/2); c.lineTo(X+1.2,B+(top+bot)/2-1); c.stroke();
+    c.strokeStyle='#2a1e14'; c.lineWidth=1.4; [-1,1].forEach(k=>{ c.beginPath(); c.moveTo(X+k*W*0.7,B+top+1); c.lineTo(X+k*(W+2.6),B+sd-1); c.stroke(); c.beginPath(); c.moveTo(X+k*W*0.7,B+bot-1); c.lineTo(X+k*(W+2),B+bot+2); c.stroke(); }); }   // a gauge and the straps
+  if(v<=2){ c.strokeStyle='#1e1c1a'; c.lineWidth=2.2; c.beginPath(); c.moveTo(X+s*(W*0.5),B+top+2); c.quadraticCurveTo(x+s*(L+(v===2?2:9)),B+sd-9,x+s*(L+(v===2?6:4)),B+sd-3); c.stroke(); c.strokeStyle='#5a5048'; c.lineWidth=1.3; c.stroke(); }   // the pipe over the shoulder
+  c.restore(); }
+// scarves, wound high round the hood's neck and over the shoulders, one end hanging
+function cvScarves(c,x,B,dir,col){ const flip=dirMirrored(dir), v=dirView(dir), s=flip?-1:1, V=VIEW[v], Y=BODY, L=V.lean, sd=Y.SHOULDER, front=v<=2, side=v===2;
+  const X=x+s*L, w=side?7:11;
+  c.save(); c.lineCap='round';
+  for(let k=0;k<3;k++){ const yy=sd-1.2+k*1.8, ww=w+1.2-k*0.8; c.fillStyle=tone(col,k===1?0.08:-0.1); c.beginPath(); c.ellipse(X,B+yy,ww,2.6,0,0,Math.PI*2); c.fill(); c.strokeStyle=tone(col,-0.5); c.lineWidth=0.6; c.stroke(); c.strokeStyle=tone(col,0.2,0.6); c.lineWidth=0.4; c.beginPath(); c.ellipse(X,B+yy-0.8,ww*0.7,1.2,0,Math.PI*1.1,Math.PI*1.9); c.stroke(); }
+  const end=front ? [[X+s*(side?3:4),B+sd+2],[X+s*(side?5:6),B+sd+10],[X+s*(side?4:5.4),B+sd+17]] : [[X-s*2,B+sd+2],[X-s*3,B+sd+11],[X-s*1,B+sd+19]];   // one end hangs: over the chest in front, down the back behind
+  c.strokeStyle=tone(col,-0.5); c.lineWidth=5.6; c.beginPath(); c.moveTo(end[0][0],end[0][1]); c.quadraticCurveTo(end[1][0],end[1][1],end[2][0],end[2][1]); c.stroke(); c.strokeStyle=col; c.lineWidth=4.4; c.stroke();
+  c.strokeStyle=tone(col,0.25,0.6); c.lineWidth=0.5; [ -1,1].forEach(o=>{ c.beginPath(); c.moveTo(end[0][0]+o,end[0][1]); c.quadraticCurveTo(end[1][0]+o,end[1][1],end[2][0]+o,end[2][1]); c.stroke(); });
+  c.strokeStyle=tone(col,-0.2); c.lineWidth=0.5; for(let i=-2;i<=2;i++){ c.beginPath(); c.moveTo(end[2][0]+i*0.8,end[2][1]); c.lineTo(end[2][0]+i*0.9,end[2][1]+2.6); c.stroke(); }   // the fringe
+  c.restore(); }
 // the tail they keep wrapped and hidden under the coat: bound in cloth strips, capped in brass
 function cvTail(c,x,B,dir,swing,opts){ const flip=dirMirrored(dir), v=dirView(dir), s=flip?-1:1, sw=Math.sin((swing||0)*1.3)*1.5;
   const P0= v===0 ? [[3,-14],[7,-7],[10,-2],[13,-3]] : v===1 ? [[-4,-16],[-9,-8],[-12,-2],[-15,-3]] : v===2 ? [[-6,-24],[-12,-14],[-15,-5],[-18,-6]] : v===3 ? [[-3,-30],[-7,-16],[-10,-5],[-14,-6]] : [[0,-32],[2,-18],[5,-6],[9,-6]];   // only the end of it ever shows
@@ -4927,6 +5005,10 @@ function cvTail(c,x,B,dir,swing,opts){ const flip=dirMirrored(dir), v=dirView(di
 Object.assign(ITEMS,{ cv_mask_weld:{ name:'Cinderveil Welding Mask', slot:'head', base:'kettle', col:'#3e3a36' }, cv_mask_resp:{ name:'Cinderveil Salvage Rig', slot:'head', base:'kettle', col:'#4a3a2c' },
   cv_mask_elder:{ name:"Cinderveil Elder's Mask", slot:'head', base:'kettle', col:'#b08a3a' }, cv_mask_plain:{ name:'Blank Iron Mask', slot:'head', base:'kettle', col:'#2c2a2e' }, cv_helm_suit:{ name:'Cinderveil Beaked Helm', slot:'head', base:'kettle', col:'#4a4642' },
   cv_suit:{ name:'Cinderveil Pressure Suit', slot:'armor', base:'gambeson', col:'#5e3e24' }, cv_suit_iron:{ name:'Cinderveil Iron Suit', slot:'armor', base:'gambeson', col:'#3a3632' }, cv_suit_legs:{ name:'Suit Leggings', slot:'legs', base:'trousers', col:'#4a3220' }, cv_suit_legs_iron:{ name:'Iron Suit Leggings', slot:'legs', base:'trousers', col:'#2e2c2a' },
+  cv_duster:{ name:'Ash Duster', slot:'armor', base:'jerkin', col:'#3a3632' }, cv_duster_rust:{ name:'Rust Duster', slot:'armor', base:'jerkin', col:'#6a3e26' }, cv_duster_red:{ name:'Faded Red Duster', slot:'armor', base:'jerkin', col:'#6a2a24' },
+  cv_duster_elder:{ name:"Elder's Long Coat", slot:'armor', base:'jerkin', col:'#4a2a22' }, cv_wrap:{ name:'Thief\'s Wrap-Coat', slot:'armor', base:'jerkin', col:'#26242a' },
+  cv_harness:{ name:'Tinker\'s Harness', slot:'shoulders' }, cv_gauntlets:{ name:'Cinderveil Gauntlets', slot:'hands', base:'gloves', col:'#3a2a1e' }, cv_wrapboots:{ name:'Bound Boots', slot:'feet', base:'boots', col:'#2e2620' },
+  cv_scarf:{ name:'Cinderveil Scarves', slot:'neck' }, cv_scarf_grey:{ name:'Grey Cinderveil Scarves', slot:'neck' },
   cv_apron:{ name:'Oilcloth Apron', slot:'armor', base:'jerkin', col:'#2e2a26' }, cv_apron_rust:{ name:'Rust-Leather Apron', slot:'armor', base:'jerkin', col:'#6a3e26' } });
 
 function drawHeadgear(c,x,B,kind,P,view,LN){

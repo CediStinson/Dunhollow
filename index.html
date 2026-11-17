@@ -1639,7 +1639,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
     } else {
       // bare shoulder: the arm's own rounded top is the shoulder cap (no separate patch)
     }
-    if(vA==='gambeson'){                     // quilted padded sleeve, most of the arm
+    if(vA==='gambeson'||vA==='cv_suit'||vA==='cv_suit_iron'){                     // quilted padded sleeve, most of the arm
       const gl=al*0.86, J=GEAR.jerkin; c.save(); c.beginPath(); c.roundRect(x+x0-1.5,B+top-1,aw+3,gl,2.2);
       const gq=c.createLinearGradient(x+x0-1.5,0,x+x0+aw+1.5,0); gq.addColorStop(0,tone(J,0.12-0.18*depth)); gq.addColorStop(1,tone(J,-0.3-0.15*depth));
       c.fillStyle=gq; c.fill(); c.strokeStyle=tone(J,-0.5); c.lineWidth=0.7; c.stroke(); c.clip();
@@ -3853,8 +3853,8 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   else if(ROBE) sheerLayer(0.58,drawElfRobe);
   else if(BUST) drawElfBustier();
   else if(typeof LING_TORSO!=='undefined' && LING_TORSO.has(E.torso)) drawLingerie(E.torso);
-  if(vA==='gambeson') drawGambeson();
-  else if(E.armor==='jerkin'){ if(vA==='smith_apron') drawApron(); else { drawJerkin(); if(vA==='studded'||vA==='dwarf_harness') drawStuds(); if(vA==='dwarf_harness') drawBelt(Y.WAIST-3.6,Math.max(WA,HI)+1.4,{col:'#3a2414',h:4.4,metal:'#a4a8ae',studs:true}); } }
+  if(vA==='gambeson'||vA==='cv_suit'||vA==='cv_suit_iron') drawGambeson();
+  else if(E.armor==='jerkin'){ if(vA==='smith_apron'||vA==='cv_apron'||vA==='cv_apron_rust') drawApron(); else { drawJerkin(); if(vA==='studded'||vA==='dwarf_harness') drawStuds(); if(vA==='dwarf_harness') drawBelt(Y.WAIST-3.6,Math.max(WA,HI)+1.4,{col:'#3a2414',h:4.4,metal:'#a4a8ae',studs:true}); } }
   else if(E.armor==='mail'){ const HV=vA==='anvil_plate'?'anvil':vA==='delver_lamellar'?'delver':vA==='rune_plate'?'rune':null;
     drawMail(vA==='brightmail' ? (F?-29:-27) : HV==='delver' ? Y.KNEE+1.5 : 0); if(vA==='blackmail') drawBrigandine(); if(vA==='brightmail') drawSurcoat(); if(HV) drawHeavyDwarf(HV); }
   else if(E.armor==='elf_scale') drawElfScale();
@@ -4479,7 +4479,7 @@ function drawHead(c, x, B, opts, view=0){
     c.fillStyle=tone(GEAR.hood,-0.55);                                         // the shadowed inside of the hood
     c.beginPath(); c.ellipse(x+hcx,B+hcy,hrx,hry,0,0,Math.PI*2); c.fill();
   }
-  const kettled=EQ.head==='kettle', HKIND=opts.vari&&opts.vari.head, closed=kettled&&(HKIND==='coif'||HKIND==='helm_full'), underHat=fn=>{ if(closed) return; if(!kettled || HKIND==='scarab_circlet' || HKIND==='sun_crown' || HKIND==='magister_circlet' || HKIND==='starfall_diadem' || HKIND==='ember_crown' || HKIND==='ember_hood'){ fn(); return; }
+  const kettled=EQ.head==='kettle', HKIND=opts.vari&&opts.vari.head, closed=kettled&&(HKIND==='coif'||HKIND==='helm_full'||CV_MASKS.has(HKIND)), underHat=fn=>{ if(closed) return; if(!kettled || HKIND==='scarab_circlet' || HKIND==='sun_crown' || HKIND==='magister_circlet' || HKIND==='starfall_diadem' || HKIND==='ember_crown' || HKIND==='ember_hood'){ fn(); return; }
     c.save(); c.beginPath(); c.rect(x-200,B+(closed?Y.SHOULDER+2:Y.HAIRLINE+1.2),400,300); c.clip(); fn(); c.restore(); };
   if(!hooded && !opts.shell) underHat(()=>drawHair(c,x,B,opts.hair,hair,hairDark,F,P,view,LN,'back'));   // anything hanging behind the skull
   if((EQ.head==='bog_crown'||EQ.head==='king_crown') && typeof drawBogCrown==='function') drawBogCrown(c,x,B,LN,HW,Y,showFace,pr,V,'far',EQ.head);   // the far side of a crown sits behind the head
@@ -4821,7 +4821,77 @@ function drawHead(c, x, B, opts, view=0){
 
 // Headgear is drawn in head space (same LN lean as the face).
 var HG_F=false;   // whether the head being dressed is a woman's (set by the caller)
+// ════════ CINDERVEIL masks: every one hand-built from scrap; the face beneath is never shown ════════
+const CV_MASKS=new Set(['cv_mask_weld','cv_mask_resp','cv_mask_elder','cv_mask_plain','cv_helm_suit']);
+function drawCVMask(c,x,B,kind,P,view,LN){
+  const Y=BODY, V=VIEW[view], HW=P.headHW, pr=V.prof, front=V.turn>-0.25, side=pr>0.8, TOP=Y.SKULL_TOP;
+  const sx=side?0.5:(1-pr*0.4), fx=LN+(side?HW*0.62:faceOff(pr)), ey=Y.EYE_TOP+1.4;
+  const IRON='#3e3a36', IRD='#1e1c1a', BR='#b08a3a', BRD='#6e5420', CU='#a8603a';
+  const P2=(pts)=>{ c.beginPath(); pts.forEach(([a,b2],k)=>k?c.lineTo(x+a,B+b2):c.moveTo(x+a,B+b2)); c.closePath(); };
+  const dot=(a,b2,r,col)=>{ c.fillStyle=col; c.beginPath(); c.arc(x+a,B+b2,r,0,Math.PI*2); c.fill(); };
+  const lens=(a,b2,r,glass,rim)=>{ dot(a,b2,r+0.75,IRD); dot(a,b2,r+0.45,rim||BR); dot(a,b2,r,IRD); const g2=c.createRadialGradient(x+a-r*0.3,B+b2-r*0.3,0.2,x+a,B+b2,r); g2.addColorStop(0,'#fff6d8'); g2.addColorStop(0.35,glass); g2.addColorStop(1,tone(glass,-0.55)); c.fillStyle=g2; c.beginPath(); c.arc(x+a,B+b2,r*0.82,0,Math.PI*2); c.fill(); };
+  const rivets=(pts,col)=>pts.forEach(([a,b2])=>{ dot(a,b2,0.42,IRD); dot(a-0.1,b2-0.1,0.28,col||'#c8b080'); });
+  // the hood-wrap behind every mask but the suit's dome
+  if(kind!=='cv_helm_suit'){ const W=HW+1.0, nk=Y.CHIN+1.2, CHc=P.chestHW*V.sw*0.55, hem=Y.SHOULDER+0.6, WR=kind==='cv_mask_elder'?'#5a3a2a':kind==='cv_mask_plain'?'#26242a':'#4a4038';
+    c.beginPath(); c.moveTo(x+LN-W+1,B+nk); c.lineTo(x+LN-W-0.3,B+Y.CHIN-6); c.bezierCurveTo(x+LN-W-0.4,B+TOP,x+LN-W*0.62,B+TOP-2.4,x+LN,B+TOP-2.4); c.bezierCurveTo(x+LN+W*0.62,B+TOP-2.4,x+LN+W+0.4,B+TOP,x+LN+W+0.3,B+Y.CHIN-6);
+    c.lineTo(x+LN+W-1,B+nk); c.quadraticCurveTo(x+LN+CHc-1,B+nk+1.4,x+LN+CHc,B+hem); c.quadraticCurveTo(x+LN,B+hem+2,x+LN-CHc,B+hem); c.quadraticCurveTo(x+LN-CHc+1,B+nk+1.4,x+LN-W+1,B+nk); c.closePath();
+    const wg=c.createLinearGradient(x+LN-W,0,x+LN+W,0); wg.addColorStop(0,tone(WR,0.18)); wg.addColorStop(1,tone(WR,-0.35)); c.fillStyle=wg; c.fill(); c.strokeStyle=tone(WR,-0.6); c.lineWidth=0.8; c.stroke();
+    c.strokeStyle=tone(WR,-0.3,0.7); c.lineWidth=0.4; [[-0.55,TOP+1,-0.7,Y.CHIN],[0.5,TOP+0.5,0.66,Y.CHIN-1],[-0.2,Y.CHIN+1,-0.35,hem]].forEach(([k,y0,k2,y1])=>{ c.beginPath(); c.moveTo(x+LN+k*W,B+y0); c.quadraticCurveTo(x+LN+(k+k2)*W*0.6,B+(y0+y1)/2,x+LN+k2*W,B+y1); c.stroke(); });
+    if(!front){ c.strokeStyle='#2a2420'; c.lineWidth=1; c.beginPath(); c.moveTo(x+LN-W+0.6,B+ey+0.4); c.lineTo(x+LN+W-0.6,B+ey+0.4); c.stroke(); c.fillStyle=BR; c.fillRect(x+LN-1,B+ey-0.6,2,2); return; } }   // from behind: the mask's strap and buckle
+  const K=HW*0.14; c.save(); c.translate(x+fx,B+ey); c.scale(K,K); c.translate(-(x+fx),-(B+ey));
+  if(kind==='cv_helm_suit'){ c.restore(); c.save(); }   // the dome is sized to the head already
+  if(kind==='cv_mask_weld'){   // the welder's face: a flat riveted plate, two round amber lenses, a grille at the mouth, a filter on the cheek
+    const L=fx-5.2*sx, R=fx+5.2*sx, t=ey-4.4, b=ey+6.4;
+    P2([[L,t+1.2],[L+1.2,t],[R-1.2,t],[R,t+1.2],[R-0.4,b-1.4],[fx,b],[L+0.4,b-1.4]]); const g2=c.createLinearGradient(x+L,0,x+R,0); g2.addColorStop(0,'#5a5450'); g2.addColorStop(0.5,IRON); g2.addColorStop(1,IRD); c.fillStyle=g2; c.fill(); c.strokeStyle=IRD; c.lineWidth=0.8; c.stroke();
+    c.strokeStyle=BRD; c.lineWidth=0.45; P2([[L+0.7,t+1.4],[L+1.4,t+0.7],[R-1.4,t+0.7],[R-0.7,t+1.4],[R-1,b-1.8],[fx,b-0.6],[L+1,b-1.8]]); c.stroke();
+    [-1,1].forEach(k=>{ if(side && k<0) return; lens(fx+k*2.3*sx,ey+0.4,1.8,'#e8a040'); });
+    for(let k=0;k<4;k++){ c.fillStyle=IRD; c.fillRect(x+fx-2.4*sx,B+Y.MOUTH-1.4+k*1.05,4.8*sx,0.5); }
+    rivets([[L+0.9,t+1.6],[R-0.9,t+1.6],[L+1.1,b-2.4],[R-1.1,b-2.4],[fx,t+0.9]]);
+    if(!side){ const cx2=R+0.9, cy2=Y.MOUTH; c.fillStyle=BRD; c.fillRect(x+cx2-1.2,B+cy2-1.6,2.4,3.2); c.fillStyle=BR; c.fillRect(x+cx2-1.0,B+cy2-1.4,2.0,0.6); c.fillRect(x+cx2-1.0,B+cy2+0.6,2.0,0.5); } }
+  else if(kind==='cv_mask_resp'){   // the salvager's rig: brass goggles on a strap, a leather snout with two filter cans
+    { const hw=(HW+1.1)/K, l=fx+(LN-fx)/K; c.strokeStyle='#2a2420'; c.lineWidth=1.4/K*1.6; c.beginPath(); c.moveTo(x+l-hw,B+ey+0.3); c.lineTo(x+l+hw,B+ey+0.3); c.stroke(); }
+    [-1,1].forEach(k=>{ if(side && k<0) return; lens(fx+k*2.5*sx,ey+0.2,2.0,'#7aa890'); });
+    if(!side) { c.fillStyle=BR; c.fillRect(x+fx-0.7,B+ey-0.2,1.4,0.8); }
+    const t=ey+2.6, b=ey+6.6; P2([[fx-3.6*sx,t],[fx+3.6*sx,t],[fx+4.2*sx,b-1.6],[fx,b],[fx-4.2*sx,b-1.6]]); c.fillStyle='#4a3a2c'; c.fill(); c.strokeStyle='#1e1612'; c.lineWidth=0.7; c.stroke();
+    dot(fx,(t+b)/2,1.5,IRD); dot(fx,(t+b)/2,1.15,'#6a6058'); c.strokeStyle=IRD; c.lineWidth=0.3; for(let k=-1;k<=1;k++){ c.beginPath(); c.moveTo(x+fx+k*0.6,B+(t+b)/2-1); c.lineTo(x+fx+k*0.6,B+(t+b)/2+1); c.stroke(); }
+    [-1,1].forEach(k=>{ if(side && k<0) return; const cx2=fx+k*4.1*sx, cy2=b-1.4; c.save(); c.translate(x+cx2,B+cy2); c.rotate(k*0.5); c.fillStyle=IRD; c.fillRect(-1.4,-1.8,2.8,3.6); c.fillStyle='#7a7068'; c.fillRect(-1.1,-1.6,2.2,3.2); c.fillStyle=BR; c.fillRect(-1.2,-1.8,2.4,0.6); c.fillRect(-1.2,1.2,2.4,0.6); c.restore(); }); }
+  else if(kind==='cv_mask_elder'){   // an elder's mask: brass grown over with a lifetime's patches, a crest of gear-teeth, a big lens and a small one, trophies on chains
+    const t=ey-5.6, b=ey+6.6, w=5.8*sx;
+    for(let k=0;k<9;k++){ const a=Math.PI*(0.08+k*0.105), rr=w+2.2; c.save(); c.translate(x+fx+Math.cos(a)*rr*(k%2?1:0.96)*(-1),B+t+3-Math.sin(a)*rr*0.7); c.rotate(-a+Math.PI/2); c.fillStyle=k%2?BR:BRD; c.fillRect(-0.7,-1.4,1.4,2.2); c.restore(); }   // the crest
+    c.beginPath(); c.ellipse(x+fx,B+(t+b)/2,w,(b-t)/2,0,0,Math.PI*2); const g2=c.createLinearGradient(x+fx-w,0,x+fx+w,0); g2.addColorStop(0,'#e0bc6a'); g2.addColorStop(0.45,BR); g2.addColorStop(1,BRD); c.fillStyle=g2; c.fill(); c.strokeStyle='#4a3410'; c.lineWidth=0.8; c.stroke();
+    c.save(); c.beginPath(); c.ellipse(x+fx,B+(t+b)/2,w,(b-t)/2,0,0,Math.PI*2); c.clip();
+      [[fx-w*0.9,t+6,3.2,3.4,CU],[fx+w*0.2,b-4.2,3.6,2.6,IRON],[fx+w*0.45,t+1.6,2.6,2.4,'#8a8a86']].forEach(([a,b2,pw,ph,col])=>{ c.fillStyle=col; c.fillRect(x+a,B+b2,pw,ph); c.strokeStyle=tone(col,-0.5); c.lineWidth=0.35; c.strokeRect(x+a,B+b2,pw,ph); rivets([[a+0.5,b2+0.5],[a+pw-0.5,b2+0.5],[a+0.5,b2+ph-0.5],[a+pw-0.5,b2+ph-0.5]],'#e8d8a8'); });
+    c.restore();
+    if(!side) lens(fx-2.4*sx,ey,2.3,'#d8483a'); lens(fx+2.6*sx,ey+0.3,1.4,'#d8483a');
+    c.fillStyle='#2a1a0a'; c.fillRect(x+fx-2*sx,B+Y.MOUTH,4*sx,0.7);
+    [[-1.6,3,'#e8e0c8'],[0,4.2,BR],[1.8,2.6,'#e8e0c8']].forEach(([dx,l,col])=>{ const a=fx+dx*sx; c.strokeStyle='#6a5a3a'; c.lineWidth=0.3; c.beginPath(); c.moveTo(x+a,B+b-0.6); c.lineTo(x+a,B+b+l-1); c.stroke(); dot(a,b+l-0.6,0.6,col); }); }   // a tooth, a coin, a tooth
+  else if(kind==='cv_mask_plain'){   // a thief's mask: smooth blackened iron, two slits, nothing to remember it by
+    const t=ey-5, b=ey+6, w=5.2*sx;
+    c.beginPath(); c.ellipse(x+fx,B+(t+b)/2,w,(b-t)/2,0,0,Math.PI*2); const g2=c.createRadialGradient(x+fx-w*0.4,B+t+3,0.5,x+fx,B+(t+b)/2,w*1.4); g2.addColorStop(0,'#5a5660'); g2.addColorStop(0.5,'#2c2a2e'); g2.addColorStop(1,'#141216'); c.fillStyle=g2; c.fill(); c.strokeStyle='#0a080a'; c.lineWidth=0.7; c.stroke();
+    [-1,1].forEach(k=>{ if(side && k<0) return; c.fillStyle='#080608'; c.beginPath(); c.ellipse(x+fx+k*2.2*sx,B+ey+0.3,1.5*sx+0.3,0.55,k*0.12,0,Math.PI*2); c.fill(); c.fillStyle='rgba(230,90,60,0.55)'; c.beginPath(); c.ellipse(x+fx+k*2.2*sx,B+ey+0.3,0.7*sx+0.15,0.25,0,0,Math.PI*2); c.fill(); });
+    c.strokeStyle='rgba(255,255,255,0.12)'; c.lineWidth=0.4; c.beginPath(); c.moveTo(x+fx-w*0.6,B+t+2); c.quadraticCurveTo(x+fx-w*0.9,B+(t+b)/2,x+fx-w*0.5,B+b-2); c.stroke(); }
+  else if(kind==='cv_helm_suit'){   // the suit's helmet: a riveted copper dome, a barred porthole, a brass collar
+    const cy=(TOP+Y.CHIN)/2+0.6, R=HW+2.8;
+    const dg=c.createRadialGradient(x+LN-R*0.4,B+cy-R*0.45,1,x+LN,B+cy,R*1.1); dg.addColorStop(0,'#e0a070'); dg.addColorStop(0.5,CU); dg.addColorStop(1,'#4a2410'); c.fillStyle=dg; c.beginPath(); c.arc(x+LN,B+cy,R,0,Math.PI*2); c.fill(); c.strokeStyle='#2a1408'; c.lineWidth=0.9; c.stroke();
+    c.fillStyle=BRD; c.beginPath(); c.ellipse(x+LN,B+Y.CHIN+2.6,R*0.9,2.2,0,0,Math.PI*2); c.fill(); c.fillStyle=BR; c.beginPath(); c.ellipse(x+LN,B+Y.CHIN+2.1,R*0.86,1.5,0,0,Math.PI*2); c.fill();
+    rivets(Array.from({length:7},(_,k)=>[LN-R*0.75+k*R*0.25,Y.CHIN+2.3]));
+    c.fillStyle=BR; c.fillRect(x+LN-1,B+cy-R-1.6,2,2); dot(LN,cy-R-1.8,1,BRD);   // the air valve on top
+    if(front){ const px=LN+(side?R*0.55:faceOff(pr)*1.1), py=cy+0.6, pr2=side?2.6:3.6;
+      dot(px,py,pr2+0.9,IRD); dot(px,py,pr2+0.55,BR); const gg=c.createRadialGradient(x+px-1,B+py-1,0.2,x+px,B+py,pr2); gg.addColorStop(0,'#5a7070'); gg.addColorStop(1,'#101818'); c.fillStyle=gg; c.beginPath(); c.arc(x+px,B+py,pr2,0,Math.PI*2); c.fill();
+      c.fillStyle='rgba(255,255,255,0.35)'; c.beginPath(); c.ellipse(x+px-pr2*0.35,B+py-pr2*0.4,pr2*0.35,pr2*0.18,-0.5,0,Math.PI*2); c.fill();
+      c.fillStyle=BRD; for(let k=-1;k<=1;k++) c.fillRect(x+px+k*pr2*0.55-0.3,B+py-pr2,0.6,pr2*2);
+      rivets(Array.from({length:8},(_,k)=>[px+Math.cos(k*Math.PI/4)*(pr2+0.7),py+Math.sin(k*Math.PI/4)*(pr2+0.7)])); }
+    else { dot(LN,cy,2.2,BRD); dot(LN,cy,1.6,IRD); }
+    c.fillStyle='rgba(255,255,255,0.25)'; c.beginPath(); c.ellipse(x+LN-R*0.45,B+cy-R*0.4,R*0.3,R*0.16,-0.6,0,Math.PI*2); c.fill(); }
+  c.restore();
+}
+Object.assign(ITEMS,{ cv_mask_weld:{ name:'Cinderveil Welding Mask', slot:'head', base:'kettle', col:'#3e3a36' }, cv_mask_resp:{ name:'Cinderveil Salvage Rig', slot:'head', base:'kettle', col:'#4a3a2c' },
+  cv_mask_elder:{ name:"Cinderveil Elder's Mask", slot:'head', base:'kettle', col:'#b08a3a' }, cv_mask_plain:{ name:'Blank Iron Mask', slot:'head', base:'kettle', col:'#2c2a2e' }, cv_helm_suit:{ name:'Cinderveil Suit Helm', slot:'head', base:'kettle', col:'#a8603a' },
+  cv_suit:{ name:'Cinderveil Pressure Suit', slot:'armor', base:'gambeson', col:'#5e3e24' }, cv_suit_iron:{ name:'Cinderveil Iron Suit', slot:'armor', base:'gambeson', col:'#3a3632' }, cv_suit_legs:{ name:'Suit Leggings', slot:'legs', base:'trousers', col:'#4a3220' }, cv_suit_legs_iron:{ name:'Iron Suit Leggings', slot:'legs', base:'trousers', col:'#2e2c2a' },
+  cv_apron:{ name:'Oilcloth Apron', slot:'armor', base:'jerkin', col:'#2e2a26' }, cv_apron_rust:{ name:'Rust-Leather Apron', slot:'armor', base:'jerkin', col:'#6a3e26' } });
+
 function drawHeadgear(c,x,B,kind,P,view,LN){
+  if(CV_MASKS.has(kind)){ drawCVMask(c,x,B,kind,P,view,LN); return; }   // the Cinderveil's masks (see CINDERVEIL)
   if(kind==='ember_crown' || kind==='ember_hood'){ drawEmberCrystal(c,x,B,P,view,LN); return; }   // the Pyromancer's headpiece: nothing on the head at all, only a crystal of fire hanging in the air before the brow
   if(kind==='obsidian_helm' || kind==='wyrm_helm') kind='kettle';           // re-coloured kettle hats keep the kettle's shape
   const Y=BODY, V=VIEW[view], HW=P.headHW, pr=V.prof, front=V.turn>-0.25;
@@ -5129,7 +5199,7 @@ function drawHeadgear(c,x,B,kind,P,view,LN){
 function drawHairBehindBody(c,x,B,opts,view){
   if((opts.equip||{}).head==='hood') return;
   const F=opts.gender==='f', P=F?PROP.f:PROP.m, hair=HAIR_COLORS[opts.hairColor];
-  const hk=opts.vari&&opts.vari.head, closed=(opts.equip||{}).head==='kettle'&&(hk==='coif'||hk==='helm_full');
+  const hk=opts.vari&&opts.vari.head, closed=(opts.equip||{}).head==='kettle'&&(hk==='coif'||hk==='helm_full'||CV_MASKS.has(hk));
   if(closed) return;                                  // a coif or great helm swallows the hair entirely
   drawHair(c,x,B,opts.hair,hair,tone(hair,-0.28),F,P,view,VIEW[view].lean*1.25,'body');
 }
@@ -9353,7 +9423,7 @@ function sitArmLook(opts){ const F=opts.gender==='f';
   return withLook(opts,o=>{ const E=o.equip||defaultEquip(o.gender), VR=o.vari||{}, vT=VR.torso||'', vA=VR.armor||''; let sl=null;
     if(E.torso==='shirt') sl = vT.startsWith('tunic_') ? {col:CLOTH.shirt,len:0.88} : vT==='smock' ? {col:CLOTH.shirt,len:0.62} : {col:CLOTH.shirt,len:F?0.28:0.46};
     else if(E.torso==='elf_robe') sl={col:ELFC.robe,len:0.97}; else if(E.torso==='elf_tunic') sl={col:ELFC.tunic,len:0.9};
-    if(vA==='gambeson') sl={col:GEAR.jerkin,len:0.86};
+    if(vA==='gambeson'||vA==='cv_suit'||vA==='cv_suit_iron') sl={col:GEAR.jerkin,len:0.86};
     return { sl, glove: E.hands==='gloves' ? GEAR.glove : null }; }); }
 // the round of the seat seen from behind, bare: shared by the standing figure and the sitting pose (body-local units)
 function cheekGeom(F,V,sit){ const P=F?PROP.f:PROP.m, HI=P.hipHW*V.sw, WA=P.waistHW*V.sw;

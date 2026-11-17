@@ -30214,10 +30214,12 @@ const CVM3=(()=>{
       smoke(pL,s=4){ const p=prj(R(pL)); push(1e6,()=>{ for(let k=0;k<5;k++){ const t=k/5; c.fillStyle=`rgba(${80+k*20},${76+k*20},${72+k*20},${0.5-t*0.38})`; c.beginPath(); c.arc(p[0]+Math.sin(k*1.7)*s*t*2*S-s*t*S,p[1]-s*k*1.3*S,s*S*(0.6+t*1.1),0,Math.PI*2); c.fill(); } }); },
       glow(pL,r,col){ const w=R(pL), p=prj(w); push(depth(w)+0.3,()=>{ const g=c.createRadialGradient(p[0],p[1],0,p[0],p[1],r*S); g.addColorStop(0,col); g.addColorStop(1,'rgba(0,0,0,0)'); c.fillStyle=g; c.beginPath(); c.arc(p[0],p[1],r*S,0,Math.PI*2); c.fill(); }); },
       shadow(rx,ry){ push(-1e6,()=>{ c.fillStyle='rgba(0,0,0,0.3)'; c.beginPath(); c.ellipse(ox,oy,rx*S,ry*S,0,0,Math.PI*2); c.fill(); }); },
-      leg(ptsL,w,col,off,walk){ const h=R(ptsL[0]), f0=R(ptsL[ptsL.length-1]), fr=((h[0]+f0[0])+(h[1]+f0[1]))/2; FORCE=(fr>0?5000:-5000)+fr*10; if(walk && off!=null){ const ph=walk.ph+off, f=ptsL[ptsL.length-1], n=ptsL.length-1, lift=Math.max(0,Math.sin(ph))*walk.lift, dx=Math.cos(ph)*walk.stride; ptsL=ptsL.map((p,i)=>i===0?p:[p[0]+dx*(i/n)*(i===n?1:0.6),p[1],p[2]+lift*(i/n)*(i===n?1:0.9)]); }
-        for(let k=1;k<ptsL.length;k++) sc.seg(ptsL[k-1],ptsL[k],w*(1-k*0.1),col);
+      leg(ptsL,w,col,off,walk,toes){ const h=R(ptsL[0]), f0=R(ptsL[ptsL.length-1]), fr=((h[0]+f0[0])+(h[1]+f0[1]))/2; FORCE=(fr>0?5000:-5000)+fr*10; if(walk && off!=null){ const ph=walk.ph+off, f=ptsL[ptsL.length-1], n=ptsL.length-1, lift=Math.max(0,Math.sin(ph))*walk.lift, dx=Math.cos(ph)*walk.stride; ptsL=ptsL.map((p,i)=>i===0?p:[p[0]+dx*(i/n)*(i===n?1:0.6),p[1],p[2]+lift*(i/n)*(i===n?1:0.9)]); }
+        for(let k=1;k<ptsL.length;k++) sc.seg(ptsL[k-1],ptsL[k],w*(1.12-k*0.14),col);   // a stout thigh, tapering to the foot
         if(ptsL.length>2 && col!==IRON){ const [a,b,d]=ptsL; sc.seg(add(a,mul(sub(b,a),0.3)),add(b,mul(sub(d,b),0.3)),Math.max(1,w*0.2),'#8a7a5a',0.02); }   // a rope lashing across the knee
-        ptsL.slice(0,-1).forEach(p=>sc.joint(p,w*0.55,0.05,col!==IRON)); FORCE=null; const f=ptsL[ptsL.length-1]; sc.disk([f[0],f[1],0.1],[0,0,1],w*0.7,IRD,{always:true,bias:-1e5}); },
+        ptsL.slice(0,-1).forEach(p=>sc.joint(p,w*0.6,0.05,col!==IRON));
+        if(toes){ const f=ptsL[ptsL.length-1]; [-0.55,0,0.55,Math.PI].forEach(a=>{ const l=a===Math.PI?w*0.9:w*1.5; sc.seg([f[0],f[1],1.2],[f[0]+Math.cos(a)*l,f[1]+Math.sin(a)*l,0.4],w*0.45,IRD); }); }   // three splayed toes and a spur behind
+        FORCE=null; const f=ptsL[ptsL.length-1]; sc.disk([f[0],f[1],0.1],[0,0,1],w*0.95,IRD,{always:true,bias:-1e5}); },
       draw(){ ops.sort((a,b)=>a.d-b.d).forEach(o=>o.fn()); } };
     return sc; }
   const W=(ph,stride,lift)=>ph==null?null:{ph,stride,lift};
@@ -30232,16 +30234,17 @@ const CVM3=(()=>{
     s.seg([11,3,10+z],[19,4,6+z],2.2,IRON,1); s.seg([11,-3,10+z],[19,-4,6+z],2.2,IRON,1); s.sphere([21,0,5+z],5,'#6a4426',{bias:1}); s.sphere([22,1.5,8+z],1.4,'#f0c850',{bias:2});
     s.draw(); }
 
-  function strutter(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,6,7), z=bob(ph,2); s.shadow(28,10);
-    [[7,0],[-7,Math.PI]].forEach(([yy,off])=>{ s.leg([[0,yy,54+z],[12,yy*1.15,34+z],[-2,yy*1.15,13+z],[6,yy*1.15,0]],5.5,TIMB,off,wk); });
-    s.cylH([-16,0,60+z],[14,0,62+z],13,WOOD,{bands:[0.1,0.5,0.9],bandCol:HOOP});
-    s.box([-2,0,73+z],18,14,4,'#5a3420',{top:1}); s.box([-10,0,77+z],4,12,9,'#5a3420',{top:1});
-    s.seg([12,0,66+z],[30,0,84+z],5,TIMB); s.box([34,0,82+z],10,9,10,'#3a3632',{rivets:true}); s.disk([39.2,0,87+z],[1,0,0],3.4,'#f0b050',{glass:true,glow:true,rim:HOOP,bias:2});
-    s.seg([-16,0,62+z],[-30,0,72+z],3.6,IRD); s.smoke([-31,0,74+z],3);
+  function strutter(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,6,7), z=bob(ph,2); s.shadow(34,14);
+    [[11,0],[-11,Math.PI]].forEach(([yy,off])=>{ s.leg([[0,yy,50+z],[14,yy*1.2,31+z],[-3,yy*1.2,12+z],[6,yy*1.2,0]],15,TIMB,off,wk,true); });
+    s.cylH([-22,0,58+z],[20,0,60+z],19,WOOD,{bands:[0.1,0.5,0.9],bandCol:HOOP});
+    s.box([-2,0,77+z],30,24,5,'#5a3420',{top:1}); s.box([-16,0,80+z],6,22,14,'#4a2a18',{top:1}); s.box([12,0,80+z],5,12,7,'#4a2a18',{top:1});   // seat, high cantle, pommel
+    [1,-1].forEach(sd=>{ s.seg([-2,sd*12,78+z],[-2,sd*21,48+z],1.4,'#3a2414',100); s.box([-2,sd*21,45+z],7,3,3,'#5a5650',{top:1}); });   // stirrup leathers and irons
+    s.seg([18,0,66+z],[34,0,86+z],9,TIMB); s.box([38,0,84+z],12,11,12,'#3a3632',{rivets:true}); s.disk([44.2,0,90+z],[1,0,0],4,'#f0b050',{glass:true,glow:true,rim:HOOP,bias:2});
+    s.seg([-20,0,62+z],[-34,0,74+z],4.4,IRD); s.smoke([-35,0,76+z],3.4);
     s.draw(); }
 
   function hauler(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,5,5), z=bob(ph,1.2); s.shadow(42,16);
-    [[22,12,0],[22,-12,Math.PI],[-20,12,Math.PI],[-20,-12,0]].forEach(([xx,yy,off])=>s.leg([[xx,yy,32+z],[xx+(xx>0?6:-6),yy*1.25,16+z],[xx+(xx>0?2:-2),yy*1.25,0]],7,TIMB,off,wk));
+    [[22,12,0],[22,-12,Math.PI],[-20,12,Math.PI],[-20,-12,0]].forEach(([xx,yy,off])=>s.leg([[xx,yy,32+z],[xx+(xx>0?6:-6),yy*1.25,16+z],[xx+(xx>0?2:-2),yy*1.25,0]],15,TIMB,off,wk));
     s.cylH([-30,0,42+z],[28,0,42+z],16,WOOD,{bands:[0.08,0.3,0.7,0.92],bandCol:HOOP});
     s.box([-6,0,57+z],26,20,10,WOOD,{planks:3,top:1}); s.box([-14,2,67+z],12,12,9,'#8a6a40',{planks:2,top:2}); s.sphere([8,-3,63+z],6,'#6a5a3a',{sy:0.7,bias:100});
     s.cylV([22,0,55+z],4,14,IRD,1); s.smoke([22,0,72+z],4.5);
@@ -30250,7 +30253,7 @@ const CVM3=(()=>{
     s.draw(); }
 
   function crawler(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,6,7), z=bob(ph,1.5); s.shadow(64,30);
-    [-26,0,26].forEach((xx,k)=>[1,-1].forEach(sd=>s.leg([[xx,sd*20,30+z],[xx*1.25,sd*40,50+z],[xx*1.45,sd*58,0]],7,TIMB,(k+(sd>0?0:1))%2?Math.PI:0,wk)));
+    [-26,0,26].forEach((xx,k)=>[1,-1].forEach(sd=>s.leg([[xx,sd*20,30+z],[xx*1.25,sd*40,50+z],[xx*1.45,sd*58,0]],11,TIMB,(k+(sd>0?0:1))%2?Math.PI:0,wk)));
     s.box([0,0,22+z],72,44,20,'#6a5038',{rivets:true,planks:5}); s.box([-6,0,42+z],42,28,9,'#4a4038',{planks:3});
     s.sphere([18,0,62+z],13,'#5a4632'); s.disk([28,0,62+z],[1,0,0],5.5,'#5a8a8a',{glass:true,rim:BR,bias:3});
     [-14,-24].forEach(xx=>{ s.cylV([xx,6,51+z],3.2,14,IRD); s.smoke([xx,6,67+z],3.4); });
@@ -30259,7 +30262,7 @@ const CVM3=(()=>{
     s.draw(); }
 
   function bellows(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,10,9), z=bob(ph,2.5); s.shadow(100,56);
-    [[44,36,0],[44,-36,Math.PI],[-44,36,Math.PI],[-44,-36,0]].forEach(([xx,yy,off])=>s.leg([[xx,yy,84+z],[xx*1.4,yy*1.5,54+z],[xx*1.55,yy*1.6,0]],13,TIMB,off,wk));
+    [[44,36,0],[44,-36,Math.PI],[-44,36,Math.PI],[-44,-36,0]].forEach(([xx,yy,off])=>s.leg([[xx,yy,84+z],[xx*1.4,yy*1.5,54+z],[xx*1.55,yy*1.6,0]],21,TIMB,off,wk));
     s.box([0,0,82+z],124,90,70,'#6a5038',{rivets:true,planks:7, face:{n:[1,0,0], fn:(pts,c,S)=>{ const cx=(pts[0][0]+pts[1][0]+pts[2][0]+pts[3][0])/4, cy=(pts[0][1]+pts[1][1]+pts[2][1]+pts[3][1])/4; c.fillStyle='#1a1614'; c.fillRect(cx-9*S,cy-8*S,18*S,26*S); const g=c.createLinearGradient(0,cy-6*S,0,cy+16*S); g.addColorStop(0,'#ffe080'); g.addColorStop(1,'#e04010'); c.fillStyle=g; c.fillRect(cx-7*S,cy-6*S,14*S,22*S); } }});
     s.glow([64,0,100+z],46,'rgba(255,120,40,0.5)');
     for(let k=0;k<5;k++) s.disk([-30+k*9,46,108+z],[0,1,0],7-(k%2),k%2?'#6a3a22':'#8a5032',{bias:1});
@@ -30269,7 +30272,7 @@ const CVM3=(()=>{
     s.draw(); }
 
   function magpie(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,12,12), z=bob(ph,3); s.shadow(40,16);
-    [[10,0],[-10,Math.PI]].forEach(([yy,off])=>s.leg([[0,yy,152+z],[-24,yy*1.6,96+z],[6,yy*1.6,46+z],[-6,yy*1.6,0]],8.5,TIMB,off,wk));
+    [[10,0],[-10,Math.PI]].forEach(([yy,off])=>s.leg([[0,yy,152+z],[-24,yy*1.6,96+z],[6,yy*1.6,46+z],[-6,yy*1.6,0]],14,TIMB,off,wk,true));
     s.box([0,0,150+z],44,40,40,'#d8d0c0',{planks:4}); s.box([0,0,190+z],50,46,6,'#1e1c1e');
     s.poly([[22,-12,160+z],[22,12,160+z],[40,0,172+z]],'#1e1c1e',3); s.poly([[22,-12,184+z],[22,12,184+z],[40,0,172+z]],'#2e2c2e',3);
     s.disk([22.5,0,176+z],[1,0,0],3.6,'#f0d070',{glass:true,glow:true,rim:BR,bias:4});
@@ -30316,8 +30319,8 @@ const CVM3=(()=>{
   AREA_PATHS.scrubland=AREA_PATHS.scrubland||[]; AREA_PATHS.scrubland.push([[7.2,26.5],[12.5,26.5]]);
   AREAS.cvcamp={ fence:{r:false,l:false}, mini:{x:0,y:0}, notches:()=>[], dummy:null, w:26, h:20, theme:'sand', sandKind:'clay', scrub:gy=>0.55, label:'Cinderveil Camp',
     objects:()=>[ {type:'teleporter', i:0, j:10, to:'scrubland', entry:'fromCamp2'},
-      {type:'cvwalker', kind:'bellows', i:14, j:2, fp:[4,4], dir:1, s:0.95}, {type:'cvwalker', kind:'magpie', i:21, j:11, fp:[2,2], dir:7, s:0.95}, {type:'cvwalker', kind:'hauler', i:7, j:15, fp:[3,2], dir:0, s:1},
-      {type:'cvwalker', kind:'strutter', i:3, j:4, fp:[1,1], dir:2, s:1}, {type:'cvwalker', kind:'skitter', i:10, j:7, fp:[1,1], dir:5, s:0.85}, {type:'cvwalker', kind:'skitter', i:19, j:16, fp:[1,1], dir:3, s:0.85},
+      {type:'cvwalker', kind:'bellows', i:14, j:1, fp:[5,5], dir:1, s:1.4}, {type:'cvwalker', kind:'magpie', i:21, j:11, fp:[2,2], dir:7, s:1.1}, {type:'cvwalker', kind:'hauler', i:7, j:15, fp:[3,2], dir:0, s:1.35},
+      {type:'cvwalker', kind:'strutter', i:3, j:4, fp:[2,2], dir:2, s:1.15}, {type:'cvwalker', kind:'skitter', i:10, j:7, fp:[1,1], dir:5, s:0.85}, {type:'cvwalker', kind:'skitter', i:19, j:16, fp:[1,1], dir:3, s:0.85},
       {type:'tent', i:5, j:1, fp:[2,2]}, {type:'tent', i:9, j:1, fp:[2,2]}, {type:'tent', i:2, j:14, fp:[2,2]}, {type:'tent', i:22, j:3, fp:[2,2]},
       {type:'campfire', i:12, j:11}, {type:'logseat', i:11, j:12}, {type:'logseat', i:13, j:12, r:1}, {type:'logseat', i:11, j:10},
       {type:'brazier', i:4, j:9}, {type:'brazier', i:4, j:12}, {type:'brazier', i:19, j:8},
@@ -30418,12 +30421,12 @@ const CVM3=(()=>{
   const CAR=['hedgerow','longmeadow','heath','scrubland'];
   CAR.forEach(a=>wrap(a,'objects',l=>encounter('cvcar'+a,0.4) ? [...l,{type:'cvcaravan', x:0, y:0, i:0, j:0, t:rnd01(Math.floor(dayClock/DAY_LEN),a.length,55)*200, noblock:true}] : l));
   OBJ_DRAW.cvcaravan=o=>{ if(!o.ok) return; const h=P(o.x,o.y), s=P(o.sx,o.sy); const ph=gt*5.5;
-    if(o.sx+o.sy<o.x+o.y){ CVM3.strutter(g,s.x,s.y,0.75,o.dir,ph); CVM3.hauler(g,h.x,h.y,0.85,o.dir,ph+1); } else { CVM3.hauler(g,h.x,h.y,0.85,o.dir,ph+1); CVM3.strutter(g,s.x,s.y,0.75,o.dir,ph); } };
+    if(o.sx+o.sy<o.x+o.y){ CVM3.strutter(g,s.x,s.y,1.15,o.dir,ph); CVM3.hauler(g,h.x,h.y,1.35,o.dir,ph+1); } else { CVM3.hauler(g,h.x,h.y,1.35,o.dir,ph+1); CVM3.strutter(g,s.x,s.y,1.15,o.dir,ph); } };
   NEAR_NAME.cvcaravan='Cinderveil Caravan';
   onUse(['cvcaravan'],o=>{ const t=CHOICE.cvTrust||0; logMsg(t>=1 ? "The hauler's driver raises a three-fingered hand to you: road-friend. The caravan clanks on toward the camp." : "A masked rider on the strutter turns to watch you as the hauler trudges by. Nobody speaks.",'#c8a860'); CHOICE.cvMet=true; });
   { const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{ if(!running) return r; for(const o of OBJECTS){ if(o.type!=='cvcaravan') continue;
       const pts=(AREA_PATHS[areaId]||[])[0]; if(!pts) continue; const cum=LEN(pts), L=cum[cum.length-1]; o.t+=dt*0.9;
-      const m=o.t%(2*L), fwd=m<L, d=fwd?m:2*L-m, p=at(pts,cum,Math.max(0.5,Math.min(L-0.5,d))), q=at(pts,cum,Math.max(0.5,Math.min(L-0.5,d+(fwd?2.4:-2.4))));
+      const m=o.t%(2*L), fwd=m<L, d=fwd?m:2*L-m, p=at(pts,cum,Math.max(0.5,Math.min(L-0.5,d))), q=at(pts,cum,Math.max(0.5,Math.min(L-0.5,d+(fwd?3.2:-3.2))));
       o.x=p[0]; o.y=p[1]; o.sx=q[0]; o.sy=q[1]; o.dir=dirFromDelta(q[0]-p[0],q[1]-p[1]); o.i=Math.floor(o.x); o.j=Math.floor(o.y); o.dz=Math.max(o.x+o.y,o.sx+o.sy)+0.5; o.ok=true; } }catch(e){ console.error(e); } return r; }; }
 
 

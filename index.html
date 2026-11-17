@@ -1068,6 +1068,12 @@ function drawCharInner(c,x,B,opts,swing=0,dir=0,pose=null){
     try{ drawCharInner(c,x,B,o2,swing,dir,pose); } finally{ c.restore(); }
     } finally{ c.restore(); }
     } finally{ Object.assign(PROP.m,sv.m); Object.assign(PROP.f,sv.f); } return; }
+  if(opts.race==='cinderveil'){   // tall, gaunt, arms that hang too long, a wrapped tail under the coat: whatever they are, they dress to pass for human
+    const sv={m:{...PROP.m}, f:{...PROP.f}}; ['m','f'].forEach(k=>Object.assign(PROP[k],{limbW:Math.min(PROP[k].limbW,5.8), waistHW:Math.min(PROP[k].waistHW,9.5), chestHW:Math.min(PROP[k].chestHW,12.4)}));   // gaunt in the body; legs left alone so the clothes still fit them
+    const pb=CV_BITS, back=[3,4,5].includes(dir); CV_LONGARM=true; CV_BITS=opts.cvBits??0;
+    c.save(); c.translate(x,B); c.scale(0.9,1.12); c.translate(-x,-B);
+    try{ if(!back) cvTail(c,x,B,dir,swing,opts); drawCharInner(c,x,B,{...opts,race:'cinderveil_'},swing,dir,pose); if(back) cvTail(c,x,B,dir,swing,opts); }
+    finally{ c.restore(); Object.assign(PROP.m,sv.m); Object.assign(PROP.f,sv.f); CV_LONGARM=false; CV_BITS=pb; } return; }
   if(opts.race==='elf'){ c.save(); c.translate(x,B); c.scale(0.93,1.055); c.translate(-x,-B);
     try{ drawCharInner(c,x,B,{...opts,race:'elf_'},swing,dir,pose); } finally{ c.restore(); } return; }
   const flip=dirMirrored(dir), view=dirView(dir);
@@ -1543,7 +1549,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       fs('#8a8e96'); [-1,1].forEach(d=>{ c.beginPath(); c.arc(x+cx+d*(bw-0.8),B+y0+2.4,0.4,0,Math.PI*2); c.fill(); }); } };
 
   // ── one arm; `depth` pushes the far arm back behind the torso ──
-  const armIn=CH-(F?1.9:2.0), al=Math.abs(Y.SHOULDER-Y.WAIST)+6.3, aw=P.limbW;
+  const armIn=CH-(F?1.9:2.0), al=(Math.abs(Y.SHOULDER-Y.WAIST)+6.3)*(CV_LONGARM?1.34:1), aw=P.limbW;
   const LGM = !F && typeof LING_TORSO!=='undefined' && LING_TORSO.has(E.torso) ? LING_DYE[lingParts(LING_ALIAS[E.torso]||E.torso)[1]] : null;
   const SLV = LGM ? {col:/^(lace_underbust|open_bralette)/.test(E.torso)?LGM.LB:tone(LGM.SHIRT,-0.1), len:0.92, cuff:true, trim:LGM.SV} : E.torso==='shirt' ? (TUN ? {col:C.shirt,len:0.88,cuff:true,trim:TUNTRIM} : SMOCK ? {col:C.shirt,len:0.62,cuff:true,roll:true} : {col:C.shirt,len:F?0.28:0.46}) : ROBE ? {col:ELFC.robe,len:0.97,bell:true} : ETUN ? {col:ELFC.tunic,len:0.9,cuff:true} : null;     // women's cut: cap sleeves
   const sleeveLen = SLV ? al*SLV.len : 0;
@@ -4824,7 +4830,7 @@ var HG_F=false;   // whether the head being dressed is a woman's (set by the cal
 // ════════ CINDERVEIL masks: every one hand-built from scrap; the face beneath is never shown ════════
 const CV_MASKS=new Set(['cv_mask_weld','cv_mask_resp','cv_mask_elder','cv_mask_plain','cv_helm_suit']);
 function drawCVMask(c,x,B,kind,P,view,LN){
-  const Y=BODY, V=VIEW[view], HW=P.headHW, pr=V.prof, front=V.turn>-0.25, side=pr>0.8, TOP=Y.SKULL_TOP;
+  const Y=BODY, V=VIEW[view], HW=P.headHW, pr=V.prof, front=V.turn>-0.25, side=pr>0.8, TOP=Y.SKULL_TOP, LINE=Y.HAIRLINE;
   const sx=side?0.5:(1-pr*0.4), fx=LN+(side?HW*0.62:faceOff(pr)), ey=Y.EYE_TOP+1.4;
   const IRON='#3e3a36', IRD='#1e1c1a', BR='#b08a3a', BRD='#6e5420', CU='#a8603a';
   const P2=(pts)=>{ c.beginPath(); pts.forEach(([a,b2],k)=>k?c.lineTo(x+a,B+b2):c.moveTo(x+a,B+b2)); c.closePath(); };
@@ -4833,10 +4839,12 @@ function drawCVMask(c,x,B,kind,P,view,LN){
   const rivets=(pts,col)=>pts.forEach(([a,b2])=>{ dot(a,b2,0.42,IRD); dot(a-0.1,b2-0.1,0.28,col||'#c8b080'); });
   // the hood-wrap behind every mask but the suit's dome
   if(kind!=='cv_helm_suit'){ const W=HW+1.0, nk=Y.CHIN+1.2, CHc=P.chestHW*V.sw*0.55, hem=Y.SHOULDER+0.6, WR=kind==='cv_mask_elder'?'#5a3a2a':kind==='cv_mask_plain'?'#26242a':'#4a4038';
-    c.beginPath(); c.moveTo(x+LN-W+1,B+nk); c.lineTo(x+LN-W-0.3,B+Y.CHIN-6); c.bezierCurveTo(x+LN-W-0.4,B+TOP,x+LN-W*0.62,B+TOP-2.4,x+LN,B+TOP-2.4); c.bezierCurveTo(x+LN+W*0.62,B+TOP-2.4,x+LN+W+0.4,B+TOP,x+LN+W+0.3,B+Y.CHIN-6);
+    c.beginPath(); c.moveTo(x+LN-W+1,B+nk); c.lineTo(x+LN-W-0.3,B+Y.CHIN-6); const pk=side?(front?-2.4:2.4):(front?-0.6:0.6); c.bezierCurveTo(x+LN-W-0.4,B+TOP+1,x+LN-W*0.7,B+TOP-1.2,x+LN+pk-1.4,B+TOP-2.2); c.quadraticCurveTo(x+LN+pk,B+TOP-4.2,x+LN+pk+1.4,B+TOP-2.2); c.bezierCurveTo(x+LN+W*0.7,B+TOP-1.2,x+LN+W+0.4,B+TOP+1,x+LN+W+0.3,B+Y.CHIN-6);
     c.lineTo(x+LN+W-1,B+nk); c.quadraticCurveTo(x+LN+CHc-1,B+nk+1.4,x+LN+CHc,B+hem); c.quadraticCurveTo(x+LN,B+hem+2,x+LN-CHc,B+hem); c.quadraticCurveTo(x+LN-CHc+1,B+nk+1.4,x+LN-W+1,B+nk); c.closePath();
     const wg=c.createLinearGradient(x+LN-W,0,x+LN+W,0); wg.addColorStop(0,tone(WR,0.18)); wg.addColorStop(1,tone(WR,-0.35)); c.fillStyle=wg; c.fill(); c.strokeStyle=tone(WR,-0.6); c.lineWidth=0.8; c.stroke();
     c.strokeStyle=tone(WR,-0.3,0.7); c.lineWidth=0.4; [[-0.55,TOP+1,-0.7,Y.CHIN],[0.5,TOP+0.5,0.66,Y.CHIN-1],[-0.2,Y.CHIN+1,-0.35,hem]].forEach(([k,y0,k2,y1])=>{ c.beginPath(); c.moveTo(x+LN+k*W,B+y0); c.quadraticCurveTo(x+LN+(k+k2)*W*0.6,B+(y0+y1)/2,x+LN+k2*W,B+y1); c.stroke(); });
+    { const pk=side?(front?-2.4:2.4):(front?-0.6:0.6); c.strokeStyle=tone(WR,-0.45,0.8); c.lineWidth=0.5; c.beginPath(); c.moveTo(x+LN+pk,B+TOP-3.6); c.quadraticCurveTo(x+LN+pk*0.4,B+TOP+3,x+LN+(front?pk*0.2:0),B+(front?LINE-1:Y.CHIN)); c.stroke(); }   // the seam up the cowl to its peak
+    if(front){ c.strokeStyle=tone(WR,-0.55); c.lineWidth=1.3; c.beginPath(); c.ellipse(x+fx-(side?0.8:0),B+ey+1.2,side?HW*0.5:HW*0.84*(1-pr*0.25),HW*0.98,0,0,Math.PI*2); c.stroke(); c.strokeStyle=tone(WR,0.2,0.8); c.lineWidth=0.5; c.beginPath(); c.ellipse(x+fx-(side?0.8:0),B+ey+1.2,(side?HW*0.5:HW*0.84*(1-pr*0.25))+0.9,HW*0.98+0.9,0,0,Math.PI*2); c.stroke(); }   // the rim of the cowl round the face
     if(!front){ c.strokeStyle='#2a2420'; c.lineWidth=1; c.beginPath(); c.moveTo(x+LN-W+0.6,B+ey+0.4); c.lineTo(x+LN+W-0.6,B+ey+0.4); c.stroke(); c.fillStyle=BR; c.fillRect(x+LN-1,B+ey-0.6,2,2); return; } }   // from behind: the mask's strap and buckle
   const K=HW*0.14; c.save(); c.translate(x+fx,B+ey); c.scale(K,K); c.translate(-(x+fx),-(B+ey));
   if(kind==='cv_helm_suit'){ c.restore(); c.save(); }   // the dome is sized to the head already
@@ -4883,8 +4891,36 @@ function drawCVMask(c,x,B,kind,P,view,LN){
       rivets(Array.from({length:8},(_,k)=>[px+Math.cos(k*Math.PI/4)*(pr2+0.7),py+Math.sin(k*Math.PI/4)*(pr2+0.7)])); }
     else { dot(LN,cy,2.2,BRD); dot(LN,cy,1.6,IRD); }
     c.fillStyle='rgba(255,255,255,0.25)'; c.beginPath(); c.ellipse(x+LN-R*0.45,B+cy-R*0.4,R*0.3,R*0.16,-0.6,0,Math.PI*2); c.fill(); }
+  if(kind!=='cv_helm_suit' && CV_BITS) cvFittings(c,x,B,fx,ey,sx,side,CV_BITS);
   c.restore();
 }
+let CV_LONGARM=false, CV_BITS=0;
+// what each Cinderveil has bolted to their mask: no two alike (bits pick up to three)
+function cvFittings(c,x,B,fx,ey,sx,side,bits){
+  const BR='#b08a3a', BRD='#6e5420', IRD='#1e1c1a', CU='#a8603a';
+  const dot=(a,b2,r,col)=>{ c.fillStyle=col; c.beginPath(); c.arc(x+a,B+b2,r,0,Math.PI*2); c.fill(); };
+  const line=(pts,col,w)=>{ c.strokeStyle=col; c.lineWidth=w; c.lineCap='round'; c.beginPath(); pts.forEach(([a,b2],k)=>k?c.lineTo(x+a,B+b2):c.moveTo(x+a,B+b2)); c.stroke(); };
+  const pick=[]; for(let k=0;k<9 && pick.length<3;k++) if((bits>>k)&1) pick.push(k);
+  pick.forEach(k=>{
+    if(k===0) [-1,1].forEach(sd=>{ if(side && sd<0) return; const a=fx+sd*5.4*sx; c.fillStyle=BRD; c.beginPath(); c.moveTo(x+a,B+ey-1); c.lineTo(x+a+sd*3.6,B+ey-3.2); c.lineTo(x+a+sd*3.6,B+ey+2.6); c.lineTo(x+a,B+ey+1); c.closePath(); c.fill(); c.fillStyle=BR; c.beginPath(); c.ellipse(x+a+sd*3.6,B+ey-0.3,0.9,2.9,0,0,Math.PI*2); c.fill(); dot(a+sd*3.6,ey-0.3,0.5,IRD); });   // ear-trumpets
+    else if(k===1){ line([[fx+3.4*sx,ey-4.6],[fx+5.6*sx,ey-12]],IRD,0.5); dot(fx+5.6*sx,ey-12.2,0.8,'#d83a2a'); line([[fx+2.2*sx,ey-4.8],[fx+3*sx,ey-9]],IRD,0.4); dot(fx+3*sx,ey-9.2,0.55,BR); }   // aerials
+    else if(k===2){ const a=fx-5.6*sx, b2=ey-3; c.fillStyle=IRD; c.fillRect(x+a-1.4,B+b2-1.4,2.8,2.8); dot(a,b2,1.1,'#ffd880'); const g=c.createRadialGradient(x+a,B+b2,0,x+a,B+b2,6); g.addColorStop(0,'rgba(255,210,120,0.55)'); g.addColorStop(1,'rgba(255,210,120,0)'); c.fillStyle=g; c.beginPath(); c.arc(x+a,B+b2,6,0,Math.PI*2); c.fill(); }   // a temple lamp
+    else if(k===3){ line([[fx+5*sx,ey-4.2],[fx+4.6*sx,ey-2.2]],BRD,0.6); dot(fx+3.8*sx,ey-1.2,1.6,BRD); dot(fx+3.8*sx,ey-1.2,1.15,'#7ad0a0'); dot(fx+3.4*sx,ey-1.6,0.35,'#ffffff'); }   // a swing-down loupe
+    else if(k===4){ const pts=[]; for(let t=0;t<=1;t+=0.1) pts.push([fx+2*sx+t*7*sx+Math.sin(t*3)*1.2, ey+5.4+t*5]); line(pts,IRD,1.7); line(pts,'#5a5048',1.1); pts.forEach(([a,b2],i)=>{ if(i%2) dot(a,b2,0.55,'#7a7068'); }); }   // a breathing hose
+    else if(k===5) for(let i=0;i<4;i++){ const b2=ey-5.2-i*1.5; c.fillStyle=IRD; c.beginPath(); c.moveTo(x+fx-0.8,B+b2+0.4); c.lineTo(x+fx,B+b2-1.3); c.lineTo(x+fx+0.8,B+b2+0.4); c.fill(); dot(fx,b2,0.4,'#c8b080'); }   // a crest of bolts
+    else if(k===6){ c.save(); c.globalAlpha=0.8; c.strokeStyle=(bits>>9)&1?'#e8e4d8':'#b02a22'; c.lineWidth=1.1; c.beginPath(); c.moveTo(x+fx-4*sx,B+ey-3.6); c.lineTo(x+fx+3.6*sx,B+ey+5); c.stroke(); c.lineWidth=0.6; c.beginPath(); c.moveTo(x+fx-2.6*sx,B+ey-4.4); c.lineTo(x+fx+4.4*sx,B+ey+3.4); c.stroke(); c.restore(); }   // war paint
+    else if(k===7) [-1.6,0,1.6].forEach((dx,i)=>{ const a=fx+dx*sx; line([[a,ey+6],[a,ey+7.6+i*0.6]],'#6a5a3a',0.25); c.fillStyle=i===1?CU:'#8a8a86'; c.fillRect(x+a-0.7,B+ey+7.6+i*0.6,1.4,1.8); });   // stamped tags
+    else if(k===8){ c.fillStyle=IRD; c.fillRect(x+fx-1.6*sx-0.8,B+ey-10,1.6,4.4); c.fillStyle=BRD; c.fillRect(x+fx-1.6*sx-1.1,B+ey-10.4,2.2,0.8); [0,1,2].forEach(i=>{ c.fillStyle=`rgba(200,196,190,${0.45-i*0.12})`; c.beginPath(); c.arc(x+fx-1.6*sx+i*0.8,B+ey-11.6-i*1.8,0.9+i*0.6,0,Math.PI*2); c.fill(); }); }   // a little chimney
+  }); }
+// the tail they keep wrapped and hidden under the coat: bound in cloth strips, capped in brass
+function cvTail(c,x,B,dir,swing,opts){ const flip=dirMirrored(dir), v=dirView(dir), s=flip?-1:1, sw=Math.sin((swing||0)*1.3)*1.5;
+  const P0= v===0 ? [[3,-14],[7,-7],[10,-2],[13,-3]] : v===1 ? [[-4,-16],[-9,-8],[-12,-2],[-15,-3]] : v===2 ? [[-6,-24],[-12,-14],[-15,-5],[-18,-6]] : v===3 ? [[-3,-30],[-7,-16],[-10,-5],[-14,-6]] : [[0,-32],[2,-18],[5,-6],[9,-6]];   // only the end of it ever shows
+  const pts=P0.map(([a,b2],i)=>[x+s*(a+(i?sw*i*0.5:0)),B+b2]);
+  const tp=()=>{ c.beginPath(); c.moveTo(pts[0][0],pts[0][1]); c.bezierCurveTo(pts[1][0],pts[1][1],pts[2][0],pts[2][1],pts[3][0],pts[3][1]); };
+  c.save(); c.lineCap='round'; tp(); c.strokeStyle='#1a1614'; c.lineWidth=5.4; c.stroke(); tp(); c.strokeStyle=v===0||v===1?'#4a4038':'#5a4e44'; c.lineWidth=4.2; c.stroke();
+  c.strokeStyle='rgba(20,16,12,0.6)'; c.lineWidth=0.6; for(let t=0.12;t<0.92;t+=0.11){ const u=1-t, bx=u*u*u*pts[0][0]+3*u*u*t*pts[1][0]+3*u*t*t*pts[2][0]+t*t*t*pts[3][0], by=u*u*u*pts[0][1]+3*u*u*t*pts[1][1]+3*u*t*t*pts[2][1]+t*t*t*pts[3][1]; c.beginPath(); c.moveTo(bx-1.8,by-1.6); c.lineTo(bx+1.6,by+1.8); c.stroke(); }   // the binding strips
+  const e=pts[3]; c.fillStyle='#6e5420'; c.beginPath(); c.ellipse(e[0],e[1],2.4,1.8,0,0,Math.PI*2); c.fill(); c.fillStyle='#b08a3a'; c.beginPath(); c.ellipse(e[0]-0.4*s,e[1]-0.4,1.6,1.1,0,0,Math.PI*2); c.fill();
+  c.restore(); }
 Object.assign(ITEMS,{ cv_mask_weld:{ name:'Cinderveil Welding Mask', slot:'head', base:'kettle', col:'#3e3a36' }, cv_mask_resp:{ name:'Cinderveil Salvage Rig', slot:'head', base:'kettle', col:'#4a3a2c' },
   cv_mask_elder:{ name:"Cinderveil Elder's Mask", slot:'head', base:'kettle', col:'#b08a3a' }, cv_mask_plain:{ name:'Blank Iron Mask', slot:'head', base:'kettle', col:'#2c2a2e' }, cv_helm_suit:{ name:'Cinderveil Suit Helm', slot:'head', base:'kettle', col:'#a8603a' },
   cv_suit:{ name:'Cinderveil Pressure Suit', slot:'armor', base:'gambeson', col:'#5e3e24' }, cv_suit_iron:{ name:'Cinderveil Iron Suit', slot:'armor', base:'gambeson', col:'#3a3632' }, cv_suit_legs:{ name:'Suit Leggings', slot:'legs', base:'trousers', col:'#4a3220' }, cv_suit_legs_iron:{ name:'Iron Suit Leggings', slot:'legs', base:'trousers', col:'#2e2c2a' },

@@ -30169,6 +30169,243 @@ function styleShop(kind){ closeDialog(); const old=document.getElementById('styl
     AREA_PATHS.longmeadow=AREA_PATHS.longmeadow.map(pl=>pl.map(([x,y])=>[W-x,y])); }
   if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
 }
+
+// Cinderveil contraptions as small 3D models, projected the way the game projects the world, so every one turns to all eight directions and walks.
+// Local axes: +x forward, +y left, +z up. dir 0..7 = S, SE, E, NE, N, NW, W, SW (as the game's facings).
+const CVM3=(()=>{
+  const sh=(hex,a)=>{ const n=parseInt(hex.slice(1),16); let r=n>>16,g=(n>>8)&255,b=n&255; const f=v=>Math.max(0,Math.min(255,Math.round(a>=0?v+(255-v)*a:v*(1+a)))); return '#'+((1<<24)+(f(r)<<16)+(f(g)<<8)+f(b)).toString(16).slice(1); };
+  const IRON='#4a4540', IRD='#1e1c1a', BR='#b08a3a', BRD='#6e5420', CU='#a8603a', WOOD='#7a5a3a', CLOTH='#8a3a2a', TIMB='#6a4a2c', HOOP='#2e2a26';
+  const VIEW=[0.612,0.612,0.5], LIGHT=(()=>{ const v=[0.15,0.55,0.82], l=Math.hypot(...v); return v.map(a=>a/l); })();
+  const dot3=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2], add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]], mul=(a,k)=>[a[0]*k,a[1]*k,a[2]*k], sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+  const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]], norm=a=>{ const l=Math.hypot(...a)||1; return a.map(v=>v/l); };
+  function Scene(c,ox,oy,S,dir){ const th=(45-dir*45)*Math.PI/180, cs=Math.cos(th), sn=Math.sin(th);
+    const R=p=>[p[0]*cs-p[1]*sn, p[0]*sn+p[1]*cs, p[2]];   // local → world (rotation only; vectors too)
+    const prj=P=>[ox+(P[0]-P[1])*0.7071*S, oy+(P[0]+P[1])*0.3536*S-P[2]*S];
+    const ops=[], push=(d,fn)=>ops.push({d,fn});
+    const depth=P=>P[0]+P[1]+P[2]*0.02;
+    const lit=(col,n)=>sh(col, dot3(n,LIGHT)*0.32-0.14);
+    const path=pts=>{ c.beginPath(); pts.forEach(([x,y],k)=>k?c.lineTo(x,y):c.moveTo(x,y)); c.closePath(); };
+    const sc={ c, S, R, prj, sh, IRON, IRD, BR, BRD, CU, WOOD, CLOTH,
+      box(cen,w,d,h,col,opt={}){ const P=[], o=cen; for(const [a,b,z] of [[-1,-1,0],[1,-1,0],[1,1,0],[-1,1,0],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]]) P.push(R([o[0]+a*w/2,o[1]+b*d/2,o[2]+z*h]));
+        const F=[[[1,2,6,5],[1,0,0]],[[3,0,4,7],[-1,0,0]],[[2,3,7,6],[0,1,0]],[[0,1,5,4],[0,-1,0]],[[4,5,6,7],[0,0,1]]].map(([ix,n])=>({ix,n:R(n)})).filter(f=>dot3(f.n,VIEW)>0.01);
+        const cw=R(o); push(depth([cw[0],cw[1],o[2]+h/2]),()=>{ F.forEach(f=>{ const pts=f.ix.map(i=>prj(P[i])); path(pts); c.fillStyle=lit(col,f.n); c.fill(); c.strokeStyle=IRD; c.lineWidth=0.9; c.lineJoin='round'; c.stroke();
+            if(opt.planks && f.n[2]<0.5){ c.strokeStyle='rgba(0,0,0,0.25)'; c.lineWidth=0.6; for(let t=1;t<opt.planks;t++){ const k=t/opt.planks, a=pts[0], b=pts[1], a2=pts[3], b2=pts[2]; c.beginPath(); c.moveTo(a[0]+(b[0]-a[0])*k,a[1]+(b[1]-a[1])*k); c.lineTo(a2[0]+(b2[0]-a2[0])*k,a2[1]+(b2[1]-a2[1])*k); c.stroke(); } }
+            if(opt.rivets && f.n[2]<0.5){ const a=pts[3], b=pts[2]; for(let t=0.08;t<1;t+=0.14){ c.fillStyle='#c8b080'; c.beginPath(); c.arc(a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t+2.2*S,0.8*S,0,Math.PI*2); c.fill(); } }
+            if(opt.face && f.n===F.find(q=>Math.abs(q.n[0]-R(opt.face.n)[0])<0.01 && Math.abs(q.n[1]-R(opt.face.n)[1])<0.01)?.n) opt.face.fn(pts,c,S); }); }); },
+      cylV(cen,r,h,col){ const w=R(cen), b=prj(w), t=prj([w[0],w[1],w[2]+h]); push(depth([w[0],w[1],w[2]+h/2]),()=>{ const rx=r*S, ry=r*S*0.5, g=c.createLinearGradient(b[0]-rx,0,b[0]+rx,0); g.addColorStop(0,sh(col,0.25)); g.addColorStop(0.45,col); g.addColorStop(1,sh(col,-0.5));
+          c.fillStyle=g; c.beginPath(); c.ellipse(b[0],b[1],rx,ry,0,0,Math.PI); c.lineTo(t[0]-rx,t[1]); c.ellipse(t[0],t[1],rx,ry,0,Math.PI,0,true); c.closePath(); c.fill(); c.strokeStyle=IRD; c.lineWidth=0.9; c.stroke();
+          c.fillStyle=sh(col,0.15); c.beginPath(); c.ellipse(t[0],t[1],rx,ry,0,0,Math.PI*2); c.fill(); c.stroke(); }); return [w[0],w[1],w[2]+h]; },
+      ring(cen,n,r,k=24){ const N=norm(n), u=norm(Math.abs(N[2])>0.9?cross(N,[1,0,0]):cross(N,[0,0,1])), v=cross(N,u), pts=[]; for(let i=0;i<k;i++){ const a=i/k*Math.PI*2; pts.push(prj(add(cen,add(mul(u,Math.cos(a)*r),mul(v,Math.sin(a)*r))))); } return pts; },
+      disk(cenL,nL,r,col,opt={}){ const cen=R(cenL), n=norm(R(nL)); if(dot3(n,VIEW)<=0.02 && !opt.always) return; push(depth(cen)+(opt.bias||0.5),()=>{ const pts=sc.ring(cen,n,r); path(pts);
+          if(opt.glass){ const p0=prj(cen), g=c.createRadialGradient(p0[0]-r*S*0.3,p0[1]-r*S*0.3,0.5,p0[0],p0[1],r*S*1.1); g.addColorStop(0,'#fff8e0'); g.addColorStop(0.3,col); g.addColorStop(1,sh(col,-0.6)); c.fillStyle=g; } else c.fillStyle=lit(col,n);
+          c.fill(); c.strokeStyle=opt.rim||IRD; c.lineWidth=(opt.rim?2:0.9)*Math.max(1,S*0.6); c.stroke(); if(opt.glow){ const p0=prj(cen), g=c.createRadialGradient(p0[0],p0[1],0,p0[0],p0[1],r*S*3); g.addColorStop(0,col+'88'); g.addColorStop(1,col+'00'); c.fillStyle=g; c.beginPath(); c.arc(p0[0],p0[1],r*S*3,0,Math.PI*2); c.fill(); } if(opt.spokes){ const p0=prj(cen); c.strokeStyle=BR; c.lineWidth=1; for(let i=0;i<pts.length;i+=4){ c.beginPath(); c.moveTo(p0[0],p0[1]); c.lineTo(pts[i][0],pts[i][1]); c.stroke(); } } }); },
+      cylH(aL,bL,r,col,opt={}){ const a=R(aL), b=R(bL), d=norm(sub(b,a)), A=sc.ring(a,d,r,28), Bp=sc.ring(b,d,r,28);
+        push(depth(mul(add(a,b),0.5)),()=>{ const all=[...A,...Bp].sort((p,q)=>p[0]-q[0]||p[1]-q[1]), cr=(o,p,q)=>(p[0]-o[0])*(q[1]-o[1])-(p[1]-o[1])*(q[0]-o[0]), lo=[], hi=[];
+          for(const p of all){ while(lo.length>=2 && cr(lo[lo.length-2],lo[lo.length-1],p)<=0) lo.pop(); lo.push(p); } for(const p of all.slice().reverse()){ while(hi.length>=2 && cr(hi[hi.length-2],hi[hi.length-1],p)<=0) hi.pop(); hi.push(p); }
+          const hull=[...lo.slice(0,-1),...hi.slice(0,-1)], pa=prj(a), pb=prj(b), mx=(pa[0]+pb[0])/2, my=(pa[1]+pb[1])/2, nx=-(pb[1]-pa[1]), ny=(pb[0]-pa[0]), nl=Math.hypot(nx,ny)||1;
+          const g=c.createLinearGradient(mx-nx/nl*r*S,my-ny/nl*r*S,mx+nx/nl*r*S,my+ny/nl*r*S); g.addColorStop(0,sh(col,0.3)); g.addColorStop(0.42,col); g.addColorStop(1,sh(col,-0.55)); path(hull); c.fillStyle=g; c.fill(); c.strokeStyle=IRD; c.lineWidth=0.9; c.stroke();
+          if(opt.bands){ c.save(); path(hull); c.clip(); c.strokeStyle=opt.bandCol||BRD; c.lineWidth=1.6*S*0.8; opt.bands.forEach(t=>{ path(sc.ring(add(a,mul(sub(b,a),t)),d,r)); c.stroke(); }); c.restore(); }
+          const end=dot3(d,VIEW)>0?{p:b,n:d}:{p:a,n:mul(d,-1)}; path(sc.ring(end.p,end.n,r)); c.fillStyle=lit(sh(col,-0.05),end.n); c.fill(); c.strokeStyle=IRD; c.stroke(); }); },
+      sphere(cenL,r,col,opt={}){ const w=R(cenL), p=prj(w); push(depth(w)+(opt.bias||0),()=>{ const g=c.createRadialGradient(p[0]-r*S*0.35,p[1]-r*S*0.4,r*S*0.1,p[0],p[1],r*S*1.05); g.addColorStop(0,sh(col,0.4)); g.addColorStop(0.55,col); g.addColorStop(1,sh(col,-0.55));
+          c.fillStyle=g; c.beginPath(); if(opt.sy) c.ellipse(p[0],p[1],r*S,r*S*opt.sy,0,0,Math.PI*2); else c.arc(p[0],p[1],r*S,0,Math.PI*2); c.fill(); c.strokeStyle=IRD; c.lineWidth=0.9; c.stroke(); }); },
+      seg(aL,bL,w,col,bias=0){ const a=R(aL), b=R(bL), pa=prj(a), pb=prj(b); push(depth(mul(add(a,b),0.5))+bias,()=>{ c.lineCap='round'; c.strokeStyle=IRD; c.lineWidth=(w+2)*S*0.55; c.beginPath(); c.moveTo(pa[0],pa[1]); c.lineTo(pb[0],pb[1]); c.stroke(); c.strokeStyle=col; c.lineWidth=w*S*0.55; c.stroke(); c.strokeStyle='rgba(255,255,255,0.18)'; c.lineWidth=w*S*0.16; c.beginPath(); c.moveTo(pa[0]-1,pa[1]-1); c.lineTo(pb[0]-1,pb[1]-1); c.stroke(); }); },
+      joint(pL,r,bias=0.05,iron){ const w=R(pL), p=prj(w); push(depth(w)+bias,()=>{ c.fillStyle=IRD; c.beginPath(); c.arc(p[0],p[1],(r+0.8)*S*0.6,0,Math.PI*2); c.fill(); c.fillStyle=iron?'#5a5650':BR; c.beginPath(); c.arc(p[0],p[1],r*S*0.6,0,Math.PI*2); c.fill(); c.fillStyle='#f0e0b0'; c.beginPath(); c.arc(p[0]-r*S*0.15,p[1]-r*S*0.15,r*S*0.2,0,Math.PI*2); c.fill(); }); },
+      poly(ptsL,col,bias=0){ const W=ptsL.map(R), cen=W.reduce((s,p)=>add(s,mul(p,1/W.length)),[0,0,0]); push(depth(cen)+bias,()=>{ path(W.map(prj)); c.fillStyle=col; c.fill(); c.strokeStyle=IRD; c.lineWidth=0.8; c.stroke(); }); },
+      smoke(pL,s=4){ const p=prj(R(pL)); push(1e6,()=>{ for(let k=0;k<5;k++){ const t=k/5; c.fillStyle=`rgba(${80+k*20},${76+k*20},${72+k*20},${0.5-t*0.38})`; c.beginPath(); c.arc(p[0]+Math.sin(k*1.7)*s*t*2*S-s*t*S,p[1]-s*k*1.3*S,s*S*(0.6+t*1.1),0,Math.PI*2); c.fill(); } }); },
+      glow(pL,r,col){ const w=R(pL), p=prj(w); push(depth(w)+0.3,()=>{ const g=c.createRadialGradient(p[0],p[1],0,p[0],p[1],r*S); g.addColorStop(0,col); g.addColorStop(1,'rgba(0,0,0,0)'); c.fillStyle=g; c.beginPath(); c.arc(p[0],p[1],r*S,0,Math.PI*2); c.fill(); }); },
+      shadow(rx,ry){ push(-1e6,()=>{ c.fillStyle='rgba(0,0,0,0.3)'; c.beginPath(); c.ellipse(ox,oy,rx*S,ry*S,0,0,Math.PI*2); c.fill(); }); },
+      leg(ptsL,w,col,off,walk){ if(walk && off!=null){ const ph=walk.ph+off, f=ptsL[ptsL.length-1], n=ptsL.length-1, lift=Math.max(0,Math.sin(ph))*walk.lift, dx=Math.cos(ph)*walk.stride; ptsL=ptsL.map((p,i)=>i===0?p:[p[0]+dx*(i/n)*(i===n?1:0.6),p[1],p[2]+lift*(i/n)*(i===n?1:0.9)]); }
+        for(let k=1;k<ptsL.length;k++) sc.seg(ptsL[k-1],ptsL[k],w*(1-k*0.1),col);
+        if(ptsL.length>2 && col!==IRON){ const [a,b,d]=ptsL; sc.seg(add(a,mul(sub(b,a),0.3)),add(b,mul(sub(d,b),0.3)),Math.max(1,w*0.2),'#8a7a5a',0.02); }   // a rope lashing across the knee
+        ptsL.slice(0,-1).forEach(p=>sc.joint(p,w*0.55,0.05,col!==IRON)); const f=ptsL[ptsL.length-1]; sc.disk([f[0],f[1],0.1],[0,0,1],w*0.7,IRD,{always:true,bias:-0.5}); },
+      draw(){ ops.sort((a,b)=>a.d-b.d).forEach(o=>o.fn()); } };
+    return sc; }
+  const W=(ph,stride,lift)=>ph==null?null:{ph,stride,lift};
+  const bob=(ph,a)=>ph==null?0:Math.abs(Math.sin(ph*2))*a;
+
+  function skitter(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,3,4), z=bob(ph,0.8); s.shadow(26,10);
+    for(let k=0;k<8;k++){ const a=(k<4?0.55+k*0.68:Math.PI-0.55-(k-4)*0.68)*(k<4?1:1)*(k<4?1:-1)+(k<4?0:0); const ang=k<4?(-Math.PI/2+0.5+k*0.72):(Math.PI/2-0.5-(k-4)*0.72);
+      const cx=Math.cos(ang), cy=Math.sin(ang); s.leg([[cx*9,cy*9,14+z],[cx*20,cy*20,26+z],[cx*30,cy*30,0]],3.4,IRON,(k%2)*Math.PI+(k<4?0:Math.PI/2),wk); }
+    s.sphere([0,0,15+z],13,BR,{sy:0.78}); s.disk([0,0,8+z],[0,0,-1],11,IRD,{always:true,bias:-2});
+    s.disk([11,0,16+z],[1,0,0.15],4.2,'#f08a30',{glass:true,glow:true,rim:BR,bias:2}); s.disk([8,4,22+z],[0.6,0.6,0.4],1.4,'#e84030',{glass:true,bias:2}); s.disk([8,-4,22+z],[0.6,-0.6,0.4],1.4,'#e84030',{glass:true,bias:2});
+    const t=s.cylV([-6,0,24+z],2,5,IRD); s.smoke([-6,0,31+z],2.2);
+    s.seg([11,3,10+z],[19,4,6+z],2.2,IRON,1); s.seg([11,-3,10+z],[19,-4,6+z],2.2,IRON,1); s.sphere([21,0,5+z],5,'#6a4426',{bias:1}); s.sphere([22,1.5,8+z],1.4,'#f0c850',{bias:2});
+    s.draw(); }
+
+  function strutter(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,6,7), z=bob(ph,2); s.shadow(28,10);
+    [[7,0],[-7,Math.PI]].forEach(([yy,off])=>{ s.leg([[0,yy,54+z],[12,yy*1.15,34+z],[-2,yy*1.15,13+z],[6,yy*1.15,0]],5.5,TIMB,off,wk); });
+    s.cylH([-16,0,60+z],[14,0,62+z],13,WOOD,{bands:[0.1,0.5,0.9],bandCol:HOOP});
+    s.box([-2,0,73+z],18,14,4,'#5a3420'); s.box([-10,0,77+z],4,12,9,'#5a3420');
+    s.seg([12,0,66+z],[30,0,84+z],5,TIMB); s.box([34,0,82+z],10,9,10,'#3a3632',{rivets:true}); s.disk([39.2,0,87+z],[1,0,0],3.4,'#f0b050',{glass:true,glow:true,rim:HOOP,bias:2});
+    s.seg([-16,0,62+z],[-30,0,72+z],3.6,IRD); s.smoke([-31,0,74+z],3);
+    s.draw(); }
+
+  function hauler(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,5,5), z=bob(ph,1.2); s.shadow(42,16);
+    [[22,12,0],[22,-12,Math.PI],[-20,12,Math.PI],[-20,-12,0]].forEach(([xx,yy,off])=>s.leg([[xx,yy,32+z],[xx+(xx>0?6:-6),yy*1.25,16+z],[xx+(xx>0?2:-2),yy*1.25,0]],7,TIMB,off,wk));
+    s.cylH([-30,0,42+z],[28,0,42+z],16,WOOD,{bands:[0.08,0.3,0.7,0.92],bandCol:HOOP});
+    s.box([-6,0,57+z],26,20,10,WOOD,{planks:3}); s.box([-14,2,67+z],12,12,9,'#8a6a40',{planks:2}); s.sphere([8,-3,63+z],6,'#6a5a3a',{sy:0.7});
+    s.cylV([22,0,55+z],4,14,IRD); s.smoke([22,0,72+z],4.5);
+    s.disk([0,16.5,42+z],[0,1,0],9,TIMB,{spokes:true,bias:1}); s.disk([0,-16.5,42+z],[0,-1,0],9,TIMB,{spokes:true,bias:1});
+    s.disk([30,0,42+z],[1,0,0],4,'#f0b050',{glass:true,glow:true,rim:HOOP,bias:2});
+    s.draw(); }
+
+  function crawler(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,6,7), z=bob(ph,1.5); s.shadow(64,30);
+    [-26,0,26].forEach((xx,k)=>[1,-1].forEach(sd=>s.leg([[xx,sd*20,30+z],[xx*1.25,sd*40,50+z],[xx*1.45,sd*58,0]],7,TIMB,(k+(sd>0?0:1))%2?Math.PI:0,wk)));
+    s.box([0,0,22+z],72,44,20,'#6a5038',{rivets:true,planks:5}); s.box([-6,0,42+z],42,28,9,'#4a4038',{planks:3});
+    s.sphere([18,0,62+z],13,'#5a4632'); s.disk([28,0,62+z],[1,0,0],5.5,'#5a8a8a',{glass:true,rim:BR,bias:3});
+    [-14,-24].forEach(xx=>{ s.cylV([xx,6,51+z],3.2,14,IRD); s.smoke([xx,6,67+z],3.4); });
+    s.seg([34,14,34+z],[54,22,26+z],5,IRON); s.seg([54,22,26+z],[70,26,14+z],4,IRON); s.seg([70,26,14+z],[80,24,20+z],3,IRD); s.seg([70,26,14+z],[80,30,8+z],3,IRD);
+    s.seg([34,-14,30+z],[52,-20,18+z],4,IRON); s.seg([52,-20,18+z],[64,-22,8+z],3.2,IRON); s.glow([67,-23,7+z],14,'rgba(120,180,255,0.8)');
+    s.draw(); }
+
+  function bellows(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,10,9), z=bob(ph,2.5); s.shadow(100,56);
+    [[44,36,0],[44,-36,Math.PI],[-44,36,Math.PI],[-44,-36,0]].forEach(([xx,yy,off])=>s.leg([[xx,yy,84+z],[xx*1.4,yy*1.5,54+z],[xx*1.55,yy*1.6,0]],13,TIMB,off,wk));
+    s.box([0,0,82+z],124,90,70,'#6a5038',{rivets:true,planks:7, face:{n:[1,0,0], fn:(pts,c,S)=>{ const cx=(pts[0][0]+pts[1][0]+pts[2][0]+pts[3][0])/4, cy=(pts[0][1]+pts[1][1]+pts[2][1]+pts[3][1])/4; c.fillStyle='#1a1614'; c.fillRect(cx-9*S,cy-8*S,18*S,26*S); const g=c.createLinearGradient(0,cy-6*S,0,cy+16*S); g.addColorStop(0,'#ffe080'); g.addColorStop(1,'#e04010'); c.fillStyle=g; c.fillRect(cx-7*S,cy-6*S,14*S,22*S); } }});
+    s.glow([64,0,100+z],46,'rgba(255,120,40,0.5)');
+    for(let k=0;k<5;k++) s.disk([-30+k*9,46,108+z],[0,1,0],7-(k%2),k%2?'#6a3a22':'#8a5032',{bias:1});
+    s.cylV([-30,-20,152+z],12,70,IRD); s.smoke([-30,-20,224+z],14); s.cylV([30,-28,152+z],6,36,IRD); s.smoke([30,-28,190+z],7);
+    s.box([78,0,82+z],26,30,5,IRON); s.box([80,0,87+z],16,8,6,'#2a2a2e');
+    s.seg([-54,40,152+z],[-54,40,190+z],1.6,WOOD); s.poly([[-54,40,190+z],[-54,56,186+z],[-54,40,180+z]],CLOTH);
+    s.draw(); }
+
+  function magpie(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,12,12), z=bob(ph,3); s.shadow(40,16);
+    [[10,0],[-10,Math.PI]].forEach(([yy,off])=>s.leg([[0,yy,152+z],[-24,yy*1.6,96+z],[6,yy*1.6,46+z],[-6,yy*1.6,0]],8.5,TIMB,off,wk));
+    s.box([0,0,150+z],44,40,40,'#d8d0c0',{planks:4}); s.box([0,0,190+z],50,46,6,'#1e1c1e');
+    s.poly([[22,-12,160+z],[22,12,160+z],[40,0,172+z]],'#1e1c1e',3); s.poly([[22,-12,184+z],[22,12,184+z],[40,0,172+z]],'#2e2c2e',3);
+    s.disk([22.5,0,176+z],[1,0,0],3.6,'#f0d070',{glass:true,glow:true,rim:BR,bias:4});
+    s.seg([-4,-6,196+z],[-4,-6,236+z],2,WOOD); s.box([-4,-6,230+z],20,20,3,'#1e1c1e'); s.poly([[-4,-6,236+z],[-4,10,232+z],[-4,-6,226+z]],'#e8e4dc'); s.seg([2,-6,233+z],[22,-6,240+z],2.4,BR);
+    [[-14,'#f0c850'],[-4,'#c8d0d8'],[6,'#f0c850'],[14,'#d84030']].forEach(([yy,col],k)=>{ s.seg([10,yy,150+z],[10,yy,140-k*3+z],0.6,'#6a5a3a',2); s.sphere([10,yy,138-k*3+z],2.2,col,{bias:2}); });
+    s.cylV([-14,-12,196+z],3,12,IRD); s.smoke([-14,-12,210+z],4);
+    s.draw(); }
+  return { skitter, strutter, hauler, crawler, bellows, magpie };
+})();
+
+// ════════ THE CINDERVEIL: masked salvagers who walk the long roads. "What lies, rides": anything unattended is salvage to them. ════════
+//   Their camp lies off the Scrublands road. A Skitter (a brass spider of theirs) may take your whole purse on the long roads: catch it, or go and get it back.
+//   Trust (CHOICE.cvTrust) is earned with salvage: 1 lets them trade with you and share their fire (after which they never take from you again), 2 better prices and the elder's mask.
+{ const ROADS=['hedgerow','longmeadow','scrubland','alderbrook','heath','foothills'];
+  const day=()=>Math.floor(dayClock/DAY_LEN), trust=()=>CHOICE.cvTrust||0;
+  const CV=(o)=>({race:'cinderveil', skin:2, hair:0, hairColor:3, beard:0, face:1, gender:'m', ...o, equip:{head:'cv_mask_resp', torso:'tunic_deep', armor:'cv_duster', shoulders:null, hands:'cv_gauntlets', legs:'hose_grey', feet:'cv_wrapboots', neck:null, weapon:null, offhand:null, ...(o.equip||{})}});
+  // ── salvage ──
+  ITEMS.cv_scrap={ name:'Salvage', slot:'misc', stack:true, stackMax:20, title:"Bent iron, a cart-hoop, nails, a hinge, half a lock. The Cinderveil want every scrap of it." }; PRICES.cv_scrap=3; if(typeof SELL_MISC!=='undefined') SELL_MISC.add?.('cv_scrap');
+  ICON_EXTRA.cv_scrap=(g2,E)=>{ g2.strokeStyle='#2a2622'; g2.lineWidth=3; g2.beginPath(); g2.arc(17,22,8,0.3,4.6); g2.stroke(); g2.strokeStyle='#6a6660'; g2.lineWidth=1.8; g2.stroke();
+    g2.fillStyle='#4a4642'; g2.fillRect(22,12,10,4); g2.fillStyle='#8a8680'; g2.fillRect(22,12,10,1.4); g2.fillStyle='#5a3e26'; g2.fillRect(12,27,14,4); [[25,26],[29,30],[14,14]].forEach(([x,y])=>{ g2.strokeStyle='#8a8680'; g2.lineWidth=1.2; g2.beginPath(); g2.moveTo(x,y); g2.lineTo(x+4,y+5); g2.stroke(); }); };
+  OBJ_DRAW.scrapheap=o=>{ const q=P(o.i+0.5,o.j+0.5), sd=(o.i*7+o.j*3)%4;   // a heap of old iron: a broken cart-wheel, hoops, chain, a split barrel
+    drawCached('scrap'+sd,q.x,q.y,90,60,45,44,(X,Y)=>{ g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(X+2,Y+3,30,9,0,0,Math.PI*2); g.fill();
+      g.fillStyle='#4a3a2a'; g.beginPath(); g.ellipse(X,Y-4,26,10,0,Math.PI,0); g.lineTo(X+26,Y); g.lineTo(X-26,Y); g.fill();
+      g.strokeStyle='#2a1e14'; g.lineWidth=3; g.beginPath(); g.ellipse(X-8+sd,Y-12,11,9,0.3,0,Math.PI*2); g.stroke(); g.strokeStyle='#6a4a2c'; g.lineWidth=2; g.stroke(); for(let k=0;k<6;k++){ const a=k*Math.PI/3+0.3; g.beginPath(); g.moveTo(X-8+sd,Y-12); g.lineTo(X-8+sd+Math.cos(a)*10,Y-12+Math.sin(a)*8); g.stroke(); }
+      g.strokeStyle='#3a3632'; g.lineWidth=2.4; g.beginPath(); g.ellipse(X+12,Y-6,9,4,-0.2,0,Math.PI*2); g.stroke(); g.strokeStyle='#6a6660'; g.lineWidth=1.2; g.stroke();
+      g.fillStyle='#5a4a3a'; g.fillRect(X+4,Y-18,10,8); g.strokeStyle='#2a2622'; g.lineWidth=1.2; g.strokeRect(X+4,Y-18,10,8); g.beginPath(); g.moveTo(X+4,Y-14); g.lineTo(X+14,Y-14); g.stroke();
+      g.strokeStyle='#5a5650'; g.lineWidth=1.4; for(let k=0;k<5;k++){ g.beginPath(); g.arc(X-18+k*3.4,Y-3-(k%2),1.6,0,Math.PI*2); g.stroke(); } }); };   // a length of chain
+  onUse(['scrapheap'],o=>{ if(o.camp){ logMsg("The Cinderveil's own heap. Hands off.",'#c8a860'); return; } CHOICE.cvHeaps=CHOICE.cvHeaps||{}; const k=areaId+':'+o.i+','+o.j;
+    if(CHOICE.cvHeaps[k]===day()){ logMsg('Nothing worth having left in this heap today.','#c8a860'); return; }
+    const n=1+(rnd01(day(),o.i+o.j,77)<0.5?1:0); let got=0; for(let t=0;t<n;t++){ const f=slotFor('cv_scrap'); if(f>=0){ player.inv[f]='cv_scrap'; got++; } }
+    if(got){ CHOICE.cvHeaps[k]=day(); logMsg('You pick through the old iron: '+got+' Salvage.','#8ac070'); try{ SND.fx('page'); }catch(e){} updateHud(); } else logMsg('Inventory is full.','#e0b070'); });
+  NEAR_NAME.scrapheap='Scrap Heap';
+  [['scrubland',[[2,24],[9,35],[3,42]]],['heath',[[33,12]]],['foothills',[[9,38]]],['longmeadow',[[48,2]]],['alderbrook',[[44,8]]]].forEach(([a,L])=>wrap(a,'objects',l=>[...l,...L.map(([i,j])=>({type:'scrapheap',i,j}))]));
+
+  // ── the machines, standing in the world ──
+  OBJ_DRAW.cvwalker=o=>{ const [fw,fh]=o.fp||[1,1], q=P(o.i+fw/2,o.j+fh/2); CVM3[o.kind](g,q.x,q.y,o.s||1,o.dir||0,null); };
+  OBJ_DRAW.skitter=o=>{ const q=P(o.x,o.y); if(o.st==='dead'){ g.save(); g.translate(q.x,q.y); g.rotate(1.2); CVM3.skitter(g,0,0,0.85,o.dir,null); g.restore(); return; }
+    CVM3.skitter(g,q.x,q.y+(o.st==='rest'?Math.sin(gt*20)*0.8:0),0.85,o.dir,o.moving?gt*14:null);
+    if(o.purse && o.st==='rest'){ g.fillStyle='#f0c850'; const t=(gt*3)%1; g.globalAlpha=1-t; g.beginPath(); g.arc(q.x+8,q.y-24-t*14,2.4,0,Math.PI*2); g.fill(); g.globalAlpha=1; } };   // counting your coins
+  NEAR_NAME.skitter='Skitter'; NEAR_NAME.cvwalker='';
+
+  // ── the camp ──
+  AREA_PATHS.cvcamp=[ [[-0.5,10.5],[5,10.4],[10,11],[13,11.2]], [[13,11],[16,8],[17,6]] ];
+  AREA_PATHS.scrubland=AREA_PATHS.scrubland||[]; AREA_PATHS.scrubland.push([[7.2,26.5],[12.5,26.5]]);
+  AREAS.cvcamp={ fence:{r:false,l:false}, mini:{x:0,y:0}, notches:()=>[], dummy:null, w:26, h:20, theme:'sand', sandKind:'clay', scrub:gy=>0.55, label:'Cinderveil Camp',
+    objects:()=>[ {type:'teleporter', i:0, j:10, to:'scrubland', entry:'fromCamp2'},
+      {type:'cvwalker', kind:'bellows', i:14, j:2, fp:[4,4], dir:1, s:0.95}, {type:'cvwalker', kind:'magpie', i:21, j:11, fp:[2,2], dir:7, s:0.95}, {type:'cvwalker', kind:'hauler', i:7, j:15, fp:[3,2], dir:0, s:1},
+      {type:'cvwalker', kind:'strutter', i:3, j:4, fp:[1,1], dir:2, s:1}, {type:'cvwalker', kind:'skitter', i:10, j:7, fp:[1,1], dir:5, s:0.85}, {type:'cvwalker', kind:'skitter', i:19, j:16, fp:[1,1], dir:3, s:0.85},
+      {type:'tent', i:5, j:1, fp:[2,2]}, {type:'tent', i:9, j:1, fp:[2,2]}, {type:'tent', i:2, j:14, fp:[2,2]}, {type:'tent', i:22, j:3, fp:[2,2]},
+      {type:'campfire', i:12, j:11}, {type:'logseat', i:11, j:12}, {type:'logseat', i:13, j:12, r:1}, {type:'logseat', i:11, j:10},
+      {type:'brazier', i:4, j:9}, {type:'brazier', i:4, j:12}, {type:'brazier', i:19, j:8},
+      {type:'anvil', i:17, j:10}, {type:'forge', i:19, j:6}, {type:'scrapheap', i:16, j:14, camp:true}, {type:'scrapheap', i:22, j:16, camp:true}, {type:'scrapheap', i:12, j:16, camp:true},
+      {type:'washline', i:7, j:6, noblock:true}, {type:'crate', i:24, j:8}, {type:'barrel', i:24, j:9}, {type:'barrel', i:9, j:17}, {type:'sandrock', i:0, j:2, v:1}, {type:'sandrock', i:25, j:18, v:3}, {type:'deadtree', i:1, j:18, s:0.8} ],
+    npcs:()=>[
+      { id:'cvodra', name:'Ashmother Odra', i:12, j:9, dir:0, opts:CV({gender:'f', cvBits:0b010000101, equip:{head:'cv_mask_elder', torso:'tunic_red', armor:'cv_duster_elder', neck:'cv_scarf'}}) },
+      { id:'cvbrannock', name:'Brannock the Fused', i:17, j:11, dir:6, opts:CV({cvBits:0b000001100, equip:{head:'cv_mask_weld', armor:'cv_apron', neck:'cv_scarf'}}) },
+      { id:'cvtinny', name:'Tinny', i:8, j:13, dir:1, wander:[[8,13],[11,14],[6,11]], speed:0.6, opts:CV({gender:'f', cvBits:0b100010010, cvPack:true, equip:{head:'cv_mask_resp', armor:'cv_duster_rust', shoulders:'cv_harness', neck:'cv_scarf_grey'}}) },
+      { id:'cvwarden', name:'Veil-Warden', i:2, j:8, dir:2, opts:CV({cvPack:true, equip:{head:'cv_helm_suit', armor:'cv_suit_iron', weapon:'morningstar'}}) } ],
+    mobs:()=>[], entries:{ fromScrub:{i:1,j:10} } };
+  AREA_TIER.cvcamp=2;
+  wrap('scrubland','objects',l=>[...l,{type:'teleporter', i:11, j:26, to:'cvcamp', entry:'fromScrub'}]);
+  AREAS.scrubland.entries.fromCamp2={i:10,j:26};
+
+  // ── the purse and how you get it back ──
+  const job=()=>CHOICE.cvJob, scrap=()=>invCount('cv_scrap');
+  const takeScrap=n=>{ for(let k=0;k<n;k++){ const j=player.inv.indexOf('cv_scrap'); if(j>=0) player.inv[j]=null; } };
+  const back=()=>TALKERS.cvodra();
+  const CVSHOP=()=>['cv_mask_resp','cv_mask_weld','cv_mask_plain','cv_duster','cv_duster_rust','cv_duster_red','cv_wrap','cv_gauntlets','cv_wrapboots','cv_scarf','cv_scarf_grey','cv_harness',...(trust()>=2?['cv_mask_elder','cv_duster_elder']:[])].filter(id=>ITEMS[id]);
+  Object.assign(PRICES,{ cv_mask_resp:40, cv_mask_weld:45, cv_mask_plain:30, cv_mask_elder:160, cv_duster:55, cv_duster_rust:55, cv_duster_red:60, cv_duster_elder:180, cv_wrap:40, cv_gauntlets:35, cv_wrapboots:30, cv_scarf:12, cv_scarf_grey:12, cv_harness:45 });
+  TALKERS.cvodra=()=>{ const st=CHOICE.cvStolen||0, o=[];
+    const intro = st ? "“You followed it here. Few do.” <i>The mask tilts; something behind it clicks.</i> “What lies, rides. Your purse lay on the road, unwatched; by our law it is ours. But you came for it, and we respect the ones who come.”"
+      : trust()===0 ? "“We do not trade with faces we do not know. You have a face. That is already one thing against you.”"
+      : trust()===1 ? "“Road-friend. Sit, if you like. Mind the pot, it bites.”" : "“Ah. The one who brings us iron. Sit by me.”";
+    if(st){ if(job()!=='purse') o.push({label:'“How do I earn it back?”', fn:()=>{ CHOICE.cvJob='purse'; remember('cvpurse','job',"Ashmother Odra will give back the purse the Skitter took for five pieces of Salvage: old iron, from the heaps in the Scrublands, the heath, the foothills, or off the masked cutpurses on the roads."); say('Ashmother Odra',"“Iron. Five pieces of it. Old cart-hoops, chain, hinges, from the heaps along the roads. The crewless cutpurses carry some too, if you can take it off them. We will not mourn them.”",[{label:'Back.',fn:back},bye]); }});
+      else o.push({label:'Hand over five Salvage.'+(scrap()<5?' ('+scrap()+'/5)':''), off:scrap()<5, fn:()=>{ takeScrap(5); player.purse+=st; CHOICE.cvStolen=0; CHOICE.cvJob=null; CHOICE.cvTrust=Math.max(trust(),1); remember('cvpurse','back',"You earned your purse back from the Cinderveil. Ashmother Odra calls you road-friend now."); updateHud();
+        say('Ashmother Odra',"“Good iron.” <i>She weighs the purse once in a three-fingered glove and drops it in your hand. Every coin is there.</i> “Road-friend, then. You may trade with us. And if you sit at our fire, no Skitter of ours will touch you again.”",[{label:'Back.',fn:back},bye]); }});
+      o.push({label:'Pay the finder\'s tithe (a quarter of it).', note:'-'+Math.ceil(st/4)+'c', fn:()=>{ player.purse+=st-Math.ceil(st/4); CHOICE.cvStolen=0; CHOICE.cvJob=null; remember('cvpurse','tithe',"You paid the Cinderveil a quarter of your purse to have the rest back."); updateHud(); say('Ashmother Odra',"“A fair finder's tithe.” <i>She counts out your coin, all but a quarter.</i> “We are not thieves. We are finders.”",[bye]); }}); }
+    else if(trust()===0){ if(job()!=='trust') o.push({label:'“How does a stranger stop being one?”', fn:()=>{ CHOICE.cvJob='trust'; remember('cvjob','trust',"Ashmother Odra will trade with you if you bring the Cinderveil five pieces of Salvage."); say('Ashmother Odra',"“Bring us iron. Five pieces. Then we will know your hands, if not your face.”",[{label:'Back.',fn:back},bye]); }});
+      else o.push({label:'Hand over five Salvage.'+(scrap()<5?' ('+scrap()+'/5)':''), off:scrap()<5, fn:()=>{ takeScrap(5); CHOICE.cvTrust=1; CHOICE.cvJob=null; player.purse+=20; remember('cvjob','done',"You brought the Cinderveil iron. They will trade with you now."); updateHud(); say('Ashmother Odra',"“Good hands.” <i>She presses twenty coppers on you, for the iron.</i> “We trade with you now, road-friend.”",[{label:'Back.',fn:back},bye]); }}); }
+    if(trust()>=1){ o.push({label:'“Show me what you have.”', fn:()=>shopFrom('Ashmother Odra',CVSHOP(),trust()>=2?0.8:1,["“Masks, coats, gloves. Nothing that shows a face. Take your pick.”"],back)});
+      if(!CHOICE.cvFire) o.push({label:'Sit at their fire.', fn:()=>{ CHOICE.cvFire=true; remember('cvfire','yes',"You sat at the Cinderveil's fire. No Skitter of theirs will take from you again."); say('Ashmother Odra',"<i>You sit. Nobody speaks. Somewhere under a coat, something shifts and settles, like a cat curling up.</i> “Now you have shared our fire,” she says at last. “Our law has a door in it, and you have walked through it. Nothing of yours lies unwatched to us again.”",[bye]); }});
+      if(trust()===1){ if(job()!=='trust2') o.push({label:'“Is there more I can do for you?”', fn:()=>{ CHOICE.cvJob='trust2'; remember('cvjob','trust2',"Ashmother Odra wants ten pieces of Salvage and an ember core, for the Bellows' firebox."); say('Ashmother Odra',"“The Bellows eats. Ten pieces of iron, and an ember core for its firebox. Do that and you are kin to us, near enough.”",[{label:'Back.',fn:back},bye]); }});
+        else o.push({label:'Bring ten Salvage and an ember core.'+(scrap()<10||!invCount('ember_core')?' ('+scrap()+'/10'+(invCount('ember_core')?', core':', no core')+')':''), off:scrap()<10||!invCount('ember_core'), fn:()=>{ takeScrap(10); const j=player.inv.indexOf('ember_core'); if(j>=0) player.inv[j]=null; CHOICE.cvTrust=2; CHOICE.cvJob=null; remember('cvjob','done2',"You fed the Bellows. The Cinderveil count you near enough kin: better prices, and the elders' masks."); updateHud(); say('Ashmother Odra',"<i>The Bellows roars as the core goes in; smoke climbs, and someone behind a mask laughs.</i> “Near enough kin. We will sell you an elder's mask now, and cheaper. Do not wear it badly.”",[{label:'Back.',fn:back},bye]); }}); } }
+    o.push({label:'“What are you, under all that?”', fn:()=>say('Ashmother Odra',["“Cold,” she says. “Always cold.” <i>It is not an answer, and she knows it.</i>"],[{label:'Back.',fn:back},bye])}, bye);
+    say('Ashmother Odra',[intro],o); };
+  TALKERS.cvbrannock=()=>{ const n=scrap(); say('Brannock the Fused',["“Iron? I pay four a piece. Good iron, five. There is no bad iron.”"+(trust()===0?" <i>He does not look up from the anvil. He has not decided about you.</i>":"")],[
+    ...(n?[{label:'Sell your Salvage ('+n+').', note:'+'+(n*(trust()>=1?5:4))+'c', fn:()=>{ takeScrap(n); player.purse+=n*(trust()>=1?5:4); updateHud(); say('Brannock the Fused',"<i>He sorts it without looking: hinge, hoop, nail, chain.</i> “Good.”",[bye]); }}]:[]), bye]); };
+  TALKERS.cvtinny=()=>say('Tinny',[["“Heaps in the Scrublands, two along the road and one by the old ruin. One on the heath by the shepherd's lean-to, one in the foothills, one in the meadow, one by the brook. They grow back. Iron always grows back.”","“The crewless ones with the blank masks? Not ours. Cutpurses. Take their iron, we won't weep.”","“The Skitters only go for purses left unwatched. Yours was in your hand? Then you weren't watching your hand.”"][day()%3]],[bye]);
+  TALKERS.cvwarden=()=>say('Veil-Warden',[trust()>=1?"<i>The beaked helm dips: you may pass.</i>":"<i>The beaked helm turns to follow you. It says nothing. The ember-pot on its back ticks as it cools.</i>"],[bye]);
+  JOURNAL.push(['The Cinderveil', ()=>{ const st=CHOICE.cvStolen||0, t=trust();
+    if(!st && !t && !CHOICE.cvJob && !CHOICE.cvMet) return null;
+    if(st) return ['active', job()==='purse' ? "A Skitter took your purse ("+st+"c). Ashmother Odra will give it back for five pieces of Salvage ("+scrap()+"/5), from the scrap heaps on the long roads." : "A brass Skitter took your whole purse ("+st+"c) and ran. Its people, the masked Cinderveil, keep camp off the Scrublands road."];
+    if(t===0) return ['active', job()==='trust' ? "Bring the Cinderveil five pieces of Salvage so they will trade with you ("+scrap()+"/5)." : "The Cinderveil, masked salvagers, keep camp off the Scrublands road. They do not trade with strangers."];
+    if(t===1) return ['active', job()==='trust2' ? "Ashmother Odra wants ten Salvage ("+scrap()+"/10) and an ember core for the Bellows' firebox." : "The Cinderveil trade with you now"+(CHOICE.cvFire?", and you have shared their fire.":". Sit at their fire, and their Skitters will leave you be.")];
+    return ['done', "The Cinderveil count you near enough kin."+(CHOICE.cvFire?" You have shared their fire.":"")]; }]);
+  if(typeof PURSUITS!=='undefined') PURSUITS.add('The Cinderveil');
+  { const _h=npcHasNews; npcHasNews=function(n){ if(n && n.id==='cvodra'){ if((job()==='purse'||job()==='trust') && scrap()>=5 || (job()==='trust2' && scrap()>=10 && invCount('ember_core'))) return '?'; if((CHOICE.cvStolen && job()!=='purse') || (!trust() && !job()) || (trust()===1 && !job())) return '!'; return null; } return _h.apply(this,arguments); }; }
+
+  // ── the Skitter: it creeps up, takes the whole purse, and runs for the far edge, stopping now and then to count. Catch it before it gets there. ──
+  let lastArea=null;
+  const exitFar=()=>{ const t=OBJECTS.filter(o=>o.type==='teleporter'); let best=null, bd=-1; t.forEach(o=>{ const d=Math.hypot(o.i+0.5-player.x,o.j+0.5-player.y); if(d>bd){ bd=d; best=o; } }); return best?[best.i+0.5,best.j+0.5]:[AREAS[areaId].w-0.5,AREAS[areaId].h/2]; };
+  const lose=o=>{ CHOICE.cvStolen=(CHOICE.cvStolen||0)+o.purse; CHOICE.cvMet=true; o.purse=0; const k=OBJECTS.indexOf(o); if(k>=0) OBJECTS.splice(k,1);
+    remember('cvpurse','taken',"A brass Skitter ran off with your purse. Its people, the masked Cinderveil, keep camp off the Scrublands road, where the smoke rises."); logMsg('The Skitter is gone, and your purse with it.','#e07050'); };
+  const SPEED={stalk:2.3, flee:4.2};
+  { const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{
+    if(!running || !player) return r;
+    if(areaId!==lastArea){ const prev=lastArea; lastArea=areaId;
+      if(ROADS.includes(areaId) && player.purse>=25 && !CHOICE.cvStolen && !CHOICE.cvFire && (CHOICE.cvSkit||{})[areaId]!==day() && encounter('skit'+areaId,0.3)){
+        CHOICE.cvSkit={...(CHOICE.cvSkit||{}), [areaId]:day()}; const A=AREAS[areaId]; let sx=0, sy=0;
+        for(let t=0;t<20;t++){ sx=1+Math.random()*(A.w-2); sy=1+Math.random()*(A.h-2); if(Math.hypot(sx-player.x,sy-player.y)>6) break; }
+        OBJECTS.push({type:'skitter', x:sx, y:sy, i:Math.floor(sx), j:Math.floor(sy), st:'stalk', t:0, dir:0, noblock:true, purse:0}); } }
+    const sk=OBJECTS.filter(o=>o.type==='skitter'); if(!sk.length) return r;
+    for(const o of sk){ o.t+=dt; const dx=player.x-o.x, dy=player.y-o.y, d=Math.hypot(dx,dy); o.moving=false;
+      if(o.st==='dead'){ if(o.t>4){ OBJECTS.splice(OBJECTS.indexOf(o),1); } continue; }
+      if(o.st==='stalk'){ if(d<0.75){ o.purse=player.purse; player.purse=0; o.st='flee'; o.t=0; o.grace=0.7; o.x-=dx/(d||1)*1.8; o.y-=dy/(d||1)*1.8; o.goal=exitFar(); CHOICE.cvMet=true; updateHud(); banner('Your purse!','#e07050',1800); logMsg('Something brass skitters out of nowhere, and your purse is gone! Catch it!','#e07050'); try{ SND.fx('hit'); }catch(e){} }
+        else if(d<14){ const k=SPEED.stalk*dt/d; o.x+=dx*k; o.y+=dy*k; o.dir=dirFromDelta(dx,dy); o.moving=true; } }
+      else if(o.st==='flee' || o.st==='rest'){
+        if(o.grace>0) o.grace-=dt;
+        if(d<1.1 && !(o.grace>0)){ player.purse+=o.purse; o.purse=0; o.st='dead'; o.t=0; const f=slotFor('cv_scrap'); if(f>=0) player.inv[f]='cv_scrap'; updateHud(); banner('Caught it!','#8ac070',1400); logMsg('You grab the Skitter by a leg. It drops your purse, twitches, and goes still. (Loot: Salvage)','#8ac070'); continue; }
+        if(o.st==='rest'){ if(o.t>1.3){ o.st='flee'; o.t=0; } continue; }
+        if(o.t>1.7){ o.st='rest'; o.t=0; continue; }   // it stops to count your coins
+        const gx=o.goal[0]-o.x, gy=o.goal[1]-o.y, gd=Math.hypot(gx,gy); if(gd<0.6){ lose(o); continue; }
+        let ax=gx/gd, ay=gy/gd; if(d<4){ ax-=dx/d*0.6; ay-=dy/d*0.6; const l=Math.hypot(ax,ay)||1; ax/=l; ay/=l; }   // and veers from you as it runs
+        o.x+=ax*SPEED.flee*dt; o.y+=ay*SPEED.flee*dt; o.x=Math.max(0.3,Math.min(AREAS[areaId].w-0.3,o.x)); o.y=Math.max(0.3,Math.min(AREAS[areaId].h-0.3,o.y)); o.dir=dirFromDelta(ax,ay); o.moving=true; }
+      o.i=Math.floor(o.x); o.j=Math.floor(o.y); }
+    }catch(e){ console.error(e); } return r; }; }
+  { const _s=switchArea; switchArea=function(...a){ try{ (typeof OBJECTS!=='undefined'?OBJECTS:[]).filter(o=>o.type==='skitter' && o.purse).forEach(lose); }catch(e){} return _s.apply(this,a); }; }   // walk away and it is gone, purse and all
+
+  // ── the crewless: cutpurses in blank masks on the long roads ──
+  ROADS.forEach(a=>wrap(a,'mobs',l=>{ if(!encounter('cvthief'+a,0.45)) return l; const A=AREAS[a], n=nightAmt()>0.5?2:1, out=[];
+    for(let k=0;k<n;k++){ const i=Math.max(1,Math.min(A.w-2,Math.round(A.w*(0.3+0.4*rnd01(day(),k,a.length)) ))), j=Math.max(1,Math.min(A.h-2,Math.round(A.h*(0.25+0.5*rnd01(k,day(),a.length+3)))));
+      out.push({ name:'Crewless Cutpurse', type:'bandit', i, j, faction:'veilthief', daily:true, opts:CV({cvBits:[0b001000000,0b000000100,0b010000000][k%3], equip:{head:'cv_mask_plain', armor:'cv_wrap', hands:'gloves', weapon:'dagger'}}) }); }
+    return [...l,...out]; }));
+  dqVictory(()=>{ mobs.filter(m=>m.dead && m.faction==='veilthief' && !m.cvLoot).forEach(m=>{ m.cvLoot=true; const n=1+(Math.random()<0.5?1:0); for(let k=0;k<n;k++){ const f=slotFor('cv_scrap'); if(f>=0) player.inv[f]='cv_scrap'; } const c2=3+Math.floor(Math.random()*8); player.purse+=c2; logMsg('Loot: '+n+' Salvage, '+c2+'c','#8ac070'); }); updateHud(); });
+  if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
+}
 </script>
 </body>
 </html>

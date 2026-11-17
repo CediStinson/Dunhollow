@@ -30195,6 +30195,14 @@ const CVM3=(()=>{
       cylV(cen,r,h,col,top=0){ const w=R(cen), b=prj(w), t=prj([w[0],w[1],w[2]+h]); push(depth([w[0],w[1],w[2]+h/2])+top*100,()=>{ const rx=r*S, ry=r*S*0.5, g=c.createLinearGradient(b[0]-rx,0,b[0]+rx,0); g.addColorStop(0,sh(col,0.25)); g.addColorStop(0.45,col); g.addColorStop(1,sh(col,-0.5));
           c.fillStyle=g; c.beginPath(); c.ellipse(b[0],b[1],rx,ry,0,0,Math.PI); c.lineTo(t[0]-rx,t[1]); c.ellipse(t[0],t[1],rx,ry,0,Math.PI,0,true); c.closePath(); c.fill(); c.strokeStyle=IRD; c.lineWidth=0.9; c.stroke();
           c.fillStyle=sh(col,0.15); c.beginPath(); c.ellipse(t[0],t[1],rx,ry,0,0,Math.PI*2); c.fill(); c.stroke(); }); return [w[0],w[1],w[2]+h]; },
+      cone(cen,r0,r1,h,col,opt={}){ const w=R(cen), b=prj(w), t=prj([w[0],w[1],w[2]+h]); push(depth([w[0],w[1],w[2]+h/2])+(opt.bias||0),()=>{ const a0=r0*S, a1=r1*S, sh0=path=>{ c.beginPath(); c.ellipse(b[0],b[1],a0,a0*0.5,0,0,Math.PI); c.lineTo(t[0]-a1,t[1]); c.ellipse(t[0],t[1],a1,a1*0.5,0,Math.PI,0,true); c.closePath(); };
+          const g=c.createLinearGradient(b[0]-a0,0,b[0]+a0,0); g.addColorStop(0,sh(col,0.22)); g.addColorStop(0.42,col); g.addColorStop(1,sh(col,-0.55)); sh0(); c.fillStyle=g; c.fill();
+          if(opt.brick){ c.save(); sh0(); c.clip(); c.strokeStyle='rgba(30,16,10,0.4)'; c.lineWidth=Math.max(0.5,0.35*S); const n=Math.max(2,Math.round(h/4));
+            for(let k=1;k<n;k++){ const f=k/n, cx2=b[0]+(t[0]-b[0])*f, cy2=b[1]+(t[1]-b[1])*f, rr=a0+(a1-a0)*f; c.beginPath(); c.ellipse(cx2,cy2,rr,rr*0.5,0,0,Math.PI); c.stroke();
+              for(let q=0;q<7;q++){ const ang=((q+(k%2)*0.5)/7)*Math.PI; c.beginPath(); c.moveTo(cx2+Math.cos(ang)*rr,cy2+Math.sin(ang)*rr*0.5); c.lineTo(cx2+Math.cos(ang)*rr,cy2+Math.sin(ang)*rr*0.5-h*S/n); c.stroke(); } } c.restore(); }
+          sh0(); c.strokeStyle=IRD; c.lineWidth=0.9; c.stroke();
+          if(opt.hoops) opt.hoops.forEach(f=>{ const cx2=b[0]+(t[0]-b[0])*f, cy2=b[1]+(t[1]-b[1])*f, rr=a0+(a1-a0)*f; c.strokeStyle=IRD; c.lineWidth=2.6*S*0.6; c.beginPath(); c.ellipse(cx2,cy2,rr+0.4,(rr+0.4)*0.5,0,0,Math.PI); c.stroke(); c.strokeStyle='#5a5650'; c.lineWidth=1.4*S*0.6; c.stroke(); });
+          if(opt.cap){ c.fillStyle=sh(opt.cap,0.1); c.beginPath(); c.ellipse(t[0],t[1],a1,a1*0.5,0,0,Math.PI*2); c.fill(); c.strokeStyle=IRD; c.lineWidth=0.9; c.stroke(); } }); },
       ring(cen,n,r,k=24){ const N=norm(n), u=norm(Math.abs(N[2])>0.9?cross(N,[1,0,0]):cross(N,[0,0,1])), v=cross(N,u), pts=[]; for(let i=0;i<k;i++){ const a=i/k*Math.PI*2; pts.push(prj(add(cen,add(mul(u,Math.cos(a)*r),mul(v,Math.sin(a)*r))))); } return pts; },
       disk(cenL,nL,r,col,opt={}){ const cen=R(cenL), n=norm(R(nL)); if(dot3(n,VIEW)<=0.02 && !opt.always) return; push(depth(cen)+(opt.bias||0.5),()=>{ const pts=sc.ring(cen,n,r); path(pts);
           if(opt.glass){ const p0=prj(cen), g=c.createRadialGradient(p0[0]-r*S*0.3,p0[1]-r*S*0.3,0.5,p0[0],p0[1],r*S*1.1); g.addColorStop(0,'#fff8e0'); g.addColorStop(0.3,col); g.addColorStop(1,sh(col,-0.6)); c.fillStyle=g; } else c.fillStyle=lit(col,n);
@@ -30220,9 +30228,11 @@ const CVM3=(()=>{
         ptsL.slice(0,-1).forEach(p=>sc.joint(p,w*0.6,0.05,col!==IRON));
         if(toes){ const f=ptsL[ptsL.length-1]; [-0.55,0,0.55,Math.PI].forEach(a=>{ const l=a===Math.PI?w*0.9:w*1.5; sc.seg([f[0],f[1],1.2],[f[0]+Math.cos(a)*l,f[1]+Math.sin(a)*l,0.4],w*0.45,IRD); }); }   // three splayed toes and a spur behind
         FORCE=null; const f=ptsL[ptsL.length-1]; sc.disk([f[0],f[1],0.1],[0,0,1],w*0.95,IRD,{always:true,bias:-1e5}); },
+      _push:push,
       draw(){ ops.sort((a,b)=>a.d-b.d).forEach(o=>o.fn()); } };
     return sc; }
   const W=(ph,stride,lift)=>ph==null?null:{ph,stride,lift};
+  const ops_push=(sc,d,fn)=>sc._push(d,fn);
   const bob=(ph,a)=>ph==null?0:Math.abs(Math.sin(ph*2))*a;
 
   function skitter(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,3,4), z=bob(ph,0.8); s.shadow(30,14);
@@ -30261,16 +30271,22 @@ const CVM3=(()=>{
     s.seg([34,-14,30+z],[52,-20,18+z],4,IRON); s.seg([52,-20,18+z],[64,-22,8+z],3.2,IRON); s.glow([67,-23,7+z],14,'rgba(120,180,255,0.8)');
     s.draw(); }
 
-  function bellows(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,10,9), z=bob(ph,2.5); s.shadow(100,56);
-    [[44,36,0],[44,-36,Math.PI],[-44,36,Math.PI],[-44,-36,0]].forEach(([xx,yy,off])=>s.leg([[xx,yy,84+z],[xx*1.4,yy*1.5,54+z],[xx*1.55,yy*1.6,0]],21,TIMB,off,wk));
-    s.box([0,0,82+z],124,90,70,'#6a5038',{rivets:true,planks:7, face:{n:[1,0,0], fn:(pts,c,S)=>{ const cx=(pts[0][0]+pts[1][0]+pts[2][0]+pts[3][0])/4, cy=(pts[0][1]+pts[1][1]+pts[2][1]+pts[3][1])/4; c.fillStyle='#1a1614'; c.fillRect(cx-9*S,cy-8*S,18*S,26*S); const g=c.createLinearGradient(0,cy-6*S,0,cy+16*S); g.addColorStop(0,'#ffe080'); g.addColorStop(1,'#e04010'); c.fillStyle=g; c.fillRect(cx-7*S,cy-6*S,14*S,22*S); } }});
-    s.glow([64,0,100+z],46,'rgba(255,120,40,0.5)');
-    for(let k=0;k<5;k++) s.disk([-30+k*9,46,108+z],[0,1,0],7-(k%2),k%2?'#6a3a22':'#8a5032',{bias:1});
-    s.cylV([-30,-20,152+z],12,70,IRD); s.smoke([-30,-20,224+z],14); s.cylV([30,-28,152+z],6,36,IRD); s.smoke([30,-28,190+z],7);
-    s.box([78,0,82+z],26,30,5,IRON); s.box([80,0,87+z],16,8,6,'#2a2a2e');
-    s.seg([-54,40,152+z],[-54,40,190+z],1.6,WOOD); s.poly([[-54,40,190+z],[-54,56,186+z],[-54,40,180+z]],CLOTH);
+  function bellows(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,10,9), z=bob(ph,2.5); s.shadow(96,60);
+    [[40,40,0],[40,-40,Math.PI],[-40,40,Math.PI],[-40,-40,0]].forEach(([xx,yy,off])=>s.leg([[xx*0.8,yy*0.8,80+z],[xx*1.35,yy*1.35,52+z],[xx*1.5,yy*1.5,0]],21,TIMB,off,wk));
+    s.cylV([0,0,74+z],64,7,TIMB,-10);   // the round timber deck
+    for(let k=0;k<12;k++){ const a=k/12*Math.PI*2; s.seg([Math.cos(a)*62,Math.sin(a)*62,81+z],[Math.cos(a)*62,Math.sin(a)*62,92+z],2.4,TIMB); }   // its rail posts
+    s.cone([0,0,81+z],46,47,30,'#8a4a32',{brick:true,hoops:[0.06,0.95]});   // the kiln: a brick drum
+    s.cone([0,0,111+z],47,26,32,'#7a4230',{brick:true,hoops:[0.5],bias:0.5});   // drawing in at the shoulder
+    s.cone([0,0,143+z],13,11,40,'#5a3a2a',{brick:true,hoops:[0.1,0.92],bias:1,cap:'#1a1412'});   // the chimney neck
+    s.smoke([0,0,188+z],16);
+    { const w=s.R([46.5,0,92+z]), n=s.R([1,0,0]); if(n[0]*0.612+n[1]*0.612>0.05){ const p=s.prj(w); s.glow([50,0,94+z],40,'rgba(255,120,40,0.55)'); ops_push(s,(w[0]+w[1])+5,()=>{ const sc2=S; c.fillStyle='#1a120c'; c.beginPath(); c.moveTo(p[0]-9*sc2,p[1]+2*sc2); c.lineTo(p[0]-9*sc2,p[1]-10*sc2); c.arc(p[0],p[1]-10*sc2,9*sc2,Math.PI,0); c.lineTo(p[0]+9*sc2,p[1]+2*sc2); c.closePath(); c.fill();
+        const g=c.createLinearGradient(0,p[1]-18*sc2,0,p[1]+2*sc2); g.addColorStop(0,'#ffe080'); g.addColorStop(1,'#e04010'); c.fillStyle=g; c.beginPath(); c.moveTo(p[0]-7*sc2,p[1]+1*sc2); c.lineTo(p[0]-7*sc2,p[1]-10*sc2); c.arc(p[0],p[1]-10*sc2,7*sc2,Math.PI,0); c.lineTo(p[0]+7*sc2,p[1]+1*sc2); c.closePath(); c.fill();
+        c.strokeStyle='#2a2622'; c.lineWidth=2*sc2*0.6; c.beginPath(); c.arc(p[0],p[1]-10*sc2,10*sc2,Math.PI,0); c.stroke(); }); } }   // the arched furnace mouth, glowing
+    for(let k=0;k<6;k++) s.disk([-8+k*5,-50,96+z],[0,-1,0],9-(k%2)*1.5,k%2?'#6a3a22':'#8a5032',{bias:1});   // the pleated leather bellows on its flank
+    s.seg([-12,-52,108+z],[26,-52,104+z],2.6,TIMB);
+    s.box([56,0,81+z],16,20,5,IRON); s.box([58,0,86+z],10,6,6,'#2a2a2e',{top:0.002});   // an anvil on the deck before the mouth
+    s.seg([-40,40,81+z],[-40,40,126+z],1.6,WOOD); s.poly([[-40,40,126+z],[-40,56,122+z],[-40,40,116+z]],CLOTH);
     s.draw(); }
-
   function magpie(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,12,12), z=bob(ph,3); s.shadow(40,16);
     [[10,0],[-10,Math.PI]].forEach(([yy,off])=>s.leg([[0,yy,152+z],[-24,yy*1.6,96+z],[6,yy*1.6,46+z],[-6,yy*1.6,0]],14,TIMB,off,wk,true));
     s.box([0,0,150+z],44,40,40,'#d8d0c0',{planks:4}); s.box([0,0,190+z],50,46,6,'#1e1c1e');

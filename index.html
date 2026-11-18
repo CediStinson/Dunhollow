@@ -14220,7 +14220,7 @@ function resetMobs(){
     const isWolf=s.type==='wolf';
     const hp=Math.round((isWolf?WOLF.base:maxHpOf(s.opts.equip,FOES[s.type].base))*(s.hpMul||1));
     const key=s.daily ? s.name+'@'+Math.floor(dayClock/DAY_LEN) : s.name, dead=defeatedMobs.has(areaId+':'+key);
-    return { id:k, key, name:s.name, type:s.type, opts:s.opts, coat:s.coat, cat:s.cat, faction:s.faction, style:s.style, spawn:[s.i,s.j], i:s.i, j:s.j, x:s.i+0.5, y:s.j+0.5,
+    return { id:k, key, name:s.name, type:s.type, opts:s.opts, coat:s.coat, cat:s.cat, faction:s.faction, style:s.style, tier:s.tier, spawn:[s.i,s.j], i:s.i, j:s.j, x:s.i+0.5, y:s.j+0.5,
              dir:k?7:1, hp:dead?0:hp, maxHp:hp, path:[], moving:false, dead, gone:false, fade:1, flash:0, lunge:null,
              state:dead?'down':'guard', t:0, k:0, wind:1, quick:false, guardDir:isWolf?null:'up', ox:0, oy:0, hostile:!dead, fallT:dead?999:0 }; });
   if(DUMMY_SPAWN) mobs.push(makeDummy());
@@ -14235,8 +14235,8 @@ function resetMobs(){
   mobs.forEach((m,k)=>{ if(m.name==='Old Greymaw' && !m.dead){ m.maxHp=m.hp=78; m.boss=true; }
     const s=MOB_SPAWNS[k]; if(s && s.chop){ m.chop=true; m.chopPh=s.chopPh||0; }
     if(m.dead && corpseGone(areaId,m)) m.gone=true; });
-  const t=tierOf(areaId);                              // further from home, tougher kin
-  mobs.forEach(m=>{ if(m.type==='dummy') return; m.tier=t; const hp=Math.round(m.maxHp*(1+(m.type==='barrowking'?0.2:TIER_HP)*(t-1)+(m.type==='barrowking'?0:LATE_HP*lateStep(t)))); m.maxHp=hp; if(!m.dead) m.hp=hp; });
+  const t0=tierOf(areaId);                              // further from home, tougher kin
+  mobs.forEach(m=>{ if(m.type==='dummy') return; const t=Math.max(t0,m.tier||0); m.tier=t; const hp=Math.round(m.maxHp*(1+(m.type==='barrowking'?0.2:TIER_HP)*(t-1)+(m.type==='barrowking'?0:LATE_HP*lateStep(t)))); m.maxHp=hp; if(!m.dead) m.hp=hp; });
   if(!(A.mobsGone && A.mobsGone())){                   // some foes come back after a while (an old corpse is marked gone; that is fine)
     const D=CHOICE.deadAt||{};
     mobs.forEach(m=>{ if(!m.dead || !RESPAWNS.has(m.name)) return; const k=areaId+':'+m.key, at=D[k];
@@ -30416,7 +30416,7 @@ const CVM3=(()=>{
       o.push({label:'Pay the finder\'s tithe (a quarter of it).', note:'-'+Math.ceil(st/4)+'c', fn:()=>{ player.purse+=st-Math.ceil(st/4); CHOICE.cvStolen=0; CHOICE.cvJob=null; remember('cvpurse','tithe',"You paid the Cinderveil a quarter of your purse to have the rest back."); updateHud(); say('Ashmother Odra',"“A fair finder's tithe.” <i>She counts out your coin, all but a quarter.</i> “We are not thieves. We are finders.”",[bye]); }}); }
     else if(trust()===0){ if(job()!=='trust') o.push({label:'“How does a stranger stop being one?”', fn:()=>{ CHOICE.cvJob='trust'; remember('cvjob','trust',"Ashmother Odra will trade with you if you bring the Cinderveil five pieces of Salvage."); say('Ashmother Odra',"“Bring us iron. Five pieces. Then we will know your hands, if not your face.”",[{label:'Back.',fn:back},bye]); }});
       else o.push({label:'Hand over five Salvage.'+(scrap()<5?' ('+scrap()+'/5)':''), off:scrap()<5, fn:()=>{ takeScrap(5); CHOICE.cvTrust=1; CHOICE.cvJob=null; player.purse+=20; remember('cvjob','done',"You brought the Cinderveil iron. They will trade with you now."); updateHud(); say('Ashmother Odra',"“Good hands.” <i>She presses twenty coppers on you, for the iron.</i> “We trade with you now, road-friend.”",[{label:'Back.',fn:back},bye]); }}); }
-    if(trust()>=1){ o.push({label:'“Show me what you have.”', fn:()=>shopFrom('Ashmother Odra',CVSHOP(),trust()>=2?0.8:1,["“Masks, coats, gloves. Nothing that shows a face. Take your pick.”"],back)});
+    if(trust()>=1){
       if(!CHOICE.cvFire) o.push({label:'Sit at their fire.', fn:()=>{ CHOICE.cvFire=true; remember('cvfire','yes',"You sat at the Cinderveil's fire. No Skitter of theirs will take from you again."); say('Ashmother Odra',"<i>You sit. Nobody speaks. Somewhere under a coat, something shifts and settles, like a cat curling up.</i> “Now you have shared our fire,” she says at last. “Our law has a door in it, and you have walked through it. Nothing of yours lies unwatched to us again.”",[bye]); }});
       if(trust()===1 && !CHOICE.cvCrawl) o.push({label:'“Is there work for a road-friend?”', fn:()=>{ CHOICE.cvCrawl='asked'; remember('cvcrawl','asked',"A crewless gang stole a Cinderveil Crawler, a six-legged salvage engine, and raid with it in the Foothills. Ashmother Odra wants it stopped, and the gang broken.");
         say('Ashmother Odra',"“Crewless. Blank masks, no fire, no law. They took one of our Crawlers and drive it up and down the Foothills road, cutting carts open like loaves. Break them. Break it, if you must. We can build another. We cannot build trust in the roads once it is gone.”",[{label:'Back.',fn:back},bye]); }});
@@ -30556,7 +30556,7 @@ const CVM3=(()=>{
 
 // ════════ Cinderveil kin: three long chains, each ending in an engine of your own. A Strider to ride (faster legs), a Packling that
 // carries for you (more pack space), and a Hushling that hides you from lesser foes. All for kin only. Minigames: forge, gait, balance, lens. ════════
-{ const trust=()=>CHOICE.cvTrust||0, kin=()=>trust()>=2, day=()=>Math.floor(dayClock/DAY_LEN);
+{ const trust=()=>CHOICE.cvTrust||0, kin=()=>trust()>=2, day=()=>Math.floor(dayClock/DAY_LEN), KIN_LV=8, seasoned=()=>playerLevel()>=KIN_LV;   // the engines are mid-game: kin, and a road-worn level 8
   const scrap=()=>invCount('cv_scrap'), take=(id,n)=>{ for(let k=0;k<n;k++){ const j=player.inv.indexOf(id); if(j>=0) player.inv[j]=null; } };
   const give=(id,n=1)=>{ let got=0; for(let k=0;k<n;k++){ const f=slotFor(id); if(f>=0){ player.inv[f]=id; got++; } } updateHud(); if(invOverlay.classList.contains('open')) refreshInventory(); return got; };
   const qA=()=>CHOICE.cvA, qB=()=>CHOICE.cvB, qC=()=>CHOICE.cvC;
@@ -30695,8 +30695,8 @@ const CVM3=(()=>{
     if(e.state==='windup'){ const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(x,B-22,30,20,'255,160,60',0.4); g.globalCompositeOperation=gs; } };
   const MON={gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:null,offhand:null}};
   wrap('heath','mobs',l=>qA()==='spring' && !hasItem('cv_spring') ? [...l,
-    { name:'Feral Skitter', type:'feralskit', i:22, j:7, faction:'feralskit', opts:MON }, { name:'Feral Skitter', type:'feralskit', i:27, j:7, faction:'feralskit', opts:MON },
-    { name:'Old Rust-Skitter', type:'feralskit', i:25, j:9, faction:'feralskit', hpMul:1.5, opts:MON } ] : l);
+    { name:'Feral Skitter', type:'feralskit', i:22, j:7, faction:'feralskit', tier:4, opts:MON }, { name:'Feral Skitter', type:'feralskit', i:27, j:7, faction:'feralskit', tier:4, opts:MON }, { name:'Feral Skitter', type:'feralskit', i:23, j:9, faction:'feralskit', tier:4, opts:MON },
+    { name:'Old Rust-Skitter', type:'feralskit', i:25, j:9, faction:'feralskit', tier:4, hpMul:1.8, opts:MON } ] : l);
   onUse(['cvwreck'],()=>{ if(qA()!=='spring'||hasItem('cv_spring')) return logMsg('A dead hauler, half sunk in the heather. Whatever could be taken has been.','#a89a80');
     if(mobs.some(m=>m.faction==='feralskit' && !m.dead)) return logMsg('Something clicks inside the wreck, then many somethings. The feral Skitters will not let you near.','#e0a060');
     if(give('cv_spring')<1) return flash('Your pack is full.'); remember('cvstrider','spring',"You pried the mainspring out of the dead hauler on Greywater Heath. Brannock will want to temper it."); logMsg('You brace a boot on the hull and lever the mainspring free. It comes out with a groan and a long, falling hum.','#8ac070'); });
@@ -30707,8 +30707,8 @@ const CVM3=(()=>{
     g.save(); g.globalAlpha*=0.95; CVM3.hauler(g,q.x,q.y+4,0.62,o.dir||1,null); g.restore(); };
   NEAR_NAME.cvframe='Little Hauler Frame';
   wrap('scrubland','objects',l=>[...l,{type:'cvframe',i:3,j:40,dir:1}]);
-  const SCAV=(name,g0,w,i,j)=>({ name, type:'bandit', i, j, faction:'scavs', opts:{gender:g0,race:'human',skin:2,hair:1,hairColor:2,beard:g0==='m'?1:0,face:2,equip:{head:'hood',torso:'tunic_deep',armor:null,hands:'gloves',legs:'hose_grey',feet:'boots',weapon:w,offhand:null}} });
-  wrap('scrubland','mobs',l=>qB()==='frame' && !CHOICE.cvFrame ? [...l, SCAV('Wreck-Picker','m','club',5,42), SCAV('Wreck-Picker','f','dagger',8,39)] : l);
+  const SCAV=(name,g0,w,i,j)=>({ name, type:'bandit', i, j, faction:'scavs', tier:4, hpMul:1.3, opts:{gender:g0,race:'human',skin:2,hair:1,hairColor:2,beard:g0==='m'?1:0,face:2,equip:{head:'hood',torso:'tunic_deep',armor:null,hands:'gloves',legs:'hose_grey',feet:'boots',weapon:w,offhand:null}} });
+  wrap('scrubland','mobs',l=>qB()==='frame' && !CHOICE.cvFrame ? [...l, SCAV('Wreck-Picker','m','club',5,42), SCAV('Wreck-Picker','f','dagger',8,39), SCAV('Wreck-Boss','m','mace',6,38)] : l);
   onUse(['cvframe'],()=>{ if(qB()!=='frame') return logMsg('A little hauler frame, half buried. Somebody built it small on purpose.','#c8b890');
     if(mobs.some(m=>m.faction==='scavs' && !m.dead)) return logMsg('“Ours,” says the wreck-picker, and spits. “Find your own.”','#e0a060');
     CHOICE.cvFrame=true; CHOICE.cvB='parts'; remember('cvpack','parts',"You dragged the little hauler frame back to Tinny. She needs eight pieces of Salvage and two wolf pelts to make it whole."); logMsg('You dig the frame out and drag it all the way back to the camp road. Tinny will be pleased.','#8ac070'); });
@@ -30823,6 +30823,7 @@ const CVM3=(()=>{
   // A · Brannock and the Strider
   TALKERS.cvbrannock=extra(TALKERS.cvbrannock,()=>{ const s=qA(), o=[], back=()=>TALKERS.cvbrannock();
     if(!kin()){ if(trust()>=1) o.push({label:'“That Strider of yours. Could I ride one?”', fn:()=>say(B,"“Ride one? No. Kin build their own. You are a road-friend. Road-friends walk.”",[{label:'Back.',fn:back},bye])}); return o; }
+    if(!s && !seasoned()){ o.push({label:'“Kin build their own legs, you said.”', fn:()=>say(B,"“I said it. Not yet.” <i>He looks at your boots.</i> “Your feet still have things to learn. Walk the long roads, go up the Pass. Come back with dust from far off, and we build.”",[{label:'Back.',fn:back},bye])}); return o; }
     if(!s) o.push({label:'“Kin build their own legs, you said.”', fn:()=>{ CHOICE.cvA='poles'; remember('cvstrider','poles',"Brannock will help you build a Strider of your own. First: four seasoned ash poles, from the woodcutters' stacks in the Fellings.");
       say(B,["<i>He sets the hammer down, which he does not do.</i> “I said it. So. Legs first. Ash, seasoned, straight. The woodcutters stack it in the Fellings. Four poles.”","“Then a mainspring. Then the forge, then teaching it to walk, then a run to prove it. It is a long road. Every Strider is.”"],[{label:'Back.',fn:back},bye]); }});
     if(s==='poles' && invCount('cv_ashpole')>=4) o.push({label:'Hand over the four ash poles.', fn:()=>{ take('cv_ashpole',4); CHOICE.cvA='spring'; updateHud(); remember('cvstrider','spring0',"Brannock has the legs. Now a mainspring: there is a dead hauler on Greywater Heath, and feral Skitters nest in it.");
@@ -30837,6 +30838,7 @@ const CVM3=(()=>{
   // B · Tinny and the Packling
   TALKERS.cvtinny=extra(TALKERS.cvtinny,()=>{ const s=qB(), o=[], back=()=>TALKERS.cvtinny(), pel=invCount('pelt');
     if(!kin()) return o;
+    if(!s && !seasoned()){ o.push({label:'“What are you always carrying?”', fn:()=>say(T,"“Everything. One day you'll need a Packling of your own, for all the junk you'll find out there.” <i>She looks you up and down.</i> “Not yet, though. You've not found enough junk yet. Go further.”",[{label:'Back.',fn:back},bye])}); return o; }
     if(!s) o.push({label:'“What are you always carrying?”', fn:()=>{ CHOICE.cvB='frame'; remember('cvpack','frame',"Tinny will build you a Packling, a little hauler that carries for you. There is a small hauler frame half-buried in the south of the Scrublands. Wreck-pickers were at it.");
       say(T,["“Everything. You should too, you are kin now. You need a Packling.” <i>She sketches one in the dust with a boot: small, four-legged, all back.</i>","“There is a little frame half-buried down the south of the Scrublands. Wreck-pickers found it first. Unfind them.”"],[{label:'Back.',fn:back},bye]); }});
     if(s==='frame') o.push({label:'“About that frame…”', fn:()=>say(T,"“South Scrublands, west side, past the old ruin. Mind the wreck-pickers. They bite.”",[{label:'Back.',fn:back},bye])});
@@ -30851,6 +30853,7 @@ const CVM3=(()=>{
   // C · Odra and the Hushling
   TALKERS.cvodra=extra(TALKERS.cvodra,()=>{ const s=qC(), o=[], back=()=>TALKERS.cvodra();
     if(!kin()) return o;
+    if(!s && !seasoned()){ o.push({label:'“How do you go unseen on the roads?”', fn:()=>say(O,"“We go unnoticed. It is a thing you learn by being noticed first, many times, by many things that wanted to kill you.” <i>The mask tilts.</i> “You have not been noticed enough yet. Come back when you have.”",[{label:'Back.',fn:back},bye])}); return o; }
     if(!s) o.push({label:'“How do you go unseen on the roads?”', fn:()=>{ CHOICE.cvC='glass'; remember('cvhush','glass',"Ashmother Odra will make you a Hushling, a little engine that hides you from lesser foes. First, clear glass from the Glass Crater.");
       say(O,["“We do not. We go <i>unnoticed</i>. That is different, and harder.” <i>Something glassy shifts in the folds of her coat.</i>","“A Hushling. A small thing, and fussy. It needs a lens, and the lens needs glass: clear, from the Glass Crater, where the old fire fused the sand. Bring me some.”"],[{label:'Back.',fn:back},bye]); }});
     if(s==='glass' && hasItem('cv_lensglass')) o.push({label:'Show her the crater glass.', fn:()=>{ CHOICE.cvC='grind'; remember('cvhush','grind',"Grind the crater glass into a lens at Odra's wheel.");
@@ -30865,9 +30868,9 @@ const CVM3=(()=>{
 
   // marks over their heads
   { const _h=npcHasNews; npcHasNews=function(n){ try{ if(n && kin()){
-        if(n.id==='cvbrannock'){ const s=qA(); if(!s) return '!'; if((s==='poles'&&invCount('cv_ashpole')>=4)||(s==='spring'&&hasItem('cv_spring'))||s==='forge'||s==='gait') return '?'; }
-        if(n.id==='cvtinny'){ const s=qB(); if(!s) return '!'; if((s==='parts'&&scrap()>=8&&invCount('pelt')>=2)||s==='balance'||(s==='heart'&&invCount('ember_core'))) return '?'; }
-        if(n.id==='cvodra'){ const s=qC(); if(!s) return '!'; if((s==='glass'&&hasItem('cv_lensglass'))||s==='grind'||(s==='moths'&&invCount('cv_cocoon')>=3)||(s==='trial'&&night())) return '?'; } } }catch(e){} return _h(n); }; }
+        if(n.id==='cvbrannock'){ const s=qA(); if(!s) return seasoned()?'!':null; if((s==='poles'&&invCount('cv_ashpole')>=4)||(s==='spring'&&hasItem('cv_spring'))||s==='forge'||s==='gait') return '?'; }
+        if(n.id==='cvtinny'){ const s=qB(); if(!s) return seasoned()?'!':null; if((s==='parts'&&scrap()>=8&&invCount('pelt')>=2)||s==='balance'||(s==='heart'&&invCount('ember_core'))) return '?'; }
+        if(n.id==='cvodra'){ const s=qC(); if(!s) return seasoned()?'!':_h(n); if((s==='glass'&&hasItem('cv_lensglass'))||s==='grind'||(s==='moths'&&invCount('cv_cocoon')>=3)||(s==='trial'&&night())) return '?'; } } }catch(e){} return _h(n); }; }
   // the journal
   JOURNAL.push(['A Strider of Your Own', ()=>{ const s=qA(); if(!s) return null; return s==='done' ? ['done',"You built a Strider with Brannock. It carries you faster on open ground (R to mount)."] : ['active', {
       poles:"Gather four seasoned ash poles from the woodcutters' stacks in the Fellings ("+invCount('cv_ashpole')+"/4), for Brannock.",
@@ -31041,6 +31044,22 @@ const scarfIcon=(main,dk,stripe)=>g2=>{ g2.fillStyle=dk; g2.beginPath(); g2.elli
   g2.strokeStyle=stripe; g2.lineWidth=1.2; [[10,12,30,12],[20,22,25,22],[19,28,25,28]].forEach(([a,b,c,d])=>{ g2.beginPath(); g2.moveTo(a,b); g2.lineTo(c,d); g2.stroke(); });
   g2.strokeStyle=dk; g2.lineWidth=0.9; for(let k=0;k<5;k++){ g2.beginPath(); g2.moveTo(19.5+k*1.3,33); g2.lineTo(19+k*1.3,37); g2.stroke(); } };   // fringe
 ICON_EXTRA.cv_scarf=scarfIcon('#8a3a2a','#4a1e16','#c8904a'); ICON_EXTRA.cv_scarf_grey=scarfIcon('#7a7670','#3e3c38','#b8b0a0');
+
+// ════════ Cinderveil trade: Brannock sells what he forges, Tinny what she carries; Ashmother Odra sells nothing, she gives ════════
+{ const trust=()=>CHOICE.cvTrust||0, disc=()=>trust()>=2?0.8:1;
+  const BRANN=['cv_mask_weld','cv_mask_resp','cv_gauntlets','cv_harness'], TINNY=['cv_mask_plain','cv_duster','cv_duster_rust','cv_duster_red','cv_wrap','cv_wrapboots','cv_scarf','cv_scarf_grey'];
+  const addOpt=(id,fn)=>{ const old=TALKERS[id]; TALKERS[id]=()=>{ const _sd=showDialog; let done=false; showDialog=function(name,text,opts,purse){ if(!done){ done=true; showDialog=_sd; try{ const ex=fn(); if(ex.length && Array.isArray(opts)){ opts=[...opts]; const k=opts.indexOf(bye); opts.splice(k<0?opts.length:k,0,...ex); } }catch(e){ console.error(e); } } return _sd.call(this,name,text,opts,purse); };
+      try{ old(); } finally{ showDialog=_sd; } }; };
+  addOpt('cvbrannock',()=> trust()>=1 ? [{label:'“What do you forge?”', fn:()=>shopFrom('Brannock the Fused',BRANN.filter(i=>ITEMS[i]),disc(),["“Masks with iron in them. Gloves that take a forge. A harness to carry your tools.” <i>He does not look up.</i> “Good iron. There is no bad iron.”"],()=>TALKERS.cvbrannock())}] : []);
+  addOpt('cvtinny',()=> trust()>=1 ? [{label:'“What is in the pack?”', fn:()=>shopFrom('Tinny',TINNY.filter(i=>ITEMS[i]),disc(),["“Coats, wraps, scarves, boots. And a plain mask, if you want to look like the rest of us.” <i>She grins, or her mask does.</i>"],()=>TALKERS.cvtinny())}] : []);
+  // Odra's gifts: the elder's mask when she names you kin, the elder's coat once you have seen her face
+  { const _r=remember; remember=function(k,v,msg){ const r=_r.apply(this,arguments); try{
+      if(k==='cvjob' && v==='done2' && !CHOICE.cvGiftMask){ CHOICE.cvGiftMask=true; giveQuestItem('cv_mask_elder',true); }
+      if(k==='cvface' && v==='seen' && !CHOICE.cvGiftCoat){ CHOICE.cvGiftCoat=true; giveQuestItem('cv_duster_elder',true); } }catch(e){} return r; }; }
+  // a save from before this: kin already, or her face already seen, and nothing given yet
+  addOpt('cvodra',()=>{ try{ if(trust()>=2 && !CHOICE.cvGiftMask){ CHOICE.cvGiftMask=true; giveQuestItem('cv_mask_elder',true); logMsg("Ashmother Odra presses an elder's mask into your hands. “Kin wear these.”",'#c8a0e0'); }
+      if(CHOICE.cvFace && !CHOICE.cvGiftCoat){ CHOICE.cvGiftCoat=true; giveQuestItem('cv_duster_elder',true); logMsg("Ashmother Odra gives you an elder's coat. “Now you know what it hides. Wear it.”",'#c8a0e0'); } }catch(e){} return []; });
+}
 </script>
 </body>
 </html>

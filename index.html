@@ -9563,7 +9563,7 @@ function cheekGeom(F,V,sit){ const P=F?PROP.f:PROP.m, HI=P.hipHW*V.sw, WA=P.wais
   return G; }
 function drawSitting(c,x,B,opts,dir,mode){
   if(dirMirrored(dir)){ c.save(); c.translate(x,0); c.scale(-1,1); c.translate(-x,0); drawSitting(c,x,B,opts,8-dir,mode); c.restore(); return; }   // west-facing = the east pose, mirrored exactly
-  const chair=mode==='chair'; if(chair) B-=CHAIR_SEAT;                // on a chair: the same seated body, lifted to the seat, the shins reaching down to the floor
+  const saddle=mode==='saddle', chair=mode==='chair'||saddle; if(chair) B-=CHAIR_SEAT;   // astride a saddle: lifted like a chair, legs either side                // on a chair: the same seated body, lifted to the seat, the shins reaching down to the floor
   const view=dirView(dir), V=VIEW[view], front=V.turn>-0.25, pr=V.prof, F=opts.gender==='f', side0=false, mer=false, side=false,   // side-sit and recline retired: they fall back to the knees pose
       // the recline is retired: it shows as the side-sit
     recl=false,   // the side-sit is retired: it shows as the recline
@@ -9622,6 +9622,8 @@ function drawSitting(c,x,B,opts,dir,mode){
     : lounge ? [
       {hip:[5*SP,-4*pr,3-0.6*pr], knee:[8*SP+(F?0:1.5),10.5,14.5], ank:[8.5*SP+(F?0:1.5),14.5,2], toe:[0,5,0], up:true, tw:1.05+0.3*pr},           // right knee raised
       {hip:[-5.6*SP,-4*pr,2.6-0.5*pr], knee:[-13.5*SP,12,2.6], ank:[-16*SP,23,2.2], toe:[0,1.5,4.8]} ]              // left leg stretched out and a little to the side, toes up
+    : saddle ? [ {hip:[5,-3*pr,3-0.6*pr], knee:[13.5,8,-1.5], ank:[14.5,6.5,-CHAIR_SEAT+3], toe:[0,5,0], up:true, tw:1.05+0.3*pr},          // astride: thighs spread round the barrel, shins hanging to the stirrups
+                 {hip:[-5,-3*pr,3-0.6*pr], knee:[-13.5,8,-1.5], ank:[-14.5,6.5,-CHAIR_SEAT+3], toe:[0,5,0], up:true, tw:1.05+0.3*pr} ]
     : chair ? [ {hip:[4.2,-4*pr,3-0.6*pr], knee:[4.3,13,4.5], ank:[4.1,14,-CHAIR_SEAT+2.5], toe:[0,5,0], up:true, tw:1.05+0.3*pr},          // thighs level along the seat, shins straight down, knees together over a narrow chair
                 {hip:[-4.2,-4*pr,3-0.6*pr], knee:[-4.3,13,4.5], ank:[-4.1,14,-CHAIR_SEAT+2.5], toe:[0,5,0], up:true, tw:1.05+0.3*pr} ]
     : [ {hip:[5.4*SP,-4*pr,3-0.6*pr], knee:[6.8*SP,11,15], ank:[6.4*SP,15,2], toe:[0,5,0], up:true, tw:1.05+0.3*pr}, {hip:[-5.4*SP,-4*pr,3-0.6*pr], knee:[-6.8*SP,11,15], ank:[-6.4*SP,15,2], toe:[0,5,0], up:true, tw:1.05+0.3*pr} ];   // thighs from the floor at the seat, full at the top   // thighs from the seat, a gap between the knees
@@ -9854,8 +9856,8 @@ function drawSitting(c,x,B,opts,dir,mode){
   LG.forEach(g=>{ const q=[g.L.hip,g.L.knee,g.L.ank].map(p=>PJ([p[0],p[1],0])); c.lineWidth=8*s; c.beginPath(); c.moveTo(q[0][0],q[0][1]+0.8); q.slice(1).forEach(p=>c.lineTo(p[0],p[1]+0.8)); c.stroke(); });
   AR.forEach(q=>{ if(q.A.hand[2]<1){ const p=PJ([q.A.hand[0],q.A.hand[1],0]); c.lineWidth=5*s; c.beginPath(); c.moveTo(p[0]-1,p[1]+0.8); c.lineTo(p[0]+1,p[1]+0.8); c.stroke(); } });
   c.restore();
-  if(chair && !front){}                                                         // on a chair seen from behind the legs are under the seat: nothing of them shows
-  else if(!front && !recl && !side){ const hw=(F?PROP.f:PROP.m).hipHW*V.sw*RS[0]*1.12+1, cx=x+LNs*RS[0], yb=B-2.2;   // from behind the seat is the lowest thing: legs only beside it
+  if(chair && !front && !saddle){}                                                         // on a chair seen from behind the legs are under the seat: nothing of them shows
+  else if(!front && !recl && !side){ const hw=(F?PROP.f:PROP.m).hipHW*V.sw*RS[0]*(saddle?0.75:1.12)+1, cx=x+LNs*RS[0], yb=B-2.2;   // from behind the seat is the lowest thing: legs only beside it
     c.save(); c.beginPath(); c.rect(x-200,B-300,400,300+yb-B); c.rect(x-200,yb,cx-hw-(x-200),60); c.rect(cx+hw,yb,x+200-(cx+hw),60); c.clip(); backLegs.forEach(drawLeg); c.restore(); }
   else if(pr>0.8){ c.save(); c.beginPath(); c.rect(x-200,B-300,400,300); c.clip(); backLegs.forEach(drawLeg); c.restore(); }
   else backLegs.forEach(drawLeg);
@@ -9863,7 +9865,7 @@ function drawSitting(c,x,B,opts,dir,mode){
   body();
   if(!side && !lounge && !mer && !chair && front && frontLegs.length) underKnees(pr*3);
   sitGenitals();
-  if(!(chair && !front)) frontLegs.forEach(g=>drawLeg(g,tuck)); frontArms.sort((a,b)=>a.d-b.d).forEach(q=>drawArm(q,false));
+  if(!(chair && !front && !saddle)) frontLegs.forEach(g=>drawLeg(g,tuck)); frontArms.sort((a,b)=>a.d-b.d).forEach(q=>drawArm(q,false));
 }
 // a parchment speech bubble whose tail points down at (x, bottom); long lines wrap instead of being squeezed
 function speechBubble(x,bottom,text,a=1){ if(a<=0) return;
@@ -27824,10 +27826,10 @@ function rwOffer(){ const Q=CHOICE.rwQ||[]; if(!Q.length) return; const R=Q[0];
 setInterval(()=>{ try{ if(!running || !player.opts) return; const D=rwDone();
     if(!CHOICE.rwSeen){ CHOICE.rwSeen={}; D.forEach(t=>CHOICE.rwSeen[t]=1); return; }   // a save from before: what was finished then was paid then
     for(const t of D){ if(CHOICE.rwSeen[t]) continue; CHOICE.rwSeen[t]=1;
-      const h=[...t].reduce((a,c)=>a*31+c.charCodeAt(0)|0,11), r=rnd01(h,1,975); if(r>=0.7) continue;   // most quests, not all
+      const h=[...t].reduce((a,c)=>a*31+c.charCodeAt(0)|0,11), r=rnd01(h,1,975), coin=(CHOICE.rwCoins||{})[t]||0; if(r>=0.7){ if(coin>0) (CHOICE.rwQ=CHOICE.rwQ||[]).push({t,c:coin}); continue; }   // most quests, not all
       const ti=rwTierIdx(), melee=rwPick(RW_MELEE[ti],h), mage=rwPick(CASTER_LOOT[ti],h+1);
       const both=rnd01(h,2,976)<0.5;
-      (CHOICE.rwQ=CHOICE.rwQ||[]).push(both ? {t,a:melee,b:mage} : rwMage() ? {t,b:mage} : {t,a:melee}); }
+      (CHOICE.rwQ=CHOICE.rwQ||[]).push(both ? {t,a:melee,b:mage,c:coin} : rwMage() ? {t,b:mage,c:coin} : {t,a:melee,c:coin}); }
     rwOffer(); }catch(e){} },1500);
 // ── a quest paid in gear pays less in coin: what a click that finishes such a quest hands over in copper is mostly taken back as the gear ──
 const rwGets=t=>{ if(RW_SKIP.has(t) || (typeof PURSUITS!=='undefined' && PURSUITS.has(t))) return false; const h=[...t].reduce((a,c)=>a*31+c.charCodeAt(0)|0,11); return rnd01(h,1,975)<0.7; };
@@ -30601,9 +30603,9 @@ const CVM3=(()=>{
   // 3 · the balance: crates go on the Packling's back; keep its spine level
   GAMES.balance={ title:"Loading the Packling", help:'Hold ← / → (or press either side) to lean against it', start:'Tinny piles on the crates. Keep the little hauler <b>level</b> until she has done.',
     init:()=>({a:0,va:0,wind:0,wt:0,bias:0,crates:[],next:1.4,dur:20}),
-    tick:(G,dt)=>{ G.wt-=dt; if(G.wt<=0){ G.wt=0.8+Math.random()*1.2; G.wind=(Math.random()*2-1)*0.9; }
+    tick:(G,dt)=>{ G.wt-=dt; if(G.wt<=0){ G.wt=0.8+Math.random()*1.2; G.wind=(Math.random()*2-1)*0.8; }
       G.next-=dt; if(G.next<=0 && G.t<G.dur-1){ G.next=2.2+Math.random()*0.8; const side=Math.random()<0.7?-Math.sign(G.bias||(Math.random()-0.5)):Math.sign(Math.random()-0.5)||1, pos=side*(0.25+Math.random()*0.6); G.crates.push(pos); G.bias+=pos*0.45; G.va+=pos*0.5; }
-      G.va+=(G.wind+G.bias+G.hold*2.6+G.a*0.7)*dt; G.va*=Math.pow(0.35,dt); G.a+=G.va*dt;
+      G.va+=(G.wind+G.bias+G.hold*2.8+G.a*0.65)*dt; G.va*=Math.pow(0.35,dt); G.a+=G.va*dt;
       if(Math.abs(G.a)>=1) return mgEnd(false,'Over she goes: crates in the dust, legs in the air. <i>Tinny sighs and starts picking up.</i>');
       if(G.t>=G.dur) mgEnd(true,'<b>Level as a table.</b> Tinny pats the crates: “It knows its own weight now.”'); },
     draw:(G,c)=>{ c.clearRect(0,0,320,210); c.save(); c.translate(160,128); c.rotate(G.a*0.5);
@@ -30748,7 +30750,7 @@ const CVM3=(()=>{
   { const _w=drawPlayerWading; drawPlayerWading=function(e){ if(!riding()) return _w.apply(this,arguments);
       const q=P(player.x,player.y), d=player.dir||0, mv=player.path.length>0, ph=mv?gt*7:null, S=1.15, z=ph==null?0:Math.abs(Math.sin(ph*2))*2;
       CVM3.strutter(g,q.x,q.y,S,d,ph); const th=(45-d*45)*Math.PI/180, lx=-2, sx=q.x+(lx*Math.cos(th)-lx*Math.sin(th))*0.7071*S, sy=q.y+(lx*Math.cos(th)+lx*Math.sin(th))*0.3536*S-(82+z)*S;
-      drawLitSprite(sx,sy+CHAIR_SEAT,()=>drawSitting(g,sx,sy+CHAIR_SEAT,player.opts,d,'chair')); }; }
+      drawLitSprite(sx,sy+CHAIR_SEAT,()=>drawSitting(g,sx,sy+CHAIR_SEAT,player.opts,d,'saddle')); }; }
   const rideBtn=document.createElement('button'); rideBtn.id='ride-btn'; rideBtn.style.cssText='position:fixed;left:12px;bottom:64px;z-index:40;display:none;padding:6px 12px;border-radius:8px;border:1px solid #8a6a3a;background:rgba(24,16,8,0.92);color:#f0dca0;font:600 12px Georgia,serif;cursor:pointer;'; document.body.appendChild(rideBtn);
   const toggleRide=()=>{ if(!CHOICE.cvStrider) return; CHOICE.cvRiding=!CHOICE.cvRiding; logMsg(CHOICE.cvRiding?'You swing up into the Strider\'s saddle.':'You climb down. The Strider folds its knees and follows on its own.','#c8a860'); };
   rideBtn.addEventListener('click',e=>{ e.stopPropagation(); rideBtn.blur(); toggleRide(); });
@@ -30772,7 +30774,7 @@ const CVM3=(()=>{
         const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(q.x,q.y-14,22,14,'190,230,255',0.18+Math.sin(gt*3)*0.06); g.globalCompositeOperation=gs; }}); }catch(e){} }; }
   // the Hushling works on you, too: a faint shimmer at your edges while lesser foes are near
   { const _w=drawPlayerWading; drawPlayerWading=function(e){ const r=_w.apply(this,arguments); try{ if(CHOICE.cvHush && mobs.some(m=>m.hostile && !m.dead && cvHush(m) && cheb(tileOf(m),tileOf(player))<=5)){ const q=P(player.x,player.y);
-        const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(q.x,q.y-50,34,60,'180,220,255',0.12+Math.sin(gt*4)*0.05); g.globalCompositeOperation=gs; } }catch(e){} return r; }; }
+        const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(q.x,q.y-50,34,60,'180,220,255',0.06+Math.sin(gt*4)*0.025); g.globalCompositeOperation=gs; } }catch(e){} return r; }; }
 
   // ════ the talk ════
   const B='Brannock the Fused', T='Tinny', O='Ashmother Odra';
@@ -30837,6 +30839,45 @@ const CVM3=(()=>{
   JOURNAL.push(['The Hushling', ()=>{ const s=qC(); if(!s) return null; return s==='done' ? ['done',"Odra gave you a Hushling. Foes five levels or more below you do not notice you pass."] : ['active', {
       glass:hasItem('cv_lensglass')?"Take the crater glass to Ashmother Odra.":"Find clear glass in the Glass Crater, for Ashmother Odra.", grind:"Grind the crater glass into a lens at Odra's wheel.",
       moths:"Cut three nightmoth cocoons in the Mistmere, at night ("+invCount('cv_cocoon')+"/3).", trial:"At night, take Odra's trial: carry her lantern out of the Ember Yard without waking a warden." }[s]]; }]);
+}
+
+// ════════ the quest-complete window: what you earned in coin, and the gear you pick (with icons you can hover) ════════
+{ const css=document.createElement('style'); css.textContent=`#rw-ov{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;background:rgba(10,6,2,0.45)}
+#rw-ov.open{display:flex}#rw-ov .note-paper{text-align:center;width:min(380px,90vw)}
+#rw-ov .rw-kicker{font:600 11px Georgia,serif;letter-spacing:2px;text-transform:uppercase;color:#7a5a30}
+#rw-ov .rw-title{font:bold 19px Georgia,serif;margin:2px 0 10px;color:#2a1e10}
+#rw-ov .rw-line{font:14px Georgia,serif;margin:10px 0 6px;color:#3a2a18}
+#rw-ov .rw-coin{display:inline-flex;align-items:center;gap:6px;font:bold 15px Georgia,serif;color:#5a3e10}
+#rw-ov .rw-row{display:flex;align-items:center;justify-content:center;gap:12px;margin:6px 0 4px}
+#rw-ov .rw-or{font:italic 14px Georgia,serif;color:#7a5a30}
+#rw-ov .rw-item{display:flex;flex-direction:column;align-items:center;gap:4px;width:110px;padding:8px 4px 6px;border:1px solid #a88a5a;border-radius:6px;background:#efe4c4;cursor:pointer;transition:transform .08s,box-shadow .08s}
+#rw-ov .rw-item:hover{transform:translateY(-2px);box-shadow:0 3px 10px rgba(80,50,10,0.35);border-color:#7a5a30}
+#rw-ov .rw-item.fixed{cursor:default}#rw-ov .rw-item.fixed:hover{transform:none}
+#rw-ov .rw-item canvas{width:56px;height:56px;background:#2a1e10;border-radius:5px;border:1px solid #6a4a28}
+#rw-ov .rw-name{font:12px Georgia,serif;color:#2a1e10;line-height:1.2}#rw-ov .rw-slot{font:italic 10px Georgia,serif;color:#7a5a30}
+#rw-ov .rw-go{margin-top:12px}`; document.head.appendChild(css);
+  const ov=document.createElement('div'); ov.id='rw-ov'; ov.innerHTML='<div class="note-paper dlg-paper"></div>'; document.body.appendChild(ov);
+  ov.addEventListener('pointerdown',e=>e.stopPropagation()); ov.addEventListener('click',e=>e.stopPropagation());
+  window.rwOpen=()=>ov.classList.contains('open');
+  const tile=(id,pick)=>{ const d=document.createElement('div'); d.className='rw-item shop-slot'+(pick?'':' fixed'); d.dataset.item=id;
+    const cv=document.createElement('canvas'); cv.width=cv.height=112; try{ drawItemIcon(cv.getContext('2d'),id,112); }catch(e){}
+    d.appendChild(cv); d.insertAdjacentHTML('beforeend',`<div class="rw-name">${ITEMS[id].name}</div><div class="rw-slot">${SLOT_NAMES[ITEMS[id].slot]||''}</div>`); return d; };
+  const close=()=>{ ov.classList.remove('open'); const t=document.getElementById('item-tip'), t2=document.getElementById('item-tip2'); if(t) t.style.display='none'; if(t2) t2.style.display='none'; };
+  rwOffer=function(){ const Q=CHOICE.rwQ||[]; if(!Q.length || rwOpen() || (typeof CVMG==='function' && CVMG())) return; const R=Q[0];   // never over a minigame
+    if(typeof dlgOverlay!=='undefined' && dlgOverlay.classList.contains('open')) return; if(combat.active || (typeof CS!=='undefined' && CS.on)) return;
+    const items=[R.a,R.b].filter(id=>id && ITEMS[id]), choose=items.length>1 && !R.all;
+    if(items.length && player.inv.indexOf(null)<0){ if(!R.warned){ R.warned=true; logMsg('A reward for “'+R.t+'” is waiting: make room in your pack.','#e8c060'); } return; }
+    const done=pick=>{ close(); CHOICE.rwQ=(CHOICE.rwQ||[]).slice(1); (pick?[pick]:choose?[]:items).forEach(id=>{ giveQuestItem(id,true); logMsg('Reward for “'+R.t+'”: '+ITEMS[id].name+'.','#8ac070'); });
+      if(pick||(!choose&&items.length)) try{ SND.fx('page'); }catch(e){} try{ updateHud(); autosaveSoon(300); }catch(e){} };
+    const P=ov.firstChild; P.innerHTML=`<div class="rw-kicker">Quest complete</div><div class="rw-title">${R.t}</div>`;
+    if(R.c>0){ const l=document.createElement('div'); l.className='rw-line'; l.innerHTML='You earned'; P.appendChild(l); const r=document.createElement('div'); r.className='rw-row';
+      const cc=document.createElement('div'); cc.className='rw-coin'; const ci=document.createElement('canvas'); ci.width=ci.height=48; ci.style.cssText='width:28px;height:28px'; ci.getContext('2d').drawImage(COIN_ICON,0,0); cc.appendChild(ci); cc.insertAdjacentHTML('beforeend',formatCoin(R.c)); r.appendChild(cc); P.appendChild(r); }
+    if(items.length){ const l=document.createElement('div'); l.className='rw-line'; l.textContent=(R.c>0?'and ':'')+(choose?'pick your reward:':'your reward:'); if(!(R.c>0)) l.textContent=l.textContent[0].toUpperCase()+l.textContent.slice(1); P.appendChild(l);
+      const row=document.createElement('div'); row.className='rw-row'; items.forEach((id,k)=>{ if(k && choose) row.insertAdjacentHTML('beforeend','<span class="rw-or">or</span>'); const t=tile(id,choose); if(choose) t.addEventListener('click',()=>done(id)); row.appendChild(t); }); P.appendChild(row); }
+    if(!choose){ const b=document.createElement('div'); b.className='dlg-opts rw-go'; b.innerHTML='<button class="dlg-opt"><span>'+(items.length?'Take it.':'Good.')+'</span></button>'; b.firstChild.addEventListener('click',()=>done(null)); P.appendChild(b); }
+    else P.insertAdjacentHTML('beforeend','<div class="rw-slot" style="margin-top:8px">Hover to compare, click to choose.</div>');
+    ov.classList.add('open'); };
+  { const _e=rwClickEnd; rwClickEnd=function(j0,p0){ const r=_e.apply(this,arguments); try{ const gain=player.purse-p0; if(gain>0) for(const [t,f] of JOURNAL){ if(j0[t]==='done' || (CHOICE.rwSeen&&CHOICE.rwSeen[t])) continue; let q=null; try{ q=f(); }catch(e){} if(q && q[0]==='done'){ (CHOICE.rwCoins=CHOICE.rwCoins||{})[t]=gain; break; } } }catch(e){} return r; }; }
 }
 </script>
 </body>

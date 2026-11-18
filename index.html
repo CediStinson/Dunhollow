@@ -10140,7 +10140,7 @@ function update(dt){
   if(TEACH_OPEN) dt*=0.12;                          // a teaching card is open: the world runs slow while you read
   if(player.sitChair && (player.path.length || combat.active || !OBJECTS.includes(player.sitChair))) player.sitChair=null;     // up again the moment you go anywhere
   const leaving=NPCS.filter(n=>n.route && n.vanish);
-  const talkN=TALK_NPC, hold=talkN && dlgIsOpen() && NPCS.includes(talkN);      // whoever you are talking to stands still
+  const talkN=TALK_NPC, hold=talkN && RT_HOLD()===talkN && NPCS.includes(talkN);      // whoever you are talking to stands still
   let saved=null; if(hold){ saved={goto:talkN.goto, path:talkN.path}; talkN.goto=null; talkN.path=[]; talkN.moving=false; if(talkN.wander) talkN.wait=Math.max(talkN.wait||0,1); }
   gt+=dt; dayClock+=dt; if(typeof cityBarks==='function') cityBarks(dt);
   const p=player;
@@ -10167,7 +10167,7 @@ function update(dt){
   walkRoutes(dt);
   try{ pupUpdate(dt); }catch(e){ console.error(e); }
   if(hold){ talkN.goto=saved.goto; talkN.path=saved.path||[]; }
-  if(talkN && !dlgIsOpen()) TALK_NPC=null;
+  if(talkN && dlgIsOpen()) TALK_SHUT=0; else if(talkN && (TALK_SHUT+=dt)>1.5){ TALK_NPC=null; TALK_SHUT=0; }   // a dialog that closes and reopens a moment later is still the same conversation
   recordTransit(leaving);
   pupCompanion(dt);
   if(pendingChair && !player.path.length){ const ch=pendingChair; pendingChair=null; if(OBJECTS.includes(ch) && cheb([ch.i,ch.j],[player.i,player.j])<=1) sitOnChair(ch); }
@@ -18583,7 +18583,8 @@ const dlgIsOpen=()=>typeof dlgOverlay!=='undefined' && dlgOverlay.classList.cont
 let TALK_STATE='', TALK_ROOT_REAL=0;
 const talkSnap=()=>JSON.stringify(CHOICE,(k,v)=>k==='invN'||k==='bells'||k==='berries'?undefined:v);   // what counts as a decision taken in a conversation (not stack counts or picked berries)
 
-const RT_HOLD=()=> TALK_NPC && dlgIsOpen() ? TALK_NPC : null;
+let TALK_SHUT=0;
+const RT_HOLD=()=> TALK_NPC && (dlgIsOpen() || TALK_SHUT<1.5) ? TALK_NPC : null;
 // "Back." on every reply that would otherwise only say goodbye, inside a conversation you started
 // a cutscene clears the screen: inventory, notes, the map, a signpost you were reading (never the menu)
 // people on their way somewhere: follow them through a door and they are still walking on the other side

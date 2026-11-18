@@ -11955,7 +11955,7 @@ function refreshStatPanel(){
   const rows = [
     ['Purse', formatCoin(player.purse)],
     ['Max Health', player.maxHp, armorBonus?`${player.maxHp-armorBonus} of your own, +${armorBonus} from your gear.`:'All of it your own: none of your gear adds health.'],
-    ...(typeof playerLevel==='function' ? [['Level', playerLevel(), playerLevel()<LV_MAX?`${xpInto()} / ${xpNeed()} xp to the next level.`:'The highest level there is.'], ['Armour', armourTotal(), `Cuts the damage you take by ${Math.round(armourCut()*100)}%.`]] : []),
+    ...(typeof playerLevel==='function' ? [['Level', playerLevel(), playerLevel()<LV_MAX?`${xpInto()} / ${xpNeed()} xp to the next level.`:'The highest level there is.'], ['Armour', armourTotal(), `Cuts the damage you take by ${Math.round(armourCut()*100)}%.`], ...((CHOICE.perks||[]).length?[['Perks', CHOICE.perks.length, CHOICE.perks.map(p=>PERKS[p]?PERKS[p].name+': '+PERKS[p].what:p).join('<br>')]]:[])] : []),
     ['Weapon', wname],
     ['Damage', typeof weaponDmg==='function' ? Math.round(weaponDmg(player.opts.equip.weapon)*levelDmgMult()) : W.dmg, 'What one clean hit with your weapon does, before the foe\'s armour.'],
     ['Critical Chance', Math.round(PARRY.critChance*100)+'%', 'The chance that a hit lands as a critical, for extra damage.'],
@@ -15586,7 +15586,7 @@ function drawActorBase(e){
   if(isP && romHush()) return;
   const ty=B-(e.type==='crawler'?120:e.type==='feralskit'?62:e.type==='rat'?40:e.type==='ratking'?66:e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'||e.type==='briarling'?66:e.type==='sporeling'?72:e.type==='capbrute'?((e.opts&&e.opts.big)?236:178):e.type==='dragon'?300:e.type==='bear'?92:e.type==='troll'||e.type==='golem'?150:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:e.type==='rootmother'?214:e.type==='hollow'?272:114)+dwarfDrop(e.opts);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
-  const deadly=!isP && e.type!=='dummy' && e.hostile!==false && e.tier && typeof foeLevel==='function' && foeLevel(e)-playerLevel()>=3;   // far stronger than you: a skull
+  const deadly=!isP && e.type!=='dummy' && e.hostile!==false && e.tier && typeof foeLevel==='function' && foeLevel(e)-playerLevel()>=7;   // far stronger than you: a skull
   const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  Lv '+(typeof foeLevel==='function'?foeLevel(e):e.tier) : ''), tw=g.measureText(label).width;
   g.fillStyle=deadly?'rgba(60,8,6,0.85)':'rgba(12,8,3,0.78)'; g.beginPath(); g.roundRect(s.x-tw/2-7,ty,tw+14,16,4); g.fill();
   if(deadly){ g.strokeStyle='rgba(220,70,50,0.8)'; g.lineWidth=1; g.stroke(); }
@@ -16673,7 +16673,7 @@ const ITEM_STATS={ moon_amulet:{agi:2,magic:3}, robe:{hp:1,magic:1}, robe_blue:{
   hood:{hp:2}, elf_circlet:{hp:1,agi:1,magic:3}, kettle:{hp:5}, bandana:{hp:1,agi:2}, coif:{hp:3}, helm_full:{hp:8},
   hose_grey:{hp:1,agi:1}, breeches:{hp:2}, elf_leggings:{agi:2,magic:2}, elf_leggings_worn:{agi:2,magic:1} };
 Object.entries(ITEM_STATS).forEach(([id,st])=>{ GEAR_HP[id]=st.hp||0; });
-const gearSum=(k)=>{ const E=(player.opts&&player.opts.equip)||{}; return SLOTS.reduce((a,sl)=>a+((ITEM_STATS[E[sl]]||{})[k]||0),0) + (k==='agi' ? (CHOICE.brannTaught?1:0)+(CHOICE.brannTrap==='done'?1:0) : 0) + (k==='ap' ? (CHOICE.temper||0)+((CHOICE.tithe&&CHOICE.tithe.ap)||0) : k==='magic' ? (CHOICE.attune||0)+((CHOICE.tithe&&CHOICE.tithe.sp)||0) : 0); };   // tithe: what you sold the Hollow Choir   // attune: ranks from older saves; woven: Maelis's thread in a piece you wear   // plus what Brann taught you, and what you paid to be trained in
+const gearSum=(k)=>{ const E=(player.opts&&player.opts.equip)||{}; return (typeof perkStat==='function'?perkStat(k):0) + SLOTS.reduce((a,sl)=>a+((ITEM_STATS[E[sl]]||{})[k]||0),0) + (k==='agi' ? (CHOICE.brannTaught?1:0)+(CHOICE.brannTrap==='done'?1:0) : 0) + (k==='ap' ? (CHOICE.temper||0)+((CHOICE.tithe&&CHOICE.tithe.ap)||0) : k==='magic' ? (CHOICE.attune||0)+((CHOICE.tithe&&CHOICE.tithe.sp)||0) : 0); };   // tithe: what you sold the Hollow Choir   // attune: ranks from older saves; woven: Maelis's thread in a piece you wear   // plus what Brann taught you, and what you paid to be trained in
 const AGI_DODGE=0.04, DODGE_CAP=0.3;                      // each point of agility: 4% to dodge a blow outright, never more than 30%
 const dodgeChance=a=>Math.min(DODGE_CAP,a*AGI_DODGE);
 // magic damage from gear adds to every spell
@@ -22650,11 +22650,11 @@ UNDER_LORE.under_sw[2][2]="Somebody slept here for a long time: a bedroll, a col
 const ITEM_LEVEL_FIX={ fire_blade:4, emberbrand:5, barrow_blade:4, grave_blade:3, khopesh:5, wyrm_hauberk:5, wyrm_shield:4, wyrm_helm:4, fen_boots:3, sand_boots:4, elf_blade:3, bog_crown:4, obsidian_helm:3, helm_full:3, helm_black:3, kettle:2, coif:2, shield_iron:3, shield:2, gauntlets:2, plate_boots:2 };
 function itemLevel(id){ if(!id || !ITEMS[id]) return 0; const base=(typeof unWoven==='function'?unWoven(id):id); if(ITEM_LEVEL_FIX[base]!=null) return Math.min(5,ITEM_LEVEL_FIX[base]+(base!==id?1:0));
   const pr=PRICES[id]??PRICES[base]??10; return pr<=20?1:pr<=60?2:pr<=150?3:pr<=280?4:5; }
-const gapOf=f=> Math.max(0,(typeof foeLevel==='function'?foeLevel(f)-playerLevel()-2:0));   // how far a foe is beyond you (for the warning and the reward; it changes no numbers)
+const gapOf=f=> Math.max(0,(typeof foeLevel==='function'?Math.floor((foeLevel(f)-playerLevel())*LV_K+1e-6)-2:0));   // how far a foe is beyond you (for the warning and the reward; it changes no numbers)
 const gapIn=f=> (typeof foeDmgMult==='function'?foeDmgMult(f):1), gapOut=f=> (typeof playerOutMult==='function'?playerOutMult(f):1);
 // a word of warning at the edge of somewhere too deep for you
 let gapWarned={};
-{ const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); try{ const t=tierOf(areaId), al=2*t, pl=playerLevel(); if(al-pl>=3 && !gapWarned[areaId] && mobs.some(m=>m.hostile&&!m.dead)){ gapWarned[areaId]=1;
+{ const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); try{ const t=tierOf(areaId), al=newLv(2*t), pl=playerLevel(); if(al-pl>=7 && !gapWarned[areaId] && mobs.some(m=>m.hostile&&!m.dead)){ gapWarned[areaId]=1;
       setTimeout(()=>{ banner('Dangerous for you','#e07050',2200); logMsg('Foes here are around level '+al+'. You are level '+pl+', with '+armourTotal()+' armour. They will hit hard and take a long time to bring down. Go carefully, or come back stronger.','#e07050');
         teach('gearlevel','Stronger foes',["Foes show their <b>level</b> over their heads. Yours is beside your health bar.","Better <b>armour</b> takes a share off every blow, a better <b>weapon</b> hits harder, and every level adds health and damage. Nothing stops you going anywhere: a foe far above you is not impossible, only very likely to kill you."]); },900); } }catch(e){} return r; }; }
 
@@ -22664,20 +22664,23 @@ let gapWarned={};
     if(gap>=1){ try{ CHOICE.daring=(CHOICE.daring||0)+1; setTimeout(()=>{ try{ giveXp(killXp(f)); }catch(e){} },600); CHOICE.daringBest=Math.max(CHOICE.daringBest||0,gap); const coin=4*gap*(f.tier||1)+Math.floor(Math.random()*6); player.purse+=coin; updateHud();
       slowmo.scale=0.15; slowmo.t=0.9; shake=Math.max(shake,10);
       setTimeout(()=>{ banner(gap>=2?'Against all odds!':'Beyond your level!','#ffd070',1800); logMsg('You beat '+f.name+' (level '+foeLevel(f)+') at level '+playerLevel()+'. Folk will hear of this. You find '+formatCoin(coin)+' on the body.','#ffd070'); },350);
-      if(CHOICE.daring===1) setTimeout(()=>teach('daring','Beyond your level',["You beat a foe <b>three or more levels above you</b>. That is hard, and it is worth something: <b>extra coin</b> and <b>double experience</b>, and word of it spreads.","Do it five times and it counts toward your <b>renown</b>."]),1400);
+      if(CHOICE.daring===1) setTimeout(()=>teach('daring','Beyond your level',["You beat a foe <b>seven or more levels above you</b>. That is hard, and it is worth something: <b>extra coin</b> and <b>double experience</b>, and word of it spreads.","Do it five times and it counts toward your <b>renown</b>."]),1400);
       autosaveSoon(400); }catch(e){} }
     return r; }; }
-JOURNAL.push(['Beyond Your Level', ()=> !CHOICE.daring ? null : CHOICE.daring>=5 ? ['done',"You have beaten "+CHOICE.daring+" foes you had no business beating, three and more levels above you."+(CHOICE.daringBest>=2?" Once, against all odds.":"")]
+JOURNAL.push(['Beyond Your Level', ()=> !CHOICE.daring ? null : CHOICE.daring>=5 ? ['done',"You have beaten "+CHOICE.daring+" foes you had no business beating, seven and more levels above you."+(CHOICE.daringBest>=2?" Once, against all odds.":"")]
   : ['active',"Foes far above your level hit hard and take an age to bring down, but they can be beaten. Each one is worth extra coin and experience, and word gets around. ("+CHOICE.daring+"/5)"]]);
 
 // ════════ LEVELS, ARMOUR, AND WEAPONS THAT GET BETTER: real numbers decide where you can go ════════
-//   CHOICE.xp : experience. Level 1-12: each level is +8 health and +5% damage. Foes have a level from where they live (danger ◆ x2).
+//   CHOICE.xp : experience. Level 1-30: each level is +3 health and +2% damage, every fifth a perk. Foes have a level from where they live (danger ◆ x2).
 //   Armour (from body armour, helms, gauntlets, boots, shields) takes a share off every blow: armour/(armour+40). Better weapons hit harder: +12% per quality level.
-const LV_MAX=14, XP_AT=[0,0,120,400,850,1500,2400,3400,4600,6000,7600,9400,11500,14000,17000];   // about level 4 when the valley is done, 6-7 after the danger-3 lands, 9 after the swamp, 11 after the Undercity, 13-14 only deep in the desert
+// Levels go to 30. The journey (and the experience it pays) is the same as when they went to 14; it is only cut finer: LV_K converts a level now to the old scale.
+//   about level 7 when the valley is done, 12-14 after the danger-3 lands, 19 after the swamp, 23 after the Undercity, 28-30 only deep in the desert
+const LV_OLD=[0,0,120,400,850,1500,2400,3400,4600,6000,7600,9400,11500,14000,17000], LV_K=13/29, oldLv=n=>1+(n-1)*LV_K, newLv=o=>Math.round(1+(o-1)/LV_K);
+const LV_MAX=30, XP_AT=[0,0]; for(let n=2;n<=LV_MAX;n++){ const o=oldLv(n), k=Math.min(13,Math.floor(o)), f=o-k; XP_AT[n]=Math.round((LV_OLD[k]+(LV_OLD[k+1]-LV_OLD[k])*f)/10)*10; }
 const playerLevel=()=>{ const x=CHOICE.xp||0; let L=1; for(let k=2;k<=LV_MAX;k++) if(x>=XP_AT[k]) L=k; return L; };
 const xpInto=()=>{ const L=playerLevel(); return (CHOICE.xp||0)-XP_AT[L]; }, xpNeed=()=>{ const L=playerLevel(); return L>=LV_MAX?0:XP_AT[L+1]-XP_AT[L]; };
-const levelHp=()=>(playerLevel()-1)*8, levelDmgMult=()=>1+0.05*(playerLevel()-1);
-const foeLevel=f=>{ if(!f) return 1; const t=f.tier||tierOf(areaId)||1; return Math.min(15, 2*t + ((f.boss||(f.opts&&f.opts.big)||['barrowking','sunqueen','brute','sandworm'].includes(f.type))?1:0) + (/^(Old |Greater |The )/.test(f.name||'')?1:0)); };
+const levelHp=()=>(playerLevel()-1)*3+(typeof perkHp==='function'?perkHp():0), levelDmgMult=()=>1+0.02*(playerLevel()-1);
+const foeLevel=f=>{ if(!f) return 1; const t=f.tier||tierOf(areaId)||1; return newLv(Math.min(15, 2*t + ((f.boss||(f.opts&&f.opts.big)||['barrowking','sunqueen','brute','sandworm'].includes(f.type))?1:0) + (/^(Old |Greater |The )/.test(f.name||'')?1:0))); };
 // what each piece is worth
 const HEAVY=/mail|plate|scale|lamellar|chitin|cuirass|hauberk|helm|kettle|coif|bevor|gauntlet|keffiyeh|crown|obsidian/;
 function armourOf(id){ if(!id || !ITEMS[id]) return 0; const it=ITEMS[id], base=(typeof unWoven==='function'?unWoven(id):id), b=it.base||base, lvl=itemLevel(id), heavy=HEAVY.test(base)||HEAVY.test(b);
@@ -22710,15 +22713,15 @@ function foeDmgMult(f){ const t=Math.max(1,Math.min(6,(f&&f.tier)||1)); return F
 function giveXp(n,why){ if(!n || n<1) return; const L0=playerLevel(); CHOICE.xp=(CHOICE.xp||0)+Math.round(n); const L1=playerLevel();
   floatText(tileOf(player),'+'+Math.round(n)+' xp','#e8d070');
   if(L1>L0){ refreshPlayerHp(false); player.hp=player.maxHp; updateHud(); setTimeout(()=>{ banner('Level '+L1+'!','#f0dc80',2000); try{ SND.perfect(); }catch(e){}
-      logMsg('You are level '+L1+' now: '+player.maxHp+' health, and your blows land a little harder.','#f0dc80');
-      teach('levels','Levels',["Every foe you fell and every task you finish gives <b>experience</b>. Each <b>level</b> gives you <b>+8 health</b> and <b>+5% damage</b>.","Foes have levels too, shown over their heads. Three or more levels above you, they carry a <b>☠</b>: a <b>hard fight</b> you can still win with good parries and good gear. <b>Five or more</b> above, and it will very likely kill you."]); },300); }
+      logMsg('You are level '+L1+' now: '+player.maxHp+' health, and your blows land a little harder.','#f0dc80'); if(L1%5===0) setTimeout(()=>{ try{ perkOffer(); }catch(e){} },2400);
+      teach('levels','Levels',["Every foe you fell and every task you finish gives <b>experience</b>. Each <b>level</b> gives you <b>+3 health</b> and <b>+2% damage</b>, and every <b>fifth</b> level lets you pick a <b>perk</b>.","Foes have levels too, shown over their heads. Seven or more levels above you, they carry a <b>☠</b>: a <b>hard fight</b> you can still win with good parries and good gear. <b>Eleven or more</b> above, and it will very likely kill you."]); },300); }
   updateHud(); }
-function killXp(f){ const d=foeLevel(f)-playerLevel(), base=6*foeLevel(f); return base*(d>=0 ? Math.min(2,1+0.2*d) : Math.max(0,1+0.25*d)); }
+function killXp(f){ const d=(foeLevel(f)-playerLevel())*LV_K, base=6*oldLv(foeLevel(f)); return base*(d>=0 ? Math.min(2,1+0.2*d) : Math.max(0,1+0.25*d)); }
 { const _fd=foeDown; foeDown=function(f){ const xp=(f && f.type!=='dummy' && !combat.practice && !f.dead) ? killXp(f) : 0; const r=_fd.apply(this,arguments); if(xp>=1) setTimeout(()=>giveXp(xp),250); return r; }; }
 setInterval(()=>{ try{ if(!running || CHOICE.xpQuests==null) return; const n=renownDone(); if(n>CHOICE.xpQuests){ const k=n-CHOICE.xpQuests; CHOICE.xpQuests=n; giveXp(k*Math.max(20,12*tierOf(areaId)),'quest'); } }catch(e){} },2500);   // a task is worth more the deeper into the world it takes you
 // older saves: a level that fits what you have already done
 setInterval(()=>{ try{ if(!running || CHOICE.xpVer>=2) return; const n=renownDone(), deep=Math.max(1,...Object.keys(visitedAreas).map(a=>tierOf(a)||1));
-    if(CHOICE.xp==null && n===0){ CHOICE.xp=0; CHOICE.xpVer=3; CHOICE.xpQuests=n; refreshPlayerHp(false); updateHud(); return; } else { const L=Math.max(1,Math.min(9,2*deep-1)); CHOICE.xp=Math.round(XP_AT[L]+(XP_AT[L+1]-XP_AT[L])*0.4); }
+    if(CHOICE.xp==null && n===0){ CHOICE.xp=0; CHOICE.xpVer=3; CHOICE.xpQuests=n; refreshPlayerHp(false); updateHud(); return; } else { const L=Math.max(1,Math.min(9,2*deep-1)); CHOICE.xp=Math.round(LV_OLD[L]+(LV_OLD[L+1]-LV_OLD[L])*0.4); }
     CHOICE.xpQuests=n; CHOICE.xpVer=2; refreshPlayerHp(false); updateHud(); }catch(e){} },1000);
 // saves from before levels were given a level from the deepest place visited, as if everything up to there was done: too generous for someone who only looked in.
 // Once, those are measured again from what was actually done: every foe beaten (at its level) and every task finished, with room to spare for foes fought twice.
@@ -25369,7 +25372,7 @@ function drawDragonFoe(x,B,e,pose){ const pk=pose&&pose.kind, pt=pose?Math.min(1
 // the breath: telegraphed, very hard to turn; it sets you burning hard. A parry at the right moment halves it, Ice Ward takes it whole, Cooling Salve puts the burning out
 { const _imp=impact; impact=function(f){ const s=curStep(f); if(!s || !s.breath || f.type!=='dragon') return _imp.apply(this,arguments);
     f.strikeAt=clock; f.fireAt=clock; duel.lastImpact=clock; shake=Math.max(shake,10); try{ SND.fx('roar'); }catch(e){}
-    const lvl=typeof foeLevel==='function'?foeLevel(f):12, base=Math.round((0.7*lvl+3)*(f.phase2?1.2:1)), since=clock-duel.parryAt, braced=duel.st==='parry' && since<=windowFor(player)+0.15;
+    const lvl=typeof foeLevel==='function'?oldLv(foeLevel(f)):12, base=Math.round((0.7*lvl+3)*(f.phase2?1.2:1)), since=clock-duel.parryAt, braced=duel.st==='parry' && since<=windowFor(player)+0.15;
     if(typeof wardTakes==='function' && wardTakes(base)){ floatText(tileOf(player),'The ward takes the fire!','#a8d8f0'); logMsg('The fire breaks on your ward like a wave on a rock.','#a8d8f0'); }
     else { const hp0=player.hp, n=Math.round(base*(braced?0.6:1)); hurtPlayer(n,braced?'Half the fire!':'Dragonfire!');
       if(player.hp<hp0 || braced){ addStatus(player,'burn',braced?6:9,Math.max(3,Math.round(lvl*(braced?0.34:0.46)))); if(!CHOICE.dragonTip){ CHOICE.dragonTip=true; logMsg('You are burning. Cooling Salve puts it out. Ice Ward would have taken that breath whole.','#f0a060'); } }
@@ -25523,7 +25526,7 @@ function drakeSwap(toDragon){ const D=CHOICE.drake.name, W=CHOICE.pupName||PUP_N
     else { const dx=D.x-player.x, dy=D.y-player.y, d=Math.hypot(dx,dy)||1; if(d>1.4){ tx=player.x+dx/d*1.1; ty=player.y+dy/d*1.1; } else { tx=D.x; ty=D.y; } }
     const mx=tx-D.x, my=ty-D.y, md=Math.hypot(mx,my), sp=Math.min(md,dt*Math.max(2.4,md*3)); D.moving=md>0.04; if(md>0.001 && !D.roast && !D.chase && !D.sleep){ D.x+=mx/md*sp; D.y+=my/md*sp; }
     if(f && !f.dead) D.dir=dirFromDelta((f.x??f.i+0.5)-D.x,(f.y??f.j+0.5)-D.y); else if(D.moving && md>0.08) D.dir=dirFromDelta(mx,my);
-    if(f && !f.dead){ D.cd-=dt; if(D.cd<=0){ D.cd=3.4+Math.random()*1.0; D.shots=(D.shots||0)+1; const age=drakeAge(), blast=D.shots%3===0; let n=Math.round((6+Math.min(16,age*1.4))*(1+playerLevel()*0.08)*(blast?1.8:1));   // every third breath a full blast
+    if(f && !f.dead){ D.cd-=dt; if(D.cd<=0){ D.cd=3.4+Math.random()*1.0; D.shots=(D.shots||0)+1; const age=drakeAge(), blast=D.shots%3===0; let n=Math.round((6+Math.min(16,age*1.4))*(1+oldLv(playerLevel())*0.08)*(blast?1.8:1));   // every third breath a full blast
         D.fire=1; const q=P(f.x??f.i+0.5,f.y??f.j+0.5); D.fireTo={x:q.x,y:q.y-40};
         if(f.warded){ floatText(tileOf(f),'Warded','#c8e0f0'); }
         else { const res=FIRE_HARDY(f); if(res<1){ n=Math.max(1,Math.round(n*res)); if(!D.resTold){ D.resTold=true; logMsg('The sun-born things of the Sunscar are hard to burn: '+CHOICE.drake.name+'\'s fire does them less harm here.','#e8c080'); } }
@@ -26012,7 +26015,7 @@ function trapsMark(){ const K=trapsSprungToday(); OBJECTS.forEach(o=>{ if(o.type
 { const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); try{ trapsMark(); }catch(e){} return r; }; }
 { let last=null; setInterval(()=>{ try{ if(!running || CS.on) { last=null; return; } const k=areaId+':'+player.i+','+player.j; if(k===last) return; last=k;
     const o=OBJECTS.find(q=>q.i===player.i && q.j===player.j && trapSet(q)); if(!o) return;
-    const jaw=o.open!==undefined, lv=typeof playerLevel==='function'?playerLevel():1, n=Math.min(Math.max(0,player.hp-1), Math.round((jaw?7:3)+lv*(jaw?1.6:0.7)));
+    const jaw=o.open!==undefined, lv=typeof playerLevel==='function'?oldLv(playerLevel()):1, n=Math.min(Math.max(0,player.hp-1), Math.round((jaw?7:3)+lv*(jaw?1.6:0.7)));
     if(jaw) o.open=true; else o.sprung=true; trapsSprungToday().push(trapKey(o));
     player.path=[]; player.hp-=n; player.flash=0.45; shake=Math.max(shake,jaw?10:5); try{ SND.hurt(false); SND.pain(player,false); }catch(e){} floatText(tileOf(player),'-'+n,'#ff7a6a',true); floatText([player.i,player.j-0.001],jaw?'Jaw-trap!':'Snare!','#f0c0a0'); updateHud();
     logMsg(jaw ? "Iron teeth slam shut on your leg. You prise the jaws apart with both hands, swearing, and limp clear. Whoever set this on an elven road wanted it to cripple." : "A noose whips tight round your ankle and jerks you off your feet. You saw the wire off on a stone, with a burning shin to show for it.",'#e0a080'); }catch(e){} },120); }
@@ -27207,7 +27210,7 @@ AREAS.guesttent.entries={ fromCity:{i:3,j:5} };
 { const prev=bedChoice; bedChoice=function(){ const r=prev(); if(areaId==='guesttent'){ const t=document.getElementById('dlg-text'); if(t) t.innerHTML="<p>A bedroll on a fur, smelling of cedar and clean wool. The elves keep it for travellers, and ask nothing for it. Sleep here, and here is where you wake if a fight goes against you.</p>"; } return r; }; }
 // before the door: what waits inside, and that there is no way back
 let TREE_GO=false;
-function treeAsk(){ const lv=playerLevel(), lo=2*(AREA_TIER.tree1||3), hi=lo+1, under=lv<lo;
+function treeAsk(){ const lv=playerLevel(), lo=newLv(2*(AREA_TIER.tree1||3)), hi=newLv(2*(AREA_TIER.tree1||3)+1), under=lv<lo;
   say('The Door at Her Foot',["You hold up the lantern. The three moonbells flare, and the dark in the doorway draws back from them like a held breath.",
     "<b>Inside: the Hunger's things, around level "+lo+" to "+hi+", and the Hollow Hunger itself (level "+hi+") at the bottom of the roots.</b> You are level "+lv+"."+(under?" <span style=\"color:#ff9a80\">That is beyond you: they will hit hard and take long to bring down.</span>":""),
     "<b>Once you go in, there is no turning back.</b> The roots close behind you, and there is no way up until the Hunger is gone. Fall, and you wake outside, and must start again from the top. Bring food and draughts."],
@@ -30467,7 +30470,7 @@ const CVM3=(()=>{
   { const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{
     if(!running || !player) return r;
     if(areaId!==lastArea){ const prev=lastArea; lastArea=areaId;
-      if(ROADS.includes(areaId) && player.purse>=25 && playerLevel()>=5 && !CHOICE.cvStolen && !CHOICE.cvFire && (CHOICE.cvSkit||{})[areaId]!==day() && (!CHOICE.cvFirst || encounter('skit'+areaId,0.25))){
+      if(ROADS.includes(areaId) && player.purse>=25 && playerLevel()>=10 && !CHOICE.cvStolen && !CHOICE.cvFire && (CHOICE.cvSkit||{})[areaId]!==day() && (!CHOICE.cvFirst || encounter('skit'+areaId,0.25))){
         CHOICE.cvSkit={...(CHOICE.cvSkit||{}), [areaId]:day()}; const A=AREAS[areaId]; let sx=0, sy=0;
         for(let t=0;t<20;t++){ sx=1+Math.random()*(A.w-2); sy=1+Math.random()*(A.h-2); if(Math.hypot(sx-player.x,sy-player.y)>6) break; }
         OBJECTS.push({type:'skitter', x:sx, y:sy, i:Math.floor(sx), j:Math.floor(sy), st:'stalk', t:0, dir:0, noblock:true, purse:0, slow:!CHOICE.cvFirst}); CHOICE.cvFirst=true; } }
@@ -30569,7 +30572,7 @@ const CVM3=(()=>{
 
 // ════════ Cinderveil kin: three long chains, each ending in an engine of your own. A Strider to ride (faster legs), a Packling that
 // carries for you (more pack space), and a Hushling that hides you from lesser foes. All for kin only. Minigames: forge, gait, balance, lens. ════════
-{ const trust=()=>CHOICE.cvTrust||0, kin=()=>trust()>=2, day=()=>Math.floor(dayClock/DAY_LEN), KIN_LV=8, seasoned=()=>playerLevel()>=KIN_LV;   // the engines are mid-game: kin, and a road-worn level 8
+{ const trust=()=>CHOICE.cvTrust||0, kin=()=>trust()>=2, day=()=>Math.floor(dayClock/DAY_LEN), KIN_LV=16, seasoned=()=>playerLevel()>=KIN_LV;   // the engines are mid-game: kin, and a road-worn level 16
   const scrap=()=>invCount('cv_scrap'), take=(id,n)=>{ for(let k=0;k<n;k++){ const j=player.inv.indexOf(id); if(j>=0) player.inv[j]=null; } };
   const give=(id,n=1)=>{ let got=0; for(let k=0;k<n;k++){ const f=slotFor(id); if(f>=0){ player.inv[f]=id; got++; } } updateHud(); if(invOverlay.classList.contains('open')) refreshInventory(); return got; };
   const qA=()=>CHOICE.cvA, qB=()=>CHOICE.cvB, qC=()=>CHOICE.cvC;
@@ -30782,7 +30785,7 @@ const CVM3=(()=>{
   NEAR_NAME.cvlantern="Odra's Lantern";
   let TRIAL=null; window.cvTrial=()=>TRIAL;
   const trialStart=()=>{ closeDialog(); TRIAL={fails:0}; switchArea('cvyard','fromCamp'); logMsg('Odra hangs her lantern at the far end of the Ember Yard. “Bring it back. Wake no one.”','#c8a0e0'); };
-  onUse(['cvlantern'],()=>{ if(!TRIAL) return; TRIAL=null; CHOICE.cvC='done'; CHOICE.cvHush=true; switchArea('cvcamp','fromYard'); remember('cvhush','done',"The Hushling is yours: a little Skitter of smoked glass that bends the light around you. Foes five levels or more below you will not notice you pass.");
+  onUse(['cvlantern'],()=>{ if(!TRIAL) return; TRIAL=null; CHOICE.cvC='done'; CHOICE.cvHush=true; switchArea('cvcamp','fromYard'); remember('cvhush','done',"The Hushling is yours: a little Skitter of smoked glass that bends the light around you. Foes ten levels or more below you will not notice you pass.");
     banner('The Hushling','#c8e8f0',2600); logMsg('You walk the lantern back. Odra takes it, and something small and glassy unfolds from under her coat and runs up your arm. “It likes you. It hides you. Do not make it regret either.”','#8ac070'); autosaveSoon(800); });
   { const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{ if(!running) return r;
       if(areaId==='cvyard'){ if(!TRIAL) TRIAL={fails:0}; for(const o of OBJECTS){ if(o.type!=='cvsleeper') continue; if(Math.hypot(player.x-(o.i+0.5),player.y-(o.j+0.5))<ringR(o)){ TRIAL.fails++;
@@ -30799,7 +30802,7 @@ const CVM3=(()=>{
   const canRide=()=>openGround() && !combat.active && !player.sitChair && !(typeof FISH!=='undefined' && FISH);
   const riding=()=>!!((CHOICE.cvStrider && CHOICE.cvRiding) || RACE) && canRide();
   window.cvRiding=riding; window.cvRideMul=()=>riding()?1.4:1;
-  window.cvHush=m=>!!(RACE && m && !m.provoked) || !!(CHOICE.cvHush && m && !m.provoked && !m.boss && foeLevel(m)<=playerLevel()-5);
+  window.cvHush=m=>!!(RACE && m && !m.provoked) || !!(CHOICE.cvHush && m && !m.provoked && !m.boss && foeLevel(m)<=playerLevel()-10);
   { const _w=drawPlayerWading; drawPlayerWading=function(e){ if(!riding()) return _w.apply(this,arguments);
       const q=P(player.x,player.y), d=player.dir||0, mv=player.path.length>0, ph=mv?gt*7:null, S=1.15, z=ph==null?0:Math.abs(Math.sin(ph*2))*2;
       CVM3.strutter(g,q.x,q.y,S,d,ph,true); SADDLE_SWAY=ph==null?0:Math.sin(ph)*2.2; const th=(45-d*45)*Math.PI/180, lx=-2, sx=q.x+(lx*Math.cos(th)-lx*Math.sin(th))*0.7071*S, sy=q.y+(lx*Math.cos(th)+lx*Math.sin(th))*0.3536*S-(82+z)*S;
@@ -30892,7 +30895,7 @@ const CVM3=(()=>{
   JOURNAL.push(['The Packling', ()=>{ const s=qB(); if(!s) return null; return s==='done' ? ['done',"Tinny built you a Packling. It follows you and carries eight more things."] : ['active', {
       frame:"Dig out the little hauler frame in the south of the Scrublands. Wreck-pickers are at it.", parts:"Bring Tinny eight Salvage ("+scrap()+"/8) and two wolf pelts ("+invCount('pelt')+"/2).",
       balance:"Help Tinny load the Packling, and keep it level.", heart:"Give Tinny an ember core, for the Packling's heart." }[s]]; }]);
-  JOURNAL.push(['The Hushling', ()=>{ const s=qC(); if(!s) return null; return s==='done' ? ['done',"Odra gave you a Hushling. Foes five levels or more below you do not notice you pass."] : ['active', {
+  JOURNAL.push(['The Hushling', ()=>{ const s=qC(); if(!s) return null; return s==='done' ? ['done',"Odra gave you a Hushling. Foes ten levels or more below you do not notice you pass."] : ['active', {
       glass:hasItem('cv_lensglass')?"Take the crater glass to Ashmother Odra.":"Find clear glass in the Glass Crater, for Ashmother Odra.", grind:"Grind the crater glass into a lens at Odra's wheel.",
       moths:"Cut three nightmoth cocoons in the Mistmere, at night ("+invCount('cv_cocoon')+"/3).", trial:"At night, take Odra's trial: carry her lantern out of the Ember Yard without waking a warden." }[s]]; }]);
 }
@@ -31082,6 +31085,18 @@ ICON_EXTRA.cv_scarf=scarfIcon('#8a3a2a','#4a1e16','#c8904a'); ICON_EXTRA.cv_scar
   const L=[]; for(let k=0;k<R.length;k++) L.push({ area:R[k], from:R[k-1]||R[1], to:R[k+1]||R[k-1] }); for(let k=R.length-2;k>0;k--) L.push({ area:R[k], from:R[k+1], to:R[k-1] });
   PED_LEGS.length=0; PED_LEGS.push(...L); Object.keys(PED_GEO).forEach(k=>delete PED_GEO[k]);
   try{ const S=CHOICE.pedd; if(S && typeof S==='object' && S.k>=PED_LEGS.length) S.k=S.k%PED_LEGS.length; }catch(e){} }
+
+// ════════ PERKS: every fifth level, pick one. Each can be taken more than once ════════
+const PERKS={ hardy:{name:'Hardy', what:'+12 max health', hp:12}, edge:{name:'Strong Arm', what:'+2 Attack Power (+6% weapon damage)', st:{ap:2}},
+  feet:{name:'Light on Your Feet', what:'+2 Agility (harder to hit)', st:{agi:2}}, lore:{name:'Spell-learned', what:'+2 Spell Power (+8% spell damage)', st:{magic:2}} };
+const perkList=()=>CHOICE.perks||[], perkHp=()=>perkList().reduce((a,p)=>a+((PERKS[p]||{}).hp||0),0), perkStat=k=>perkList().reduce((a,p)=>a+(((PERKS[p]||{}).st||{})[k]||0),0);
+const perksOwed=()=>Math.floor(playerLevel()/5)-perkList().length;
+function perkOffer(){ if(perksOwed()<=0) return; if(dlgIsOpen() || combat.active || (typeof CS!=='undefined' && CS.on)) return;
+  const n=perkList().length+1, opt=id=>({label:`<b>${PERKS[id].name}</b> <small>(${PERKS[id].what}${perkList().filter(p=>p===id).length?', taken '+perkList().filter(p=>p===id).length+'×':''})</small>`, fn:()=>{ closeDialog(); CHOICE.perks=[...perkList(),id]; refreshPlayerHp(false); player.hp=Math.min(player.maxHp,player.hp+(PERKS[id].hp||0)); updateHud(); try{ refreshStatPanel(); }catch(e){}
+      banner(PERKS[id].name,'#f0dc80',1600); logMsg('Perk: '+PERKS[id].name+' ('+PERKS[id].what+').','#f0dc80'); autosaveSoon(300); if(perksOwed()>0) setTimeout(perkOffer,700); }});
+  say('Level '+(n*5)+': a Perk',["The road has taught you something. Pick one; you can take the same again later."],['hardy','edge','feet','lore'].map(opt)); }
+setInterval(()=>{ try{ if(!running || !player.opts) return; if(!CHOICE.lv30){ CHOICE.lv30=1; if((CHOICE.xp||0)>0) logMsg('Levels now go to 30: your level is counted afresh from your experience, and every fifth level brings a perk.','#e8c060'); refreshPlayerHp(false); updateHud(); }
+  if(perksOwed()>0) perkOffer(); }catch(e){} },3000);
 </script>
 </body>
 </html>

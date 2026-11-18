@@ -11959,7 +11959,7 @@ function showDialog(name,text,opts,purse){
   const box=document.getElementById('dlg-opts'); box.innerHTML='';
   opts.forEach(o=>{ const b=document.createElement('button'); b.className='dlg-opt'+(o.off?' off':'');
     b.innerHTML=`<span>${o.label}</span>${o.note?`<small>${o.note}</small>`:''}`;
-    b.addEventListener('click',()=>{ if(o.off) return; const p0=player.purse, j0=(typeof rwClickStart==='function')?rwClickStart():null; o.fn(); try{ if(j0) rwClickEnd(j0,p0); }catch(e){} }); box.appendChild(b); });   // a choice that finishes a quest paid in gear keeps only part of its coin
+    b.addEventListener('click',()=>{ if(o.off) return; const p0=player.purse, j0=(typeof rwClickStart==='function')?rwClickStart():null, i0=invFlat(); o.fn(); try{ if(j0) rwClickEnd(j0,p0); }catch(e){} try{ if(typeof dlgGains==='function') dlgGains(i0); }catch(e){} }); box.appendChild(b); });   // a choice that finishes a quest paid in gear keeps only part of its coin
   dlgOverlay.classList.add('open');
   try{ VOICE.read(name,text); }catch(e){}                 // read aloud, if voices are on
   try{ gestOnDialog(name,text); }catch(e){}
@@ -27808,7 +27808,7 @@ for(const id of Object.keys(ITEMS)){ const it=ITEMS[id]; if(id.startsWith('t_') 
     if(n.id==='magistrate' && !BARON_DOWN() && (hasItem('seal')||hasItem('ledger')||hasItem('journal')||hasItem('orrinletters')||hasItem('trapnote')||(hasItem('charter')&&!CHOICE.charterGiven))) return '?';   // evidence to lay before him
   }catch(e){} return r; }; }
 // ════════ quest rewards in kind: most finished quests also leave you a piece of gear; often you choose, a fighter's piece or a caster's ════════
-const RW_SKIP=new Set(["Vesna's Night Work",'The Fallen Oak']);
+const RW_SKIP=new Set(["Vesna's Night Work",'The Fallen Oak','A Strider of Your Own','The Packling','The Hushling']);   // the Cinderveil chains pay in engines
 const RW_MELEE=[ ['jerkin','gambeson','hood','boots','gloves','hatchet','hose_grey','leather_spaulders'],
   ['gambeson','studded','kettle','shield','sword','mace','spear','studded_caps','studded_spaulder','breeches'],
   ['mail','blackmail','morningstar','riding_boots','shield_iron','gauntlets','coif','longsword','plate_boots','brig_spaulders','iron_pauldrons'] ];
@@ -30865,6 +30865,7 @@ const CVM3=(()=>{
   const close=()=>{ ov.classList.remove('open'); const t=document.getElementById('item-tip'), t2=document.getElementById('item-tip2'); if(t) t.style.display='none'; if(t2) t2.style.display='none'; };
   rwOffer=function(){ const Q=CHOICE.rwQ||[]; if(!Q.length || rwOpen() || (typeof CVMG==='function' && CVMG())) return; const R=Q[0];   // never over a minigame
     if(typeof dlgOverlay!=='undefined' && dlgOverlay.classList.contains('open')) return; if(combat.active || (typeof CS!=='undefined' && CS.on)) return;
+    if(RW_SKIP.has(R.t)){ R.a=R.b=null; if(!(R.c>0)){ CHOICE.rwQ=Q.slice(1); return; } }   // queued before it was skipped
     const items=[R.a,R.b].filter(id=>id && ITEMS[id]), choose=items.length>1 && !R.all;
     if(items.length && player.inv.indexOf(null)<0){ if(!R.warned){ R.warned=true; logMsg('A reward for “'+R.t+'” is waiting: make room in your pack.','#e8c060'); } return; }
     const done=pick=>{ close(); CHOICE.rwQ=(CHOICE.rwQ||[]).slice(1); (pick?[pick]:choose?[]:items).forEach(id=>{ giveQuestItem(id,true); logMsg('Reward for “'+R.t+'”: '+ITEMS[id].name+'.','#8ac070'); });
@@ -30878,6 +30879,23 @@ const CVM3=(()=>{
     else P.insertAdjacentHTML('beforeend','<div class="rw-slot" style="margin-top:8px">Hover to compare, click to choose.</div>');
     ov.classList.add('open'); };
   { const _e=rwClickEnd; rwClickEnd=function(j0,p0){ const r=_e.apply(this,arguments); try{ const gain=player.purse-p0; if(gain>0) for(const [t,f] of JOURNAL){ if(j0[t]==='done' || (CHOICE.rwSeen&&CHOICE.rwSeen[t])) continue; let q=null; try{ q=f(); }catch(e){} if(q && q[0]==='done'){ (CHOICE.rwCoins=CHOICE.rwCoins||{})[t]=gain; break; } } }catch(e){} return r; }; }
+}
+
+// ════════ what a conversation hands you: the items show at the end of it, as icons you can hover ════════
+{ const css=document.createElement('style'); css.textContent=`.dlg-gain{margin-top:10px;padding-top:8px;border-top:1px dashed rgba(90,60,30,0.35);text-align:center}
+.dlg-gain .gl{font:italic 12px Georgia,serif;color:#7a5a30;margin-bottom:5px}.dlg-gain .gr{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.dlg-gain .gi{display:flex;flex-direction:column;align-items:center;width:78px;gap:2px;cursor:default}
+.dlg-gain .gi canvas{width:40px;height:40px;background:#2a1e10;border:1px solid #6a4a28;border-radius:5px}.dlg-gain .gn{font:11px Georgia,serif;color:#2a1e10;line-height:1.15}
+#gain-toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:45;display:none;padding:8px 14px 8px;border-radius:8px;background:#e8dcb8;border:1px solid #8a6a3a;box-shadow:0 4px 14px rgba(0,0,0,0.5)}`;
+  document.head.appendChild(css);
+  const toast=document.createElement('div'); toast.id='gain-toast'; document.body.appendChild(toast); let tT=null;
+  const row=(ids)=>{ const d=document.createElement('div'); d.className='dlg-gain'; d.innerHTML='<div class="gl">You receive</div><div class="gr"></div>'; const gr=d.lastChild;
+    ids.forEach(([id,n])=>{ const t=document.createElement('div'); t.className='gi shop-slot'; t.dataset.item=id; const cv=document.createElement('canvas'); cv.width=cv.height=80; try{ drawItemIcon(cv.getContext('2d'),id,80); }catch(e){}
+      t.appendChild(cv); t.insertAdjacentHTML('beforeend',`<div class="gn">${ITEMS[id].name}${n>1?' ×'+n:''}</div>`); gr.appendChild(t); }); return d; };
+  window.dlgGains=(i0)=>{ const c={}; i0.forEach(id=>c[id]=(c[id]||0)-1); invFlat().forEach(id=>c[id]=(c[id]||0)+1);
+    const got=Object.keys(c).filter(id=>c[id]>0 && ITEMS[id]).map(id=>[id,c[id]]); if(!got.length) return;
+    if(dlgIsOpen()){ const tx=document.getElementById('dlg-text'); const old=tx.querySelector('.dlg-gain'); if(old) old.remove(); tx.appendChild(row(got)); return; }
+    toast.innerHTML=''; const r=row(got); r.style.cssText='margin:0;padding:0;border:0'; toast.appendChild(r); toast.style.display='block'; clearTimeout(tT); tT=setTimeout(()=>{ toast.style.display='none'; },3600); };
 }
 </script>
 </body>

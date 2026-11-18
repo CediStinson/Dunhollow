@@ -11933,16 +11933,21 @@ function refreshStatPanel(){
   const wname = E.weapon ? ITEMS[E.weapon].name : 'Bare fists';
   const rows = [
     ['Purse', formatCoin(player.purse)],
-    ['Max Health', player.maxHp+(armorBonus?` (+${armorBonus})`:'')],
-    ...(typeof playerLevel==='function' ? [['Level', playerLevel()+(playerLevel()<LV_MAX?' <small style="opacity:.6">('+xpInto()+' / '+xpNeed()+' xp)</small>':' <small style="opacity:.6">(max)</small>')], ['Armour', armourTotal()+' <small style="opacity:.6">(−'+Math.round(armourCut()*100)+'% damage)</small>']] : []),
+    ['Max Health', player.maxHp, armorBonus?`${player.maxHp-armorBonus} of your own, +${armorBonus} from your gear.`:'All of it your own: none of your gear adds health.'],
+    ...(typeof playerLevel==='function' ? [['Level', playerLevel(), playerLevel()<LV_MAX?`${xpInto()} / ${xpNeed()} xp to the next level.`:'The highest level there is.'], ['Armour', armourTotal(), `Cuts the damage you take by ${Math.round(armourCut()*100)}%.`]] : []),
     ['Weapon', wname],
-    ['Damage', typeof weaponDmg==='function' ? Math.round(weaponDmg(player.opts.equip.weapon)*levelDmgMult()) : W.dmg],
-    ['Critical Chance', Math.round(PARRY.critChance*100)+'%'],
+    ['Damage', typeof weaponDmg==='function' ? Math.round(weaponDmg(player.opts.equip.weapon)*levelDmgMult()) : W.dmg, 'What one clean hit with your weapon does, before the foe\'s armour.'],
+    ['Critical Chance', Math.round(PARRY.critChance*100)+'%', 'The chance that a hit lands as a critical, for extra damage.'],
     ['Off Hand', E.offhand ? ITEMS[E.offhand].name : 'None'],
   ];
-  panel.innerHTML = rows.map(([k,v])=>`<div class="stat-row"><b>${k}</b><span>${v}</span></div>`).join('');
-  const a=gearSum('agi'), m=gearSum('magic');
-  panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Swing Time</b><span>${(W.wind*(1-Math.min(0.3,gearSum('aspd')/100))).toFixed(2)}s</span></div><div class="stat-row"><b>Agility</b><span>${a}${a?` (${Math.round(dodgeChance(a)*100)}% dodge)`:''}</span></div><div class="stat-row"><b>Attack Power</b><span>${gearSum('ap')} (×${APM().toFixed(2)} weapon)</span></div><div class="stat-row"><b>Spell Power</b><span>${m}${isMagicWeapon()?' (×'+SPM().toFixed(2)+' spells)':''}</span></div>`);
+  const row=(k,v,h)=>`<div class="stat-row"${h?` data-help="${String(h).replace(/"/g,'&quot;')}"`:''}><b>${k}</b><span>${v}</span></div>`;
+  panel.innerHTML = rows.map(([k,v,h])=>row(k,v,h)).join('');
+  const a=gearSum('agi'), m=gearSum('magic'), sp=gearSum('aspd');
+  panel.insertAdjacentHTML('beforeend',
+    row('Swing Time',(W.wind*(1-Math.min(0.3,sp/100))).toFixed(2)+'s', 'From the start of a swing to the hit. Shorter is faster.'+(sp?` Your gear makes it ${Math.min(30,sp)}% faster.`:''))+
+    row('Agility',a, `${Math.round(dodgeChance(a)*100)}% chance to dodge a blow outright. Each point adds ${Math.round(AGI_DODGE*100)}%, up to ${Math.round(DODGE_CAP*100)}%.`)+
+    row('Attack Power',gearSum('ap'), `Your weapon hits ×${APM().toFixed(2)} as hard. Each point adds about 3%.`)+
+    row('Spell Power',m, isMagicWeapon()?`Your spells hit ×${SPM().toFixed(2)} as hard. Each point adds about 4%.`:'Makes spells hit harder, once you carry a staff.'));
   const t=[SLOTS.some(sl=>isWoven(player.opts.equip[sl]))&&('Woven pieces worn '+SLOTS.filter(sl=>isWoven(player.opts.equip[sl])).length),SLOTS.some(sl=>isTempered(player.opts.equip[sl]))&&('Tempered pieces worn '+SLOTS.filter(sl=>isTempered(player.opts.equip[sl])).length)].filter(Boolean);
   if(t.length) panel.insertAdjacentHTML('beforeend',`<div class="stat-row"><b>Special gear</b><span>${t.join(' · ')}</span></div>`);
 }
@@ -16662,16 +16667,16 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
   if(typeof armourOf==='function' && armourOf(id)) L.push(['Armour','+'+armourOf(id)]);
   if(WEAPONS[id]){ L.push(['Damage',typeof weaponDmg==='function'?weaponDmg(id):WEAPONS[id].dmg]); L.push(['Swing time',WEAPONS[id].wind.toFixed(2)+'s <small>('+(WEAPONS[id].wind<=0.17?'fast':WEAPONS[id].wind<=0.22?'steady':'slow')+')</small>']); } if(WEAPONS[id]&&WEAPONS[id].magic) L.push(['Spell power','×'+WEAPONS[id].magic]);
   const hp=GEAR_HP[id]||0; if(hp) L.push(['Health',(hp>0?'+':'')+hp]);
-  if(st.agi) L.push(['Agility','+'+st.agi+' <small>('+Math.round(st.agi*AGI_DODGE*100)+'% dodge)</small>']);
-  if(st.ap) L.push(['Attack power','+'+st.ap+' <small>(+'+st.ap*3+'% weapon damage)</small>']);
-  if(st.aspd) L.push(['Swing speed','+'+st.aspd+'% <small>(your weapon swings that much faster)</small>']);
+  if(st.agi) L.push(['Agility','+'+st.agi]);   // what a point is worth shows on the stat panel, under the mouse
+  if(st.ap) L.push(['Attack power','+'+st.ap]);
+  if(st.aspd) L.push(['Swing speed','+'+st.aspd+'%']);
   if(typeof RUNE_SET!=='undefined' && RUNE_SET.includes(unWoven(id))) L.push(['Forge-Heat (any four pieces)','every third blow you land bursts with fire for extra damage']);
   if(typeof MAGISTER_SET!=='undefined' && MAGISTER_SET.includes(unWoven(id))) L.push(["The Magister's Economy (any four pieces)",'every third spell you cast costs no mana']);
   if(typeof STARFALL_SET!=='undefined' && STARFALL_SET.includes(unWoven(id))) L.push(['Starfall (any four pieces)','one spell in four strikes twice, the second for half']);
   if(typeof EMBER_SET!=='undefined' && EMBER_SET.includes(unWoven(id))) L.push(['Kindled (any four pieces)','your spells set foes burning, and a foe that strikes you is sometimes lashed by flame']);
   if(id==='duel_boots') L.push(['Riposte Step','after you dodge a blow, your next strike within 2 seconds lands 40% harder']);
-  if(st.magic) L.push(['Spell power','+'+st.magic+' <small>(+'+st.magic*4+'% spell damage)</small>']);
-  if(st.mreg) L.push(['Mana regeneration','+'+st.mreg+' <small>per second in a fight (base 7)</small>']);
+  if(st.magic) L.push(['Spell power','+'+st.magic]);
+  if(st.mreg) L.push(['Mana regeneration','+'+st.mreg+'/s']);
   if(typeof isWoven==='function' && isWoven(id)) L.push(['Woven by Maelis','one of a kind <small>(+1 spell power included)</small>']);
   if(typeof isTempered==='function' && isTempered(id)) L.push(['Tempered by Oswin','one of a kind <small>(+1 attack power included)</small>']);
   const s2=itemStat(id); if(s2 && /shield|swing/.test(s2.short)) L.push(['Special',s2.short.replace(/^\+\d+ HP, /,'')]);
@@ -30907,6 +30912,16 @@ const CVM3=(()=>{
     const got=Object.keys(c).filter(id=>c[id]>0 && ITEMS[id]).map(id=>[id,c[id]]); if(!got.length) return;
     if(dlgIsOpen()){ const tx=document.getElementById('dlg-text'); const old=tx.querySelector('.dlg-gain'); if(old) old.remove(); tx.appendChild(row(got)); return; }
     toast.innerHTML=''; const r=row(got); r.style.cssText='margin:0;padding:0;border:0'; toast.appendChild(r); toast.style.display='block'; clearTimeout(tT); tT=setTimeout(()=>{ toast.style.display='none'; },3600); };
+}
+
+// ════════ the stat panel explains itself: what a number means shows under the mouse ════════
+{ const tip=document.createElement('div'); tip.id='stat-tip'; tip.className='itip'; document.body.appendChild(tip);
+  const hide=()=>{ tip.style.display='none'; };
+  document.addEventListener('pointerover',e=>{ const r=e.target.closest && e.target.closest('.stat-row[data-help]'); if(!r){ return; }
+    tip.innerHTML=`<b>${r.querySelector('b').textContent}</b><div class="fl lore" style="margin-top:4px">${r.dataset.help}</div>`; tip.style.display='block';
+    const w=tip.offsetWidth, h=tip.offsetHeight, b=r.getBoundingClientRect(); tip.style.left=Math.max(6,Math.min(innerWidth-w-6,e.clientX+12))+'px'; tip.style.top=Math.max(6,b.top-h-6)+'px'; });
+  document.addEventListener('pointerout',e=>{ const r=e.target.closest && e.target.closest('.stat-row[data-help]'); if(r && !(e.relatedTarget && r.contains(e.relatedTarget))) hide(); });
+  const css=document.createElement('style'); css.textContent='.stat-row[data-help]{cursor:help}.stat-row[data-help] b{text-decoration:underline dotted rgba(232,208,160,0.4);text-underline-offset:2px}'; document.head.appendChild(css);
 }
 </script>
 </body>

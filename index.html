@@ -7134,6 +7134,7 @@ function openHint(o,x,y){ if(!player || combat.active || cheb([o.i,o.j],[player.
   g.fillStyle='#f0d890'; g.fillText(t,x,y-2); g.restore(); }
 // what each signpost says: one wooden plate per direction (ang: which way the arrow points on screen)
 function signPlanks(sp){                            // each plank points roughly the way its road leaves the room
+  if(sp.arms) return sp.arms;   // a signpost on the long roads names its own two roads
   if(sp.city) return [
     { ang:-1.35, len:36, col:'#8a6a3e', label:'HOLLOWMERE', dir:'North', text:'The King\'s Road to Hollowmere, seat of Baron Bertram. Tolls payable at the gate.', note:'Someone has scratched underneath: “and at every gate after”.' },
     { ang:0.45,  len:34, col:'#9a7446', label:'DUNHOLLOW',  dir:'East',  text:'The forest road runs on to Dunhollow, a village a mile on.' },
@@ -9364,7 +9365,7 @@ function drawObject(o){
     }
     g.restore();
   } else if(o.type==='signpost'){
-    drawCached('signpost2'+(o.city?'c':'x'),x,y,90,90,45,72,(X,Y)=>paintSignpost(X,Y,o));
+    drawCached('signpost2'+(o.city?'c':o.arms?o.arms.map(a=>a.label).join('|'):'x'),x,y,90,90,45,72,(X,Y)=>paintSignpost(X,Y,o));
   } else if(o.type==='hearth' && o.i===0){ drawFireplace(o);           // indoors: a stone fireplace built into the wall, not a campfire on the floorboards
   } else if(o.type==='hearth'){
     drawCached('hearth',x,y,110,90,55,50,paintHearth); drawFlames(x,y-4,0.8);
@@ -10477,6 +10478,11 @@ function paintGroundTexture(){
           const lip=smooth(R0*0.33,R0*0.38,r); gc2=mixC(gc2,[120,150,110],lip*0.6);
           pc=mixC(pc,gc2,gl); }
         const ring=smooth(R0*0.38,R0*0.45,r)*(1-smooth(R0*0.45,R0*0.7,r)); if(ring>0){ const [d1,,id]=vor(gx*2.6,gy*2.6,15); if((id%3)===0 && d1<0.3) pc=mixC(pc,[96,150,120],ring*0.8*(1-d1/0.3)); } }
+      if(AREAS[areaId].green){ const gv=AREAS[areaId].green(gy,gx), edge=smooth(-0.12,0.12,gv-0.5+(fbm(gx*0.7,gy*0.7,171)-0.5)*0.9+(fbm(gx*2.2,gy*2.2,173)-0.5)*0.25);   // where the forest gives out: grass in ragged tongues, going dry and yellow, then the clay
+        if(edge>0){ const n6=fbm(gx*1.4,gy*1.4,172), n7=fbm(gx*7,gy*7,175), bl=(hsh(px*3+1,py*7+2)%1000)/1000; let gr=mixC([84,114,52],[116,138,68],n6); gr=mixC(gr,[156,146,84],clamp01((0.75-gv)*1.6)*0.7);
+          gr=mixC(gr,[60,84,38],smooth(0.55,0.8,n7)*0.35); if(bl<0.05) gr=mixC(gr,[136,160,80],0.5); else if(bl>0.95) gr=mixC(gr,[52,74,34],0.45);   // tussocks and single blades
+          pc=mixC(pc,gr,edge); }
+        else { const dry=clamp01(gv*2.2)*smooth(0.4,0.75,fbm(gx*1.1,gy*1.1,174)); pc=mixC(pc,[150,136,82],dry*0.45); } }        // dry grass patches just past the edge
       if(G.path>0){ const tr=mixC([184,150,104],[164,128,86],fbm(gx*2.6,gy*2.6,85)); pc=mixC(pc,tr,smooth(0.25,0.8,G.path)*0.8); }
       const ao=1-0.25*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1+((hsh(px,py)%1000)/1000-0.5)*0.06), o=(py*TWp+px)*4;
       D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
@@ -30082,7 +30088,7 @@ function styleShop(kind){ closeDialog(); const old=document.getElementById('styl
   hedgerow:{ ...BASE, w:12, h:56, theme:'road', label:'Hedgerow Way', dens:0.75,
     objects:()=>{ const l=[ {type:'teleporter', i:6, j:55, to:'road', entry:'fromCity'}, {type:'teleporter', i:6, j:0, to:'longmeadow', entry:'fromHedge'},
         {type:'milestone', i:Math.round(along(P_HEDGE,48))+2, j:48, t:'HOL 6'}, {type:'milestone', i:Math.round(along(P_HEDGE,12))-2, j:12, t:'HOL 5'},
-        {type:'wayshrine', i:Math.round(along(P_HEDGE,40))-3, j:40}, {type:'signpost', i:Math.round(along(P_HEDGE,53))+2, j:53},
+        {type:'wayshrine', i:Math.round(along(P_HEDGE,40))-3, j:40}, {type:'signpost', i:Math.round(along(P_HEDGE,53))+2, j:53, arms:[{ang:-0.46, len:34, col:'#9a7446', label:'LONG MEADOW', dir:'North', text:'North along the hedges to the Long Meadow, and the King\'s Road after it.'}, {ang:Math.PI-0.46, len:30, col:'#8a6a3e', label:'FOREST ROAD', dir:'South', text:'South to the Forest Road, and Dunhollow.'}]},
         {type:'cart', i:Math.round(along(P_HEDGE,24))+2, j:24}, {type:'barrel', i:Math.round(along(P_HEDGE,24))+3, j:25},
         {type:'campfire', i:Math.round(along(P_HEDGE,30))-3, j:30}, {type:'logseat', i:Math.round(along(P_HEDGE,30))-4, j:31}, {type:'logseat', i:Math.round(along(P_HEDGE,30))-2, j:31, r:1},
         {type:'haystack', i:10, j:18}, {type:'haystack', i:9, j:16}, {type:'stooks', i:10, j:14, noblock:true}, {type:'stooks', i:9, j:20, noblock:true}, {type:'fieldshelter', i:1, j:6},
@@ -30111,11 +30117,11 @@ function styleShop(kind){ closeDialog(); const old=document.getElementById('styl
     entries:{ fromHedge:{i:4,j:10}, fromKings:{i:51,j:1} } },
 
   // ── The Scrublands: the woods thin to thorn and dry grass, then to clay and sand ──
-  scrubland:{ ...BASE, w:12, h:52, theme:'sand', sandKind:'clay', label:'The Scrublands', scrub:gy=>Math.max(0,Math.min(1,1.25-gy/40)),
+  scrubland:{ ...BASE, w:12, h:52, theme:'sand', sandKind:'clay', label:'The Scrublands', scrub:gy=>Math.max(0,Math.min(1,1.25-gy/40)), green:gy=>Math.max(0,Math.min(1,1.25-gy/15)),
     objects:()=>{ const l=[ {type:'teleporter', i:6, j:0, to:'camp', entry:'fromWash'}, {type:'teleporter', i:6, j:51, to:'drywash', entry:'fromPits'},
         {type:'well', i:Math.round(along(P_SCRUB,27))+3, j:27}, {type:'tent', i:Math.round(along(P_SCRUB,30))-4, j:29, fp:[2,2]}, {type:'campfire', i:Math.round(along(P_SCRUB,30))-2, j:32},
         {type:'ruin', i:1, j:38, v:1}, {type:'ruin', i:10, j:44, v:0}, {type:'cart', i:Math.round(along(P_SCRUB,20))-3, j:20}, {type:'bones', i:9, j:36, noblock:true}, {type:'bones', i:2, j:47, noblock:true},
-        {type:'cairn', i:Math.round(along(P_SCRUB,42))+2, j:42}, {type:'signpost', i:Math.round(along(P_SCRUB,4))+2, j:4} ];
+        {type:'cairn', i:Math.round(along(P_SCRUB,42))+2, j:42}, {type:'signpost', i:Math.round(along(P_SCRUB,4))+2, j:4, arms:[{ang:-0.46, len:34, col:'#9a7446', label:'CHARCOAL PITS', dir:'North', text:'North: back to the charcoal pits and the bandit camp, and the forest beyond.'}, {ang:Math.PI-0.46, len:30, col:'#8a6a3e', label:'DRY WASH', dir:'South', text:'South, into the dry country: the Dry Wash, and the desert past it.', note:'Someone has scratched a little skull under it.'}]} ];
       for(let j=1;j<16;j+=1) for(const s of [-1,1]){ const x=along(P_SCRUB,j)+s*(3+R(j,s,7)*3); if(R(j,s,8)<0.55-j*0.025 && x>0 && x<11) l.push(tree(Math.round(x),j, R(j,s,9)<0.5?'oak':'pine', 0.75+R(j,s,10)*0.4-j*0.015)); }   // the last of the trees
       for(let j=10;j<44;j+=3){ const s=(j%2?1:-1), x=along(P_SCRUB,j)+s*(3+R(j,1,11)*2.5); if(x>0&&x<11) l.push({type:'deadtree', i:Math.round(x), j, s:0.6+R(j,2,12)*0.5}); }
       for(let j=18;j<50;j+=4){ const s=(j%8?1:-1), x=along(P_SCRUB,j)+s*(3+R(j,3,13)*3); if(x>0&&x<11) l.push({type:'sandrock', i:Math.round(x), j, v:j%5}); }
@@ -30145,7 +30151,7 @@ function styleShop(kind){ closeDialog(); const old=document.getElementById('styl
         {type:'brook', i:10, j:0, fp:[1,52], mean:0.9, ph:1.1, br:-9, noblock:true, dz:-99},
         {type:'fieldshelter', i:1, j:30}, {type:'campfire', i:2, j:33}, {type:'logpile', i:1, j:35}, {type:'felltree', i:Math.round(along(P_FOOT,44))-5, j:44, fp:[3,1]},
         {type:'wayshrine', i:Math.round(along(P_FOOT,20))-3, j:20}, {type:'cairn', i:Math.round(along(P_FOOT,8))-2, j:8}, {type:'cairn', i:Math.round(along(P_FOOT,26))+2, j:26, s:0.8},
-        {type:'signpost', i:Math.round(along(P_FOOT,48))-2, j:48} ];
+        {type:'signpost', i:Math.round(along(P_FOOT,48))-2, j:48, arms:[{ang:-0.46, len:32, col:'#9a7446', label:'VARROW PASS', dir:'North', text:'North, uphill all the way, to the Varrow Pass and the dwarves\' hold.'}, {ang:Math.PI-0.46, len:32, col:'#8a6a3e', label:'LOGGING ROAD', dir:'South', text:'South, down to the Logging Road.'}]} ];
       for(let k=0;k<12;k++){ const j=2+k*4, x=along(P_FOOT,j)+(k%2?2.5:-3); if(x>0&&x<9) l.push({type:k%3===0?'rockridge':'boulder', i:Math.round(x), j, v:k%5, ...(k%3===0?{fp:[2,1]}:{})}); }
       for(let k=0;k<16;k++){ const j=1+k*3, x=along(P_FOOT,j)+(k%2?3.5:-3.5); if(x>0&&x<9.5) l.push(tree(Math.round(x),j,'pine',0.9+R(k,1,15)*0.6)); }
       return l; },

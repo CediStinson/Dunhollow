@@ -6385,7 +6385,7 @@ Object.assign(AREAS,{
       {type:'teleporter', i:2, j:0, to:'crossroads', entry:'fromCamp'},
       {type:'teleporter', i:3, j:23, to:'camp', entry:'fromTrail'},
       {type:'crate', i:4, j:11, breakable:true},
-      {type:'cart', i:0, j:15}, {type:'bones', i:1, j:17, noblock:true},
+      {type:'cart', i:0, j:15, nomule:true}, {type:'edricremains', i:1, j:17, noblock:true},
       ...(!collectedPickups.has('southtrail:1,16') && !CHOICE.ada ? [{type:'pickup', i:1, j:16, item:'edric_knife', onTake:()=>{ CHOICE.edric='found'; logMsg("An overturned handcart, goblin arrows, and what is left of a man. This must be Edric.",'#e8c060'); }}] : []),
     ].filter(o=>!o.breakable || !destroyedBreakables.has('southtrail:'+o.i+','+o.j)),
     mobs:()=>[], entries:{ fromCrossroads:{i:2,j:1}, fromCamp:{i:3,j:22} } },
@@ -20822,7 +20822,7 @@ const paintStave=(col,bark,thorn)=>(g2,id,size)=>{ g2.save(); g2.scale(size/40,s
   g2.strokeStyle=thorn; g2.lineWidth=1.3; [[14,26,10,22],[20,20,24,23],[25,14,22,10],[28,11,32,13]].forEach(([a,b,c,d])=>{ g2.beginPath(); g2.moveTo(a,b); g2.lineTo(c,d); g2.stroke(); }); g2.restore(); };
 ITEM_ICON.storm_limb=paintStave('#8a6a40','#3a2a1a','#2a2020'); ITEM_ICON.blackthorn_stave=paintStave('#3a3430','#1a1614','#a8a090');
 wrap('fenpath','objects',l=> CHOICE.mageZ==='asked' && !hasItem('storm_limb') ? [...l,{type:'pickup', i:1, j:12, item:'storm_limb', onTake:()=>logMsg('A limb the lightning split off the great oak, black along one side. Orvell will want this.','#9adcf0')}] : l);
-wrap('southtrail','objects',l=> CHOICE.necroZ==='asked' && !hasItem('blackthorn_stave') && nightAmt()>0.5 ? [...l,{type:'pickup', i:2, j:15, item:'blackthorn_stave', onTake:()=>logMsg('The blackthorn gives up a straight stave without a sound. The thorns are cold.','#b8a8e8')}] : l);
+wrap('southtrail','objects',l=>[...l,{type:'blackthorn', i:2, j:15, plain:true, quest:true}]);   // a blackthorn grows where Edric died; Vesna's stave is cut from it, at night
 JOURNAL.push(["A Staff of Storm-Oak", ()=> !CHOICE.mageZ ? null : CHOICE.mageZ==='done' ? ['done',"Magister Orvell cut your first staff from a limb of the lightning-struck oak."] : ['active', hasItem('storm_limb') ? "Bring the limb of storm-oak to Magister Orvell." : "Fetch a limb of the lightning-struck oak on the Fen Causeway, north of the boundary stones, for Magister Orvell."]]);
 JOURNAL.push(["A Staff of Blackthorn", ()=> !CHOICE.necroZ ? null : CHOICE.necroZ==='done' ? ['done',"Vesna bound a green stone into the blackthorn from Edric's place: a staff the dead will listen to."] : ['active', hasItem('blackthorn_stave') ? "Bring the blackthorn stave to Vesna in the graveyard." : "Cut the blackthorn that grew where Edric died on Collier's Trail, at night, and bring it to Vesna."]]);
 { const prevApply=applySave; applySave=function(...a){ const r=prevApply.apply(this,a); try{                   // saves from before: anyone already learning is past the first errand
@@ -30971,7 +30971,7 @@ const CVM3=(()=>{
     g2.fillStyle='#4a6a3a'; g2.beginPath(); g2.ellipse(10,15,4,2,0.4,0,Math.PI*2); g2.fill();
     [[14,25],[22,27],[18,31],[27,22]].forEach(([x,y])=>{ const gr=g2.createRadialGradient(x-1.5,y-1.5,0.5,x,y,5); gr.addColorStop(0,'#8a96b8'); gr.addColorStop(0.4,'#3a3a68'); gr.addColorStop(1,'#1a1830'); g2.fillStyle=gr; g2.beginPath(); g2.arc(x,y,4.4,0,Math.PI*2); g2.fill(); }); };
   const REGROW=4, key=o=>areaId+':bt:'+o.i+','+o.j, ripe=o=>{ const t=(CHOICE.berries||{})[key(o)]; return t==null ? 1 : Math.min(1,(dayClock-t)/(DAY_LEN*REGROW)); };
-  OBJ_DRAW.blackthorn=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, r=ripe(o), s=(o.s||1)*1.15, sw=Math.sin(gt*0.9+o.j)*0.6, R=k=>rnd01(k,o.i*7+o.j,2201), bloom=r<0.35;
+  OBJ_DRAW.blackthorn=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, r=o.plain?0.5:ripe(o), s=(o.s||1)*1.15, sw=Math.sin(gt*0.9+o.j)*0.6, R=k=>rnd01(k,o.i*7+o.j,2201), bloom=r<0.35;
     const cx=x, cy=y-24*s, RX=27*s, RY=22*s;                                   // the thicket: a dense dome, taller than a man's waist
     g.fillStyle='rgba(8,5,2,0.34)'; g.beginPath(); g.ellipse(x+5,y+2,31*s,9*s,0,0,Math.PI*2); g.fill();
     // dark thorny twigs sticking out of the dome, drawn first so the mass sits over their roots
@@ -30984,22 +30984,40 @@ const CVM3=(()=>{
       if(bloom){ g.fillStyle=k%5===0?'#2a2018':lit>0.55?'#fbf8f2':lit>0.3?'#ece6da':'#d6cfbf'; g.beginPath(); g.ellipse(lx,ly,2.6*s,2.0*s,a,0,Math.PI*2); g.fill(); }   // a cloud of white on bare black wood
       else { g.fillStyle=lit>0.62?'#4f6a3c':lit>0.4?'#3e5630':lit>0.2?'#33482a':'#283a22'; g.beginPath(); g.ellipse(lx,ly,3.6*s,2.1*s,a,0,Math.PI*2); g.fill(); } }
     if(bloom){ g.fillStyle='#d8c060'; for(let k=0;k<22;k++){ const a=R(k+300)*Math.PI*2, rr=Math.sqrt(R(k+301))*0.9; g.beginPath(); g.arc(cx+Math.cos(a)*RX*rr,cy+Math.sin(a)*RY*rr,0.6*s,0,Math.PI*2); g.fill(); } return; }
+    if(o.plain){ if(o.quest && CHOICE.necroZ==='asked' && !hasItem('blackthorn_stave') && nightAmt()>0.5){ const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(cx,cy,RX*1.3,RY*1.2,'170,160,230',0.14+Math.sin(gt*1.6)*0.05); g.globalCompositeOperation=gs; } return; }
     // the sloes: on the front and top of the mass, green and hard, then blue-black under a dusty bloom
     const n=Math.round(26*Math.min(1,(r-0.35)/0.65+0.25)); for(let k=0;k<n;k++){ const a=-Math.PI*(R(k+120)*1.1)+0.15, rr=0.45+R(k+121)*0.5, bx=cx+Math.cos(a)*RX*rr, by=cy+Math.sin(a)*RY*rr*0.9+RY*0.15;
       if(r<1){ g.fillStyle='#7f9e4a'; g.beginPath(); g.arc(bx,by,1.7*s,0,Math.PI*2); g.fill(); continue; }
-      const gr=g.createRadialGradient(bx-0.8*s,by-0.8*s,0.2,bx,by,2.5*s); gr.addColorStop(0,'#aab4ce'); gr.addColorStop(0.45,'#3c3c6c'); gr.addColorStop(1,'#1a1830'); g.fillStyle=gr; g.beginPath(); g.arc(bx,by,2.4*s,0,Math.PI*2); g.fill(); } };
+      const gr=g.createRadialGradient(bx-0.6*s,by-0.6*s,0.2,bx,by,1.8*s); gr.addColorStop(0,'#aab4ce'); gr.addColorStop(0.45,'#3c3c6c'); gr.addColorStop(1,'#1a1830'); g.fillStyle=gr; g.beginPath(); g.arc(bx,by,1.6*s,0,Math.PI*2); g.fill(); } };
   NEAR_NAME.blackthorn='Blackthorn';
-  onUse(['blackthorn'],o=>{ const r=ripe(o);
-    if(r<1){ const days=Math.ceil((1-r)*REGROW); pzSay(r<0.35?'Blackthorn in blossom: white flowers on black wood, and thorns like nails. The sloes come after.':'Hard green sloes, nowhere near ripe. '+(days<=1?'Tomorrow, perhaps.':'Another '+days+' days or so.'),'#c8c0d8'); return; }
-    const n=1+(Math.random()<0.5?1:0); let got=0; for(let k=0;k<n;k++){ const f=slotFor('sloes'); if(f<0) break; player.inv[f]='sloes'; got++; }
-    if(!got){ pzSay('Your pack is full.','#e0b070'); return; }
-    (CHOICE.berries=CHOICE.berries||{})[key(o)]=dayClock; try{ SND.fx('bag',0.6); }catch(e){} updateHud(); try{ refreshInventory(); }catch(e){}
-    floatText([o.i,o.j],'+'+got+' sloes','#8a8ac8'); logMsg('You pick '+(got>1?'two handfuls':'a handful')+' of sloes. The blackthorn takes its price in blood, as it always does.','#b8b8d8'); });
-  // where it grows: the hedges of the long road, the edges of the meadow, and thick along Collier's Trail down to Mara Blackthorn's camp
-  wrap('southtrail','objects',l=>[...l, ...[[1,4,1],[3,8,0.9],[1,14,1.05],[4,20,0.95]].map(([i,j,s2])=>({type:'blackthorn',i,j,s:s2}))]);
-  wrap('hedgerow','objects',l=>[...l, ...[[3,8,1],[9,18,0.95],[3,31,1.05],[9,42,0.9]].map(([i,j,s2])=>({type:'blackthorn',i,j,s:s2}))]);
-  wrap('longmeadow','objects',l=>[...l, ...[[44,1,1],[32,9,0.9],[14,1,1.05]].map(([i,j,s2])=>({type:'blackthorn',i,j,s:s2}))]);
+  onUse(['blackthorn'],o=>{
+    if(o.quest && CHOICE.necroZ==='asked' && !hasItem('blackthorn_stave')){
+      if(nightAmt()<=0.5) return pzSay('A blackthorn, grown up where Edric died. Vesna said to cut it at night.','#c8c0d8');
+      const f=player.inv.indexOf(null); if(f<0) return pzSay('Your pack is full.','#e0b070');
+      giveQuestItem('blackthorn_stave',true); logMsg('You cut a straight stave from the blackthorn. It gives it up without a sound. The thorns are cold.','#b8a8e8'); return; }
+    pzSay(o.quest?'A blackthorn, black wood and thorns like nails. It grew up fast, here where the blood soaked in.':'Blackthorn: black wood, thorns like nails.','#c8c0d8'); });
 }
+
+// ════════ Edric, where the goblins left him on Collier's Trail: a skeleton picked clean beside the handcart, rags of his tunic,
+// goblin arrows still in the ribs, and old blood dried black on the road. Once Tobb has fetched him, only the blood is left. ════════
+OBJ_DRAW.edricremains=o=>{ const q=P(o.i+0.5,o.j+0.5), R=k=>rnd01(k,o.i,4411), gone=EDRIC_FOUND(); g.save(); g.translate(q.x,q.y); g.scale(1.45,1.45); const x=0, y=0; try{
+  // the blood: one big dark pool where he fell, a drag mark toward the cart, spatter all round
+  const pool=(px,py,rx,ry,a,al)=>{ g.fillStyle=`rgba(104,10,8,${Math.min(0.85,al*1.35)})`; g.beginPath(); g.ellipse(px,py,rx,ry,a,0,Math.PI*2); g.fill(); };
+  pool(x+2,y+2,30,10,0.1,0.5); pool(x-6,y+1,18,6,-0.2,0.45); pool(x+12,y+4,10,4,0.3,0.4);
+  g.strokeStyle='rgba(98,10,8,0.55)'; g.lineCap='round'; g.lineWidth=7; g.beginPath(); g.moveTo(x-8,y); g.quadraticCurveTo(x-24,y-4,x-40,y-14); g.stroke();   // dragged toward the cart
+  g.lineWidth=3; g.beginPath(); g.moveTo(x-30,y-9); g.lineTo(x-44,y-18); g.stroke();
+  for(let k=0;k<44;k++){ const a=R(k)*Math.PI*2, d=12+R(k+40)*40; pool(x+Math.cos(a)*d*1.6,y+Math.sin(a)*d*0.55,1.2+R(k+80)*2.6,0.8+R(k+81)*1.4,a,0.35+R(k+82)*0.3); }
+  g.fillStyle='rgba(140,20,14,0.45)'; for(let k=0;k<8;k++){ const a=R(k+120)*Math.PI*2; g.beginPath(); g.ellipse(x+Math.cos(a)*8,y+1+Math.sin(a)*3,3,1.4,a,0,Math.PI*2); g.fill(); }   // a darker, wetter-looking heart to it
+  if(gone) return;   // Tobb and Hobb carried him home on a barrow (the finally below restores the transform)
+  // the bones: the same heap a raised skeleton falls into, with rags of his tunic under it
+  g.fillStyle='rgba(92,70,46,0.9)'; g.beginPath(); g.moveTo(x-12,y-4); g.lineTo(x+6,y-8); g.lineTo(x+12,y-1); g.lineTo(x+4,y+5); g.lineTo(x-8,y+4); g.closePath(); g.fill();
+  g.save(); g.scale(1/1.45,1/1.45); drawSkelFig(0,0,{pile:true, alpha:1, dir:2, weapon:null}); g.restore();
+  const arrow=(ax,ay,ang,len,broke)=>{ const ex=ax+Math.cos(ang)*len, ey=ay+Math.sin(ang)*len; g.strokeStyle='#5a4430'; g.lineWidth=1.2; g.beginPath(); g.moveTo(ax,ay); g.lineTo(ex,ey); g.stroke();
+    if(!broke){ g.fillStyle='#1a1614'; g.beginPath(); g.moveTo(ex,ey); g.lineTo(ex+Math.cos(ang+2.6)*4,ey+Math.sin(ang+2.6)*4); g.lineTo(ex-Math.cos(ang)*5,ey-Math.sin(ang)*5); g.closePath(); g.fill();
+      g.beginPath(); g.moveTo(ex,ey); g.lineTo(ex+Math.cos(ang-2.6)*4,ey+Math.sin(ang-2.6)*4); g.lineTo(ex-Math.cos(ang)*5,ey-Math.sin(ang)*5); g.closePath(); g.fill(); } };
+  arrow(x+16,y+12,0.3,8,true); arrow(x-30,y+6,-0.4,10,false); arrow(x+22,y-6,-2.6,9,false); } finally{ g.restore(); } };   // goblin arrows, black-fletched, in the road
+
+NEAR_NAME.edricremains='What is left of a man';
 </script>
 </body>
 </html>

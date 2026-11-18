@@ -9858,8 +9858,10 @@ function drawSitting(c,x,B,opts,dir,mode){
   LG.forEach(g=>{ const q=[g.L.hip,g.L.knee,g.L.ank].map(p=>PJ([p[0],p[1],0])); c.lineWidth=8*s; c.beginPath(); c.moveTo(q[0][0],q[0][1]+0.8); q.slice(1).forEach(p=>c.lineTo(p[0],p[1]+0.8)); c.stroke(); });
   AR.forEach(q=>{ if(q.A.hand[2]<1){ const p=PJ([q.A.hand[0],q.A.hand[1],0]); c.lineWidth=5*s; c.beginPath(); c.moveTo(p[0]-1,p[1]+0.8); c.lineTo(p[0]+1,p[1]+0.8); c.stroke(); } });
   c.restore();
-  if(chair && !front && !saddle){}                                                         // on a chair seen from behind the legs are under the seat: nothing of them shows
-  else if(saddle && !front) backLegs.forEach(g=>drawLeg(g));   // (not forEach(drawLeg): the index would read as 'thigh only' for the second leg)   // astride, from behind: both legs hang free either side
+  const sFar=saddle && LG.length===2 && Math.abs(LG[0].d-LG[1].d)>3 ? LG[0] : null;   // astride, seen at an angle: the far leg is behind the barrel
+  const sLeg=(g,t)=>{ if(g!==sFar) return drawLeg(g,t); c.save(); c.beginPath(); c.rect(x-200,B-300,400,301); c.clip(); drawLeg(g,t); c.restore(); };   // only its thigh over the saddle shows
+  if(saddle){ backLegs.forEach(g=>sLeg(g)); }
+  else if(chair && !front && !saddle){}                                                         // on a chair seen from behind the legs are under the seat: nothing of them shows
   else if(!front && !recl && !side){ const hw=(F?PROP.f:PROP.m).hipHW*V.sw*RS[0]*(saddle?0.75:1.12)+1, cx=x+LNs*RS[0], yb=B-2.2;   // from behind the seat is the lowest thing: legs only beside it
     c.save(); c.beginPath(); c.rect(x-200,B-300,400,300+yb-B); c.rect(x-200,yb,cx-hw-(x-200),60); c.rect(cx+hw,yb,x+200-(cx+hw),60); c.clip(); backLegs.forEach(drawLeg); c.restore(); }
   else if(pr>0.8){ c.save(); c.beginPath(); c.rect(x-200,B-300,400,300); c.clip(); backLegs.forEach(drawLeg); c.restore(); }
@@ -9868,7 +9870,7 @@ function drawSitting(c,x,B,opts,dir,mode){
   body();
   if(!side && !lounge && !mer && !chair && front && frontLegs.length) underKnees(pr*3);
   sitGenitals();
-  if(!(chair && !front && !saddle)) frontLegs.forEach(g=>drawLeg(g,tuck)); frontArms.sort((a,b)=>a.d-b.d).forEach(q=>drawArm(q,false));
+  if(saddle) frontLegs.forEach(g=>sLeg(g,tuck)); else if(!(chair && !front)) frontLegs.forEach(g=>drawLeg(g,tuck)); frontArms.sort((a,b)=>a.d-b.d).forEach(q=>drawArm(q,false));
 }
 // a parchment speech bubble whose tail points down at (x, bottom); long lines wrap instead of being squeezed
 function speechBubble(x,bottom,text,a=1){ if(a<=0) return;

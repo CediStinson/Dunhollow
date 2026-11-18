@@ -823,7 +823,7 @@ const WEAPONS = {
   elf_blade:   { wind:0.17, dmg:12, len:26 },
 };
 const weaponOf = e => (e.type==='wolf') ? {wind:0.35,dmg:9} : WEAPONS[(e.opts && e.opts.equip && e.opts.equip.weapon) || 'fists'] || WEAPONS.fists;
-const INV_SIZE = 30;
+let INV_SIZE = 30;   // a Packling adds to it
 function defaultEquip(){ return { head:null, torso:'shirt', armor:null, cloak:null, shoulders:null, hands:null, legs:'trousers', feet:null, weapon:null, offhand:null, neck:null, special:null }; }
 function defaultInv(){
   return Array(INV_SIZE).fill(null);   // the farm gives up its gear reluctantly
@@ -10133,7 +10133,7 @@ function update(dt){
   if(p.path.length){
     const [ni,nj]=p.path[0];
     const tx=ni+0.5, ty=nj+0.5;
-    const dx=tx-p.x, dy=ty-p.y, d=Math.hypot(dx,dy), step=3.2*dt*(p.opts&&p.opts.equip&&p.opts.equip.feet==='fen_boots'?1.15:1)*(CHOICE.coldWalk?0.72:1);
+    const dx=tx-p.x, dy=ty-p.y, d=Math.hypot(dx,dy), step=3.2*dt*(p.opts&&p.opts.equip&&p.opts.equip.feet==='fen_boots'?1.15:1)*(CHOICE.coldWalk?0.72:1)*(typeof cvRideMul==='function'?cvRideMul():1);
     if(d>0.001) p.dir=dirFromDelta(dx,dy);          // face the way we are walking
     if(d<=step){ p.x=tx; p.y=ty; p.i=ni; p.j=nj; p.path.shift(); }
     else { p.x+=dx/d*step; p.y+=dy/d*step; }
@@ -10877,7 +10877,7 @@ function pointerUp(px,py){
       return;
     }
     if(m && calmThug(m) && cheb([m.i,m.j],[player.i,player.j])<=6){ thugTalk(m); return; }
-    if(m && cheb([m.i,m.j],[player.i,player.j])<=6){ startCombat(); return; }
+    if(m && cheb([m.i,m.j],[player.i,player.j])<=6){ m.provoked=true; startCombat(); return; }
     // (animals are not clicked: a click always goes to the door, chest or tile underneath)
     { const st=typeof stairsAt==='function' && stairsAt(ti,tj); if(st){ goStairs(st); return; } }
     // a click on the upper part of a crate or barrel lands on the ground behind it (often a wall or a house): catch the sprite too
@@ -11134,7 +11134,7 @@ function applySave(sv){
   rescueStrayItems();
   for(const k of SLOTS) player.opts.equip[k]=migrateId(player.opts.equip[k]);
   delete player.opts._ck;
-  player.inv = Array.isArray(sv.inv) ? [...sv.inv.map(migrateId), ...Array(Math.max(0,INV_SIZE-sv.inv.length)).fill(null)].slice(0,INV_SIZE)
+  player.inv = Array.isArray(sv.inv) ? [...sv.inv.map(migrateId), ...Array(Math.max(0,INV_SIZE-sv.inv.length)).fill(null)].slice(0,Math.max(INV_SIZE,sv.inv.length))
                                      : defaultInv(player.opts.gender);
   player.path=[];
   // world state: where you are, what you carry in coin, and what you've already done
@@ -14630,6 +14630,7 @@ const FOOLED={};                                         // "area:name" -> true 
 const disguised=()=>!!(player.opts && unWoven(player.opts.equip.head)==='bandana' && !player.opts.hideHelm);
 const isThug=m=>!!(m && m.opts && m.opts.equip && m.opts.equip.head==='bandana' && m.type!=='dummy');
 const tabardAwes=m=>{ let h=7; for(const ch of areaId+':'+m.name) h=(h*31+ch.charCodeAt(0))>>>0; return h%2===0; };   // the purple crews aren't his men, officially: half of them will not raise a hand against his red, the other half don't care
+function quietFoe(m){ return calmThug(m) || (typeof cvHush==='function' && cvHush(m)); }   // calm thugs, and foes too lowly to notice you past a Hushling
 const calmThug=m=> !!m && m.hostile && !m.dead && FOOLED[areaId+':'+m.name]!==false && ((disguised() && (isThug(m) || OUTLAWS.has(m.faction) || mobs.some(o=>o.faction===m.faction && isThug(o)))) || (typeof tabardOn==='function' && tabardOn() && (m.faction==='guard' || ((isThug(m) || mobs.some(o=>o.faction===m.faction && isThug(o))) && tabardAwes(m)))));   // the purple fools the thugs; the Baron's red fools his soldiers   // in the purple, the Baron's crews never start a fight with you: not even their mates without a bandana. Only your own blow ends it
 const OUTLAWS=new Set(['thieves','unpaid','roadthief','highway']);   // other rough folk: they know the purple, and want no trouble with the Baron's men
 const REFUSED={};                                        // "area:name" -> they've already said no to handing their papers over
@@ -14672,7 +14673,7 @@ function startCombat(target){
   player.st=(player.st||[]).filter(s=>s.kind==='bleed');   // only bleeding carries over from the last fight
   setTimeout(()=>{ try{ refreshFoodBar(); }catch(e){} },0);
   const practice = !!target && target.type==='dummy';
-  if(combat.active || (!practice && !mobs.some(m=>m.hostile && !m.dead && !calmThug(m)))) return;
+  if(combat.active || (!practice && !mobs.some(m=>m.hostile && !m.dead && !quietFoe(m)))) return;
   combat.practice=practice;
   if(player.path.length){ const [ni,nj]=player.path[0]; player.i=ni; player.j=nj; }
   player.x=player.i+0.5; player.y=player.j+0.5; player.path=[]; player.moving=false;
@@ -14684,9 +14685,9 @@ function startCombat(target){
 }
 // who joins a fight already going: the rest of the same band within JOIN_KIN tiles, anything else only if it is right on top of you (within JOIN_ANY)
 const JOIN_KIN=8, JOIN_ANY=3;
-function joins(m,faction){ if(!(m.hostile && !m.dead && !calmThug(m))) return false; const d=cheb(tileOf(m),tileOf(player)); return d<=JOIN_ANY || (faction!=null && m.faction===faction && d<=JOIN_KIN); }
+function joins(m,faction){ if(!(m.hostile && !m.dead && !quietFoe(m))) return false; const d=cheb(tileOf(m),tileOf(player)); return d<=JOIN_ANY || (faction!=null && m.faction===faction && d<=JOIN_KIN); }
 function nextFoe(first,target){
-  const live=mobs.filter(m=>first ? (m.hostile && !m.dead && !calmThug(m)) : joins(m,combat.lastFaction)).sort((a,b)=>cheb(tileOf(a),tileOf(player))-cheb(tileOf(b),tileOf(player)));
+  const live=mobs.filter(m=>first ? (m.hostile && !m.dead && !quietFoe(m)) : joins(m,combat.lastFaction)).sort((a,b)=>cheb(tileOf(a),tileOf(player))-cheb(tileOf(b),tileOf(player)));
   const foe=target||live[0]; combat.foe=foe;
   if(foe.type==='dummy'){ foe.hp=foe.maxHp; foe.state='guard'; foe.k=0; foe.guardDir='up'; combat.phase='approach'; foe.path=[]; logMsg('Practice: attack the side he is not guarding, or parry his swing.','#8ab0d8'); return; }
   foe.state='guard'; foe.k=0;
@@ -15168,7 +15169,7 @@ function combatStep(dt){
         else { resetMobs(); combat.respawnT=0; setTimeout(()=>{ if(!combat.active) clog.classList.remove('open'); },4000); }
       }
     }
-    if(player.opts && mobs.some(m=>m.hostile && !m.dead && !calmThug(m) && cheb(tileOf(m),tileOf(player))<=PARRY.aggro)) startCombat();
+    if(player.opts && mobs.some(m=>m.hostile && !m.dead && !quietFoe(m) && cheb(tileOf(m),tileOf(player))<=PARRY.aggro)) startCombat();
     const pd=combat.pendingDummy;
     if(pd && !player.path.length){ combat.pendingDummy=null; if(cheb(tileOf(pd),tileOf(player))===1) startCombat(pd); }
     if(pendingBed && !player.path.length){ const bd=pendingBed; pendingBed=null; if(OBJECTS.includes(bd)) bedPrompt(); }
@@ -15526,6 +15527,7 @@ function drawActorBase(e){
   else if(e.type==='dragon') drawDragonFoe(s.x,B,e,poseFor(e));
   else if(e.type==='bear') drawBear(s.x,B,e,poseFor(e));
   else if(e.type==='crawler') drawCrawlerFoe(s.x,B,e);
+  else if(e.type==='feralskit') drawFeralSkit(s.x,B,e);
   else if(e.type==='troll') drawTroll(s.x,B,e,poseFor(e));
   else if(e.type==='golem') drawGolem(s.x,B,e,poseFor(e));
   else if(e.echo){ if(!e.dead){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; g.save(); g.globalAlpha*=0.68; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); g.globalCompositeOperation='lighter'; glow(s.x,B-48,26,56,'150,190,255',0.28); g.restore(); } }   // Corvin's echo: an old fight, half there
@@ -15543,7 +15545,7 @@ function drawActorBase(e){
   if(!isP && e.dead) return;
   if(!isP && e.type==='sporeling' && typeof sporeDormant==='function' && sporeDormant(e)) return;   // a sleeping sporeling is just a mushroom: no name over it
   if(isP && romHush()) return;
-  const ty=B-(e.type==='crawler'?120:e.type==='rat'?40:e.type==='ratking'?66:e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'||e.type==='briarling'?66:e.type==='sporeling'?72:e.type==='capbrute'?((e.opts&&e.opts.big)?236:178):e.type==='dragon'?300:e.type==='bear'?92:e.type==='troll'||e.type==='golem'?150:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:e.type==='rootmother'?214:e.type==='hollow'?272:114)+dwarfDrop(e.opts);
+  const ty=B-(e.type==='crawler'?120:e.type==='feralskit'?62:e.type==='rat'?40:e.type==='ratking'?66:e.type==='wolf'||e.type==='scorpion'||e.type==='gnawer'||e.type==='briarling'?66:e.type==='sporeling'?72:e.type==='capbrute'?((e.opts&&e.opts.big)?236:178):e.type==='dragon'?300:e.type==='bear'?92:e.type==='troll'||e.type==='golem'?150:e.type==='sandworm'?178:e.type==='scarab'?78:e.type==='hunger'?206:e.type==='rootmother'?214:e.type==='hollow'?272:114)+dwarfDrop(e.opts);
   g.font='500 11px "Segoe UI", system-ui, sans-serif';
   const deadly=!isP && e.type!=='dummy' && e.hostile!==false && e.tier && typeof foeLevel==='function' && foeLevel(e)-playerLevel()>=3;   // far stronger than you: a skull
   const label=(deadly?'☠ ':'')+e.name+(!isP && e.tier ? '  Lv '+(typeof foeLevel==='function'?foeLevel(e):e.tier) : ''), tw=g.measureText(label).width;
@@ -30457,7 +30459,7 @@ const CVM3=(()=>{
 
 }
 
-// ════════ Cinderveil, round two: the stolen Crawler, Strutter rides, chalk in the crypts, finds on the heath and in the foothills ════════
+// ════════ Cinderveil, round two: the stolen Crawler, chalk in the crypts, finds on the heath and in the foothills ════════
 { const trust=()=>CHOICE.cvTrust||0;
   // ── the Rogue Crawler, a foe ──
   FOES.crawler={ label:'Rogue Crawler', base:105, stagger:1.45, pattern:[ {wait:1.6,wind:1.35,after:0.9,dir:'right'}, {wait:1.0,wind:1.1,after:0.7,dir:'left'}, {wait:0.3,wind:0.8,after:1.0,dir:'up'}, {wait:1.8,wind:1.4,after:0.9,dir:'left',feint:'right'} ] };
@@ -30472,16 +30474,8 @@ const CVM3=(()=>{
       remember('cvcrawl','slain',"The stolen Crawler lies in pieces in the Foothills. Back to Ashmother Odra with the news."); logMsg('The Crawler shudders, sags on its legs and goes still. You pry loose some good iron. (Loot: 4 Salvage)','#8ac070'); } });
   if(typeof BEASTS!=='undefined') BEASTS.push({ k:'crawler', is:f=>f.type==='crawler', name:'Crawlers', kind:'Engines · the Cinderveil', lore:"Six-legged salvage engines of timber and iron, a hide canopy over a cask-round hull, a claw and a cutting torch at the front. The Cinderveil build them to strip wrecks. In the wrong hands they strip carts." });
 
-  // ── riding a Strutter: road-friends ride between the long roads for a few coppers ──
-  const DEST=[['scrubland','The Scrublands (by the camp)'],['hedgerow','Hedgerow Way'],['longmeadow','The Long Meadow'],['heath','Greywater Heath'],['foothills','The Foothills'],['alderbrook','The Alder Brook']];
-  const FARE=4;
-  const ride=(to)=>{ if(player.purse<FARE) return; player.purse-=FARE; updateHud(); closeDialog(); const e=Object.keys(AREAS[to].entries)[0];
-    logMsg('You climb into the saddle. The Strutter rocks into a long-legged lope, and the road goes by in a clatter of timber feet.','#c8a860'); switchArea(to, to==='scrubland'?'fromCamp2':e); };
-  const rideMenu=(who)=>say(who,[trust()>=1 ? "“Up you get, road-friend. "+FARE+" coppers for the feed. Where to?”" : "<i>The rider looks at you, then at the saddle, then back at you. No.</i>"],
-    trust()>=1 ? [...DEST.filter(([a])=>a!==areaId).map(([a,n])=>({label:n, note:'-'+FARE+'c', off:player.purse<FARE, fn:()=>ride(a)})), ...(areaId!=='cvcamp'?[{label:'The Cinderveil Camp', note:'-'+FARE+'c', off:player.purse<FARE, fn:()=>{ player.purse-=FARE; updateHud(); closeDialog(); switchArea('cvcamp','fromScrub'); }}]:[]), bye] : [bye]);
-  onUse(['cvwalker'],o=>{ if(o.kind==='strutter') rideMenu('A Strutter Rider'); else if(o.kind==='hauler') logMsg('The hauler stands with its legs folded, crates lashed on its back. It ticks as it cools.','#c8a860'); else if(o.kind==='bellows') logMsg('Heat rolls off the kiln. Somewhere inside, the fire breathes in time with the bellows.','#c8a860'); else if(o.kind==='magpie') logMsg('High up in the lookout, something with a spyglass is watching the road.','#c8a860'); else logMsg('A Skitter, folded up and still. One eye opens and follows you.','#c8a860'); });
+  onUse(['cvwalker'],o=>{ if(o.kind==='strutter') logMsg('A Strutter, knees folded, saddle empty. The rider eyes you: these legs are spoken for. Build your own, they say.','#c8a860'); else if(o.kind==='hauler') logMsg('The hauler stands with its legs folded, crates lashed on its back. It ticks as it cools.','#c8a860'); else if(o.kind==='bellows') logMsg('Heat rolls off the kiln. Somewhere inside, the fire breathes in time with the bellows.','#c8a860'); else if(o.kind==='magpie') logMsg('High up in the lookout, something with a spyglass is watching the road.','#c8a860'); else logMsg('A Skitter, folded up and still. One eye opens and follows you.','#c8a860'); });
   NEAR_NAME.cvwalker='Cinderveil Engine';
-  { const _o=PUZ_ON.cvcaravan; PUZ_ON.cvcaravan=o=>{ if(trust()>=1) rideMenu('The Caravan Driver'); else _o(o); }; }
 
   // ── chalk in the crypt mazes: at every crossing, an arrow toward the nearest way through ──
   OBJ_DRAW.ucarrow=o=>{ const a=P(o.i+0.5-o.di*0.18,o.j+0.5-o.dj*0.18), b=P(o.i+0.5+o.di*0.3,o.j+0.5+o.dj*0.3), ang=Math.atan2(b.y-a.y,b.x-a.x); g.save(); g.strokeStyle='rgba(232,228,214,0.7)'; g.lineWidth=2.2; g.lineCap='round';
@@ -30516,6 +30510,333 @@ const CVM3=(()=>{
   onUse(['stashcairn'],()=>{ if(CHOICE.footStash){ logMsg('Just a cairn. You put the stones back the way you found them.','#c8b890'); return; }
     say('A Cairn',["A cairn of river stones beside the road, taller than the others. One stone near the bottom is a different colour, and loose."],[{label:'Pull out the loose stone.', fn:()=>{ CHOICE.footStash=true; player.purse+=30; for(let k=0;k<3;k++){ const f=slotFor('cv_scrap'); if(f>=0) player.inv[f]='cv_scrap'; } updateHud();
       remember('footstash','found',"You found a prospector's stash in a cairn in the Foothills."); say('A Cairn',"Behind it, an oilskin bundle: thirty coppers, a bent pick-head, hinges, a coil of wire. A prospector's stash, never collected. (3 Salvage)",[bye]); }}, bye]); });
+}
+
+// ════════ Cinderveil kin: three long chains, each ending in an engine of your own. A Strider to ride (faster legs), a Packling that
+// carries for you (more pack space), and a Hushling that hides you from lesser foes. All for kin only. Minigames: forge, gait, balance, lens. ════════
+{ const trust=()=>CHOICE.cvTrust||0, kin=()=>trust()>=2, day=()=>Math.floor(dayClock/DAY_LEN);
+  const scrap=()=>invCount('cv_scrap'), take=(id,n)=>{ for(let k=0;k<n;k++){ const j=player.inv.indexOf(id); if(j>=0) player.inv[j]=null; } };
+  const give=(id,n=1)=>{ let got=0; for(let k=0;k<n;k++){ const f=slotFor(id); if(f>=0){ player.inv[f]=id; got++; } } updateHud(); if(invOverlay.classList.contains('open')) refreshInventory(); return got; };
+  const qA=()=>CHOICE.cvA, qB=()=>CHOICE.cvB, qC=()=>CHOICE.cvC;
+  const night=()=>nightAmt()>0.5;
+
+  // ── things to carry ──
+  Object.assign(ITEMS,{
+    cv_ashpole:{ name:'Ash Pole', slot:'misc', stack:true, stackMax:8, title:"A straight, seasoned ash pole from the Fellings, as long as you are tall. Brannock wants four for a Strider's legs." },
+    cv_spring:{ name:'Hauler Mainspring', slot:'misc', title:"A coil of black spring-steel the size of a cartwheel hub, out of a dead hauler. It hums when you tap it." },
+    cv_lensglass:{ name:'Crater Glass', slot:'misc', title:"A lump of clear, sand-fused glass from the Glass Crater, cloudy on the outside, clean as water within." },
+    cv_lens:{ name:'Ground Lens', slot:'misc', title:"A lens ground by your own hand at the Cinderveil wheel. Look through it and the world goes soft at the edges." },
+    cv_cocoon:{ name:'Nightmoth Cocoon', slot:'misc', stack:true, stackMax:5, title:"A cocoon spun by the Mistmere's nightmoths. In the dark it gives off a faint, cold shine, like breath on glass." } });
+  Object.assign(PRICES,{ cv_ashpole:0, cv_spring:0, cv_lensglass:0, cv_lens:0, cv_cocoon:0 });
+  ['cv_ashpole','cv_spring','cv_lensglass','cv_lens','cv_cocoon'].forEach(id=>QUEST_ITEMS.add(id));
+  ICON_EXTRA.cv_ashpole=g2=>{ g2.lineCap='round'; [[8,34,30,6,'#c8b08a'],[12,36,34,10,'#b89a70'],[6,30,26,4,'#d8c098']].forEach(([a,b,c2,d,col])=>{ g2.strokeStyle='#4a3a28'; g2.lineWidth=5; g2.beginPath(); g2.moveTo(a,b); g2.lineTo(c2,d); g2.stroke(); g2.strokeStyle=col; g2.lineWidth=3; g2.stroke(); }); };
+  const coil=(g2,col,edge)=>{ g2.strokeStyle='#1a1816'; g2.lineWidth=4.4; g2.beginPath(); for(let t=0;t<=6*Math.PI;t+=0.2){ const r=3+t*0.75; g2.lineTo(20+Math.cos(t)*r,20+Math.sin(t)*r); } g2.stroke(); g2.strokeStyle=col; g2.lineWidth=2.2; g2.stroke(); if(edge){ g2.strokeStyle=edge; g2.lineWidth=0.8; g2.stroke(); } };
+  ICON_EXTRA.cv_spring=g2=>coil(g2,'#4a4640');
+  ICON_EXTRA.cv_lensglass=g2=>{ g2.fillStyle='rgba(200,220,215,0.85)'; g2.strokeStyle='#5a6a68'; g2.lineWidth=1.4; g2.beginPath(); g2.moveTo(9,26); g2.lineTo(14,11); g2.lineTo(27,8); g2.lineTo(33,21); g2.lineTo(25,32); g2.lineTo(13,33); g2.closePath(); g2.fill(); g2.stroke(); g2.fillStyle='rgba(255,255,255,0.7)'; g2.beginPath(); g2.moveTo(15,14); g2.lineTo(24,12); g2.lineTo(18,20); g2.closePath(); g2.fill(); };
+  ICON_EXTRA.cv_lens=g2=>{ g2.fillStyle='#6a4a2c'; g2.beginPath(); g2.arc(20,20,14,0,Math.PI*2); g2.fill(); const gr=g2.createRadialGradient(16,15,2,20,20,11); gr.addColorStop(0,'#ffffff'); gr.addColorStop(1,'#8ab8c0'); g2.fillStyle=gr; g2.beginPath(); g2.arc(20,20,11,0,Math.PI*2); g2.fill(); g2.strokeStyle='#2e2a26'; g2.lineWidth=1.2; g2.stroke(); };
+  ICON_EXTRA.cv_cocoon=g2=>{ g2.fillStyle='#d8dcd0'; g2.strokeStyle='#8a8c80'; g2.lineWidth=1; g2.beginPath(); g2.ellipse(20,22,8,13,0.3,0,Math.PI*2); g2.fill(); g2.stroke(); g2.strokeStyle='rgba(120,120,110,0.6)'; for(let k=-2;k<=2;k++){ g2.beginPath(); g2.ellipse(20,22+k*4,7.5-Math.abs(k),2,0.3,0,Math.PI); g2.stroke(); } g2.strokeStyle='#8a8c80'; g2.beginPath(); g2.moveTo(17,9); g2.lineTo(15,3); g2.stroke(); };
+
+  // ════ the minigame table: a small panel over the world, a canvas, keys and clicks ════
+  const MG=document.createElement('div'); MG.id='cv-mg';
+  MG.style.cssText='position:fixed;left:50%;top:46%;transform:translate(-50%,-50%);z-index:60;display:none;width:360px;padding:12px 14px 10px;border-radius:10px;border:1px solid #8a6a3a;background:rgba(20,14,7,0.96);color:#f0dca0;font:13px Georgia,serif;text-align:center;user-select:none;touch-action:none;box-shadow:0 8px 30px rgba(0,0,0,0.6)';
+  MG.innerHTML='<div id="cvmg-t" style="font-weight:bold;font-size:15px;letter-spacing:0.5px"></div><div id="cvmg-m" style="min-height:34px;margin:4px 0"></div><canvas id="cvmg-cv" width="320" height="210" style="display:block;margin:0 auto;width:320px;height:210px;border-radius:6px;background:#140e08"></canvas><div id="cvmg-h" style="margin-top:6px;font-size:11px;color:#a08050"></div>';
+  document.body.appendChild(MG);
+  const $=id=>document.getElementById(id), mgMsg=t=>{ $('cvmg-m').innerHTML=t; };
+  let G=null; window.CVMG=()=>G;
+  const GAMES={};
+  function cvGame(kind,win,lose){ if(G) return; closeDialog(); player.path=[]; player.moving=false; G={kind,win,lose,st:'play',t:0,hold:0,...GAMES[kind].init()}; $('cvmg-t').textContent=GAMES[kind].title; $('cvmg-h').innerHTML=GAMES[kind].help+' · Esc to stop'; mgMsg(GAMES[kind].start); MG.style.display='block'; }
+  window.cvGame=cvGame;
+  const mgEnd=(ok,msg)=>{ if(!G || G.st!=='play') return; G.st='end'; G.ok=ok; G.endT=ok?1.6:1.9; mgMsg(msg); try{ SND.fx(ok?'catch':'miss'); }catch(e){} };
+  const mgClose=(abort)=>{ const g0=G; if(!g0) return; G=null; MG.style.display='none'; if(abort) return; if(g0.ok) g0.win&&g0.win(); else g0.lose&&g0.lose(); };
+  let mgLast=performance.now();
+  setInterval(()=>{ const now=performance.now(), dt=Math.min(0.1,(now-mgLast)/1000); mgLast=now; if(!G) return; try{ if(combat.active){ mgClose(true); return; }
+    if(G.st==='end'){ G.endT-=dt; if(G.endT<=0) return mgClose(false); } else { G.t+=dt; GAMES[G.kind].tick(G,dt); }
+    if(G) GAMES[G.kind].draw(G,$('cvmg-cv').getContext('2d')); }catch(e){ console.error(e); mgClose(true); } },33);
+  const press=k=>{ if(G && G.st==='play' && GAMES[G.kind].press) GAMES[G.kind].press(G,k); };
+  window.addEventListener('keydown',e=>{ if(!G) return; if(e.target && e.target.tagName==='INPUT') return; e.preventDefault(); e.stopPropagation();
+    if(e.key==='Escape'){ mgClose(true); logMsg('You set the work down for now.','#a89a80'); return; }
+    if(e.repeat) return; const k=e.key===' '||e.key==='Enter'?'go':e.key==='ArrowLeft'||e.key==='a'||e.key==='A'?'left':e.key==='ArrowRight'||e.key==='d'||e.key==='D'?'right':e.key==='ArrowUp'||e.key==='w'||e.key==='W'?'up':e.key==='ArrowDown'||e.key==='s'||e.key==='S'?'down':null;
+    if(k==='left') G.hold=-1; if(k==='right') G.hold=1; if(k) press(k); },true);
+  window.addEventListener('keyup',e=>{ if(!G) return; e.stopPropagation(); if(['ArrowLeft','ArrowRight','a','A','d','D'].includes(e.key)) G.hold=0; },true);
+  $('cvmg-cv').addEventListener('pointerdown',e=>{ if(!G) return; e.preventDefault(); e.stopPropagation(); const r=e.target.getBoundingClientRect(), x=(e.clientX-r.left)*320/r.width, y=(e.clientY-r.top)*210/r.height;
+    if(GAMES[G.kind].click) GAMES[G.kind].click(G,x,y); else { G.hold=x<160?-1:1; press('go'); } });
+  window.addEventListener('pointerup',()=>{ if(G) G.hold=0; },true);
+  MG.addEventListener('click',e=>e.stopPropagation()); MG.addEventListener('pointerdown',e=>e.stopPropagation());
+  const pips=(c,x,y,n,of,col)=>{ for(let k=0;k<of;k++){ c.beginPath(); c.arc(x+k*14,y,4.5,0,Math.PI*2); c.fillStyle=k<n?col:'#3a2c1a'; c.fill(); c.strokeStyle='#8a6a3a'; c.lineWidth=1; c.stroke(); } };
+
+  // 1 · the forge: strike the spring while the heat sits in the gold
+  GAMES.forge={ title:"Brannock's Anvil", help:'Space / click when the marker sits in the gold', start:'Draw the temper. Strike while the steel glows <b>gold</b>: five clean blows.',
+    init:()=>({p:0,v:0.85,dir:1,c:0.55,w:0.22,hits:0,miss:0,fx:0}),
+    tick:(G,dt)=>{ G.p+=G.v*G.dir*dt; if(G.p>1){ G.p=1; G.dir=-1; } if(G.p<0){ G.p=0; G.dir=1; } G.fx=Math.max(0,G.fx-dt); },
+    press:(G)=>{ if(Math.abs(G.p-G.c)<=G.w/2){ G.hits++; G.fx=0.35; G.good=true; try{ SND.fx('hit'); }catch(e){} if(G.hits>=5) return mgEnd(true,'<b>The spring rings true.</b> Brannock grunts, which is a great deal, from him.');
+        G.w=Math.max(0.09,G.w-0.03); G.v*=1.14; G.c=0.15+Math.random()*0.7; mgMsg('A clean blow. '+(5-G.hits)+' more.'); }
+      else { G.miss++; G.fx=0.35; G.good=false; if(G.miss>=3) return mgEnd(false,'The steel goes dull and grey. <i>“Again,”</i> says Brannock, and puts it back in the fire.'); mgMsg(G.p<G.c?'Too hot. The steel spits.':'Too cold. The blow rings flat.'); } },
+    draw:(G,c)=>{ c.clearRect(0,0,320,210); const x0=30,w=260,y=128;
+      const gr=c.createLinearGradient(x0,0,x0+w,0); gr.addColorStop(0,'#3a1a10'); gr.addColorStop(0.35,'#a83a18'); gr.addColorStop(0.6,'#f0a030'); gr.addColorStop(0.85,'#fff0b0'); gr.addColorStop(1,'#ffffff'); c.fillStyle=gr; c.fillRect(x0,y,w,20);
+      c.fillStyle='rgba(240,200,80,0.35)'; c.fillRect(x0+(G.c-G.w/2)*w,y-6,G.w*w,32); c.strokeStyle='#f2c84a'; c.lineWidth=2; c.strokeRect(x0+(G.c-G.w/2)*w,y-6,G.w*w,32);
+      const mx=x0+G.p*w; c.fillStyle='#e8e0d0'; c.beginPath(); c.moveTo(mx,y-10); c.lineTo(mx-7,y-22); c.lineTo(mx+7,y-22); c.closePath(); c.fill(); c.fillRect(mx-1.5,y-10,3,40);
+      // the anvil and the coil on it
+      c.fillStyle='#2e2a26'; c.fillRect(110,72,100,18); c.fillRect(140,90,40,14); c.beginPath(); c.moveTo(210,72); c.lineTo(236,76); c.lineTo(210,84); c.fill();
+      const heat=Math.min(1,G.hits/5); c.strokeStyle=`rgb(${80+heat*170|0},${70+heat*60|0},${60+heat*120|0})`; c.lineWidth=4; c.beginPath(); for(let t=0;t<=5*Math.PI;t+=0.25){ const r=4+t*1.6; c.lineTo(160+Math.cos(t)*r,58+Math.sin(t)*r*0.45); } c.stroke();
+      if(G.fx>0){ c.globalAlpha=G.fx/0.35; c.fillStyle=G.good?'#ffe080':'#a0a0a0'; for(let k=0;k<10;k++){ const a=k*0.63+G.t*9; c.fillRect(160+Math.cos(a)*(14+G.fx*60),58+Math.sin(a)*(6+G.fx*30),3,3); } c.globalAlpha=1; }
+      pips(c,30,186,G.hits,5,'#f2c84a'); c.fillStyle='#a08050'; c.font='11px Georgia'; c.textAlign='right'; c.fillText('misses',258,190); pips(c,266,186,G.miss,3,'#c05030'); } };
+
+  // 2 · the gait: the leg-frame shows you its step; you play it back
+  const LEGS=[['up',160,40],['right',236,105],['down',160,170],['left',84,105]];
+  GAMES.gait={ title:'Teaching the Gait', help:'Arrow keys / WASD or click the legs, in order', start:'Watch the legs. Then step them in the same order.',
+    init:()=>{ const seq=[]; for(let k=0;k<7;k++) seq.push(Math.floor(Math.random()*4)); return {seq,round:0,lens:[3,4,5,6],show:0,inp:0,mode:'show',lit:-1,litT:0,flash:0}; },
+    tick:(G,dt)=>{ G.litT-=dt; if(G.litT<=0) G.lit=-1; G.flash=Math.max(0,G.flash-dt);
+      if(G.mode==='show'){ G.show+=dt; const n=G.lens[G.round], k=Math.floor((G.show-0.6)/0.62), f=(G.show-0.6)/0.62-k; if(k>=0 && k<n){ G.lit=f<0.72?G.seq[k]:-1; G.litT=0.05; } if(k>=n){ G.mode='play'; G.inp=0; G.lit=-1; mgMsg('Your turn: '+n+' steps.'); } } },
+    press:(G,k)=>{ if(G.mode!=='play') return; const i=LEGS.findIndex(l=>l[0]===k); if(i<0) return; G.lit=i; G.litT=0.25;
+      if(i!==G.seq[G.inp]){ return mgEnd(false,'The frame lurches and sits down hard in the dust. <i>Brannock waits for you to stop laughing. He is not laughing.</i>'); }
+      G.inp++; try{ SND.fx('step'); }catch(e){} if(G.inp>=G.lens[G.round]){ G.round++; G.flash=0.5; if(G.round>=G.lens.length) return mgEnd(true,'<b>It walks.</b> Four steps, eight, a dozen: the frame strides off and stops by itself.'); G.mode='show'; G.show=0; mgMsg('Good. Again, longer.'); } },
+    click:(G,x,y)=>{ const l=LEGS.map((L,k)=>[k,Math.hypot(x-L[1],y-L[2])]).sort((a,b)=>a[1]-b[1])[0]; if(l[1]<44) GAMES.gait.press(G,LEGS[l[0]][0]); },
+    draw:(G,c)=>{ c.clearRect(0,0,320,210); c.fillStyle='#5a3a22'; c.beginPath(); c.ellipse(160,105,38,26,0,0,Math.PI*2); c.fill(); c.strokeStyle='#2e2a26'; c.lineWidth=3; c.stroke(); c.fillStyle='#3a2414'; c.fillRect(150,96,20,18);
+      LEGS.forEach(([k,x,y],i)=>{ c.strokeStyle='#6a4a2c'; c.lineWidth=7; c.beginPath(); c.moveTo(160+(x-160)*0.35,105+(y-105)*0.35); c.lineTo(x,y); c.stroke();
+        c.beginPath(); c.arc(x,y,17,0,Math.PI*2); c.fillStyle=G.lit===i?'#f2c84a':'#3a2c1a'; c.fill(); c.strokeStyle=G.lit===i?'#fff0b0':'#8a6a3a'; c.lineWidth=2; c.stroke();
+        c.fillStyle=G.lit===i?'#2a1a08':'#a08050'; c.font='bold 14px Georgia'; c.textAlign='center'; c.fillText({up:'↑',right:'→',down:'↓',left:'←'}[k],x,y+5); });
+      c.fillStyle='#a08050'; c.font='11px Georgia'; c.textAlign='left'; c.fillText(G.mode==='show'?'watch…':'your step',12,20); pips(c,12,198,G.round,4,'#8ae08a');
+      if(G.flash>0){ c.fillStyle=`rgba(140,224,140,${G.flash*0.5})`; c.fillRect(0,0,320,210); } } };
+
+  // 3 · the balance: crates go on the Packling's back; keep its spine level
+  GAMES.balance={ title:"Loading the Packling", help:'Hold ← / → (or press either side) to lean against it', start:'Tinny piles on the crates. Keep the little hauler <b>level</b> until she has done.',
+    init:()=>({a:0,va:0,wind:0,wt:0,bias:0,crates:[],next:1.4,dur:20}),
+    tick:(G,dt)=>{ G.wt-=dt; if(G.wt<=0){ G.wt=0.8+Math.random()*1.2; G.wind=(Math.random()*2-1)*0.9; }
+      G.next-=dt; if(G.next<=0 && G.t<G.dur-1){ G.next=2.2+Math.random()*0.8; const side=Math.random()<0.7?-Math.sign(G.bias||(Math.random()-0.5)):Math.sign(Math.random()-0.5)||1, pos=side*(0.25+Math.random()*0.6); G.crates.push(pos); G.bias+=pos*0.45; G.va+=pos*0.5; }
+      G.va+=(G.wind+G.bias+G.hold*2.6+G.a*0.7)*dt; G.va*=Math.pow(0.35,dt); G.a+=G.va*dt;
+      if(Math.abs(G.a)>=1) return mgEnd(false,'Over she goes: crates in the dust, legs in the air. <i>Tinny sighs and starts picking up.</i>');
+      if(G.t>=G.dur) mgEnd(true,'<b>Level as a table.</b> Tinny pats the crates: “It knows its own weight now.”'); },
+    draw:(G,c)=>{ c.clearRect(0,0,320,210); c.save(); c.translate(160,128); c.rotate(G.a*0.5);
+      c.fillStyle='#7a5a3a'; c.beginPath(); c.ellipse(0,0,92,20,0,0,Math.PI*2); c.fill(); c.strokeStyle='#2e2a26'; c.lineWidth=2.4; c.stroke(); [-60,-20,20,60].forEach(x=>{ c.beginPath(); c.moveTo(x,-19); c.lineTo(x,19); c.stroke(); });
+      const stack={}; G.crates.forEach(p=>{ const k=Math.round(p*4); stack[k]=(stack[k]||0)+1; const h=stack[k]; c.fillStyle='#9a7a48'; c.fillRect(p*90-13,-20-h*22,26,22); c.strokeStyle='#4a3420'; c.lineWidth=1.4; c.strokeRect(p*90-13,-20-h*22,26,22); c.beginPath(); c.moveTo(p*90-13,-20-h*22); c.lineTo(p*90+13,-20-(h-1)*22); c.stroke(); });
+      c.restore(); c.fillStyle='#2e2a26'; c.beginPath(); c.moveTo(150,146); c.lineTo(170,146); c.lineTo(176,176); c.lineTo(144,176); c.closePath(); c.fill();
+      // the level: a bubble in a tube
+      c.fillStyle='#2a1e10'; c.fillRect(60,190,200,12); c.fillStyle='rgba(140,224,140,0.35)'; c.fillRect(140,190,40,12); const bx=160+Math.max(-1,Math.min(1,G.a))*96; c.fillStyle=Math.abs(G.a)>0.7?'#e07050':'#c8e8f0'; c.beginPath(); c.ellipse(bx,196,8,5,0,0,Math.PI*2); c.fill();
+      c.fillStyle='#a08050'; c.font='11px Georgia'; c.textAlign='left'; c.fillText(Math.max(0,Math.ceil(G.dur-G.t))+'s',12,20); c.textAlign='right'; c.fillText(G.wind>0.4?'gust →':G.wind<-0.4?'← gust':'',308,20); } };
+
+  // 4 · the lens: stop the grinding-stone's mark on the bright arc, each time narrower
+  GAMES.lens={ title:'The Grinding Wheel', help:'Space / click when the mark crosses the bright arc', start:'Grind the glass true. Six passes, each finer than the last.',
+    init:()=>({th:0,w:2.1,dir:1,phi:1.2+Math.random()*3,hw:0.55,hits:0,miss:0,fx:0}),
+    tick:(G,dt)=>{ G.th+=G.w*G.dir*dt; G.fx=Math.max(0,G.fx-dt); },
+    press:(G)=>{ let d=((G.th-G.phi)%(2*Math.PI)+3*Math.PI)%(2*Math.PI)-Math.PI; if(Math.abs(d)<=G.hw){ G.hits++; G.fx=0.4; G.good=true; try{ SND.fx('hit'); }catch(e){} if(G.hits>=6) return mgEnd(true,'<b>Clear as rain.</b> The lens throws a small, perfect light on your palm.');
+        G.hw=Math.max(0.16,G.hw-0.075); G.w*=1.1; G.dir*=-1; G.phi=G.th+Math.PI*(0.6+Math.random()*0.8)*(Math.random()<0.5?1:-1); mgMsg('A true pass. '+(6-G.hits)+' more.'); }
+      else { G.miss++; G.fx=0.4; G.good=false; if(G.miss>=3) return mgEnd(false,'A crack runs through the glass with a tiny sound. <i>The heart of it is still good: you can start again.</i>'); mgMsg('The stone skips. Scratched, but not ruined.'); } },
+    draw:(G,c)=>{ c.clearRect(0,0,320,210); const cx=160, cy=100, R=72; c.fillStyle='#4a4038'; c.beginPath(); c.arc(cx,cy,R+12,0,Math.PI*2); c.fill(); c.fillStyle='#6a5e52'; c.beginPath(); c.arc(cx,cy,R,0,Math.PI*2); c.fill();
+      const gr=c.createRadialGradient(cx-10,cy-12,4,cx,cy,34); gr.addColorStop(0,'rgba(255,255,255,'+(0.3+G.hits*0.1)+')'); gr.addColorStop(1,'rgba(140,180,190,0.5)'); c.fillStyle=gr; c.beginPath(); c.arc(cx,cy,34,0,Math.PI*2); c.fill();
+      c.strokeStyle='#f2e8a0'; c.lineWidth=10; c.beginPath(); c.arc(cx,cy,R+6,G.phi-G.hw,G.phi+G.hw); c.stroke();
+      c.strokeStyle='#1a1410'; c.lineWidth=4; c.beginPath(); c.moveTo(cx+Math.cos(G.th)*(R-14),cy+Math.sin(G.th)*(R-14)); c.lineTo(cx+Math.cos(G.th)*(R+14),cy+Math.sin(G.th)*(R+14)); c.stroke();
+      c.fillStyle='#e8e0d0'; c.beginPath(); c.arc(cx+Math.cos(G.th)*(R+6),cy+Math.sin(G.th)*(R+6),5,0,Math.PI*2); c.fill();
+      if(G.fx>0){ c.globalAlpha=G.fx/0.4; c.strokeStyle=G.good?'#ffffff':'#c05030'; c.lineWidth=2; c.beginPath(); c.arc(cx,cy,34+(0.4-G.fx)*60,0,Math.PI*2); c.stroke(); c.globalAlpha=1; }
+      pips(c,30,196,G.hits,6,'#f2e8a0'); c.fillStyle='#a08050'; c.font='11px Georgia'; c.textAlign='right'; c.fillText('cracks',258,200); pips(c,266,196,G.miss,3,'#c05030'); } };
+
+  // ════ props in the world ════
+  OBJ_DRAW.ashstack=o=>{ const q=P(o.i+0.5,o.j+0.5); if(CHOICE['cvAsh'+o.k]){ g.fillStyle='rgba(60,40,20,0.35)'; g.beginPath(); g.ellipse(q.x,q.y,16,6,0,0,Math.PI*2); g.fill(); return; }
+    g.lineCap='round'; for(let k=0;k<5;k++){ const a=-0.3+k*0.15, b=q.x-14+k*7; g.strokeStyle='#3a2a18'; g.lineWidth=5; g.beginPath(); g.moveTo(b,q.y+2); g.lineTo(b+Math.sin(a)*30+4,q.y-46+k*2); g.stroke(); g.strokeStyle=k%2?'#c8b08a':'#b89a70'; g.lineWidth=3; g.stroke(); }
+    g.strokeStyle='#5a4028'; g.lineWidth=1.6; g.beginPath(); g.moveTo(q.x-16,q.y-22); g.quadraticCurveTo(q.x,q.y-16,q.x+18,q.y-24); g.stroke(); };
+  NEAR_NAME.ashstack='Seasoned Ash Poles';
+  wrap('fellings','objects',l=>[...l,{type:'ashstack',i:2,j:1,k:0},{type:'ashstack',i:7,j:6,k:1}]);
+  onUse(['ashstack'],o=>{ if(CHOICE['cvAsh'+o.k]) return logMsg('Only bark and shavings left.','#a89a80');
+    if(qA()!=='poles') return logMsg('Ash poles, stacked to season, straight as arrows. Someone took care choosing them.','#c8b890');
+    if(give('cv_ashpole',2)<2) return flash('Your pack is full.'); CHOICE['cvAsh'+o.k]=true; logMsg('You shoulder two of the seasoned ash poles. (Ash Poles: '+invCount('cv_ashpole')+'/4)','#8ac070');
+    if(invCount('cv_ashpole')>=4) remember('cvstrider','poles2',"You have four ash poles. Bring them to Brannock at the Cinderveil camp."); });
+
+  // the dead hauler on the heath, and the feral Skitters nesting in it
+  OBJ_DRAW.cvwreck=o=>{ const q=P(o.i+1,o.j+1); g.fillStyle='rgba(30,22,14,0.35)'; g.beginPath(); g.ellipse(q.x+4,q.y+4,62,18,0,0,Math.PI*2); g.fill();
+    g.save(); g.beginPath(); g.rect(q.x-120,q.y-160,240,166); g.clip(); g.translate(q.x,q.y); g.rotate(0.38); g.translate(-q.x,-q.y); CVM3.hauler(g,q.x,q.y+30,1.2,o.dir||3,null); g.restore();   // keeled over, half sunk
+    g.save(); g.globalCompositeOperation='multiply'; g.fillStyle='rgba(120,90,70,0.45)'; g.beginPath(); g.ellipse(q.x,q.y-34,62,40,0.38,0,Math.PI*2); g.fill(); g.restore();   // rust and weather
+    for(let k=0;k<11;k++){ const x=q.x-54+k*11+Math.sin(k*2.3)*4, y=q.y+2+Math.cos(k*1.7)*5; g.fillStyle=k%2?'#3e4a2c':'#4a5634'; g.beginPath(); g.ellipse(x,y,9,6,0,0,Math.PI*2); g.fill(); g.fillStyle='#8a5a8a'; g.fillRect(x-1,y-5,2,2); } };   // heather over the legs
+  NEAR_NAME.cvwreck='Dead Hauler';
+  wrap('heath','objects',l=>[...l,{type:'cvwreck',i:24,j:5,fp:[2,2],dir:3}]);
+  FOES.feralskit={ label:'Feral Skitter', base:34, stagger:1.0, unguarded:true, pattern:[{wait:0.7,wind:0.55,after:0.35,dir:'left'},{wait:0.4,wind:0.5,after:0.45,dir:'right'},{wait:0.9,wind:0.7,after:0.4,dir:'up'},{wait:0.5,wind:0.6,after:0.4,dir:'right',feint:'left'}] };
+  window.drawFeralSkit=(x,B,e)=>{ if(e.dead){ g.save(); g.globalAlpha*=0.7; g.translate(x,B); g.scale(1,0.55); g.translate(-x,-B); CVM3.skitter(g,x,B,0.75,e.dir||0,null); g.restore(); return; }
+    CVM3.skitter(g,x,B,0.75,e.dir||0,(e.moving||e.state==='windup')?gt*(e.state==='windup'?4:11):null);
+    if(e.state==='windup'){ const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(x,B-22,30,20,'255,160,60',0.4); g.globalCompositeOperation=gs; } };
+  const MON={gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:null,offhand:null}};
+  wrap('heath','mobs',l=>qA()==='spring' && !hasItem('cv_spring') ? [...l,
+    { name:'Feral Skitter', type:'feralskit', i:22, j:7, faction:'feralskit', opts:MON }, { name:'Feral Skitter', type:'feralskit', i:27, j:7, faction:'feralskit', opts:MON },
+    { name:'Old Rust-Skitter', type:'feralskit', i:25, j:9, faction:'feralskit', hpMul:1.5, opts:MON } ] : l);
+  onUse(['cvwreck'],()=>{ if(qA()!=='spring'||hasItem('cv_spring')) return logMsg('A dead hauler, half sunk in the heather. Whatever could be taken has been.','#a89a80');
+    if(mobs.some(m=>m.faction==='feralskit' && !m.dead)) return logMsg('Something clicks inside the wreck, then many somethings. The feral Skitters will not let you near.','#e0a060');
+    if(give('cv_spring')<1) return flash('Your pack is full.'); remember('cvstrider','spring',"You pried the mainspring out of the dead hauler on Greywater Heath. Brannock will want to temper it."); logMsg('You brace a boot on the hull and lever the mainspring free. It comes out with a groan and a long, falling hum.','#8ac070'); });
+  if(typeof BEASTS!=='undefined') BEASTS.push({ k:'feralskit', is:f=>f.type==='feralskit', name:'Feral Skitters', kind:'Engines · gone wild', lore:"Skitters whose makers died or lost them. They nest in wrecks and keep the old rule, take what lies unwatched, except now everything looks unwatched to them." });
+
+  // the hauler frame in the Scrublands, with scavengers picking it over
+  OBJ_DRAW.cvframe=o=>{ const q=P(o.i+0.5,o.j+0.5); if(CHOICE.cvB && CHOICE.cvB!=='frame'){ g.fillStyle='rgba(60,40,20,0.3)'; g.beginPath(); g.ellipse(q.x,q.y,24,8,0,0,Math.PI*2); g.fill(); return; }
+    g.save(); g.globalAlpha*=0.95; CVM3.hauler(g,q.x,q.y+4,0.62,o.dir||1,null); g.restore(); };
+  NEAR_NAME.cvframe='Little Hauler Frame';
+  wrap('scrubland','objects',l=>[...l,{type:'cvframe',i:3,j:40,dir:1}]);
+  const SCAV=(name,g0,w,i,j)=>({ name, type:'bandit', i, j, faction:'scavs', opts:{gender:g0,race:'human',skin:2,hair:1,hairColor:2,beard:g0==='m'?1:0,face:2,equip:{head:'hood',torso:'tunic_deep',armor:null,hands:'gloves',legs:'hose_grey',feet:'boots',weapon:w,offhand:null}} });
+  wrap('scrubland','mobs',l=>qB()==='frame' && !CHOICE.cvFrame ? [...l, SCAV('Wreck-Picker','m','club',5,42), SCAV('Wreck-Picker','f','dagger',8,39)] : l);
+  onUse(['cvframe'],()=>{ if(qB()!=='frame') return logMsg('A little hauler frame, half buried. Somebody built it small on purpose.','#c8b890');
+    if(mobs.some(m=>m.faction==='scavs' && !m.dead)) return logMsg('“Ours,” says the wreck-picker, and spits. “Find your own.”','#e0a060');
+    CHOICE.cvFrame=true; CHOICE.cvB='parts'; remember('cvpack','parts',"You dragged the little hauler frame back to Tinny. She needs eight pieces of Salvage and two wolf pelts to make it whole."); logMsg('You dig the frame out and drag it all the way back to the camp road. Tinny will be pleased.','#8ac070'); });
+
+  // crater glass, and the nightmoths' cocoons
+  OBJ_DRAW.lensglass=o=>{ if(hasItem('cv_lensglass')||hasItem('cv_lens')||(qC()&&qC()!=='glass')) return; const q=P(o.i+0.5,o.j+0.5), s=Math.sin(gt*2)*0.5+0.5;
+    g.fillStyle='rgba(200,230,225,0.85)'; g.strokeStyle='#5a6a68'; g.lineWidth=1.2; g.beginPath(); g.moveTo(q.x-12,q.y); g.lineTo(q.x-6,q.y-16); g.lineTo(q.x+8,q.y-18); g.lineTo(q.x+14,q.y-4); g.lineTo(q.x+4,q.y+4); g.closePath(); g.fill(); g.stroke();
+    const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(q.x,q.y-10,22,16,'220,250,255',0.18+s*0.15); g.globalCompositeOperation=gs; };
+  NEAR_NAME.lensglass='Clear Crater Glass';
+  wrap('crater','objects',l=>[...l,{type:'lensglass',i:10,j:13}]);
+  onUse(['lensglass'],()=>{ if(qC()!=='glass') return logMsg('Glass, fused by some old heat. Pretty, and no use to you just now.','#c8b890'); if(hasItem('cv_lensglass')) return;
+    if(give('cv_lensglass')<1) return flash('Your pack is full.'); remember('cvhush','glass2',"You found clear glass in the Glass Crater. Take it to Ashmother Odra to grind."); logMsg('You work the clear lump free of the slag around it. Clean as water inside.','#8ac070'); });
+  OBJ_DRAW.mothcocoon=o=>{ if(CHOICE['cvMoth'+o.k]) return; const q=P(o.i+0.5,o.j+0.5), n=night(), y=q.y-34;
+    g.strokeStyle='#3a3020'; g.lineWidth=1; g.beginPath(); g.moveTo(q.x,q.y-60); g.lineTo(q.x,y-8); g.stroke(); g.fillStyle=n?'#e8f0e8':'#a8a89a'; g.beginPath(); g.ellipse(q.x,y,4.5,8,0,0,Math.PI*2); g.fill();
+    if(n){ const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(q.x,y,26,26,'200,240,230',0.25+Math.sin(gt*1.3+o.k)*0.1); g.globalCompositeOperation=gs; } };
+  NEAR_NAME.mothcocoon='Hanging Cocoon';
+  wrap('mistmere','objects',l=>[...l,{type:'mothcocoon',i:3,j:2,k:0},{type:'mothcocoon',i:13,j:1,k:1},{type:'mothcocoon',i:16,j:12,k:2}]);
+  onUse(['mothcocoon'],o=>{ if(CHOICE['cvMoth'+o.k]) return; if(qC()!=='moths') return logMsg('A cocoon hangs from a reed-stem on a thread of silk.','#c8b890');
+    if(!night()) return logMsg('By day the cocoon is grey and dead-looking. The silk you want only shines after dark.','#c8b890');
+    if(give('cv_cocoon')<1) return flash('Your pack is full.'); CHOICE['cvMoth'+o.k]=true; logMsg('You cut the shining cocoon down, carefully. (Cocoons: '+invCount('cv_cocoon')+'/3)','#8ac070');
+    if(invCount('cv_cocoon')>=3) remember('cvhush','moths2',"You have three nightmoth cocoons. Back to Ashmother Odra."); });
+
+  // ════ the strider's trial run: checkpoints down the Long Meadow ════
+  const RACE_PTS=[[40,3],[30,9],[20,2],[9,7],[4,5],[26,4]];
+  let RACE=null; window.cvRace=()=>RACE;
+  OBJ_DRAW.cvpost=o=>{ const q=P(o.i+0.5,o.j+0.5); g.fillStyle='#4a3420'; g.fillRect(q.x-2,q.y-54,4,54); g.fillStyle='#8a2a1a'; g.beginPath(); g.moveTo(q.x+2,q.y-54); g.lineTo(q.x+24,q.y-48+Math.sin(gt*3)*2); g.lineTo(q.x+2,q.y-40); g.closePath(); g.fill(); };
+  NEAR_NAME.cvpost='Trial Post';
+  wrap('longmeadow','objects',l=>qA()==='race'||qA()==='done' ? [...l,{type:'cvpost',i:48,j:8}] : l);
+  const raceHud=document.createElement('div'); raceHud.style.cssText='position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:42;display:none;padding:5px 14px;border-radius:8px;border:1px solid #8a6a3a;background:rgba(20,14,7,0.9);color:#f0dca0;font:600 14px Georgia,serif'; document.body.appendChild(raceHud);
+  const raceStart=()=>{ closeDialog(); let L=0, at=[player.i,player.j]; for(const [i,j] of [...RACE_PTS,[48,8]]){ const p=findPath(at[0],at[1],i,j); L+=p?p.length:Math.hypot(i-at[0],j-at[1])*1.4; at=[i,j]; }
+    RACE={k:0,t:Math.ceil(L*1.25/(3.2*1.4)+8),max:0}; RACE.max=RACE.t; logMsg('The frame shivers under you and stands. Brannock drops his hand: go!','#f2c84a'); banner('Ride!','#f2c84a',1200); };
+  const raceEnd=(ok)=>{ RACE=null; raceHud.style.display='none'; if(ok){ CHOICE.cvA='done'; CHOICE.cvStrider=true; CHOICE.cvRiding=true; remember('cvstrider','done',"Your own Strider, built with Brannock: ash legs, a tempered mainspring. It carries you faster on any open road. (R to mount or dismount.)");
+      banner('A Strider of Your Own','#f2c84a',2600); logMsg('You pull up by the post, the Strider blowing smoke. Brannock walks the last of it, looks at every joint, and nods once. It is yours.','#8ac070'); autosaveSoon(800); }
+    else logMsg('Too slow: the frame needs a full run in one go. Use the trial post to try again.','#e0a060'); };
+  onUse(['cvpost'],()=>{ if(qA()==='done') return logMsg('The trial post. Brannock has carved a notch in it with your time.','#c8b890'); if(RACE) return;
+    say('Brannock the Fused',["“Through every flag, then back to the post. One run, no stopping. Faster than the sun goes down.”"],[{label:'Ride the trial.',fn:raceStart},{label:'Not yet.',fn:closeDialog}]); });
+  OBJ_DRAW.cvflag=o=>{ if(!RACE||RACE.k!==o.k) return; const q=P(o.i+0.5,o.j+0.5); const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(q.x,q.y-20,40,40,'255,210,90',0.35+Math.sin(gt*6)*0.12); g.globalCompositeOperation=gs;
+    g.fillStyle='#4a3420'; g.fillRect(q.x-2,q.y-60,4,60); g.fillStyle='#f2c84a'; g.beginPath(); g.moveTo(q.x+2,q.y-60); g.lineTo(q.x+26,q.y-53+Math.sin(gt*5)*2); g.lineTo(q.x+2,q.y-45); g.closePath(); g.fill(); };
+  wrap('longmeadow','objects',l=>qA()==='race' ? [...l,...RACE_PTS.map(([i,j],k)=>({type:'cvflag',i,j,k,noblock:true}))] : l);
+
+  // ════ the Ember Yard: the Hushling's trial, at night, past sleeping wardens ════
+  AREAS.cvyard={ fence:{r:false,l:false}, mini:{x:0,y:0}, notches:()=>[], dummy:null, w:18, h:12, theme:'sand', sandKind:'clay', scrub:()=>0.4, label:'The Ember Yard',
+    objects:()=>[ {type:'teleporter', i:0, j:6, to:'cvcamp', entry:'fromYard'},
+      {type:'cvsleeper', i:5, j:6, r0:2.0, ph:0, dir:2}, {type:'cvsleeper', i:10, j:3, r0:1.8, ph:2.1, dir:0}, {type:'cvsleeper', i:10, j:9, r0:1.8, ph:4.0, dir:4}, {type:'cvsleeper', i:12, j:6, r0:1.6, ph:1.0, dir:6},
+      {type:'cvlantern', i:16, j:6}, {type:'tent', i:7, j:0, fp:[2,2]}, {type:'tent', i:14, j:10, fp:[2,2]}, {type:'crate', i:8, j:7}, {type:'barrel', i:12, j:1}, {type:'barrel', i:3, j:10}, {type:'scrapheap', i:15, j:2, camp:true},
+      {type:'brazier', i:1, j:3}, {type:'brazier', i:1, j:9} ],
+    npcs:()=>[], mobs:()=>[], entries:{ fromCamp:{i:1,j:6} } };
+  AREA_TIER.cvyard=2; AREAS.cvcamp.entries.fromYard={i:12,j:13};
+  const ringR=o=>o.r0+0.7*Math.sin(gt*0.9+o.ph);
+  const ring=(o,a)=>{ const q=P(o.i+0.5,o.j+0.5), r=ringR(o); g.save(); g.strokeStyle='rgba(255,180,90,'+a+')'; g.fillStyle='rgba(255,150,60,'+(a*0.16)+')'; g.lineWidth=2; g.setLineDash([6,5]); g.beginPath(); g.ellipse(q.x,q.y,r*TW/2*1.414,r*TH/2*1.414,0,0,Math.PI*2); g.fill(); g.stroke(); g.restore(); };
+  { const _ng=nightGlows; nightGlows=function(){ _ng(); try{ if(areaId==='cvyard') OBJECTS.forEach(o=>{ if(o.type==='cvsleeper'){ const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; ring(o,0.5*nightAmt()); g.globalCompositeOperation=gs; } }); }catch(e){} }; }   // the rings show through the dark
+  OBJ_DRAW.cvsleeper=o=>{ const q=P(o.i+0.5,o.j+0.5); ring(o,0.55);
+    drawLitSprite(q.x,q.y,()=>drawSitting(g,q.x,q.y,{race:'cinderveil',gender:'m',skin:2,hair:0,hairColor:3,beard:0,face:1,cvBits:0b000100000,cvPack:true,equip:{head:'cv_helm_suit',torso:'tunic_deep',armor:'cv_suit_iron',hands:'cv_gauntlets',legs:'hose_grey',feet:'cv_wrapboots',weapon:null,offhand:null}},o.dir,'knees'));
+    g.fillStyle='rgba(230,230,240,'+(0.5+Math.sin(gt*2+o.ph)*0.3)+')'; g.font='italic 12px Georgia'; g.textAlign='center'; g.fillText('z',q.x+14+Math.sin(gt+o.ph)*3,q.y-96-((gt*8+o.ph*5)%14)); };
+  NEAR_NAME.cvsleeper='Sleeping Warden';
+  OBJ_DRAW.cvlantern=o=>{ const q=P(o.i+0.5,o.j+0.5); g.fillStyle='#3a2a18'; g.fillRect(q.x-2,q.y-40,4,40); g.fillStyle='#2e2a26'; g.fillRect(q.x-7,q.y-56,14,16); g.fillStyle='#f0b050'; g.fillRect(q.x-4,q.y-53,8,10);
+    const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(q.x,q.y-48,40,30,'255,190,90',0.45); g.globalCompositeOperation=gs; };
+  NEAR_NAME.cvlantern="Odra's Lantern";
+  let TRIAL=null; window.cvTrial=()=>TRIAL;
+  const trialStart=()=>{ closeDialog(); TRIAL={fails:0}; switchArea('cvyard','fromCamp'); logMsg('Odra hangs her lantern at the far end of the Ember Yard. “Bring it back. Wake no one.”','#c8a0e0'); };
+  onUse(['cvlantern'],()=>{ if(!TRIAL) return; TRIAL=null; CHOICE.cvC='done'; CHOICE.cvHush=true; switchArea('cvcamp','fromYard'); remember('cvhush','done',"The Hushling is yours: a little Skitter of smoked glass that bends the light around you. Foes five levels or more below you will not notice you pass.");
+    banner('The Hushling','#c8e8f0',2600); logMsg('You walk the lantern back. Odra takes it, and something small and glassy unfolds from under her coat and runs up your arm. “It likes you. It hides you. Do not make it regret either.”','#8ac070'); autosaveSoon(800); });
+  { const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{ if(!running) return r;
+      if(areaId==='cvyard'){ if(!TRIAL) TRIAL={fails:0}; for(const o of OBJECTS){ if(o.type!=='cvsleeper') continue; if(Math.hypot(player.x-(o.i+0.5),player.y-(o.j+0.5))<ringR(o)){ TRIAL.fails++;
+            floatText(tileOf(player),'Noticed!','#ffb070',true); logMsg('A warden stirs, and a beaked helm turns toward you. You freeze, and back away to the start.','#e0a060');
+            player.path=[]; player.x=1.5; player.y=6.5; player.i=1; player.j=6; break; } } }
+      else if(TRIAL && areaId!=='cvyard') TRIAL=null;
+      if(RACE){ if(areaId!=='longmeadow'||combat.active){ raceEnd(false); } else { RACE.t-=dt; const [i,j]=RACE.k<RACE_PTS.length?RACE_PTS[RACE.k]:[48,8]; raceHud.style.display='block';
+          raceHud.textContent=(RACE.k<RACE_PTS.length?'Flag '+(RACE.k+1)+' / '+RACE_PTS.length:'Back to the post!')+'  ·  '+Math.max(0,Math.ceil(RACE.t))+'s';
+          if(Math.hypot(player.x-(i+0.5),player.y-(j+0.5))<1.3){ RACE.k++; try{ SND.fx('page'); }catch(e){} if(RACE.k>RACE_PTS.length) raceEnd(true); }
+          else if(RACE.t<=0) raceEnd(false); } } }catch(e){ console.error(e); } return r; }; }
+
+  // ════ the engines: riding, and the two that follow ════
+  const openGround=()=>{ const A=AREAS[areaId]; return !!A && !A.inside && !A.cave && !/^uc_/.test(areaId) && areaId!=='cvyard'; };
+  const canRide=()=>openGround() && !combat.active && !player.sitChair && !(typeof FISH!=='undefined' && FISH);
+  const riding=()=>!!((CHOICE.cvStrider && CHOICE.cvRiding) || RACE) && canRide();
+  window.cvRiding=riding; window.cvRideMul=()=>riding()?1.4:1;
+  window.cvHush=m=>!!(RACE && m && !m.provoked) || !!(CHOICE.cvHush && m && !m.provoked && !m.boss && foeLevel(m)<=playerLevel()-5);
+  { const _w=drawPlayerWading; drawPlayerWading=function(e){ if(!riding()) return _w.apply(this,arguments);
+      const q=P(player.x,player.y), d=player.dir||0, mv=player.path.length>0, ph=mv?gt*7:null, S=1.15, z=ph==null?0:Math.abs(Math.sin(ph*2))*2;
+      CVM3.strutter(g,q.x,q.y,S,d,ph); const th=(45-d*45)*Math.PI/180, lx=-2, sx=q.x+(lx*Math.cos(th)-lx*Math.sin(th))*0.7071*S, sy=q.y+(lx*Math.cos(th)+lx*Math.sin(th))*0.3536*S-(82+z)*S;
+      drawLitSprite(sx,sy+CHAIR_SEAT,()=>drawSitting(g,sx,sy+CHAIR_SEAT,player.opts,d,'chair')); }; }
+  const rideBtn=document.createElement('button'); rideBtn.id='ride-btn'; rideBtn.style.cssText='position:fixed;left:12px;bottom:64px;z-index:40;display:none;padding:6px 12px;border-radius:8px;border:1px solid #8a6a3a;background:rgba(24,16,8,0.92);color:#f0dca0;font:600 12px Georgia,serif;cursor:pointer;'; document.body.appendChild(rideBtn);
+  const toggleRide=()=>{ if(!CHOICE.cvStrider) return; CHOICE.cvRiding=!CHOICE.cvRiding; logMsg(CHOICE.cvRiding?'You swing up into the Strider\'s saddle.':'You climb down. The Strider folds its knees and follows on its own.','#c8a860'); };
+  rideBtn.addEventListener('click',e=>{ e.stopPropagation(); rideBtn.blur(); toggleRide(); });
+  window.addEventListener('keydown',e=>{ if(G || (e.target && e.target.tagName==='INPUT')) return; if((e.key==='r'||e.key==='R') && CHOICE.cvStrider && !dlgIsOpen()){ e.preventDefault(); toggleRide(); } });
+  setInterval(()=>{ try{ const show=!!CHOICE.cvStrider && !!player.opts && canRide() && !dlgIsOpen() && !G; rideBtn.style.display=show?'block':'none'; if(show) rideBtn.textContent=CHOICE.cvRiding?'⚙ Dismount (R)':'⚙ Strider (R)';
+    // a Packling carries eight more
+    const want=30+(CHOICE.cvPack?8:0); if(INV_SIZE<want && player.inv){ INV_SIZE=want; INV_RAW=true; try{ while(player.inv.length<INV_SIZE) player.inv.push(null); } finally{ INV_RAW=false; }
+      if(typeof invBuilt!=='undefined' && invBuilt){ const n=invGrid.querySelectorAll('.slot').length||invGrid.children.length; for(let i=n;i<INV_SIZE;i++) invGrid.appendChild(makeSlot('inv',i)); if(invOverlay.classList.contains('open')) refreshInventory(); } } }catch(e){} },300);
+  // followers: a little hauler and a glassy skitter, trailing you like the drake does
+  const FOL={pack:null,hush:null,strider:null}; let folArea=null;
+  const folOn=k=>k==='pack'?!!CHOICE.cvPack && !(AREAS[areaId]||{}).inside : k==='hush'?!!CHOICE.cvHush : k==='strider'?!!CHOICE.cvStrider && !riding() && openGround() : false;
+  { const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{ if(!running || !player.opts) return r; if(G){ player.path=[]; } const reset=folArea!==areaId; folArea=areaId; const fd=DIR_DELTA[player.dir||0]||[1,1];
+      [['pack',1.7,0.7],['hush',1.0,-0.6],['strider',2.4,-0.3]].forEach(([k,back,side])=>{ if(!folOn(k)){ FOL[k]=null; return; }
+        const n=Math.hypot(fd[0],fd[1])||1, tx=player.x-fd[0]/n*back+(-fd[1]/n)*side, ty=player.y-fd[1]/n*back+(fd[0]/n)*side; let F=FOL[k];
+        if(!F||reset){ F=FOL[k]={x:tx,y:ty,dir:player.dir||0,moving:false}; }
+        const dx=tx-F.x, dy=ty-F.y, d=Math.hypot(dx,dy); if(d>7){ F.x=tx; F.y=ty; } else if(d>0.3){ const sp=Math.min(d*3.2,6.5)*dt; F.x+=dx/d*sp; F.y+=dy/d*sp; F.dir=dirFromDelta(dx,dy); F.moving=true; } else F.moving=false; }); }catch(e){ console.error(e); } return r; }; }
+  { const _pd=pupDrawItems; pupDrawItems=function(items){ _pd(items); try{
+      const F1=FOL.pack; if(F1) items.push({d:F1.x+F1.y, ax:F1.x, ay:F1.y, fn:()=>{ const q=P(F1.x,F1.y); CVM3.hauler(g,q.x,q.y,0.6,F1.dir,F1.moving?gt*9:null); }});
+      const F3=FOL.strider; if(F3) items.push({d:F3.x+F3.y, ax:F3.x, ay:F3.y, fn:()=>{ const q=P(F3.x,F3.y); CVM3.strutter(g,q.x,q.y,1.15,F3.dir,F3.moving?gt*7:null); }});
+      const F2=FOL.hush; if(F2) items.push({d:F2.x+F2.y, ax:F2.x, ay:F2.y, fn:()=>{ const q=P(F2.x,F2.y); g.save(); g.globalAlpha*=0.5+Math.sin(gt*2.4)*0.12; CVM3.skitter(g,q.x,q.y,0.55,F2.dir,F2.moving?gt*12:null); g.restore();
+        const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(q.x,q.y-14,22,14,'190,230,255',0.18+Math.sin(gt*3)*0.06); g.globalCompositeOperation=gs; }}); }catch(e){} }; }
+  // the Hushling works on you, too: a faint shimmer at your edges while lesser foes are near
+  { const _w=drawPlayerWading; drawPlayerWading=function(e){ const r=_w.apply(this,arguments); try{ if(CHOICE.cvHush && mobs.some(m=>m.hostile && !m.dead && cvHush(m) && cheb(tileOf(m),tileOf(player))<=5)){ const q=P(player.x,player.y);
+        const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(q.x,q.y-50,34,60,'180,220,255',0.12+Math.sin(gt*4)*0.05); g.globalCompositeOperation=gs; } }catch(e){} return r; }; }
+
+  // ════ the talk ════
+  const B='Brannock the Fused', T='Tinny', O='Ashmother Odra';
+  const extra=(old,fn)=>()=>{ const _sd=showDialog; let done=false; showDialog=function(name,text,opts,purse){ if(!done){ done=true; showDialog=_sd; try{ const ex=fn(); if(ex.length && Array.isArray(opts)){ opts=[...opts]; const k=opts.indexOf(bye); opts.splice(k<0?opts.length:k,0,...ex); } }catch(e){ console.error(e); } } return _sd.call(this,name,text,opts,purse); };
+    try{ old(); } finally{ showDialog=_sd; } };
+  // A · Brannock and the Strider
+  TALKERS.cvbrannock=extra(TALKERS.cvbrannock,()=>{ const s=qA(), o=[], back=()=>TALKERS.cvbrannock();
+    if(!kin()){ if(trust()>=1) o.push({label:'“That Strider of yours. Could I ride one?”', fn:()=>say(B,"“Ride one? No. Kin build their own. You are a road-friend. Road-friends walk.”",[{label:'Back.',fn:back},bye])}); return o; }
+    if(!s) o.push({label:'“Kin build their own legs, you said.”', fn:()=>{ CHOICE.cvA='poles'; remember('cvstrider','poles',"Brannock will help you build a Strider of your own. First: four seasoned ash poles, from the woodcutters' stacks in the Fellings.");
+      say(B,["<i>He sets the hammer down, which he does not do.</i> “I said it. So. Legs first. Ash, seasoned, straight. The woodcutters stack it in the Fellings. Four poles.”","“Then a mainspring. Then the forge, then teaching it to walk, then a run to prove it. It is a long road. Every Strider is.”"],[{label:'Back.',fn:back},bye]); }});
+    if(s==='poles' && invCount('cv_ashpole')>=4) o.push({label:'Hand over the four ash poles.', fn:()=>{ take('cv_ashpole',4); CHOICE.cvA='spring'; updateHud(); remember('cvstrider','spring0',"Brannock has the legs. Now a mainspring: there is a dead hauler on Greywater Heath, and feral Skitters nest in it.");
+      say(B,["<i>He sights down each pole like a crossbow.</i> “Good wood.”","“A spring now. There is a dead hauler on the Greywater Heath, out in the heather. Its spring is good, but things live in it. Skitters, gone wild, no maker. Be quick with them. They are only iron.”"],[{label:'Back.',fn:back},bye]); }});
+    if(s==='spring' && hasItem('cv_spring')) o.push({label:'Give him the mainspring.', fn:()=>{ take('cv_spring',1); CHOICE.cvA='forge'; updateHud(); remember('cvstrider','forge',"Temper the mainspring at Brannock's anvil.");
+      say(B,"“Black and sound.” <i>He drops it into the fire.</i> “You hold the hammer. I am too old to hold your Strider's heart for you.”",[{label:'Take the hammer.',fn:()=>cvGame('forge',()=>{ CHOICE.cvA='gait'; remember('cvstrider','gait',"The mainspring is tempered. Next, teach the frame its gait, with Brannock."); },null)},bye]); }});
+    if(s==='forge') o.push({label:'Temper the mainspring.', fn:()=>cvGame('forge',()=>{ CHOICE.cvA='gait'; remember('cvstrider','gait',"The mainspring is tempered. Next, teach the frame its gait, with Brannock."); },null)});
+    if(s==='gait') o.push({label:'Teach the frame its gait.', fn:()=>{ say(B,"“It knows how to stand. It does not know how to walk. You show it, leg by leg, and it remembers.”",[{label:'Begin.',fn:()=>cvGame('gait',()=>{ CHOICE.cvA='race'; remember('cvstrider','race',"The Strider walks. Now prove it: a timed run past the flags on the Long Meadow, from Brannock's trial post."); },null)},bye]); }});
+    if(s==='race') o.push({label:'“What now?”', fn:()=>say(B,"“Now you ride it. Long Meadow. I have set flags. Every flag and back to the post before I lose patience.”",[{label:'Back.',fn:back},bye])});
+    if(s==='done') o.push({label:'“How is my Strider?”', fn:()=>say(B,["“Oiled. Watched. Like I watch mine.” <i>Pause.</i> “Ride it. Legs that stand still forget.”"],[{label:'Back.',fn:back},bye])});
+    return o; });
+  // B · Tinny and the Packling
+  TALKERS.cvtinny=extra(TALKERS.cvtinny,()=>{ const s=qB(), o=[], back=()=>TALKERS.cvtinny(), pel=invCount('pelt');
+    if(!kin()) return o;
+    if(!s) o.push({label:'“What are you always carrying?”', fn:()=>{ CHOICE.cvB='frame'; remember('cvpack','frame',"Tinny will build you a Packling, a little hauler that carries for you. There is a small hauler frame half-buried in the south of the Scrublands. Wreck-pickers were at it.");
+      say(T,["“Everything. You should too, you are kin now. You need a Packling.” <i>She sketches one in the dust with a boot: small, four-legged, all back.</i>","“There is a little frame half-buried down the south of the Scrublands. Wreck-pickers found it first. Unfind them.”"],[{label:'Back.',fn:back},bye]); }});
+    if(s==='frame') o.push({label:'“About that frame…”', fn:()=>say(T,"“South Scrublands, west side, past the old ruin. Mind the wreck-pickers. They bite.”",[{label:'Back.',fn:back},bye])});
+    if(s==='parts') o.push({label:'Bring eight Salvage and two wolf pelts.'+(scrap()<8||pel<2?' ('+scrap()+'/8, '+pel+'/2 pelts)':''), off:scrap()<8||pel<2, fn:()=>{ take('cv_scrap',8); take('pelt',2); CHOICE.cvB='balance'; updateHud(); remember('cvpack','balance',"Tinny has the parts. Now help her load the Packling and keep it level.");
+      say(T,["<i>Iron for the ribs, pelts for the saddle-pads. She works fast and hums.</i>","“There. Now the hard part. It has to learn its own weight, or it falls over every time you buy a turnip.”"],[{label:'Load it up.',fn:()=>cvGame('balance',()=>{ CHOICE.cvB='heart'; remember('cvpack','heart',"The Packling knows its weight. All it needs now is a heart: an ember core, for Tinny."); },null)},bye]); }});
+    if(s==='balance') o.push({label:'Load the Packling.', fn:()=>cvGame('balance',()=>{ CHOICE.cvB='heart'; remember('cvpack','heart',"The Packling knows its weight. All it needs now is a heart: an ember core, for Tinny."); },null)});
+    if(s==='heart') o.push({label:'Give her an ember core.'+(invCount('ember_core')?'':' (none)'), off:!invCount('ember_core'), fn:()=>{ take('ember_core',1); CHOICE.cvB='done'; CHOICE.cvPack=true; updateHud();
+      remember('cvpack','done',"Your Packling follows you: a little hauler that carries eight more things than you could."); banner('The Packling','#c8a860',2600);
+      say(T,["<i>The core goes in. The Packling shudders, stands, and walks three steps to stand beside you, as if it always had.</i>","“It's yours. It carries. It doesn't fight, it doesn't go indoors, it doesn't like geese. Give it a name, if you like. We don't.”"],[bye]); autosaveSoon(800); }});
+    if(s==='done') o.push({label:'“The Packling is doing well.”', fn:()=>say(T,"“Course it is. I built it.” <i>A pause.</i> “We built it.”",[{label:'Back.',fn:back},bye])});
+    return o; });
+  // C · Odra and the Hushling
+  TALKERS.cvodra=extra(TALKERS.cvodra,()=>{ const s=qC(), o=[], back=()=>TALKERS.cvodra();
+    if(!kin()) return o;
+    if(!s) o.push({label:'“How do you go unseen on the roads?”', fn:()=>{ CHOICE.cvC='glass'; remember('cvhush','glass',"Ashmother Odra will make you a Hushling, a little engine that hides you from lesser foes. First, clear glass from the Glass Crater.");
+      say(O,["“We do not. We go <i>unnoticed</i>. That is different, and harder.” <i>Something glassy shifts in the folds of her coat.</i>","“A Hushling. A small thing, and fussy. It needs a lens, and the lens needs glass: clear, from the Glass Crater, where the old fire fused the sand. Bring me some.”"],[{label:'Back.',fn:back},bye]); }});
+    if(s==='glass' && hasItem('cv_lensglass')) o.push({label:'Show her the crater glass.', fn:()=>{ CHOICE.cvC='grind'; remember('cvhush','grind',"Grind the crater glass into a lens at Odra's wheel.");
+      say(O,"“Good. Now grind it. Slowly. A lens remembers every hurry.”",[{label:'Sit at the wheel.',fn:()=>grind()},bye]); }});
+    if(s==='grind') o.push({label:'Grind the lens.', fn:()=>grind()});
+    if(s==='moths') o.push({label:'Bring three nightmoth cocoons.'+(invCount('cv_cocoon')<3?' ('+invCount('cv_cocoon')+'/3)':''), off:invCount('cv_cocoon')<3, fn:()=>{ take('cv_cocoon',3); CHOICE.cvC='trial'; updateHud(); remember('cvhush','trial',"The Hushling is built. Last, Odra's trial: at night, carry her lantern out of the Ember Yard without waking a single warden.");
+      say(O,["<i>She spins the cocoon-silk around the lens with three fingers, very fast. When she opens her hand, a small skitter of smoked glass sits in it, and you can see the fire through it.</i>","“It will not go with just anyone. Show it you can be quiet. Come at night: I will hang my lantern in the Ember Yard, among the sleeping wardens. Bring it back and wake no one.”"],[{label:'Back.',fn:back},bye]); }});
+    if(s==='trial') o.push({label:night()?'Take the trial in the Ember Yard.':'Take the trial. (only at night)', off:!night(), fn:trialStart});
+    return o; });
+  const grind=()=>{ if(!hasItem('cv_lensglass')) return say(O,"“No glass, no lens.”",[bye]); cvGame('lens',()=>{ take('cv_lensglass',1); give('cv_lens'); CHOICE.cvC='moths'; remember('cvhush','moths',"The lens is ground. Now three nightmoth cocoons from the Mistmere: they only shine, and only come away clean, at night."); updateHud();
+      say(O,"“There. Look through it: the world goes soft at the edges. The Hushling will need silk to hold it, nightmoth silk, from the Mistmere. Three cocoons. They only shine after dark.”",[bye]); },null); };
+
+  // marks over their heads
+  { const _h=npcHasNews; npcHasNews=function(n){ try{ if(n && kin()){
+        if(n.id==='cvbrannock'){ const s=qA(); if(!s) return '!'; if((s==='poles'&&invCount('cv_ashpole')>=4)||(s==='spring'&&hasItem('cv_spring'))||s==='forge'||s==='gait') return '?'; }
+        if(n.id==='cvtinny'){ const s=qB(); if(!s) return '!'; if((s==='parts'&&scrap()>=8&&invCount('pelt')>=2)||s==='balance'||(s==='heart'&&invCount('ember_core'))) return '?'; }
+        if(n.id==='cvodra'){ const s=qC(); if(!s) return '!'; if((s==='glass'&&hasItem('cv_lensglass'))||s==='grind'||(s==='moths'&&invCount('cv_cocoon')>=3)||(s==='trial'&&night())) return '?'; } } }catch(e){} return _h(n); }; }
+  // the journal
+  JOURNAL.push(['A Strider of Your Own', ()=>{ const s=qA(); if(!s) return null; return s==='done' ? ['done',"You built a Strider with Brannock. It carries you faster on open ground (R to mount)."] : ['active', {
+      poles:"Gather four seasoned ash poles from the woodcutters' stacks in the Fellings ("+invCount('cv_ashpole')+"/4), for Brannock.",
+      spring:hasItem('cv_spring')?"Bring the mainspring to Brannock.":"Pry the mainspring out of the dead hauler on Greywater Heath. Feral Skitters nest in it.",
+      forge:"Temper the mainspring at Brannock's anvil.", gait:"Teach the Strider frame its gait, with Brannock.", race:"Ride the trial on the Long Meadow: every flag and back to Brannock's post, in time." }[s]]; }]);
+  JOURNAL.push(['The Packling', ()=>{ const s=qB(); if(!s) return null; return s==='done' ? ['done',"Tinny built you a Packling. It follows you and carries eight more things."] : ['active', {
+      frame:"Dig out the little hauler frame in the south of the Scrublands. Wreck-pickers are at it.", parts:"Bring Tinny eight Salvage ("+scrap()+"/8) and two wolf pelts ("+invCount('pelt')+"/2).",
+      balance:"Help Tinny load the Packling, and keep it level.", heart:"Give Tinny an ember core, for the Packling's heart." }[s]]; }]);
+  JOURNAL.push(['The Hushling', ()=>{ const s=qC(); if(!s) return null; return s==='done' ? ['done',"Odra gave you a Hushling. Foes five levels or more below you do not notice you pass."] : ['active', {
+      glass:hasItem('cv_lensglass')?"Take the crater glass to Ashmother Odra.":"Find clear glass in the Glass Crater, for Ashmother Odra.", grind:"Grind the crater glass into a lens at Odra's wheel.",
+      moths:"Cut three nightmoth cocoons in the Mistmere, at night ("+invCount('cv_cocoon')+"/3).", trial:"At night, take Odra's trial: carry her lantern out of the Ember Yard without waking a warden." }[s]]; }]);
 }
 </script>
 </body>

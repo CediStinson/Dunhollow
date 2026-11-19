@@ -9964,6 +9964,7 @@ function speechBubble(x,bottom,text,a=1){ if(a<=0) return;
   g.beginPath(); g.moveTo(x-5,bottom-0.5); g.lineTo(x,bottom+7); g.lineTo(x+4,bottom-0.5); g.fill();
   g.fillStyle='#3a2a18'; g.textAlign='center'; g.textBaseline='middle'; lines.forEach((l,k)=>g.fillText(l,bx,top+4.5+lh*(k+0.5)));
   g.restore(); }
+const DANCE_FIG=new Map();
 function drawNPCBody(n){
   const P0=P(n.x??n.i+0.5,n.y??n.j+0.5), x=P0.x, y=P0.y-(n.moving?Math.abs(Math.sin(gt*9+n.i))*2:0), sw=n.moving?Math.sin(gt*9+n.i)*5:0;
   if(n.bathe){ const sink=56+Math.sin(gt*1.4+n.i)*0.8;          // shoulder-deep: everything below the waterline is hidden
@@ -9978,6 +9979,9 @@ function drawNPCBody(n){
   if(n.dryad) drawDryad(n,x,y,sw);
   else if(n.sit) drawCachedFigure(x,y,()=>drawSitting(g,x,y,n.opts,n.dir||0,n.sit),'s:'+n.id,(n.dir||0)+'|'+n.sit+'|'+litSig(n.opts));
   else if(n.opts.ghost){ g.save(); g.globalAlpha=0.5+Math.sin(gt*2.2)*0.08; glow(x,y-50,40,70,'170,210,255',0.25); drawChar(g,x,y-2+Math.sin(gt*1.5)*2,n.opts,0,n.dir||0); g.restore(); }
+  else if(n.dance!=null){ const sq=Math.round(sw/2.5)*2.5, k=n.id+'|'+(n.dir||0)+'|'+sq; let cv=DANCE_FIG.get(k);   // dancers: a handful of frames per facing, painted once and reused
+    if(!cv){ if(DANCE_FIG.size>240) DANCE_FIG.clear(); cv=document.createElement('canvas'); cv.width=260; cv.height=330; const cx=cv.getContext('2d'); cx.setTransform(2,0,0,2,130,292); const sg=g; g=cx; try{ drawChar(cx,0,0,n.opts,sq,n.dir||0,NPC_POSE(n)); } finally{ g=sg; } DANCE_FIG.set(k,cv); }
+    g.drawImage(cv,x-65,y-146,130,165); }   // dancers: a few cached frames per facing, not a fresh lighting pass every frame
   else if(!LOW_FX && !n.wander && typeof drawLitSprite==='function'){ const ps=n.moving?NPC_POSE(n):litPose(NPC_POSE(n)); drawLitSprite(x,y,()=>drawChar(g,x,y,n.opts,sw,n.dir||0,ps),1,n.moving?null:'n:'+n.id,(n.dir||0)+'|'+Math.round(sw*4)+'|'+litSig(ps)+'|'+litSig(n.opts)); }
   else if(n.moving) drawChar(g,x,y,n.opts,sw,n.dir||0,NPC_POSE(n));                // walking: a new frame every time anyway
   else { const ps=litPose(NPC_POSE(n)); drawCachedFigure(x,y,()=>drawChar(g,x,y,n.opts,sw,n.dir||0,ps),'r:'+n.id,(n.dir||0)+'|'+Math.round(sw*4)+'|'+litSig(ps)+'|'+litSig(n.opts)); }
@@ -21441,12 +21445,14 @@ OBJ_DRAW.bunting=o=>{ const a=P(o.a[0],o.a[1]), b=P(o.b[0],o.b[1]), h=o.h||90, N
 wrap('wheatsheaf','objects',l=> harvestEve() ? [...l,{type:'bunting', i:0, j:0, a:[0.2,0.2], b:[6.8,0.2], h:96, noblock:true},{type:'bunting', i:0, j:0, a:[0.2,0.2], b:[0.2,5.6], h:96, noblock:true}] : l);
 wrap('village','objects',l=> harvestEve() ? [...l,{type:'bunting', i:5, j:4, a:[3.5,4.6], b:[9.2,4.2], h:110, noblock:true},{type:'lantern', i:4, j:4},{type:'lantern', i:9, j:5}] : l);
 const FEAST_FOLK=(id,nm,F,s)=>({ id, name:nm, i:4, j:4, dir:1, opts:{gender:F?'f':'m', skin:s%5, hair:(s*3)%6, hairColor:(s*5)%14, beard:F?0:(s%4), face:s%3, equip:{head:null, torso:F?'smock':'tunic_linen', armor:null, hands:null, legs:F?'trousers':'breeches', feet:'boots', weapon:null, offhand:null}} });
-wrap('wheatsheaf','npcs',l=> harvestEve() && nightAmt()>0.3 ? [...l, {...FEAST_FOLK('dancer1','A Dancer',true,3), dance:0}, {...FEAST_FOLK('dancer2','A Dancer',false,7), dance:Math.PI}] : l);
+const DANCE_AT=[[2.7,5.0],[4.9,1.0]];   // two rings on the open floor, clear of the walk to the bar (dancers never block a tile: you can slip through)
+wrap('wheatsheaf','npcs',l=> harvestEve() && nightAmt()>0.3 ? [...l, {...FEAST_FOLK('dancer1','A Dancer',true,3), dance:0, ring:0, noblock:true}, {...FEAST_FOLK('dancer2','A Dancer',false,7), dance:Math.PI, ring:0, noblock:true},
+  {...FEAST_FOLK('dancer3','A Dancer',true,11), dance:0.6, ring:1, noblock:true}, {...FEAST_FOLK('dancer4','A Dancer',false,13), dance:0.6+Math.PI, ring:1, noblock:true}] : l);
 wrap('docks','npcs',l=> shipDay() ? [...l, {...FEAST_FOLK('sailor1','A Sailor',false,2), haul:0}, {...FEAST_FOLK('sailor2','A Sailor',false,9), haul:0.5}, ...townsfolk(77,4,[[3,8],[6,8],[9,8],[10,6],[4,7]])] : l);
-Object.assign(TALKERS,{ dancer1:()=>say('A Dancer',"“Harvest-eve! Grab a hand, any hand. Not that one, that's Gunnar's.”",[bye]), dancer2:()=>say('A Dancer',"“One more reel and I'll fall down. Then another.”",[bye]),
+Object.assign(TALKERS,{ dancer1:()=>say('A Dancer',"“Harvest-eve! Grab a hand, any hand. Not that one, that's Gunnar's.”",[bye]), dancer2:()=>say('A Dancer',"“One more reel and I'll fall down. Then another.”",[bye]), dancer3:()=>say('A Dancer',"“Pip's playing it too fast on purpose. He does it every year.”",[bye]), dancer4:()=>say('A Dancer',"“Mind the left foot. I've only got the one that knows the steps.”",[bye]),
   sailor1:()=>say('A Sailor',"“Mind your toes. Spring ship waits for nobody, and the tide waits for her.”",[bye]), sailor2:()=>say('A Sailor',"“Salt fish out, wool and Hollowmere ale in. Heavier going than coming.”",[bye]) });
 setInterval(()=>{ try{ if(!running) return; const t=performance.now()/1000;
-  NPCS.forEach(n=>{ if(n.dance!=null){ const a=t*1.8+n.dance, cx=4, cy=3.9; n.x=cx+Math.cos(a)*0.55; n.y=cy+Math.sin(a)*0.45; n.i=Math.floor(n.x); n.j=Math.floor(n.y); n.dir=dirFromDelta(-Math.sin(a),Math.cos(a)); n.moving=true; }
+  NPCS.forEach(n=>{ if(n.dance!=null){ const a=t*1.8+n.dance, [cx,cy]=DANCE_AT[n.ring||0]; n.x=cx+Math.cos(a)*0.42; n.y=cy+Math.sin(a)*0.34; n.i=Math.floor(n.x); n.j=Math.floor(n.y); n.dir=dirFromDelta(-Math.sin(a),Math.cos(a)); n.moving=true; }
     if(n.haul!=null){ const u=((t*0.07+n.haul)%1), out=u<0.5, k=out?u*2:(u-0.5)*2, e=k<0.5?2*k*k:1-Math.pow(-2*k+2,2)/2, A={x:4.6,y:6.2}, Bq={x:7.4,y:3.9};
       const f=out?A:Bq, to=out?Bq:A; n.x=f.x+(to.x-f.x)*e; n.y=f.y+(to.y-f.y)*e; n.i=Math.floor(n.x); n.j=Math.floor(n.y); n.dir=dirFromDelta(to.x-f.x,to.y-f.y); n.moving=k>0.02&&k<0.98; n.carry=out; } }); }catch(e){} },33);
 { const base=drawNPC; drawNPC=function(n){ const r=base(n); if(n.carry){ const q=P(n.x,n.y); g.save(); g.fillStyle='#8a6a3a'; g.strokeStyle='#4a3418'; g.lineWidth=1; g.fillRect(q.x-8,q.y-118,16,12); g.strokeRect(q.x-8,q.y-118,16,12); g.beginPath(); g.moveTo(q.x-8,q.y-112); g.lineTo(q.x+8,q.y-112); g.stroke(); g.restore(); } return r; }; }   // a crate on the shoulder

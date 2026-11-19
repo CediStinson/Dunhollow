@@ -6739,8 +6739,9 @@ function genTrees(id){
   OBJECTS.forEach(o=>{ if(o.type==='dapple' || (o.noblock && o.dz!=null && o.dz<-90 && o.type!=='brook')) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) mark(o.i+a,o.j+b,o.noblock?0:(o.fp||['teleporter','house','berrybush','barrel','barrels','crate','crates','chest','pickup','stash'].includes(o.type))?1:0); });   // nothing worth opening is ever grown shut in   // a berry bush keeps room round it to be picked   // flowers, stones, light: no ring kept clear round them
   NPCS.forEach(n=>mark(n.i,n.j,1)); MOB_SPAWNS.forEach(m=>mark(m.i,m.j,1));
   Object.values(A.entries).forEach(e=>mark(e.i,e.j,1));
+  const busyNow=busy; const busy0=new Set(); Object.values(A.entries).forEach(e=>{ for(let a=-1;a<=1;a++) for(let b=-1;b<=1;b++) busy0.add((e.i+a)+','+(e.j+b)); });   // the grove is laid out the same every visit, whoever is about; only then are the trees standing on someone (or something) left out
   for(let j=0;j<A.h;j++) for(let i=0;i<A.w;i++){
-    if(busy.has(i+','+j) || inNotch(i,j)) continue;
+    if(busy0.has(i+','+j) || inNotch(i,j)) continue;
     const G=groundAt(i+0.5,j+0.5); if(G.path>0.08 || G.d<(A.theme==='village'||A.theme==='farm'||A.theme==='city'?1.4:1.2)) continue;
     const edge = Math.min(i,j,A.w-1-i,A.h-1-j);
     const open=A.theme==='village'||A.theme==='farm';
@@ -6758,7 +6759,7 @@ function genTrees(id){
     }
   }
   areaId=saveArea;
-  return keep;
+  return keep.filter(t=>!busyNow.has(t.i+','+t.j));
 }
 const TREE_COLS = {
   oak:  [['#8cb24e','#4e7a2a','#1c3012'],['#9aba58','#587c2c','#223414'],['#7aa244','#446e26','#182a10']],
@@ -10220,7 +10221,7 @@ function walkTo(ti,tj){
 
 // ── update / draw
 function update(dt){
-  if(TEACH_OPEN) dt*=0.12;                          // a teaching card is open: the world runs slow while you read
+  if(TEACH_OPEN && TEACH_SLOW) dt*=0.12;                          // a teaching card is open: the world runs slow while you read
   if(player.sitChair && (player.path.length || combat.active || !OBJECTS.includes(player.sitChair))) player.sitChair=null;     // up again the moment you go anywhere
   const leaving=NPCS.filter(n=>n.route && n.vanish);
   const talkN=TALK_NPC, hold=talkN && RT_HOLD()===talkN && NPCS.includes(talkN);      // whoever you are talking to stands still
@@ -19465,6 +19466,7 @@ function gearShell(opts,swing,dir,pose){ const pk=pose?pose.kind+':'+Math.round(
 let TEACH_OPEN=false; const TEACH_Q=[];
 function teach(key,title,lines){ CHOICE.taught=CHOICE.taught||{}; if(CHOICE.taught[key]) return; CHOICE.taught[key]=true;
   if(TEACH_OPEN){ TEACH_Q.push([title,lines]); return; } showTeach(title,lines); }
+var TEACH_SLOW=false;
 function showTeach(title,lines){ let el=document.getElementById('teach-card');
   if(!el){ el=document.createElement('div'); el.id='teach-card'; el.style.cssText='position:fixed;bottom:16px;left:16px;z-index:60;max-width:min(318px,calc(100vw - 32px));padding:14px 18px 12px;background:linear-gradient(#22180c,#140e06);border:1px solid #9a7a32;border-radius:9px;box-shadow:0 10px 36px rgba(0,0,0,0.7);color:#f0e4c8;font:14px/1.45 Georgia,serif;';
     document.body.appendChild(el); }
@@ -19472,7 +19474,7 @@ function showTeach(title,lines){ let el=document.getElementById('teach-card');
     `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:9px"><small style="color:#a89878">Time is slowed while you read.</small><button id="teach-ok" style="background:#3a2a12;border:1px solid #9a7a32;color:#f0d890;border-radius:5px;padding:6px 16px;font:bold 13px Georgia,serif;cursor:pointer">Got it</button></div>`;
   el.style.display='block'; TEACH_OPEN=true;
   const close=()=>{ if(!TEACH_OPEN) return; TEACH_OPEN=false; el.style.display='none'; clearTimeout(close.t); const n=TEACH_Q.shift(); if(n) setTimeout(()=>showTeach(n[0],n[1]),400); };
-  el.querySelector('#teach-ok').onclick=e=>{ e.stopPropagation(); close(); }; close.t=setTimeout(close,16000); showTeach.close=close; }
+  el.querySelector('#teach-ok').onclick=e=>{ e.stopPropagation(); close(); }; TEACH_SLOW=true; close.t=setTimeout(()=>{ TEACH_SLOW=false; const sm=el.querySelector('small'); if(sm) sm.textContent='Close it when you are done.'; },16000); showTeach.close=close; }   // it stays until you close it; the world only waits for you the first while
 document.addEventListener('keydown',e=>{ if(TEACH_OPEN && e.key==='Enter' && showTeach.close){ e.preventDefault(); showTeach.close(); } });
 // ── the first fight (on the farm, for most) ──
 // ── the Barrow-King ──

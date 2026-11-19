@@ -12578,15 +12578,21 @@ AREA_PATHS.ruin=[ [[8.5,3.5],[6,3.4],[4.6,4.4]] ];
 
 // ── the trapped scout ──
 function faelanTalk(){
-  if(mobs.some(m=>m.hostile && !m.dead)){ say('Faelan',"“Behind you! The wolves first, then the trap!”",[bye]); return; }
+  const live=mobs.filter(m=>m.hostile && !m.dead);
+  if(live.length && !CHOICE.faelanAmbush && areaId==='mistmere'){ CHOICE.faelanAmbush=1;   // the wolves have smelt his blood: they come out of the wood at the bottom of the mere while you speak
+    say('Faelan',["“Wait. Listen.” <i>A howl, close, from the trees to the south.</i> “They have smelt the blood. Behind you!”"],[{label:'Turn and face them.', fn:()=>{ closeDialog();
+      const edge=[[9,13],[12,13],[7,13]]; live.forEach((m,k)=>{ const [ei,ej]=edge[k%edge.length]; m.i=ei; m.j=ej; if(m.x!=null){ m.x=ei+0.5; m.y=ej+0.5; } m.ambush=true; });
+      const step=setInterval(()=>{ try{ if(areaId!=='mistmere' || combat.active || !live.some(m=>!m.dead)){ clearInterval(step); return; }
+        live.forEach(m=>{ if(m.dead) return; const p=findPath(m.i,m.j,player.i,player.j); if(p && p.length>1){ const [ni,nj]=p[0]; m.dir=dirFromDelta(ni-m.i,nj-m.j); m.i=ni; m.j=nj; if(m.x!=null){ m.x=ni+0.5; m.y=nj+0.5; } m.moving=true; } }); }catch(e){ clearInterval(step); } },260); }}]); return; }
+  if(live.length){ say('Faelan',"“Behind you! The wolves first, then the trap!”",[bye]); return; }
   const kin = player.opts.race==='elf';
   say('Faelan',["“Don't come closer yet. The Baron's trap: see his mark on the jaws.”",
     kin ? "“Kinsman? Here, among the axes? Then the stars have not forgotten me after all.”" : "“A human. Have you come to finish what the trap started, or to open it?”"],[
     {label:'Pry the jaws open.', fn:()=>{ remember('faelan','freed','You freed Faelan from the Baron\'s trap.'); player.hp=Math.max(1,player.hp-4); giveQuestItem('leaf',true); updateHud();
-      say('Faelan',"“Ah! …There. Free. You are bleeding for me. Take this leaf, and show it at the Silver Gate, north of the mere. They will know you as Faelan's friend.” <i>You receive Faelan's Leaf.</i>",[{label:'Farewell.',fn:()=>{ closeDialog(); switchArea('mistmere','fromGate'); }}]); }},
+      say('Faelan',"“Ah! …There. Free. You are bleeding for me. Take this leaf, and show it at the Silver Gate, north of the mere. They will know you as Faelan's friend.” <i>You receive Faelan's Leaf.</i>",[{label:'Farewell.',fn:()=>{ closeDialog(); const f=NPCS.find(n=>n.id==='faelan'); if(f){ f.name='Faelan'; goOff(f,11,1,{speed:1.1, delay:0.6, done:()=>{ const k=NPCS.indexOf(f); if(k>=0) NPCS.splice(k,1); }}); logMsg('Faelan limps away north, toward the Silver Gate, without looking back.','#a8c8a0'); } }}]); }},   // he goes; you stay
     {label:'Take his fine blade. He will not need it.', fn:()=>{ remember('faelan','robbed','You robbed a trapped elf and left him in the reeds.'); giveQuestItem('elf_blade',true); updateHud();
-      say('Faelan',"“Go, then. I will remember your face.” <i>You take the Elven Blade.</i>",[{label:'Leave.',fn:()=>{ closeDialog(); switchArea('mistmere','fromGate'); }}]); }},
-    {label:'“Someone else will come along.”', fn:()=>{ remember('faelan','left','You left Faelan in the trap.'); say('Faelan',"“Someone did, and then they left.”",[{label:'Leave.',fn:()=>{ closeDialog(); switchArea('mistmere','fromGate'); }}]); }},
+      say('Faelan',"“Go, then. I will remember your face.” <i>You take the Elven Blade.</i>",[{label:'Leave.',fn:()=>closeDialog()}]); }},
+    {label:'“Someone else will come along.”', fn:()=>{ remember('faelan','left','You left Faelan in the trap.'); say('Faelan',"“Someone did, and then they left.”",[{label:'Leave.',fn:()=>closeDialog()}]); }},
   ]);
 }
 // ── the Silver Gate ──

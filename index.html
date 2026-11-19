@@ -5397,17 +5397,6 @@ function beardBraid(c,x,y,len,hair){ const n=Math.round(len/2.3);       // a pla
     c.strokeStyle=tone(hair,-0.45,0.45); c.lineWidth=0.35; c.beginPath(); c.ellipse(x+sd*0.55*w,yy+1.3,w*0.95,1.55,sd*0.65,Math.PI*0.1,Math.PI*0.9); c.stroke(); }
   { const yy=y+len*0.72; c.fillStyle='#b8943a'; c.beginPath(); c.roundRect(x-1.9,yy,3.8,1.9,0.6); c.fill(); c.fillStyle='rgba(255,240,190,0.55)'; c.fillRect(x-1.6,yy+0.25,3.2,0.45); }
   c.strokeStyle=tone(hair,0.02); c.lineWidth=0.7; c.lineCap='round'; for(let k=-1;k<=1;k++){ c.beginPath(); c.moveTo(x+k*0.5,y+len); c.quadraticCurveTo(x+k*1.2,y+len+2,x+k*0.9+0.3,y+len+3.6); c.stroke(); } }
-// a long beard's outline: soft, lumpy edges that taper into a few locks (pts: left edge top→bottom; mirrored)
-function beardMass(c,cx,y0,w0,L,locks,sway){ const P2=[]; const N=8;
-  for(let k=0;k<=N;k++){ const t=k/N, w=w0*(1-0.5*Math.pow(t,1.4)), wob=Math.sin(k*2.1+sway)*0.7*(0.3+t); P2.push([cx-w+wob,y0+L*t*0.9]); }
-  c.beginPath(); c.moveTo(P2[0][0],P2[0][1]); P2.forEach(([a,b])=>c.lineTo(a,b));
-  const wb=w0*0.5; for(let k=0;k<locks;k++){ const lx=cx-wb+wb*2*(k+0.5)/locks, nx=cx-wb+wb*2*(k+1)/locks; c.quadraticCurveTo(lx-1,y0+L*0.95+1,lx+Math.sin(k+sway)*0.8,y0+L+(k===Math.floor(locks/2)?2.5:0.5)); c.quadraticCurveTo(lx+1,y0+L*0.95,nx,y0+L*0.88); }
-  for(let k=N;k>=0;k--){ const t=k/N, w=w0*(1-0.5*Math.pow(t,1.4)), wob=Math.sin(k*1.7+sway+1)*0.7*(0.3+t); c.lineTo(cx+w+wob,y0+L*t*0.9); }
-  c.closePath(); }
-function beardStrands(c,cx,y0,w0,L,hair){ c.lineCap='round';
-  for(let k=-5;k<=5;k++){ const u=k/5, x0=cx+u*w0*0.85, sw=Math.sin(k*1.9)*1.6;
-    c.strokeStyle=k%2?'rgba(20,10,4,0.28)':'rgba(255,240,210,0.13)'; c.lineWidth=k%2?0.55:0.45;
-    c.beginPath(); c.moveTo(x0,y0); c.bezierCurveTo(x0+sw,y0+L*0.3,x0-sw,y0+L*0.6,cx+u*w0*0.4+sw*0.5,y0+L*(0.85+0.1*Math.cos(k))); c.stroke(); } }
 function drawBeardProfile(c,x,B,style,hair,hairDark,P,pr,LN){
   const Y=BODY, HWp=P.headHW, jw=P.jawHW*(1-pr*0.12);
   const yJaw=Y.CHIN-4, yTop=Y.SKULL_TOP+7;
@@ -5960,29 +5949,7 @@ function dressedEquip(){ return charOpts.race==='elf' ? {...NUDE_EQUIP, ...ELF_S
 function creatorEquip(){ return creatorClothed ? dressedEquip() : {...NUDE_EQUIP}; }
 function drawCreator(){ drawLitFigure(cc, {...charOpts, equip:creatorEquip()}, creatorDir,44,5.0,CREATOR_FIG); }
 
-function drawHairPreview(ctx,style,w,h){
-  ctx.clearRect(0,0,w,h);
-  ctx.save();
-  ctx.translate(w/2,h/2+2);
-  ctx.scale(1.35,1.35);
-  drawHead(ctx,0,80,{...charOpts,hair:style});
-  ctx.restore();
-}
 
-function drawFacePreview(ctx,face,w,h){
-  ctx.clearRect(0,0,w,h);
-  ctx.save(); ctx.translate(w/2,h/2); ctx.scale(2.6,2.6); ctx.translate(0,77+79.5);
-  drawHead(ctx,0,-79.5,{...charOpts,face});
-  ctx.restore();
-}
-function drawBeardPreview(ctx,style,w,h){
-  ctx.clearRect(0,0,w,h);
-  ctx.save();
-  ctx.translate(w/2,h/2-6);
-  ctx.scale(1.35,1.35);
-  drawHead(ctx,0,80,{...charOpts,gender:'m',beard:style});
-  ctx.restore();
-}
 
 // [key, label, elves only, value]: chips with a value pick one style for that key (click again to remove)
 // [key, label, elves only, value, group]: group 'face' goes under Face Details, the rest under Tattoos & Markings.
@@ -6165,8 +6132,6 @@ let OBJECTS=[], NOTCHES=[], MOB_SPAWNS=[], DUMMY_SPAWN=null, areaId='farm';
 const visitedAreas={};
 const inNotch = (i,j) => NOTCHES.some(n=>i>=n.i0 && i<n.i0+(n.w||3) && j>=n.j0 && j<n.j0+(n.h||3));
 const notchAt = (i,j) => NOTCHES.find(n=>i>=n.i0 && i<n.i0+(n.w||3) && j>=n.j0 && j<n.j0+(n.h||3));
-// the one opening in each field's fence: the middle of its inner side, facing the yard
-function gateOf(n){ const G=fieldGate(n); return [G.inn,G.out]; }   // where the fence leaves its gap
 // each field's gate: a gap in one of its drawn fences that opens onto ground you can stand on (the usual spot, one in from the end of the side facing the yard, when that works)
 function fieldGate(n){ const key=areaId+':'+blocked.size; if(n._gate && n._gateKey===key) return n._gate; const i0=n.i0, j0=n.j0, i1=i0+(n.w||3), j1=j0+(n.h||3), vi=i0===0?i1:i0, hj=j0===0?j1:j0, both=j0>0 && j1<ROOM.h;
   const ok=(i,j)=>i>=0&&j>=0&&i<ROOM.w&&j<ROOM.h && (typeof walkable!=='function' || walkable(i,j)) && !blocked.has(i+','+j);
@@ -6484,55 +6449,6 @@ function vor(x,y,sd){ const cx=Math.floor(x), cy=Math.floor(y); let d1=9, d2=9, 
     if(d<d1){ d2=d1; d1=d; id=h; } else if(d<d2) d2=d; }
   return [d1,d2,id]; }
 
-// ── forest edge behind a low wooden fence, only along the two back edges
-function drawWalls(){
-  const {w,h}=ROOM, t=WALL_T, H=WALL_H, fenceH=34;
-  const o=P(0,0), rEnd=P(w,0), lEnd=P(0,h);
-
-  // dense canopy filling the full height, behind the fence
-  poly([o,rEnd,up(rEnd,H),up(o,H)],'#233c1a');
-  poly([o,lEnd,up(lEnd,H),up(o,H)],'#1a2e13');
-
-  // overlapping treetop blobs along the top edge, two layers for depth
-  const canopy=(axis,len,c1,c2)=>{
-    for(let u=0.5; u<len; u+=1.1){
-      const p = axis==='r' ? P(u,0) : P(0,u);
-      const cy = H - 6 + Math.sin(u*2.3+ (axis==='r'?0:1.5))*6;
-      g.fillStyle=c2; g.beginPath(); g.arc(p.x, p.y-cy-5, 13, 0, Math.PI*2); g.fill();
-      g.fillStyle=c1; g.beginPath(); g.arc(p.x, p.y-cy, 15, 0, Math.PI*2); g.fill();
-    }
-  };
-  canopy('r', w, '#2f4d22','#1d3016');
-  canopy('l', h, '#26401c','#162710');
-  // a few lighter leaf highlights, upper-left key light
-  g.fillStyle='rgba(140,180,90,0.14)';
-  for(let u=1; u<w; u+=2.3){ const p=P(u,0); g.beginPath(); g.arc(p.x-4,p.y-H+4,6,0,Math.PI*2); g.fill(); }
-  for(let u=1; u<h; u+=2.3){ const p=P(0,u); g.beginPath(); g.arc(p.x-4,p.y-H+4,6,0,Math.PI*2); g.fill(); }
-
-  // low wooden picket fence in front of the trees
-  const postColor='#4a3418', railColor='#6a4c28';
-  const posts=(axis,len)=>{
-    for(let u=0; u<=len+0.01; u+=1){
-      const p = axis==='r' ? P(u,0) : P(0,u);
-      g.fillStyle=postColor; g.fillRect(p.x-1.6, p.y-fenceH, 3.2, fenceH);
-      g.fillStyle=tone(postColor,0.16); g.fillRect(p.x-1.6, p.y-fenceH, 1.1, fenceH);
-    }
-  };
-  posts('r', w); posts('l', h);
-  g.strokeStyle=railColor; g.lineWidth=3.4;
-  line(up(o,fenceH*0.62), up(rEnd,fenceH*0.62)); line(up(o,fenceH*0.62), up(lEnd,fenceH*0.62));
-  line(up(o,fenceH*0.95), up(rEnd,fenceH*0.95)); line(up(o,fenceH*0.95), up(lEnd,fenceH*0.95));
-
-  // wall thickness end faces + top caps, forest-toned (kept for iso consistency)
-  poly([rEnd,P(w,-t),up(P(w,-t),H),up(rEnd,H)],'#152510');
-  poly([lEnd,P(-t,h),up(P(-t,h),H),up(lEnd,H)],'#101d0c');
-  const cap='#2c4a20';
-  poly([up(o,H),up(rEnd,H),up(P(w,-t),H),up(P(0,-t),H)],cap);
-  poly([up(o,H),up(lEnd,H),up(P(-t,h),H),up(P(-t,0),H)],cap);
-  poly([up(o,H),up(P(0,-t),H),up(P(-t,-t),H),up(P(-t,0),H)],cap);
-
-  WALL_TORCHES.filter(torchHere).forEach(drawWallTorch);
-}
 
 function drawWallTorch(tc){
   const base = tc.side==='r' ? up(P(tc.u,0),30) : up(P(0,tc.u),30);
@@ -6545,64 +6461,6 @@ function drawWallTorch(tc){
   g.beginPath(); g.moveTo(base.x,base.y-20+fl); g.quadraticCurveTo(base.x+3.5,base.y-13,base.x,base.y-9); g.quadraticCurveTo(base.x-3.5,base.y-13,base.x,base.y-20+fl); g.fill();
 }
 
-// ── farmland floor: grass with patches of tilled dirt, front slab edge
-function drawFloor(){
-  const {w,h}=ROOM, dn=(p,d)=>({x:p.x,y:p.y+d});
-  poly([P(w,0),P(w,h),dn(P(w,h),12),dn(P(w,0),12)],'#3a3018');
-  poly([P(0,h),P(w,h),dn(P(w,h),12),dn(P(0,h),12)],'#2e2712');
-
-  const grassBase=['#5e7a34','#6a8a3c','#547030'], mudBase=['#6a4f2c','#5e4526','#755530'];
-  const roadBase=['#6e5c3c','#645032','#5a4830'];
-  const isRoad = AREAS[areaId].theme==='road' || AREAS[areaId].theme==='crossroads';
-  for(let j=0;j<h;j++) for(let i=0;i<w;i++){
-    if(inNotch(i,j)) continue;                              // wheat grows here instead
-    if(isRoad){                                             // the forest road / crossroads clearing
-      const isX = AREAS[areaId].theme==='crossroads';
-      const onPath = !isX || Math.abs(i-w/2)<1.6 || Math.abs(j-h/2)<1.6;   // the crossing paths, at a crossroads
-      const base = isX && !onPath
-        ? ['#5e7a34','#6a8a3c','#547030'][(i+j+hsh(i,j))%3]                // grass off the paths
-        : roadBase[(i+j+hsh(i,j))%3];
-      poly([P(i,j),P(i+1,j),P(i+1,j+1),P(i,j+1)], base);
-      if(!isX || onPath) for(let k=0;k<2;k++){
-        const bx=0.2+(hsh(i*4+k,j*4)%60)/100, by=0.2+(hsh(i*4,j*4+k)%60)/100;
-        const p=P(i+bx,j+by), r=1.8+(hsh(i+k,j+k)%3);
-        g.fillStyle='rgba(30,22,10,0.22)'; g.beginPath(); g.ellipse(p.x,p.y+1,r*1.5,r*0.6,0,0,Math.PI*2); g.fill();
-      }
-      g.strokeStyle='rgba(15,18,8,0.14)'; g.lineWidth=1;
-      g.beginPath(); const a2=P(i,j),b2=P(i+1,j),c2=P(i+1,j+1),d2=P(i,j+1);
-      g.moveTo(a2.x,a2.y); g.lineTo(b2.x,b2.y); g.lineTo(c2.x,c2.y); g.lineTo(d2.x,d2.y); g.closePath(); g.stroke();
-      continue;
-    }
-    const isDirt = hsh(i,j)%10<3;                          // scattered tilled patches
-    const base = isDirt ? mudBase[(i+j+hsh(i,j))%3] : grassBase[(i+j+hsh(i,j))%3];
-    poly([P(i,j),P(i+1,j),P(i+1,j+1),P(i,j+1)], base);
-    if(isDirt){
-      // a few darker mud blotches, and sometimes a faint wet sheen
-      for(let k=0;k<3;k++){
-        const bx=0.15+(hsh(i*4+k,j*4)%70)/100, by=0.15+(hsh(i*4,j*4+k)%70)/100;
-        const p=P(i+bx,j+by), r=2.2+(hsh(i+k,j+k)%3);
-        g.fillStyle = k%2 ? 'rgba(40,28,14,0.35)' : 'rgba(90,65,35,0.28)';
-        g.beginPath(); g.ellipse(p.x,p.y+1.5,r*1.6,r*0.7,0,0,Math.PI*2); g.fill();
-      }
-      if(hsh(i,j)%3===0){
-        const p=P(i+0.5,j+0.5);
-        g.fillStyle='rgba(170,200,215,0.12)';
-        g.beginPath(); g.ellipse(p.x,p.y+1,5,2.1,0,0,Math.PI*2); g.fill();
-      }
-    } else {
-      // little tufts of grass blades, leaning slightly, a few per tile
-      for(let k=0;k<5;k++){
-        const tx=0.08+(hsh(i*6+k,j*3)%80)/100, ty=0.08+(hsh(i*3,j*6+k)%80)/100;
-        const p=P(i+tx,j+ty), bh=2.2+(hsh(i+k*2,j+k)%3)*0.6, lean=((hsh(i*2+k,j*2)%5)-2)*0.5;
-        g.strokeStyle = (hsh(i+k,j+k)%2) ? '#8aa850' : '#6a8a3c'; g.lineWidth=0.8;
-        for(let b=-1;b<=1;b++){ g.beginPath(); g.moveTo(p.x+b*1.1,p.y+1.4); g.lineTo(p.x+b*1.1+lean,p.y-bh); g.stroke(); }
-      }
-    }
-    g.strokeStyle='rgba(20,25,10,0.10)'; g.lineWidth=1;
-    g.beginPath(); const a=P(i,j),b=P(i+1,j),c=P(i+1,j+1),d=P(i,j+1);
-    g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c.x,c.y); g.lineTo(d.x,d.y); g.closePath(); g.stroke();
-  }
-}
 
 // the forest floor filling the carved-out corner, with undergrowth and a rock for closure
 // a field is thousands of strokes: draw it into its own canvas ten times a second (the sway is slow) and stamp that
@@ -6800,10 +6658,6 @@ function paintBirch(x,y,s,col){
     g.fillStyle=cg; g.beginPath(); g.arc(cx2,cy2,rr,0,Math.PI*2); g.fill(); });
   for(let k=0;k<26;k++){ const a=rnd01(k,Math.round(y),98)*Math.PI*2, d=rnd01(k,Math.round(x),99)*20*s;
     g.fillStyle=`rgba(230,240,150,${0.25+rnd01(k,4,100)*0.3})`; g.beginPath(); g.ellipse(x+Math.cos(a)*d-3*s,cy+Math.sin(a)*d*0.8-3*s,1.4*s,0.9*s,a,0,Math.PI*2); g.fill(); }
-}
-function paintOak(x,y,s,col){
-  // reuse the big leafy tree, recoloured
-  const sv=paintTree; paintTreeCol(x,y,s,col);
 }
 function paintTreeCol(x,y,s,col,bark){
   g.save();
@@ -7441,40 +7295,6 @@ function paintTent(x,y,burnt){
   g.strokeStyle='#5a4a30'; g.lineWidth=1.4; g.beginPath(); g.moveTo(R0.x,R0.y); g.lineTo(R1.x,R1.y); g.stroke();
 }
 // A desert tent in the Bedouin way: long and low, a roof of dark woven goat-hair with pale stripes, lifted on a row of poles so it rises and sags,
-// open along its front over rugs, a striped wall at the end, guy-ropes run far out. 2x2 footprint, anchor = its far-front corner (as paintTent)
-function paintBedouin(x,y,v=0){
-  const T=TW/2, H2=TH/2, pt=(gi,gj,h=0)=>({x:x+(gi-gj)*T, y:y+(gi+gj)*H2-h}), poly=(pts,f)=>{ g.fillStyle=f; g.beginPath(); g.moveTo(pts[0].x,pts[0].y); pts.slice(1).forEach(p=>g.lineTo(p.x,p.y)); g.closePath(); g.fill(); };
-  const a=-2.1, b=0.05, jb=-1.95, jf=-0.25, jr=-1.05, N=24, ridgeH=t=>52+10*Math.abs(Math.cos(t*Math.PI*2)), frontH=t=>44-6*Math.abs(Math.sin(t*Math.PI*2)), backH=t=>22-3*Math.abs(Math.sin(t*Math.PI*2));   // three poles: peaks over them, sags between
-  const ROOF='#2e2620', STRIPE=['#9a8a68','#b08a5a','#8a7a70'][v%3], RUG=['#8a2a22','#2e4a6a','#7a5a22'][v%3];
-  g.fillStyle='rgba(10,6,2,0.32)'; { const c0=pt((a+b)/2,(jb+jf)/2); g.beginPath(); g.ellipse(c0.x+8,c0.y+6,150,56,0,0,Math.PI*2); g.fill(); }
-  const I=k=>a+(b-a)*k/N, t=k=>k/N;
-  // inside, seen through the open front: shade, a rug, a cushion and a pot
-  const inner=[...Array(N+1)].map((_,k)=>pt(I(k),jf,frontH(t(k)))), floorF=[...Array(N+1)].map((_,k)=>pt(I(k),jf));
-  poly([...inner,...floorF.slice().reverse()],'#1a120c');
-  poly([pt(a+0.35,jf-0.15),pt(b-0.4,jf-0.15),pt(b-0.4,jb+0.35),pt(a+0.35,jb+0.35)],RUG); g.strokeStyle='rgba(240,210,150,0.35)'; g.lineWidth=1; g.beginPath(); [pt(a+0.45,jf-0.2),pt(b-0.5,jf-0.2)].forEach((p,k)=>k?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.stroke();
-  { const c1=pt(a+0.9,jb+0.6,4); g.fillStyle='#a07a3a'; g.beginPath(); g.ellipse(c1.x,c1.y,12,6,0,0,Math.PI*2); g.fill(); const c2=pt(b-0.7,jb+0.55,6); g.fillStyle='#6a4a2a'; g.beginPath(); g.ellipse(c2.x,c2.y,6,7,0,0,Math.PI*2); g.fill(); }
-  // the end wall, striped, from the ground up to the roof
-  { const E=[pt(b,jf),pt(b,jf,frontH(1)),pt(b,jr,ridgeH(1)),pt(b,jb,backH(1)),pt(b,jb)]; poly(E,'#c8b48a'); g.save(); g.beginPath(); E.forEach((p,k)=>k?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); g.clip();
-    [['#7a3020',8],['#2e2620',16],['#a07a3a',24],['#2e2620',36]].forEach(([c0,hh])=>{ g.strokeStyle=c0; g.lineWidth=3.5; g.beginPath(); const p=pt(b,jf,hh), q=pt(b,jb,hh); g.moveTo(p.x,p.y); g.lineTo(q.x,q.y); g.stroke(); }); g.restore();
-    g.strokeStyle='rgba(30,20,12,0.7)'; g.lineWidth=0.9; g.beginPath(); E.forEach((p,k)=>k?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); g.stroke(); }
-  // the roof: front slope from the ridge down to the front edge, woven dark, its pale stripes running the length of it
-  const RD=[...Array(N+1)].map((_,k)=>pt(I(k),jr,ridgeH(t(k)))), FE=inner;
-  poly([...RD,...FE.slice().reverse()],ROOF);
-  { const lineAt=f=>[...Array(N+1)].map((_,k)=>{ const h=ridgeH(t(k))+(frontH(t(k))-ridgeH(t(k)))*f; return pt(I(k),jr+(jf-jr)*f,h); });
-    [[0.3,STRIPE,2.6],[0.38,STRIPE,1.2],[0.72,STRIPE,2.2]].forEach(([f,c0,w])=>{ g.strokeStyle=c0; g.globalAlpha=0.7; g.lineWidth=w; g.beginPath(); lineAt(f).forEach((p,k)=>k?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.stroke(); }); g.globalAlpha=1;
-    g.strokeStyle='rgba(255,240,210,0.07)'; g.lineWidth=0.6; for(let f=0.08;f<1;f+=0.11){ g.beginPath(); lineAt(f).forEach((p,k)=>k?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.stroke(); } }   // the weave
-  g.strokeStyle='#120c08'; g.lineWidth=0.9; g.beginPath(); [...RD,...FE.slice().reverse()].forEach((p,k)=>k?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); g.closePath(); g.stroke();
-  // a fringed valance along the front edge
-  g.fillStyle='#8a3a22'; g.beginPath(); FE.forEach((p,k)=>k?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y)); FE.slice().reverse().forEach(p=>g.lineTo(p.x,p.y+5)); g.closePath(); g.fill();
-  g.strokeStyle='#c89a4a'; g.lineWidth=0.8; FE.forEach((p,k)=>{ if(k%2) return; g.beginPath(); g.moveTo(p.x,p.y+5); g.lineTo(p.x,p.y+9); g.stroke(); });
-  // poles: along the front, and the tops of the middle ones through the ridge
-  [0,0.25,0.5,0.75,1].forEach(tt=>{ const tp=pt(a+(b-a)*tt,jf,frontH(tt)), bt=pt(a+(b-a)*tt,jf); g.strokeStyle='#4a3420'; g.lineWidth=2.2; g.beginPath(); g.moveTo(tp.x,tp.y); g.lineTo(bt.x,bt.y); g.stroke(); });
-  [0.25,0.5,0.75].forEach(tt=>{ const r0=pt(a+(b-a)*tt,jr,ridgeH(tt)); g.fillStyle='#4a3420'; g.fillRect(r0.x-1.2,r0.y-5,2.4,6); });
-  // guy-ropes, staked out well beyond the tent
-  g.strokeStyle='rgba(60,44,24,0.75)'; g.lineWidth=0.7;
-  [[0,jf,frontH(0),a-0.5,jf+0.7],[0.5,jf,frontH(0.5),(a+b)/2,jf+0.9],[1,jf,frontH(1),b+0.4,jf+0.7],[0.25,jr,ridgeH(0.25),a+(b-a)*0.25,jf+1.1],[0.75,jr,ridgeH(0.75),a+(b-a)*0.75,jf+1.1],[1,jr,ridgeH(1),b+0.9,jr]].forEach(([tt,jj,hh,si,sj])=>{
-    const p=pt(a+(b-a)*tt,jj,hh), q=pt(si,sj); g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(q.x,q.y); g.stroke(); g.fillStyle='#5a3a1c'; g.fillRect(q.x-1,q.y-4,2,5); });
-}
 // A round desert tent: a striped wall a head and more high, a doorway with its flap tied back, a tall cone of dark goat-hair over it, fringed at the eave, guy-ropes out to stakes.
 function paintRoundTent(x,y,v=0){
   const T=TW/2, H2=TH/2, pt=(gi,gj,h=0)=>({x:x+(gi-gj)*T, y:y+(gi+gj)*H2-h}), c0=pt(-1,-1), cx=c0.x, cy=c0.y, rx=88, ry=44, WH=100, AP=104;
@@ -10169,21 +9989,6 @@ function paintCottage(x,y,roof,door='r',N=3,dt=1){        // N: the footprint's 
   }
 }
 
-function drawCharacter(wx,wy,opts,name,moving,dir=0){
-  const {x,y}=P(wx,wy);
-  const bob = moving ? -Math.abs(Math.sin(gt*10))*2.5 : 0;
-  const swing = moving ? Math.sin(gt*10)*5 : 0;
-  const B=y+bob;
-  drawChar(g,x,B,opts,swing,dir);
-  if(romHush()) return;
-  g.font='500 11px "Segoe UI", system-ui, sans-serif';
-  const tw=g.measureText(name).width, ty=B-114;
-  g.fillStyle='rgba(12,8,3,0.78)';
-  g.beginPath(); g.roundRect(x-tw/2-7,ty,tw+14,16,4); g.fill();
-  g.fillStyle='#e8c878'; g.textAlign='center'; g.textBaseline='middle';
-  g.fillText(name,x,ty+8);
-  g.textAlign='left'; g.textBaseline='alphabetic';
-}
 
 // ── pathfinding (BFS, 8 directions, no corner cutting)
 function walkable(i,j){ return i>=0 && j>=0 && i<ROOM.w && j<ROOM.h && !blocked.has(i+','+j) && !mobAt(i,j); }
@@ -10676,23 +10481,6 @@ function paintGroundDetail(){
   }
 }
 
-// ── the cut earth along the two open front edges
-function paintEarthEdge(){
-  const {w,h}=ROOM, Hh=18;
-  const face=(a,b,shade)=>{
-    const gr=g.createLinearGradient(0,Math.min(a.y,b.y),0,Math.max(a.y,b.y)+Hh);
-    gr.addColorStop(0,tone('#5a4428',shade)); gr.addColorStop(0.35,tone('#3e2e1a',shade)); gr.addColorStop(1,tone('#1a130a',shade));
-    g.fillStyle=gr; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(b.x,b.y+Hh); g.lineTo(a.x,a.y+Hh); g.closePath(); g.fill();
-  };
-  face(P(w,0),P(w,h),0.02); face(P(0,h),P(w,h),-0.12);
-  // stones and roots poking out of the cut
-  const bits=(a,b,count)=>{ for(let k=0;k<count;k++){
-    const t=rnd01(k,count,20), x=lerpN(a.x,b.x,t), y=lerpN(a.y,b.y,t)+4+rnd01(k,1,21)*10;
-    if(k%3===0){ g.strokeStyle='rgba(60,40,22,0.8)'; g.lineWidth=1; g.beginPath(); g.moveTo(x,y-3); g.quadraticCurveTo(x+3,y+2,x+1,y+7); g.stroke(); }
-    else { g.fillStyle=['#5e5850','#4a453e','#6e675c'][k%3]; g.beginPath(); g.ellipse(x,y,2+rnd01(k,2,22)*2.5,1.5+rnd01(k,3,23)*1.5,0,0,Math.PI*2); g.fill(); }
-  }};
-  bits(P(w,0),P(w,h),h*5); bits(P(0,h),P(w,h),w*5);
-}
 
 // ── the forest wall behind the clearing: layered trees and a misty treeline
 // ── open country behind the village and the farm: rolling hills, a patchwork of fields and hedgerows, copses and lone trees, the forest only a dark line far off
@@ -11218,8 +11006,7 @@ function snapshot(slot){
   };
 }
 
-function loadGame(id){ const list=readSaves(); if(!list) return; const sv=list.find(e=>e.id===id); if(sv) applySave(sv); }
-function deleteSaveByName(n){ const list=readSaves(); if(!list) return; writeSaves(list.filter(e=>nameKey(e.name)!==nameKey(n))); renderSaves(); }
+function loadGame(id){ const list=readSaves(); if(!list) return; const sv=list.find(e=>e.id===id); if(sv) applySave(sv); }   // (used by tools/oldsave.js)
 function applySave(sv){
   fenMergeSave(sv);
   QUESTS_DONE=-1;
@@ -11269,12 +11056,6 @@ function applySave(sv){
   try{ pupNamesSync(); pupSync(); }catch(e){}
 }
 
-function deleteSave(id){
-  const list=readSaves();
-  if(!list) return;
-  writeSaves(list.filter(e=>e.id!==id && e!==list.find(x=>x.id===id)));
-  renderSaves();
-}
 
 function renderSaves(){
   const list=readSaves(), all=allSaves();
@@ -11334,8 +11115,6 @@ document.getElementById('import-file').addEventListener('change',e=>{ const f=e.
 const cloudMsg=t=>{ document.getElementById('cloud-msg').textContent=t; };
 async function cloud(body){ const r=await fetch('save.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const j=await r.json().catch(()=>({ok:false,err:'The server answered strangely.'})); return j; }
 let cloudChecked=false;
-async function checkCloud(){ if(cloudChecked || location.protocol==='file:') return; cloudChecked=true;
-  try{ const j=await cloud({action:'ping'}); if(j.ok){ document.getElementById('cloud-box').style.display='';  } }catch(e){} }
 const codeVal=(forSave)=>{ const v=forSave&&player.opts ? player.name : document.getElementById('cloud-code').value.trim(); return 'char:'+nameKey(v); };
 document.getElementById('cloud-save').addEventListener('click',async()=>{ if(!player.opts){ cloudMsg('Start a game first.'); return; } const code=codeVal(true);
   cloudMsg('Saving…'); try{ const j=await cloud({action:'save',code,data:snapshot()}); cloudMsg(j.ok?'Saved '+player.name+' on the server.':(j.err||'Saving failed.')); }catch(e){ cloudMsg('Could not reach the server.'); } });
@@ -11816,7 +11595,6 @@ function setAt(loc,id){ if(player.opts) delete player.opts._ck; if(loc.kind==='e
 // code just loses one loaf, and a loaf put into a free space joins a pile that has room.
 const STACK_MAX=10, NO_STACK=new Set();   // everything you eat or drink piles up, raw or cooked
 const stackable=id=>!!(id && ITEMS[id] && (ITEMS[id].slot==='food' && !NO_STACK.has(id) || ITEMS[id].currency || ITEMS[id].stack));   // food, currency, and a few gathered things (moonbells)
-const stackMax=id=>ITEMS[id] && ITEMS[id].currency ? 1e9 : (ITEMS[id] && ITEMS[id].stackMax) || STACK_MAX;          // Silver Leaves and Grave Tallies: one pile, as big as it likes
 let INV_RAW=false;
 function invN(){ if(!Array.isArray(CHOICE.invN)) CHOICE.invN=[]; return CHOICE.invN; }
 function stackAt(k){ const t=player.inv[k]; if(!stackable(t)) return t?1:0; return 1+Math.max(0,invN()[k]|0); }
@@ -12642,7 +12420,6 @@ const LING_DYE={   // '' is the black set; the others dye the leather and change
   brn: { SHIRT:'#efe4cc', LB:'#6e4628', LE:'#2a170a', LH:'#8e5e38', TOOL:'rgba(50,28,12,0.5)', STITCH:'rgba(222,196,152,0.65)', IR:'#6a5430', IL:'#c8a860', SV:'#e2cc88', CH2:'#a88a4a', BOSS:'#b8984e', BONE:'#ece0c4', SH:'rgba(204,154,104,0.58)', SHI:'rgba(196,146,98,0.72)', ED:'rgba(140,96,54,0.95)', STONE:'#d88a3a', word:'Tan', note:"Dyed a warm brown and fitted in brass." },
   dbr: { SHIRT:'#d4c4a2', LB:'#3a2416', LE:'#140a04', LH:'#5c3c26', TOOL:'rgba(160,120,82,0.42)', STITCH:'rgba(196,164,120,0.6)', IR:'#5a4426', IL:'#a88a54', SV:'#cdb27a', CH2:'#8e7444', BOSS:'#9a7e48', BONE:'#dccca8', SH:'rgba(120,82,52,0.6)', SHI:'rgba(112,76,48,0.76)', ED:'rgba(74,48,28,0.95)', STONE:'#c87a2a', word:'Umber', note:"Dyed the brown of old saddles and fitted in dark bronze." },
   red: { SHIRT:'#1e1618', LB:'#561418', LE:'#1e0406', LH:'#7c2228', TOOL:'rgba(20,4,6,0.45)', STITCH:'rgba(206,164,154,0.55)', IR:'#3e3e42', IL:'#a8acb2', SV:'#d6d8dc', CH2:'#7e8288', BOSS:'#9a9ea4', BONE:'#e2d6c6', SH:'rgba(132,24,34,0.56)', SHI:'rgba(124,22,30,0.72)', ED:'rgba(86,14,20,0.95)', STONE:'#b0182a', word:'Oxblood', note:"Dyed the red of dried wine and fitted in dark iron and silver, with a garnet where the moonstone would be." } };
-const lingDedupe=pts=>{ for(let k=pts.length-1;k>0;k--){ const [a,b]=pts[k],[c2,d]=pts[k-1]; if(Math.hypot(a-c2,b-d)<1.2) pts.splice(k,1); } return pts; };   // rounded-corner paths draw stray tangents through near-duplicate points
 const lingParts=id=>{ const m=/^(.*)_(brn|dbr|red)$/.exec(id); return m ? [m[1],m[2]] : [id,'']; };
 const LING_ALIAS={ open_bralette:'lace_underbust', open_bralette_brn:'lace_underbust_brn', open_bralette_dbr:'lace_underbust_dbr', open_bralette_red:'lace_underbust_red' };
 const LING_TORSO=new Set([...LING_BASE.flatMap(b=>Object.keys(LING_DYE).map(k=>k?b+'_'+k:b)),...Object.keys(LING_ALIAS)]);
@@ -12739,7 +12516,6 @@ function townsfolk(seed,n,points){                       // passers-by: seeded l
 }
 const GUARD=(o)=>BANDIT({skin:1,hair:0,hairColor:3,beard:1,equip:{head:BARON_DOWN()?'kettle':'coif',torso:BARON_DOWN()?'tunic_red':'baron_tabard',armor:BARON_DOWN()?'brightmail':'blackmail',hands:'gloves',legs:'trousers',feet:'boots',weapon:'spear',offhand:BARON_DOWN()?'shield':'shield_iron',cloak:BARON_DOWN()?null:'duel_shoulder',shoulders:'iron_pauldrons'},...o});   // the Baron's men wear his red over one shoulder
 const B=(i,j,fw,fh,v,extra)=>({type:'bldg', i, j, fp:[fw,fh], v, ...extra});
-const streetPts=(list)=>list;
 Object.assign(AREAS,{
   citygate:{ fence:{r:false,l:false}, w:14, h:22, theme:'city', grassy:true, label:'Hollowmere · Gate Ward', mini:{x:0,y:0},
     notches:()=>[], dummy:null,
@@ -14634,14 +14410,6 @@ function drawHPBar(cx2,topY,w,h,ratio,label){
     g.restore();
   }
 }
-function drawHeart(c,x,y,full,s=1){
-  c.save(); c.translate(x,y); c.scale(s,s);
-  c.beginPath(); c.moveTo(0,4); c.bezierCurveTo(-6,0,-5,-5,-2.4,-5); c.bezierCurveTo(-1,-5,0,-3.8,0,-3);
-  c.bezierCurveTo(0,-3.8,1,-5,2.4,-5); c.bezierCurveTo(5,-5,6,0,0,4); c.closePath();
-  c.fillStyle=full?'#d63a34':'#2a1a14'; c.fill(); c.lineWidth=1; c.strokeStyle=full?'#6a1410':'#6a4a3a'; c.stroke();
-  if(full){ c.fillStyle='rgba(255,220,210,0.7)'; c.fillRect(-3,-3.6,1.4,1.4); }
-  c.restore();
-}
 // a direction glyph: an arrow/chevron pointing the way the guard leans
 function drawDirGlyph(c,x,y,dir,s=1,col='#e8d0a0'){
   c.save(); c.translate(x,y); c.scale(s,s);
@@ -15790,7 +15558,6 @@ const BLEEDERS=new Set(['dagger','hatchet','axe','elf_blade','spear']);
 Object.assign(WEAPONS,{ staff_hex:{ wind:0.24, dmg:3, len:30, magic:1.05 }, staff_oak:{ wind:0.24, dmg:3, len:30, magic:1 }, staff_star:{ wind:0.26, dmg:4, len:32, magic:1.35 }, staff_cinder:{ wind:0.30, dmg:4, len:30, magic:1.15 } });
 Object.assign(ITEMS,{ staff_hex:{ name:"Necromancer's Staff", slot:'weapon' }, staff_oak:{ name:"Apprentice's Oak Staff", slot:'weapon' }, staff_star:{ name:'Starwood Staff', slot:'weapon' }, staff_cinder:{ name:'Cinder Staff', slot:'weapon' } });
 Object.assign(PRICES,{ staff_hex:70, staff_oak:55, staff_star:150, staff_cinder:90 });
-const FIRE_STAFF=id=>id==='staff_cinder';
 const SPELLS = { left:{ name:'Fire', col:'#f08a30', rgb:'255,150,60', cost:30, dmg:5, fx:f=>addStatus(f,'burn',3.6,2) },
                  up:  { name:'Frost', col:'#8ac8f0', rgb:'150,210,255', cost:24, dmg:4, fx:f=>{ addStatus(f,'chill',5,0); if(f.state==='windup'){ f.t+=0.35; f.wind+=0.35; } } },
                  right:{ name:'Arcane', col:'#c090f0', rgb:'200,150,255', cost:18, dmg:8, fx:null } };
@@ -16660,7 +16427,7 @@ function drawPoolGlints(o){ if(LOW_FX) return; const [fw,fh]=o.fp;   // sun glin
       g.fillStyle=`rgba(255,255,240,${0.35*tw*tw})`; g.beginPath(); g.ellipse(q.x+Math.sin(gt*0.6+k)*4,q.y,5+tw*4,1,0,0,Math.PI*2); g.fill(); } g.restore(); }
 
 // ════════ Balance: magic is strong, but not free ════════
-SPELLS.right.dmg=10; SPELLS.left.dmg=8; SPELLS.up.dmg=7; HEX_SPELLS.up.dmg=8; HEX_SPELLS.right.dmg=6;   // a starting caster keeps pace with a starting sword (wolves give a guard nothing to get past) WEAPONS.staff_crystal.magic=1.35; WEAPONS.staff_star.magic=1.3;
+SPELLS.right.dmg=10; SPELLS.left.dmg=8; SPELLS.up.dmg=7; HEX_SPELLS.up.dmg=8; HEX_SPELLS.right.dmg=6;   // a starting caster keeps pace with a starting sword (wolves give a guard nothing to get past)
 
 
 // ════════ A clearer road: one main story, told in order, and the loose ends tied ════════
@@ -16859,10 +16626,6 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
 // food and draughts: the grocer, the innkeeper and the priestess sell them
 { const oldG=TALKERS.grocer; TALKERS.grocer=()=>{ if(!CHOICE.nim){ oldG(); return; }
     say('Gerd the Grocer',["“Fresh today. Mostly.”"],[{label:'Buy food.', fn:()=>shopFrom('Gerd the Grocer',['apple','bread'],1,"“Apples a copper, bread two. Don't squeeze them.”",TALKERS.grocer)},{label:'Chat.', fn:oldG},bye]); }; }
-function cookAt(who,back){ const n=invCount('raw_meat'); if(!n){ say(who,"“Cook what? Bring me meat, I'll put it on the spit.”",[{label:'Back.',fn:back},bye]); return; }
-  const cost=n; say(who,[`You hand over ${n} piece${n>1?'s':''} of raw meat.`,`“Spit-roast, salt, a bit of thyme. ${cost} copper for the fire.”`],[
-    {label:`Have it cooked. (${cost} copper)`, off:player.purse<cost, note:'-'+cost+'c', fn:()=>{ player.purse-=cost; player.inv=player.inv.map(x=>x==='raw_meat'?'cooked_meat':x); updateHud(); refreshFoodBar(); logMsg(`${who} roasts your meat. (${n}× Roast Meat, +28 HP each)`,'#8ad07a'); say(who,"The smell fills the room. Someone at a table looks up hopefully.",[{label:'Back.',fn:back},bye]); }},
-    {label:'Back.', fn:back}]); }
 { const oldB=TALKERS.bertha; TALKERS.bertha=()=>{ say('Bertha of the Wheatsheaf',["“What'll it be?”"],[{label:'Buy bread for the road.', fn:()=>shopFrom('Bertha of the Wheatsheaf',['bread','apple'],1,"“Baked this morning. Or yesterday.”",TALKERS.bertha)},{label:'Talk.', fn:oldB},bye]); }; }
 { const oldP=TALKERS.priest; TALKERS.priest=()=>{ say('Mother Hild',["“Bless you, child. Is it the draughts you want?”"],[{label:'Buy healing draughts.', fn:()=>shopFrom('Mother Hild',['potion','mana_potion','rue_water','linen_wrap'],1,"“Thistle, honey and a prayer. Drink it when it hurts, not before.”",TALKERS.priest)},{label:'Talk.', fn:oldP},bye]); }; }
 // story items left behind for lack of room come to hand as soon as there is space
@@ -17128,7 +16891,6 @@ function drawWisp(o){ const n=nightAmt(); if(n<0.35) return; const q=P(o.i+0.5,o
 // a little mound of disturbed mud with a stick in it: something is buried here
 function drawBogMound(o){ const q=P(o.i+0.5,o.j+0.5);
   g.fillStyle='#4a3a22'; g.beginPath(); g.ellipse(q.x,q.y,15,6,0,0,Math.PI*2); g.fill(); g.fillStyle='#5e4a2c'; g.beginPath(); g.ellipse(q.x-2,q.y-2,10,4,0,0,Math.PI*2); g.fill(); }
-  // g.strokeStyle='#2e2214'; g.lineWidth=2; g.beginPath(); g.moveTo(q.x+5,q.y-1); g.lineTo(q.x+9,q.y-22); g.stroke(); g.fillStyle='#8a2a1a'; g.fillRect(q.x+8,q.y-22,5,3); } -- removed red flag
 
 // ════════ the areas ════════
 const LOGGER=(o)=>({gender:'m',skin:2,hair:1,hairColor:3,beard:3,face:1,...o,equip:{head:null,torso:'smock',armor:null,hands:'gloves',legs:'breeches',feet:'boots',weapon:'hatchet',offhand:null,...(o.equip||{})}});
@@ -17569,7 +17331,6 @@ function fenScene(){ const gd=NPCS.find(n=>n.id==='gerd'); if(!gd) return;
 // necro: null → 'met' (graveyard) → 1 Drain (up) → 2 Wither (right) → 3 Raise Dead (left)
 const NECRO=()=> typeof CHOICE.necro==='number' ? CHOICE.necro : 0;
 const VESNA=(i,j,dir)=>({ id:'vesna', name:'Vesna the Grave-Speaker', i, j, dir, opts:{gender:'f',skin:0,hair:5,hairColor:0,beard:0,face:2,equip:{head:null,torso:'necro_bustier',armor:'necro_robe',hands:null,legs:'hose_grey',feet:'boots',weapon:'staff_hex',offhand:null}} });
-const vesnaInFen=()=> NECRO()>=1 && FEN_OPEN();
 wrap('graveyard','npcs',l=> CHOICE.necro && (!FEN_OPEN() || nightAmt()>0.5) ? [...l, VESNA(5,3,1)] : l);   // the graveyard by night, always; by day too until the fen road opens    // once the fen road is open she goes home to her stilt-hut, and you find her there
 wrap('fen','npcs',l=> FEN_OPEN() ? [...l, VESNA(18,6,1)] : l);
 // the grave-motes: little lights over the old graves, only at night, only once she has asked
@@ -17755,7 +17516,6 @@ Object.entries({ jerkin:1, studded:1 }).forEach(([id,v])=>{ ITEM_STATS[id]={...I
 ITEM_STATS.elf_cloak={...ITEM_STATS.elf_cloak, magic:1};
 const APM=()=>1+gearSum('ap')*0.03;
 var HIT_SRC=null;                       // who caused the wound being dealt right now: 'melee', 'spell' or null (bones, burns)
-const playerHitDmg=()=> (player.opts && player.opts.equip.weapon==='emberbrand') ? emberHit() : isMagicWeapon() ? SPELLS.right.dmg*SPM() : weaponOf(player).dmg*APM();
 const AREA_TIER={ farm:1, road:1, lane:1, millroad:2, wolfwood:2, camp:2, southtrail:2, mistmere:2, clearing:2,
   fellings:3, ruin:3, lowstreets:3, warren:3, kingsroad:3, elfroad:3, cave1:3, cave2:4, cave3:4, cave4:4,
   fen:4, fenpath:4, northroad:3, barrow:5 };
@@ -17791,7 +17551,6 @@ QUEST_ITEMS.add('ember_core');
 // Emberbrand: weapon damage × Attack Power, plus a tongue of fire × Spell Power, and every cut burns
 // one rule: +4% per point of Attack Power AND per point of Spell Power, so every point you wear counts
 const emberMult=()=>1+(gearSum('ap')+gearSum('magic'))*0.04;
-const emberHit=()=>WEAPONS.emberbrand.dmg*emberMult();
 // foes with fire set you alight
 const FIRE_FOE=f=> f && ((f.opts&&f.opts.equip&&['fire_blade','emberbrand'].includes(f.opts.equip.weapon)) || /^Ash Hound|^The Slag Warden|^Ember Sprite|^The Kindled One|^The Black Dragon/.test(f.name||''));
 
@@ -18876,13 +18635,8 @@ function drawPup(p){ const dep=(typeof poolDepth==='function')?poolDepth(p.x,p.y
     try{ drawPupFigure(p); } finally{ p.lie=lie; p.moving=om; g.restore(); }
     g.save(); for(let k=0;k<3;k++){ const t=((gt*0.7+k/3)%1); g.strokeStyle=`rgba(225,240,250,${0.5*(1-t)})`; g.lineWidth=1.2; g.beginPath(); g.ellipse(q.x,wl,(10+t*22)*sc,(3.5+t*7)*sc,0,0,Math.PI*2); g.stroke(); }
     g.fillStyle='rgba(225,240,250,0.35)'; g.beginPath(); g.ellipse(q.x,wl,13*sc,4*sc,0,0,Math.PI*2); g.fill(); g.restore(); }
-// ── Hamond's house at night: Hamond, Old Wenna and Ada asleep in their beds; Edric's bed is yours if you want it ──
-const SLEEP_HRS=()=>{ const h=HOUR(); return h>=22 || h<6; };
 const SLEEPERS=[ ['elder','Elder Hamond',{gender:'m',skin:1,hair:4,hairColor:13,beard:5}], ['wenna','Old Wenna',{gender:'f',skin:0,hair:4,hairColor:13,beard:0}], ['ada','Ada',{gender:'f',skin:1,hair:3,hairColor:8,beard:0,face:1}] ];
-wrap('elderhouse','npcs',l=>{ if(!SLEEP_HRS()) return l; const out=[...l];
-  SLEEPERS.forEach(([id,name,o])=>{ return;   // all of them walk to bed themselves now (ROUTINES) const bed=AREAS.elderhouse.objects().find(b=>b.owner===id); if(!bed) return;
-    out.push({ id:'sleep_'+id, name, i:bed.i, j:bed.j, x:bed.i+1.9, y:bed.j+0.95, dir:0, sleepBed:bed, opts:{...o, eyesShut:true, equip:{head:null,torso:'shirt',armor:null,hands:null,legs:'trousers',feet:null,weapon:null,offhand:null}} }); });
-  return out; });
+// (the sleepers used to be placed here; they all walk to bed themselves now, through ROUTINES)
 SLEEPERS.forEach(([id,name])=>{ TALKERS['sleep_'+id]=()=>{ const real={elder:'elder',wenna:'wenna',ada:'ada'}[id], news=(()=>{ try{ return npcHasNews({id:real,name}); }catch(e){ return null; } })();
   say(name,[{elder:"Hamond is asleep on his back with his hands folded on his chest, snoring like a slow saw.",wenna:"Old Wenna sleeps with her stick beside her, one hand still on it. Now and then she mutters something about a goat.",ada:"Ada is asleep, turned toward the empty bed by the far wall."}[id]],[{label:'Wake '+(id==='elder'?'him':'her')+(news?' gently.':'.'), fn:()=>{ TALK_NPC=null; closeDialog(); const t=TALKERS[real]; if(!t) return;
       if(news){ t(); return; }   // something to settle: they wake and get straight to it
@@ -18890,7 +18644,6 @@ SLEEPERS.forEach(([id,name])=>{ TALKERS['sleep_'+id]=()=>{ const real={elder:'el
                wenna:["<i>Old Wenna's hand closes on her stick before her eyes open.</i> “Hm? Oh, you. I thought you were the goat.” <i>She sits up, grumbling.</i> “Go on, then. Old women sleep light anyway.”"],
                ada:["<i>Ada starts awake and looks first at the empty bed, then at you.</i> “Oh. I... it is you.” <i>She rubs her eyes.</i> “What is it?”"]}[id];
       say(name,W,[{label:'Talk to '+(id==='elder'?'him':'her')+'.',fn:()=>{ closeDialog(); t(); }},{label:'“Sorry. Go back to sleep.”',fn:closeDialog}]); }},{label:'Let them sleep.',fn:closeDialog}]); }; });
-function bedBlanket(o){ const k=o.col!=null ? o.col : ([...areaId].reduce((h,ch)=>h*31+ch.charCodeAt(0)|0,7)+o.i*13+o.j*7)>>>0; return BED_BLANKETS[k%BED_BLANKETS.length]; }
 function drawSleeper(n){                           // asleep in a bed, turned over like the dead, with a z or two
     const bed=n.sleepBed, br=Math.sin(gt*1.1+bed.i)*0.5;
     const pil=P(bed.i+0.5-0.18,bed.j+0.5), U=Math.hypot(TW/2,TH/2), ux=-(TW/2)/U, uy=-(TH/2)/U;               // u: along the bed, from the foot toward the pillow
@@ -21652,7 +21405,8 @@ const SND=(()=>{
   function tick(){ if(!live() || typeof areaId==='undefined' || !AREAS[areaId]) return;
     const P=place(), out=!P.inside, fight=typeof combat!=='undefined' && combat.active, k=fight?0.55:1;
     gustT-=0.25; if(gustT<=0){ gust=R(0.25,1); gustT=R(2,6); }
-    T('wind', out ? (0.012+0.022*gust)*(P.wood?0.7:1)*k : 0, 2.5);          // a breath of wind, not a gale L.wind.f.frequency.setTargetAtTime(280+gust*380,ctx.currentTime,2);
+    T('wind', out ? (0.012+0.022*gust)*(P.wood?0.7:1)*k : 0, 2.5);          // a breath of wind, not a gale
+    try{ if(L.wind && L.wind.f) L.wind.f.frequency.setTargetAtTime(280+gust*380,ctx.currentTime,2); }catch(e){}   // the gusts change its pitch
     T('leaves', out && P.wood ? 0.002+0.004*gust : 0, 2.5);
     T('rain', P.rain ? 0.022*k : 0, 2);          // a soft patter
     T('room', P.inside && !P.cave ? 0.05 : 0); T('cave', P.cave ? 0.22 : 0);
@@ -23852,7 +23606,7 @@ WEAPON_ART.rune_maul=(c,hx,hy,ang,id,s)=>{ c.save(); c.translate(hx,hy); c.rotat
   c.restore(); };
 // Forge-Heat: with any four pieces on, every third blow you land bursts with fire
 let RUNE_HITS=0, RUNE_FIRE=false;
-const runeSetOn=()=>setOn(RUNE_SET);   // any four of the five return E.head && unWoven(E.head)==='rune_helm' && E.armor && unWoven(E.armor)==='rune_plate' && E.hands && unWoven(E.hands)==='rune_gauntlets' && E.legs && unWoven(E.legs)==='rune_greaves' && E.feet && unWoven(E.feet)==='rune_boots'; };
+const runeSetOn=()=>setOn(RUNE_SET);   // any four of the five
 { const _w=wound; wound=function(f,n,label,col){ const r=_w.apply(this,arguments);
     try{ if(!RUNE_FIRE && f && f!==player && HIT_SRC==='melee' && n>0 && !f.warded && f.type!=='dummy' && runeSetOn()){ RUNE_HITS++;
         if(RUNE_HITS>=3 && !f.dead && f.hp>0){ RUNE_HITS=0; const W=WEAPONS[player.opts.equip.weapon]||WEAPONS.fists, extra=Math.max(4,Math.round((W.dmg||6)*0.6+gearSum('ap')*0.3));
@@ -24455,7 +24209,6 @@ const PETTABLE={ dog:["The dog leans its whole weight against your leg and looks
   horse:["The horse blows warm air down your sleeve, looking for an apple.","You run a hand down its neck. It stamps once, content."], pony:["The pit pony noses your pocket. It knows miners carry crusts.","You stroke its shaggy forelock. Lamp-black comes off on your fingers."],
   camel:["The camel looks down its long nose at you with enormous contempt, and allows it.","It chews, slowly, and does not spit. Sefa says that means it likes you."], sheep:["The sheep stands very still, as if being touched were a thing that happened to other sheep.","Your hand sinks into the wool to the wrist."], goat:["The goat butts your hand, then tries to eat your cuff."] };
 let pendingPet=null;
-function animalAt(ti,tj){ let best=null, bd=1.1; OBJECTS.forEach(o=>{ if(o.type!=='animal' || !o.ok || !PETTABLE[o.kind]) return; const d=Math.hypot(o.x-(ti+0.5),o.y-(tj+0.5)); if(d<bd){ bd=d; best=o; } }); return best; }
 function petAnimal(o){ if(Math.hypot(player.x-o.x,player.y-o.y)>2.3){ const p=findPath(player.i,player.j,Math.floor(o.x),Math.floor(o.y)); if(p&&p.length){ if(p.length>1) p.pop(); player.path=p; pendingPet=o; } return; }
   const lines=PETTABLE[o.kind]; logMsg(lines[Math.floor(Math.random()*lines.length)],'#e8c8a0'); o.heart=1.4; faunaSound(o,true); o.st='idle'; o.tm=3; if(o.kind==='dog'){ o.wag=1; } if(o.kind==='cat'){ o.sit=1; } }
 // ════════ THE BROWN BEAR: Old Brumm, in a hollow up off the Wolfwood. Two heavy swipes, then it rears up and roars: brace for it (parry high) or be shaken ════════
@@ -25198,7 +24951,6 @@ const ucIn=(r,d)=> d==='n'?[r.cx,1] : d==='s'?[r.cx,r.h-2] : d==='w'?[1,r.cy] : 
 const UC_LABEL={ under_nw:'Well Bottom', under_ne:'Cellar Stair', under_sw:'Chapel Crypts', under_se:'The Ember Stair' };
 // a spot in a chamber: the walkway tiles nearest its middle, the drop beside the walkways
 const ucWalk=r=>{ const out=[]; for(let j=0;j<r.h;j++) for(let i=0;i<r.w;i++) if(r.G[j*r.w+i]) out.push([i,j]); return out.sort((a,b)=>(Math.abs(a[0]-r.cx)+Math.abs(a[1]-r.cy))-(Math.abs(b[0]-r.cx)+Math.abs(b[1]-r.cy))); };
-const ucDrop=r=>{ const out=[], g=(i,j)=>i>=0&&j>=0&&i<r.w&&j<r.h&&r.G[j*r.w+i]; for(let j=0;j<r.h;j++) for(let i=0;i<r.w;i++){ if(g(i,j)) continue; if([[1,0],[-1,0],[0,1],[0,-1]].some(([a,b])=>g(i+a,j+b))) out.push([i,j]); } return out; };
 const ucNearDoor=(r,i,j)=>Object.keys(r.ex).some(d=>{ const [a,b]=ucEdge(r,d), [c,e]=ucIn(r,d); return Math.max(Math.abs(a-i),Math.abs(b-j))<=1 || (c===i&&e===j); });
 // the furthest dead end in each quarter from its ways in: Wenlo's page lies there
 function ucFurthestEnd(q){ const starts=Object.values(UCR).filter(r=>r.q===q && Object.values(r.ex).some(([to])=>!UCR[to] || UCR[to].q!==q)).map(r=>r.id), dist={}, Q=[...starts]; starts.forEach(s=>dist[s]=0);
@@ -25790,7 +25542,8 @@ OBJ_DRAW.treestand=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, H=58;
   g.fillStyle='#7a5634'; g.beginPath(); g.moveTo(x-16,y-H-2); g.lineTo(x,y-H-8); g.lineTo(x+16,y-H-2); g.lineTo(x,y-H+4); g.closePath(); g.fill();   // the platform
   g.strokeStyle='#6a4a2a'; g.lineWidth=1.6; g.beginPath(); g.moveTo(x-12,y-H-4); g.lineTo(x-12,y-H-16); g.lineTo(x+12,y-H-16); g.lineTo(x+12,y-H-4); g.stroke();   // a rail
   g.strokeStyle='#8a6a44'; g.lineWidth=1.4; g.beginPath(); g.moveTo(x+18,y+6); g.lineTo(x+12,y-H); g.moveTo(x+24,y+4); g.lineTo(x+18,y-H-2); g.stroke(); for(let k=1;k<6;k++){ const t=k/6; g.beginPath(); g.moveTo(x+18-6*t,y+6-(H+6)*t); g.lineTo(x+24-6*t,y+4-(H+6)*t); g.stroke(); } };   // the ladder up
-OBJ_DRAW.snare=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y; if(o.open!==undefined){ drawCached('snare'+(o.open?1:0),x,y,50,24,20,16,(X,Y)=>paintSnare(X,Y,o.open)); return; }   // the Baron's iron jaw-traps keep their own look g.strokeStyle='#5a3e24'; g.lineWidth=2; g.beginPath(); g.moveTo(x-6,y); g.lineTo(x-6,y-14); g.stroke();
+OBJ_DRAW.snare=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y; if(o.open!==undefined){ drawCached('snare'+(o.open?1:0),x,y,50,24,20,16,(X,Y)=>paintSnare(X,Y,o.open)); return; }   // the Baron's iron jaw-traps keep their own look
+  g.strokeStyle='#5a3e24'; g.lineWidth=2; g.beginPath(); g.moveTo(x-6,y); g.lineTo(x-6,y-14); g.stroke();   // a snare's stake
   g.strokeStyle='#b8a070'; g.lineWidth=1; if(o.sprung){ g.beginPath(); g.moveTo(x-6,y-14); g.lineTo(x+6,y-24); g.stroke(); g.beginPath(); g.moveTo(x+4,y-2); g.quadraticCurveTo(x+8,y-4,x+6,y-1); g.stroke(); g.fillStyle='rgba(150,140,120,0.8)'; g.beginPath(); g.ellipse(x+5,y-1,2.5,1.2,0,0,Math.PI*2); g.fill(); }   // sprung: something got away, leaving fur
   else { g.beginPath(); g.moveTo(x-6,y-12); g.lineTo(x+2,y-4); g.stroke(); g.beginPath(); g.ellipse(x+4,y-3,4,2,0,0,Math.PI*2); g.stroke(); } };
 OBJ_DRAW.groundmist=o=>{ const q=P(o.i+0.5,o.j+0.5), T=gt*0.15; g.save(); for(let k=0;k<4;k++){ const ph=T+k*1.7+o.i; g.fillStyle=`rgba(200,210,215,${0.06+0.03*Math.sin(ph)})`; g.beginPath(); g.ellipse(q.x+Math.sin(ph)*20+(k-1.5)*16,q.y+Math.cos(ph*0.7)*5,46,13,0,0,Math.PI*2); g.fill(); } g.restore(); };
@@ -27038,24 +26791,6 @@ OBJ_DRAW.chopblock=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y;
   g.strokeStyle='#5a3a1e'; g.lineWidth=2.4; g.lineCap='round'; g.beginPath(); g.moveTo(x+1,y-15); g.lineTo(x+14,y-34); g.stroke();   // the haft
   g.fillStyle='#8a8a8a'; g.beginPath(); g.moveTo(x-5,y-14); g.lineTo(x+4,y-14); g.lineTo(x+4,y-20); g.quadraticCurveTo(x-1,y-21,x-6,y-17); g.closePath(); g.fill(); g.fillStyle='#c8ccd0'; g.fillRect(x-5,y-15.2,9,1.2);
   g.fillStyle='#9a7448'; g.beginPath(); g.ellipse(x-20,y+4,6,3,0.4,0,Math.PI*2); g.fill(); g.fillStyle='#c8a46e'; g.beginPath(); g.ellipse(x-24,y+2,3,4,0.4,0,Math.PI*2); g.fill(); };   // a split log
-// the edge of the world: an earth bank where the land drops away, a lip of long grass hanging over it, and dark beneath
-function paintEarthBank(){ const {w,h}=ROOM, Hh=38;
-  const face=(a,b,shade)=>{ const top=Math.min(a.y,b.y), gr=g.createLinearGradient(0,top,0,Math.max(a.y,b.y)+Hh+30);
-    gr.addColorStop(0,tone('#5e4630',shade)); gr.addColorStop(0.18,tone('#4a3622',shade)); gr.addColorStop(0.45,tone('#6a5238',shade-0.05)); gr.addColorStop(0.7,tone('#2e2216',shade)); gr.addColorStop(1,'rgba(10,8,6,0)');
-    g.fillStyle=gr; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(b.x,b.y+Hh+30); g.lineTo(a.x,a.y+Hh+30); g.closePath(); g.fill();
-    g.strokeStyle=tone('#7a6448',shade,0.35); g.lineWidth=1; for(let s=0;s<3;s++){ const dy=10+s*8+(s===1?2:0); g.beginPath(); for(let t=0;t<=1.0001;t+=0.02){ const x=lerpN(a.x,b.x,t), y=lerpN(a.y,b.y,t)+dy+Math.sin(t*40+s*3)*1.4; t?g.lineTo(x,y):g.moveTo(x,y); } g.stroke(); } };   // strata
-  face(P(w,0),P(w,h),0.02); face(P(0,h),P(w,h),-0.14);
-  const bits=(a,b,count,seed)=>{ for(let k=0;k<count;k++){ const t=rnd01(k,seed,980), x=lerpN(a.x,b.x,t), y=lerpN(a.y,b.y,t)+5+rnd01(k,seed+1,981)*26;
-      if(k%4===0){ g.strokeStyle='rgba(70,48,26,0.85)'; g.lineWidth=0.9+rnd01(k,2,982); g.beginPath(); g.moveTo(x,y-6); g.bezierCurveTo(x+3,y,x-2,y+5,x+1,y+11+rnd01(k,3,983)*8); g.stroke(); }   // roots hanging out of the cut
-      else { const r=1.5+rnd01(k,4,984)*3; g.fillStyle=['#6e675c','#5a544a','#7e776a'][k%3]; g.beginPath(); g.ellipse(x,y,r*1.3,r,0,0,Math.PI*2); g.fill(); g.fillStyle='rgba(255,250,235,0.18)'; g.beginPath(); g.ellipse(x-r*0.4,y-r*0.4,r*0.6,r*0.35,0,0,Math.PI*2); g.fill(); } } };
-  bits(P(w,0),P(w,h),h*9,1); bits(P(0,h),P(w,h),w*9,2);
-  const lip=(a,b,count,seed)=>{ for(let k=0;k<count;k++){ const t=(k+rnd01(k,seed,985))/count, x=lerpN(a.x,b.x,t), y=lerpN(a.y,b.y,t);   // grass hanging over the edge
-      const n=4+Math.floor(rnd01(k,seed,986)*3); for(let s=0;s<n;s++){ const L=5+rnd01(k*7+s,seed,987)*9, dx=(rnd01(s,k,988)-0.5)*7; g.strokeStyle=['#4f6e2c','#65863a','#3f5c24','#7c9c48'][(k+s)%4]; g.lineWidth=1.1; g.beginPath(); g.moveTo(x+dx*0.3,y-1); g.quadraticCurveTo(x+dx,y+L*0.3,x+dx*1.4,y+L); g.stroke(); } } };
-  lip(P(w,0),P(w,h),h*14,3); lip(P(0,h),P(w,h),w*14,4);
-  for(let k=0;k<(w+h)*16;k++){ const onR=k%2===0, t=rnd01(k,5,989), gx=onR?w-0.04-rnd01(k,6,990)*0.38:t*w, gy=onR?t*h:h-0.04-rnd01(k,6,990)*0.38, q=P(gx,gy);   // a strip of long grass along the brink
-    if(inNotch(Math.floor(gx),Math.floor(gy))) continue; const n=5+Math.floor(rnd01(k,7,991)*4), L=9+rnd01(k,8,992)*10;
-    for(let s=0;s<n;s++){ const a=(s/(n-1)-0.5)*1.1+(rnd01(s,k,993)-0.5)*0.3, LL=L*(0.7+rnd01(s,k,994)*0.5); g.strokeStyle=['#4f6e2c','#65863a','#7c9c48','#8fae55','#9a9a5a'][(k+s)%5]; g.lineWidth=1; g.beginPath(); g.moveTo(q.x,q.y); g.quadraticCurveTo(q.x+Math.sin(a)*LL*0.4,q.y-LL*0.6,q.x+Math.sin(a)*LL*0.9,q.y-LL); g.stroke(); }
-    if(rnd01(k,9,995)<0.12){ g.fillStyle=['#f2ede0','#f0d060','#c8a0e0'][k%3]; g.beginPath(); g.arc(q.x+2,q.y-L*0.9,1.6,0,Math.PI*2); g.fill(); } } }
 // the farm's ground, done over: meadow tones, clover, the long lush grass under the fences, packed earth only where feet go, and puddles by the well
 function farmGroundPixel(gx,gy,G,w,h){ const n=fbm(gx*0.7,gy*0.7,301), n2=fbm(gx*2.2,gy*2.2,302), n3=fbm(gx*8,gy*8,303), de=Math.min(gx,gy,w-gx,h-gy);
   let c=mixC([70,104,40],[112,146,60],smooth(0.25,0.8,n)); c=mixC(c,[138,140,76],smooth(0.6,0.85,fbm(gx*0.3,gy*0.3,304))*0.5);   // meadow, with dry patches where the sun sits
@@ -28830,17 +28565,6 @@ ITEM_ICON.ember_hood=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40);
   g2.fillStyle='#ffb050'; g2.beginPath(); g2.ellipse(17.6,18.5,1,0.6,0,0,Math.PI*2); g2.ellipse(22.4,18.5,1,0.6,0,0,Math.PI*2); g2.fill();
   g2.fillStyle='#d8a442'; g2.beginPath(); g2.moveTo(20,31); g2.lineTo(22,33); g2.lineTo(20,35); g2.lineTo(18,33); g2.closePath(); g2.fill(); g2.restore(); };
 
-// the veil of the Veiled Cinder Crest: dark ember gauze from the bridge of the nose to below the chin, a gold edge, fine chains up to the band, little gold discs along the hem
-function drawEmberVeil(c,x,B,P,view,LN){ const Y=BODY, V=VIEW[view], HW=P.headHW, pr=V.prof, front=V.turn>-0.25, LINE=Y.HAIRLINE; if(!front) return;
-  const side=pr>0.8, cx=LN+(side?HW*0.62:faceOff(pr)*0.8), cy=(LINE+Y.CHIN)/2+0.8, rx=side?HW*0.5:(HW-1.3)*(1-pr*0.35), ry=(Y.CHIN-LINE)/2+1.4, vy=cy-ry*0.05, by=cy+ry+3.2;
-  const L=x+cx-rx-0.6, R=x+cx+rx+0.6, path=()=>{ c.beginPath(); c.moveTo(L,B+vy); c.quadraticCurveTo(x+cx,B+vy+1.4,R,B+vy); c.quadraticCurveTo(R+0.6,B+cy+ry*0.6,x+cx+rx*0.55,B+by-1.2); c.quadraticCurveTo(x+cx,B+by+1.6,x+cx-rx*0.55,B+by-1.2); c.quadraticCurveTo(L-0.6,B+cy+ry*0.6,L,B+vy); c.closePath(); };
-  c.save(); const vg=c.createLinearGradient(0,B+vy,0,B+by); vg.addColorStop(0,'rgba(74,18,12,0.62)'); vg.addColorStop(1,'rgba(36,8,6,0.88)'); c.fillStyle=vg; path(); c.fill();
-  c.save(); path(); c.clip(); c.strokeStyle='rgba(0,0,0,0.28)'; c.lineWidth=0.5; for(let i=-2;i<=2;i++){ c.beginPath(); c.moveTo(x+cx+i*rx*0.36,B+vy+1); c.quadraticCurveTo(x+cx+i*rx*0.44,B+cy+ry*0.5,x+cx+i*rx*0.3,B+by); c.stroke(); }   // the folds of the gauze
-    c.fillStyle='rgba(255,170,110,0.10)'; c.fillRect(L,B+vy,(R-L)*0.4,by-vy); c.restore();
-  c.strokeStyle='#d8a442'; c.lineWidth=0.75; c.beginPath(); c.moveTo(L,B+vy); c.quadraticCurveTo(x+cx,B+vy+1.4,R,B+vy); c.stroke();   // its gold edge
-  c.strokeStyle='rgba(216,164,66,0.85)'; c.lineWidth=0.45; [[L,-1],[R,1]].forEach(([ex,sd])=>{ c.beginPath(); c.moveTo(ex,B+vy); c.quadraticCurveTo(ex+sd*1.4,B+(vy+LINE)/2,ex+sd*0.8,B+LINE+1.2); c.stroke(); });   // fine chains up to the band
-  c.fillStyle='#e0b050'; const n=side?3:5; for(let k=0;k<n;k++){ const t=(k+0.5)/n, px=x+cx-rx*0.55+t*rx*1.1, py=B+by-1.2+Math.sin(t*Math.PI)*2.4; c.beginPath(); c.arc(px,py+0.9,0.75,0,Math.PI*2); c.fill(); }   // little gold discs along the hem
-  c.restore(); }
 ITEM_ICON.ember_hood=(g2,id,size)=>{ (ITEM_ICON.ember_crown||paintItemArt)(g2,'ember_crown',size); g2.save(); g2.scale(size/40,size/40);
   g2.fillStyle='rgba(60,14,10,0.85)'; g2.beginPath(); g2.moveTo(11,29); g2.quadraticCurveTo(20,31,29,29); g2.quadraticCurveTo(29,35,24,37); g2.quadraticCurveTo(20,39,16,37); g2.quadraticCurveTo(11,35,11,29); g2.closePath(); g2.fill();
   g2.strokeStyle='#d8a442'; g2.lineWidth=0.9; g2.beginPath(); g2.moveTo(11,29); g2.quadraticCurveTo(20,31,29,29); g2.stroke(); g2.lineWidth=0.6; g2.beginPath(); g2.moveTo(11,29); g2.lineTo(8,24); g2.moveTo(29,29); g2.lineTo(32,24); g2.stroke();
@@ -29199,7 +28923,8 @@ function stitchGolem(f){
   const S=SKEL; player.mana-=GOLEM_COST; if(kit) player.inv[player.inv.indexOf('grave_thread')]=null; else { player.inv[player.inv.indexOf(fl)]=null; player.inv[player.inv.indexOf('old_bone')]=null; } GOLEM_USED=true;
   const hp=Math.max(8,Math.round(player.maxHp*0.4));
   const [gx,gy]=golemSlot(f); GOLEM={ x:gx, y:gy, dir:(S&&S.dir)||0, hp, max:hp, t:GOLEM_LIFE, rise:0, anim:0, cd:1.6, hit:0, fade:0, moving:false, dmg:Math.max(5,Math.round(7*SPM())) };
-  lunge(player,f);   // the skeleton stays on its feet: the golem rises beside it shake=Math.max(shake,5); SND.spell('Raise Dead'); try{ SND.fx('grise'); }catch(e){}
+  lunge(player,f);   // the skeleton stays on its feet: the golem rises beside it
+  shake=Math.max(shake,5); SND.spell('Raise Dead'); try{ SND.fx('grise'); }catch(e){}
   try{ burst({x:GOLEM.x,y:GOLEM.y},f||player,'#c8b8a8',16); }catch(e){}
   floatText(tileOf(player),'Flesh Golem!','#d8c8b8',true);
   logMsg('Beside your skeleton the meat in your pack crawls together over an old bone. Staples bite, thread pulls tight, a sackcloth face settles over it. It stands, slowly, and your skeleton fights on next to it.','#d8c8b8');
@@ -29744,7 +29469,6 @@ JOURNAL.push(["Blade Dance", ()=> !bladeQ() ? null : bladeQ()==='done' ? ['done'
 //   The Rat King's Ledger (Tuck): chalk marks through the drains, a smugglers' cache, a choice. The Deepest Seam: knocking from below the Old Workings, a buried crew, deepsilver for Oswin.
 //   The Mother's Seed (Faelith): bring three dead lightblooms back. And the job boards: clear a nest, fetch a few things, for coin and silver leaves ════════
 const dqRoom=id=>(typeof UCR!=='undefined'&&UCR[id])||(typeof OWR!=='undefined'&&OWR[id])||(typeof RCR!=='undefined'&&RCR[id])||null;
-const DQ_NAME=id=>{ const A=AREAS[id]; return (A&&A.mapLabel&&A.mapLabel!=='?')?A.mapLabel:id; };
 // a quest spot in a dungeon room: on the first free floor tile off the through-ways, steady from visit to visit
 function dqSpot(roomId,make,cond,nth){ wrap(roomId,'objects',l=>{ try{ if(!cond()) return l; const r=dqRoom(roomId); if(!r) return l; const F0=ucFreeSpots(r,l), F=F0.filter(([i,j])=>!l.some(o=>Math.abs(o.i-i)<=0&&Math.abs(o.j-j)<=0)); if(!F.length) F.push(...F0); const p=F[Math.min(F.length-1,nth||0)]||ucWalk(r).find(([i,j])=>!l.some(o=>o.i===i&&o.j===j)); if(!p) return l; return [...l,{...make(), i:p[0], j:p[1], noblock:true}]; }catch(e){ return l; } }); }
 function dqDrop(type,k){ try{ const x=OBJECTS.findIndex(o=>o.type===type && (k==null||o.k===k)); if(x>=0) OBJECTS.splice(x,1); }catch(e){} }

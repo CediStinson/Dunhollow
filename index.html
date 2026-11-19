@@ -31398,6 +31398,20 @@ wrap('heath','objects',l=>{ if(!encounter('shepherd',0.6)) return l; const out=[
   [[34,9],[36,13],[39,10],[33,12],[40,13],[37,8],[35,15]].forEach(([i,j],q)=>{ for(let k=0;k<3;k++){ const sd=(i*31+j*17+k*7+q*13)%97;
     out.push({type:'animal', kind:'sheep', i:i+(k%2), j:j+(k>1?1:0), home:[i+0.5,j+0.5], seed:sd, noblock:true, col:cols[(sd+k)%cols.length], st:'idle', tm:0.5+rnd01(sd,k,901)*2, ok:false}); } });
   return [...l,...out]; });
+
+// ════════ the first fights: a coach at your shoulder for the first few blows, telling you exactly what to press ════════
+{ const el=document.createElement('div'); el.id='coach'; el.style.cssText='position:fixed;left:50%;top:22%;transform:translateX(-50%);z-index:55;display:none;pointer-events:none;padding:10px 20px;border-radius:10px;background:rgba(18,12,6,0.88);border:1px solid #c8a050;color:#f6e6b8;font:600 17px Georgia,serif;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,0.5);letter-spacing:0.5px'; document.body.appendChild(el);
+  const kn=k=>{ const a=(KEYS&&KEYS[k])||DEFAULT_KEYS[k]||[]; return a.map(x=>x===' '?'Space':x.length===1?x.toUpperCase():x.replace('Arrow','')).join(' / '); };
+  const DIR={left:['◀','left'],right:['▶','right'],up:['▲','up']}; let last=null;
+  setInterval(()=>{ try{ const f=typeof combat!=='undefined' && combat.active && !combat.practice ? combat.foe : null; const C=CHOICE.coach=CHOICE.coach||{b:0,a:0};
+      if(!f || (C.b>=3 && C.a>=3)){ el.style.display='none'; last=null; return; }
+      let html=null, key=null;
+      if(f.state==='windup' && C.b<3){ const d=DIR[f.swingDir]||DIR.left; key='b'+f.t.toFixed(0)+f.swingDir; html=`He swings from the <b>${d[1]}</b> ${d[0]}<br><span style="font-size:14px">Hold <b>${kn(f.swingDir)}</b> and press <b>${kn('block')}</b> (or right click) to block</span>`;
+        if(last!=='b'){ last='b'; C.b++; } }
+      else if((f.state==='stagger' || f.state==='recover') && C.a<3){ html=`<b>Now: strike!</b><br><span style="font-size:14px">Press <b>${kn('attack')}</b> (or left click). Hold <b>${kn('left')}</b>, <b>${kn('up')}</b> or <b>${kn('right')}</b> to choose the side</span>`;
+        if(last!=='a'){ last='a'; C.a++; } }
+      else last=f.state;
+      if(html){ if(el.innerHTML!==html) el.innerHTML=html; el.style.display='block'; } else el.style.display='none'; }catch(e){} },60); }
 </script>
 </body>
 </html>

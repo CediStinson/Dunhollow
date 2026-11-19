@@ -16177,8 +16177,13 @@ function drawRockRidge(o){ const L=o.fp[0], a=P(o.i+0.08,o.j+0.55), b=P(o.i+L-0.
     g.strokeStyle='rgba(10,8,6,0.65)'; g.lineWidth=1.3; g.beginPath(); g.moveTo(p1.x,p1.y); g.lineTo(mid.x+6,mid.y+6); g.lineTo(m.x+8,m.y+10); g.stroke(); }
   g.restore(); out(); g.strokeStyle='rgba(12,10,8,0.8)'; g.lineWidth=1.2; g.stroke(); }
 // a low heap of broken stone, knee-high: a wall you can see over
+// a soft round shadow, blurred once and kept: a blur filter every frame costs dearly (the Ridge Tunnel's rubble alone took it to 5 fps)
+const SOFT_SH={};
+function softShadow(x,y,rx,ry,a,blur){ rx=Math.max(1,Math.abs(rx)); ry=Math.max(1,Math.abs(ry)); const qx=Math.round(rx), qy=Math.round(ry), key=qx+'|'+qy+'|'+a+'|'+blur;
+  let cv=SOFT_SH[key]; if(!cv){ const pad=blur*3+2; cv=document.createElement('canvas'); cv.width=qx*2+pad*2; cv.height=qy*2+pad*2; const c=cv.getContext('2d'); c.filter='blur('+blur+'px)'; c.fillStyle='rgba(0,0,0,'+a+')'; c.beginPath(); c.ellipse(qx+pad,qy+pad,qx,qy,0,0,Math.PI*2); c.fill(); cv.pad=pad; SOFT_SH[key]=cv; }
+  g.drawImage(cv, x-rx-cv.pad*rx/qx, y-ry-cv.pad*ry/qy, cv.width*rx/qx, cv.height*ry/qy); }
 function drawRubble(o){ const c=P(o.i+0.5,o.j+0.5), sd=o.i*11+o.j*5, base=ROCK_DARK()?'#4e4a44':'#6a645a';   // broken stone: angular lumps, lit on their upper faces, dust and grit round them
-  g.save(); g.fillStyle='rgba(0,0,0,0.3)'; g.filter='blur(3px)'; g.beginPath(); g.ellipse(c.x+3,c.y+3,30,10,0,0,Math.PI*2); g.fill(); g.restore();
+  softShadow(c.x+3,c.y+3,30,10,0.3,3);
   for(let k=0;k<14;k++){ const x=c.x+(rnd01(k,sd,765)-0.5)*40, y=c.y+(rnd01(k,sd,766)-0.5)*12, s=1+rnd01(k,sd,767)*1.6; g.fillStyle=tone(base,-0.1-0.2*rnd01(k,sd,768)); g.fillRect(x-s/2,y-s/2,s,s*0.7); }   // grit
   const L=[...Array(6)].map((_,k)=>({x:c.x+(rnd01(k,sd,760)-0.5)*40, y:c.y+(rnd01(k,sd,761)-0.5)*12, r:4+7*rnd01(k,sd,762), k})).sort((a,b)=>a.y-b.y);
   L.forEach(({x,y,r,k})=>{ const n=5, a0=rnd01(k,sd,769)*6, pts=[...Array(n)].map((_,m)=>{ const an=a0+m/n*Math.PI*2, rr=r*(0.75+0.4*rnd01(k*7+m,sd,770)); return [x+Math.cos(an)*rr*1.2, y+Math.sin(an)*rr*0.55]; }), top=[x-r*0.1, y-r*0.95];
@@ -28148,7 +28153,7 @@ function paintUcWalls(q){ if(q==='under_se'||q==='ow_nw'||q==='ow_ne'||q==='ow_s
     g.strokeStyle='rgba(255,240,215,0.2)'; g.lineWidth=1.2; arch(0,0); g.stroke(); }); }
 // a stone coffin: a box with carved panels on its sides, a moulded lid, the dead carved lying on it, head on a cushion, hands folded on a sword
 OBJ_DRAW.sarcophagus=o=>{ const along=o.j===0, x0=o.i+(along?0.08:0.2), y0=o.j+(along?0.18:0.08), W=along?0.84:0.6, Dd=along?0.6:0.84, Hh=30, col=['#8e8a86','#7a7672','#9a9690'][o.v||0];
-  const sh=P(x0+W/2+0.08,y0+Dd/2+0.08); g.save(); g.fillStyle='rgba(0,0,0,0.35)'; g.filter='blur(4px)'; g.beginPath(); g.ellipse(sh.x,sh.y,40,14,0,0,Math.PI*2); g.fill(); g.restore();
+  const sh=P(x0+W/2+0.08,y0+Dd/2+0.08); softShadow(sh.x,sh.y,40,14,0.35,4);
   isoBox(x0,y0,W,Dd,Hh,tone(col,0.1),tone(col,-0.12),tone(col,-0.32));
   const face=(ax,ay,bx,by,dark)=>{ const A=P(ax,ay), B=P(bx,by), at=(t,hh)=>({x:A.x+(B.x-A.x)*t, y:A.y+(B.y-A.y)*t-hh});   // carved panels: sunk, their top edges in shadow, their bottom edges catching light
     for(let k=0;k<2;k++){ const t0=0.08+k*0.46, t1=t0+0.38, p=[at(t0,7),at(t1,7),at(t1,Hh-7),at(t0,Hh-7)]; g.fillStyle=tone(col,dark-0.28); g.beginPath(); p.forEach((q,n)=>n?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.closePath(); g.fill();
@@ -28217,7 +28222,7 @@ OBJ_DRAW.owcage=o=>{ const x0=o.i+0.12, y0=o.j+0.12, W=0.76, H=78; isoBox(x0,y0,
 OBJ_DRAW.owspill=o=>{ const q=P(o.i+0.5,o.j+0.5); for(let k=0;k<26;k++){ const a=rnd01(k,o.i,1951)*Math.PI*2, r=rnd01(k,o.j,1952), x=q.x+Math.cos(a)*r*30, y=q.y+Math.sin(a)*r*11, s=2+rnd01(k,1,1953)*3.5;
     g.fillStyle=['#5a524a','#6a6058','#3e3a36'][k%3]; g.beginPath(); g.moveTo(x-s,y); g.lineTo(x,y-s*0.6); g.lineTo(x+s,y); g.lineTo(x,y+s*0.4); g.closePath(); g.fill(); if(k%5===0){ g.fillStyle='#c8ccd4'; g.fillRect(x-0.6,y-1,1.2,1.2); } } };
 OBJ_DRAW.owgeode=o=>{ const q=P(o.i+1,o.j+1), x=q.x, y=q.y;   // a geode as big as a cottage, broken open, full of light
-  g.save(); g.fillStyle='rgba(0,0,0,0.35)'; g.filter='blur(5px)'; g.beginPath(); g.ellipse(x+6,y+4,62,22,0,0,Math.PI*2); g.fill(); g.restore();
+  softShadow(x+6,y+4,62,22,0.35,5);
   const shell=[[-58,0],[-62,-40],[-40,-92],[0,-112],[44,-90],[62,-42],[58,0],[20,10],[-24,10]];
   g.fillStyle='#5a5652'; g.beginPath(); shell.forEach(([a,b],n)=>n?g.lineTo(x+a,y+b):g.moveTo(x+a,y+b)); g.closePath(); g.fill();
   g.fillStyle='rgba(255,250,240,0.12)'; g.beginPath(); g.moveTo(x-58,y); g.lineTo(x-62,y-40); g.lineTo(x-40,y-92); g.lineTo(x-20,y-40); g.closePath(); g.fill();
@@ -28248,7 +28253,7 @@ onUse(['owgeode'],()=>pzSay("You stand in the mouth of the geode and the light c
 // ════════ DUNGEON PROPS, redrawn to sit in the detailed rooms: a lantern is an iron cage on a stone plinth, bones lie scattered and shaded, an ore seam is a real outcrop ════════
 var DUNGEON_DRAW={};
 DUNGEON_DRAW.lantern=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, f=0.85+0.15*Math.sin(gt*7+o.i*3)*Math.sin(gt*3.1+o.j);
-  g.save(); g.fillStyle='rgba(0,0,0,0.35)'; g.filter='blur(3px)'; g.beginPath(); g.ellipse(x+3,y+2,16,6,0,0,Math.PI*2); g.fill(); g.restore();
+  softShadow(x+3,y+2,16,6,0.35,3);
   isoBox(o.i+0.32,o.j+0.32,0.36,0.36,22,'#8a8478','#5e5a52','#46423c'); g.fillStyle='rgba(255,250,235,0.12)'; g.fillRect(x-9,y-23,18,2);   // a squat stone plinth
   const b=y-22; g.strokeStyle='#2a2622'; g.lineWidth=2; g.beginPath(); g.moveTo(x,b); g.lineTo(x,b-6); g.stroke();
   const lw=9, lh=18, top=b-6-lh; g.fillStyle=o.off?'#2a2420':`rgba(255,${Math.round(200+30*f)},120,0.95)`; g.fillRect(x-lw/2,top,lw,lh);   // the panes, lit
@@ -28266,7 +28271,7 @@ DUNGEON_DRAW.bones=o=>{ const q=P(o.i+0.5,o.j+0.5), sd=o.i*13+o.j*7, R=k=>rnd01(
     g.fillStyle='#1a1614'; g.beginPath(); g.ellipse(sx-1.7,sy-2.2,1.2,1.4,0,0,Math.PI*2); g.ellipse(sx+1.7,sy-2.2,1.2,1.4,0,0,Math.PI*2); g.fill(); } };
 // an ore seam: an outcrop of broken dark rock, facets lit and shadowed, silver running through it, a pick left in it
 OBJ_DRAW.oreseam=o=>{ const [w,h]=o.fp||[1,1], q=P(o.i+w/2,o.j+h/2), sd=o.i*31+o.j*17, R=(k,s)=>rnd01(k,sd,s), W=(w+h)*TW*0.26, Hh=34+16*Math.sqrt(w*h);
-  g.save(); g.fillStyle='rgba(0,0,0,0.35)'; g.filter='blur(4px)'; g.beginPath(); g.ellipse(q.x+4,q.y+3,W*1.05,W*0.36,0,0,Math.PI*2); g.fill(); g.restore();
+  softShadow(q.x+4,q.y+3,W*1.05,W*0.36,0.35,4);
   const N=7, pts=[...Array(N)].map((_,k)=>{ const t=k/(N-1); return [q.x-W+t*2*W, q.y+Math.sin(t*Math.PI)*W*0.18-(Math.sin(t*Math.PI)*Hh*(0.7+0.5*R(k,2011)))]; });   // the ridge line
   for(let k=0;k<N-1;k++){ const a=pts[k], b=pts[k+1], ba=[q.x-W+k/(N-1)*2*W, q.y+W*0.12], bb=[q.x-W+(k+1)/(N-1)*2*W, q.y+W*0.12], lit=0.12-k*0.07+(R(k,2012)-0.5)*0.16;
     g.fillStyle=tone('#3a3632',lit-0.3); g.beginPath(); g.moveTo(ba[0],ba[1]); g.lineTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.lineTo(bb[0],bb[1]); g.closePath(); g.fill();
@@ -28420,7 +28425,7 @@ function paintRootWalls(q){ const {w,h}=ROOM, H=140, sd=(areaId.length*37+w*7+h*
 { const _pw=paintUcWalls; paintUcWalls=function(q){ if(typeof q==='string' && q.startsWith('rc_')) return paintRootWalls(q); return _pw.apply(this,arguments); }; }
 // props of the Rootdeep
 OBJ_DRAW.rcroots=o=>{ const c=P(o.i+0.5,o.j+0.5), sd=o.i*31+o.j*7;   // a doorway the living roots have woven shut: they stir
-  g.save(); g.fillStyle='rgba(0,0,0,0.35)'; g.filter='blur(3px)'; g.beginPath(); g.ellipse(c.x,c.y+2,38,12,0,0,Math.PI*2); g.fill(); g.restore();
+  softShadow(c.x,c.y+2,38,12,0.35,3);
   for(let k=0;k<11;k++){ const x0=c.x-30+k*6, sw=Math.sin(gt*1.3+k*0.9)*3, H=70+rnd01(k,sd,2201)*30, lean=(rnd01(k,sd,2202)-0.5)*40;
     g.strokeStyle=k%2?'#2a1a10':'#3e2a18'; g.lineWidth=5+rnd01(k,sd,2203)*5; g.lineCap='round'; g.beginPath(); g.moveTo(x0,c.y+4); g.bezierCurveTo(x0+lean*0.3+sw,c.y-H*0.4,x0-lean*0.6-sw,c.y-H*0.7,x0+lean+sw,c.y-H); g.stroke();
     g.strokeStyle='rgba(220,190,140,0.18)'; g.lineWidth=1.4; g.stroke(); }
@@ -28434,7 +28439,7 @@ OBJ_DRAW.rcglow=o=>{ const q=P(o.i+0.5,o.j+0.5), sd=o.i*11+o.j*5, col=[['120,230
     g.strokeStyle='rgba(220,220,200,0.6)'; g.lineWidth=1; g.beginPath(); g.moveTo(x,y); g.lineTo(x,y-hgt); g.stroke(); g.fillStyle=col[1]; g.beginPath(); g.ellipse(x,y-hgt,r,r*0.55,0,Math.PI,0); g.fill(); } };
 if(typeof LIGHT_TYPES!=='undefined'){ LIGHT_TYPES.rcglow=[0,-6,50,'150,220,180']; LIGHT_TYPES.rcshroom=[0,-50,120,'130,220,200']; }
 OBJ_DRAW.rcshroom=o=>{ const q=P(o.i+0.5,o.j+0.5), s=o.small?0.6:1, col=[['#4a8a7a','#9ae8d0','120,230,200'],['#7a5a8a','#d8b0f0','200,150,240'],['#8a7a4a','#f0e0a0','230,210,140']][o.v||0], H=78*s;   // a cap taller than a man, glowing underneath
-  g.save(); g.fillStyle='rgba(0,0,0,0.3)'; g.filter='blur(3px)'; g.beginPath(); g.ellipse(q.x+3,q.y+2,22*s,7*s,0,0,Math.PI*2); g.fill(); g.restore();
+  softShadow(q.x+3,q.y+2,22*s,7*s,0.3,3);
   const st=g.createLinearGradient(q.x-6*s,0,q.x+6*s,0); st.addColorStop(0,'#d8d0bc'); st.addColorStop(1,'#8a8270'); g.fillStyle=st; g.beginPath(); g.moveTo(q.x-6*s,q.y); g.quadraticCurveTo(q.x-3*s,q.y-H*0.5,q.x-4*s,q.y-H); g.lineTo(q.x+4*s,q.y-H); g.quadraticCurveTo(q.x+3*s,q.y-H*0.5,q.x+6*s,q.y); g.closePath(); g.fill();
   g.save(); g.globalCompositeOperation='lighter'; glow(q.x,q.y-H+4,44*s,22*s,col[2],0.4); g.restore();
   g.fillStyle=col[1]; g.beginPath(); g.ellipse(q.x,q.y-H+2,30*s,8*s,0,0,Math.PI*2); g.fill();   // the gills, lit
@@ -28442,7 +28447,7 @@ OBJ_DRAW.rcshroom=o=>{ const q=P(o.i+0.5,o.j+0.5), s=o.small?0.6:1, col=[['#4a8a
   const cg=g.createRadialGradient(q.x-8*s,q.y-H-14*s,2,q.x,q.y-H-6*s,34*s); cg.addColorStop(0,tone(col[0],0.3)); cg.addColorStop(1,tone(col[0],-0.3)); g.fillStyle=cg; g.beginPath(); g.moveTo(q.x-32*s,q.y-H); g.quadraticCurveTo(q.x-30*s,q.y-H-26*s,q.x,q.y-H-28*s); g.quadraticCurveTo(q.x+30*s,q.y-H-26*s,q.x+32*s,q.y-H); g.quadraticCurveTo(q.x,q.y-H+4*s,q.x-32*s,q.y-H); g.closePath(); g.fill();
   g.fillStyle='rgba(255,255,240,0.4)'; for(let k=0;k<6;k++){ const a=-2.6+k*0.5; g.beginPath(); g.ellipse(q.x+Math.cos(a)*18*s,q.y-H-14*s+Math.sin(a)*8*s,2.4*s,1.6*s,0,0,Math.PI*2); g.fill(); } };
 OBJ_DRAW.rccocoon=o=>{ const q=P(o.i+0.5,o.j+0.5), split=(o.v||0)===1;   // a husk growing in a cocoon of bark and rot
-  g.save(); g.fillStyle='rgba(0,0,0,0.3)'; g.filter='blur(3px)'; g.beginPath(); g.ellipse(q.x+2,q.y+2,16,6,0,0,Math.PI*2); g.fill(); g.restore();
+  softShadow(q.x+2,q.y+2,16,6,0.3,3);
   const shape=()=>{ g.beginPath(); g.moveTo(q.x-12,q.y); g.bezierCurveTo(q.x-20,q.y-30,q.x-14,q.y-62,q.x,q.y-70); g.bezierCurveTo(q.x+14,q.y-62,q.x+20,q.y-30,q.x+12,q.y); g.closePath(); };
   const gr=g.createLinearGradient(q.x-16,0,q.x+16,0); gr.addColorStop(0,'#5a4430'); gr.addColorStop(1,'#1e140c'); g.fillStyle=gr; shape(); g.fill();
   g.save(); shape(); g.clip(); g.strokeStyle='rgba(20,10,6,0.55)'; g.lineWidth=1.6; for(let k=0;k<8;k++){ g.beginPath(); g.moveTo(q.x-16,q.y-k*9); g.quadraticCurveTo(q.x,q.y-k*9-6+Math.sin(k)*3,q.x+16,q.y-k*9-2); g.stroke(); } g.restore();
@@ -28605,7 +28610,7 @@ ITEM_ICON.ember_crown=ITEM_ICON.ember_hood=(g2,id,size)=>{ g2.save(); g2.scale(s
 
 // a gnarled knot of root bursting up out of the floor and diving back in
 OBJ_DRAW.rcknot=o=>{ const q=P(o.i+0.5,o.j+0.5), s=o.small?0.65:1, sd=o.i*19+o.j*7, col=['#3e2a18','#2e2018','#4a3a2a'][o.v||0];
-  g.save(); g.fillStyle='rgba(0,0,0,0.32)'; g.filter='blur(3px)'; g.beginPath(); g.ellipse(q.x+3,q.y+2,30*s,9*s,0,0,Math.PI*2); g.fill(); g.restore();
+  softShadow(q.x+3,q.y+2,30*s,9*s,0.32,3);
   for(let k=0;k<4;k++){ const a=(rnd01(k,sd,2311)-0.5)*1.4, x0=q.x-24*s+k*5*s, x1=x0+(26+rnd01(k,sd,2312)*16)*s, hh=(22+rnd01(k,sd,2313)*24)*s, th=(5+rnd01(k,sd,2314)*5)*s;   // loops of root, arching up out of the earth
     g.lineCap='round'; g.strokeStyle='rgba(0,0,0,0.35)'; g.lineWidth=th+3; g.beginPath(); g.moveTo(x0+2,q.y+3); g.bezierCurveTo(x0+4,q.y-hh+3,x1-6,q.y-hh*0.9+3,x1+2,q.y+3+a*4); g.stroke();
     g.strokeStyle=col; g.lineWidth=th; g.beginPath(); g.moveTo(x0,q.y); g.bezierCurveTo(x0+2,q.y-hh,x1-8,q.y-hh*0.9,x1,q.y+a*4); g.stroke();
@@ -28797,7 +28802,7 @@ ITEM_ICON.duskplum=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40);
 // the plants, regrowing like the bramble bushes up top
 const DEEP_REGROW=2, deepKey=o=>areaId+':'+o.type+':'+o.i+','+o.j, deepRipe=o=>{ const t=(CHOICE.deepFruit||{})[deepKey(o)]; return t==null ? 1 : Math.min(1,(dayClock-t)/(DAY_LEN*DEEP_REGROW)); };
 OBJ_DRAW.rcberry=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, r=deepRipe(o), sd=o.i*17+o.j*5, sw=Math.sin(gt*1.1+o.i)*0.8;   // a low shrub of dark round leaves on a twist of root, berries of cold light
-  g.save(); g.fillStyle='rgba(0,0,0,0.3)'; g.filter='blur(3px)'; g.beginPath(); g.ellipse(x+2,y+2,22,7,0,0,Math.PI*2); g.fill(); g.restore();
+  softShadow(x+2,y+2,22,7,0.3,3);
   g.strokeStyle='#3a2a1a'; g.lineWidth=3; g.lineCap='round'; g.beginPath(); g.moveTo(x-6,y); g.quadraticCurveTo(x-2,y-10,x,y-16); g.moveTo(x+6,y); g.quadraticCurveTo(x+3,y-8,x+2,y-14); g.stroke();
   for(let k=0;k<16;k++){ const a=rnd01(k,sd,2501)*Math.PI*2, rr=rnd01(k,sd,2502), lx=x+Math.cos(a)*rr*20+sw, ly=y-18+Math.sin(a)*rr*10; g.fillStyle=['#2e4a2a','#3e5e34','#24402a'][k%3]; g.beginPath(); g.ellipse(lx,ly,5,3.4,a,0,Math.PI*2); g.fill(); }
   if(r>=0.5){ const n=Math.round(9*Math.min(1,(r-0.5)*2)); g.save(); g.globalCompositeOperation='lighter'; glow(x,y-18,30,18,'140,210,255',0.18*r); g.restore();
@@ -28845,7 +28850,7 @@ onUse(['rcpod'],o=>{ const key=areaId+':'+o.i+','+o.j; if(collectedPickups.has(k
 NEAR_NAME.rclight='a lightbloom'; NEAR_NAME.rcpod='a seed-pod'; NEAR_NAME.rcrune='carving in a root';
 if(typeof LIGHT_TYPES!=='undefined'){ LIGHT_TYPES.rclight=[0,-50,150,'230,240,190']; LIGHT_TYPES.rcpod=[0,-20,50,'200,220,120']; }
 OBJ_DRAW.rclight=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, sd=o.i*31+o.j*7, col=[['240,236,190','#f4f0c8'],['200,240,220','#d8f8ec'],['230,210,250','#ece0fc']][o.v||0], f=0.85+0.15*Math.sin(gt*1.6+sd);   // a lightbloom: stems from a tuft of leaves, each bending under a glowing bell
-  g.save(); g.fillStyle='rgba(0,0,0,0.3)'; g.filter='blur(3px)'; g.beginPath(); g.ellipse(x+2,y+2,16,5,0,0,Math.PI*2); g.fill(); g.restore();
+  softShadow(x+2,y+2,16,5,0.3,3);
   g.save(); g.globalCompositeOperation='lighter'; glow(x,y-52,48*f,38*f,col[0],0.32); glow(x,y,34,12,col[0],0.12); g.restore();
   for(let k=0;k<7;k++){ const a=-1.2+k*0.4; g.fillStyle=k%2?'#2e5a2e':'#3e6e34'; g.beginPath(); g.ellipse(x+Math.sin(a)*9,y-4,4,9,a*0.7,0,Math.PI*2); g.fill(); }   // the leaves at its foot
   [[-6,66,-0.5],[2,78,0.15],[8,58,0.6]].forEach(([dx,h,lean],k)=>{ const sw=Math.sin(gt*0.9+k+sd)*1.6, tx=x+dx+lean*18+sw, ty=y-h;
@@ -28853,7 +28858,7 @@ OBJ_DRAW.rclight=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, sd=o.i*31+o.j*7,
     const bx=tx+lean*9, by=ty+3; const bg=g.createRadialGradient(bx,by+3,0.5,bx,by+3,7); bg.addColorStop(0,'#ffffff'); bg.addColorStop(0.5,col[1]); bg.addColorStop(1,'rgba(255,255,255,0.2)'); g.fillStyle=bg;
     g.beginPath(); g.moveTo(bx-5,by+8); g.quadraticCurveTo(bx-5.5,by,bx,by-1); g.quadraticCurveTo(bx+5.5,by,bx+5,by+8); g.quadraticCurveTo(bx,by+6,bx-5,by+8); g.closePath(); g.fill(); }); };
 OBJ_DRAW.rcpod=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, S=o.rich?1.35:1, sd=o.i*19+o.j*11, b=0.6+0.4*Math.sin(gt*1.4+sd);   // a vine curling up out of the earth, and on it a swollen pod, seams glowing, something inside
-  g.save(); g.fillStyle='rgba(0,0,0,0.3)'; g.filter='blur(3px)'; g.beginPath(); g.ellipse(x+2,y+2,16*S,5*S,0,0,Math.PI*2); g.fill(); g.restore();
+  softShadow(x+2,y+2,16*S,5*S,0.3,3);
   g.strokeStyle='#3e2a18'; g.lineWidth=3.4*S; g.lineCap='round'; g.beginPath(); g.moveTo(x-10*S,y); g.bezierCurveTo(x-14*S,y-22*S,x+8*S,y-30*S,x+2*S,y-44*S); g.stroke(); g.lineWidth=2*S; g.beginPath(); g.moveTo(x+8*S,y); g.quadraticCurveTo(x+12*S,y-14*S,x+4*S,y-22*S); g.stroke();
   [[-12,-16],[10,-12],[-4,-34]].forEach(([dx,dy],k)=>{ g.fillStyle=k%2?'#3e6e34':'#2e5a2e'; g.beginPath(); g.ellipse(x+dx*S,y+dy*S,5*S,2.6*S,k-0.5,0,Math.PI*2); g.fill(); });
   const px=x+2*S, py=y-26*S, pg=g.createRadialGradient(px-4*S,py-5*S,1,px,py,12*S); pg.addColorStop(0,o.rich?'#e8d890':'#c8d890'); pg.addColorStop(0.6,o.rich?'#8a7a3a':'#5a7a3a'); pg.addColorStop(1,'#2a3a1a'); g.fillStyle=pg;
@@ -28861,7 +28866,7 @@ OBJ_DRAW.rcpod=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, S=o.rich?1.35:1, s
   g.save(); g.globalCompositeOperation='lighter'; g.strokeStyle=o.rich?`rgba(255,220,120,${0.7*b})`:`rgba(210,240,120,${0.6*b})`; g.lineWidth=1.1; [-4,0,4].forEach(dx=>{ g.beginPath(); g.moveTo(px+dx*0.4*S,py-13*S); g.quadraticCurveTo(px+dx*S*1.6,py,px+dx*0.4*S,py+11*S); g.stroke(); });
   glow(px,py,18*S,16*S,o.rich?'255,210,110':'200,230,110',0.22*b); g.restore(); };
 OBJ_DRAW.rcrune=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y, sd=o.i*13+o.j*17;   // a stump of old root standing out of the floor, the writing cut into it glowing silver
-  g.save(); g.fillStyle='rgba(0,0,0,0.32)'; g.filter='blur(3px)'; g.beginPath(); g.ellipse(x+2,y+2,18,6,0,0,Math.PI*2); g.fill(); g.restore();
+  softShadow(x+2,y+2,18,6,0.32,3);
   const bg=g.createLinearGradient(x-12,0,x+12,0); bg.addColorStop(0,'#6a4e32'); bg.addColorStop(1,'#2a1c10'); g.fillStyle=bg; g.beginPath(); g.moveTo(x-12,y); g.quadraticCurveTo(x-14,y-26,x-9,y-44); g.lineTo(x+8,y-48); g.quadraticCurveTo(x+14,y-26,x+12,y); g.closePath(); g.fill();
   g.strokeStyle='rgba(20,12,6,0.5)'; g.lineWidth=1; for(let k=-2;k<=2;k++){ g.beginPath(); g.moveTo(x+k*4,y-2); g.quadraticCurveTo(x+k*5,y-24,x+k*3.5,y-44); g.stroke(); }
   g.fillStyle='#4a3420'; g.beginPath(); g.ellipse(x,y-46,9,3.4,-0.2,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(200,170,120,0.4)'; g.lineWidth=0.8; g.beginPath(); g.ellipse(x,y-46,6,2,-0.2,0,Math.PI*2); g.stroke();   // its cut top, rings

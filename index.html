@@ -29949,7 +29949,8 @@ const jobMet=id=>!!((CHOICE.met||{})[id] || (JOB_MET_GUESS[id] && JOB_MET_GUESS[
 { const _t=talkTo; talkTo=function(n){ try{ if(n && n.id){ (CHOICE.met=CHOICE.met||{})[n.id]=1; const S=CHOICE.jobs; if(S && S.active) S.active.forEach(a=>{ const j=JOB_POOL.find(x=>x.id===a.id); if(j && j.kind==='visit' && j.who===n.id && !a.got){ a.got=1; setTimeout(()=>logMsg('Job done: you looked in on '+(n.name||'them')+'. Back to the board to be paid.','#e8c060'),400); } }); } }catch(e){} return _t.apply(this,arguments); }; }
 const jobDay=()=>Math.floor((dayClock+DAY_LEN*0.25)/DAY_LEN);
 const jobsToday=(board)=>{ const d=jobDay(), pool=JOB_POOL.filter(j=>(j.board||'market')===board && (!j.need || j.need())), out=[]; let s=(d*7919+(board==='market'?131:17))>>>0;
-  while(out.length<3 && out.length<pool.length){ s=(s*1103515245+12345)>>>0; const j=pool[s%pool.length]; if(!out.includes(j)) out.push(j); } return out; };
+  for(let guard=0; out.length<3 && out.length<pool.length && guard<200; guard++){ s=(s*1103515245+12345)>>>0; const j=pool[(s>>>16)%pool.length]; if(!out.includes(j)) out.push(j); }   // high bits (the low ones of this generator repeat), and never more than a few hundred tries
+  for(const j of pool){ if(out.length>=3) break; if(!out.includes(j)) out.push(j); } return out; };
 const jobState=()=>CHOICE.jobs=(CHOICE.jobs && typeof CHOICE.jobs==='object')?CHOICE.jobs:{active:[], done:0, dayTaken:{}};
 const jobProg=j=>{ const S=jobState(), a=S.active.find(x=>x.id===j.id); if(!a) return 0; return j.kind==='kill'||j.kind==='visit' ? a.got||0 : Math.min(j.n,invCount(j.item)); };
 const jobLeaves=j=>j.lv;

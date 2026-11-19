@@ -27501,7 +27501,7 @@ AREAS.hollowheart={ ...INSIDE_BASE, w:15, h:14, theme:'interior', cave:true, lab
   npcs:()=> SEAL() && !SEAL().done ? sealBackers().filter(k=>SEAL_ALLY[k]).map((k,n)=>{ const A=SEAL_ALLY[k](); const spots=[[3,11],[11,11],[2,9],[12,9],[5,12],[9,12],[1,7]]; const [i,j]=spots[n%spots.length]; return { id:'ally_'+k, name:A.name, i, j, dir:i<7?0:6, opts:A.opts }; }) : [],
   mobs:()=> SEAL() && SEAL().done ? [] : [{ name:'The Hollow', type:'hollow', i:7, j:5, faction:'hollowking', opts:{ spirit:true, equip:{...NOEQ, weapon:'hollow_maw'} } }],
   entries:{ fromUp:{i:7,j:12} } };
-Object.assign(AREA_TIER,{ hollowstair:5, hollowroots:5, hollowheart:5 });
+Object.assign(AREA_TIER,{ hollowstair:5, hollowroots:6, hollowheart:6 });   // the last descent is the hardest place in the valley: no wedge-hunt asks more of you than the Hollow itself
 NEAR_NAME.sealstone='the Valley Seal';
 OBJ_DRAW.sealstone=o=>{ const q=P(o.i+0.5,o.j+0.5); g.save(); g.globalCompositeOperation='lighter'; glow(q.x,q.y-18,40,30,'255,230,170',0.35+0.08*Math.sin(gt*1.4)); g.restore();
   g.fillStyle='#8a6a3a'; g.beginPath(); g.ellipse(q.x,q.y-14,14,8,0,0,Math.PI*2); g.fill(); g.strokeStyle='#e8d098'; g.lineWidth=1.2; g.stroke();
@@ -31149,6 +31149,73 @@ wrap('heath','objects',l=>{ if(!encounter('shepherd',0.6)) return l; const out=[
         if(last!=='a'){ last='a'; C.a++; } }
       else last=f.state;
       if(html){ if(el.innerHTML!==html) el.innerHTML=html; el.style.display='block'; } else el.style.display='none'; }catch(e){} },60); }
+
+// ════════ the Cinderveil and the shaking ground: Odra's people fled a waking thing once before, and their fire keeps its dreams away ════════
+ITEMS.cv_ember_ward={ name:'Ember Ward', slot:'misc', title:"An ember core in a cage of brass wire, on a sooty cord. Ashmother Odra says the Hollow's dreams cannot stand its warmth. Carried into the Hollow, its blows land a little softer." };
+PRICES.cv_ember_ward=0; QUEST_ITEMS.add('cv_ember_ward');
+{ const _p=paintEmberArt; paintEmberArt=function(g2,id,size){ if(id!=='cv_ember_ward') return _p.apply(this,arguments);
+    g2.save(); g2.scale(size/40,size/40);
+    g2.strokeStyle='#4a3a2a'; g2.lineWidth=1.3; g2.beginPath(); g2.moveTo(9,4); g2.quadraticCurveTo(20,14,31,4); g2.stroke();   // the cord
+    const gl=g2.createRadialGradient(20,24,0,20,24,13); gl.addColorStop(0,'rgba(255,170,60,0.65)'); gl.addColorStop(1,'rgba(255,90,20,0)'); g2.fillStyle=gl; g2.fillRect(6,10,28,28);
+    g2.fillStyle='#2a1a16'; g2.beginPath(); g2.moveTo(20,14); g2.lineTo(27,19); g2.lineTo(26,29); g2.lineTo(19,33); g2.lineTo(13,27); g2.lineTo(14,18); g2.closePath(); g2.fill();
+    g2.strokeStyle='#ffb050'; g2.lineWidth=1.1; g2.beginPath(); g2.moveTo(17,19); g2.lineTo(20,24); g2.lineTo(18,29); g2.moveTo(20,24); g2.lineTo(24,22); g2.stroke();
+    g2.strokeStyle='#b8864a'; g2.lineWidth=1.2; [[14,18,26,29],[26,18,14,30],[20,13,20,34]].forEach(([a,b,c,d])=>{ g2.beginPath(); g2.moveTo(a,b); g2.lineTo(c,d); g2.stroke(); });   // the brass cage
+    g2.strokeStyle='rgba(30,20,10,0.6)'; g2.lineWidth=0.9; g2.beginPath(); g2.moveTo(20,14); g2.lineTo(27,19); g2.lineTo(26,29); g2.lineTo(19,33); g2.lineTo(13,27); g2.lineTo(14,18); g2.closePath(); g2.stroke();
+    g2.restore(); return true; }; }
+{ const trust=()=>CHOICE.cvTrust||0, inHollow=()=>/^hollow(stair|roots|heart)$/.test(areaId||'');
+  const _fd=foeDmgMult; foeDmgMult=function(f){ const m=_fd.apply(this,arguments); return (inHollow() && hasItem('cv_ember_ward')) ? m*0.88 : m; };
+  const old=TALKERS.cvodra; TALKERS.cvodra=()=>{ const _sd=showDialog; let done=false;
+    showDialog=function(name,text,opts,purse){ if(!done){ done=true; showDialog=_sd;
+        if(SEAL() && !CHOICE.cvWard && Array.isArray(opts)){ opts=[...opts]; const k=opts.indexOf(bye);
+          opts.splice(k<0?opts.length:k,0,{label:'“The ground shook. Do the Cinderveil know what it is?”', fn:()=>{
+            if(!trust()){ say('Ashmother Odra',["“Kin ask that.” <i>The mask tilts.</i> “You are not kin. Bring us salvage, and we will see.”"],[{label:'Back.', fn:()=>TALKERS.cvodra()}]); return; }
+            say('Ashmother Odra',["<i>She is quiet a long while.</i> “Our grandmothers' grandmothers lived in the Sunscar. The ground there shook for a year. Then the wells went bitter, and the dreams came.”",
+              "“Dreams of a mouth under the old stones, turning over in its sleep. They walked north and never went back. The masks were for the dust, they say. They were also for the dreams.”",
+              "“Fire keeps it out. Fire and brass and stubbornness.” <i>She lifts a caged ember from her own neck and holds it out.</i> “If you mean to go down to it, take this. It will not like you, carrying it. Good.”"],
+              [{label:'Take the Ember Ward.', fn:()=>{ closeDialog(); CHOICE.cvWard=true; giveQuestItem('cv_ember_ward',true); remember('cvward','given',"Ashmother Odra gave you an Ember Ward against the Hollow."); logMsg("Ember Ward: carried into the Hollow, its blows land softer.",'#ffb050'); try{ autosaveSoon(300); }catch(e){} }}]); } }); } }
+      return _sd.call(this,name,text,opts,purse); };
+    try{ old(); } finally{ showDialog=_sd; } };
+  const _h=npcHasNews; npcHasNews=function(n){ if(n && n.id==='cvodra' && SEAL() && !CHOICE.cvWard && trust()>=1 && !SEAL().done) return '!'; return _h.apply(this,arguments); };
+  const vs=JOURNAL.find(e=>e[0]==='The Valley Seal'); if(vs){ const f=vs[1]; vs[1]=()=>{ const r=f(); if(r && r[0]==='active' && !CHOICE.cvWard) r[1]+="<br><i>The Cinderveil of the Scrublands felt the ground shake too. Ashmother Odra may know something.</i>"; return r; }; } }
+
+// ════════ the Halfway Lantern's troubles: three small jobs on the road north, for a hero still finding their feet (Lv 4-7) ════════
+{ const HL=()=>CHOICE.hl||null, M='Marta of the Halfway Lantern', dead=k=>defeatedMobs.has(k);
+  const ROB=['hedgerow:Hedge-Robber Cobb','hedgerow:Hedge-Robber Nell'], DOGS=['hedgerow:Scab the Feral Dog','hedgerow:Brindle the Feral Dog','hedgerow:One-Ear the Feral Dog'], JORY=['longmeadow:Black Jory','longmeadow:Jory\'s Lookout'];
+  const all=L=>L.every(dead), coin=n=>{ player.purse+=n; updateHud(); };
+  const refresh=()=>{ try{ if(areaId==='hedgerow'||areaId==='longmeadow'){ MOB_SPAWNS.length=0; MOB_SPAWNS.push(...AREAS[areaId].mobs()); resetMobs(); } }catch(e){} };
+  wrap('hedgerow','mobs',l=>{ const out=[...l];
+    if(HL()==='r1'){ const c=(AREAS.hedgerow.objects().find(o=>o.type==='cart'))||{i:6,j:24};
+      if(!dead(ROB[0])) out.push({ name:'Hedge-Robber Cobb', type:'bandit', i:c.i-2, j:c.j-1, faction:'hedgerobbers', opts:BANDIT({skin:2,hair:4,hairColor:3,beard:3,equip:{head:'hood'}}) });
+      if(!dead(ROB[1])) out.push({ name:'Hedge-Robber Nell', type:'bandit', i:c.i-2, j:c.j+2, faction:'hedgerobbers', opts:BANDIT({gender:'f',skin:1,hair:2,hairColor:6,beard:0,equip:{head:'bandana'}}) }); }
+    if(HL()==='r2'){ [['Scab',8,17,'#7a6a52'],['Brindle',8,19,'#5a4a3a'],['One-Ear',9,13,'#8a7a62']].forEach(([n,i,j,c])=>{ if(!dead('hedgerow:'+n+' the Feral Dog')) out.push({ name:n+' the Feral Dog', type:'wolf', i, j, faction:'feraldogs', coat:c, hpMul:0.75 }); }); }
+    return out; });
+  wrap('longmeadow','mobs',l=>{ const out=[...l]; if(HL()==='r3'){
+      if(!dead(JORY[0])) out.push({ name:'Black Jory', type:'bandit', i:45, j:4, faction:'jory', hpMul:1.35, opts:BANDIT({skin:3,hair:3,hairColor:1,beard:4,equip:{head:'bandana',feet:'riding_boots'}}) });
+      if(!dead(JORY[1])) out.push({ name:"Jory's Lookout", type:'bandit', i:43, j:5, faction:'jory', opts:BANDIT({skin:1,hair:1,hairColor:4,beard:0,equip:{head:'hood'}}) }); }
+    return out; });
+  const ready=()=> (HL()==='r1'&&all(ROB)) || (HL()==='r2'&&all(DOGS)) || (HL()==='r3'&&all(JORY));
+  const opts=()=>{ const o=[], back=()=>TALKERS.halfwayinn();
+    if(!HL()) o.push({label:'“You look worried.”', fn:()=>say(M,["“Do I? I'm short a cart of ale, that's all. The cart came up Hedgerow Way this morning. The ale didn't.”","“Two of them, the carter says. A man in a hood and a woman with a red rag on her head, waiting where the old broken cart sits in the sunken lane. Took the kegs and laughed about it.”","“The Baron's men won't stir for two kegs. Would you?”"],
+      [{label:'“I will see to them.”', fn:()=>{ CHOICE.hl='r1'; remember('hl','r1',"Marta of the Halfway Lantern lost her ale to two hedge-robbers on Hedgerow Way."); refresh(); say(M,"“By the old cart, halfway down the sunken lane. Mind yourself. Thirty copper when you're back.”",[bye]); }}, {label:'“Not today.”', fn:back}])});
+    if(HL()==='r1' && all(ROB)) o.push({label:'“Your hedge-robbers won\'t trouble the road again.”', fn:()=>say(M,["“Oh, you lovely thing.” <i>She counts out thirty copper, then two loaves.</i> “The kegs are past saving, I'd guess. They'll have drunk them. Still: the next cart gets through.”"],[{label:'Take it.', fn:()=>{ CHOICE.hl='d1'; coin(30); giveQuestItem('bread'); giveQuestItem('bread'); logMsg('+30 copper, 2 loaves.','#e8c060'); back(); }}])});
+    if(HL()==='d1') o.push({label:'“Anything else on the road?”', fn:()=>say(M,["“Since you ask. Dogs. Not wolves: dogs, run wild. Somebody's farm went under last winter and the dogs stayed. Three of them, running the hay-fields along Hedgerow Way.”","“They had my hens. Next it'll be somebody's child. They go for the legs, and they come at you from both sides.”"],
+      [{label:'“I will deal with them.”', fn:()=>{ CHOICE.hl='r2'; remember('hl','r2',"Three feral dogs run the hay-fields of Hedgerow Way. Marta wants them gone."); refresh(); say(M,"“Along the sunken lane, where the hay-fields are. Don't let them get round you.”",[bye]); }}, {label:'“Later.”', fn:back}])});
+    if(HL()==='r2' && all(DOGS)) o.push({label:'“The dogs are dead.”', fn:()=>say(M,["“It had to be done. I'm sorry it was you that did it.” <i>She presses a stoppered bottle and some coin on you.</i> “Gisla's draught. Keep it for the next bad day.”"],[{label:'Take it.', fn:()=>{ CHOICE.hl='d2'; coin(20); giveQuestItem('potion'); logMsg('+20 copper, a Healing Draught.','#e8c060'); back(); }}])});
+    if(HL()==='d2') o.push({label:'“You have that look again.”', fn:()=>say(M,["“Black Jory.” <i>She says it the way you'd name a bad tooth.</i> “He works the top of the meadow, toward the King's Road. Him and a lookout. Every traveller coming down to me has paid him first.”","“He's no hedge-robber. He was a soldier once, or says so. Don't go up there until you can handle yourself, love.”"],
+      [{label:'“I will bring him down.”', fn:()=>{ CHOICE.hl='r3'; remember('hl','r3',"Black Jory and his lookout rob travellers at the top of the Long Meadow."); refresh(); say(M,"“North-east, up toward the road. He wears good boots for a thief. If you get them, they're yours.”",[bye]); }}, {label:'“Not yet.”', fn:back}])});
+    if(HL()==='r3' && all(JORY)) o.push({label:'“Black Jory is finished.”', fn:()=>say(M,["“Is he.” <i>She sits down, hard, on the bench.</i> “Good. Good. There's forty copper in the pot for whoever did it, and a bed whenever you want one.”","“And you kept the boots. Of course you did.”"],[{label:'Take the coin.', fn:()=>{ CHOICE.hl='done'; coin(40); giveQuestItem('riding_boots',true); logMsg("+40 copper, Black Jory's riding boots.",'#e8c060'); back(); }}])});
+    return o; };
+  const old=TALKERS.halfwayinn; TALKERS.halfwayinn=()=>{ const _sd=showDialog; let done=false;
+    showDialog=function(name,text,o,purse){ if(!done){ done=true; showDialog=_sd; try{ const ex=opts(); if(ex.length && Array.isArray(o)){ o=[...o]; const k=o.indexOf(bye); o.splice(k<0?o.length:k,0,...ex); } }catch(e){ console.error(e); } } return _sd.call(this,name,text,o,purse); };
+    try{ old(); } finally{ showDialog=_sd; } };
+  const _h=npcHasNews; npcHasNews=function(n){ if(n && n.id==='halfwayinn'){ if(ready()) return '?'; if(!HL()||HL()==='d1'||HL()==='d2') return '!'; } return _h.apply(this,arguments); };
+  const step=(k,a,b,txtA,txtR,txtD)=>()=>{ const h=HL(); const ord=['r1','d1','r2','d2','r3','done']; const i=ord.indexOf(h); if(i<ord.indexOf(a)) return null; if(i>ord.indexOf(a)) return ['done',txtD]; return ['active', all(k)?txtR:txtA]; };
+  JOURNAL.push(['Robbed on Hedgerow Way', step(ROB,'r1','d1',"Two hedge-robbers stole Marta's ale on Hedgerow Way. They wait by the old cart in the sunken lane.","The hedge-robbers are dealt with. Tell Marta at the Halfway Lantern, on the Long Meadow.","You saw off the hedge-robbers who took Marta's ale.")]);
+  JOURNAL.push(['Dogs in the Hay-Fields', step(DOGS,'r2','d2',"Three feral dogs run the hay-fields along Hedgerow Way. They come at you from both sides.","The dogs are dead. Tell Marta at the Halfway Lantern.","You put down the feral dogs of Hedgerow Way.")]);
+  JOURNAL.push(['Black Jory', step(JORY,'r3','done',"Black Jory and his lookout rob travellers at the top of the Long Meadow, toward the King's Road.","Black Jory is down. Tell Marta at the Halfway Lantern.","You ended Black Jory's tolls on the Long Meadow. You kept his boots.")]);
+  Object.assign(QUEST_AT,{ 'Robbed on Hedgerow Way':'hedgerow', 'Dogs in the Hay-Fields':'hedgerow', 'Black Jory':'longmeadow' });
+  Object.assign(QUEST_PLUS,{ 'Robbed on Hedgerow Way':1, 'Dogs in the Hay-Fields':2, 'Black Jory':-1 });
+  JOB_POOL.push({id:'v_marta', board:'village', kind:'visit', who:'halfwayinn', text:'Marta keeps the Halfway Lantern on the Long Meadow, north up Hedgerow Way from the forest road. Travellers say she has had trouble on the road.', n:1, pay:8, lv:1, need:()=>!jobMet('halfwayinn')}); }
 </script>
 </body>
 </html>

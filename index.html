@@ -11832,7 +11832,7 @@ function eatItem(k){ const id=player.inv[k];
   const r=eatItemRaw(k); refreshPlayerHp(false); updateHud(); return r; }
 function eatItemRaw(k){ const id=player.inv[k]; if(!id||!ITEMS[id]||!ITEMS[id].heal) return false; SND.fx(/potion|draught|tonic|water|ale|wine|cider|milk|flask/.test(id)?'gulp':'chew');
   if(player.hp>=player.maxHp){ if(typeof flash==='function') flash('You are not hurt.'); return false; }
-  const h=Math.min(ITEMS[id].heal, player.maxHp-player.hp); player.hp+=h; player.inv[k]=null;
+  const h=Math.min(Math.round(ITEMS[id].heal*(typeof perkHas==='function' && perkHas('herbal')?1.4:1)), player.maxHp-player.hp); player.hp+=h; player.inv[k]=null;
   floatText(tileOf(player),'+'+h+' HP','#8ad07a'); if(id==='raw_meat') logMsg('You chew the raw meat. It is not a good idea, but it is something. Better cooked over a campfire.','#c8a070'); else logMsg((id==='potion'?'You drink the ':'You eat the ')+ITEMS[id].name.toLowerCase().replace(/^loaf of /,'bread')+'. (+'+h+' HP)','#8ad07a');
   updateHud(); if(invOverlay.classList.contains('open')) refreshInventory(); refreshFoodBar(); return true; }
 let foodCD=0;
@@ -11958,7 +11958,7 @@ function refreshStatPanel(){
     ...(typeof playerLevel==='function' ? [['Level', playerLevel(), playerLevel()<LV_MAX?`${xpInto()} / ${xpNeed()} xp to the next level.`:'The highest level there is.'], ['Armour', armourTotal(), `Cuts the damage you take by ${Math.round(armourCut()*100)}%.`], ...((CHOICE.perks||[]).length?[['Perks', CHOICE.perks.length, CHOICE.perks.map(p=>PERKS[p]?PERKS[p].name+': '+PERKS[p].what:p).join('<br>')]]:[])] : []),
     ['Weapon', wname],
     ['Damage', typeof weaponDmg==='function' ? Math.round(weaponDmg(player.opts.equip.weapon)*levelDmgMult()) : W.dmg, 'What one clean hit with your weapon does, before the foe\'s armour.'],
-    ['Critical Chance', Math.round(PARRY.critChance*100)+'%', 'The chance that a hit lands as a critical, for extra damage.'],
+    ['Critical Chance', Math.round((PARRY.critChance+(typeof perkHas==='function' && perkHas('keen')?0.08:0))*100)+'%', 'The chance that a hit lands as a critical, for extra damage.'],
     ['Off Hand', E.offhand ? ITEMS[E.offhand].name : 'None'],
   ];
   const row=(k,v,h)=>`<div class="stat-row"${h?` data-help="${String(h).replace(/"/g,'&quot;')}"`:''}><b>${k}</b><span>${v}</span></div>`;
@@ -14893,7 +14893,7 @@ function impact(f){                                   // a foe's swing lands (or
     floatText(tileOf(player),'PERFECT!','#ffffff',true); SND.perfect(); momGain(25);
     if(typeof manaGain==='function' && isMagicWeapon()) manaGain(15);
     burst(player,f,'#fff4c0',16);
-    logMsg(`Perfect parry! ${shortName(f)} staggers.`,'#f0c060');
+    logMsg(`Perfect parry! ${shortName(f)} staggers.`,'#f0c060'); if(typeof perkHas==='function' && perkHas('riposte')) RIPOSTE_UNTIL=performance.now()+2500;
     if(!f.quick) f.k++;
     if(duel.ripUntil>clock && !f.dead) riposteCounter(f);
   } else {
@@ -14944,7 +14944,7 @@ function woundRaw(f,n,label,col){
   if(f!==player && HIT_SRC==='melee' && n>0 && RIPOSTE_UNTIL>performance.now()){ RIPOSTE_UNTIL=0; n=Math.round(n*1.4); floatText(tileOf(player),'Riposte!','#f0d080',true); }   // the duellist's boots: a dodge sets up the answer
   if(f.type==='barrowking' && HIT_SRC==='melee' && !isMagicWeapon() && n>0) n=Math.max(1,Math.round(n*BK_STEEL));   // his bog-iron mail turns plain steel
   if(f!==player && hasStatus(player,'weak') && n>0) n=Math.max(1,Math.ceil(n*0.5));   // withered: half, as a withered foe
-  const crit = Math.random()<PARRY.critChance;
+  const crit = Math.random()<PARRY.critChance+(typeof perkHas==='function' && perkHas('keen')?0.08:0);
   if(crit) n=Math.round(n*PARRY.critMult);
   f.hp-=n; f.flash=0.35; shake=Math.max(shake,crit?7:3);
   floatText(tileOf(f),'-'+n,crit?'#ffe070':'#ffd070',true);
@@ -31099,12 +31099,18 @@ ICON_EXTRA.cv_scarf=scarfIcon('#8a3a2a','#4a1e16','#c8904a'); ICON_EXTRA.cv_scar
 // ════════ PERKS: every fifth level, pick one. Each can be taken more than once ════════
 const PERKS={ hardy:{name:'Hardy', what:'+12 max health', hp:12}, edge:{name:'Strong Arm', what:'+2 Attack Power (+6% weapon damage)', st:{ap:2}},
   feet:{name:'Light on Your Feet', what:'+2 Agility (harder to hit)', st:{agi:2}}, lore:{name:'Spell-learned', what:'+2 Spell Power (+8% spell damage)', st:{magic:2}} };
+Object.assign(PERKS,{ guard:{name:'Steady Guard', what:'your parry window is a fifth wider', special:true}, riposte:{name:'Riposte', what:'after a perfect parry, your next blow within a breath or two hits 40% harder', special:true},
+  keen:{name:'Keen Eye', what:'+8% critical chance', special:true}, herbal:{name:'Hedge-Herbalist', what:'food and draughts heal 40% more', special:true} });
+const perkHas=id=>(CHOICE.perks||[]).includes(id);
+{ const _wf=windowFor; windowFor=e=>_wf(e)*(e===player && perkHas('guard')?1.2:1); }
 const perkList=()=>CHOICE.perks||[], perkHp=()=>perkList().reduce((a,p)=>a+((PERKS[p]||{}).hp||0),0), perkStat=k=>perkList().reduce((a,p)=>a+(((PERKS[p]||{}).st||{})[k]||0),0);
 const perksOwed=()=>Math.floor(playerLevel()/5)-perkList().length;
 function perkOffer(){ if(perksOwed()<=0) return; if(dlgIsOpen() || combat.active || (typeof CS!=='undefined' && CS.on)) return;
   const n=perkList().length+1, opt=id=>({label:`<b>${PERKS[id].name}</b> <small>(${PERKS[id].what}${perkList().filter(p=>p===id).length?', taken '+perkList().filter(p=>p===id).length+'×':''})</small>`, fn:()=>{ closeDialog(); CHOICE.perks=[...perkList(),id]; refreshPlayerHp(false); player.hp=Math.min(player.maxHp,player.hp+(PERKS[id].hp||0)); updateHud(); try{ refreshStatPanel(); }catch(e){}
       banner(PERKS[id].name,'#f0dc80',1600); logMsg('Perk: '+PERKS[id].name+' ('+PERKS[id].what+').','#f0dc80'); autosaveSoon(300); if(perksOwed()>0) setTimeout(perkOffer,700); }});
-  say('Level '+(n*5)+': a Perk',["The road has taught you something. Pick one; you can take the same again later."],['hardy','edge','feet','lore'].map(opt)); }
+  const SP=(n===3||n===5) ? ['guard','riposte','keen','herbal'].filter(p=>!perkHas(p)) : [];   // levels 15 and 25: a knack, not a number
+  if(SP.length) say('Level '+(n*5)+': a Knack',["Fifteen roads, or twenty-five, teach more than strength. Pick a knack; each can be learned only once."],SP.map(opt));
+  else say('Level '+(n*5)+': a Perk',["The road has taught you something. Pick one; you can take the same again later."],['hardy','edge','feet','lore'].map(opt)); }
 setInterval(()=>{ try{ if(!running || !player.opts) return; if(!CHOICE.lv30){ CHOICE.lv30=1; if((CHOICE.xp||0)>0) logMsg('Levels now go to 30: your level is counted afresh from your experience, and every fifth level brings a perk.','#e8c060'); refreshPlayerHp(false); updateHud(); }
   if(perksOwed()>0) perkOffer(); }catch(e){} },3000);
 

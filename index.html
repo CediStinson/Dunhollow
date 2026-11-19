@@ -14054,7 +14054,8 @@ const GUARD_AFTER = { left:'right', up:'left', right:'up' };   // which side he 
 const WOLF = { label:'Wolf', base:40, stagger:0.9, unguarded:true, pattern:[   // not spawned on the farm — saved for later
   {wait:0.9, wind:0.58, after:0.55, dir:'left'},     // a little longer to read the lunge: playtests showed wolves were parried far less than anything else
   {wait:0.7, wind:0.54, after:0.55, dir:'right'},
-  {wait:1.1, wind:0.50, after:0.70, dir:'up'} ]};
+  {wait:1.1, wind:0.50, after:0.70, dir:'up'},
+  {wait:0.9, wind:0.62, after:0.60, dir:'right', feint:'left'} ]};   // and now and then a snap one way that turns into a lunge the other
 const foeDef = f => f.type==='wolf' ? WOLF : FOES[f.type];
 const LOOT = ['kettle','jerkin','mail','gloves','hood','boots','shirt','trousers','dagger','sword','morningstar','shield','studded','gambeson','hood_red','riding_boots','axe','mace','club','shield_iron','gauntlets'];
 const ZOOM_T = 1.65;
@@ -15126,9 +15127,10 @@ function combatStep(dt){
   f.t-=dt*(typeof foeTimeScale==='function'?foeTimeScale(f):1);   // the Stilled Hour slows him
   if(f.state==='windup' && f.feintAt && f.t<=f.feintAt){ f.feintAt=0; f.swingDir=curStep(f).dir; floatText(tileOf(f),'Feint!','#ffb070');
     teach('feint','A feint',["The arrow <b>changed sides</b> halfway through the swing: that was a <b>feint</b>.","Cunning fighters show you one side, then strike from another. Don't parry at the first sight of the arrow: watch it until the ring is nearly closed."]); }
-  if(f.state==='guard' && STYLES[styleOf(f)] && STYLES[styleOf(f)].shifts && f.guardDir){ f.sw=(f.sw??1.4)-dt;
+  // goblins shift their guard too: twitchy, never still behind their little blades
+  if(f.state==='guard' && (STYLES[styleOf(f)] && STYLES[styleOf(f)].shifts || f.type==='goblin' && !combat.practice && !coachOn()) && f.guardDir){ const gob=f.type==='goblin'; f.sw=(f.sw??(gob?0.75:1.4))-dt;
     if(f.sw<=0.4 && !f.nextGuard){ const o=DIRS3.filter(d=>d!==f.guardDir); f.nextGuard=o[Math.floor(Math.random()*o.length)]; }
-    if(f.sw<=0){ f.guardDir=f.nextGuard||f.guardDir; f.nextGuard=null; f.sw=1.1+Math.random()*0.7; } } else if(f.state!=='guard'){ f.nextGuard=null; }
+    if(f.sw<=0){ f.guardDir=f.nextGuard||f.guardDir; f.nextGuard=null; f.sw=gob?0.6+Math.random()*0.5:1.1+Math.random()*0.7; } } else if(f.state!=='guard'){ f.nextGuard=null; }
   partnerTick(f,dt);
   if(f.state==='guard' && f.t<=0) beginWind(f,false);
   else if(f.state==='windup' && f.t<=0) impact(f);
@@ -15137,6 +15139,9 @@ function combatStep(dt){
     const p=1-f.t/f.wind, d=[f.i-player.i,f.j-player.j], l=Math.hypot(d[0],d[1])||1;
     f.ox=d[0]/l*0.14*p; f.oy=d[1]/l*0.14*p;
   } else { f.ox*=0.8; f.oy*=0.8; }
+  if(f.type==='wolf' && f.state==='guard' && !combat.practice){   // a wolf never stands still: it paces round you, side to side, looking for the opening
+    const d=[f.i-player.i,f.j-player.j], l=Math.hypot(d[0],d[1])||1, ph=(f.circPh??(f.circPh=Math.random()*6.28)), w=Math.sin(clock*2.1+ph);
+    f.ox=-d[1]/l*0.16*w + d[0]/l*0.04*Math.abs(w); f.oy=d[0]/l*0.16*w + d[1]/l*0.04*Math.abs(w); }
 }
 
 // ── weapon poses from the fight state ──

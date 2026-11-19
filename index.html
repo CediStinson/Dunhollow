@@ -30247,17 +30247,21 @@ const CVM3=(()=>{
   // desert wear: every colour sanded toward dust, dust banked on the lower half of every shell, a scatter of grit
   const SAND='#b49c74', mixH=(a,b,t)=>{ const p=h=>parseInt(h.slice(1),16), A=p(a), Bq=p(b), ch=(s0)=>Math.round(((A>>s0)&255)*(1-t)+((Bq>>s0)&255)*t); return '#'+((1<<24)+(ch(16)<<16)+(ch(8)<<8)+ch(0)).toString(16).slice(1); };
   const D=c0=>(typeof c0==='string' && /^#[0-9a-f]{6}$/i.test(c0)) ? mixH(c0,SAND,0.4) : c0;
+const daub=(c,xs,ys,clip,col,sd)=>{ if(!col) return; const x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys), W0=x1-x0, H0=y1-y0; let q=sd%997+3; const r=()=>(q=(q*577+101)%997)/997; c.save(); clip(); c.clip(); c.globalAlpha=0.62; c.fillStyle=col;
+    for(let k=0;k<4;k++){ const cx=x0+W0*(0.15+r()*0.7), cy=y0+H0*(0.15+r()*0.6), rx=W0*(0.18+r()*0.2), ry=H0*(0.16+r()*0.18); c.beginPath(); for(let a=0;a<=12;a++){ const t=a/12*Math.PI*2, j=0.75+r()*0.4; const px=cx+Math.cos(t)*rx*j, py=cy+Math.sin(t)*ry*j; a?c.lineTo(px,py):c.moveTo(px,py); } c.closePath(); c.fill(); }   // paint slapped on with a rag, in patches
+    c.globalAlpha=0.35; c.strokeStyle=col; c.lineWidth=1.2; for(let k=0;k<3;k++){ const yy=y0+H0*(0.2+r()*0.6), xx=x0+W0*r()*0.5; c.beginPath(); c.moveTo(xx,yy); c.lineTo(xx+W0*(0.2+r()*0.3),yy+(r()-0.5)*3); c.stroke(); } c.restore(); };   // and a few dry strokes
   const grime=(c,x0,y0,x1,y1,clip,sdIn)=>{ const W0=x1-x0, H0=y1-y0; if(W0<2||H0<2) return; c.save(); clip(); c.clip();
     const g=c.createLinearGradient(0,y0,0,y1); g.addColorStop(0,'rgba(180,156,116,0.06)'); g.addColorStop(0.5,'rgba(180,156,116,0.2)'); g.addColorStop(1,'rgba(200,176,132,0.62)'); c.fillStyle=g; c.fillRect(x0,y0,W0,H0);   // sand banked low
     let sd=(sdIn!=null?sdIn:Math.abs(Math.round(x0*7+y0*13+W0*3)))%997+1; const r=()=>(sd=(sd*577+101)%997)/997;
-    for(let k=0;k<3;k++){ const cx=x0+W0*r(), cy=y0+H0*(0.15+r()*0.7), rr=Math.max(1.2,Math.min(W0,H0)*(0.08+r()*0.12)); c.fillStyle=`rgba(${120+Math.round(r()*30)},${58+Math.round(r()*16)},28,0.38)`; c.beginPath(); c.ellipse(cx,cy,rr*1.3,rr*0.8,r()*3,0,Math.PI*2); c.fill();   // rust blooms
-      c.strokeStyle='rgba(118,56,26,0.32)'; c.lineWidth=Math.max(0.6,rr*0.35); c.beginPath(); c.moveTo(cx,cy); c.lineTo(cx+(r()-0.5)*1.5,cy+rr*(2+r()*3)); c.stroke(); }   // and its run-off
+    const NR=W0*H0>500?3:W0*H0>160?1:0; for(let k=0;k<NR;k++){ const cx=x0+W0*r(), cy=y0+H0*(0.15+r()*0.7), rr=Math.max(1.2,Math.min(W0,H0)*(0.08+r()*0.12)); c.fillStyle=`rgba(${120+Math.round(r()*30)},${58+Math.round(r()*16)},28,0.38)`; c.beginPath(); c.ellipse(cx,cy,rr*1.3,rr*0.8,r()*3,0,Math.PI*2); c.fill();   // rust blooms
+      if(rr>2){ c.strokeStyle='rgba(118,56,26,0.28)'; c.lineWidth=Math.max(0.6,rr*0.3); c.beginPath(); c.moveTo(cx,cy); c.lineTo(cx+(r()-0.5)*1.5,cy+rr*(1.5+r()*2)); c.stroke(); } }   // and its run-off
     if(W0>14 && H0>9 && r()<0.6){ const pw=W0*(0.18+r()*0.14), ph=H0*(0.16+r()*0.14), px=x0+W0*(0.1+r()*0.6), py=y0+H0*(0.15+r()*0.45); c.save(); c.translate(px+pw/2,py+ph/2); c.rotate((r()-0.5)*0.5);
       c.fillStyle=['rgba(92,86,78,0.9)','rgba(150,92,54,0.88)','rgba(74,62,50,0.9)','rgba(120,104,70,0.88)'][Math.floor(r()*4)]; c.fillRect(-pw/2,-ph/2,pw,ph); c.strokeStyle='rgba(30,24,18,0.85)'; c.lineWidth=0.8; c.strokeRect(-pw/2,-ph/2,pw,ph);
       c.fillStyle='rgba(222,206,170,0.7)'; [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([a,b])=>{ if(r()<0.85){ c.beginPath(); c.arc(a*(pw/2-1.4),b*(ph/2-1.4),0.75,0,Math.PI*2); c.fill(); } }); c.restore(); }   // a patch of some other metal, riveted over a hole
-    c.fillStyle='rgba(60,44,28,0.38)'; for(let k=0;k<16;k++) c.fillRect(x0+W0*r(),y0+H0*(0.2+r()*0.8),1.1,1.1);   // grit
+    c.fillStyle='rgba(60,44,28,0.38)'; for(let k=0,n=Math.min(16,Math.round(W0*H0/60));k<n;k++) c.fillRect(x0+W0*r(),y0+H0*(0.2+r()*0.8),1.1,1.1);   // grit
     c.fillStyle='rgba(222,204,164,0.35)'; for(let k=0;k<6;k++) c.fillRect(x0+W0*r(),y0+H0*(0.5+r()*0.5),1.3,0.9);   // sand caught in the seams
     c.restore(); };
+  const WOODS=['#6e5034','#7a5a3a','#5a4028','#8a6a44','#9a8462','#644830'];   // every limb a pole of some timber or other
   const MATS={ wood:'#6e5034', iron:'#4e4842', rust:'#6e3e24', copper:'#9a5a36', bone:'#a89878' }, MKEYS=Object.keys(MATS), FAB=['#9a6a3a','#7a3a2e','#3e4a5e','#8a8060','#5a6a3a','#6a4a5a'];
   const woodish=c0=>/^#(6|7|8)[0-9a-f]{5}$/i.test(c0) && parseInt(c0.slice(1,3),16)>parseInt(c0.slice(5,7),16)+20;
   function Scene(c,ox,oy,S,dir){ const th=(45-dir*45)*Math.PI/180, cs=Math.cos(th), sn=Math.sin(th); let SD=7919; const rnd=()=>(SD=(SD*16807)%2147483647)/2147483647;   // the same scrap every frame: the dice are re-rolled from the same seed
@@ -30270,7 +30274,7 @@ const CVM3=(()=>{
     const sc={ c, S, R, prj, sh, IRON, IRD, BR, BRD, CU, WOOD, CLOTH,
       box(cen,w,d,h,col,opt={}){ col=D(col); const gs=Math.floor(rnd()*900), P=[], o=cen; for(const [a,b,z] of [[-1,-1,0],[1,-1,0],[1,1,0],[-1,1,0],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]]) P.push(R([o[0]+a*w/2,o[1]+b*d/2,o[2]+z*h]));
         const F=[[[1,2,6,5],[1,0,0]],[[3,0,4,7],[-1,0,0]],[[2,3,7,6],[0,1,0]],[[0,1,5,4],[0,-1,0]],[[4,5,6,7],[0,0,1]]].map(([ix,n])=>({ix,n:R(n)})).filter(f=>dot3(f.n,VIEW)>0.01);
-        const cw=R(o); push(depth([cw[0],cw[1],o[2]+h/2])+(opt.top||0)*100,()=>{ F.forEach(f=>{ const pts=f.ix.map(i=>prj(P[i])); path(pts); c.fillStyle=lit(col,f.n); c.fill(); if(f.n[2]<0.5){ const ys=pts.map(p=>p[1]), xs=pts.map(p=>p[0]); grime(c,Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys),()=>path(pts),gs+F.indexOf(f)*37); } c.strokeStyle=IRD; c.lineWidth=0.9; c.lineJoin='round'; c.stroke();
+        const cw=R(o); push(depth([cw[0],cw[1],o[2]+h/2])+(opt.top||0)*100,()=>{ F.forEach(f=>{ const pts=f.ix.map(i=>prj(P[i])); path(pts); c.fillStyle=lit(col,f.n); c.fill(); if(opt.daub){ daub(c,pts.map(p=>p[0]),pts.map(p=>p[1]),()=>path(pts),opt.daub,gs+F.indexOf(f)*53); } if(f.n[2]<0.5){ const ys=pts.map(p=>p[1]), xs=pts.map(p=>p[0]); grime(c,Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys),()=>path(pts),gs+F.indexOf(f)*37); } c.strokeStyle=IRD; c.lineWidth=0.9; c.lineJoin='round'; c.stroke();
             if(opt.planks && f.n[2]<0.5){ c.strokeStyle='rgba(0,0,0,0.25)'; c.lineWidth=0.6; for(let t=1;t<opt.planks;t++){ const k=t/opt.planks, a=pts[0], b=pts[1], a2=pts[3], b2=pts[2]; c.beginPath(); c.moveTo(a[0]+(b[0]-a[0])*k,a[1]+(b[1]-a[1])*k); c.lineTo(a2[0]+(b2[0]-a2[0])*k,a2[1]+(b2[1]-a2[1])*k); c.stroke(); } }
             if(opt.rivets && f.n[2]<0.5){ const a=pts[3], b=pts[2]; for(let t=0.08;t<1;t+=0.14){ c.fillStyle='#c8b080'; c.beginPath(); c.arc(a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t+2.2*S,0.8*S,0,Math.PI*2); c.fill(); } }
             if(opt.face && f.n===F.find(q=>Math.abs(q.n[0]-R(opt.face.n)[0])<0.01 && Math.abs(q.n[1]-R(opt.face.n)[1])<0.01)?.n) opt.face.fn(pts,c,S); }); }); },
@@ -30293,15 +30297,15 @@ const CVM3=(()=>{
         push(depth(mul(add(a,b),0.5)),()=>{ const all=[...A,...Bp].sort((p,q)=>p[0]-q[0]||p[1]-q[1]), cr=(o,p,q)=>(p[0]-o[0])*(q[1]-o[1])-(p[1]-o[1])*(q[0]-o[0]), lo=[], hi=[];
           for(const p of all){ while(lo.length>=2 && cr(lo[lo.length-2],lo[lo.length-1],p)<=0) lo.pop(); lo.push(p); } for(const p of all.slice().reverse()){ while(hi.length>=2 && cr(hi[hi.length-2],hi[hi.length-1],p)<=0) hi.pop(); hi.push(p); }
           const hull=[...lo.slice(0,-1),...hi.slice(0,-1)], pa=prj(a), pb=prj(b), mx=(pa[0]+pb[0])/2, my=(pa[1]+pb[1])/2, nx=-(pb[1]-pa[1]), ny=(pb[0]-pa[0]), nl=Math.hypot(nx,ny)||1;
-          const g=c.createLinearGradient(mx-nx/nl*r*S,my-ny/nl*r*S,mx+nx/nl*r*S,my+ny/nl*r*S); g.addColorStop(0,sh(col,0.3)); g.addColorStop(0.42,col); g.addColorStop(1,sh(col,-0.55)); path(hull); c.fillStyle=g; c.fill(); { const xs=hull.map(p=>p[0]), ys=hull.map(p=>p[1]); grime(c,Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys),()=>path(hull),gs); } c.strokeStyle=IRD; c.lineWidth=0.9; c.stroke();
+          const g=c.createLinearGradient(mx-nx/nl*r*S,my-ny/nl*r*S,mx+nx/nl*r*S,my+ny/nl*r*S); g.addColorStop(0,sh(col,0.3)); g.addColorStop(0.42,col); g.addColorStop(1,sh(col,-0.55)); path(hull); c.fillStyle=g; c.fill(); { const xs=hull.map(p=>p[0]), ys=hull.map(p=>p[1]); daub(c,xs,ys,()=>path(hull),opt.daub,gs); grime(c,Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys),()=>path(hull),gs); } c.strokeStyle=IRD; c.lineWidth=0.9; c.stroke();
           if(opt.bands){ c.save(); path(hull); c.clip(); c.strokeStyle=opt.bandCol||BRD; c.lineWidth=1.6*S*0.8; opt.bands.forEach(t=>{ path(sc.ring(add(a,mul(sub(b,a),t)),d,r)); c.stroke(); }); c.restore(); }
           const end=dot3(d,VIEW)>0?{p:b,n:d}:{p:a,n:mul(d,-1)}; path(sc.ring(end.p,end.n,r)); c.fillStyle=lit(sh(col,-0.05),end.n); c.fill(); c.strokeStyle=IRD; c.stroke(); }); },
       sphere(cenL,r,col,opt={}){ col=D(col); const gs=Math.floor(rnd()*900), w=R(cenL), p=prj(w); push(depth(w)+(opt.bias||0),()=>{ const g=c.createRadialGradient(p[0]-r*S*0.35,p[1]-r*S*0.4,r*S*0.1,p[0],p[1],r*S*1.05); g.addColorStop(0,sh(col,0.2)); g.addColorStop(0.55,col); g.addColorStop(1,sh(col,-0.55));
           c.fillStyle=g; const shp=()=>{ c.beginPath(); if(opt.sy) c.ellipse(p[0],p[1],r*S,r*S*opt.sy,0,0,Math.PI*2); else c.arc(p[0],p[1],r*S,0,Math.PI*2); }; shp(); c.fill(); const ry=r*S*(opt.sy||1); grime(c,p[0]-r*S,p[1]-ry,p[0]+r*S,p[1]+ry,shp,gs); shp(); c.strokeStyle=IRD; c.lineWidth=0.9; c.stroke(); }); },
       seg(aL,bL,w,col,bias=0,mat){ col=D(col); const a=R(aL), b=R(bL), pa=prj(a), pb=prj(b); push(depth(mul(add(a,b),0.5))+bias,()=>{ c.lineCap='round'; c.strokeStyle=IRD; c.lineWidth=(w+2)*S*0.55; c.beginPath(); c.moveTo(pa[0],pa[1]); c.lineTo(pb[0],pb[1]); c.stroke(); c.strokeStyle=col; c.lineWidth=w*S*0.55; c.stroke(); c.strokeStyle='rgba(230,214,176,0.12)'; c.lineWidth=w*S*0.16; c.beginPath(); c.moveTo(pa[0]-1,pa[1]-1); c.lineTo(pb[0]-1,pb[1]-1); c.stroke();
           if(w>=2){ const L0=Math.hypot(pb[0]-pa[0],pb[1]-pa[1]); c.beginPath(); c.moveTo(pa[0],pa[1]); c.lineTo(pb[0],pb[1]); c.lineWidth=w*S*0.42; c.lineCap='butt';
-            c.setLineDash([1.6,3.4+((Math.round(pa[0]+pb[1])%3)+3)%3]); c.strokeStyle='rgba(124,60,28,0.42)'; c.stroke();   // rust flecks along the limb
-            c.setLineDash([1,5]); c.lineDashOffset=2; c.strokeStyle='rgba(206,184,140,0.4)'; c.stroke(); c.setLineDash([]); c.lineDashOffset=0;   // and caked sand
+            if(mat!=='wood'){ c.setLineDash([1.6,3.4+((Math.round(pa[0]+pb[1])%3)+3)%3]); c.strokeStyle='rgba(124,60,28,0.42)'; c.stroke(); }   // rust flecks along an iron limb
+            c.setLineDash([1,mat==='wood'?9:5]); c.lineDashOffset=2; c.strokeStyle='rgba(206,184,140,0.35)'; c.stroke(); c.setLineDash([]); c.lineDashOffset=0;   // and caked sand
             if(mat==='wood'){ const nx=-(pb[1]-pa[1])/(L0||1), ny=(pb[0]-pa[0])/(L0||1), o=w*S*0.13; c.strokeStyle='rgba(40,26,14,0.5)'; c.lineWidth=0.5; c.lineCap='round'; [-1,1].forEach(q=>{ c.beginPath(); c.moveTo(pa[0]+nx*o*q,pa[1]+ny*o*q); c.lineTo(pb[0]+nx*o*q*0.6,pb[1]+ny*o*q*0.6); c.stroke(); }); }   // the grain of a pole
             else if(mat){ c.fillStyle='rgba(222,206,170,0.7)'; [0.18,0.82].forEach(t=>{ c.beginPath(); c.arc(pa[0]+(pb[0]-pa[0])*t,pa[1]+(pb[1]-pa[1])*t,Math.max(0.6,w*S*0.09),0,Math.PI*2); c.fill(); }); }   // bolts where a scrap of pipe was fixed on
             if(L0>8){ const t=0.82, fx=pa[0]+(pb[0]-pa[0])*t, fy=pa[1]+(pb[1]-pa[1])*t; c.strokeStyle='rgba(196,172,128,0.45)'; c.lineWidth=w*S*0.5; c.lineCap='round'; c.beginPath(); c.moveTo(fx,fy); c.lineTo(pb[0],pb[1]); c.stroke(); } } }); },   // the low end of every limb, dusted
@@ -30315,7 +30319,7 @@ const CVM3=(()=>{
       smoke(pL,s=4){ const p=prj(R(pL)); push(1e6,()=>{ for(let k=0;k<5;k++){ const t=k/5; c.fillStyle=`rgba(${80+k*20},${76+k*20},${72+k*20},${0.5-t*0.38})`; c.beginPath(); c.arc(p[0]+Math.sin(k*1.7)*s*t*2*S-s*t*S,p[1]-s*k*1.3*S,s*S*(0.6+t*1.1),0,Math.PI*2); c.fill(); } }); },
       glow(pL,r,col){ const w=R(pL), p=prj(w); push(depth(w)+0.3,()=>{ const g=c.createRadialGradient(p[0],p[1],0,p[0],p[1],r*S); g.addColorStop(0,col); g.addColorStop(1,'rgba(0,0,0,0)'); c.fillStyle=g; c.beginPath(); c.arc(p[0],p[1],r*S,0,Math.PI*2); c.fill(); }); },
       shadow(rx,ry){ push(-1e6,()=>{ c.fillStyle='rgba(0,0,0,0.3)'; c.beginPath(); c.ellipse(ox,oy,rx*S,ry*S,0,0,Math.PI*2); c.fill(); }); },
-      leg(ptsL,w,col,off,walk,toes,nohip){ const segM=[], jK=[]; for(let k=1;k<ptsL.length;k++){ if(rnd()<0.55) segM.push([col, woodish(col)?'wood':'iron']); else { const m=MKEYS[Math.floor(rnd()*MKEYS.length)]; segM.push([MATS[m], m==='wood'||m==='bone'?'wood':m]); } } for(let k=0;k<ptsL.length;k++){ const q=rnd(); jK.push(q<0.4?'ball':q<0.72?'lash':'plate'); } const wrap=rnd()<0.45, fab=FAB[Math.floor(rnd()*FAB.length)];   // a limb from whatever was lying about const h=R(ptsL[0]), f0=R(ptsL[ptsL.length-1]), fr=((h[0]+f0[0])+(h[1]+f0[1]))/2; FORCE=(fr>0?5000:-5000)+fr*10; if(walk && off!=null){ const ph=walk.ph+off, f=ptsL[ptsL.length-1], n=ptsL.length-1, lift=Math.max(0,Math.sin(ph))*walk.lift, dx=Math.cos(ph)*walk.stride; ptsL=ptsL.map((p,i)=>i===0?p:[p[0]+dx*(i/n)*(i===n?1:0.6),p[1],p[2]+lift*(i/n)*(i===n?1:0.9)]); }
+      leg(ptsL,w,col,off,walk,toes,nohip){ const segM=[], jK=[]; for(let k=1;k<ptsL.length;k++) segM.push([WOODS[Math.floor(rnd()*WOODS.length)],'wood']); for(let k=0;k<ptsL.length;k++){ const q=rnd(); jK.push(q<0.4?'ball':q<0.72?'lash':'plate'); } const wrap=rnd()<0.45, fab=FAB[Math.floor(rnd()*FAB.length)];   // a limb from whatever was lying about const h=R(ptsL[0]), f0=R(ptsL[ptsL.length-1]), fr=((h[0]+f0[0])+(h[1]+f0[1]))/2; FORCE=(fr>0?5000:-5000)+fr*10; if(walk && off!=null){ const ph=walk.ph+off, f=ptsL[ptsL.length-1], n=ptsL.length-1, lift=Math.max(0,Math.sin(ph))*walk.lift, dx=Math.cos(ph)*walk.stride; ptsL=ptsL.map((p,i)=>i===0?p:[p[0]+dx*(i/n)*(i===n?1:0.6),p[1],p[2]+lift*(i/n)*(i===n?1:0.9)]); }
         for(let k=1;k<ptsL.length;k++) sc.seg(ptsL[k-1],ptsL[k],w*(1.12-k*0.14),segM[k-1][0],0,segM[k-1][1]);   // a stout thigh, tapering to the foot: each piece from a different heap
         if(wrap && ptsL.length>2){ const [a,b]=ptsL, m0=add(a,mul(sub(b,a),0.4)), m1=add(a,mul(sub(b,a),0.62)); sc.seg(m0,m1,w*1.3,fab,0.03); sc.poly([m1,add(m1,[1.5,0,-8]),add(m1,[-1.2,0,-6.5])],sh(fab,-0.15),0.04); }   // a rag bound round it, its end hanging
         if(ptsL.length>2 && col!==IRON){ const [a,b,d]=ptsL; sc.seg(add(a,mul(sub(b,a),0.3)),add(b,mul(sub(d,b),0.3)),Math.max(1,w*0.2),'#8a7a5a',0.02); }   // a rope lashing across the knee
@@ -30330,6 +30334,9 @@ const CVM3=(()=>{
           c.strokeStyle=sh(col,-0.55); c.lineWidth=0.7; rp(); c.stroke();
           c.strokeStyle=sh(col,-0.3); c.lineWidth=0.5; [4,6].forEach(k=>{ if(!P[k]) return; const top=[P[0][0]+(P[2][0]-P[0][0])*(1-(k-3)/(N-4)),P[1][1]]; c.beginPath(); c.moveTo(top[0],top[1]); c.quadraticCurveTo(top[0]+1,(top[1]+P[k][1])/2,P[k][0],P[k][1]-1); c.stroke(); });   // folds
           c.strokeStyle=sh(col,-0.2); for(let k=3;k<N;k++){ c.beginPath(); c.moveTo(P[k][0],P[k][1]); c.lineTo(P[k][0]+0.4,P[k][1]+2.2); c.stroke(); } }); },   // frayed threads
+      rope(aL,bL,sag=3,bias=0.5,w=1.3){ const n=5; let prev=aL; for(let k=1;k<=n;k++){ const t=k/n, p=add(add(aL,mul(sub(bL,aL),t)),[0,0,-Math.sin(t*Math.PI)*sag]); sc.seg(prev,p,w,'#9a8a62',bias); prev=p; } },   // a rope, sagging
+      coil(pL,r,bias=1){ const w=R(pL), p=prj(w); push(depth(w)+bias,()=>{ for(let k=0;k<3;k++){ c.strokeStyle=IRD; c.lineWidth=1.9*S*0.55; c.beginPath(); c.ellipse(p[0]+k*0.6,p[1]+k*1.2*S,r*S,r*S*0.55,0,0,Math.PI*2); c.stroke(); c.strokeStyle=D('#9a8a62'); c.lineWidth=1.1*S*0.55; c.stroke(); } }); },   // a coil of rope hung on a peg
+      wheel(cenL,nL,r,bias=1){ sc.disk(cenL,nL,r,'#6a4a2c',{spokes:true,rim:D('#4a3424'),bias}); },   // a cartwheel off some old cart, bolted on
       _push:push,
       draw(){ ops.sort((a,b)=>a.d-b.d).forEach(o=>o.fn()); } };
     return sc; }
@@ -30340,9 +30347,9 @@ const CVM3=(()=>{
   function skitter(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,3,4), z=bob(ph,0.8); s.shadow(30,14);
     [[0.5,0],[1.15,1],[1.95,0],[2.6,1]].forEach(([a,g],k)=>[1,-1].forEach(sd=>{ const ang=sd*a, cx=Math.cos(ang), cy=Math.sin(ang);   // four legs a side, front to back: hip at the body's rim, knee high and out, foot planted wide
       s.leg([[cx*9,cy*9,13+z],[cx*19,cy*21,24+z],[cx*27,cy*31,0]],3.2,IRON,((g+(sd>0?0:1))%2)*Math.PI,wk); }));
-    s.sphere([0,0,13+z],12,BR,{sy:0.72}); s.disk([0,0,7+z],[0,0,-1],10,IRD,{always:true,bias:-2});
+    s.cone([0,0,5+z],11,11,15,'#7a5a3a',{hoops:[0.14,0.86],cap:'#5a4028'}); s.disk([0,0,5+z],[0,0,-1],10,IRD,{always:true,bias:-2});   // a keg on legs
     s.disk([11,0,16+z],[1,0,0.15],4.2,'#f08a30',{glass:true,glow:true,rim:BR,bias:2}); s.disk([8,4,22+z],[0.6,0.6,0.4],1.4,'#e84030',{glass:true,bias:2}); s.disk([8,-4,22+z],[0.6,-0.6,0.4],1.4,'#e84030',{glass:true,bias:2});
-    const t=s.cylV([-6,0,24+z],2,5,IRD); s.smoke([-6,0,31+z],2.2); s.rag([-4,9,20+z],[1,0,0],8,6,'#7a3a2e','dark');
+    const t=s.cylV([-6,0,24+z],2,5,IRD); s.smoke([-6,0,31+z],2.2); s.rag([-4,9,20+z],[1,0,0],8,6,'#7a3a2e','dark'); s.rope([-9,-6,16+z],[9,-6,16+z],-2,3,1);
     s.seg([11,3,10+z],[19,4,6+z],2.2,IRON,1); s.seg([11,-3,10+z],[19,-4,6+z],2.2,IRON,1); s.sphere([21,0,5+z],5,'#6a4426',{bias:1}); s.sphere([22,1.5,8+z],1.4,'#f0c850',{bias:2});
     s.draw(); }
 
@@ -30350,50 +30357,59 @@ const CVM3=(()=>{
   const SK_PAINT={ moss:{shell:'#3e4a2a',leg:'#2e2a22',eye:'#e8a040',cloth:'#8a3a2a'}, amber:{shell:'#8a5a22',leg:'#3a2a1a',eye:'#e8d060',cloth:'#2e4a5a'}, ember:{shell:'#3a1e1a',leg:'#1e1816',eye:'#ff7040',cloth:'#c89040'} };
   function strutter(c,x,y,S,dir,ph,rid,paint){ const PT=SK_PAINT[paint]||SK_PAINT.moss, SK_SHELL=PT.shell, SK_LEG=PT.leg, SK_EYE=PT.eye, SK_CLOTH=PT.cloth; const s=Scene(c,x,y,S,dir), wk=W(ph,6,8), z=bob(ph,1.2), gait=[0,Math.PI,Math.PI,0]; s.shadow(46,22);
     [[14,1],[14,-1],[-10,1],[-10,-1]].forEach(([xx,sd],k)=>s.leg([[xx,sd*9,40+z],[xx*1.3+(xx>0?6:-6),sd*26,56+z],[xx*1.6+(xx>0?8:-8),sd*33,0]],10,SK_LEG,gait[k],wk,false,true));
-    s.sphere([4,0,42+z],15,SK_SHELL,{sy:0.7}); [-15,-28,-39].forEach((xx,k)=>s.sphere([xx,0,40-k*2+z],13-k*2.4,k%2?sh(SK_SHELL,0.12):SK_SHELL,{sy:0.65}));   // the thorax, and the long body behind in plates
+    s.cylH([-8,0,41+z],[16,0,42+z],10,'#7a5a3a',{bands:[0.12,0.5,0.88],bandCol:HOOP,daub:SK_SHELL});   // the thorax: a barrel on its side, paint slapped on in patches
+    s.box([-19,0,31+z],12,15,13,'#7a5a3a',{planks:3,daub:SK_SHELL}); s.cylH([-38,0,36+z],[-26,0,37+z],7,'#6e5034',{bands:[0.2,0.8],bandCol:HOOP}); s.box([-43,0,32+z],5,8,7,'#6a4a2c',{planks:2});   // the body behind: a crate, a keg, a box at the tail
     const fw=s.R([1,0,0]), HB=fw[0]+fw[1]>0.2 ? 6000 : 0;   // facing you: the head sits over the front legs, which are laid down whole
-    s.sphere([20,0,46+z],7,sh(SK_SHELL,-0.1),{bias:HB});
+    s.box([21,0,40+z],10,10,9,'#6a4a2c',{planks:2,top:HB/100,daub:SK_SHELL});   // the head: a little crate
     [1,-1].forEach(sd=>s.disk([23,sd*4.5,48+z],[0.5,sd,0.25],3.2,SK_EYE,{glass:true,glow:true,rim:'#2a1e14',bias:HB+2}));   // two glass eyes
     s.seg([24,2,51+z],[34,9,66+z],1.2,IRD,HB+3); s.seg([24,-2,51+z],[34,-9,66+z],1.2,IRD,HB+3);   // feelers
     s.box([2,0,51+z],20,24,1.4,SK_CLOTH,{top:1}); s.box([2,0,52.4+z],16,13,4,'#5a3420',{top:1}); s.box([-6,0,56.4+z],4,13,6,'#4a2a18',{top:1}); s.box([10,0,56.4+z],3,8,4,'#4a2a18',{top:1});   // blanket, seat, cantle, pommel
     [1,-1].forEach(sd=>{ if(rid){ s.seg([2,sd*7,55+z],[4,sd*16,42+z],1.3,'#3a2414',100); s.box([4,sd*16,39.5+z],6,2.6,2.4,'#5a5650',{top:1}); } else { s.seg([2,sd*7,55+z],[2,sd*16,34+z],1.3,'#3a2414',100); s.box([2,sd*16,31+z],6,2.6,2.6,'#5a5650',{top:1}); } });   // stirrups, drawn up to the rider's feet
     s.cylV([-12,6,48+z],2.2,9,IRD,1); s.smoke([-12,6,59+z],2.4);
-    s.rag([-24,-10.5,48+z],[1,0,0.15],16,13,'#9a6a3a','dark'); s.rag([-4,13,53+z],[1,0,0],10,16,'#3e4a5e');   // a striped rag over the tail on one side, a long blanket end on the other
+    s.rag([-24,-10.5,48+z],[1,0,0.15],16,13,'#9a6a3a','dark'); s.rag([-4,13,53+z],[1,0,0],10,16,'#3e4a5e');
+    s.wheel([4,-10.6,41+z],[0,-1,0],7.5,0.8);   // a cartwheel bolted to one side of the barrel
+    s.rope([-25,-8,44.5+z],[-13,8,44.5+z],0.5,0.9); s.rope([-25,8,44.5+z],[-13,-8,44.5+z],0.5,0.9);   // the crate roped on, crosswise
+    s.rope([-8,9,50+z],[-25,12,40+z],2,0.6); s.coil([-30,10,40+z],2.6,0.7);   // a line from the saddle, and a coil of it hung at the back   // a striped rag over the tail on one side, a long blanket end on the other
     s.seg([34,9,66+z],[33,11,60+z],2.2,'#7a3a2e',3.5);   // a strip of red cloth knotted to one feeler
     s.draw(); }
   // the Hauler: a pack beetle. A domed back split down the middle, six short legs, the load lashed on top and slung under the wing-cases, a horn with a lamp
   function hauler(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,4,5), z=bob(ph,1.2), SH='#5a4a2a'; s.shadow(44,22);
     [20,0,-20].forEach((xx,k)=>[1,-1].forEach(sd=>s.leg([[xx,sd*13,30+z],[xx*1.15,sd*29,40+z],[xx*1.3,sd*34,0]],10,'#2e2a22',(k+(sd>0?0:1))%2?Math.PI:0,wk,false,true)));
-    s.sphere([-4,0,38+z],28,SH,{sy:0.6}); s.seg([-30,0,46+z],[22,0,52+z],0.9,IRD,40);   // the domed back and its seam
-    s.box([-8,25,34+z],18,6,11,'#6a4a2a',{top:0.5}); s.box([-8,-25,34+z],18,6,11,'#6a4a2a',{top:0.5});   // packs slung under the wing-cases
+    s.cylH([-28,0,37+z],[22,0,38+z],16,'#6a5034',{bands:[0.08,0.36,0.64,0.92],bandCol:HOOP});   // the back: a great cask, banded
+    s.box([-8,19,30+z],18,6,12,'#7a5a3a',{planks:3,top:0.5}); s.box([-12,-19,28+z],14,6,10,'#6a4a2a',{planks:2,top:0.5});   // crates slung at its sides, not a matched pair
     s.box([-6,0,55+z],26,20,9,WOOD,{planks:3,top:1}); s.box([-13,2,64+z],12,12,9,'#8a6a40',{planks:2,top:2}); s.sphere([6,-3,61+z],6,'#6a5a3a',{sy:0.7,bias:100});   // the load, roped on
-    s.sphere([26,0,38+z],11,sh(SH,-0.15)); [1,-1].forEach(sd=>s.disk([31,sd*6.5,41+z],[0.5,sd,0.25],3,'#e8a040',{glass:true,glow:true,rim:'#2a1e14',bias:2}));
+    s.box([28,0,30+z],13,13,13,'#5a4028',{planks:3}); [1,-1].forEach(sd=>s.disk([34.6,sd*3.6,39+z],[1,sd*0.2,0.1],2.8,'#e8a040',{glass:true,glow:true,rim:'#2a1e14',bias:2}));   // a crate for a head, two lamps in it
     s.seg([32,0,46+z],[44,0,60+z],4.4,sh(SH,-0.35),3); s.seg([44,0,60+z],[48,0,56+z],2.8,sh(SH,-0.35),3); s.sphere([49,0,54+z],2.6,'#f0b050',{bias:4}); s.glow([49,0,54+z],13,'rgba(255,180,80,0.7)');
     s.cylV([-26,8,50+z],3,12,IRD,1); s.smoke([-26,8,64+z],4);
-    s.rag([-8,10.5,63+z],[1,0,0],24,16,'#8a8060'); s.rag([-16,-10.5,64+z],[1,0,0],12,10,'#7a3a2e','light');   // a tarp thrown over the load, slipping down one side; a scrap of red on the other
+    s.rag([-8,10.5,63+z],[1,0,0],24,16,'#8a8060'); s.rag([-16,-10.5,64+z],[1,0,0],12,10,'#7a3a2e','light');
+    s.wheel([-6,-17,38+z],[0,-1,0],10,0.8);   // an old cartwheel lashed to its flank
+    [-16,-2,8].forEach(xx=>s.rope([xx,-11,60+z],[xx+2,11,60+z],-3,40)); s.rope([-22,-10,66+z],[10,-10,64+z],1,40);   // ropes thrown over the load and hitched down   // a tarp thrown over the load, slipping down one side; a scrap of red on the other
     s.draw(); }
 
   function crawler(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,6,7), z=bob(ph,1.5); s.shadow(64,30);
     [-26,0,26].forEach((xx,k)=>[1,-1].forEach(sd=>s.leg([[xx,sd*20,30+z],[xx*1.25,sd*40,50+z],[xx*1.45,sd*58,0]],11,TIMB,(k+(sd>0?0:1))%2?Math.PI:0,wk)));
     s.cylH([-38,0,34+z],[34,0,34+z],19,'#6a5038',{bands:[0.08,0.35,0.65,0.92],bandCol:HOOP});   // a planked, hooped hull, round as a cask
     s.sphere([-8,0,50+z],20,'#7a5a3a',{sy:0.55,bias:100});   // a hide canopy stretched over it
-    s.sphere([18,0,58+z],13,'#5a4632',{bias:120}); s.disk([28,0,62+z],[1,0,0],5.5,'#5a8a8a',{glass:true,rim:BR,bias:3});
+    s.box([18,0,48+z],18,16,18,'#5a4632',{planks:3,top:1.2}); s.disk([27.5,0,58+z],[1,0,0],5.5,'#5a8a8a',{glass:true,rim:BR,bias:3});
     [-24,-32].forEach(xx=>{ s.cylV([xx,6,46+z],3.2,16,IRD,1.3); s.smoke([xx,6,64+z],3.4); });
     s.seg([34,14,34+z],[54,22,26+z],5,IRON); s.seg([54,22,26+z],[70,26,14+z],4,IRON); s.seg([70,26,14+z],[80,24,20+z],3,IRD); s.seg([70,26,14+z],[80,30,8+z],3,IRD);
     s.seg([34,-14,30+z],[52,-20,18+z],4,IRON); s.seg([52,-20,18+z],[64,-22,8+z],3.2,IRON); s.glow([67,-23,7+z],14,'rgba(120,180,255,0.8)');
     s.rag([-10,19,46+z],[1,0,0],22,14,'#5a6a3a','dark'); s.rag([-30,-18,42+z],[1,0,0],10,9,'#6a4a5a');
+    s.wheel([12,-19.5,34+z],[0,-1,0],11,0.8); s.rope([-30,0,66+z],[10,0,66+z],-6,120); s.coil([-36,14,48+z],3.4,1);
     s.draw(); }
 
   function bellows(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,9,9), z=bob(ph,2.5); s.shadow(100,62);   // a great kiln-beetle: six jointed legs, the round deck its back, a head with mandibles before it
     [46,0,-46].forEach((xx,k)=>[1,-1].forEach(sd=>s.leg([[xx*0.9,sd*40,72+z],[xx*1.2,sd*80,104+z],[xx*1.4,sd*96,0]],18,TIMB,(k+(sd>0?0:1))%2?Math.PI:0,wk,false,true)));
     s.sphere([0,0,62+z],64,'#4a3a26',{sy:0.32}); s.cylV([0,0,74+z],62,6,TIMB,-10);   // the shell, and the deck laid on it
     for(let k=0;k<12;k++){ const a=k/12*Math.PI*2; s.seg([Math.cos(a)*60,Math.sin(a)*60,80+z],[Math.cos(a)*60,Math.sin(a)*60,91+z],2.4,TIMB); }
-    s.sphere([78,0,64+z],22,'#3a2e20',{sy:0.75}); [1,-1].forEach(sd=>{ s.disk([90,sd*12,72+z],[0.5,sd,0.25],6,'#ff8a3a',{glass:true,glow:true,rim:'#2a1e14',bias:2}); s.seg([96,sd*10,58+z],[112,sd*16,52+z],5,'#2a2016',2); s.seg([112,sd*16,52+z],[114,sd*6,48+z],4,'#2a2016',2); });   // the head: ember eyes and iron mandibles
-    s.sphere([-82,0,58+z],24,'#4a3a26',{sy:0.6}); s.sphere([-102,0,54+z],16,'#3e3020',{sy:0.6});   // the body behind, in plates
+    s.box([80,0,46+z],32,30,30,'#4a3a26',{planks:4}); [1,-1].forEach(sd=>{ s.disk([96.5,sd*8,66+z],[1,sd*0.2,0.1],5.5,'#ff8a3a',{glass:true,glow:true,rim:'#2a1e14',bias:2}); s.seg([96,sd*10,58+z],[112,sd*16,52+z],5,'#2a2016',2); s.seg([112,sd*16,52+z],[114,sd*6,48+z],4,'#2a2016',2); });   // the head: ember eyes and iron mandibles
+    s.cylH([-96,0,56+z],[-66,0,58+z],20,'#4a3a26',{bands:[0.1,0.5,0.9],bandCol:HOOP}); s.box([-112,0,40+z],16,22,22,'#3e3020',{planks:3});   // the body behind: a tun and a crate
     s.cone([0,0,81+z],46,47,30,'#8a4a32',{brick:true,hoops:[0.06,0.95]});
     s.cone([0,0,111+z],47,26,32,'#7a4230',{brick:true,hoops:[0.5],bias:0.5,cap:'#4a2a1e'});
     s.cone([0,0,143+z],13,11,40,'#5a3a2a',{brick:true,hoops:[0.1,0.92],bias:1,cap:'#1a1412'});
     s.smoke([0,0,188+z],16);
+    [[50,30],[-40,46],[20,-56]].forEach(([xx,yy])=>s.rope([0,0,170+z],[xx,yy,92+z],6,2,1.6));   // guy-ropes from the chimney to the rail
+    s.wheel([60,-36,96+z],[0.6,-0.8,0],16,1.5);
     s.rag([30,58,90+z],[1,-0.3,0],34,22,'#8a8060','dark',1); s.rag([-40,-52,90+z],[1,0.4,0],20,16,'#7a3a2e'); s.rag([-58,20,90+z],[0.3,1,0],16,12,'#3e4a5e','light',1);   // hides and sacking hung from the rail, wherever they were thrown
     { const w=s.R([46.5,0,92+z]), n=s.R([1,0,0]); if(n[0]*0.612+n[1]*0.612>0.05){ const p=s.prj(w); s.glow([50,0,94+z],40,'rgba(255,120,40,0.55)'); ops_push(s,(w[0]+w[1])+5,()=>{ const sc2=S; c.fillStyle='#1a120c'; c.beginPath(); c.moveTo(p[0]-9*sc2,p[1]+2*sc2); c.lineTo(p[0]-9*sc2,p[1]-10*sc2); c.arc(p[0],p[1]-10*sc2,9*sc2,Math.PI,0); c.lineTo(p[0]+9*sc2,p[1]+2*sc2); c.closePath(); c.fill();
         const g=c.createLinearGradient(0,p[1]-18*sc2,0,p[1]+2*sc2); g.addColorStop(0,'#ffe080'); g.addColorStop(1,'#e04010'); c.fillStyle=g; c.beginPath(); c.moveTo(p[0]-7*sc2,p[1]+1*sc2); c.lineTo(p[0]-7*sc2,p[1]-10*sc2); c.arc(p[0],p[1]-10*sc2,7*sc2,Math.PI,0); c.lineTo(p[0]+7*sc2,p[1]+1*sc2); c.closePath(); c.fill();
@@ -30406,7 +30422,7 @@ const CVM3=(()=>{
     s.draw(); }
   function magpie(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,12,12), z=bob(ph,3); s.shadow(60,30);   // a harvestman: the lookout is its body, slung high between six long thin legs, the knees above the roof
     [24,0,-24].forEach((xx,k)=>[1,-1].forEach(sd=>s.leg([[xx*0.6,sd*16,146+z],[xx*1.6,sd*52,214+z],[xx*2.4,sd*76,0]],11,'#2e2a22',(k+(sd>0?0:1))%2?Math.PI:0,wk,false,true)));
-    s.sphere([0,0,136+z],22,'#3a3022',{sy:0.55}); s.sphere([30,0,140+z],10,'#2e261c'); [1,-1].forEach(sd=>s.disk([36,sd*5,143+z],[0.5,sd,0.25],3,'#e8a040',{glass:true,glow:true,rim:'#2a1e14',bias:2}));
+    s.cylH([-18,0,134+z],[18,0,134+z],11,'#5a4630',{bands:[0.15,0.5,0.85],bandCol:HOOP}); s.box([30,0,128+z],12,12,12,'#4a3a26',{planks:2}); [1,-1].forEach(sd=>s.disk([36.4,sd*3.4,136+z],[1,sd*0.2,0.1],2.6,'#e8a040',{glass:true,glow:true,rim:'#2a1e14',bias:2}));
     s.seg([38,3,146+z],[56,14,170+z],1.4,IRD,3); s.seg([38,-3,146+z],[56,-14,170+z],1.4,IRD,3);   // its head and feelers, under the cabin
     s.box([0,0,150+z],44,40,40,'#d8d0c0',{planks:4}); s.cone([0,0,190+z],34,4,26,'#26242a',{bias:100,hoops:[0.02]}); s.box([0,0,188+z],52,48,3,'#1e1c1e',{top:0.9});   // a pointed shingle roof over the lookout
     for(let k=0;k<8;k++){ const a=k/8*Math.PI*2; s.seg([Math.cos(a)*30,Math.sin(a)*28,146+z],[Math.cos(a)*30,Math.sin(a)*28,156+z],1.6,TIMB); }   // the gallery rail round it
@@ -30415,6 +30431,8 @@ const CVM3=(()=>{
     s.seg([0,0,214+z],[0,0,240+z],2,WOOD); s.poly([[0,0,240+z],[0,16,236+z],[0,0,230+z]],'#e8e4dc',200); s.seg([10,0,160+z],[24,0,168+z],2.4,BR,3);   // flag on the roof peak, a spyglass from the window
     [[-14,'#f0c850'],[-4,'#c8d0d8'],[6,'#f0c850'],[14,'#d84030']].forEach(([yy,col],k)=>{ s.seg([10,yy,150+z],[10,yy,140-k*3+z],0.6,'#6a5a3a',2); s.sphere([10,yy,138-k*3+z],2.2,col,{bias:2}); });
     s.cylV([-14,-12,192+z],3,16,IRD,1.5); s.smoke([-14,-12,210+z],4);
+    { const lx=6, ly=24; s.rope([lx-3,ly,150+z],[lx-3,ly,60+z],0,25,1.1); s.rope([lx+3,ly,150+z],[lx+3,ly,60+z],0,25,1.1); for(let zz=70;zz<150;zz+=12) s.seg([lx-3,ly,zz+z],[lx+3,ly,zz+z],1.4,'#7a5a3a',25.5); }   // a rope ladder down from the cabin
+    s.wheel([-24,0,170+z],[-1,0,0],12,40);   // a cartwheel for a weather-vane, on the back of the cabin
     s.rag([18,20,148+z],[1,-0.4,0],18,24,'#9a6a3a','dark',30); s.rag([-20,-20,146+z],[1,0.5,0],12,30,'#6a4a5a',null,30);   // canvas strips hanging under the cabin, ragged
     s.draw(); }
   function strutterCantle(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), z=bob(ph,1.2); s.box([-6,0,56.4+z],4,13,6,'#4a2a18',{top:1}); s.draw(); }   // the high back of the saddle, drawn again over a rider seen from behind
@@ -30896,8 +30914,8 @@ const CVM3=(()=>{
     try{ old(); } finally{ showDialog=_sd; } };
   // the Strider's lacquer: Brannock boils it from beetle-shell, three colours, and the dust takes all of them
   TALKERS.cvbrannock=extra(TALKERS.cvbrannock,()=>{ if(!CHOICE.cvStrider) return []; const back=()=>TALKERS.cvbrannock();
-    const pick=(k,nm)=>({label:nm+(((CHOICE.cvPaint||'moss')===k)?' <small>(as it is now)</small>':''), fn:()=>{ CHOICE.cvPaint=k; logMsg('Brannock lacquers your Strider '+nm.toLowerCase()+'. By evening the dust has found it.','#c8a860'); say(B,"“Done. Give it a week of road and you will not tell it from the ground.”",[{label:'Back.',fn:back},bye]); }});
-    return [{label:'“Could my Strider wear another colour?”', fn:()=>say(B,"“Lacquer. Beetle-shell, ground and boiled down. Moss, amber, or ember-black.” <i>He shrugs.</i> “The dust has them all soon enough.”",[pick('moss','Moss green'),pick('amber','Amber'),pick('ember','Ember black'),{label:'Back.',fn:back},bye])}]; });
+    const pick=(k,nm)=>({label:nm+(((CHOICE.cvPaint||'moss')===k)?' <small>(as it is now)</small>':''), fn:()=>{ CHOICE.cvPaint=k; logMsg('Brannock daubs your Strider '+nm.toLowerCase()+' with a rag. By evening the dust has found it.','#c8a860'); say(B,"“Done. Give it a week of road and you will not tell it from the ground.”",[{label:'Back.',fn:back},bye]); }});
+    return [{label:'“Could my Strider wear another colour?”', fn:()=>say(B,"“Paint. Ochre and soot and boiled beetle-shell, slapped on with a rag. Moss, amber, or ember-black.” <i>He shrugs.</i> “The dust has them all soon enough.”",[pick('moss','Moss green'),pick('amber','Amber'),pick('ember','Ember black'),{label:'Back.',fn:back},bye])}]; });
   // A · Brannock and the Strider
   TALKERS.cvbrannock=extra(TALKERS.cvbrannock,()=>{ const s=qA(), o=[], back=()=>TALKERS.cvbrannock();
     if(!kin()){ if(trust()>=1) o.push({label:'“That Strider of yours. Could I ride one?”', fn:()=>say(B,"“Ride one? No. Kin build their own. You are a road-friend. Road-friends walk.”",[{label:'Back.',fn:back},bye])}); return o; }

@@ -8254,15 +8254,16 @@ function paintCityDetail(){
   }
 }
 // timber-framed townhouse on any footprint; anchored at its front corner like the cottage
+const bWH=o=>Math.max(o.slits?(o.h||150):172,o.h||172);   // walls tall enough for a door a grown man walks through, and a real upper floor above it
 function paintBuilding(X,Y,o){
-  const T=TW/2, H2=TH/2, fw=o.fw, fh=o.fh, ins=0.1, WH=o.h||150, RH=o.rh||(o.ridge==='j'?fw:fh)*30, pal=CITY_PAL[o.v%CITY_PAL.length];
+  const T=TW/2, H2=TH/2, fw=o.fw, fh=o.fh, ins=0.1, WH=bWH(o), RH=o.rh||(o.ridge==='j'?fw:fh)*30, pal=CITY_PAL[o.v%CITY_PAL.length];
   const pt=(gi,gj,hh=0)=>({x:X+(gi-gj)*T, y:Y+(gi+gj)*H2-hh});
   const poly=(pts,fill,stroke,lw=1)=>{ g.beginPath(); pts.forEach((q,n)=>n?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.closePath(); if(fill){ g.fillStyle=fill; g.fill(); } if(stroke){ g.strokeStyle=stroke; g.lineWidth=lw; g.stroke(); } };
   const L=pt(-fw+ins,-ins), F=pt(-ins,-ins), R=pt(-ins,-fh+ins);
   { const K0=pt(-fw,-fh), sx=26, sy=12;                    // cast shadow: the footprint slid toward the lower right, softened in two passes
     [[1.0,0.22],[0.6,0.18]].forEach(([k,al])=>{ g.fillStyle=`rgba(8,5,2,${al})`; g.beginPath(); g.moveTo(pt(-fw,0).x+sx*k,pt(-fw,0).y+sy*k); g.lineTo(F.x+sx*k,F.y+sy*k); g.lineTo(pt(0,-fh).x+sx*k,pt(0,-fh).y+sy*k); g.lineTo(K0.x+sx*k,K0.y+sy*k); g.closePath(); g.fill(); }); }
   const face=(a,b,lit)=>{                                   // one wall: stone ground floor, framed plaster above, windows, door
-    const stoneH=o.stone?WH:Math.round(WH*0.42), q=(t,hh)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t-hh}), len=Math.hypot(b.x-a.x,b.y-a.y)/T/1.118;
+    const stoneH=o.stone?WH:Math.max(112,Math.round(WH*0.42)), q=(t,hh)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t-hh}), len=Math.hypot(b.x-a.x,b.y-a.y)/T/1.118;
     const k=lit?0:-0.22, stc=tone(pal.st,k), plc=tone(pal.pl,k-0.04);
     poly([q(0,0),q(1,0),q(1,stoneH),q(0,stoneH)],stc);
     g.strokeStyle=tone(pal.st,-0.45,0.7); g.lineWidth=0.7;
@@ -8291,9 +8292,12 @@ function paintBuilding(X,Y,o){
     if(o.shopfront && lit){ poly([q(0.12,6),q(0.62,6),q(0.62,stoneH-6),q(0.12,stoneH-6)],'#2a2018',tone(pal.tb,-0.2),1.5);            // an open shop counter with an awning
       for(let n=0;n<5;n++){ g.fillStyle=['#c83a2a','#e0c070','#6a8a4a','#c8c0b0','#8a5a30'][(n+o.v)%5]; const u=q(0.16+n*0.09,12); g.fillRect(u.x-3,u.y-8,6,8); }
       poly([q(0.08,stoneH-2),q(0.66,stoneH-2),q(0.7,stoneH-22),q(0.04,stoneH-22)],o.awn||'#9a3a2a','rgba(0,0,0,0.3)'); }
-    if(doorHere){ const t0=dT-0.07, t1=dT+0.07; poly([q(t0,0),q(t1,0),q(t1,48),q((t0+t1)/2,56),q(t0,48)],tone('#5a3a1e',k),'#2a1a0c',1.4);
-      g.strokeStyle='rgba(20,10,4,0.5)'; g.lineWidth=0.8; for(let t=t0+0.03;t<t1;t+=0.035){ const u=q(t,2), v=q(t,48); g.beginPath(); g.moveTo(u.x,u.y); g.lineTo(v.x,v.y); g.stroke(); }
-      g.fillStyle='#c8a050'; const kb=q(t1-0.025,24); g.beginPath(); g.arc(kb.x,kb.y,1.6,0,Math.PI*2); g.fill(); }
+    if(doorHere){ const dw=Math.min(0.16,0.42/Math.max(1,len)), t0=dT-dw, t1=dT+dw, DH=Math.min(98,stoneH-10);
+      poly([q(t0-0.02,0),q(t1+0.02,0),q(t1+0.02,DH+4),q((t0+t1)/2,DH+16),q(t0-0.02,DH+4)],tone(pal.st,k-0.18),'rgba(20,12,6,0.6)',1);   // the stone surround
+      poly([q(t0,0),q(t1,0),q(t1,DH),q((t0+t1)/2,DH+10),q(t0,DH)],tone('#5a3a1e',k),'#2a1a0c',1.4);
+      g.strokeStyle='rgba(20,10,4,0.5)'; g.lineWidth=0.8; for(let t=t0+0.03;t<t1;t+=0.035){ const u=q(t,2), v=q(t,DH); g.beginPath(); g.moveTo(u.x,u.y); g.lineTo(v.x,v.y); g.stroke(); }
+      g.strokeStyle='rgba(30,22,14,0.8)'; g.lineWidth=1.6; [DH*0.25,DH*0.72].forEach(hh=>{ const u=q(t0,hh), v=q(t1,hh); g.beginPath(); g.moveTo(u.x,u.y); g.lineTo(v.x,v.y); g.stroke(); });   // iron straps
+      g.fillStyle='#c8a050'; const kb=q(t1-0.03,DH*0.48); g.beginPath(); g.arc(kb.x,kb.y,1.6,0,Math.PI*2); g.fill(); }
     if(o.shield && doorHere){ const ts=Math.min(0.88,Math.max(0.12,dT+(dT>0.5?-0.27:0.27))), hs=o.shopfront?stoneH+20:70, C=q(ts,hs), A=q(ts+0.1,hs), L2=Math.hypot(A.x-C.x,A.y-C.y)||1;
       g.save(); g.transform((A.x-C.x)/L2,(A.y-C.y)/L2,0,1,C.x,C.y); g.scale(1.45,1.45);
       const shp=()=>{ g.beginPath(); g.moveTo(-9,-10); g.lineTo(9,-10); g.lineTo(9,0); g.quadraticCurveTo(8,8,0,12); g.quadraticCurveTo(-8,8,-9,0); g.closePath(); }; shp();
@@ -8357,7 +8361,7 @@ function paintBuilding(X,Y,o){
   if(!o.nochim){ const c0=o.ridge==='j'?pt(-fw/2+0.3,-fh*0.3,WH+RH*0.8):pt(-fw*0.3,-fh/2+0.25,WH+RH*0.8);
     g.fillStyle=tone(pal.st,-0.1); g.fillRect(c0.x-7,c0.y-26,14,28); g.fillStyle=tone(pal.st,-0.4); g.fillRect(c0.x,c0.y-26,7,28); g.fillStyle='#2a2622'; g.fillRect(c0.x-8,c0.y-29,16,4); }
 }
-function cityBuildingSize(o){ const fw=o.fp[0], fh=o.fp[1], WH=o.h||150, RH=o.rh||(o.ridge==='j'?fw:fh)*30; return { w:(fw+fh)*64+80, h:(fw+fh)*32+WH+RH+90, ax:fw*64+40, ay:(fw+fh)*32+WH+RH+50 }; }
+function cityBuildingSize(o){ const fw=o.fp[0], fh=o.fp[1], WH=bWH(o), RH=o.rh||(o.ridge==='j'?fw:fh)*30; return { w:(fw+fh)*64+80, h:(fw+fh)*32+WH+RH+90, ax:fw*64+40, ay:(fw+fh)*32+WH+RH+50 }; }
 // the Baron's arms: a gold boar's head, couped, tusk bared, looking to the left (sinister) — on every banner, flag, seal and tabard of his
 function drawBaronSigil(c,cx,cy,sz,gold='#e2b84e',dark='#4a1210',worn=0){
   const k=sz/2, P_=(u,v)=>[cx+u*k,cy+v*k];
@@ -9352,7 +9356,7 @@ function drawObject(o){
   } else if(o.type==='bldg'){
     const a=P(o.i+o.fp[0],o.j+o.fp[1]), S=cityBuildingSize(o);
     // see-through while someone walks behind it
-    const pp=P(player.x,player.y), topY=a.y-(o.fp[0]+o.fp[1])*32-(o.h||150)-(S.ay-(o.fp[0]+o.fp[1])*32-(o.h||150)-50)*0.9;
+    const pp=P(player.x,player.y), topY=a.y-(o.fp[0]+o.fp[1])*32-(bWH(o))-(S.ay-(o.fp[0]+o.fp[1])*32-(bWH(o))-50)*0.9;
     const behind = player.x<o.i+o.fp[0]+0.3 && player.y<o.j+o.fp[1]+0.3 && !(player.x>o.i+o.fp[0]-0.2 || player.y>o.j+o.fp[1]-0.2)
       && pp.x>a.x-o.fp[0]*64-8 && pp.x<a.x+o.fp[1]*64+8 && pp.y>topY+14 && pp.y<a.y+10;
     o.fade=lerpN(o.fade??1, behind?0.34:1, 0.2); const ga=g.globalAlpha; g.globalAlpha=ga*o.fade;
@@ -9849,7 +9853,7 @@ function drawNPCBody(n){
 // A timber-framed cottage on a 2x2 footprint, painted once and cached per roof colour.
 let COTTAGE_CHIM={dx:0,dy:-300}; const COTTAGE_CHIMS={};
 function paintCottage(x,y,roof,door='r',N=3,dt=1){        // N: the footprint's side in tiles; a bigger house stands a little taller and its roof climbs higher
-  const T=TW/2, H2=TH/2, ins=0.12, WH=118+(N-3)*14, RH=86*N/3;
+  const T=TW/2, H2=TH/2, ins=0.12, WH=132+(N-3)*14, RH=86*N/3;
   const pt=(gi,gj,h=0)=>({x:x+(gi-gj)*T, y:y+(gi+gj)*H2-h});          // local grid, (N,N) is the anchor at x,y
   const a=ins, b=N-ins;
   const Bm=pt(b-N,b-N), R=pt(b-N,a-N), L=pt(a-N,b-N), K=pt(a-N,a-N);
@@ -9897,7 +9901,7 @@ function paintCottage(x,y,roof,door='r',N=3,dt=1){        // N: the footprint's 
   });
   // door on the shaded face, window with a warm glow on the lit face
   const DF = door==='l' ? [L,Bm] : [Bm,R], WF = door==='l' ? [Bm,R] : [L,Bm];
-  const dc=(dt+0.5)/N, dw=0.08*3/N, d0=lerp(DF[0],DF[1],dc-dw), d1=lerp(DF[0],DF[1],dc+dw), DH=92;   // the door over its doorstep tile
+  const dc=(dt+0.5)/N, dw=0.08*3/N, d0=lerp(DF[0],DF[1],dc-dw), d1=lerp(DF[0],DF[1],dc+dw), DH=104;   // the door over its doorstep tile
   quad([up2(d0,8),up2(d1,8),up2(d1,DH+2),up2(d0,DH+2)],'#3a2412');
   quad([up2(d0,9),up2(d1,9),up2(d1,DH),up2(d0,DH)],'#6a4624');
   g.strokeStyle='rgba(20,10,4,0.6)'; g.lineWidth=0.8; for(let t=0.25;t<1;t+=0.25){ const q0=lerp(d0,d1,t); g.beginPath(); g.moveTo(q0.x,q0.y-9); g.lineTo(q0.x,q0.y-DH); g.stroke(); }
@@ -18700,7 +18704,7 @@ AREAS.martahut.entries={ fromHut:{i:3,j:5} };
 rtWrap('martahut');
 AREAS.martahut.objects=(o=>()=>o().map(x=>x.type==='teleporter'?{...x, i:3, j:6}:x))(AREAS.martahut.objects);
 TALKERS.sleep_trader=()=>say('Marta the Trader',["Marta is asleep, rolled up in two blankets with her boots still on. The money box is under her pillow, and one hand is on it."],[{label:'Let her sleep.', fn:closeDialog}]);
-function paintRoundHut(x,y){ const rx=72, ry=36, H=46, R=1.16;
+function paintRoundHut(x,y){ const rx=72, ry=36, H=86, R=1.16;
   g.fillStyle='rgba(8,5,2,0.32)'; g.beginPath(); g.ellipse(x+8,y+6,rx*1.15,ry*1.15,0,0,Math.PI*2); g.fill();
   const wg=g.createLinearGradient(x-rx,0,x+rx,0); wg.addColorStop(0,'#8a7656'); wg.addColorStop(0.45,'#b8a27c'); wg.addColorStop(1,'#6e5c40');
   g.fillStyle=wg; g.beginPath(); g.ellipse(x,y,rx,ry,0,0,Math.PI); g.lineTo(x-rx,y-H); g.ellipse(x,y-H,rx,ry,0,Math.PI,0,true); g.closePath(); g.fill();     // the wall: a short drum
@@ -18708,15 +18712,15 @@ function paintRoundHut(x,y){ const rx=72, ry=36, H=46, R=1.16;
   g.strokeStyle='rgba(60,44,24,0.25)'; g.lineWidth=0.8; for(let h=10;h<H;h+=9){ g.beginPath(); g.ellipse(x,y-h,rx,ry,0,0.15,Math.PI-0.15); g.stroke(); }
   g.fillStyle='rgba(60,46,28,0.35)'; g.beginPath(); g.ellipse(x,y,rx,ry,0,0,Math.PI); g.lineTo(x-rx,y-6); g.ellipse(x,y-6,rx,ry,0,Math.PI,0,true); g.closePath(); g.fill();   // damp at the foot
   const da=0.45, dx=x+Math.cos(da)*rx, dy=y+Math.sin(da)*ry;                                                   // the door, toward the square
-  g.fillStyle='#3a2614'; g.beginPath(); g.moveTo(dx-12,dy+1); g.lineTo(dx-12,dy-30); g.quadraticCurveTo(dx-3,dy-38,dx+6,dy-31); g.lineTo(dx+6,dy-2); g.closePath(); g.fill();
-  g.strokeStyle='#5a4024'; g.lineWidth=1; for(let k=0;k<3;k++){ g.beginPath(); g.moveTo(dx-9+k*5,dy); g.lineTo(dx-9+k*5,dy-31); g.stroke(); }
+  g.fillStyle='#3a2614'; g.beginPath(); g.moveTo(dx-15,dy+1); g.lineTo(dx-15,dy-66); g.quadraticCurveTo(dx-4,dy-78,dx+8,dy-67); g.lineTo(dx+8,dy-2); g.closePath(); g.fill();
+  g.strokeStyle='#5a4024'; g.lineWidth=1; for(let k=0;k<4;k++){ g.beginPath(); g.moveTo(dx-12+k*5,dy); g.lineTo(dx-12+k*5,dy-67); g.stroke(); }
   const top=y-H-62, rg=g.createLinearGradient(x-rx*R,0,x+rx*R,0); rg.addColorStop(0,'#9a7a3a'); rg.addColorStop(0.4,'#d2b468'); rg.addColorStop(1,'#7a5e2a');
   g.fillStyle=rg; g.beginPath(); g.moveTo(x,top); g.lineTo(x+rx*R,y-H+4); g.ellipse(x,y-H+4,rx*R,ry*R,0,0,Math.PI); g.closePath(); g.fill();        // the thatch cone, overhanging the wall
   g.strokeStyle='rgba(90,66,26,0.5)'; g.lineWidth=0.9; for(let k=0;k<=16;k++){ const a=Math.PI*k/16, px=x+Math.cos(a)*rx*R, py=y-H+4+Math.sin(a)*ry*R; g.beginPath(); g.moveTo(x+(px-x)*0.12,top+(py-top)*0.12); g.lineTo(px,py); g.stroke(); }
   g.strokeStyle='rgba(60,42,16,0.5)'; g.lineWidth=1.4; g.beginPath(); g.ellipse(x,y-H+4,rx*R,ry*R,0,0.05,Math.PI-0.05); g.stroke();           // the ragged eave
   g.fillStyle='#4a3a20'; g.beginPath(); g.ellipse(x,top+4,5,2.5,0,0,Math.PI*2); g.fill(); }
-function drawRoundHut(o){ const S=o.fp[0]/2, q=P(o.i+o.fp[0]/2,o.j+o.fp[1]/2); g.save(); g.translate(q.x,q.y); g.scale(S,S); drawCached('roundhut',0,0,190,190,95,150,paintRoundHut); g.restore();
-    for(let k=0;k<4;k++){ const t=((gt*0.18+k/4)%1); g.fillStyle=`rgba(150,146,140,${0.22*(1-t)})`; g.beginPath(); g.arc(q.x+(Math.sin(t*3+k)*6+t*8)*S,q.y-(46+62)*S-t*55,3+t*9,0,Math.PI*2); g.fill(); }
+function drawRoundHut(o){ const S=o.fp[0]/2, q=P(o.i+o.fp[0]/2,o.j+o.fp[1]/2); g.save(); g.translate(q.x,q.y); g.scale(S,S); drawCached('roundhut2',0,0,200,260,100,220,paintRoundHut); g.restore();
+    for(let k=0;k<4;k++){ const t=((gt*0.18+k/4)%1); g.fillStyle=`rgba(150,146,140,${0.22*(1-t)})`; g.beginPath(); g.arc(q.x+(Math.sin(t*3+k)*6+t*8)*S,q.y-(86+62)*S-t*55,3+t*9,0,Math.PI*2); g.fill(); }
     if(o.inside) drawDoorMark(o); }
 // the purple bandana is the Baron's thugs' mark: you take it off one of them, no honest (or dishonest) vendor ever sells it
 // chairs block your way like anything else; only someone going to sit on one may step onto it
@@ -29894,7 +29898,7 @@ OBJ_DRAW.inktable=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y; g.save(); g.fil
   g.strokeStyle='#c8c4b8'; g.lineWidth=0.8; g.beginPath(); g.moveTo(x+10,y-16); g.lineTo(x+15,y-21); g.stroke(); g.restore(); };   // a needle
 // Bulga is drawn with the cave troll's frame, kinder: warm skin, an apron, no club
 { const _db=drawNPCBody; drawNPCBody=function(n){ if(!n.ogre) return _db.apply(this,arguments);
-    const P0=P(n.x??n.i+0.5,n.y??n.j+0.5), x=P0.x, y=P0.y; drawTroll(x,y,{dir:n.dir||0,moving:false,ogre:true,opts:{equip:{weapon:null}}},null);
+    const P0=P(n.x??n.i+0.5,n.y??n.j+0.5), x=P0.x, y=P0.y; drawTroll(x,y,{dir:n.dir||0,moving:!!n.moving,ogre:true,pirate:n.pirate,scarf:n.scarf,sash:n.sash,opts:{equip:{weapon:null}}},null);
     if(romHush()) return; g.font='500 11px "Segoe UI", system-ui, sans-serif'; const tw=g.measureText(n.name).width, ty=y-182;
     g.fillStyle='rgba(12,8,3,0.78)'; g.beginPath(); g.roundRect(x-tw/2-7,ty,tw+14,16,4); g.fill(); g.fillStyle='#f0dca0'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(n.name,x,ty+8);
     const q=npcHasNews(n); if(q){ const by=ty-12+Math.sin(gt*3)*2; g.fillStyle='#1a1006'; g.font='bold 15px Georgia, serif'; g.fillText(q,x+1,by+1); g.fillStyle='#f0c040'; g.fillText(q,x,by); }
@@ -31501,7 +31505,7 @@ function spawnCrab(i,j,big){ try{ const m={ name:big?'Wreck Crab':'Mud Crab', ty
       objects:()=>{ const l=[{type:'teleporter', i:35, j:5, to:'jverge', entry:'fromHaven'},
           {type:'teleporter', i:30, j:25, to:'tideflats', entry:'fromHaven', locked:()=>tideIn(), onLocked:()=>{ logMsg('The slipway runs down into green water. The flats are under the sea. Low water in '+fmtHrs(tideHoursTo('low'))+'.','#7ac0e0'); setTimeout(()=>{ OBJECTS.forEach(o=>{ if(o.type==='teleporter') o._warned=false; }); },3000); }},
           {type:'slipway', i:29, j:19, fp:[3,6], noblock:true, dz:-98},
-          B(2,0,6,3,1,{h:82,rh:46,door:'d',dt:2,sign:'🍺'}), B(10,0,4,3,2,{h:74,rh:40,door:'d',dt:1,sign:'⚓'}), B(16,0,5,3,0,{h:88,rh:48,door:'d',dt:2,sign:'🗝'}), B(23,0,4,3,3,{h:70,rh:40,door:'d',dt:1}),
+          B(2,0,6,3,1,{h:82,rh:46,door:'l',dt:2,sign:'🍺',inside:'bilge',back:'fromCity'}), B(10,0,4,3,2,{h:74,rh:40,door:'l',dt:1,sign:'⚓',inside:'chandlery',back:'fromCity'}), B(16,0,5,3,0,{h:88,rh:48,door:'l',dt:2,sign:'🗝'}), B(23,0,4,3,3,{h:70,rh:40,door:'l',dt:1}),
           {type:'stilthut', i:31, j:8, fp:[3,3]}, {type:'stilthut', i:1, j:10, fp:[3,3]},
           {type:'cstall', i:9, j:8, v:1}, {type:'cstall', i:12, j:8, v:3}, {type:'cstall', i:17, j:8, v:5},
           {type:'bellframe', i:26, j:9}, {type:'noticeboard', i:20, j:7}, {type:'gallows', i:33, j:1},
@@ -31582,6 +31586,96 @@ function spawnCrab(i,j,big){ try{ const m={ name:big?'Wreck Crab':'Mud Crab', ty
       if(r<0.42) return {type:'palm', i:o.i, j:o.j, v, s:0.5+o.s*0.35, ox:o.ox, oy:o.oy};
       if(r<0.62) return {type:'jtree', i:o.i, j:o.j, v:v%3, s:0.55+o.s*0.3, ox:o.ox, oy:o.oy};
       return {type:'fern', i:o.i, j:o.j, v:v%3, s:0.9+o.s*0.4, noblock:true, ox:o.ox, oy:o.oy}; }); }; }
+
+// ════════ THE WRACK COAST, part two: the Bilge & Barnacle, the chandlery, Barnacle Bet's shells, the mudlark race, the ferry, the sealed gate ════════
+Object.assign(ITEMS,{
+  tide_table:{ name:'Tide Table', slot:'misc', title:"A greasy almanac of high and low water, in Snitchkin's handwriting. With it you know the tide to the quarter-hour." },
+  shell_charm:{ name:'Shell-Strung Charm', slot:'neck', title:"Five shells of the Wrack Flats on a tarred cord. Barnacle Bet says it brings luck at low water. It certainly brings noise." },
+  pearl_earring:{ name:'Black Pearl Earring', slot:'neck', title:"A black pearl on a gold hook. Captains wear them so the sea knows who to bring home." },
+  nautilus_lamp:{ name:'Nautilus Lantern', slot:'offhand', title:"A ghost nautilus with a candle-stub in its heart, hung on a brass ring. Its light lies on water like a path." },
+  mudlark_boots:{ name:'Mudlark Boots', slot:'feet', base:'boots', col:'#3a3a32', title:"Tarred sealskin, light as slippers, never stuck in mud. Nobb wore them to win twenty races and lose one." },
+ });
+Object.assign(PRICES,{ tide_table:25, shell_charm:120, pearl_earring:220, nautilus_lamp:160, mudlark_boots:90 });
+QUEST_ITEMS.add('tide_table');
+Object.assign(ITEM_STATS,{ shell_charm:{agi:3,magic:1}, pearl_earring:{hp:10,agi:2}, nautilus_lamp:{magic:4,hp:4}, mudlark_boots:{agi:3,hp:4} });
+if(typeof GEAR_HP!=='undefined') Object.assign(GEAR_HP,{ shell_charm:0, pearl_earring:4, nautilus_lamp:0, mudlark_boots:3 });
+// the tide table makes the clock exact; without it you read the water by eye
+{ const _th=tideHud; tideHud=function(){ _th.apply(this,arguments); const el=document.getElementById('tide-hud'); if(!el || el.style.display==='none' || hasItem('tide_table')) return;
+    const sp=el.querySelector('span'); if(sp){ const lv=tideLevel(), ph=tidePhase(); sp.textContent = lv<0.02 ? 'The water is far out. For now.' : ph>=0.66||ph<0.06 ? 'The sea is coming in.' : 'The sea is drawing back.'; sp.title='A tide table would tell you to the hour.'; } }; }
+// ── inside
+AREAS.bilge={ ...CROOM('The Bilge & Barnacle',9,7,'wrackhaven','fromBilge', ()=>[
+    {type:'counter', i:8, j:1, fp:[1,4]}, {type:'barrel', i:8, j:0}, {type:'barrel', i:7, j:0}, {type:'kegrack', i:5, j:0, fp:[2,1]}, {type:'hearth', i:0, j:2},
+    {type:'table', i:2, j:1}, {type:'table', i:4, j:3}, {type:'table', i:2, j:4}, {type:'bench', i:5, j:5}, {type:'lantern', i:1, j:0}, {type:'lantern', i:6, j:5}, {type:'banner', i:3, j:0} ],
+  ()=>[ { id:'saltlick', name:'Mama Saltlick', i:8, j:5, dir:1, opts:{race:'human',gender:'f',skin:4,hair:4,hairColor:1,face:0,equip:{head:'hood_red',torso:'smock',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}} },
+        { id:'barnbet', name:'Barnacle Bet', i:2, j:2, dir:1, sit:true, opts:GOBLIN({gender:'f', skin:21, hair:3, equip:{head:'straw_hat',torso:'smock',armor:null,hands:null,legs:'hose_grey',feet:null,weapon:null,offhand:null}}) },
+        { id:'grubb', name:'Grubb the Bouncer', i:1, j:5, dir:2, ogre:true, pirate:true, scarf:'#2a4a8a', sash:'#c8a04a', opts:{equip:{}} },
+        { id:'fiddler', name:'One-String Wil', i:5, j:2, dir:2, opts:{race:'human',gender:'m',skin:2,hair:2,hairColor:3,beard:2,face:1,equip:{head:'tricorn',torso:'shirt',armor:null,hands:null,legs:'breeches',feet:'boots',weapon:null,offhand:null}} } ]) };
+AREAS.chandlery={ ...CROOM('Gall\'s Chandlery',6,5,'wrackhaven','fromChand', ()=>[
+    {type:'counter', i:5, j:1, fp:[1,3]}, {type:'crates', i:0, j:0}, {type:'barrels', i:2, j:0}, {type:'rack', i:4, j:0}, {type:'shelf', i:0, j:2}, {type:'lantern', i:3, j:0} ],
+  ()=>[ { id:'gall', name:'Gall the Chandler', i:5, j:4, dir:1, opts:GOBLIN({skin:20, hair:0, equip:{head:'bandana',torso:'shirt',armor:'smith_apron',hands:'gloves',legs:'trousers',feet:null,weapon:null,offhand:null}}) } ]) };
+{ const H=AREAS.wrackhaven, oF=H.objects; const doorOf=k=>{ const o=oF().find(o=>o.type==='bldg' && o.inside===k); return o ? doorTile(o) : [5,4]; };
+  H.entries=Object.assign(H.entries||{},{ fromBilge:(([i,j])=>({i,j}))(doorOf('bilge')), fromChand:(([i,j])=>({i,j}))(doorOf('chandlery')) }); }
+// the more lively harbour: an ogre deck-hand, a ferryman, a goblin child with a whistle
+wrap('wrackhaven','npcs',l=>[...l,
+  { id:'wr_ogre', name:'Hob the Hauler', i:10, j:13, dir:7, ogre:true, pirate:true, scarf:'#a8241e', sash:'#8a1e1a', opts:{equip:{}} },
+  { id:'ferryman', name:'Old Corrie, Ferryman', i:15, j:20, dir:1, opts:{race:'human',gender:'m',skin:3,hair:0,hairColor:7,beard:5,face:1,equip:{head:'straw_hat',torso:'tunic_linen',armor:null,hands:null,legs:'breeches',feet:null,weapon:null,offhand:null}} },
+  { id:'nobb', name:'Nobb the Mudlark', i:28, j:17, dir:2, opts:GOBLIN({skin:21, hair:1, equip:{head:null,torso:'shirt',armor:null,hands:null,legs:'trousers',feet:'mudlark_boots',weapon:null,offhand:null}}) } ]);
+// ── Mama Saltlick: rum, fish stew, rumours
+TALKERS.saltlick=()=>say('Mama Saltlick',[["“Sit, eat, pay. In that order or I'll know why.”","“Ysolde's law is no blood on the boards. Mine's no blood in the stew. Very similar laws. Different reasons.”","“Low water tonight. Half my customers will be out on the flats and the other half will be in here betting on which half drowns.”"][tideIdx()%3]],
+  [{label:'“What have you got?”', fn:()=>shopFrom('Mama Saltlick',['rum','bread','cooked_meat','grilled_fish','potion'].filter(i=>ITEMS[i]),1,["“Rum. Stew. More rum.”"],()=>TALKERS.saltlick())},
+   {label:'“Heard anything?”', fn:()=>say('Mama Saltlick',[["“There's a door out past the wrecks, under the lowest water. Stone, old, barnacled shut. Ysolde's people say it's an old king's tomb. The goblins say it's a mouth. I say stay out of it.”","“The tigers on the Verge have been bold this season. Something deeper in the jungle is pushing them out.”","“Nobb the mudlark races anyone for coin at low water. Nobody's beaten him in a year. His boots, I reckon. Or he's part eel.”"][(tideIdx()+1)%3]],[{label:'Back.', fn:()=>TALKERS.saltlick()}])}, bye]);
+TALKERS.fiddler=()=>{ try{ SND.fx('fiddle'); }catch(e){} say('One-String Wil',["<i>He saws out something cheerful on a fiddle with one string left on it.</i> “Requests cost a copper. Silence costs two.”"],[{label:'Pay for a tune. (-1c)', off:player.purse<1, fn:()=>{ player.purse-=1; updateHud(); try{ SND.fx('fiddle'); }catch(e){} closeDialog(); logMsg('Wil plays “The Drowned Man’s Hornpipe”. Somebody dances. Somebody falls over.','#e8d8a8'); }}, bye]); };
+TALKERS.grubb=()=>say('Grubb the Bouncer',["<i>The ogre looks down at you for a long time.</i> “No blood. On boards.”","<i>He thinks about it.</i> “Or in stew.”"],[bye]);
+TALKERS.wr_ogre=()=>say('Hob the Hauler',[["“Lift. Carry. Put down. Good day.”","“Goblins think. Hob carries. Both happy.”","“Low water, Hob carries treasure. High water, Hob carries goblins who went for treasure.”"][tideIdx()%3]],[bye]);
+// ── Gall's chandlery: what you need for the flats, and what pirates wear
+TALKERS.gall=()=>say('Gall the Chandler',["“Rope, tar, spades, tide tables, hats with corners. Everything a sensible person needs to do something stupid at low water.”"],
+  [{label:'“Show me.”', fn:()=>shopFrom('Gall the Chandler',['tide_table','shovel','rum','tricorn','pirate_coat','scimitar','bandana'].filter(i=>ITEMS[i]),1,["“Tide table first. Trust me.”"],()=>TALKERS.gall())}, bye]);
+// ── Barnacle Bet: the shell collector
+const shellCount=id=>invCount(id), hasSet=()=>['sh_cowrie','sh_conch','sh_spiral','sh_star','sh_mirror'].every(id=>invCount(id)>0);
+function removeOne(id){ const k=player.inv.indexOf(id); if(k<0) return; const N=invN(); if(stackable(id) && (N[k]|0)>0) N[k]--; else { player.inv[k]=null; N[k]=0; } }
+TALKERS.barnbet=()=>{ const o=[], back=()=>TALKERS.barnbet();
+  if(hasSet() && !CHOICE.betCharm) o.push({label:'Trade one of each of the five shells for a charm.', fn:()=>{ ['sh_cowrie','sh_conch','sh_spiral','sh_star','sh_mirror'].forEach(id=>removeOne(id)); CHOICE.betCharm=1; giveQuestItem('shell_charm',true); updateHud(); say('Barnacle Bet',["<i>She lays them out in a row, licks each one, and threads them on a cord.</i> “There. Now the sea knows you're one of us.”"],[{label:'Back.', fn:back}]); }});
+  if(invCount('sh_ghost') && !CHOICE.betLamp) o.push({label:'Trade the Ghost Nautilus for her lantern.', fn:()=>{ removeOne('sh_ghost'); CHOICE.betLamp=1; giveQuestItem('nautilus_lamp',true); updateHud(); say('Barnacle Bet',["“Oh. Oh, look at it.” <i>She holds it to her ear for a long time.</i> “Take my lantern. I made it from the last one I found. Forty years ago. I've been waiting for its sister.”"],[{label:'Back.', fn:back}]); }});
+  if(invCount('black_pearl') && !CHOICE.betEar) o.push({label:'Trade a black pearl for an earring.', fn:()=>{ removeOne('black_pearl'); CHOICE.betEar=1; giveQuestItem('pearl_earring',true); updateHud(); say('Barnacle Bet',["“I'll set it in gold, from my own ear. Captains wear these so the sea brings them home. Can't hurt.”"],[{label:'Back.', fn:back}]); }});
+  const loose=SHELLS.reduce((a,id)=>a+invCount(id),0); if(loose>0) o.push({label:'Sell her your shells. (+'+SHELLS.reduce((a,id)=>a+invCount(id)*(PRICES[id]||10),0)+'c)', fn:()=>{ let c=0; SHELLS.forEach(id=>{ while(invCount(id)>0){ c+=PRICES[id]||10; removeOne(id); } }); player.purse+=c; updateHud(); say('Barnacle Bet',["<i>She counts them twice.</i> “Fair price. Better than Gall would give you, the thief.”"],[{label:'Back.', fn:back}]); }});
+  say('Barnacle Bet',[CHOICE.betMet?"“Shells? Show Bet.”":"“Ah, a beachcomber's face! Wet knees, salty eyebrows.” <i>A tiny goblin woman, very old, with shells sewn all over her hat.</i>","“Five shells I want, one of each: the tiger cowrie, the queen conch, the wentletrap, the sun star, the moon scallop. Bring me the set and I'll string you a charm. And if the sea ever gives you a <b>ghost nautilus</b>… come straight to Bet.”"],[...o,bye]); CHOICE.betMet=1; };
+// ── the ferry to Port Fearn and back
+TALKERS.ferryman=()=>say('Old Corrie, Ferryman',["“Port Fearn, round the headland. Half a day if the wind likes you. Twenty copper whether it does or not.”"],[{label:'Sail to Port Fearn. (-20c)', off:player.purse<20, fn:()=>{ player.purse-=20; updateHud(); closeDialog(); dayClock+=DAY_LEN*0.4; const E=AREAS.portfearn&&AREAS.portfearn.entries?Object.keys(AREAS.portfearn.entries)[0]:null; switchArea('portfearn',E); logMsg('Corrie\'s cutter beats round the headland in a shower of spray. Port Fearn, with its own harbour stink.','#9fc8e0'); }}, bye]);
+wrap('portfearn','npcs',l=>[...l,{ id:'ferryman2', name:'Old Corrie, Ferryman', i:15, j:12, dir:1, opts:{race:'human',gender:'m',skin:3,hair:0,hairColor:7,beard:5,face:1,equip:{head:'straw_hat',torso:'tunic_linen',armor:null,hands:null,legs:'breeches',feet:null,weapon:null,offhand:null}} }]);
+TALKERS.ferryman2=()=>say('Old Corrie, Ferryman',["“Back to Wrackhaven? Twenty copper. I'll have you there for low water if you don't dawdle.”"],[{label:'Sail to Wrackhaven. (-20c)', off:player.purse<20, fn:()=>{ player.purse-=20; updateHud(); closeDialog(); dayClock+=DAY_LEN*0.4; switchArea('wrackhaven','fromFerry'); logMsg('The cutter runs in past the harbour wall, and the bell on the tide-tower swings in the wind.','#9fc8e0'); }}, bye]);
+AREAS.wrackhaven.entries.fromFerry={i:15,j:17};
+// ── Nobb's mudlark race: five flags out on the flats before his whistle; win and he gives up his boots
+const RACE={ on:false, t:0, got:0, flags:[] };
+TALKERS.nobb=()=>{ const lv=tideLevel(); const o=[];
+  if(lv<0.02 && tideHoursTo('flood')>1.2 && !RACE.on) o.push({label:CHOICE.nobbWon?'Race him again. (5c stake)':'Race him. (5c stake)', off:player.purse<5, fn:()=>{ player.purse-=5; updateHud(); closeDialog(); raceStart(); }});
+  say('Nobb the Mudlark',[CHOICE.nobbWon?"“Rematch? I'm faster now. I've been eating eels.”":"“You! Racing face! Five flags out on the flats, I put them out, you fetch them, back to me before my whistle. Beat me and I give you my boots. Lose and I keep your coin.”", lv<0.02?"“Water's out. Go when you like.”":"“Not now, mud's under the sea. Low water. Come back at low water.”"],[...o,bye]); };
+function raceStart(){ RACE.on=true; RACE.got=0; RACE.t=performance.now(); RACE.limit=CHOICE.nobbWon?50:60; RACE.flags=[]; CHOICE.raceIdx=tideIdx();
+  switchArea('tideflats','fromHaven'); const pts=[[6,8],[18,10],[30,9],[12,16],[26,15],[34,13],[8,13],[22,19]].filter(([i,j])=>!tfDeep(i,j)&&!blocked.has(i+','+j));
+  for(let k=0;k<5 && pts.length;k++){ const p=pts.splice(Math.floor(Math.random()*pts.length),1)[0]; const f={type:'mlflag', i:p[0], j:p[1], noblock:true, race:true}; OBJECTS.push(f); RACE.flags.push(f); }
+  banner('Go! Five flags!','#f0d060',1400); try{ SND.fx('whoosh'); }catch(e){} logMsg('Nobb blows his whistle. Five red rags on sticks, out across the mud. Fetch them all and get back up the slipway!','#f0d060'); }
+OBJ_DRAW.mlflag=o=>{ if(o.taken) return; const q=P(o.i+0.5,o.j+0.5), w=Math.sin(gt*5+o.i)*3; g.strokeStyle='#5a3e24'; g.lineWidth=2; g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(q.x,q.y-34); g.stroke();
+  g.fillStyle='#c8281e'; g.beginPath(); g.moveTo(q.x,q.y-34); g.quadraticCurveTo(q.x+10,q.y-32+w*0.3,q.x+18,q.y-29+w); g.lineTo(q.x,q.y-22); g.closePath(); g.fill(); g.save(); g.globalCompositeOperation='lighter'; glow(q.x+6,q.y-28,10,8,'255,120,80',0.25); g.restore(); };
+onUse(['mlflag'],o=>{ if(o.taken || !RACE.on) return; o.taken=true; RACE.got++; try{ SND.fx('bag'); }catch(e){} floatText([o.i,o.j],RACE.got+' / 5','#f0d060'); if(RACE.got>=5) logMsg('All five! Back to the slipway, fast!','#f0d060'); });
+setInterval(()=>{ try{ if(!RACE.on) return; const left=RACE.limit-(performance.now()-RACE.t)/1000*(typeof slowmo!=='undefined'&&slowmo.scale?1:1);
+    const el=document.getElementById('tide-hud'); if(el && el.style.display!=='none'){ el.insertAdjacentHTML('beforeend',`<div style="color:#f0d060;margin-top:3px">🏁 Flags ${RACE.got}/5 · ${Math.max(0,Math.ceil(left))}s</div>`); }
+    if(areaId==='wrackhaven' && RACE.got>=5){ RACE.on=false; const first=!CHOICE.nobbWon; CHOICE.nobbWon=(CHOICE.nobbWon||0)+1; player.purse+=first?10:15; updateHud(); banner('You beat Nobb!','#f0d060',1800);
+      if(first){ giveQuestItem('mudlark_boots',true); say('Nobb the Mudlark',["<i>He stares at you, then at his whistle, as if it lied.</i> “Nobody beats Nobb.” <i>He sits down and pulls off his boots.</i> “A deal's a deal. They're lucky. Mostly.”"],[bye]); }
+      else logMsg('Nobb pays up, muttering about eels.','#f0d060'); return; }
+    if(left<=0 || (areaId!=='tideflats' && areaId!=='wrackhaven') || CHOICE.raceIdx!==tideIdx()){ RACE.on=false; banner('Nobb wins!','#c87a5a',1600); logMsg('Nobb\'s whistle shrills from the slipway. He has won again, and he lets you know it.','#c87a5a'); OBJECTS.forEach(o=>{ if(o.type==='mlflag') o.taken=true; }); } }catch(e){} },500);
+// ── the sealed gate, far out where only the lowest water reaches; opened later by the Harbourmistress's key
+{ const _tf=AREAS.tideflats.objects; AREAS.tideflats.objects=()=>[..._tf(), {type:'drowngate', i:30, j:21, fp:[2,1]}]; }
+OBJ_DRAW.drowngate=o=>{ const q=P(o.i+1,o.j+0.6); drawCached('drowngate',q.x,q.y,200,200,100,170,(X,Y)=>{
+    g.fillStyle='rgba(20,18,14,0.35)'; g.beginPath(); g.ellipse(X,Y+4,70,18,0,0,Math.PI*2); g.fill();
+    const st='#6a6e64', sd=tone(st,-0.35); g.fillStyle=sd; g.fillRect(X-58,Y-110,22,112); g.fillRect(X+36,Y-110,22,112); g.fillStyle=st; g.fillRect(X-56,Y-110,18,112); g.fillRect(X+38,Y-110,18,112);
+    g.fillStyle=st; g.beginPath(); g.moveTo(X-62,Y-108); g.quadraticCurveTo(X,Y-150,X+62,Y-108); g.lineTo(X+62,Y-96); g.quadraticCurveTo(X,Y-136,X-62,Y-96); g.closePath(); g.fill(); g.strokeStyle='rgba(20,20,16,0.7)'; g.lineWidth=1; g.stroke();
+    g.fillStyle='#2a2c26'; g.beginPath(); g.moveTo(X-36,Y); g.lineTo(X-36,Y-96); g.quadraticCurveTo(X,Y-128,X+36,Y-96); g.lineTo(X+36,Y); g.closePath(); g.fill();   // the door itself, shut
+    g.strokeStyle='#4a4c44'; g.lineWidth=1; for(let k=-2;k<=2;k++){ g.beginPath(); g.moveTo(X+k*14,Y-2); g.lineTo(X+k*14,Y-100+Math.abs(k)*6); g.stroke(); }
+    g.fillStyle='#8a8e80'; g.beginPath(); g.ellipse(X,Y-78,12,7,0,0,Math.PI*2); g.fill(); g.fillStyle='#1a1c18'; g.beginPath(); g.ellipse(X,Y-78,4,6,0,0,Math.PI*2); g.fill();   // an eye carved over the door
+    g.fillStyle='#d8d0b8'; for(let k=0;k<40;k++){ const bx=X-58+((k*37)%116), by=Y-6-((k*23)%60); g.beginPath(); g.arc(bx,by,1.4,0,Math.PI*2); g.fill(); }   // barnacles
+    g.fillStyle='rgba(50,80,50,0.75)'; for(let k=0;k<9;k++){ g.beginPath(); g.ellipse(X-50+k*12,Y-2,6,3,0,0,Math.PI*2); g.fill(); } }); };
+onUse(['drowngate'],o=>{ if(CHOICE.gateKey){ pzSay('The key turns. Something below breathes out.','#9fc8d8'); return; } say('A Drowned Door',["A door of grey stone in an arch, out where only the lowest water ever leaves it dry. Barnacles have grown over the seams. Over the lintel, an <b>eye</b> has been carved, wide open.","There is a keyhole, green with age, the size of your thumb. Mama Saltlick said the Harbourmistress's people call this a king's tomb. The goblins call it a mouth."],[bye]); });
+// a first nudge toward the race and the shells, on the notice board
+{ const _nb=TALKERS.wrackboard; }
 </script>
 </body>
 </html>

@@ -29904,15 +29904,29 @@ const JOB_POOL=[
   {id:'tails', kind:'fetch', text:'Tuck is buying rat tails in bulk. Bring five.', item:'rat_tail', n:5, pay:25, lv:1},
   {id:'bones', kind:'fetch', text:'A grave-speaker wants old bones, no questions asked. Bring three.', item:'old_bone', n:3, pay:25, lv:1},
   {id:'plums', kind:'fetch', text:'The Wheatsheaf wants duskplums from the Rootdeep for a pie. Bring three.', item:'duskplum', n:3, pay:30, lv:2},
-  {id:'ore', kind:'fetch', text:'A jeweller in the Castle Ward wants deepsilver. Bring one lump.', item:'deep_ore', n:1, pay:60, lv:4, need:()=>CHOICE.seam==='done'} ];
+  {id:'ore', kind:'fetch', text:'A jeweller in the Castle Ward wants deepsilver. Bring one lump.', item:'deep_ore', n:1, pay:60, lv:4, need:()=>CHOICE.seam==='done'},
+  // Dunhollow's board: the valley's own troubles, and people worth knowing
+  {id:'v_wolves', board:'village', kind:'kill', text:'Wolves are taking lambs again. Kill five wolves anywhere in the valley.', areas:['road','lane','wolfwood','millroad','alderbrook','hedgerow','mistmere'], types:['wolf'], n:5, pay:18, lv:1},
+  {id:'v_gobs', board:'village', kind:'kill', text:"Goblins on the Collier's Trail are robbing the charcoal carts. Kill three.", areas:['southtrail'], types:['goblin'], n:3, pay:22, lv:1},
+  {id:'v_purse', board:'village', kind:'kill', text:'Cutpurses and highwaymen on the roads out of the valley. Put down three.', areas:['longmeadow','alderbrook','hedgerow'], types:['bandit'], name:/Cutpurse|Highwayman/, n:3, pay:24, lv:1},
+  {id:'v_pelts', board:'village', kind:'fetch', text:'Marta has a buyer for wolf pelts. Bring three.', item:'pelt', n:3, pay:20, lv:1},
+  {id:'v_hunter', board:'village', kind:'visit', who:'hunter', text:"Brann the Hunter, at his clearing west of the crossroads, would like news from the village. Go and see him.", n:1, pay:8, lv:1, need:()=>!jobMet('hunter')},
+  {id:'v_gisla', board:'village', kind:'visit', who:'gisla', text:'Gisla the Herb-Wife, along the Mill Track, needs a hand now and then. Call on her.', n:1, pay:8, lv:1, need:()=>!jobMet('gisla')},
+  {id:'v_hobb', board:'village', kind:'visit', who:'carter', text:'Hobb the Carter waits at the crossroads with news of the roads. Look in on him.', n:1, pay:8, lv:1, need:()=>!jobMet('carter')},
+  {id:'v_faelan', board:'village', kind:'visit', who:'faelan', text:'A ranger called Faelan keeps watch in the Mistmere, north past the Wolfwood. Find him.', n:1, pay:10, lv:1, need:()=>!jobMet('faelan')},
+  {id:'v_vesna', board:'village', kind:'visit', who:'vesna', text:'Vesna the grave-speaker walks the graveyard after dark. She is worth knowing, if you are brave.', n:1, pay:10, lv:1, need:()=>!jobMet('vesna')} ];
+// who you have met (counted from now on, and guessed for older saves from what you have done with them)
+const JOB_MET_GUESS={ hunter:()=>Object.keys(CHOICE).some(k=>/^brann/.test(k)), carter:()=>!!(QUEST.wheel||CHOICE.wheel), gisla:()=>Object.keys(CHOICE).some(k=>/gisla|herb/i.test(k)), vesna:()=>!!CHOICE.necro, faelan:()=>!!CHOICE.fell };
+const jobMet=id=>!!((CHOICE.met||{})[id] || (JOB_MET_GUESS[id] && JOB_MET_GUESS[id]()));
+{ const _t=talkTo; talkTo=function(n){ try{ if(n && n.id){ (CHOICE.met=CHOICE.met||{})[n.id]=1; const S=CHOICE.jobs; if(S && S.active) S.active.forEach(a=>{ const j=JOB_POOL.find(x=>x.id===a.id); if(j && j.kind==='visit' && j.who===n.id && !a.got){ a.got=1; setTimeout(()=>logMsg('Job done: you looked in on '+(n.name||'them')+'. Back to the board to be paid.','#e8c060'),400); } }); } }catch(e){} return _t.apply(this,arguments); }; }
 const jobDay=()=>Math.floor((dayClock+DAY_LEN*0.25)/DAY_LEN);
-const jobsToday=(board)=>{ const d=jobDay(), pool=JOB_POOL.filter(j=>!j.need || j.need()), out=[]; let s=(d*7919+(board==='market'?131:17))>>>0;
+const jobsToday=(board)=>{ const d=jobDay(), pool=JOB_POOL.filter(j=>(j.board||'market')===board && (!j.need || j.need())), out=[]; let s=(d*7919+(board==='market'?131:17))>>>0;
   while(out.length<3 && out.length<pool.length){ s=(s*1103515245+12345)>>>0; const j=pool[s%pool.length]; if(!out.includes(j)) out.push(j); } return out; };
 const jobState=()=>CHOICE.jobs=(CHOICE.jobs && typeof CHOICE.jobs==='object')?CHOICE.jobs:{active:[], done:0, dayTaken:{}};
-const jobProg=j=>{ const S=jobState(), a=S.active.find(x=>x.id===j.id); if(!a) return 0; return j.kind==='kill' ? a.got||0 : Math.min(j.n,invCount(j.item)); };
+const jobProg=j=>{ const S=jobState(), a=S.active.find(x=>x.id===j.id); if(!a) return 0; return j.kind==='kill'||j.kind==='visit' ? a.got||0 : Math.min(j.n,invCount(j.item)); };
 const jobLeaves=j=>j.lv;
 dqVictory(()=>{ const S=jobState(); if(!S.active.length) return; mobs.filter(m=>m.dead && !m.jobCounted).forEach(m=>{ m.jobCounted=true;
-    S.active.forEach(a=>{ const j=JOB_POOL.find(x=>x.id===a.id); if(!j || j.kind!=='kill' || !areaId.startsWith(j.pre) || !j.types.includes(m.type) || (j.name && !j.name.test(m.name||''))) return; a.got=Math.min(j.n,(a.got||0)+1); if(a.got===j.n) logMsg('Job done: '+j.text.split('.').slice(-2,-1)[0].trim()+'. Hand it in at a notice board.','#e8c060'); }); }); });
+    S.active.forEach(a=>{ const j=JOB_POOL.find(x=>x.id===a.id); if(!j || j.kind!=='kill' || !(j.areas ? j.areas.includes(areaId) : areaId.startsWith(j.pre)) || !j.types.includes(m.type) || (j.name && !j.name.test(m.name||''))) return; a.got=Math.min(j.n,(a.got||0)+1); if(a.got===j.n) logMsg('Job done: '+j.text.split('.').slice(-2,-1)[0].trim()+'. Hand it in at a notice board.','#e8c060'); }); }); });
 function jobBoard(board,old){ const S=jobState(), d=jobDay(), T=board==='market'?'The Market Notice Board':'The Notice Board', back=()=>jobBoard(board,old);
   const today=jobsToday(board), opts=[];
   S.active.forEach(a=>{ const j=JOB_POOL.find(x=>x.id===a.id); if(!j) return; const p=jobProg(j), ok=p>=j.n;
@@ -29921,7 +29935,7 @@ function jobBoard(board,old){ const S=jobState(), d=jobDay(), T=board==='market'
       S.active=S.active.filter(x=>x.id!==j.id); S.done=(S.done||0)+1; player.purse+=j.pay; addLeaves(jobLeaves(j),'for work posted on the board'); updateHud(); try{ autosaveSoon(200); }catch(e){} logMsg('Job paid: '+formatCoin(j.pay)+'.','#e8c060'); back(); }}); });
   today.forEach(j=>{ if(S.active.some(a=>a.id===j.id)) return; const taken=(S.dayTaken||{})[j.id]===d;
     opts.push({label:'Take the job: '+j.text, off:taken || S.active.length>=2, note:taken?'done today':S.active.length>=2?'two at a time':'+'+formatCoin(j.pay)+', +'+jobLeaves(j)+' leaves', fn:()=>{ S.active.push({id:j.id, got:0}); S.dayTaken=S.dayTaken||{}; S.dayTaken[j.id]=d; logMsg('You take down the notice: '+j.text,'#e8c060'); back(); }}); });
-  say(T,["Notices pinned three deep, most of them old. The fresh ones are for work below ground: the Undercity, the Varrowdeep, the Rootdeep. The Wardens of Sylvhaven pay in silver leaves.",`<i>New work every morning. Two jobs at a time. Jobs done: ${S.done||0}.</i>`],[...opts, ...(old?[{label:'Read the older notices.', fn:old}]:[]), bye],true); }
+  say(T,[board==='market' ? "Notices pinned three deep, most of them old. The fresh ones are for work below ground: the Undercity, the Varrowdeep, the Rootdeep. The Wardens of Sylvhaven pay in silver leaves." : "Notices in a dozen hands: wolves at the lambs again, a cart robbed on the trail, so-and-so would be glad of a visitor. Small work, honest pay, and a silver leaf or two from the Wardens for helping the valley.",`<i>New work every morning. Two jobs at a time. Jobs done: ${S.done||0}.</i>`],[...opts, ...(old?[{label:'Read the older notices.', fn:old}]:[]), bye],true); }
 { const prev=PUZ_ON.noticeboard; onUse(['noticeboard'],o=>{ jobBoard(o.board||'village', o.board==='market'||!prev ? null : ()=>prev(o)); }); }
 wrap('market','objects',l=>[...l,{type:'noticeboard', i:11, j:15, board:'market'}]);
 // the board shows when there is work on it: a gold ! for a fresh job you have not taken, a ? when a job of yours is done and waiting to be paid

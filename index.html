@@ -10205,6 +10205,7 @@ function findPathRaw(si,sj,ti,tj){
     for(const [di,dj] of dirs){
       const ni=i+di, nj=j+dj;
       if(!walkable(ni,nj) || prev.has(key(ni,nj)) || fenceBetween(i,j,ni,nj)) continue;
+      if(di && dj && (blocked.has(ni+','+j) || blocked.has(i+','+nj))) continue;   // no cutting the corner of a rock or a stall on a diagonal
       prev.set(key(ni,nj),[i,j]); q.push([ni,nj]);
     }
   }
@@ -19750,7 +19751,10 @@ setTimeout(()=>Object.keys(AREAS).forEach(a=>wrap(a,'objects',l=>{ const out=[..
 const MULE_BACK=1.35;
 function muleItems(items){ const now=performance.now()/1000;
   NPCS.forEach(n=>{ if(!n.mule) return; const x=n.x??n.i+0.5, y=n.y??n.j+0.5, walking=!!(n.goto||n.moving);
-    const behind=()=>{ let ux=0, uy=-0.8; if(n.goto){ const dx=n.goto[0]+0.5-x, dy=n.goto[1]+0.5-y, L=Math.hypot(dx,dy); if(L>0.2){ ux=-dx/L; uy=-dy/L; } } return {x:x+ux*MULE_BACK, y:y+uy*MULE_BACK}; };
+    const free=(px,py)=>{ const i=Math.floor(px), j=Math.floor(py); return i>=0 && j>=0 && i<ROOM.w && j<ROOM.h && !blocked.has(i+','+j); };
+    const behind=()=>{ let ux=0, uy=-0.8; if(n.goto){ const dx=n.goto[0]+0.5-x, dy=n.goto[1]+0.5-y, L=Math.hypot(dx,dy); if(L>0.2){ ux=-dx/L; uy=-dy/L; } }
+      const a0=Math.atan2(uy,ux); for(const da of [0,0.6,-0.6,1.2,-1.2,1.8,-1.8,2.6,-2.6,Math.PI]){ const a=a0+da, px=x+Math.cos(a)*MULE_BACK, py=y+Math.sin(a)*MULE_BACK; if(free(px,py)) return {x:px,y:py}; }   // behind him, or the nearest open ground to that: never inside a stall, a wall or a rock
+      return {x,y}; };
     if(!n.trail || (walking && !n._muleWalk)){ const B=n.muleAt&&n.trail ? {x:n.muleAt.x,y:n.muleAt.y} : behind(); n.trail=[B,{x,y}]; }   // a fresh start: from where the mule stands (or behind him) to him
     n._muleWalk=walking;
     const T=n.trail, L=T[T.length-1]; if(Math.hypot(x-L.x,y-L.y)>0.05) T.push({x,y}); else { L.x=x; L.y=y; }
@@ -19759,8 +19763,11 @@ function muleItems(items){ const now=performance.now()/1000;
     for(let k=T.length-1;k>0;k--){ const a=T[k], b0=T[k-1], seg=Math.hypot(a.x-b0.x,a.y-b0.y); if(seg>=need){ const f=need/(seg||1); tx=a.x+(b0.x-a.x)*f; ty=a.y+(b0.y-a.y)*f; need=0; break; } need-=seg; }
     const M=n.muleAt=n.muleAt||{x:tx,y:ty,ph:0,phi:Math.PI/4,t:now,mvT:0};
     const dt=Math.min(0.1,Math.max(0,now-(M.t||now))); M.t=now;
-    const dx=tx-M.x, dy=ty-M.y, d=Math.hypot(dx,dy), maxStep=3.2*dt;                  // never faster than a brisk walk: corrections are walked, not jumped
-    const st=d>maxStep ? maxStep/d : 1, ox=M.x, oy=M.y; M.x+=dx*st; M.y+=dy*st;
+    let dx=tx-M.x, dy=ty-M.y, d=Math.hypot(dx,dy); const maxStep=3.2*dt;                  // never faster than a brisk walk: corrections are walked, not jumped
+    if(!free(tx,ty)){ let q=0; for(let k=T.length-1;k>0;k--){ if(free(T[k].x,T[k].y)) { q=k; } else break; } tx=T[q].x; ty=T[q].y; }   // never aim for a point inside something: the nearest open point of his trail instead
+    dx=tx-M.x; dy=ty-M.y; d=Math.hypot(dx,dy);
+    if(d>MULE_BACK*2.5 || !free(M.x,M.y)){ M.x=tx; M.y=ty; }   // fallen far behind (a door, a turn through a gate) or standing in something: it is simply where it should be
+    const st=d>maxStep ? maxStep/d : 1, ox=M.x, oy=M.y; let nx=M.x+dx*st, ny=M.y+dy*st; if(!free(nx,ny) && free(tx,ty)){ nx=tx; ny=ty; } M.x=nx; M.y=ny;
     const mv=Math.hypot(M.x-ox,M.y-oy); M.mvT = mv>0.002 ? 0.25 : Math.max(0,(M.mvT||0)-dt); M.moving=M.mvT>0;
     if(mv>0.002){ const a=P(ox,oy), b2=P(M.x,M.y), want=Math.round(Math.atan2((b2.y-a.y)*2,b2.x-a.x)/(Math.PI/4))*(Math.PI/4);   // one of the eight facings, like everyone else
       let dA=want-M.phi; while(dA>Math.PI) dA-=Math.PI*2; while(dA<-Math.PI) dA+=Math.PI*2; M.phi+=dA*Math.min(1,dt*10); }   // it turns smoothly towards where it is walking
@@ -29946,8 +29953,8 @@ function jobBoard(board,old){ const S=jobState(), d=jobDay(), T=board==='market'
       if(j.kind==='fetch'){ for(let q=0;q<j.n;q++){ const k=player.inv.indexOf(j.item); if(k>=0) player.inv[k]=null; } }
       S.active=S.active.filter(x=>x.id!==j.id); S.done=(S.done||0)+1; player.purse+=j.pay; addLeaves(jobLeaves(j),'for work posted on the board'); updateHud(); try{ autosaveSoon(200); }catch(e){} logMsg('Job paid: '+formatCoin(j.pay)+'.','#e8c060'); back(); }}); });
   today.forEach(j=>{ if(S.active.some(a=>a.id===j.id)) return; const taken=(S.dayTaken||{})[j.id]===d;
-    opts.push({label:'Take the job: '+j.text, off:taken || S.active.length>=2, note:taken?'done today':S.active.length>=2?'two at a time':'+'+formatCoin(j.pay)+', +'+jobLeaves(j)+' leaves', fn:()=>{ S.active.push({id:j.id, got:0}); S.dayTaken=S.dayTaken||{}; S.dayTaken[j.id]=d; logMsg('You take down the notice: '+j.text,'#e8c060'); back(); }}); });
-  say(T,[board==='market' ? "Notices pinned three deep, most of them old. The fresh ones are for work below ground: the Undercity, the Varrowdeep, the Rootdeep. The Wardens of Sylvhaven pay in silver leaves." : "Notices in a dozen hands: wolves at the lambs again, a cart robbed on the trail, so-and-so would be glad of a visitor. Small work, honest pay, and a silver leaf or two from the Wardens for helping the valley.",`<i>New work every morning. Two jobs at a time. Jobs done: ${S.done||0}.</i>`],[...opts, ...(old?[{label:'Read the older notices.', fn:old}]:[]), bye],true); }
+    opts.push({label:'Take the job: '+j.text, off:taken, note:taken?'done today':'+'+formatCoin(j.pay)+', +'+jobLeaves(j)+' leaves', fn:()=>{ S.active.push({id:j.id, got:0}); S.dayTaken=S.dayTaken||{}; S.dayTaken[j.id]=d; logMsg('You take down the notice: '+j.text,'#e8c060'); back(); }}); });
+  say(T,[board==='market' ? "Notices pinned three deep, most of them old. The fresh ones are for work below ground: the Undercity, the Varrowdeep, the Rootdeep. The Wardens of Sylvhaven pay in silver leaves." : "Notices in a dozen hands: wolves at the lambs again, a cart robbed on the trail, so-and-so would be glad of a visitor. Small work, honest pay, and a silver leaf or two from the Wardens for helping the valley.",`<i>New work every morning. Jobs done: ${S.done||0}.</i>`],[...opts, ...(old?[{label:'Read the older notices.', fn:old}]:[]), bye],true); }
 { const prev=PUZ_ON.noticeboard; onUse(['noticeboard'],o=>{ jobBoard(o.board||'village', o.board==='market'||!prev ? null : ()=>prev(o)); }); }
 wrap('market','objects',l=>[...l,{type:'noticeboard', i:11, j:15, board:'market'}]);
 // the board shows when there is work on it: a gold ! for a fresh job you have not taken, a ? when a job of yours is done and waiting to be paid

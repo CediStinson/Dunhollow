@@ -10596,7 +10596,7 @@ function paintGroundTexture(){
     if((theme==='farm' || (theme==='village' && !AREAS[areaId].boggy)) && !G.notch){ const fc=farmGroundPixel(gx,gy,G,w,h), ao=1-0.42*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.06-0.12*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.08), o=(py*TWp+px)*4;
       D[o]=fc[0]*k; D[o+1]=fc[1]*k; D[o+2]=fc[2]*k; D[o+3]=255; continue; }
     let c=mixC(G1,G2,smooth(0.25,0.8,fbm(gx*0.9,gy*0.9,1)));
-    const BOGGY=AREAS[areaId].boggy, bogK=BOGGY?clamp01(1.25-gy/h*1.1)*clamp01(0.3+gx/w):0;           // the fen creeping in from the north-east
+    const BOGGY=AREAS[areaId].boggy, bogK=typeof BOGGY==='function'?BOGGY(gx,gy,w,h):BOGGY?clamp01(1.25-gy/h*1.1)*clamp01(0.3+gx/w):0;           // the fen creeping in (from the north-east, or wherever the place says)
     if(bogK>0) c=mixC(c,[70,72,42],bogK*0.55);
     c=mixC(c,DRY,smooth(0.55,0.85,fbm(gx*0.35,gy*0.35,2))*0.45);
     if(forest) c=mixC(c,LIT,smooth(0.5,0.8,fbm(gx*1.3,gy*1.3,8))*0.35);   // leaf litter
@@ -12388,7 +12388,7 @@ wrap('graveyard','objects',list=>[...list,{type:'teleporter', i:4, j:0, to:'ston
 AREAS.graveyard.entries.fromStones={i:4,j:1};
 Object.assign(AREAS,{
   // The Old Boundary Stones: the Baron wants to move them, and the village's land with them
-  stones:{ fence:{r:false,l:false}, w:12, h:10, theme:'village', boggy:true, label:'The Old Boundary Stones', mini:{x:0,y:0},
+  stones:{ fence:{r:false,l:false}, w:12, h:10, theme:'village', label:'The Old Boundary Stones', mini:{x:0,y:0},
     notches:()=>[], dummy:null,
     objects:()=>{
       const l=[{type:'teleporter', i:4, j:9, to:'graveyard', entry:'fromStones'}];
@@ -12398,7 +12398,7 @@ Object.assign(AREAS,{
       if(!saved) [[2,2],[2,5],[2,8],[10,2],[10,5],[10,8]].forEach(([i,j])=>l.push({type:'stake', i, j}));
       if(CHOICE.stones==='lost') l.push({type:'banner', i:9, j:7});
       if(saved) l.push({type:'critter', kind:'flowers', i:6, j:7, noblock:true});
-      l.push({type:'pool', i:9, j:0, fp:[3,1], kind:'fen'}, {type:'reeds', i:11, j:2, dense:true}, {type:'reeds', i:8, j:1}, {type:'reeds', i:11, j:6}, {type:'deadtree', i:11, j:4, s:1.1}, {type:'deadtree', i:7, j:0, s:0.8});
+      l.push({type:'flowerbed', i:9, j:1, noblock:true, cols:['#8a5aa0','#a878c0','#6e4a88']}, {type:'flowerbed', i:11, j:5, noblock:true, cols:['#e8d060','#f0e8c0','#c8a040']}, {type:'boulder', i:11, j:3, v:2});   // open grassland: heather and a field-stone where the fen used to creep in
       return l; },
     npcs:()=> (!CHOICE.stones || CHOICE.stones==='fight') ? [{ id:'surveyor', name:'Surveyor Quill', i:3, j:4, dir:1,
       opts:{gender:'m',skin:1,hair:1,hairColor:6,beard:2,face:2,equip:{head:null,torso:'tunic_linen',armor:null,hands:'gloves',legs:'hose_grey',feet:'riding_boots',weapon:null,offhand:null}} }] : [],
@@ -30270,16 +30270,17 @@ function styleShop(kind){ closeDialog(); const old=document.getElementById('styl
     entries:{ fromCamp:{i:6,j:1}, fromWash:{i:6,j:50} } },
 
   // ── Greywater Heath: high moor of heather and peat, standing stones, mist in the hollows ──
-  heath:{ ...BASE, w:48, h:14, theme:'road', label:'Greywater Heath', dens:0.12,
+  heath:{ ...BASE, w:48, h:14, theme:'road', label:'Greywater Heath', dens:0.12, boggy:(gx,gy,w,h)=>smooth(0.42,0.6,gx/w+(fbm(gx*0.18,gy*0.18,41)-0.5)*0.18)*1.15,   // grass and heather to the west, the fen seeping up from the east
     objects:()=>{ const Y=x=>acrossY(P_HEATH,x), l=[ {type:'teleporter', i:2, j:13, to:'stones', entry:'fromFen'}, {type:'teleporter', i:45, j:0, to:'fenpath', entry:'fromStones'},
         {type:'fieldshelter', i:38, j:11}, {type:'campfire', i:36, j:10}, {type:'cairn', i:10, j:Math.round(Y(10))-2}, {type:'cairn', i:40, j:Math.round(Y(40))+2, s:0.8},
-        {type:'wayshrine', i:31, j:Math.round(Y(31))+3}, {type:'pool', i:14, j:11, fp:[2,2], kind:'fen'}, {type:'pool', i:25, j:1, fp:[2,1], kind:'fen'} ];
+        {type:'wayshrine', i:31, j:Math.round(Y(31))+3}, {type:'pool', i:27, j:11, fp:[2,2], kind:'fen'}, {type:'pool', i:33, j:1, fp:[2,1], kind:'fen'}, {type:'pool', i:42, j:4, fp:[3,2], kind:'fen'}, {type:'pool', i:44, j:10, fp:[2,2], kind:'fen'}, {type:'pool', i:30, j:6, fp:[2,1], kind:'fen'} ];
+      [[26,10],[29,12],[32,2],[35,1],[41,3],[45,6],[43,11],[46,12],[29,7],[38,3],[34,12],[47,8]].forEach(([i,j],k)=>l.push({type:'reeds', i, j, noblock:true, v:k%3}));   // reeds round the wet ground
       [[18,2],[20,1],[22.5,1.6],[23.5,3.8],[21.5,5],[18.8,4.4]].forEach(([i,j],k)=>l.push({type:'menhir', i:Math.round(i), j:Math.round(j), v:k%3}));   // a ring of old stones off the road
-      for(let k=0;k<28;k++){ const i=1+k*1.7|0, s=k%2?1:-1, y=Y(i)+s*(2+R(k,1,14)*4); if(y>0 && y<13) l.push({type:'flowerbed', i, j:Math.round(y), noblock:true, cols:['#8a5aa0','#a878c0','#6e4a88']}); }   // heather
+      for(let k=0;k<17;k++){ const i=1+k*1.55|0, s=k%2?1:-1, y=Y(i)+s*(2+R(k,1,14)*4); if(y>0 && y<13) l.push({type:'flowerbed', i, j:Math.round(y), noblock:true, cols:['#8a5aa0','#a878c0','#6e4a88']}); }   // heather
       for(let k=0;k<12;k++){ const i=3+k*3.8|0, y=Y(i)+(k%2?4:-4); if(y>0&&y<13) l.push({type:k%3?'rocks':'boulder', i, j:Math.round(y), v:k%5, noblock:k%3?true:undefined}); }
       if(nightAmt()>0.3) for(let k=0;k<9;k++) l.push({type:'groundmist', i:4+k*5, j:1+(k*5)%12, noblock:true, flat:true, dz:-98});
       return l; },
-    npcs:()=> encounter('shepherd',0.6) ? [{ id:'heathshepherd', name:'Old Gwen the Shepherd', i:37, j:11, dir:6, named:true, opts:{gender:'f',skin:0,hair:3,hairColor:12,face:0,equip:{head:'hood',torso:'smock',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}} }] : [],
+    npcs:()=> encounter('shepherd',0.6) ? [{ id:'heathshepherd', name:'Old Gwen the Shepherd', i:37, j:11, dir:6, named:true, opts:{gender:'f',skin:0,hair:3,hairColor:12,face:0,equip:{head:'hood',torso:'smock',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:'staff_oak',offhand:null}} }] : [],
     mobs:()=> nightAmt()>0.55 ? [{ name:'Moor Wolf', type:'wolf', i:26, j:10, faction:'moorwolf', daily:true, coat:'#5a5a62' }, { name:'Moor Wolf', type:'wolf', i:28, j:11, faction:'moorwolf', daily:true, coat:'#4a4a52' }, { name:'Moor Wolf', type:'wolf', i:27, j:12, faction:'moorwolf', daily:true, coat:'#6a6a70' }] : [],
     entries:{ fromStones:{i:2,j:12}, fromFen:{i:45,j:1} } },
 
@@ -31360,6 +31361,12 @@ Object.assign(ITEM_STATS,{ cv_mask_resp:{hp:4,agi:1}, cv_mask_weld:{hp:5,ap:1}, 
   cv_harness:{hp:3,ap:1}, cv_gauntlets:{hp:3,ap:1,agi:1}, cv_wrapboots:{hp:3,agi:1}, cv_scarf:{agi:1}, cv_scarf_grey:{agi:1} });
 Object.assign(GEAR_HP,{ cv_mask_resp:4, cv_mask_weld:5, cv_mask_plain:4, cv_mask_elder:7, cv_duster:8, cv_duster_rust:8, cv_duster_red:7, cv_duster_elder:12, cv_wrap:6, cv_harness:3, cv_gauntlets:3, cv_wrapboots:3, cv_scarf:0, cv_scarf_grey:0 });
 Object.assign(PRICES,{ cv_mask_resp:70, cv_mask_weld:75, cv_mask_plain:60, cv_mask_elder:220, cv_duster:110, cv_duster_rust:110, cv_duster_red:120, cv_duster_elder:260, cv_wrap:95, cv_harness:80, cv_gauntlets:70, cv_wrapboots:60, cv_scarf:30, cv_scarf_grey:30 });
+
+// Old Gwen's flock: a good spread of sheep grazing round her on the heath, on the days she is out with them
+wrap('heath','objects',l=>{ if(!encounter('shepherd',0.6)) return l; const out=[], cols=FAUNA_COL.sheep||[null];
+  [[34,9],[36,13],[39,10],[33,12],[40,13],[37,8],[35,15]].forEach(([i,j],q)=>{ for(let k=0;k<3;k++){ const sd=(i*31+j*17+k*7+q*13)%97;
+    out.push({type:'animal', kind:'sheep', i:i+(k%2), j:j+(k>1?1:0), home:[i+0.5,j+0.5], seed:sd, noblock:true, col:cols[(sd+k)%cols.length], st:'idle', tm:0.5+rnd01(sd,k,901)*2, ok:false}); } });
+  return [...l,...out]; });
 </script>
 </body>
 </html>

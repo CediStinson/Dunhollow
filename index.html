@@ -14413,16 +14413,20 @@ function renderMap(cv,V){                             // V: {zoom, px, py, label
     c.fillStyle='#fff'; c.strokeStyle='#8a1a10'; c.lineWidth=2; c.beginPath(); c.arc(m[0],m[1],Math.max(3.5,Math.min(6,k*0.6)),0,Math.PI*2); c.fill(); c.stroke(); }
   if(V.labels){ c.font=`${Math.max(11,Math.min(18,k*1.4))}px Georgia,serif`; c.textAlign='center'; c.textBaseline='middle';
     const taken=[];   // labels shuffle up or down a step until they don't sit on each other
-    ids.forEach(id=>{ const A=AREAS[id], o=L[id], m=P2(o.u+A.w/2,o.v+A.h/2), t=A.under?'':(A.mapLabel!=null?A.mapLabel:(A.label||id)); if(!t) return; const ZL=window.ZLV_ON?zoneLv(id):null, tl=ZL?'  Lv '+ZL:'', w=c.measureText(t+tl).width+10;
+    ids.forEach(id=>{ const A=AREAS[id], o=L[id], m=P2(o.u+A.w/2,o.v+A.h/2), t=A.under?'':(A.mapLabel!=null?A.mapLabel:(A.label||id)); if(!t) return; const w=c.measureText(t).width+10;
       const clash=y=>taken.some(r=>Math.abs(r.x-m[0])<(r.w+w)/2+2 && Math.abs(r.y-y)<22); if(clash(m[1])) for(const d of [22,-22,44,-44,66,-66]){ if(!clash(m[1]+d)){ m[1]+=d; break; } }
       taken.push({x:m[0],y:m[1],w});
-      c.fillStyle='rgba(14,9,4,0.72)'; c.fillRect(m[0]-w/2,m[1]-10,w,20); c.fillStyle=id===areaId?'#fff2c0':'#e8d4a0';
-      if(tl){ const wt=c.measureText(t).width, x0=m[0]-(w-10)/2; c.textAlign='left'; c.fillText(t,x0,m[1]); c.fillStyle=lvCol(ZL); c.fillText(tl,x0+wt,m[1]); c.textAlign='center'; } else c.fillText(t,m[0],m[1]); }); }
+      c.fillStyle='rgba(14,9,4,0.72)'; c.fillRect(m[0]-w/2,m[1]-10,w,20); c.fillStyle=id===areaId?'#fff2c0':'#e8d4a0'; c.fillText(t,m[0],m[1]); }); }
   if(typeof mapMarks==='function'){ const MK=mapMarks(), R=Math.max(5,Math.min(10,k*1.1));   // who has business for you, and where your quests point
     ids.forEach(id=>{ const mk=MK[id]; if(!mk || (AREAS[id].maze && !mazeKnown(id))) return; const A=AREAS[id], o=L[id], m0=P2(o.u+A.w/2,o.v+A.h/2), m=[m0[0], m0[1]-(V.labels?R+14:0)];
       if(mk.goal){ const x=m[0]-(mk.news?R*0.9:0), y=m[1]; c.fillStyle='#e8c060'; c.strokeStyle='#3a2a10'; c.lineWidth=1.5; c.beginPath(); c.moveTo(x,y-R); c.lineTo(x+R*0.75,y); c.lineTo(x,y+R); c.lineTo(x-R*0.75,y); c.closePath(); c.fill(); c.stroke(); }
       if(mk.news){ const x=m[0]+(mk.goal?R*0.9:0), y=m[1]; c.fillStyle=mk.news==='?'?'#8ad0ff':'#ffd84a'; c.strokeStyle='#2a1a08'; c.lineWidth=1.5; c.beginPath(); c.arc(x,y,R,0,Math.PI*2); c.fill(); c.stroke();
         c.fillStyle='#2a1a08'; c.font='bold '+Math.round(R*1.5)+'px Georgia,serif'; c.textAlign='center'; c.textBaseline='middle'; c.fillText(mk.news,x,y+1); } }); }
+  if(V.labels && window.ZLV_ON){ const seen=[]; ids.forEach(id=>{ const R=regionOf(id); if(R && !seen.includes(R) && regionLv(R)) seen.push(R); });   // a legend in the corner: each region you have been in, and how hard it is
+    if(seen.length){ const d=cv.width/(cv.getBoundingClientRect().width||cv.width), fs=Math.round(13*d), lh=Math.round(19*d), pad=Math.round(9*d); c.save(); c.font=`${fs}px Georgia,serif`; c.textBaseline='middle'; c.textAlign='left';
+      const rows=seen.map(R=>{ const rg=regionLv(R); return [R, rg[0]===rg[1]?'Lv '+rg[0]:'Lv '+rg[0]+'–'+rg[1], rg[0]]; }), w0=Math.max(...rows.map(r=>c.measureText(r[0]).width)), w1=Math.max(...rows.map(r=>c.measureText(r[1]).width)), W2=w0+w1+pad*3, H2=lh*rows.length+pad*1.4;
+      c.fillStyle='rgba(14,9,4,0.84)'; c.fillRect(pad,pad,W2,H2); c.strokeStyle='rgba(192,144,64,0.5)'; c.lineWidth=d; c.strokeRect(pad,pad,W2,H2);
+      rows.forEach(([R,t,lo],q)=>{ const y=pad*1.7+lh*q+lh/2-pad*0.3; c.fillStyle=regionOf(areaId)===R?'#fff2c0':'#e8d4a0'; c.fillText(R,pad*2,y); c.fillStyle=lvCol(lo); c.fillText(t,pad*2+w0+pad,y); }); c.restore(); } }
 }
 function updateMinimap(){
   const box=document.getElementById('minimap'); if(!box) return;
@@ -14432,7 +14436,7 @@ function updateMinimap(){
     cv.addEventListener('click',openBigMap); box.insertBefore(cv,box.firstChild); }
   renderMap(cv,{zoom:1});
   drawClock(box);
-  { const ml=document.getElementById('minimap-label'), ZL=window.ZLV_ON?zoneLv(areaId):null; ml.innerHTML=AREAS[areaId].label+(ZL?` <span style="color:${lvCol(ZL)}">· Lv ${ZL}</span>`:''); }
+  { const ml=document.getElementById('minimap-label'), R=window.ZLV_ON?regionOf(areaId):null, rg=R?regionLv(R):null; ml.innerHTML=AREAS[areaId].label+(rg?`<br><span style="color:${lvCol(rg[0])}">${R} · Lv ${rg[0]===rg[1]?rg[0]:rg[0]+'–'+rg[1]}</span>`:''); }
   if(BIGMAP.open) drawBigMap();
 }
 // ── a little sun-and-moon dial on top of the minimap ──
@@ -31137,6 +31141,14 @@ function questLv(t,txt){ if(QUEST_NOLV.has(t)) return null; const at=QUEST_AT[t]
   for(const [id,L] of mapAreaNames()) if(new RegExp('\\b'+L.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i').test(plain)) best=Math.max(best,areaLv(id));
   return best||null; }
 const ZLV_CACHE={}; function zoneLv(id){ if(id in ZLV_CACHE) return ZLV_CACHE[id]; let foes=false; try{ const A=AREAS[id]; foes=!!(A && A.mobs && A.mobs().some(m=>m && m.hostile!==false && m.type!=='dummy')); }catch(e){} return ZLV_CACHE[id]=foes?areaLv(id):null; }   // a place with no foes needs no level
+const REGIONS={ 'Dunhollow Valley':['farm','road','lane','village','graveyard','hedgerow','stones','longmeadow','millroad','tunnel','alderbrook','crossroads','wolfwood','southtrail','camp','pits','clearing'],
+  'The Elvenwood':['mistmere','silvergate','sylvhaven','fellings','ruin','elfroad','warren','bearden','willowpool','hollowrite'],
+  'Hollowmere':['kingsroad','citygate','market','lowstreets','keepward','docks','ratdrain','portfearn','gbtunnel'],
+  'The Fen':['fenpath','fen','blackwater','sunkenwood','reedbank'], 'The Foothills':['heath','foothills','northroad','varrowpass'],
+  'The Scrublands':['scrubland','cvcamp','cvyard'], 'The Desert':['drywash','waystation','oasis','glassdunes','redmesa','singingdunes','saltpan','crater','bonewaste'] };
+const REGION_OF={}; for(const R in REGIONS) REGIONS[R].forEach(id=>REGION_OF[id]=R);
+const regionOf=id=> REGION_OF[id] || (/^uc_/.test(id)?'The Undercity': /^(vm_|ow_|varrow(mine|tomb))/.test(id)?'Varrowdeep': /^rc_/.test(id)?'The Rootdeep':null);
+const RLV_CACHE={}; function regionLv(R){ if(R in RLV_CACHE) return RLV_CACHE[R]; const L=Object.keys(AREAS).filter(id=>regionOf(id)===R).map(zoneLv).filter(Boolean); return RLV_CACHE[R]=L.length?[Math.min(...L),Math.max(...L)]:null; }
 const lvCol=L=>{ const d=L-playerLevel(); return d>=7?'#d05040':d>=3?'#d8a030':d<=-6?'#8a8a80':'#5a9a40'; };   // red: deadly, amber: hard, green: right for you, grey: beneath you
 function qLvBadge(t,txt){ const L=questLv(t,txt); return L ? ` <span class="qlv" style="color:${lvCol(L)}" title="Foes along the way are around level ${L}. You are level ${playerLevel()}.">Lv ${L}</span>` : ''; }
 window.ZLV_ON=true;

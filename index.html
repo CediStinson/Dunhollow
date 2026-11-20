@@ -9333,7 +9333,7 @@ function drawObject(o){
   } else if(o.type==='archtop'){
     drawCached('archtop',x,y,200,240,100,210,paintArchTop);
   } else if(o.type==='pavilion'){
-    const a=P(o.i+1,o.j+1); drawCached('pav'+(o.burnt?1:0),a.x,a.y,180,200,90,170,(X,Y)=>paintPavilion(X,Y,o.burnt)); if(o.inside) drawDoorMark(o);
+    const fw=o.fp?o.fp[0]:2, S=fw/2, a=P(o.i+fw/2,o.j+fw/2); g.save(); g.translate(a.x,a.y); g.scale(S,S); drawCached('pav'+(o.burnt?1:0),0,0,180,200,90,170,(X,Y)=>paintPavilion(X,Y,o.burnt)); g.restore(); if(o.inside) drawDoorMark(o);
   } else if(o.type==='lantern'){
     drawCached('lantern'+(o.off?1:0),x,y,40,80,14,74,(X,Y)=>paintLantern(X,Y,o.off));
     if(!o.off){ g.save(); g.globalCompositeOperation='lighter'; glow(x+12,y-54,26,26,'255,236,180',0.35+Math.sin(gt*3+o.i)*0.06); g.restore(); }
@@ -9449,7 +9449,7 @@ function drawObject(o){
     drawTree(o);
   } else if(o.type==='house'){
     const a=P(o.i+o.fp[0],o.j+o.fp[1]);
-    const N=o.fp[0], dt=o.dt??1, big=N>3; drawCached('house'+o.roof+o.door+(big?'_'+N+'_'+dt:''),a.x,a.y,big?720:560,big?620:500,big?360:280,big?560:440,(ax,ay)=>paintCottage(ax,ay,o.roof,o.door,N,dt)); if(o.inside) drawDoorMark(o);
+    const N=o.fp[0], dt=o.dt??1, big=N>3; const CW=big?Math.max(720,N*128+240):560, CH2=big?Math.max(620,N*64+440):500; drawCached('house'+o.roof+o.door+(big?'_'+N+'_'+dt:''),a.x,a.y,CW,CH2,big?CW/2:280,big?CH2-60:440,(ax,ay)=>paintCottage(ax,ay,o.roof,o.door,N,dt)); if(o.inside) drawDoorMark(o);
     // a thin curl of chimney smoke, live
     g.save(); g.globalCompositeOperation='source-over';
     const CH=COTTAGE_CHIMS[o.fp[0]]||COTTAGE_CHIM, cx=a.x+CH.dx, cy=a.y+CH.dy;
@@ -31650,18 +31650,20 @@ TALKERS.nobb=()=>{ const lv=tideLevel(); const o=[];
   if(lv<0.02 && tideHoursTo('flood')>1.2 && !RACE.on) o.push({label:CHOICE.nobbWon?'Race him again. (5c stake)':'Race him. (5c stake)', off:player.purse<5, fn:()=>{ player.purse-=5; updateHud(); closeDialog(); raceStart(); }});
   say('Nobb the Mudlark',[CHOICE.nobbWon?"“Rematch? I'm faster now. I've been eating eels.”":"“You! Racing face! Five flags out on the flats, I put them out, you fetch them, back to me before my whistle. Beat me and I give you my boots. Lose and I keep your coin.”", lv<0.02?"“Water's out. Go when you like.”":"“Not now, mud's under the sea. Low water. Come back at low water.”"],[...o,bye]); };
 function raceStart(){ RACE.on=true; RACE.got=0; RACE.t=performance.now(); RACE.limit=CHOICE.nobbWon?50:60; RACE.flags=[]; CHOICE.raceIdx=tideIdx();
-  switchArea('tideflats','fromHaven'); const pts=[[6,8],[18,10],[30,9],[12,16],[26,15],[34,13],[8,13],[22,19]].filter(([i,j])=>!tfDeep(i,j)&&!blocked.has(i+','+j));
+  switchArea('tideflats','fromHaven'); const pts=[]; for(let j=6;j<20;j+=2) for(let i=3;i<TF_W-3;i+=3) if(!tfDeep(i,j,0.15) && !blocked.has(i+','+j) && !OBJECTS.some(o=>o.i===i&&o.j===j)) pts.push([i,j]);   // anywhere dry and clear, well above the low-water line
   for(let k=0;k<5 && pts.length;k++){ const p=pts.splice(Math.floor(Math.random()*pts.length),1)[0]; const f={type:'mlflag', i:p[0], j:p[1], noblock:true, race:true}; OBJECTS.push(f); RACE.flags.push(f); }
   banner('Go! Five flags!','#f0d060',1400); try{ SND.fx('whoosh'); }catch(e){} logMsg('Nobb blows his whistle. Five red rags on sticks, out across the mud. Fetch them all and get back up the slipway!','#f0d060'); }
 OBJ_DRAW.mlflag=o=>{ if(o.taken) return; const q=P(o.i+0.5,o.j+0.5), w=Math.sin(gt*5+o.i)*3; g.strokeStyle='#5a3e24'; g.lineWidth=2; g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(q.x,q.y-34); g.stroke();
   g.fillStyle='#c8281e'; g.beginPath(); g.moveTo(q.x,q.y-34); g.quadraticCurveTo(q.x+10,q.y-32+w*0.3,q.x+18,q.y-29+w); g.lineTo(q.x,q.y-22); g.closePath(); g.fill(); g.save(); g.globalCompositeOperation='lighter'; glow(q.x+6,q.y-28,10,8,'255,120,80',0.25); g.restore(); };
 onUse(['mlflag'],o=>{ if(o.taken || !RACE.on) return; o.taken=true; RACE.got++; try{ SND.fx('bag'); }catch(e){} floatText([o.i,o.j],RACE.got+' / 5','#f0d060'); if(RACE.got>=5) logMsg('All five! Back to the slipway, fast!','#f0d060'); });
-setInterval(()=>{ try{ if(!RACE.on) return; const left=RACE.limit-(performance.now()-RACE.t)/1000*(typeof slowmo!=='undefined'&&slowmo.scale?1:1);
+function raceTick(){ try{ if(!RACE.on) return; const left=RACE.limit-(performance.now()-RACE.t)/1000*(typeof slowmo!=='undefined'&&slowmo.scale?1:1);
     const el=document.getElementById('tide-hud'); if(el && el.style.display!=='none'){ el.insertAdjacentHTML('beforeend',`<div style="color:#f0d060;margin-top:3px">🏁 Flags ${RACE.got}/5 · ${Math.max(0,Math.ceil(left))}s</div>`); }
     if(areaId==='wrackhaven' && RACE.got>=5){ RACE.on=false; const first=!CHOICE.nobbWon; CHOICE.nobbWon=(CHOICE.nobbWon||0)+1; player.purse+=first?10:15; updateHud(); banner('You beat Nobb!','#f0d060',1800);
       if(first){ giveQuestItem('mudlark_boots',true); say('Nobb the Mudlark',["<i>He stares at you, then at his whistle, as if it lied.</i> “Nobody beats Nobb.” <i>He sits down and pulls off his boots.</i> “A deal's a deal. They're lucky. Mostly.”"],[bye]); }
       else logMsg('Nobb pays up, muttering about eels.','#f0d060'); return; }
-    if(left<=0 || (areaId!=='tideflats' && areaId!=='wrackhaven') || CHOICE.raceIdx!==tideIdx()){ RACE.on=false; banner('Nobb wins!','#c87a5a',1600); logMsg('Nobb\'s whistle shrills from the slipway. He has won again, and he lets you know it.','#c87a5a'); OBJECTS.forEach(o=>{ if(o.type==='mlflag') o.taken=true; }); } }catch(e){} },500);
+    if(left<=0 || (areaId!=='tideflats' && areaId!=='wrackhaven') || CHOICE.raceIdx!==tideIdx()){ RACE.on=false; banner('Nobb wins!','#c87a5a',1600); logMsg('Nobb\'s whistle shrills from the slipway. He has won again, and he lets you know it.','#c87a5a'); OBJECTS.forEach(o=>{ if(o.type==='mlflag') o.taken=true; }); } }catch(e){} }
+setInterval(raceTick,500);
+{ const _sw=switchArea; switchArea=function(){ const r=_sw.apply(this,arguments); if(RACE.on && areaId==='wrackhaven') setTimeout(raceTick,0); return r; }; }
 // ── the sealed gate, far out where only the lowest water reaches; opened later by the Harbourmistress's key
 { const _tf=AREAS.tideflats.objects; AREAS.tideflats.objects=()=>[..._tf(), {type:'drowngate', i:30, j:21, fp:[2,1]}]; }
 OBJ_DRAW.drowngate=o=>{ const q=P(o.i+1,o.j+0.6); drawCached('drowngate',q.x,q.y,200,200,100,170,(X,Y)=>{
@@ -31676,6 +31678,36 @@ OBJ_DRAW.drowngate=o=>{ const q=P(o.i+1,o.j+0.6); drawCached('drowngate',q.x,q.y
 onUse(['drowngate'],o=>{ if(CHOICE.gateKey){ pzSay('The key turns. Something below breathes out.','#9fc8d8'); return; } say('A Drowned Door',["A door of grey stone in an arch, out where only the lowest water ever leaves it dry. Barnacles have grown over the seams. Over the lintel, an <b>eye</b> has been carved, wide open.","There is a keyhole, green with age, the size of your thumb. Mama Saltlick said the Harbourmistress's people call this a king's tomb. The goblins call it a mouth."],[bye]); });
 // a first nudge toward the race and the shells, on the notice board
 { const _nb=TALKERS.wrackboard; }
+
+// ════════ buildings as big outside as they are inside: each grows away from its door (into the back of the map, or over the edge), so the door, and everything in front of it, stays where it was ════════
+const GROW={
+  farm:{ farmhouse:{W:5,H:5} },
+  village:{ wheatsheaf:{W:6,H:6}, martahut:{W:4,H:4}, elderhouse:{W:6,H:6} },
+  clearing:{ lodge:{W:5,H:5} },
+  citygate:{ inn:{W:8,H:4} },
+  sylvhaven:{ weavetent:{W:4,H:4}, moonbath:{W:4,H:4}, guesttent:{W:5,H:5, east:2} },
+  market:{ guildhall:{W:8,H:6, remove:[[1,1]]}, tailorshop:{W:5,H:6, east:1}, smithy:{W:5,H:6, east:1}, goldhouse:{W:6,H:5, south:1} },
+  lowstreets:{ steamcellar:{W:5,H:4}, dicenden:{W:4,H:5, south:1} },
+  keepward:{ barracks:{W:6,H:6, east:1} },
+  portfearn:{ fearnhouse:{W:7,H:5, south:1} },
+  wrackhaven:{ bilge:{W:8,H:6}, chandlery:{W:5,H:5, east:1} } };
+function growBuilding(o,G){ const [fw,fh]=o.fp, W=Math.max(fw,G.W), H=Math.max(fh,G.H), dt=o.dt??1, out={...o, fp:[W,H], grown:true};
+  if(o.door==='l'){ out.j=o.j+fh-H; const east=G.east||0, west=W-fw-east; out.i=o.i-west; out.dt=dt+west; }   // the south face stays put: grow north, and sideways as told
+  else { out.i=o.i+fw-W; const south=G.south||0, north=H-fh-south; out.j=o.j-north; out.dt=dt+north; }       // the east face stays put: grow west, and north
+  return out; }
+for(const area in GROW){ const A=AREAS[area]; if(!A) continue; const oF=A.objects, cfg=GROW[area];
+  const gone=new Set(); Object.values(cfg).forEach(G=>(G.remove||[]).forEach(([i,j])=>gone.add(i+','+j)));
+  A.objects=()=>{ const L=oF().filter(o=>!(o.fp && !o.inside && gone.has(o.i+','+o.j))).map(o=>{ const G=o.inside&&cfg[o.inside]; return (G && o.fp) ? growBuilding(o,G) : o; }), big=L.filter(o=>o.grown);
+    const inBig=(i,j)=>big.some(b=>i>=b.i&&j>=b.j&&i<b.i+b.fp[0]&&j<b.j+b.fp[1]);
+    const busy=new Set(); L.forEach(o=>{ if(o.noblock&&o.dz!=null&&o.dz<-90) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) busy.add((o.i+a)+','+(o.j+b)); });
+    return L.map(o=>{ if(o.grown || o.fp || o.type==='teleporter' || !inBig(o.i,o.j)) return o;   // a small thing the house grew over: set it down just outside
+      for(let r=1;r<6;r++) for(let dj=0;dj<=r;dj++) for(const di of [0,-r,r,-1,1]){ const i=o.i+di, j=o.j+dj+ (big.find(b=>o.i>=b.i&&o.i<b.i+b.fp[0])?0:0); if(i<0||j<0||i>=A.w||j>=A.h||inBig(i,j)||busy.has(i+','+j)) continue; busy.add(i+','+j); return {...o, i, j}; }
+      return null; }).filter(Boolean); }; }
+for(const area in GROW){ const A=AREAS[area]; if(!A || !A.npcs) continue; const nF=A.npcs;   // and anyone who used to stand where a house now is steps out in front of it
+  A.npcs=()=>{ const L=nF(); let big=[], all=[]; try{ MAP_ALL=true; all=A.objects(); big=all.filter(o=>o.grown); }catch(e){} finally{ MAP_ALL=false; } if(!big.length) return L;
+    const busy=new Set(); all.forEach(o=>{ if(o.noblock) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let c=0;c<fh;c++) busy.add((o.i+a)+','+(o.j+c)); });
+    const inBig=(i,j)=>big.some(b=>i>=b.i&&j>=b.j&&i<b.i+b.fp[0]&&j<b.j+b.fp[1]);
+    return L.map(n=>{ if(!inBig(n.i,n.j)) return n; const b=big.find(b=>n.i>=b.i&&n.j>=b.j&&n.i<b.i+b.fp[0]&&n.j<b.j+b.fp[1]); for(let k=1;k<6;k++) for(const di of [0,-1,1,-2,2]){ const i=n.i+di, j=b.j+b.fp[1]-1+k; if(i>=0 && i<A.w && j<A.h && !inBig(i,j) && !busy.has(i+','+j)){ busy.add(i+','+j); return {...n, i, j}; } } return n; }); }; }
 </script>
 </body>
 </html>

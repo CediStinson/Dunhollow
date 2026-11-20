@@ -10146,21 +10146,28 @@ function groundAt(gx,gy){
 }
 
 let worldCache=null;
+// where a house has grown back past the edge of its map, the ground is painted out under it and the backdrop stands behind it (the walkable map is unchanged)
+function mapPad(){ let l=0, t=0; OBJECTS.forEach(o=>{ if(!o.grown) return; l=Math.max(l,-o.i); t=Math.max(t,-o.j); }); return { l:l?l+1:0, t:t?t+1:0 }; }
 function buildWorldCache(){
-  const {w,h}=ROOM, pad=240;
-  const oW=Math.ceil((w+h)*TW/2+pad*2), oH=Math.ceil((w+h)*TH/2+WALL_H+pad*2);
+  const {w,h}=ROOM, pad=240, PD=AREAS[areaId].theme==='interior'?{l:0,t:0}:mapPad(), L=PD.l, T=PD.t;
+  const oW=Math.ceil((w+h+L+T)*TW/2+pad*2), oH=Math.ceil((w+h+L+T)*TH/2+WALL_H+pad*2);
   const off=document.createElement('canvas'); off.width=oW; off.height=oH;
   const ctx=off.getContext('2d');
-  const ox=pad+h*TW/2, oy=pad+WALL_H+60;
+  const ox=pad+(h+L)*TW/2, oy=pad+WALL_H+60+(L+T)*TH/2;
   const saveG=g, sx=cam.x, sy=cam.y;
   g=ctx; cam.x=ox-gc.width/2; cam.y=oy-ORIGIN_Y;
+  const shifted=fn=>{ if(!L && !T) return fn(); const cx=cam.x, cy=cam.y, gA=groundAt, bD=backDoorGaps;
+    ROOM.w=w+L; ROOM.h=h+T; cam.x=cx-(L-T)*TW/2; cam.y=cy-(L+T)*TH/2;
+    groundAt=(x,y)=>gA(Math.max(x-L,-0.45),Math.max(y-T,-0.45));   // out in the margin the ground carries on as it is at the edge: a road runs straight out to its gap
+    backDoorGaps=()=>bD().map(d=>({...d, u:d.u+(d.side==='r'?L:T)}));
+    try{ return fn(); } finally{ ROOM.w=w; ROOM.h=h; cam.x=cx; cam.y=cy; groundAt=gA; backDoorGaps=bD; } };
   try{
-    if(AREAS[areaId].theme==='interior') paintInteriorWalls(); else paintBackdrop();
+    if(AREAS[areaId].theme==='interior') paintInteriorWalls(); else shifted(()=>paintBackdrop());
     // (no earth cut under the map)
-    paintGroundTexture();
-    if(AREAS[areaId].theme==='city') paintCityDetail(); else if(AREAS[areaId].theme!=='interior' && AREAS[areaId].theme!=='ash' && AREAS[areaId].theme!=='sand' && !AREAS[areaId].mountain) paintGroundDetail();
+    shifted(()=>{ paintGroundTexture();
+      if(AREAS[areaId].theme==='city') paintCityDetail(); else if(AREAS[areaId].theme!=='interior' && AREAS[areaId].theme!=='ash' && AREAS[areaId].theme!=='sand' && !AREAS[areaId].mountain) paintGroundDetail(); });
     paintPools();
-    paintFence();
+    shifted(()=>paintFence());
     if(AREAS[areaId].theme!=='interior') drawRoadDecor();
   } finally { g=saveG; cam.x=sx; cam.y=sy; }
   worldCache={ctx, cv:ctx.canvas, ox, oy, area:areaId, sky:AREAS[areaId].theme==='interior' ? windowSky().key : null};

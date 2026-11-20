@@ -10162,7 +10162,12 @@ function buildWorldCache(){
     backDoorGaps=()=>bD().map(d=>({...d, u:d.u+(d.side==='r'?L:T)}));
     try{ return fn(); } finally{ ROOM.w=w; ROOM.h=h; cam.x=cx; cam.y=cy; groundAt=gA; backDoorGaps=bD; } };
   try{
-    if(AREAS[areaId].theme==='interior') paintInteriorWalls(); else shifted(()=>paintBackdrop());
+    if(AREAS[areaId].theme==='interior') paintInteriorWalls(); else { shifted(()=>paintBackdrop());
+      // the backdrop band stops dead at the map's far left and right tips; let it trail off instead
+      const F=150; ctx.save(); ctx.globalCompositeOperation='destination-out';
+      [[pad,pad+F],[oW-pad,oW-pad-F]].forEach(([x0,x1])=>{ const gr=ctx.createLinearGradient(x0,0,x1,0); gr.addColorStop(0,'rgba(0,0,0,1)'); gr.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.fillStyle=gr; ctx.fillRect(Math.min(x0,x1)-(x0<x1?pad:0), 0, F+pad, oH); });
+      ctx.restore(); }
     // (no earth cut under the map)
     shifted(()=>{ paintGroundTexture();
       if(AREAS[areaId].theme==='city') paintCityDetail(); else if(AREAS[areaId].theme!=='interior' && AREAS[areaId].theme!=='ash' && AREAS[areaId].theme!=='sand' && !AREAS[areaId].mountain) paintGroundDetail(); });
@@ -31710,7 +31715,12 @@ for(const area in GROW){ const A=AREAS[area]; if(!A) continue; const oF=A.object
     const busy=new Set(); L.forEach(o=>{ if(o.noblock&&o.dz!=null&&o.dz<-90) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) busy.add((o.i+a)+','+(o.j+b)); });
     return L.map(o=>{ if(o.grown || o.fp || o.type==='teleporter' || !inBig(o.i,o.j)) return o;   // a small thing the house grew over: set it down just outside
       for(let r=1;r<6;r++) for(let dj=0;dj<=r;dj++) for(const di of [0,-r,r,-1,1]){ const i=o.i+di, j=o.j+dj+ (big.find(b=>o.i>=b.i&&o.i<b.i+b.fp[0])?0:0); if(i<0||j<0||i>=A.w||j>=A.h||inBig(i,j)||busy.has(i+','+j)) continue; busy.add(i+','+j); return {...o, i, j}; }
-      return null; }).filter(Boolean); }; }
+      return null; }).filter(Boolean).map(o=>{ if(o.type!=='drywall' || !o.a || !o.b) return o;   // a wall along the map's edge runs on into the margin behind the grown houses
+        let l=0, t=0; big.forEach(b=>{ l=Math.max(l,-b.i); t=Math.max(t,-b.j); }); if(l) l++; if(t) t++; const a=[...o.a], b2=[...o.b];
+        let shift=0;   // gaps are measured from the wall's start, so they move with it
+        if(a[1]===b2[1]){ if(Math.min(a[0],b2[0])===0){ if(a[0]===0){ a[0]=-l; shift=l; } else b2[0]=-l; } }
+        if(a[0]===b2[0]){ if(Math.min(a[1],b2[1])===0){ if(a[1]===0){ a[1]=-t; shift=t; } else b2[1]=-t; } }
+        return {...o, a, b:b2, gaps:(o.gaps||[]).map(x=>x+shift)}; }); }; }
 for(const area in GROW){ const A=AREAS[area]; if(!A || !A.npcs) continue; const nF=A.npcs;   // and anyone who used to stand where a house now is steps out in front of it
   A.npcs=()=>{ const L=nF(); let big=[], all=[]; try{ MAP_ALL=true; all=A.objects(); big=all.filter(o=>o.grown); }catch(e){} finally{ MAP_ALL=false; } if(!big.length) return L;
     const busy=new Set(); all.forEach(o=>{ if(o.noblock) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let c=0;c<fh;c++) busy.add((o.i+a)+','+(o.j+c)); });

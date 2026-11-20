@@ -15455,6 +15455,7 @@ function drawActorBase(e){
   else if(e.type==='bear') drawBear(s.x,B,e,poseFor(e));
   else if(e.type==='crawler') drawCrawlerFoe(s.x,B,e);
   else if(e.type==='feralskit') drawFeralSkit(s.x,B,e);
+  else if(e.type==='gorilla') drawGorilla(s.x,B,e,poseFor(e));
   else if(e.type==='troll') drawTroll(s.x,B,e,poseFor(e));
   else if(e.type==='golem') drawGolem(s.x,B,e,poseFor(e));
   else if(e.echo){ if(!e.dead){ const ps=poseFor(e), sw=e.moving?Math.sin(gt*10)*5:0; g.save(); g.globalAlpha*=0.68; drawChar(g,s.x,B,e.opts,sw,e.dir||0,ps); g.globalCompositeOperation='lighter'; glow(s.x,B-48,26,56,'150,190,255',0.28); g.restore(); } }   // Corvin's echo: an old fight, half there
@@ -31708,6 +31709,152 @@ for(const area in GROW){ const A=AREAS[area]; if(!A || !A.npcs) continue; const 
     const busy=new Set(); all.forEach(o=>{ if(o.noblock) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let c=0;c<fh;c++) busy.add((o.i+a)+','+(o.j+c)); });
     const inBig=(i,j)=>big.some(b=>i>=b.i&&j>=b.j&&i<b.i+b.fp[0]&&j<b.j+b.fp[1]);
     return L.map(n=>{ if(!inBig(n.i,n.j)) return n; const b=big.find(b=>n.i>=b.i&&n.j>=b.j&&n.i<b.i+b.fp[0]&&n.j<b.j+b.fp[1]); for(let k=1;k<6;k++) for(const di of [0,-1,1,-2,2]){ const i=n.i+di, j=b.j+b.fp[1]-1+k; if(i>=0 && i<A.w && j<A.h && !inBig(i,j) && !busy.has(i+','+j)){ busy.add(i+','+j); return {...n, i, j}; } } return n; }); }; }
+
+// ════════ THE WRACK COAST, part three: the Green Deep and its troop, Old Stripe, Hob's debt, Skrag's map, and the Drowned Eye under the lowest water ════════
+// ── the silverback as a foe: a chest-beat before the great overhead pound, then sweeps and a fast double slap
+FOES.gorilla={ label:'Silverback', base:96, stagger:1.25, pattern:[
+  {wait:1.5, wind:1.35, after:0.95, dir:'up', roar:true},   // he rears and beats his chest: then both fists come down
+  {wait:0.9, wind:0.95, after:0.55, dir:'left'},
+  {wait:0.15, wind:0.6, after:0.85, dir:'right'},
+  {wait:1.2, wind:1.05, after:0.7, dir:'right', feint:'left'} ]};
+Object.assign(WEAPONS,{ ape_fists:{ wind:0.3, dmg:22, len:26 } });
+const APE=()=>({gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,beast:true,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:'ape_fists',offhand:null}});
+Object.assign(AREA_TIER,{ greendeep:6, brinevault:6 });
+REGIONS['The Wrack Coast'].push('greendeep','brinevault'); REGION_OF.greendeep=REGION_OF.brinevault='The Wrack Coast';
+// ── new things
+Object.assign(ITEMS,{
+  skrag_map:{ name:"Skrag's Tide Map", slot:'misc', title:"A goblin chart of the Wrack Flats, scribbled over. An X is marked far out, where the sand only shows at the very lowest water, between two rocks shaped like teeth." },
+  drowned_key:{ name:'The Drowned Key', slot:'misc', title:"A green bronze key as long as your hand, its bow shaped like an open eye. It is cold, and stays cold in a warm pocket." },
+  tiger_pelt:{ name:"Old Stripe's Pelt", slot:'misc', title:"The hide of a tiger the size of a pony, scarred all over. Mama Saltlick will want to see it." },
+  eye_of_deep:{ name:'Eye of the Deep', slot:'neck', title:"A sea-green stone with a black pupil, warm as skin. Underwater it would let you see in the dark. On land it only watches." },
+  troop_band:{ name:"Grey-Back's Band", slot:'hands', base:'gloves', col:'#3a3632', title:"A braided band of silver hair the troop left on your path. It smells of the deep jungle and gives your fists some of their weight." } });
+Object.assign(PRICES,{ skrag_map:0, drowned_key:0, tiger_pelt:60, eye_of_deep:400, troop_band:180 });
+['skrag_map','drowned_key','tiger_pelt'].forEach(id=>QUEST_ITEMS.add(id));
+Object.assign(ITEM_STATS,{ eye_of_deep:{magic:5,hp:12,agi:2}, troop_band:{ap:3,hp:6} });
+if(typeof GEAR_HP!=='undefined') Object.assign(GEAR_HP,{ eye_of_deep:8, troop_band:5 });
+// ── drawing the gorilla in fights, and calm ones about the place
+OBJ_DRAW.apeidle=o=>{ const q=P(o.i+0.5,o.j+0.5); drawGorilla(q.x,q.y,{dir:o.dir||1, seed:o.i, size:o.s||1, moving:false},null); };
+OBJ_DRAW.apecage=o=>{ const q=P(o.i+0.5,o.j+0.5), open=CHOICE.deep==='spared'||CHOICE.deep==='done_spared';
+  if(!open) drawGorilla(q.x,q.y,{dir:1, seed:o.i+3, size:0.42, moving:false},null);
+  g.strokeStyle='#4a3a22'; g.lineWidth=2.4; const w=26, h=46; for(let k=0;k<=5;k++){ if(open && k>=2 && k<=3) continue; const x=q.x-w+k*w*0.4; g.beginPath(); g.moveTo(x,q.y+2); g.lineTo(x,q.y-h); g.stroke(); }
+  g.lineWidth=3.2; g.strokeStyle='#5a4428'; g.beginPath(); g.moveTo(q.x-w-2,q.y-h); g.lineTo(q.x+w+2,q.y-h); g.moveTo(q.x-w-2,q.y); g.lineTo(q.x+w+2,q.y); g.stroke();
+  g.strokeStyle='#8a7a5a'; g.lineWidth=1; for(let k=0;k<3;k++){ g.beginPath(); g.moveTo(q.x-w,q.y-h+8+k*14); g.lineTo(q.x+w,q.y-h+8+k*14); g.stroke(); } };
+// ── the Green Deep
+{ const BASE={ fence:{r:false,l:false}, mini:{x:0,y:0}, notches:()=>[], dummy:null }, R=(a,b,c)=>rnd01(a,b,c);
+  AREA_PATHS.greendeep=[[[20.5,-0.5],[19,5],[22,9],[18,13],[10,14],[4,13.5]], [[22,9],[30,8],[36,10]]];
+  const spared=()=>CHOICE.deep==='spared'||CHOICE.deep==='done_spared', killed=()=>CHOICE.deep==='killed'||CHOICE.deep==='done_killed';
+  AREAS.greendeep={ ...BASE, w:40, h:18, theme:'wood', jungle:true, dens:0.5, label:'The Green Deep',
+    objects:()=>{ const l=[{type:'teleporter', i:20, j:0, to:'jverge', entry:'fromDeep'}, {type:'ruin', i:31, j:3, v:0}, {type:'ruin', i:34, j:13, v:1}, {type:'bones', i:12, j:4, noblock:true}, {type:'bones', i:26, j:15, noblock:true},
+        {type:'campfire', i:6, j:12}, {type:'tent', i:2, j:14, fp:[2,2]}, {type:'crates', i:9, j:15}, {type:'barrels', i:4, j:11},
+        {type:'apecage', i:8, j:10}, {type:'apecage', i:10, j:11}, {type:'apecage', i:3, j:9}];
+      if(spared()) l.push({type:'apeidle', i:30, j:6, dir:1, s:1.3}, {type:'apeidle', i:27, j:4, dir:2}, {type:'apeidle', i:33, j:8, dir:0}, {type:'apeidle', i:24, j:6, dir:7, s:0.6}, {type:'apeidle', i:9, j:9, dir:1, s:0.42});
+      for(let k=0;k<9;k++){ const i=24+Math.floor(R(k,1,501)*14), j=2+Math.floor(R(k,2,502)*12); l.push({type:'fern', i, j, v:k%3, s:1.1, noblock:true}); }
+      return l; },
+    npcs:()=>[],
+    mobs:()=>{ const m=[];
+      if(!spared()){ if(!killed()) m.push({ name:'Grey-Back', type:'gorilla', i:30, j:6, faction:'troop', tier:6, hpMul:2.1, size:1.3, opts:APE() });
+        m.push({ name:'Troop Gorilla', type:'gorilla', i:27, j:4, faction:'troop', tier:6, hpMul:1.1, daily:true, opts:APE() }, { name:'Troop Gorilla', type:'gorilla', i:33, j:9, faction:'troop2', tier:6, hpMul:1.1, daily:true, opts:APE(), key:'troop2@'+Math.floor(dayClock/DAY_LEN) }); }
+      if(CHOICE.deep!=='done_spared' && CHOICE.deep!=='spared'){ m.push(
+        { name:'Captain Skrag', type:'brute', i:5, j:13, faction:'poachers', tier:6, hpMul:1.6, opts:GOBLIN({skin:22, equip:{head:'tricorn',torso:'shirt',armor:'cv_duster_red',hands:'gloves',legs:'trousers',feet:null,weapon:'scimitar',offhand:null}}) },
+        { name:"Skrag's Poacher", type:'goblin', i:7, j:14, faction:'poachers', tier:6, opts:GOBLIN({skin:20, equip:{head:'bandana',torso:'shirt',armor:'jerkin',hands:null,legs:'trousers',feet:null,weapon:'spear',offhand:null}}) },
+        { name:"Skrag's Netter", type:'goblin', i:3, j:12, faction:'poachers', tier:6, opts:GOBLIN({skin:21, equip:{head:'hood',torso:'shirt',armor:null,hands:null,legs:'trousers',feet:null,weapon:'dagger',offhand:null}}) }); }
+      if(CHOICE.stripe!=='slain' && CHOICE.stripe!=='done' && !hasItem('tiger_pelt')) m.push({ name:'Old Stripe', type:'wolf', cat:true, coat:'#c06a22', stripes:'#140c06', size:1.55, i:36, j:12, faction:'stripe', tier:6, hpMul:2.3 });
+      return m; },
+    entries:{ fromVerge:{i:20,j:1} } };
+  wrap('jverge','objects',l=>[...l,{type:'teleporter', i:22, j:13, to:'greendeep', entry:'fromVerge'}]);
+  AREAS.jverge.entries.fromDeep={i:22,j:12};
+  // the troop calms when the cages open, and the poachers' boss keeps a chart
+  setInterval(()=>{ try{ if(areaId!=='greendeep' || !running) return; const dead=n=>defeatedMobs.has('greendeep:'+n);
+      if(!CHOICE.deep || CHOICE.deep==='asked'){
+        if(dead('Captain Skrag') && dead("Skrag's Poacher") && dead("Skrag's Netter") && !dead('Grey-Back')){ CHOICE.deep='spared'; mobs.forEach(m=>{ if(m.type==='gorilla'){ m.hostile=false; m.gone=true; m.dead=true; } });
+          banner('The cages open','#9fd080',1800); logMsg("You knock the pins out of the cages. The young apes are out and gone into the green in a heartbeat. A moment later a huge grey shape stands up out of the ferns, looks at you for a long breath, and turns away. The troop goes with him.",'#9fd080');
+          try{ switchArea('greendeep','fromVerge'); }catch(e){} }
+        else if(dead('Grey-Back')){ CHOICE.deep='killed'; logMsg("Grey-Back is down. The troop scatters, screaming, into the deep green. The goblins at the camp cheer and go back to their nets.",'#c8a070'); } } }catch(e){} },700);
+  // ── quests
+  // Ysolde: what drives the tigers out
+  const _ys=TALKERS.ysolde; TALKERS.ysolde=()=>{ const D=CHOICE.deep;
+    if(!D) return say('Ysolde Brine, Harbourmistress',["“Tigers on my slipway, twice this month. They're being pushed out of the Green Deep, south of the Verge. Something in there has the whole jungle on edge.”","“Find out what, and end it. However you like. I'm not sentimental about jungles.”"],[{label:'“I will go.”', fn:()=>{ CHOICE.deep='asked'; remember('deep','asked','Ysolde wants to know what is driving the tigers out of the Green Deep.'); closeDialog(); }}, bye]);
+    if(D==='asked') return say('Ysolde Brine, Harbourmistress',["“The Green Deep. South off the Verge road. Come back when it's quiet.”"],[bye]);
+    if(D==='spared'||D==='killed') return say('Ysolde Brine, Harbourmistress',[D==='spared'?"“Goblin poachers caging ape babies, and the troop tearing the jungle apart looking for them. And you let the apes go.” <i>She almost smiles.</i> “Skrag. Of course it was Skrag.”":"“So you killed the big one.” <i>She shrugs.</i> “The troop will scatter. The tigers will settle. Skrag's goblins will be pleased with you, which is not a compliment.”",
+        "“Skrag dropped this the last time he was in my office, and I never gave it back.” <i>She slides a stained chart across.</i> “He swears there's a key buried out on the flats. A key to that drowned door. Only shows at the very lowest water. Go and get rich, or go and drown. Either way, take it.”"],
+      [{label:'Take the map.', fn:()=>{ CHOICE.deep=D==='spared'?'done_spared':'done_killed'; giveQuestItem('skrag_map',true); player.purse+=180; updateHud(); logMsg("+180 copper, and Skrag's Tide Map.",'#e8c060'); if(D==='spared'){ giveQuestItem('troop_band',true); logMsg("On the way out of the Deep you found a braid of silver hair laid across the path: Grey-Back's Band.",'#9fd080'); } closeDialog(); }}]);
+    return _ys(); };
+  // Mama Saltlick: Old Stripe
+  const _sl=TALKERS.saltlick; TALKERS.saltlick=()=>{ const S=CHOICE.stripe;
+    if(hasItem('tiger_pelt') && S!=='done') return say('Mama Saltlick',["<i>She spreads the pelt over two tables and looks at it for a long time.</i> “That's him. That's the one that took my Jory off the Verge road.”","“Here.” <i>Coin, a lot of it, and two pearls, and a bottle.</i> “Drinks are free for you. For a week. Don't tell anyone.”"],[{label:'Take it.', fn:()=>{ CHOICE.stripe='done'; removeOne('tiger_pelt'); player.purse+=150; giveQuestItem('pearl',true); giveQuestItem('pearl',true); giveQuestItem('rum',true); updateHud(); closeDialog(); }}]);
+    if(!S && CHOICE.tideMet) return say('Mama Saltlick',["“You've the look of someone who can use that blade.” <i>She wipes the same cup for a while.</i> “There's a tiger in the Green Deep. Old, scarred, big as a pony. Took my cook off the Verge road last spring. Bring me its hide.”"],[{label:'“I will.”', fn:()=>{ CHOICE.stripe='asked'; remember('stripe','asked','Mama Saltlick wants the hide of Old Stripe, the man-eater of the Green Deep.'); closeDialog(); }}, {label:'“Not now.”', fn:()=>_sl()}]);
+    return _sl(); };
+  { const _fd=foeDown; foeDown=function(f){ const r=_fd.apply(this,arguments); try{ if(f && f.name==='Old Stripe' && areaId==='greendeep'){ CHOICE.stripe=CHOICE.stripe==='done'?'done':'slain'; giveQuestItem('tiger_pelt',true); logMsg("Old Stripe is down. You take the pelt. It takes a long time.",'#e8c060'); } }catch(e){} return r; }; }
+  // Hob's debt: Weasel Wick in the Cut
+  wrap('smugcut','npcs',l=>CHOICE.hob==='asked' ? [...l,{ id:'wick', name:'Weasel Wick', i:21, j:2, dir:2, opts:BANDIT({skin:1,hair:2,hairColor:4,beard:1,equip:{head:'hood',torso:'shirt',armor:'jerkin'}}) }] : l);
+  wrap('smugcut','mobs',l=>CHOICE.hob==='fight' ? [...l,
+    { name:'Weasel Wick', type:'bandit', i:21, j:2, faction:'wick', tier:5, opts:BANDIT({skin:1,hair:2,hairColor:4,beard:1,equip:{head:'hood',torso:'shirt',armor:'jerkin',weapon:'dagger'}}) },
+    { name:"Wick's Cutthroat", type:'bandit', i:19, j:6, faction:'wick', tier:5, opts:BANDIT({skin:3,hair:1,equip:{head:'bandana',weapon:'scimitar'}}) },
+    { name:"Wick's Cutthroat", type:'bandit', i:23, j:6, faction:'wick', tier:5, key:'wickct2', opts:BANDIT({skin:2,hair:3,equip:{head:'hood',weapon:'club'}}) } ] : l);
+  const _hob=TALKERS.wr_ogre; TALKERS.wr_ogre=()=>{ const H=CHOICE.hob;
+    if(!H) return say('Hob the Hauler',["“Weasel Wick.” <i>The ogre says it like a curse.</i> “Owes Hob hundred copper. For carrying. Hob carried. Wick ran. Hides in Smugglers' Cut.”","“You bring Hob money. Hob gives you some. Fair.”"],[{label:'“I will find him.”', fn:()=>{ CHOICE.hob='asked'; remember('hob','asked',"Weasel Wick owes Hob the Hauler a hundred copper and hides in the Smugglers' Cut."); closeDialog(); }}, bye]);
+    if(H==='paid') return say('Hob the Hauler',["<i>Hob counts the coins three times, slowly, lips moving.</i> “Hundred. Good. You take half. Hob takes half. Hob also takes you to drink.”"],[{label:'Take your share.', fn:()=>{ CHOICE.hob='done'; player.purse+=50; updateHud(); closeDialog(); logMsg('+50 copper. Hob buys you a rum that could strip paint.','#e8c060'); }}]);
+    return _hob(); };
+  TALKERS.wick=()=>say('Weasel Wick',["“Hob sent you? That great lump?” <i>He glances at the trees, where two shapes shift.</i> “Tell him the debt's paid in spirit.”"],[
+    {label:'“Pay up, or I make you.”', fn:()=>{ CHOICE.hob='fight'; closeDialog(); logMsg('Wick whistles. Two cutthroats step out of the trees.','#e08060'); try{ switchArea('smugcut','fromVerge'); }catch(e){} }},
+    {label:'Pay his debt yourself. (-100c)', off:player.purse<100, fn:()=>{ player.purse-=100; CHOICE.hob='paid'; updateHud(); closeDialog(); logMsg("You count out Hob's hundred yourself. Wick looks at you as if you were mad, and is gone before you can change your mind.",'#c8b890'); }}, bye]);
+  setInterval(()=>{ try{ if(CHOICE.hob==='fight' && defeatedMobs.has('smugcut:Weasel Wick')){ CHOICE.hob='paid'; logMsg("Wick's purse is heavier than it should be. Hob's hundred, and then some (+30c).",'#e8c060'); player.purse+=30; updateHud(); } }catch(e){} },800);
+  // Skrag's X: far out between the teeth, at the very lowest water
+  { const _tf=AREAS.tideflats.objects; AREAS.tideflats.objects=()=>{ const l=_tf(); if(hasItem('skrag_map') && !hasItem('drowned_key') && !CHOICE.gateKey) l.push({type:'xmark', i:8, j:22, noblock:true, skrag:true}, {type:'rocks', i:6, j:21}, {type:'rocks', i:10, j:21}); return l; }; }
+  { const _x=PUZ_ON.xmark; PUZ_ON.xmark=o=>{ if(!o.skrag) return _x(o); if(!hasItem('shovel')){ pzSay('This is the X on Skrag\'s map, between the two teeth. You need a spade.','#c8b890'); return; }
+      giveQuestItem('drowned_key',true); try{ SND.fx('step'); }catch(e){} o.skrag=false; tideMark(o); banner('The Drowned Key','#9fd0e0',1800); logMsg("A foot down, the spade rings on bronze: a key in the shape of an open eye, in a rotted leather pouch. It is cold. It stays cold.",'#9fd0e0'); }; }
+  // the drowned door opens with the key, at low water
+  { const _g=PUZ_ON.drowngate; PUZ_ON.drowngate=o=>{ if(!hasItem('drowned_key') && !CHOICE.gateKey) return _g(o);
+      if(tideLevel()>0.2){ pzSay('Water is already lapping at the door. Next low water.','#7ac0e0'); return; }
+      if(!CHOICE.gateKey){ CHOICE.gateKey=1; removeOne('drowned_key'); logMsg("The key turns. Something below breathes out, a long cold sigh of old air, and the grey door grinds inward onto steps going down into the dark.",'#9fd0e0'); }
+      switchArea('brinevault','fromGate'); }; }
+  // ── the Drowned Eye: a vault the sea fills twice a day
+  AREAS.brinevault={ ...INSIDE_BASE, w:14, h:12, theme:'interior', cave:true, label:'The Drowned Eye', mini:{x:0,y:0}, tier:6,
+    objects:()=>[{type:'teleporter', i:7, j:11, to:'tideflats', entry:'fromGate'}, {type:'pillar', i:3, j:3}, {type:'pillar', i:10, j:3}, {type:'pillar', i:3, j:7}, {type:'pillar', i:10, j:7},
+      {type:'puddle', i:5, j:8, flat:true, noblock:true, dz:-99, s:1.4}, {type:'puddle', i:9, j:5, flat:true, noblock:true, dz:-99}, {type:'bones', i:2, j:9, noblock:true}, {type:'bones', i:11, j:2, noblock:true},
+      {type:'idol', i:6, j:0, fp:[2,2]}, ...(CHOICE.eyeChest?[]:[{type:'vaultchest', i:4, j:1}, {type:'vaultchest', i:9, j:1}])],
+    npcs:()=>[],
+    mobs:()=>[ ...(CHOICE.eyeBoss?[]:[{ name:'The Abyssal Claw', type:'scorpion', i:7, j:4, faction:'claw', tier:6, hpMul:3.2, opts:SCORP({crab:true, big:true, col:'#5a2a3a'}) }]),
+      { name:'Barnacled Crab', type:'scorpion', i:3, j:9, faction:'vcrab1', tier:6, hpMul:1.1, daily:true, opts:SCORP({crab:true, col:'#7a4a3a'}) },
+      { name:'Barnacled Crab', type:'scorpion', i:11, j:9, faction:'vcrab2', tier:6, hpMul:1.1, daily:true, key:'vcrab2@'+Math.floor(dayClock/DAY_LEN), opts:SCORP({crab:true, col:'#7a4a3a'}) } ],
+    entries:{ fromGate:{i:7,j:10} } };
+  { const _tf=AREAS.tideflats; _tf.entries.fromGate={i:31,j:22}; }
+  OBJ_DRAW.idol=o=>{ const q=P(o.i+1,o.j+1); drawCached('idol',q.x,q.y,200,260,100,230,(X,Y)=>{ const st='#5e6a5e', sd=tone(st,-0.35);
+      g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(X,Y+2,60,16,0,0,Math.PI*2); g.fill();
+      g.fillStyle=sd; g.fillRect(X-44,Y-30,88,30); g.fillStyle=st; g.fillRect(X-40,Y-28,80,26);   // the plinth
+      g.fillStyle=st; g.beginPath(); g.moveTo(X-34,Y-28); g.lineTo(X-30,Y-150); g.quadraticCurveTo(X,Y-196,X+30,Y-150); g.lineTo(X+34,Y-28); g.closePath(); g.fill(); g.strokeStyle='rgba(20,24,20,0.6)'; g.lineWidth=1; g.stroke();
+      g.fillStyle=sd; g.fillRect(X-26,Y-100,52,6); g.fillRect(X-24,Y-70,48,5);   // carved bands
+      g.fillStyle='#d8d0b8'; for(let k=0;k<30;k++){ g.beginPath(); g.arc(X-30+((k*37)%60),Y-30-((k*23)%60),1.3,0,Math.PI*2); g.fill(); }
+      g.fillStyle='#e8e4d0'; g.beginPath(); g.ellipse(X,Y-140,18,11,0,0,Math.PI*2); g.fill(); g.strokeStyle='#2a2e28'; g.lineWidth=1.5; g.stroke(); });
+    const gl=0.55+0.25*Math.sin(gt*1.4); g.save(); g.globalCompositeOperation='lighter'; glow(q.x,q.y-140,30,22,'90,255,190',CHOICE.eyeBoss?0.15:gl); g.restore();
+    g.fillStyle=CHOICE.eyeBoss?'#2a3a30':'#0c1a14'; g.beginPath(); g.ellipse(q.x+Math.sin(gt*0.7)*3,q.y-140,6,9,0,0,Math.PI*2); g.fill(); };   // the pupil follows you, a little
+  OBJ_DRAW.vaultchest=o=>{ const q=P(o.i+0.5,o.j+0.5); g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(q.x,q.y+2,18,6,0,0,Math.PI*2); g.fill(); g.fillStyle='#4a3420'; g.fillRect(q.x-15,q.y-18,30,18); g.fillStyle='#5e4428'; g.beginPath(); g.ellipse(q.x,q.y-18,15,6,0,Math.PI,0); g.fill(); g.strokeStyle='#6a6e64'; g.lineWidth=2; g.strokeRect(q.x-15,q.y-18,30,18); g.fillStyle='#d8d0b8'; for(let k=0;k<12;k++){ g.beginPath(); g.arc(q.x-13+((k*7)%26),q.y-3-((k*5)%14),1.2,0,Math.PI*2); g.fill(); } g.fillStyle='#c8a050'; g.fillRect(q.x-2,q.y-12,4,5); };
+onUse(['vaultchest'],o=>{ if(areaId!=='brinevault') return; if(!CHOICE.eyeBoss){ pzSay('The Claw is still guarding the hoard.','#e08060'); return; } if(CHOICE.eyeChest) return;
+    CHOICE.eyeChest=1; sackAdd('coin',260); sackAdd('black_pearl',2); sackAdd('pearl',3); sackAdd(pick([['pirate_coat',1],['tricorn',1],['sh_ghost',1]],Math.random()),1); logMsg('Two strongboxes, crusted with a hundred years of barnacles. Coin and pearls spill into your Tide Sack. Now get it ashore.','#e8c060'); });
+  { const _fd=foeDown; foeDown=function(f){ const r=_fd.apply(this,arguments); try{ if(f && f.name==='The Abyssal Claw' && areaId==='brinevault'){ CHOICE.eyeBoss=1; giveQuestItem('eye_of_deep',true); banner('The Eye closes','#9fe0c0',2000);
+        logMsg("The great crab sags into the water. Behind it, the idol's eye dims to a dull green stone; a smaller stone, the same green, lies in the claw. The Eye of the Deep.",'#9fe0c0'); try{ remember('eye','done','You broke the Abyssal Claw under the Drowned Eye.'); }catch(e){} } }catch(e){} return r; }; }
+  // in the vault, the sea comes too
+  let vaultWarn=0; setInterval(()=>{ try{ if(areaId!=='brinevault' || !running) { vaultWarn=0; return; } const lv=tideLevel();
+      if(lv>0.35 && vaultWarn<1){ vaultWarn=1; banner('Water on the steps!','#7ac0e0',1600); logMsg('Cold water is running down the steps behind you. The tide has turned.','#7ac0e0'); }
+      if(lv>0.6 && vaultWarn<2){ vaultWarn=2; sweptAway(); } }catch(e){} },500);
+  // ── journal and levels
+  const ord=['asked','spared','killed','done_spared','done_killed'];
+  JOURNAL.push(['Trouble in the Green Deep', ()=>{ const D=CHOICE.deep; if(!D) return null; if(D==='asked') return ['active',"Something is driving the tigers out of the Green Deep, south of the Jungle Verge. Ysolde Brine wants it ended."];
+      if(D==='spared') return ['active',"Goblin poachers under Captain Skrag were caging the troop's young. You freed them, and the troop let you go. Tell Ysolde."]; if(D==='killed') return ['active',"You killed Grey-Back, and the troop has scattered. Tell Ysolde."];
+      return ['done', D==='done_spared'?"You broke Skrag's poaching camp and freed the young apes. The Green Deep is quiet, and the troop knows your smell.":"You killed Grey-Back. The troop scattered, and the tigers went back into the green."]; }]);
+  JOURNAL.push(['The Man-Eater', ()=>{ const S=CHOICE.stripe; if(!S) return null; if(S==='done') return ['done',"You brought Mama Saltlick the hide of Old Stripe."]; return ['active', S==='slain'||hasItem('tiger_pelt') ? "Old Stripe is dead. Bring his pelt to Mama Saltlick in the Bilge & Barnacle." : "Mama Saltlick wants the hide of Old Stripe, a huge scarred tiger in the Green Deep."]; }]);
+  JOURNAL.push(["Hob's Hundred", ()=>{ const H=CHOICE.hob; if(!H) return null; if(H==='done') return ['done',"Hob the Hauler got his hundred copper, and shared it."]; return ['active', H==='paid' ? "Hob's hundred is in hand. Take it to him at the docks." : "Weasel Wick owes Hob the Hauler a hundred copper. He hides in the Smugglers' Cut."]; }]);
+  JOURNAL.push(['The Drowned Eye', ()=>{ if(!hasItem('skrag_map') && !hasItem('drowned_key') && !CHOICE.gateKey) return null; if(CHOICE.eyeBoss) return ['done',"Under the drowned door you broke the Abyssal Claw and took the Eye of the Deep."];
+      if(CHOICE.gateKey) return ['active',"The drowned door is open. Something guards the idol below. Go at low water, and come out before the sea comes in after you."];
+      if(hasItem('drowned_key')) return ['active',"You have the Drowned Key. The door lies far out on the flats, at the lowest water."];
+      return ['active',"Skrag's map marks an X between two tooth-shaped rocks, far out on the Wrack Flats, only dry at the very lowest water. Bring a spade."]; }]);
+  Object.assign(QUEST_AT,{ 'Trouble in the Green Deep':'greendeep', 'The Man-Eater':'greendeep', "Hob's Hundred":27, 'The Drowned Eye':30 });
+  Object.assign(QUEST_PLUS,{ 'Trouble in the Green Deep':2, 'The Man-Eater':3 });
+  { const _h=npcHasNews; npcHasNews=function(n){ if(n){ if(n.id==='ysolde'){ if(!CHOICE.deep) return '!'; if(CHOICE.deep==='spared'||CHOICE.deep==='killed') return '?'; }
+        if(n.id==='saltlick'){ if(hasItem('tiger_pelt') && CHOICE.stripe!=='done') return '?'; if(!CHOICE.stripe && CHOICE.tideMet) return '!'; }
+        if(n.id==='wr_ogre'){ if(!CHOICE.hob) return '!'; if(CHOICE.hob==='paid') return '?'; } if(n.id==='wick') return '!'; }
+      return _h.apply(this,arguments); }; }
+}
 </script>
 </body>
 </html>

@@ -9321,7 +9321,7 @@ function drawObject(o){
     else if(o.kind==='flowers'){ drawCached('flowers',x,y,60,30,30,20,paintFlowers); }
   } else if(o.type==='pool'){
     // baked into the ground; only a slow shimmer is live
-    const [fw,fh]=o.fp, c0=P(o.i+fw/2,o.j+fh/2), t=(gt*0.3+o.i)%1;
+    const [fw,fh]=o.fp, c0=P(o.i+fw/2,o.j+fh/2), t=((gt*0.3+o.i)%1+1)%1;
     g.save(); g.globalCompositeOperation='lighter'; g.strokeStyle=`rgba(200,230,240,${0.18*(1-t)})`; g.lineWidth=1;
     g.beginPath(); g.ellipse(c0.x,c0.y,8+t*30,3+t*12,0,0,Math.PI*2); g.stroke();
     if(o.kind==='bath') for(let k=0;k<5;k++){ const u=(gt*0.25+k/5)%1, q=P(o.i+0.6+((k*37)%10)/10*(fw-1.2),o.j+0.5+((k*53)%10)/10*(fh-1)); g.fillStyle=`rgba(255,255,255,${0.22*Math.sin(u*Math.PI)})`; g.beginPath(); g.ellipse(q.x+Math.sin(gt+k)*6,q.y-u*60,10+u*14,6+u*8,0,0,Math.PI*2); g.fill(); }
@@ -10011,7 +10011,9 @@ function paintCottage(x,y,roof,door='r',N=3,dt=1){        // N: the footprint's 
 
 
 // ── pathfinding (BFS, 8 directions, no corner cutting)
-function walkable(i,j){ return i>=0 && j>=0 && i<ROOM.w && j<ROOM.h && !blocked.has(i+','+j) && !mobAt(i,j); }
+const PAD_C={objs:null, p:{l:0,t:0}};
+function padNow(){ const k=areaId+':'+OBJECTS.length; if(PAD_C.objs!==k){ PAD_C.objs=k; PAD_C.p=(AREAS[areaId]&&AREAS[areaId].theme==='interior')?{l:0,t:0}:mapPad(); } return PAD_C.p; }
+function walkable(i,j){ const P=padNow(); return i>=-P.l && j>=-P.t && i<ROOM.w && j<ROOM.h && !blocked.has(i+','+j) && !mobAt(i,j); }   // a grown map's margin is ground like any other
 function findPath(si,sj,ti,tj){                       // to a chair: its tile counts as free, so you can walk up and sit
   const ch=OBJECTS.find(o=>o.type==='chair' && o.i===ti && o.j===tj);
   if(!ch || (si===player.i && sj===player.j)) return findPathRaw(si,sj,ti,tj);
@@ -10158,7 +10160,7 @@ function buildWorldCache(){
   g=ctx; cam.x=ox-gc.width/2; cam.y=oy-ORIGIN_Y;
   const shifted=fn=>{ if(!L && !T) return fn(); const cx=cam.x, cy=cam.y, gA=groundAt, bD=backDoorGaps;
     ROOM.w=w+L; ROOM.h=h+T; cam.x=cx-(L-T)*TW/2; cam.y=cy-(L+T)*TH/2;
-    groundAt=(x,y)=>gA(Math.max(x-L,-0.45),Math.max(y-T,-0.45));   // out in the margin the ground carries on as it is at the edge: a road runs straight out to its gap
+    groundAt=(x,y)=>{ const X=x-L, Y=y-T; return inNotch(Math.floor(X),Math.floor(Y)) ? gA(X,Y) : gA(Math.max(X,-0.45),Math.max(Y,-0.45)); };   // out in the margin the ground carries on as it is at the edge: a road runs straight out to its gap
     backDoorGaps=()=>bD().map(d=>({...d, u:d.u+(d.side==='r'?L:T)}));
     try{ return fn(); } finally{ ROOM.w=w; ROOM.h=h; cam.x=cx; cam.y=cy; groundAt=gA; backDoorGaps=bD; } };
   try{
@@ -31708,6 +31710,22 @@ function growBuilding(o,G){ const [fw,fh]=o.fp, W=Math.max(fw,G.W), H=Math.max(f
   if(o.door==='l'){ out.j=o.j+fh-H; const east=G.east||0, west=W-fw-east; out.i=o.i-west; out.dt=dt+west; }   // the south face stays put: grow north, and sideways as told
   else { out.i=o.i+fw-W; const south=G.south||0, north=H-fh-south; out.j=o.j-north; out.dt=dt+north; }       // the east face stays put: grow west, and north
   return out; }
+// the map grew a margin behind the big houses: what stood along the old edge (crates by the fence, a field, a way out) moves out to the new one,
+// and fields along it spread to the edge
+function growPad(big){ let l=0, t=0; big.forEach(b=>{ l=Math.max(l,-b.i); t=Math.max(t,-b.j); }); return { l:l?l+1:0, t:t?t+1:0 }; }
+const EDGE_STRETCH=new Set(['garden','pen','pool','field','wheat','crops']);
+function edgeOut(A, o, all, big, inBig){ const P=growPad(big); if(!P.l && !P.t) return o;
+  if(o.grown || o.inside || o.type==='drywall' || o.type==='ucgrate' || o.a) return o;
+  const [fw,fh]=o.fp||[1,1], stretch=o.fp && EDGE_STRETCH.has(o.type);
+  const di=(P.l && o.i<=(stretch?1:2)) ? P.l : 0, dj=(P.t && o.j<=(stretch?1:2)) ? P.t : 0; if(!di && !dj) return o;
+  const n=stretch ? {...o, i:o.i-di, j:o.j-dj, fp:[fw+di, fh+dj], edged:true} : {...o, i:o.i-di, j:o.j-dj, edged:true};
+  const [nw,nh]=n.fp||[1,1];
+  for(let a=0;a<nw;a++) for(let c=0;c<nh;c++){ const i=n.i+a, j=n.j+c; if(stretch && i>=o.i && j>=o.j) continue;   // a field only needs room where it spreads
+    if(inBig(i,j)) return o;
+    if(all.some(q=>q!==o && !q.grown && !q.noblock && !n.noblock && q.type!=='drywall' && !(q.i<=2&&P.l) && !(q.j<=2&&P.t) && i>=q.i && j>=q.j && i<q.i+(q.fp?q.fp[0]:1) && j<q.j+(q.fp?q.fp[1]:1))) return o; }
+  if(o.type==='teleporter'){ A._ent0=A._ent0||JSON.parse(JSON.stringify(A.entries||{}));   // whoever arrives through it arrives out at the new edge too
+    Object.entries(A._ent0).forEach(([k,e])=>{ if(Math.max(Math.abs(e.i-o.i),Math.abs(e.j-o.j))<=1) A.entries[k]={...e, i:e.i-di, j:e.j-dj}; }); }
+  return n; }
 for(const area in GROW){ const A=AREAS[area]; if(!A) continue; const oF=A.objects, cfg=GROW[area];
   const gone=new Set(); Object.values(cfg).forEach(G=>(G.remove||[]).forEach(([i,j])=>gone.add(i+','+j)));
   A.objects=()=>{ const L=oF().filter(o=>!(o.fp && !o.inside && gone.has(o.i+','+o.j))).map(o=>{ const G=o.inside&&cfg[o.inside]; return (G && o.fp) ? growBuilding(o,G) : o; }), big=L.filter(o=>o.grown);
@@ -31715,12 +31733,15 @@ for(const area in GROW){ const A=AREAS[area]; if(!A) continue; const oF=A.object
     const busy=new Set(); L.forEach(o=>{ if(o.noblock&&o.dz!=null&&o.dz<-90) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) busy.add((o.i+a)+','+(o.j+b)); });
     return L.map(o=>{ if(o.grown || o.fp || o.type==='teleporter' || !inBig(o.i,o.j)) return o;   // a small thing the house grew over: set it down just outside
       for(let r=1;r<6;r++) for(let dj=0;dj<=r;dj++) for(const di of [0,-r,r,-1,1]){ const i=o.i+di, j=o.j+dj+ (big.find(b=>o.i>=b.i&&o.i<b.i+b.fp[0])?0:0); if(i<0||j<0||i>=A.w||j>=A.h||inBig(i,j)||busy.has(i+','+j)) continue; busy.add(i+','+j); return {...o, i, j}; }
-      return null; }).filter(Boolean).map(o=>{ if(o.type!=='drywall' || !o.a || !o.b) return o;   // a wall along the map's edge runs on into the margin behind the grown houses
+      return null; }).filter(Boolean).map((o,_,all)=>edgeOut(A, o, all, big, inBig)).map(o=>{ if(o.type!=='drywall' || !o.a || !o.b) return o;   // a wall along the map's edge runs on into the margin behind the grown houses
         let l=0, t=0; big.forEach(b=>{ l=Math.max(l,-b.i); t=Math.max(t,-b.j); }); if(l) l++; if(t) t++; const a=[...o.a], b2=[...o.b];
         let shift=0;   // gaps are measured from the wall's start, so they move with it
         if(a[1]===b2[1]){ if(Math.min(a[0],b2[0])===0){ if(a[0]===0){ a[0]=-l; shift=l; } else b2[0]=-l; } }
         if(a[0]===b2[0]){ if(Math.min(a[1],b2[1])===0){ if(a[1]===0){ a[1]=-t; shift=t; } else b2[1]=-t; } }
         return {...o, a, b:b2, gaps:(o.gaps||[]).map(x=>x+shift)}; }); }; }
+for(const area in GROW){ const A=AREAS[area]; if(!A || !A.notches) continue; const tF=A.notches;   // a field along the old edge ploughs on out to the new one
+  A.notches=()=>{ const L=tF(); let P={l:0,t:0}; try{ MAP_ALL=true; P=growPad(A.objects().filter(o=>o.grown)); }catch(e){} finally{ MAP_ALL=false; } if(!P.l && !P.t) return L;
+    return L.map(n=>{ const w=n.w||3, h=n.h||3, di=(P.l && n.i0<=1)?P.l+n.i0:0, dj=(P.t && n.j0<=1)?P.t+n.j0:0; return (di||dj) ? {...n, i0:n.i0-di, j0:n.j0-dj, w:w+di, h:h+dj} : n; }); }; }
 for(const area in GROW){ const A=AREAS[area]; if(!A || !A.npcs) continue; const nF=A.npcs;   // and anyone who used to stand where a house now is steps out in front of it
   A.npcs=()=>{ const L=nF(); let big=[], all=[]; try{ MAP_ALL=true; all=A.objects(); big=all.filter(o=>o.grown); }catch(e){} finally{ MAP_ALL=false; } if(!big.length) return L;
     const busy=new Set(); all.forEach(o=>{ if(o.noblock) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let c=0;c<fh;c++) busy.add((o.i+a)+','+(o.j+c)); });

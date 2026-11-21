@@ -9854,6 +9854,44 @@ function drawNPCBody(n){
 }
 // A timber-framed cottage on a 2x2 footprint, painted once and cached per roof colour.
 let COTTAGE_CHIM={dx:0,dy:-300}; const COTTAGE_CHIMS={};
+// a lean-to: walls of the house's own stuff, and a single roof slope running up to tuck in under the house's eave
+function paintLeanTo(x,y,o){ const w=o.fp[0], d=o.fp[1], T=TW/2, H2=TH/2, t=o.touch, lo=o.hLo, hi=o.hHi, ins=0.06;
+  const pal=o.town ? CITY_PAL[o.v%CITY_PAL.length] : null, wallL=o.town?pal.pl:'#8e6842', wallR=o.town?tone(pal.pl,-0.22):'#5e4128', tim=o.town?pal.tb:'#3e2814', rf=o.town?pal.rf:(o.roof||'#b89a50'), stn=o.town?pal.st:'#6e665a';
+  const ht=(gi,gj)=> t==='e' ? lo+(hi-lo)*((gi+w)/w) : t==='w' ? lo+(hi-lo)*(-gi/w) : t==='s' ? lo+(hi-lo)*((gj+d)/d) : lo+(hi-lo)*(-gj/d);
+  const pt=(gi,gj,h=0)=>({x:x+(gi-gj)*T, y:y+(gi+gj)*H2-h});
+  const ei=t==='e'?0.2:0, ej=t==='s'?0.2:0;   // into the house's wall a little, so no daylight shows at the join
+  const K=[-w+ins,-d+ins], R=[ei-ins,-d+ins], F=[ei-ins,ej-ins], L=[-w+ins,ej-ins];
+  const quad=(ps,fill)=>{ g.beginPath(); ps.forEach((q,n)=>n?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.closePath(); g.fillStyle=fill; g.fill(); };
+  const up=(c,h)=>pt(c[0],c[1],h===undefined?ht(c[0],c[1]):h);
+  // soft contact shadow only (the house casts the big one)
+  g.fillStyle='rgba(8,5,2,0.22)'; quad([pt(L[0],L[1]),pt(F[0],F[1]),pt(R[0],R[1]),{x:pt(R[0],R[1]).x+14,y:pt(R[0],R[1]).y+6},{x:pt(F[0],F[1]).x+14,y:pt(F[0],F[1]).y+6}],'rgba(8,5,2,0.22)');
+  const wall=(a,b,fill,lit)=>{ quad([pt(a[0],a[1]),pt(b[0],b[1]),up(b),up(a)],fill);
+    quad([pt(a[0],a[1]),pt(b[0],b[1]),pt(b[0],b[1],o.town?Math.min(lo*0.7,96):9),pt(a[0],a[1],o.town?Math.min(lo*0.7,96):9)],tone(stn,lit?0:-0.2));   // footing
+    g.save(); g.beginPath(); g.moveTo(pt(a[0],a[1]).x,pt(a[0],a[1]).y); g.lineTo(pt(b[0],b[1]).x,pt(b[0],b[1]).y); g.lineTo(up(b).x,up(b).y); g.lineTo(up(a).x,up(a).y); g.closePath(); g.clip();
+    if(o.town){ g.strokeStyle=tim; g.lineWidth=3; const n=Math.max(2,Math.round(Math.hypot(b[0]-a[0],b[1]-a[1])*1.5)); for(let k=0;k<=n;k++){ const u=k/n, c=[a[0]+(b[0]-a[0])*u, a[1]+(b[1]-a[1])*u], p0=pt(c[0],c[1],Math.min(lo*0.7,96)), p1=up(c); g.beginPath(); g.moveTo(p0.x,p0.y); g.lineTo(p1.x,p1.y); g.stroke(); } }
+    else { g.strokeStyle='rgba(30,16,6,0.5)'; g.lineWidth=0.9; for(let h=14;h<hi;h+=7.5){ const p0=pt(a[0],a[1],h), p1=pt(b[0],b[1],h); g.beginPath(); g.moveTo(p0.x,p0.y); g.lineTo(p1.x,p1.y); g.stroke(); } }
+    g.restore();
+    // a small shuttered window in the middle of the wall
+    const m=[(a[0]+b[0])/2,(a[1]+b[1])/2], wm=ht(m[0],m[1]), dx=(b[0]-a[0]), dy=(b[1]-a[1]), len=Math.hypot(dx,dy)||1, s0=[m[0]-dx/len*0.22,m[1]-dy/len*0.22], s1=[m[0]+dx/len*0.22,m[1]+dy/len*0.22], wl=Math.min(lo-30,wm*0.5), wh=wl+26;
+    if(len>=1.5 && wl>30){ quad([pt(s0[0],s0[1],wl-2),pt(s1[0],s1[1],wl-2),pt(s1[0],s1[1],wh+2),pt(s0[0],s0[1],wh+2)],tim); quad([pt(s0[0],s0[1],wl),pt(s1[0],s1[1],wl),pt(s1[0],s1[1],wh),pt(s0[0],s0[1],wh)],lit?'#e0a850':'#b07a38'); } };
+  if(t!=='s') wall(L,F,wallL,true);
+  if(t!=='e') wall(F,R,wallR,false);
+  // the roof: one plane over the top, overhanging the low edge
+  const ov=0.18, oK=[K[0]-(t==='w'?0:t==='e'?ov:0), K[1]-(t==='n'?0:t==='s'?ov:0)];
+  const rK=up(K,ht(K[0],K[1])+4), rR=up(R,ht(R[0],R[1])+4), rF=up(F,ht(F[0],F[1])+4), rL=up(L,ht(L[0],L[1])+4);
+  const low=t==='e'?[rK,rL]:t==='w'?[rR,rF]:t==='s'?[rK,rR]:[rL,rF], drop=q=>({x:q.x,y:q.y+7});
+  const pts=[rK,rR,rF,rL].map(q=>low.includes(q)?drop(q):q);
+  const rg=g.createLinearGradient(pts[0].x,pts[0].y,pts[2].x,pts[2].y); rg.addColorStop(0,tone(rf,0.12)); rg.addColorStop(1,tone(rf,-0.2));
+  quad(pts,rg);
+  g.save(); g.beginPath(); pts.forEach((q,n)=>n?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.closePath(); g.clip();   // courses of thatch or tile across the slope
+  g.strokeStyle=tone(rf,-0.32,0.7); g.lineWidth=1.1; const along=(t==='e'||t==='w');
+  for(let k=1;k<10;k++){ const u=k/10; const a= along ? [-w+(w)*u,-d] : [-w,-d+d*u], b= along ? [-w+w*u,0] : [0,-d+d*u]; const p0=pt(a[0],a[1],ht(a[0],a[1])+4), p1=pt(b[0],b[1],ht(b[0],b[1])+4); g.beginPath(); g.moveTo(p0.x,p0.y); g.lineTo(p1.x,p1.y); g.stroke(); }
+  g.restore();
+  g.strokeStyle=tone(rf,-0.45); g.lineWidth=2.6; g.beginPath(); g.moveTo(low[0].x,low[0].y+7); g.lineTo(low[1].x,low[1].y+7); g.stroke();   // the eave
+  const hiE=[rK,rR,rF,rL].filter(q=>!low.includes(q)); g.strokeStyle='rgba(20,12,6,0.55)'; g.lineWidth=3; g.beginPath(); g.moveTo(hiE[0].x,hiE[0].y); g.lineTo(hiE[1].x,hiE[1].y); g.stroke();   // flashing where it meets the wall
+}
+OBJ_DRAW.lean=o=>{ const a=P(o.i+o.fp[0],o.j+o.fp[1]), w=o.fp[0], d=o.fp[1], CW=(w+d)*TW/2+120, CH=(w+d)*TH/2+o.hHi+80;
+  drawCached('lean'+w+'x'+d+o.touch+o.hHi+'_'+o.hLo+(o.town?'t'+o.v:'w'+o.roof),a.x,a.y,CW,CH,w*TW/2+60,CH-30,(X,Y)=>paintLeanTo(X,Y,o)); };
 function paintCottage(x,y,roof,door='r',N=3,dt=1,D=0,low=false){        // N: the footprint along i (the gable face), D along j (the ridge); a bigger house stands a little taller
   D=D||N; const W=N, T=TW/2, H2=TH/2, ins=0.12, WH=(132+(Math.max(W,D)-3)*14)*(low?0.74:1), RH=86*W/3*(low?0.8:1);
   const pt=(gi,gj,h=0)=>({x:x+(gi-gj)*T, y:y+(gi+gj)*H2-h});          // local grid, (N,N) is the anchor at x,y
@@ -31740,9 +31778,10 @@ function growEntries(A, area, list){ A._ent0=A._ent0||JSON.parse(JSON.stringify(
 for(const area in GROW){ const A=AREAS[area]; if(!A) continue; const oF=A.objects, cfg=GROW[area];
   const gone=new Set(); Object.values(cfg).forEach(G=>(G.remove||[]).forEach(([i,j])=>gone.add(i+','+j)));
   A.objects=()=>{ const L=oF().filter(o=>!(o.fp && !o.inside && gone.has(o.i+','+o.j))).map(o=>{ const G=o.inside&&cfg[o.inside]; return (G && o.fp) ? growBuilding(o,G) : o; });
-    L.filter(o=>o.grown && cfg[o.inside].wings).forEach(o=>cfg[o.inside].wings.forEach(([di,dj,w,h,dr,dt,ridge])=>L.push(o.type==='bldg'
-      ? {type:'bldg', i:o.i+di, j:o.j+dj, fp:[w,h], v:((o.v||0)+2)%6, door:dr, dt, h:Math.round((o.h||150)*0.72), rh:o.rh?Math.round(o.rh*0.8):undefined, stone:o.stone, ...(ridge?{ridge}:{}), grown:true, wing:o.inside}
-      : {type:o.type, i:o.i+di, j:o.j+dj, fp:[w,h], roof:o.roof, wdoor:dr, dt, low:true, grown:true, wing:o.inside})));   // a lower wing built on: the house is an L, not a box
+    L.filter(o=>o.grown && cfg[o.inside].wings).forEach(o=>cfg[o.inside].wings.forEach(([di,dj,w,h,dr])=>{ const wi=o.i+di, wj=o.j+dj, [W,H]=o.fp;
+      const touch = wi+w===o.i ? 'e' : wi===o.i+W ? 'w' : wj+h===o.j ? 's' : 'n';   // the side of the wing that leans on the house
+      const town=o.type==='bldg', eave=town ? bWH(o) : 132+(Math.max(W,H)-3)*14;
+      L.push({type:'lean', i:wi, j:wj, fp:[w,h], touch, hHi:Math.round(eave*0.86), hLo:Math.round(eave*(town?0.56:0.6)), town, v:o.v||0, stone:!!o.stone, roof:o.roof, wdoor:dr, grown:true, wing:o.inside}); }));   // a lean-to built on under the eaves: one house in an L, not two
     const big=L.filter(o=>o.grown);
     const inBig=(i,j)=>big.some(b=>i>=b.i&&j>=b.j&&i<b.i+b.fp[0]&&j<b.j+b.fp[1]);
     const busy=new Set(); L.forEach(o=>{ if(o.noblock&&o.dz!=null&&o.dz<-90) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) busy.add((o.i+a)+','+(o.j+b)); });

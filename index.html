@@ -6302,18 +6302,18 @@ Object.assign(AREAS,{
       ...(collectedPickups.has('farmhouse:1,3') ? [] : [{type:'pickup', i:1, j:3, item:'straw_hat'}]),
     ].filter(o=>!o.breakable || !destroyedBreakables.has('farmhouse:'+o.i+','+o.j)),
     entries:{ fromFarm:{i:3,j:2}, bed:{i:1,j:1} } },
-  elderhouse:{ ...INSIDE_BASE, w:7, h:7, theme:'interior', label:"Hamond's House", mini:{x:0,y:0},
+  elderhouse:{ ...INSIDE_BASE, w:6, h:6, theme:'interior', label:"Hamond's House", mini:{x:0,y:0},   // a family under one roof, and not a pace to spare
     objects:()=>[
-      {type:'teleporter', i:4, j:6, to:'village', entry:'fromHouse'},
+      {type:'teleporter', i:3, j:5, to:'village', entry:'fromHouse'},
       // the sleeping side: the beds side by side, heads to the back wall, two either side of the hearth for the warmth
       {type:'bed', i:0, j:0, fp:[2,1], owner:'elder'}, {type:'bed', i:0, j:1, fp:[2,1], owner:'wenna'},   // in the corner, a pace from the hearth
       {type:'hearth', i:0, j:3},
-      {type:'bed', i:0, j:5, fp:[2,1], owner:'ada'}, {type:'bed', i:0, j:6, fp:[2,1], edric:true},     // Ada's, and Edric's beside it, still made up
+      {type:'bed', i:0, j:4, fp:[2,1], edric:true}, {type:'bed', i:0, j:5, fp:[2,1], owner:'ada'},     // Edric's, still made up, and Ada's beside it
       // the living side: a table in the middle of the room, stores along the far wall
-      {type:'table', i:4, j:3},
-      {type:'crate', i:4, j:0, breakable:true}, {type:'crate', i:5, j:0, breakable:true}, {type:'barrel', i:6, j:0, breakable:true},
+      {type:'table', i:3, j:2},
+      {type:'crate', i:3, j:0, breakable:true}, {type:'crate', i:4, j:0, breakable:true}, {type:'barrel', i:5, j:0, breakable:true},
     ].filter(o=>!o.breakable || !destroyedBreakables.has('elderhouse:'+o.i+','+o.j)),
-    entries:{ fromVillage:{i:4,j:5} } },
+    entries:{ fromVillage:{i:3,j:4} } },
   camp:{ fence:{r:false,l:false}, w:13, h:15, theme:'road', label:'Bandit Camp and Charcoal Pits', mini:{x:1,y:2},
     notches:()=>[], dummy:null,
     objects:()=>[
@@ -10830,7 +10830,7 @@ function pointerUp(px,py){
       if(best){ player.path=best; pendingPickup=pk; }
       return;
     }
-    const hs = OBJECTS.find(o=>(o.type==='house'||o.type==='bldg'||o.type==='chapel'||(o.type==='keep'&&o.inside)||o.type==='roundhut'||(o.type==='pavilion'&&o.inside)) && (o.inside||o.door) && ti>=o.i && tj>=o.j && ti<o.i+o.fp[0] && tj<o.j+o.fp[1]);
+    const hs = OBJECTS.find(o=>(o.type==='house'||o.type==='bldg'||o.type==='chapel'||(o.type==='keep'&&o.inside)||o.type==='roundhut'||(o.type==='pavilion'&&o.inside)) && (o.inside||(o.door&&!o.wing)) && ti>=o.i && tj>=o.j && ti<o.i+o.fp[0] && tj<o.j+o.fp[1]);
     if(hs){ const [di,dj]=doorTile(hs);
       if(player.i===di && player.j===dj){ enterHouse(hs); return; }
       const pth=findPath(player.i,player.j,di,dj); if(pth){ player.path=pth; pendingDoor=hs; } return; }
@@ -25673,7 +25673,7 @@ OBJ_DRAW.groundmist=o=>{ const q=P(o.i+0.5,o.j+0.5), T=gt*0.15; g.save(); for(le
     {type:'smokerack', i:5, j:7},
     {type:'hideframe', i:2, j:5, c:'#7a7268'}, {type:'hideframe', i:2, j:7, c:'#9a6e48'},
     {type:'skintable', i:7, j:6}, {type:'gamepole', i:3, j:8}, {type:'trappile', i:9, j:6},
-    {type:'target', i:11, j:7}, {type:'chopblock', i:6, j:4},
+    {type:'target', i:11, j:7}, {type:'chopblock', i:8, j:7},
     {type:'tracks', i:3, j:4, noblock:true, flat:true, dz:-99}, {type:'tracks', i:8, j:8, noblock:true, flat:true, dz:-99}, {type:'tracks', i:1, j:6, noblock:true, flat:true, dz:-99} ]; }
 AREA_PATHS.clearing=[ [[-0.5,4.5],[3,4.4],[5.4,5.4],[6.6,4.4],[8.4,4.2]], [[2.5,-0.5],[2.8,2],[4,4.4]], [[8.4,4.2],[10,4.6],[11.5,5]], [[5.5,5.8],[5.5,6.8]] ];   // a trodden ring round the fire, and the ways out
 // ── the bear's hollow is off the Wolfwood now, not at Brann's door ──
@@ -31698,17 +31698,17 @@ onUse(['drowngate'],o=>{ if(CHOICE.gateKey){ pzSay('The key turns. Something bel
 
 // ════════ buildings as big outside as they are inside: each grows away from its door (into the back of the map, or over the edge), so the door, and everything in front of it, stays where it was ════════
 const GROW={
-  farm:{ farmhouse:{W:5,H:5} },
+  farm:{ farmhouse:{W:4,H:4, wings:[[0,4,2,2,'l',1]]} },   // the farmhouse, and a dairy built on at its front corner
   village:{ wheatsheaf:{W:4,H:4, at:[-1,0], dt:2, wings:[[0,-2,2,2,'r',1]]},   // the inn: a hall, and the kitchen built on behind its west end
              elderhouse:{W:4,H:4, at:[9,0], dt:1, wings:[[-2,2,2,2,'l',1]]} },   // Hamond's: the house, and a low workshop leaning on its west side
-  clearing:{ lodge:{W:5,H:5, east:1} },
-  citygate:{ inn:{W:8,H:4} },
+  clearing:{ lodge:{W:4,H:4, east:1, wings:[[-2,2,2,2,'l',1]]} },   // Brann's lodge, and a woodshed against it
+  citygate:{ inn:{W:6,H:4, wings:[[0,-2,2,2,'r',1,'j']]} },   // the Crooked Lantern, and its stable behind
   sylvhaven:{ weavetent:{W:3,H:3}, moonbath:{W:3,H:3}, guesttent:{W:3,H:3} },   // elven tents: light, no bigger than they need to be
-  market:{ guildhall:{W:8,H:6, remove:[[1,1]]}, tailorshop:{W:5,H:6, east:1}, smithy:{W:5,H:6, east:1}, goldhouse:{W:6,H:5, south:1} },
-  lowstreets:{ steamcellar:{W:5,H:4}, dicenden:{W:4,H:5, south:1} },
-  keepward:{ barracks:{W:6,H:6, east:1} },
-  portfearn:{ fearnhouse:{W:7,H:5, south:1} },
-  wrackhaven:{ bilge:{W:8,H:6}, chandlery:{W:5,H:5, east:1} } };
+  market:{ guildhall:{W:4,H:5}, tailorshop:{W:4,H:5}, smithy:{W:4,H:5}, goldhouse:{W:5,H:4} },   // a row of town houses, each only a little deeper than it was
+  lowstreets:{ steamcellar:{W:4,H:4}, dicenden:{W:4,H:4, south:1} },
+  keepward:{ barracks:{W:5,H:5, wings:[[5,1,2,3,'l',1,'j']]} },   // the barracks, and its armoury on the east end
+  portfearn:{ fearnhouse:{W:5,H:4, south:1, wings:[[1,-2,3,2,'r',1]]} },   // the Mother House, and its counting-room behind
+  wrackhaven:{ bilge:{W:6,H:4, wings:[[-2,1,2,3,'l',1,'j']]}, chandlery:{W:4,H:4} } };   // the Bilge & Barnacle, and its brewhouse on the west
 function growBuilding(o,G){ const [fw,fh]=o.fp, W=Math.max(fw,G.W), H=Math.max(fh,G.H), dt=o.dt??1, out={...o, fp:[W,H], grown:true};
   if(o.door==='l'){ out.j=o.j+fh-H; const east=G.east||0, west=W-fw-east; out.i=o.i-west; out.dt=dt+west; }   // the south face stays put: grow north, and sideways as told
   else { out.i=o.i+fw-W; const south=G.south||0, north=H-fh-south; out.j=o.j-north; out.dt=dt+north; }       // the east face stays put: grow west, and north
@@ -31740,7 +31740,9 @@ function growEntries(A, area, list){ A._ent0=A._ent0||JSON.parse(JSON.stringify(
 for(const area in GROW){ const A=AREAS[area]; if(!A) continue; const oF=A.objects, cfg=GROW[area];
   const gone=new Set(); Object.values(cfg).forEach(G=>(G.remove||[]).forEach(([i,j])=>gone.add(i+','+j)));
   A.objects=()=>{ const L=oF().filter(o=>!(o.fp && !o.inside && gone.has(o.i+','+o.j))).map(o=>{ const G=o.inside&&cfg[o.inside]; return (G && o.fp) ? growBuilding(o,G) : o; });
-    L.filter(o=>o.grown && cfg[o.inside].wings).forEach(o=>cfg[o.inside].wings.forEach(([di,dj,w,h,dr,dt])=>L.push({type:o.type, i:o.i+di, j:o.j+dj, fp:[w,h], roof:o.roof, wdoor:dr, dt, low:true, grown:true, wing:o.inside})));   // a lower wing built on: the house is an L, not a box
+    L.filter(o=>o.grown && cfg[o.inside].wings).forEach(o=>cfg[o.inside].wings.forEach(([di,dj,w,h,dr,dt,ridge])=>L.push(o.type==='bldg'
+      ? {type:'bldg', i:o.i+di, j:o.j+dj, fp:[w,h], v:((o.v||0)+2)%6, door:dr, dt, h:Math.round((o.h||150)*0.72), rh:o.rh?Math.round(o.rh*0.8):undefined, stone:o.stone, ...(ridge?{ridge}:{}), grown:true, wing:o.inside}
+      : {type:o.type, i:o.i+di, j:o.j+dj, fp:[w,h], roof:o.roof, wdoor:dr, dt, low:true, grown:true, wing:o.inside})));   // a lower wing built on: the house is an L, not a box
     const big=L.filter(o=>o.grown);
     const inBig=(i,j)=>big.some(b=>i>=b.i&&j>=b.j&&i<b.i+b.fp[0]&&j<b.j+b.fp[1]);
     const busy=new Set(); L.forEach(o=>{ if(o.noblock&&o.dz!=null&&o.dz<-90) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) busy.add((o.i+a)+','+(o.j+b)); });

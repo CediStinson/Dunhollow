@@ -9449,10 +9449,12 @@ function drawObject(o){
     drawTree(o);
   } else if(o.type==='house'){
     const a=P(o.i+o.fp[0],o.j+o.fp[1]);
-    const N=o.fp[0], dt=o.dt??1, big=N>3; const CW=big?Math.max(720,N*128+240):560, CH2=big?Math.max(620,N*64+440):500; drawCached('house'+o.roof+o.door+(big?'_'+N+'_'+dt:''),a.x,a.y,CW,CH2,big?CW/2:280,big?CH2-60:440,(ax,ay)=>paintCottage(ax,ay,o.roof,o.door,N,dt)); if(o.inside) drawDoorMark(o);
+    const N=o.fp[0], D=o.fp[1]||N, dt=o.dt??1, dr=o.door||o.wdoor||'r', big=N>3||D!==N||o.low;
+    const CW=big?Math.max(720,(N+D)*64+240):560, CH2=big?Math.max(620,(N+D)*32+440):500, AX=big?120+N*64:280;
+    drawCached('house'+o.roof+dr+(big?'_'+N+'x'+D+'_'+dt+(o.low?'l':''):''),a.x,a.y,CW,CH2,AX,big?CH2-60:440,(ax,ay)=>paintCottage(ax,ay,o.roof,dr,N,dt,D,!!o.low)); if(o.inside) drawDoorMark(o);
     // a thin curl of chimney smoke, live
     g.save(); g.globalCompositeOperation='source-over';
-    const CH=COTTAGE_CHIMS[o.fp[0]]||COTTAGE_CHIM, cx=a.x+CH.dx, cy=a.y+CH.dy;
+    const CH=COTTAGE_CHIMS[o.fp[0]+'x'+(o.fp[1]||o.fp[0])+(o.low?'l':'')]||COTTAGE_CHIM, cx=a.x+CH.dx, cy=a.y+CH.dy;
     for(let k=0;k<6;k++){ const t=((gt*0.18+k/6)%1); g.fillStyle=`rgba(200,196,188,${0.22*(1-t)})`;
       g.beginPath(); g.arc(cx+Math.sin(t*5+k)*5+t*14, cy-t*60, 4+t*9, 0, Math.PI*2); g.fill(); }
     g.restore();
@@ -9852,11 +9854,10 @@ function drawNPCBody(n){
 }
 // A timber-framed cottage on a 2x2 footprint, painted once and cached per roof colour.
 let COTTAGE_CHIM={dx:0,dy:-300}; const COTTAGE_CHIMS={};
-function paintCottage(x,y,roof,door='r',N=3,dt=1){        // N: the footprint's side in tiles; a bigger house stands a little taller and its roof climbs higher
-  const T=TW/2, H2=TH/2, ins=0.12, WH=132+(N-3)*14, RH=86*N/3;
+function paintCottage(x,y,roof,door='r',N=3,dt=1,D=0,low=false){        // N: the footprint along i (the gable face), D along j (the ridge); a bigger house stands a little taller
+  D=D||N; const W=N, T=TW/2, H2=TH/2, ins=0.12, WH=(132+(Math.max(W,D)-3)*14)*(low?0.74:1), RH=86*W/3*(low?0.8:1);
   const pt=(gi,gj,h=0)=>({x:x+(gi-gj)*T, y:y+(gi+gj)*H2-h});          // local grid, (N,N) is the anchor at x,y
-  const a=ins, b=N-ins;
-  const Bm=pt(b-N,b-N), R=pt(b-N,a-N), L=pt(a-N,b-N), K=pt(a-N,a-N);
+  const Bm=pt(-ins,-ins), R=pt(-ins,ins-D), L=pt(ins-W,-ins), K=pt(ins-W,ins-D);   // (W,D) is the anchor at x,y
   const up2=(p,h)=>({x:p.x,y:p.y-h});
   const quad=(pts,fill)=>{ g.beginPath(); g.moveTo(pts[0].x,pts[0].y); for(let k=1;k<pts.length;k++) g.lineTo(pts[k].x,pts[k].y); g.closePath(); g.fillStyle=fill; g.fill(); };
   const lerp=(p,q,t)=>({x:p.x+(q.x-p.x)*t,y:p.y+(q.y-p.y)*t});
@@ -9901,7 +9902,8 @@ function paintCottage(x,y,roof,door='r',N=3,dt=1){        // N: the footprint's 
   });
   // door on the shaded face, window with a warm glow on the lit face
   const DF = door==='l' ? [L,Bm] : [Bm,R], WF = door==='l' ? [Bm,R] : [L,Bm];
-  const dc=(dt+0.5)/N, dw=0.08*3/N, d0=lerp(DF[0],DF[1],dc-dw), d1=lerp(DF[0],DF[1],dc+dw), DH=104;   // the door over its doorstep tile
+  const FL=door==='l'?W:D, WL=door==='l'?D:W;   // the door's face and the window face, in tiles
+  const dc=(dt+0.5)/FL, dw=0.08*3/FL, d0=lerp(DF[0],DF[1],dc-dw), d1=lerp(DF[0],DF[1],dc+dw), DH=104;   // the door over its doorstep tile
   quad([up2(d0,8),up2(d1,8),up2(d1,DH+2),up2(d0,DH+2)],'#3a2412');
   quad([up2(d0,9),up2(d1,9),up2(d1,DH),up2(d0,DH)],'#6a4624');
   g.strokeStyle='rgba(20,10,4,0.6)'; g.lineWidth=0.8; for(let t=0.25;t<1;t+=0.25){ const q0=lerp(d0,d1,t); g.beginPath(); g.moveTo(q0.x,q0.y-9); g.lineTo(q0.x,q0.y-DH); g.stroke(); }
@@ -9909,10 +9911,10 @@ function paintCottage(x,y,roof,door='r',N=3,dt=1){        // N: the footprint's 
   [0.25,0.75].forEach(t=>{ const hp=lerp(d0,d1,0.05); g.fillStyle='#2a2622'; g.fillRect(hp.x-1,hp.y-DH*t-2,9,2.4); });                 // iron hinges
   beam(up2(d0,8),up2(d0,DH+4),3.6,'#2e1c0c'); beam(up2(d1,8),up2(d1,DH+4),3.6,'#2e1c0c'); beam(up2(d0,DH+4),up2(d1,DH+4),4,'#2e1c0c');  // frame
   quad([up2(lerp(d0,d1,-0.2),8),up2(lerp(d0,d1,1.2),8),up2(lerp(d0,d1,1.2),4),up2(lerp(d0,d1,-0.2),4)],'#8a8274');                  // step
-  { const lp=up2(lerp(DF[0],DF[1],dc+dw+0.08*3/N),DH-10);                                                                                        // lantern beside the door
+  { const lp=up2(lerp(DF[0],DF[1],dc+dw+0.08*3/FL),DH-10);                                                                                        // lantern beside the door
     g.strokeStyle='#2a2622'; g.lineWidth=1.2; g.beginPath(); g.moveTo(lp.x,lp.y); g.lineTo(lp.x+6,lp.y-3); g.stroke();
     g.fillStyle='#2a2622'; g.fillRect(lp.x+3,lp.y-2,6,9); g.fillStyle='#ffc860'; g.fillRect(lp.x+4,lp.y-0.5,4,6); }
-  (N>3?[[0.18,0.31],[0.44,0.57],[0.7,0.83]]:[[0.3,0.46],[0.6,0.76]]).forEach(([t0,t1])=>{
+  (WL>=6?[[0.1,0.2],[0.32,0.42],[0.56,0.66],[0.78,0.88]]:WL>3?[[0.18,0.31],[0.44,0.57],[0.7,0.83]]:WL<=2?[[0.3,0.7]]:[[0.3,0.46],[0.6,0.76]]).forEach(([t0,t1])=>{
     const w0=lerp(WF[0],WF[1],t0), w1=lerp(WF[0],WF[1],t1), lo=50, hi=80;
     quad([up2(w0,lo-2),up2(w1,lo-2),up2(w1,hi+2),up2(w0,hi+2)],'#3a2412');
     const wg=g.createLinearGradient(w0.x,w0.y-hi,w1.x,w1.y-lo); wg.addColorStop(0,'#ffd88a'); wg.addColorStop(1,'#d88a30');
@@ -9942,7 +9944,7 @@ function paintCottage(x,y,roof,door='r',N=3,dt=1){        // N: the footprint's 
   quad([Lt,Bt,M1],'#7a5636');                                         // boarded gable
   for(let t=0.1;t<1;t+=0.1){ const bp=lerp(Lt,Bt,t); g.strokeStyle='rgba(30,16,6,0.5)'; g.lineWidth=0.8; g.beginPath(); g.moveTo(bp.x,bp.y); g.lineTo(bp.x,bp.y-(1-Math.abs(t-0.5)*2)*RH); g.stroke(); }
   beam(Lt,M1,2.4,'#4e341a'); beam(Bt,M1,2.4,'#4e341a'); beam(lerp(Lt,Bt,0.5),M1,2,'#4e341a');
-  { const gm=lerp(Lt,Bt,0.5), lc=up2(gm,RH*0.42), lw=11*N/3, lh=15*N/3;   // a loft door in the gable, with its hoist beam over it
+  { const gm=lerp(Lt,Bt,0.5), lc=up2(gm,RH*0.42), lw=11*W/3*(low?0.7:1), lh=15*W/3*(low?0.7:1);   // a loft door in the gable, with its hoist beam over it
     beam(up2(gm,RH*0.2),up2(gm,RH*0.2),0); quad([{x:lc.x-lw/2,y:lc.y+lh/2},{x:lc.x+lw/2,y:lc.y+lh/2},{x:lc.x+lw/2,y:lc.y-lh/2},{x:lc.x-lw/2,y:lc.y-lh/2}],'#2a1a0c');
     quad([{x:lc.x-lw/2+1.4,y:lc.y+lh/2-1.4},{x:lc.x-0.5,y:lc.y+lh/2-1.4},{x:lc.x-0.5,y:lc.y-lh/2+1.4},{x:lc.x-lw/2+1.4,y:lc.y-lh/2+1.4}],'#5e3e20');   // one leaf of it ajar
     g.strokeStyle='rgba(20,10,4,0.6)'; g.lineWidth=0.6; for(let k=1;k<3;k++){ g.beginPath(); g.moveTo(lc.x-lw/2+1.4+k*(lw/2-2)/3,lc.y-lh/2+1.4); g.lineTo(lc.x-lw/2+1.4+k*(lw/2-2)/3,lc.y+lh/2-1.4); g.stroke(); }
@@ -9976,7 +9978,7 @@ function paintCottage(x,y,roof,door='r',N=3,dt=1){        // N: the footprint's 
   g.strokeStyle=tone(roof,-0.25); g.lineWidth=4; g.beginPath(); g.moveTo(M1.x,M1.y); g.lineTo(M2.x,M2.y); g.stroke();   // ridge
   g.strokeStyle=tone(roof,0.2,0.6); g.lineWidth=1.2; g.beginPath(); g.moveTo(M1.x,M1.y-1.5); g.lineTo(M2.x,M2.y-1.5); g.stroke();
   // stone chimney near the back of the ridge
-  const cB=lerp(M1,M2,0.72), cw=9; COTTAGE_CHIM={dx:cB.x-x, dy:cB.y-22-y}; COTTAGE_CHIMS[N]=COTTAGE_CHIM;
+  const cB=lerp(M1,M2,0.72), cw=9; COTTAGE_CHIM={dx:cB.x-x, dy:cB.y-22-y}; COTTAGE_CHIMS[W+'x'+D+(low?'l':'')]=COTTAGE_CHIM;
   quad([{x:cB.x-cw,y:cB.y+10},{x:cB.x,y:cB.y+13},{x:cB.x,y:cB.y-16},{x:cB.x-cw,y:cB.y-19}],'#7a7266');
   quad([{x:cB.x,y:cB.y+13},{x:cB.x+cw,y:cB.y+10},{x:cB.x+cw,y:cB.y-19},{x:cB.x,y:cB.y-16}],'#555046');
   quad([{x:cB.x-cw,y:cB.y-19},{x:cB.x,y:cB.y-16},{x:cB.x+cw,y:cB.y-19},{x:cB.x,y:cB.y-22}],'#2a2622');
@@ -17479,7 +17481,7 @@ const ROUTINES={
     { h:[18.5,19], area:'village', walk:[[3,6],[3,2]] },
     { h:[19,21.5], area:'wheatsheaf', at:[2,2], dir:1, sit:true },
     { h:[21.5,22], area:'village', walk:[[3,2],[3,8]] },                                                    // home to her hut
-    { h:[22,31],   area:'martahut', at:[5,2], bed:[4,1] } ] },                                              // and to bed                                         // home again, down the lane                                   // counting the day's coin over a cider
+    { h:[22,31],   area:'martahut', at:[2,1], bed:[2,0] } ] },                                              // and to bed                                         // home again, down the lane                                   // counting the day's coin over a cider
   pip:{ name:'Pip the Bard', ids:{village:'bard', wheatsheaf:'bard'}, opts:{gender:'m',skin:0,hair:1,hairColor:7,beard:2,face:2,equip:{head:'hood_red',torso:'tunic_red',armor:null,hands:null,legs:'hose_grey',feet:'boots',weapon:null,offhand:null}}, slots:[
     { h:[9.5,17],  area:'village', at:[10,7], dir:1, wander:[[10,7],[7,6],[11,5],[8,8]], fromArea:'lane' },   // up the lane from wherever he slept; busking round the well
     { h:[17,17.5], area:'village', walk:[[10,7],[3,2]] },
@@ -18710,14 +18712,14 @@ let CLICKED_BED=null;                                                           
 wrap('village','objects',l=>[...l,{type:'roundhut', i:0, j:7, fp:[3,3], door:'r', dt:1, inside:'martahut', back:'fromHut'}]);   // Marta's: she lives and sleeps here
 AREAS.village.entries.fromHut={i:3,j:8};
 // inside Marta's hut: one round room, her bed, her stock, a fire in the middle
-AREAS.martahut={ ...CROOM("Marta's Hut",7,7,'village','fromHut', ()=>[
-    {type:'bed', i:4, j:1, fp:[2,1], owner:'marta'}, {type:'hearth', i:3, j:3}, {type:'crates', i:1, j:2}, {type:'barrels', i:1, j:4},
-    {type:'table', i:5, j:4}, {type:'lantern', i:2, j:1}, {type:'critter', kind:'flowers', i:4, j:5, noblock:true}],
+AREAS.martahut={ ...CROOM("Marta's Hut",5,5,'village','fromHut', ()=>[   // small and full: her bed, her fire, her stock
+    {type:'bed', i:2, j:0, fp:[2,1], owner:'marta'}, {type:'hearth', i:3, j:2}, {type:'crates', i:0, j:1}, {type:'barrels', i:0, j:3},
+    {type:'table', i:4, j:2}, {type:'lantern', i:1, j:0}, {type:'critter', kind:'flowers', i:1, j:3, noblock:true}],
   ()=>[]),                                                       // nobody is placed here: Marta walks home and goes to bed herself (ROUTINES)
   tent:true, round:true, hut:true };
-AREAS.martahut.entries={ fromHut:{i:3,j:5} };
+AREAS.martahut.entries={ fromHut:{i:2,j:3} };
 rtWrap('martahut');
-AREAS.martahut.objects=(o=>()=>o().map(x=>x.type==='teleporter'?{...x, i:3, j:6}:x))(AREAS.martahut.objects);
+AREAS.martahut.objects=(o=>()=>o().map(x=>x.type==='teleporter'?{...x, i:2, j:4}:x))(AREAS.martahut.objects);
 TALKERS.sleep_trader=()=>say('Marta the Trader',["Marta is asleep, rolled up in two blankets with her boots still on. The money box is under her pillow, and one hand is on it."],[{label:'Let her sleep.', fn:closeDialog}]);
 function paintRoundHut(x,y){ const rx=72, ry=36, H=86, R=1.16;
   g.fillStyle='rgba(8,5,2,0.32)'; g.beginPath(); g.ellipse(x+8,y+6,rx*1.15,ry*1.15,0,0,Math.PI*2); g.fill();
@@ -23097,7 +23099,7 @@ function hhTick(dt){ const K=hhK(); if(!K){ HH=null; return; }
     if(!havenBurnt()) out.push({ id:'elowen', name:'Elowen of the Heartwood', i:6, j:12, dir:1, opts:ELFO({gender:'f',skin:0,hair:3,hairColor:11,face:1,equip:{head:'elf_circlet',torso:'elf_robe',armor:'elf_cloak',hands:null,legs:'elf_leggings',feet:'elf_boots',weapon:null,offhand:null}}) });
     return out; });
   A.entries={ fromGate:{i:9,j:16}, fromTent:{i:3,j:15}, fromBath:{i:16,j:3}, fromGuest:{i:14,j:15}, fromTree:{i:12,j:11}, fromHeart:{i:9,j:16} };
-  AREA_PATHS.sylvhaven=[ [[9.5,17.5],[9.6,14.5],[11.5,12.2]], [[9.6,14.5],[5,13.5],[3.5,12]], [[11.5,12.2],[14.5,10.6]], [[11.5,12.2],[11.4,8],[11.7,4.5],[15.6,4.4],[16.4,3.5]], [[6.5,11],[4.5,6],[4.5,3.5]] ];
+  AREA_PATHS.sylvhaven=[ [[9.5,17.5],[9.6,14.5],[11.5,12.2]], [[9.6,14.5],[5,13.5],[3.5,12]], [[9.6,14.5],[14,15]], [[11.5,12.2],[13.5,7],[16,3.5]], [[6.5,11],[4.5,6],[4.5,3.5]] ];
   CRAGS.sylvhaven=[];
   // anything that still leads to the Heartwood leads here
   const _sw=switchArea; switchArea=function(id,entry,...r){ if(id==='heartwood'){ id='sylvhaven'; entry=entry==='fromGuest'?'fromGuest':'fromTree'; } return _sw.call(this,id,entry,...r); }; }
@@ -27153,10 +27155,10 @@ function drawBedroll(o){ const k=(o.i*7+o.j*3)%3, cols=[['#5a6a48','#8a9a6a'],['
     g.fillStyle='#e8e2d0'; g.beginPath(); g.ellipse(X+38,Y+2,16,9,-0.45,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(120,110,90,0.6)'; g.stroke();             // the pillow
     g.fillStyle=cols[0]; g.beginPath(); g.moveTo(X-58,Y+4); g.quadraticCurveTo(X-40,Y+12,X-18,Y+2); g.lineTo(X-24,Y-6); g.quadraticCurveTo(X-44,Y-2,X-58,Y+4); g.fill();   // the top folded back
     g.fillStyle='#c8b070'; [[-30,-2],[-14,-10]].forEach(([dx,dy])=>{ g.beginPath(); g.ellipse(X+dx,Y+dy,4,2,0.5,0,Math.PI*2); g.fill(); }); }); }
-AREAS.guesttent={ ...CROOM("The Travellers' Tent",7,7,'sylvhaven','fromGuest', ()=>[                 // a round canvas pavilion, like the others in Sylvhaven
-    {type:'bed', i:2, j:1, fp:[2,1], roll:true}, {type:'bed', i:1, j:3, fp:[2,1], roll:true}, {type:'bed', i:4, j:3, fp:[2,1], roll:true},
-    {type:'lantern', i:5, j:2}, {type:'clothtable', i:1, j:2} ], ()=>[]), tent:true, round:true };
-AREAS.guesttent.entries={ fromCity:{i:3,j:5} };
+AREAS.guesttent={ ...CROOM("The Travellers' Tent",5,5,'sylvhaven','fromGuest', ()=>[                 // a round canvas pavilion, like the others in Sylvhaven
+    {type:'bed', i:1, j:0, fp:[2,1], roll:true}, {type:'bed', i:3, j:1, fp:[2,1], roll:true}, {type:'bed', i:0, j:2, fp:[2,1], roll:true},
+    {type:'lantern', i:4, j:3}, {type:'clothtable', i:0, j:3} ], ()=>[]), tent:true, round:true };
+AREAS.guesttent.entries={ fromCity:{i:2,j:3} };
 { const prev=wakeAfterDefeat; wakeAfterDefeat=function(...a){ const r=prev.apply(this,a); if(areaId==='guesttent'){ banner("You wake in the Travellers' Tent",'#c8d8b0',1800);
     logMsg("Elves found you, and carried you back to the travellers' tent beside the great tree without a word. Someone has left water by your head.",'#c8d8b0'); } return r; }; }
 
@@ -31697,10 +31699,11 @@ onUse(['drowngate'],o=>{ if(CHOICE.gateKey){ pzSay('The key turns. Something bel
 // ════════ buildings as big outside as they are inside: each grows away from its door (into the back of the map, or over the edge), so the door, and everything in front of it, stays where it was ════════
 const GROW={
   farm:{ farmhouse:{W:5,H:5} },
-  village:{ wheatsheaf:{W:6,H:6}, martahut:{W:4,H:4}, elderhouse:{W:5,H:6, east:1} },   // Hamond's grows east, so the lane to the graves stays open between it and the inn
+  village:{ wheatsheaf:{W:4,H:4, at:[-1,0], dt:2, wings:[[0,-2,2,2,'r',1]]},   // the inn: a hall, and the kitchen built on behind its west end
+             elderhouse:{W:4,H:4, at:[9,0], dt:1, wings:[[-2,2,2,2,'l',1]]} },   // Hamond's: the house, and a low workshop leaning on its west side
   clearing:{ lodge:{W:5,H:5, east:1} },
   citygate:{ inn:{W:8,H:4} },
-  sylvhaven:{ weavetent:{W:4,H:4}, moonbath:{W:4,H:4}, guesttent:{W:5,H:5, at:[12,5], dt:2} },
+  sylvhaven:{ weavetent:{W:3,H:3}, moonbath:{W:3,H:3}, guesttent:{W:3,H:3} },   // elven tents: light, no bigger than they need to be
   market:{ guildhall:{W:8,H:6, remove:[[1,1]]}, tailorshop:{W:5,H:6, east:1}, smithy:{W:5,H:6, east:1}, goldhouse:{W:6,H:5, south:1} },
   lowstreets:{ steamcellar:{W:5,H:4}, dicenden:{W:4,H:5, south:1} },
   keepward:{ barracks:{W:6,H:6, east:1} },
@@ -31736,7 +31739,9 @@ function growEntries(A, area, list){ A._ent0=A._ent0||JSON.parse(JSON.stringify(
   return list; }
 for(const area in GROW){ const A=AREAS[area]; if(!A) continue; const oF=A.objects, cfg=GROW[area];
   const gone=new Set(); Object.values(cfg).forEach(G=>(G.remove||[]).forEach(([i,j])=>gone.add(i+','+j)));
-  A.objects=()=>{ const L=oF().filter(o=>!(o.fp && !o.inside && gone.has(o.i+','+o.j))).map(o=>{ const G=o.inside&&cfg[o.inside]; return (G && o.fp) ? growBuilding(o,G) : o; }), big=L.filter(o=>o.grown);
+  A.objects=()=>{ const L=oF().filter(o=>!(o.fp && !o.inside && gone.has(o.i+','+o.j))).map(o=>{ const G=o.inside&&cfg[o.inside]; return (G && o.fp) ? growBuilding(o,G) : o; });
+    L.filter(o=>o.grown && cfg[o.inside].wings).forEach(o=>cfg[o.inside].wings.forEach(([di,dj,w,h,dr,dt])=>L.push({type:o.type, i:o.i+di, j:o.j+dj, fp:[w,h], roof:o.roof, wdoor:dr, dt, low:true, grown:true, wing:o.inside})));   // a lower wing built on: the house is an L, not a box
+    const big=L.filter(o=>o.grown);
     const inBig=(i,j)=>big.some(b=>i>=b.i&&j>=b.j&&i<b.i+b.fp[0]&&j<b.j+b.fp[1]);
     const busy=new Set(); L.forEach(o=>{ if(o.noblock&&o.dz!=null&&o.dz<-90) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) busy.add((o.i+a)+','+(o.j+b)); });
     return L.map(o=>{ if(o.grown || o.fp || o.type==='teleporter' || !inBig(o.i,o.j)) return o;   // a small thing the house grew over: set it down just outside

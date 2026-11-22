@@ -6302,18 +6302,18 @@ Object.assign(AREAS,{
       ...(collectedPickups.has('farmhouse:1,3') ? [] : [{type:'pickup', i:1, j:3, item:'straw_hat'}]),
     ].filter(o=>!o.breakable || !destroyedBreakables.has('farmhouse:'+o.i+','+o.j)),
     entries:{ fromFarm:{i:3,j:2}, bed:{i:1,j:1} } },
-  elderhouse:{ ...INSIDE_BASE, w:6, h:6, theme:'interior', label:"Hamond's House", mini:{x:0,y:0},   // a family under one roof, and not a pace to spare
+  elderhouse:{ ...INSIDE_BASE, w:7, h:5, theme:'interior', label:"Hamond's House", mini:{x:0,y:0}, shape:[[3,0,4,5],[0,2,3,3]],   // the hall, and the sleeping arm off its west side: the L of the house outside
     objects:()=>[
-      {type:'teleporter', i:3, j:5, to:'village', entry:'fromHouse'},
+      {type:'teleporter', i:4, j:4, to:'village', entry:'fromHouse'},
       // the sleeping side: the beds side by side, heads to the back wall, two either side of the hearth for the warmth
-      {type:'bed', i:0, j:0, fp:[2,1], owner:'elder'}, {type:'bed', i:0, j:1, fp:[2,1], owner:'wenna'},   // in the corner, a pace from the hearth
-      {type:'hearth', i:0, j:3},
-      {type:'bed', i:0, j:4, fp:[2,1], edric:true}, {type:'bed', i:0, j:5, fp:[2,1], owner:'ada'},     // Edric's, still made up, and Ada's beside it
+      {type:'bed', i:4, j:0, fp:[2,1], owner:'elder'},                                                  // Hamond's against the hall's back wall, by the fire
+      {type:'hearth', i:3, j:1},
+      {type:'bed', i:0, j:2, fp:[2,1], owner:'wenna'}, {type:'bed', i:0, j:3, fp:[2,1], edric:true}, {type:'bed', i:0, j:4, fp:[2,1], owner:'ada'},   // the sleeping arm: Wenna's, Edric's still made up, Ada's
       // the living side: a table in the middle of the room, stores along the far wall
-      {type:'table', i:3, j:2},
-      {type:'crate', i:3, j:0, breakable:true}, {type:'crate', i:4, j:0, breakable:true}, {type:'barrel', i:5, j:0, breakable:true},
+      {type:'table', i:5, j:2},
+      {type:'crate', i:6, j:0, breakable:true}, {type:'crate', i:6, j:1, breakable:true}, {type:'barrel', i:6, j:3, breakable:true},
     ].filter(o=>!o.breakable || !destroyedBreakables.has('elderhouse:'+o.i+','+o.j)),
-    entries:{ fromVillage:{i:3,j:4} } },
+    entries:{ fromVillage:{i:4,j:3} } },
   camp:{ fence:{r:false,l:false}, w:13, h:15, theme:'road', label:'Bandit Camp and Charcoal Pits', mini:{x:1,y:2},
     notches:()=>[], dummy:null,
     objects:()=>[
@@ -6428,7 +6428,7 @@ function switchArea(id,entryKey){
   updateMinimap();
   banner(A.label,'#e8c878',1300);
   skelFollowArea(); stonesHint(id); fenOpenCheck(id); fenRumour(id); poolsArea(id); introScene(id,entryKey);
-  markElves(); tentBlock(id); corridorBlock(id);
+  markElves(); tentBlock(id); shapeBlock(id); corridorBlock(id);
   try{ pupArea(); }catch(err){ console.error(err); }
   transitArea(prev,id);
   autosaveSoon();
@@ -7188,7 +7188,7 @@ function paintInteriorWalls(){
   if(AREAS[areaId] && AREAS[areaId].tent) return paintTentWalls();
   if(AREAS[areaId] && AREAS[areaId].elfhall) return paintElfHallWalls();
   const {w,h}=ROOM, H=118, o=P(0,0), rEnd=P(w,0), lEnd=P(0,h);
-  const wall=(a,b,c1,c2,side)=>{
+  const wall=(a,b,c1,c2,side,seg)=>{
     const gr=g.createLinearGradient(0,Math.min(a.y,b.y)-H,0,Math.max(a.y,b.y)); gr.addColorStop(0,c2); gr.addColorStop(1,c1);
     g.fillStyle=gr; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(b.x,b.y-H); g.lineTo(a.x,a.y-H); g.closePath(); g.fill();
     // stacked logs
@@ -7197,9 +7197,9 @@ function paintInteriorWalls(){
     // a small shuttered window near the middle
     const len=side==='r'?w:h, L=(t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
     const tall=o=>o.type==='hearth'||o.type==='forge';
-    const busy=(OBJECTS||[]).filter(o=>tall(o) && (side==='l' ? o.i===0 : o.j===0)).map(o=>side==='l'?[o.j-0.6,o.j+1.6]:[o.i-0.6,o.i+1.6]);
-    if(side==='r') busy.push([0.9,2.9]);                                             // the shelf of pots on the right wall   // never a window behind a chimney or a forge hood
-    const along=t=>side==='l'?h*(1-t):w*t, ok=t=>{ const u0=along(t-0.08), u1=along(t+0.08), lo2=Math.min(u0,u1), hi2=Math.max(u0,u1); return !busy.some(([p,q])=>hi2>p && lo2<q); };
+    const LN=seg?seg.ln:0, busy=(OBJECTS||[]).filter(o=>tall(o) && (side==='l' ? o.i===LN : o.j===LN)).map(o=>side==='l'?[o.j-0.6,o.j+1.6]:[o.i-0.6,o.i+1.6]);
+    if(side==='r' && !seg) busy.push([0.9,2.9]);                                             // the shelf of pots on the right wall   // never a window behind a chimney or a forge hood
+    const along=t=>seg ? (side==='l' ? seg.u1+(seg.u0-seg.u1)*t : seg.u0+(seg.u1-seg.u0)*t) : side==='l'?h*(1-t):w*t, ok=t=>{ const u0=along(t-0.08), u1=along(t+0.08), lo2=Math.min(u0,u1), hi2=Math.max(u0,u1); return !busy.some(([p,q])=>hi2>p && lo2<q); };
     const tc=[0.5,0.3,0.7,0.2,0.8,0.12,0.88].find(ok); if(tc==null) return; const t0=tc-0.08, t1=tc+0.08;
     const p0=L(t0), p1=L(t1), lo=52, hi=84;
     g.fillStyle='#24160a'; g.beginPath(); g.moveTo(p0.x,p0.y-lo+2); g.lineTo(p1.x,p1.y-lo+2); g.lineTo(p1.x,p1.y-hi-2); g.lineTo(p0.x,p0.y-hi-2); g.closePath(); g.fill();
@@ -7209,6 +7209,12 @@ function paintInteriorWalls(){
       for(let k=0;k<5;k++){ const t=t0+(t1-t0)*(0.12+0.76*rnd01(k,len,901)), pp=L(t); g.fillRect(pp.x,pp.y-hi+3+rnd01(k,len,902)*(hi-lo-12),1.2,1.2); } }
     g.strokeStyle='#3a2412'; g.lineWidth=1.6; const pm=L((t0+t1)/2); g.beginPath(); g.moveTo(pm.x,pm.y-lo); g.lineTo(pm.x,pm.y-hi); g.moveTo(p0.x,p0.y-(lo+hi)/2); g.lineTo(p1.x,p1.y-(lo+hi)/2); g.stroke();
   };
+  if(roomShape()){   // an L or a T: a wall along every back edge of the floor, posts at the corners, the beam along the top
+    const segs=shapeWalls();
+    segs.forEach(sg=>{ const a=sg.side==='r'?P(sg.u0,sg.ln):P(sg.ln,sg.u1), b=sg.side==='r'?P(sg.u1,sg.ln):P(sg.ln,sg.u0); if(sg.side==='r') wall(a,b,'#6a4a2a','#3e2a16','r',sg); else wall(a,b,'#54391f','#2e1f10','l',sg); });
+    g.strokeStyle='#2a1a0c'; segs.forEach(sg=>{ const a=sg.side==='r'?P(sg.u0,sg.ln):P(sg.ln,sg.u1), b=sg.side==='r'?P(sg.u1,sg.ln):P(sg.ln,sg.u0);
+      g.lineWidth=5; g.beginPath(); g.moveTo(a.x,a.y-H); g.lineTo(b.x,b.y-H); g.stroke(); g.lineWidth=6; [a,b].forEach(q=>{ g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(q.x,q.y-H); g.stroke(); }); });
+    return; }
   wall(o,rEnd,'#6a4a2a','#3e2a16','r'); wall(lEnd,o,'#54391f','#2e1f10','l');
   // corner post and top beam
   g.strokeStyle='#2a1a0c'; g.lineWidth=6; g.beginPath(); g.moveTo(o.x,o.y); g.lineTo(o.x,o.y-H); g.stroke();
@@ -9286,7 +9292,7 @@ function drawObject(o){
     g.restore();
   } else if(o.type==='signpost'){
     drawCached('signpost2'+(o.city?'c':o.arms?o.arms.map(a=>a.label).join('|'):'x'),x,y,90,90,45,72,(X,Y)=>paintSignpost(X,Y,o));
-  } else if(o.type==='hearth' && o.i===0){ drawFireplace(o);           // indoors: a stone fireplace built into the wall, not a campfire on the floorboards
+  } else if(o.type==='hearth' && (o.i===0 || (roomShape() && !inShape(o.i-1,o.j)))){ drawFireplace(o);           // indoors: a stone fireplace built into the wall, not a campfire on the floorboards
   } else if(o.type==='hearth'){
     drawCached('hearth',x,y,110,90,55,50,paintHearth); drawFlames(x,y-4,0.8);
   } else if(o.type==='campfire'){
@@ -10386,6 +10392,7 @@ function paintGroundTexture(){
       let pc=mixC([232,232,226],[204,208,212],vein); if(((tx+ty)&1)) pc=mixC(pc,[214,220,226],0.5); if(edge) pc=mixC(pc,[150,156,162],0.6);
       const o=(py*TWp+px)*4, k=1-0.18*(1-smooth(0,1.3,Math.min(gx,gy)));
       D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
+    if(theme==='interior' && AREAS[areaId].shape && !inShape(Math.floor(gx),Math.floor(gy))){ D[(py*TWp+px)*4+3]=0; continue; }   // the cut-away corner of an L: no floor
     if(theme==='interior' && !AREAS[areaId].volcanic){ const plank=Math.floor(gy*2.2), seam=Math.abs(gy*2.2-plank-0.5)>0.46, grain=fbm(gx*3,gy*18+plank*7,15);
       let pc=mixC([128,90,54],[96,66,38],grain); if(seam) pc=mixC(pc,[40,26,14],0.7); if(((plank*37)%11)<2) pc=mixC(pc,[150,110,70],0.3);
       const o=(py*TWp+px)*4, k=1-0.3*(1-smooth(0,1.3,Math.min(gx,gy)));
@@ -13620,7 +13627,7 @@ AREAS.village.entries.fromTavern={i:3,j:2};
 wrap('sylvhaven','objects',l=>l.map(o=>o.type==='pavilion'&&o.i===10&&o.j===1&&!o.burnt ? {...o, door:'r', dt:1, inside:'moonbath', back:'fromCity'} : o));
 AREAS.sylvhaven.entries.fromBath={i:12,j:2};
 Object.assign(AREAS,{
-  wheatsheaf: CROOM('The Wheatsheaf',7,6,'village','fromTavern', ()=>[{type:'stash', i:1, j:0}, {type:'hearth', i:0, j:2}, {type:'table', i:2, j:1}, {type:'table', i:4, j:2}, {type:'counter', i:6, j:1, fp:[1,3]}, {type:'barrel', i:6, j:0}, {type:'barrel', i:5, j:0}, {type:'bench', i:1, j:4}],
+  wheatsheaf: CROOM('The Wheatsheaf',7,6,'village','fromTavern', ()=>[{type:'stash', i:1, j:0}, {type:'hearth', i:0, j:2}, {type:'table', i:2, j:1}, {type:'table', i:4, j:2}, {type:'counter', i:6, j:2, fp:[1,2]}, {type:'barrel', i:4, j:0}, {type:'barrel', i:3, j:0}, {type:'bench', i:1, j:4}],
     ()=>[ { id:'bertha', name:'Bertha of the Wheatsheaf', i:6, j:4, dir:1, opts:{gender:'f',skin:1,hair:4,hairColor:8,face:0,equip:{head:null,torso:'smock',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}} },
       { id:'gunnar', name:'Gunnar the Ploughman', i:3, j:1, dir:1, opts:{gender:'m',skin:2,hair:1,hairColor:3,beard:4,face:1,equip:{head:null,torso:'shirt',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}} },
       ...(nightAmt()>0.4 ? [{ id:'tobbpub', name:'Old Tobb', i:4, j:3, dir:0, sit:true, opts:{gender:'m',skin:2,hair:2,hairColor:12,beard:4,face:1,equip:{head:'hood',torso:'smock',armor:null,hands:'gloves',legs:'hose_grey',feet:'boots',weapon:null,offhand:null}} }] : []) ]),
@@ -17532,10 +17539,10 @@ const ROUTINES={
     { h:[7,11],    area:'village', at:[13,4], dir:0, wander:[[13,4],[12,6],[11,5]] },                   // calling for that goat
     { h:[11,13],   area:'village', at:[6,4], dir:0 },                                                     // gossip at the well
     { h:[13,20],   area:'village', at:[13,4], dir:0, wander:[[13,4],[12,6],[11,5]] },
-    { h:[20,31],   area:'elderhouse', at:[2,1], bed:[0,1] } ] },                                          // early to bed, her stick beside her
+    { h:[20,31],   area:'elderhouse', at:[2,2], bed:[0,2] } ] },                                          // early to bed, her stick beside her
   elder:{ name:'Elder Hamond', ids:{village:'elder', elderhouse:'elder'}, sleepId:'sleep_elder', opts:{gender:'m',skin:1,hair:4,hairColor:13,beard:5,equip:{head:null,torso:'tunic_blue',armor:'jerkin',hands:null,legs:'breeches',feet:'riding_boots',weapon:null,offhand:null}}, slots:[
     { h:[6.5,21.5], area:'village', at:[8,5], dir:7 },                                                    // about the village all day
-    { h:[21.5,30.5], area:'elderhouse', at:[2,0], bed:[0,0] } ] },                                        // home, and to bed
+    { h:[21.5,30.5], area:'elderhouse', at:[4,1], bed:[4,0] } ] },                                        // home, and to bed
   gunnar:{ name:'Gunnar the Ploughman', ids:{wheatsheaf:'gunnar', lane:'gunnar'}, opts:{gender:'m',skin:2,hair:1,hairColor:3,beard:4,face:1,equip:{head:null,torso:'shirt',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}}, slots:[
     { h:[6.5,12],  area:'lane', at:[5,15], dir:3, chop:true, equip:{weapon:'pitchfork'} },               // out at first light to the field on the lane
     { h:[12,13.5], area:'wheatsheaf', at:[3,1], dir:1 },                                                   // his dinner at the inn
@@ -17836,6 +17843,14 @@ AREAS.weavetent.entries.fromCity={i:1,j:4};
 function corridorBlock(id){ const A=AREAS[id]; if(!A || !A.corridor) return;   // a road through deep forest: off the road there is no way through
   for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++){ if(inNotch(i,j)) continue; const k=i+','+j; if(groundAt(i+0.5,j+0.5).d>A.corridor) blocked.add(k); }
   OBJECTS.forEach(o=>{ if(o.type==='teleporter') blocked.delete(o.i+','+o.j); }); Object.values(A.entries).forEach(e=>blocked.delete(e.i+','+e.j)); }
+// a room that is not a plain rectangle (an L or a T, like the house outside): shape = rects [i,j,w,h] that together make the floor
+const roomShape=()=>{ const A=AREAS[areaId]; return A && A.shape; };
+const inShape=(i,j)=>{ const S=roomShape(); if(!S) return i>=0&&j>=0&&i<ROOM.w&&j<ROOM.h; return S.some(([a,b,w,h])=>i>=a&&j>=b&&i<a+w&&j<b+h); };
+function shapeBlock(id){ if(!AREAS[id] || !AREAS[id].shape) return; for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++) if(!inShape(i,j)) blocked.add(i+','+j); }
+function shapeWalls(){ const out=[], W=ROOM.w, H=ROOM.h;   // every back edge of the floor: 'r' runs along a row (i0..i1 at j), 'l' along a column (j0..j1 at i)
+  for(let j=0;j<H;j++){ let s=null; for(let i=0;i<=W;i++){ const e=i<W && inShape(i,j) && !inShape(i,j-1); if(e && s===null) s=i; if(!e && s!==null){ out.push({side:'r', ln:j, u0:s, u1:i}); s=null; } } }
+  for(let i=0;i<W;i++){ let s=null; for(let j=0;j<=H;j++){ const e=j<H && inShape(i,j) && !inShape(i-1,j); if(e && s===null) s=j; if(!e && s!==null){ out.push({side:'l', ln:i, u0:s, u1:j}); s=null; } } }
+  return out.sort((a,b)=>(a.side==='r'?(a.u0+a.u1)/2+a.ln:(a.u0+a.u1)/2+a.ln)-(b.side==='r'?(b.u0+b.u1)/2+b.ln:(b.u0+b.u1)/2+b.ln)); }
 function tentBlock(id){ if(AREAS[id] && AREAS[id].tent){ for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++) if(!inTent(i+0.5,j+0.5)) blocked.add(i+','+j); } }
 wrap('sylvhaven','npcs',l=>l.filter(n=>n.id!=='maelis'));
 wrap('sylvhaven','objects',l=>l.map(o=>o.type==='pavilion'&&o.i===1&&o.j===1&&!o.burnt ? {...o, door:'r', dt:1, inside:'weavetent', back:'fromCity'} : o));
@@ -18753,6 +18768,9 @@ let CLICKED_BED=null;                                                           
 wrap('village','objects',l=>[...l,{type:'roundhut', i:0, j:7, fp:[3,3], door:'r', dt:1, inside:'martahut', back:'fromHut'}]);   // Marta's: she lives and sleeps here
 AREAS.village.entries.fromHut={i:3,j:8};
 // inside Marta's hut: one round room, her bed, her stock, a fire in the middle
+AREAS.wheatsheaf.shape=[[0,2,7,4],[0,0,5,2]];   // the taproom across the front, the kitchen behind its west end: the L of the inn outside
+AREAS.wheatsheaf.objects=(o=>()=>o().map(x=>x.type==='teleporter'&&x.to==='village'?{...x, i:6, j:5}:x))(AREAS.wheatsheaf.objects);   // the door is in the east wall, as it is outside
+AREAS.wheatsheaf.entries.fromCity={i:5,j:5};
 AREAS.martahut={ ...CROOM("Marta's Hut",5,5,'village','fromHut', ()=>[   // small and full: her bed, her fire, her stock
     {type:'bed', i:2, j:0, fp:[2,1], owner:'marta'}, {type:'hearth', i:3, j:2}, {type:'crates', i:0, j:1}, {type:'barrels', i:0, j:3},
     {type:'table', i:4, j:2}, {type:'lantern', i:1, j:0}, {type:'critter', kind:'flowers', i:1, j:3, noblock:true}],
@@ -19551,10 +19569,10 @@ ROUTINES.ada={ name:'Ada', sleepId:'sleep_ada',
   get slots(){ const key=(adaHome()?'f':'v')+(adaPoolMember()?'p':''); if(ADA_SL[key]) return ADA_SL[key];
     const farmDoor=()=>{ const h=AREAS.farm.objects().find(o=>o.inside==='farmhouse'); return h?doorTile(h):[1,3]; };
     return ADA_SL[key]={
-      v: [ { h:[6.5,22], area:'village', at:[5,3], dir:0 }, { h:[22,30.5], area:'elderhouse', at:[2,5], bed:[0,5] } ],
+      v: [ { h:[6.5,22], area:'village', at:[5,3], dir:0 }, { h:[22,30.5], area:'elderhouse', at:[2,4], bed:[0,4] } ],
       vp:[ { h:[6.3,6.7], area:'village', walk:[[10,4],[0,5]] },                                    // out of Hamond's house and off to the Willow Pool
            { h:[18.2,22], area:'village', at:[5,3], dir:0, fromArea:'tunnel' },                    // back from the sisters in the evening
-           { h:[22,30.3], area:'elderhouse', at:[2,5], bed:[0,5] } ],
+           { h:[22,30.3], area:'elderhouse', at:[2,4], bed:[0,4] } ],
       f: [ { h:[8.4,9], area:'village', walk:[[10,4],[6,9]] },                                    // out of Hamond's house in the morning, down to the lane
            { h:[9,9.6], area:'lane', walk:[[10,1],[8,9]] },                                          //    to Edric's field by the stooks
            { h:[9.6,12.5], area:'lane', at:[8,9], dir:1, chop:true, equip:{weapon:'pitchfork'} },     // she works it by day...
@@ -19562,10 +19580,10 @@ ROUTINES.ada={ name:'Ada', sleepId:'sleep_ada',
            { h:[13.5,19], area:'lane', at:[8,9], dir:1, chop:true, equip:{weapon:'pitchfork'} },
            { h:[19,19.6], area:'lane', walk:[[8,9],[10,1]] },                                        // ...and walks back up to the village at dusk
            { h:[19.6,22], area:'village', at:[5,3], dir:0, fromArea:'lane' },                       // the evening by the well, as she always did
-           { h:[22,32.4], area:'elderhouse', at:[2,5], bed:[0,5] } ],                                // and her old bed at Hamond's
+           { h:[22,32.4], area:'elderhouse', at:[2,4], bed:[0,4] } ],                                // and her old bed at Hamond's
       fp:[ { h:[6.3,6.7], area:'village', walk:[[10,4],[0,5]] },                                    // with the sisters she goes to the pool from Hamond's, as in the village
            { h:[18.2,22], area:'village', at:[5,3], dir:0, fromArea:'tunnel' },
-           { h:[22,30.3], area:'elderhouse', at:[2,5], bed:[0,5] } ] }[key]; } };
+           { h:[22,30.3], area:'elderhouse', at:[2,4], bed:[0,4] } ] }[key]; } };
 ['ada','adafarm','sleep_ada'].forEach(i=>RT_IDS.add(i));
 rtWrap('farm'); rtWrap('farmhouse');
 
@@ -21312,10 +21330,10 @@ OBJ_DRAW.bunting=o=>{ const a=P(o.a[0],o.a[1]), b=P(o.b[0],o.b[1]), h=o.h||90, N
   g.save(); g.strokeStyle='rgba(60,44,28,0.9)'; g.lineWidth=1.2; g.beginPath(); for(let k=0;k<=24;k++){ const q=pt(k/24); k?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y); } g.stroke();
   for(let k=1;k<N;k++){ const q=pt(k/N), sw=Math.sin(gt*2.2+k)*1.5; g.fillStyle=cols[k%cols.length]; g.beginPath(); g.moveTo(q.x-4,q.y); g.lineTo(q.x+4,q.y); g.lineTo(q.x+sw,q.y+10); g.closePath(); g.fill(); }
   g.restore(); };
-wrap('wheatsheaf','objects',l=> harvestEve() ? [...l,{type:'bunting', i:0, j:0, a:[0.2,0.2], b:[6.8,0.2], h:96, noblock:true},{type:'bunting', i:0, j:0, a:[0.2,0.2], b:[0.2,5.6], h:96, noblock:true}] : l);
+wrap('wheatsheaf','objects',l=> harvestEve() ? [...l,{type:'bunting', i:0, j:0, a:[0.2,0.2], b:[4.8,0.2], h:96, noblock:true},{type:'bunting', i:0, j:0, a:[0.2,0.2], b:[0.2,5.6], h:96, noblock:true}] : l);
 wrap('village','objects',l=> harvestEve() ? [...l,{type:'bunting', i:5, j:4, a:[3.5,4.6], b:[9.2,4.2], h:110, noblock:true},{type:'lantern', i:4, j:4},{type:'lantern', i:9, j:5}] : l);
 const FEAST_FOLK=(id,nm,F,s)=>({ id, name:nm, i:4, j:4, dir:1, opts:{gender:F?'f':'m', skin:s%5, hair:(s*3)%6, hairColor:(s*5)%14, beard:F?0:(s%4), face:s%3, equip:{head:null, torso:F?'smock':'tunic_linen', armor:null, hands:null, legs:F?'trousers':'breeches', feet:'boots', weapon:null, offhand:null}} });
-const DANCE_AT=[[2.7,5.0],[4.9,1.0]];   // two rings on the open floor, clear of the walk to the bar (dancers never block a tile: you can slip through)
+const DANCE_AT=[[2.7,5.0],[3.3,3.5]];   // two rings on the open floor, clear of the walk to the bar (dancers never block a tile: you can slip through)
 wrap('wheatsheaf','npcs',l=> harvestEve() && nightAmt()>0.3 ? [...l, {...FEAST_FOLK('dancer1','A Dancer',true,3), dance:0, ring:0, noblock:true}, {...FEAST_FOLK('dancer2','A Dancer',false,7), dance:Math.PI, ring:0, noblock:true},
   {...FEAST_FOLK('dancer3','A Dancer',true,11), dance:0.6, ring:1, noblock:true}, {...FEAST_FOLK('dancer4','A Dancer',false,13), dance:0.6+Math.PI, ring:1, noblock:true}] : l);
 wrap('docks','npcs',l=> shipDay() ? [...l, {...FEAST_FOLK('sailor1','A Sailor',false,2), haul:0}, {...FEAST_FOLK('sailor2','A Sailor',false,9), haul:0.5}, ...townsfolk(77,4,[[3,8],[6,8],[9,8],[10,6],[4,7]])] : l);

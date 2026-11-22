@@ -6306,12 +6306,12 @@ Object.assign(AREAS,{
     objects:()=>[
       {type:'teleporter', i:4, j:4, to:'village', entry:'fromHouse'},
       // the sleeping side: the beds side by side, heads to the back wall, two either side of the hearth for the warmth
-      {type:'bed', i:4, j:0, fp:[2,1], owner:'elder'},                                                  // Hamond's against the hall's back wall, by the fire
-      {type:'hearth', i:3, j:1},
-      {type:'bed', i:0, j:2, fp:[2,1], owner:'wenna'}, {type:'bed', i:0, j:3, fp:[2,1], edric:true}, {type:'bed', i:0, j:4, fp:[2,1], owner:'ada'},   // the sleeping arm: Wenna's, Edric's still made up, Ada's
+      {type:'bed', i:3, j:0, fp:[2,1], owner:'elder'}, {type:'bed', i:5, j:0, fp:[2,1], edric:true},   // along the hall's back wall: Hamond's, and Edric's still made up
+      {type:'hearth', i:0, j:3},                                                                        // the fire in the west arm's end wall, the women's beds either side of it
+      {type:'bed', i:1, j:2, fp:[2,1], owner:'wenna'}, {type:'bed', i:1, j:4, fp:[2,1], owner:'ada'},
       // the living side: a table in the middle of the room, stores along the far wall
-      {type:'table', i:5, j:2},
-      {type:'crate', i:6, j:0, breakable:true}, {type:'crate', i:6, j:1, breakable:true}, {type:'barrel', i:6, j:3, breakable:true},
+      {type:'table', i:4, j:2},
+      {type:'crate', i:6, j:2, breakable:true}, {type:'crate', i:6, j:3, breakable:true}, {type:'barrel', i:6, j:4, breakable:true},
     ].filter(o=>!o.breakable || !destroyedBreakables.has('elderhouse:'+o.i+','+o.j)),
     entries:{ fromVillage:{i:4,j:3} } },
   camp:{ fence:{r:false,l:false}, w:13, h:15, theme:'road', label:'Bandit Camp and Charcoal Pits', mini:{x:1,y:2},
@@ -7210,7 +7210,7 @@ function paintInteriorWalls(){
     g.strokeStyle='#3a2412'; g.lineWidth=1.6; const pm=L((t0+t1)/2); g.beginPath(); g.moveTo(pm.x,pm.y-lo); g.lineTo(pm.x,pm.y-hi); g.moveTo(p0.x,p0.y-(lo+hi)/2); g.lineTo(p1.x,p1.y-(lo+hi)/2); g.stroke();
   };
   if(roomShape()){   // an L or a T: a wall along every back edge of the floor, posts at the corners, the beam along the top
-    const segs=shapeWalls();
+    const segs=shapeWalls().filter(sg=>sg.ln===0);   // only the two long back walls; round the inner corner of the L the cut-away simply stays dark
     segs.forEach(sg=>{ const a=sg.side==='r'?P(sg.u0,sg.ln):P(sg.ln,sg.u1), b=sg.side==='r'?P(sg.u1,sg.ln):P(sg.ln,sg.u0); if(sg.side==='r') wall(a,b,'#6a4a2a','#3e2a16','r',sg); else wall(a,b,'#54391f','#2e1f10','l',sg); });
     g.strokeStyle='#2a1a0c'; segs.forEach(sg=>{ const a=sg.side==='r'?P(sg.u0,sg.ln):P(sg.ln,sg.u1), b=sg.side==='r'?P(sg.u1,sg.ln):P(sg.ln,sg.u0);
       g.lineWidth=5; g.beginPath(); g.moveTo(a.x,a.y-H); g.lineTo(b.x,b.y-H); g.stroke(); g.lineWidth=6; [a,b].forEach(q=>{ g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(q.x,q.y-H); g.stroke(); }); });
@@ -17539,10 +17539,10 @@ const ROUTINES={
     { h:[7,11],    area:'village', at:[13,4], dir:0, wander:[[13,4],[12,6],[11,5]] },                   // calling for that goat
     { h:[11,13],   area:'village', at:[6,4], dir:0 },                                                     // gossip at the well
     { h:[13,20],   area:'village', at:[13,4], dir:0, wander:[[13,4],[12,6],[11,5]] },
-    { h:[20,31],   area:'elderhouse', at:[2,2], bed:[0,2] } ] },                                          // early to bed, her stick beside her
+    { h:[20,31],   area:'elderhouse', at:[2,3], bed:[1,2] } ] },                                          // early to bed, her stick beside her
   elder:{ name:'Elder Hamond', ids:{village:'elder', elderhouse:'elder'}, sleepId:'sleep_elder', opts:{gender:'m',skin:1,hair:4,hairColor:13,beard:5,equip:{head:null,torso:'tunic_blue',armor:'jerkin',hands:null,legs:'breeches',feet:'riding_boots',weapon:null,offhand:null}}, slots:[
     { h:[6.5,21.5], area:'village', at:[8,5], dir:7 },                                                    // about the village all day
-    { h:[21.5,30.5], area:'elderhouse', at:[4,1], bed:[4,0] } ] },                                        // home, and to bed
+    { h:[21.5,30.5], area:'elderhouse', at:[3,1], bed:[3,0] } ] },                                        // home, and to bed
   gunnar:{ name:'Gunnar the Ploughman', ids:{wheatsheaf:'gunnar', lane:'gunnar'}, opts:{gender:'m',skin:2,hair:1,hairColor:3,beard:4,face:1,equip:{head:null,torso:'shirt',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}}, slots:[
     { h:[6.5,12],  area:'lane', at:[5,15], dir:3, chop:true, equip:{weapon:'pitchfork'} },               // out at first light to the field on the lane
     { h:[12,13.5], area:'wheatsheaf', at:[3,1], dir:1 },                                                   // his dinner at the inn
@@ -19569,10 +19569,10 @@ ROUTINES.ada={ name:'Ada', sleepId:'sleep_ada',
   get slots(){ const key=(adaHome()?'f':'v')+(adaPoolMember()?'p':''); if(ADA_SL[key]) return ADA_SL[key];
     const farmDoor=()=>{ const h=AREAS.farm.objects().find(o=>o.inside==='farmhouse'); return h?doorTile(h):[1,3]; };
     return ADA_SL[key]={
-      v: [ { h:[6.5,22], area:'village', at:[5,3], dir:0 }, { h:[22,30.5], area:'elderhouse', at:[2,4], bed:[0,4] } ],
+      v: [ { h:[6.5,22], area:'village', at:[5,3], dir:0 }, { h:[22,30.5], area:'elderhouse', at:[3,4], bed:[1,4] } ],
       vp:[ { h:[6.3,6.7], area:'village', walk:[[10,4],[0,5]] },                                    // out of Hamond's house and off to the Willow Pool
            { h:[18.2,22], area:'village', at:[5,3], dir:0, fromArea:'tunnel' },                    // back from the sisters in the evening
-           { h:[22,30.3], area:'elderhouse', at:[2,4], bed:[0,4] } ],
+           { h:[22,30.3], area:'elderhouse', at:[3,4], bed:[1,4] } ],
       f: [ { h:[8.4,9], area:'village', walk:[[10,4],[6,9]] },                                    // out of Hamond's house in the morning, down to the lane
            { h:[9,9.6], area:'lane', walk:[[10,1],[8,9]] },                                          //    to Edric's field by the stooks
            { h:[9.6,12.5], area:'lane', at:[8,9], dir:1, chop:true, equip:{weapon:'pitchfork'} },     // she works it by day...
@@ -19580,10 +19580,10 @@ ROUTINES.ada={ name:'Ada', sleepId:'sleep_ada',
            { h:[13.5,19], area:'lane', at:[8,9], dir:1, chop:true, equip:{weapon:'pitchfork'} },
            { h:[19,19.6], area:'lane', walk:[[8,9],[10,1]] },                                        // ...and walks back up to the village at dusk
            { h:[19.6,22], area:'village', at:[5,3], dir:0, fromArea:'lane' },                       // the evening by the well, as she always did
-           { h:[22,32.4], area:'elderhouse', at:[2,4], bed:[0,4] } ],                                // and her old bed at Hamond's
+           { h:[22,32.4], area:'elderhouse', at:[3,4], bed:[1,4] } ],                                // and her old bed at Hamond's
       fp:[ { h:[6.3,6.7], area:'village', walk:[[10,4],[0,5]] },                                    // with the sisters she goes to the pool from Hamond's, as in the village
            { h:[18.2,22], area:'village', at:[5,3], dir:0, fromArea:'tunnel' },
-           { h:[22,30.3], area:'elderhouse', at:[2,4], bed:[0,4] } ] }[key]; } };
+           { h:[22,30.3], area:'elderhouse', at:[3,4], bed:[1,4] } ] }[key]; } };
 ['ada','adafarm','sleep_ada'].forEach(i=>RT_IDS.add(i));
 rtWrap('farm'); rtWrap('farmhouse');
 

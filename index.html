@@ -6412,7 +6412,7 @@ function switchArea(id,entryKey){
     else OBJECTS.push({type:'opened', kind:OPENED_KIND[k]||'crate', i:bi, j:bj}); });
   blocked.clear();
   NPCS.forEach(n=>{ if(n.wander){ n.x=n.i+0.5; n.y=n.j+0.5; n.path=[]; n.wait=Math.random()*4; } });
-  [...OBJECTS,...NPCS].forEach(o=>{ if(o.type==='teleporter'||o.type==='debris'||o.noblock||o.wander) return;
+  OBJECTS.forEach(o=>{ if(o.type==='teleporter'||o.type==='debris'||o.noblock||o.wander) return;   // (people never block a tile: you can slip past them)
     const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) blocked.add((o.i+a)+','+(o.j+b)); });
   OBJECTS.forEach(o=>{ if(o.type==='teleporter') blocked.delete(o.i+','+o.j); });   // a doorway in a footprint (a cave mouth) stays walkable
   resetMobs();
@@ -6426,7 +6426,7 @@ function switchArea(id,entryKey){
   updateMinimap();
   banner(A.label,'#e8c878',1300);
   skelFollowArea(); stonesHint(id); fenOpenCheck(id); fenRumour(id); poolsArea(id); introScene(id,entryKey);
-  markElves(); tentBlock(id); shapeBlock(id); corridorBlock(id);
+  markElves(); tentBlock(id); shapeBlock(id); corridorBlock(id); repairReach(id);
   try{ pupArea(); }catch(err){ console.error(err); }
   transitArea(prev,id);
   autosaveSoon();
@@ -15271,7 +15271,7 @@ function victory(faction,partial){
   if(faction==='flamesworn' && Math.random()<0.5){ const pool=['ash_mantle','cinder_gloves','obsidian_helm','scorched_greaves','emberstep_boots']; giveQuestItem(pool[Math.floor(Math.random()*pool.length)]); }
   if(faction==='ashhound' && Math.random()<0.6) giveQuestItem('ember_core');
   if(faction==='slagwarden'){ CHOICE.warden=true; logMsg('The Warden crumbles into slag. Behind him, the forge flares up, and a woman made of heat and smoke steps out of it.','#ffb060');
-    setTimeout(()=>{ if(areaId==='emberforge' && !NPCS.some(n=>n.id==='ilka')){ const nn=AREAS.emberforge.npcs(); NPCS.push(...nn); nn.forEach(n=>blocked.add(n.i+','+n.j)); } },1800); }
+    setTimeout(()=>{ if(areaId==='emberforge' && !NPCS.some(n=>n.id==='ilka')){ const nn=AREAS.emberforge.npcs(); NPCS.push(...nn); } },1800); }
   if(faction==='guard' && Math.random()<0.4 && giveQuestItem('baron_tabard')) logMsg("One of them wore the Baron's tabard. You take it: faded, frayed, and still his.",'#e8c060');
   grave.forEach(m=>{ if(Math.random()<0.07){ const id=m.type==='skeleton'?'tin_medal':'glass_beads', f=player.inv.indexOf(null); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } } });   // what the dead were buried with; what goblins stole
 }
@@ -16273,7 +16273,7 @@ Object.assign(ITEMS,{ staff_crystal:{ name:'Heartcrystal Staff', slot:'weapon' }
 // the queen falls: the cave is yours
 
 // ── acting on puzzle pieces ──
-function pzRebuild(){ blocked.clear(); [...OBJECTS,...NPCS].forEach(o=>{ if(o.type==='teleporter'||o.type==='debris'||o.noblock||o.wander) return;
+function pzRebuild(){ blocked.clear(); OBJECTS.forEach(o=>{ if(o.type==='teleporter'||o.type==='debris'||o.noblock||o.wander) return;
   const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) blocked.add((o.i+a)+','+(o.j+b)); }); }
 function pzSay(t,col){ floatText(tileOf(player),t,col||'#e8d8a8'); logMsg(t,col||'#e8d8a8'); }
 function puzAct(o){                                 // you use something in the world: a crate, a stone, a mirror, a mound of earth
@@ -18044,6 +18044,24 @@ function corridorBlock(id){ const A=AREAS[id]; if(!A || !A.corridor) return;   /
 // a room that is not a plain rectangle (an L or a T, like the house outside): shape = rects [i,j,w,h] that together make the floor
 const roomShape=()=>{ const A=AREAS[areaId]; return A && A.shape; };
 const inShape=(i,j)=>{ const S=roomShape(); if(!S) return i>=0&&j>=0&&i<ROOM.w&&j<ROOM.h; return S.some(([a,b,w,h])=>i>=a&&j>=b&&i<a+w&&j<b+h); };
+// nothing you can use may be walled in: if a door, a way in or a chest can't be reached, the chairs round the tables give way, one at a time
+const REACH_T=/berrybush|forage|crate|barrel|chest|stash|pickup|strongbox|footlocker|notice|lectern|trapdoor|ucgrate|teleporter|bed|anvil|cauldron|hearth|stairs|bathchest|wardrobe/;
+function repairReach(id){ const A=AREAS[id]; if(!A || A.maze || A.ucq) return; const ents=Object.values(A.entries||{}).filter(e=>!blocked.has(e.i+','+e.j)); if(!ents.length) return;
+  const reach=()=>{ const s=ents[0], seen=new Set([s.i+','+s.j]), q=[[s.i,s.j]]; while(q.length){ const [i,j]=q.shift(); for(const [di,dj] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){ const ni=i+di, nj=j+dj, k=ni+','+nj; if(seen.has(k)||!walkable(ni,nj)||fenceBetween(i,j,ni,nj)) continue; if(di&&dj&&(blocked.has(ni+','+j)||blocked.has(i+','+nj))) continue; seen.add(k); q.push([ni,nj]); } } return seen; };
+  const targets=()=>[...OBJECTS.filter(o=>REACH_T.test(o.type)&&!o.decor&&o.type!=='clutter'), ...OBJECTS.filter(o=>o.inside).map(o=>{ const [i,j]=doorTile(o); return {i,j,fp:[1,1],door:1}; }), ...ents.map(e=>({i:e.i,j:e.j,fp:[1,1],door:1}))];
+  const near=(o,seen)=>{ const [fw,fh]=o.fp||[1,1]; if(o.door) return seen.has(o.i+','+o.j); for(let a=-1;a<=fw;a++) for(let b=-1;b<=fh;b++) if(seen.has((o.i+a)+','+(o.j+b))) return true; return false; };
+  const touches=(o,set)=>[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]].some(([a,b])=>set.has((o.i+a)+','+(o.j+b)));
+  const softFor=(t,seen)=>{ const [fw,fh]=t.fp||[1,1], inBox=(a,b)=>a>=t.i-1&&a<=t.i+fw&&b>=t.j-1&&b<=t.j+fh;
+    const pocket=new Set(), q=[]; for(let a=t.i-1;a<=t.i+fw;a++) for(let b=t.j-1;b<=t.j+fh;b++) if(walkable(a,b)){ pocket.add(a+','+b); q.push([a,b]); }
+    while(q.length && pocket.size<400){ const [i,j]=q.shift(); for(const [di,dj] of [[1,0],[-1,0],[0,1],[0,-1]]){ const k=(i+di)+','+(j+dj); if(!pocket.has(k)&&walkable(i+di,j+dj)){ pocket.add(k); q.push([i+di,j+dj]); } } }
+    return OBJECTS.filter(o=>SOFT_T.test(o.type)&&!o.noblock&&!(o.fp&&(o.fp[0]>1||o.fp[1]>1))&&touches(o,seen)&&(touches(o,pocket)||inBox(o.i,o.j))).sort((p,q)=>Math.hypot(p.i-t.i,p.j-t.j)-Math.hypot(q.i-t.i,q.j-t.j))[0]; };
+  const outdoors=!(A.theme==='interior'||A.cave||/^(cave|temple)/.test(id));
+  for(let guard=0;guard<30;guard++){ const seen=reach(), bad=targets().filter(o=>!near(o,seen)); if(!bad.length) return;
+    const chair=OBJECTS.filter(o=>o.type==='chair'&&o.byTable&&[[1,0],[-1,0],[0,1],[0,-1]].some(([a,b])=>seen.has((o.i+a)+','+(o.j+b)))).sort((p,q)=>Math.min(...bad.map(b=>Math.hypot(p.i-b.i,p.j-b.j)))-Math.min(...bad.map(b=>Math.hypot(q.i-b.i,q.j-b.j))))[0];
+    if(chair){ OBJECTS.splice(OBJECTS.indexOf(chair),1); blocked.delete(chair.i+','+chair.j); continue; }
+    if(!outdoors) return; let soft=null; for(const t of bad){ soft=softFor(t,seen); if(soft) break; }   // outdoors a tree, lamp or stump that closes the pocket gives way
+    if(!soft) return; for(let n=OBJECTS.length-1;n>=0;n--){ const o=OBJECTS[n]; if(o.i===soft.i&&o.j===soft.j&&SOFT_T.test(o.type)&&!o.noblock) OBJECTS.splice(n,1); } blocked.delete(soft.i+','+soft.j); } }
+const SOFT_T=/^(tree|pine|birch|oak|deadtree|lamp|lantern|stump|haystack|bush|shrub)$/;
 function shapeBlock(id){ if(!AREAS[id] || !AREAS[id].shape) return; for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++) if(!inShape(i,j)) blocked.add(i+','+j); }
 function shapeWalls(){ const out=[], W=ROOM.w, H=ROOM.h;   // every back edge of the floor: 'r' runs along a row (i0..i1 at j), 'l' along a column (j0..j1 at i)
   for(let j=0;j<H;j++){ let s=null; for(let i=0;i<=W;i++){ const e=i<W && inShape(i,j) && !inShape(i,j-1); if(e && s===null) s=i; if(!e && s!==null){ out.push({side:'r', ln:j, u0:s, u1:i}); s=null; } } }
@@ -27304,9 +27322,9 @@ function climbStairs(o){ if(player.climb) return; if(o.locked && o.locked()){ o.
 // what each small room of Hollowmere keeps: [area, objects to add, tables to swap for another kind]
 [ ['chapelin',[ {type:'rug', i:3, j:1, fp:[1,5], col:'#6a2a3a', trim:'#c8a860', flat:true, noblock:true, dz:-99}, {type:'candlestand', i:1, j:0}, {type:'candlestand', i:5, j:0}, {type:'lectern', i:4, j:1}, {type:'footlocker', i:5, j:6} ]],
   ['guildhall',[ {type:'rug', i:1, j:3, fp:[5,2], col:'#2a3a5a', trim:'#c8a050', flat:true, noblock:true, dz:-99}, {type:'lectern', i:2, j:0}, {type:'notice', i:6, j:0}, {type:'strongbox', i:7, j:5} ]],
-  ['goldhouse',[ {type:'rug', i:1, j:3, fp:[3,2], col:'#5a2a1a', trim:'#d8b050', flat:true, noblock:true, dz:-99}, {type:'strongbox', i:1, j:0}, {type:'strongbox', i:3, j:0} ],{counttable:[5,2]}],
+  ['goldhouse',[ {type:'rug', i:1, j:3, fp:[3,2], col:'#5a2a1a', trim:'#d8b050', flat:true, noblock:true, dz:-99}, {type:'strongbox', i:1, j:0}, {type:'strongbox', i:5, j:0} ],{counttable:[5,2]}],
   ['fearnhouse',[ {type:'rug', i:1, j:3, fp:[3,1], col:'#5a2a1a', trim:'#d8b050', flat:true, noblock:true, dz:-99}, {type:'strongbox', i:4, j:5}, {type:'strongbox', i:5, j:5} ],{counttable:[4,0]}],
-  ['barracks',[ {type:'footlocker', i:2, j:0}, {type:'footlocker', i:2, j:1}, {type:'armorstand', i:0, j:5}, {type:'armorstand', i:1, j:5}, {type:'crates', i:5, j:3} ]],
+  ['barracks',[ {type:'footlocker', i:4, j:0}, {type:'footlocker', i:5, j:1}, {type:'armorstand', i:0, j:5}, {type:'armorstand', i:1, j:5}, {type:'crates', i:5, j:3} ]],
   ['dicenden',[ {type:'kegrack', i:1, j:0, fp:[2,1]}, {type:'barrel', i:4, j:0} ],{dicetable:[4,2]}],
   ['gbtunnel',[ {type:'puddle', i:0, j:2, flat:true, noblock:true, dz:-99}, {type:'puddle', i:1, j:4, s:0.8, flat:true, noblock:true, dz:-99}, {type:'puddle', i:0, j:6, s:1.2, flat:true, noblock:true, dz:-99}, {type:'crate', i:1, j:2}, {type:'barrel', i:1, j:5}, {type:'rubble', i:0, j:7, noblock:true} ]],
   ['tunnel',[ {type:'puddle', i:6, j:1, flat:true, noblock:true, dz:-99}, {type:'puddle', i:15, j:1, s:1.2, flat:true, noblock:true, dz:-99}, {type:'puddle', i:21, j:1, s:0.8, ox:0.2, flat:true, noblock:true, dz:-99} ]] ].forEach(([area,add,swap])=>wrap(area,'objects',l=>{
@@ -30341,7 +30359,7 @@ function styleShop(kind){ closeDialog(); const old=document.getElementById('styl
         {type:'haystack', i:10, j:18}, {type:'haystack', i:9, j:16}, {type:'stooks', i:10, j:14, noblock:true}, {type:'stooks', i:9, j:20, noblock:true}, {type:'fieldshelter', i:1, j:6},
         {type:'stile', i:Math.round(along(P_HEDGE,35))+2, j:35, noblock:true}, {type:'stile', i:Math.round(along(P_HEDGE,9))-2, j:9, noblock:true} ];
       for(let j=32;j<=45;j++){ const x=along(P_HEDGE,j); if(j!==35) l.push({type:'hawhedge', i:Math.round(x)+2, j}); if(j!==38 && j!==39) l.push({type:'hawhedge', i:Math.round(x)-2, j}); }   // the sunken stretch, hedged both sides
-      for(let k=0;k<10;k++){ const j=4+k*5, x=along(P_HEDGE,j), s=k%2?1:-1; l.push({type:'berrybush', i:Math.round(x)+s*3, j}); }
+      for(let k=0;k<10;k++){ const j=4+k*5, x=along(P_HEDGE,j), s=k%2?1:-1; l.push({type:'berrybush', i:Math.round(x)+s*(j>=32&&j<=45?1:3), j}); }   // in the sunken stretch it grows inside the hedges, by the lane
       for(let k=0;k<14;k++){ const j=2+k*4, x=along(P_HEDGE,j); l.push({type:k%3?'foxglove':'flowerbed', i:Math.round(x)+(k%2?2:-2), j:j+1, dx:0, noblock:true}); }
       return l; },
     npcs:()=> encounter('drover',0.55) ? [{ id:'drover', name:'Hamm the Drover', i:Math.round(along(P_HEDGE,20))+1, j:20, dir:6, wander:[[6,10],[6,44],[5,22]], speed:0.6, named:true, opts:{gender:'m',skin:2,hair:3,hairColor:5,beard:2,face:1,equip:{head:'straw_hat',torso:'smock',armor:null,hands:null,legs:'breeches',feet:'boots',weapon:null,offhand:null}} }] : [],
@@ -31878,8 +31896,8 @@ if(typeof GEAR_HP!=='undefined') Object.assign(GEAR_HP,{ shell_charm:0, pearl_ea
     const sp=el.querySelector('span'); if(sp){ const lv=tideLevel(), ph=tidePhase(); sp.textContent = lv<0.02 ? 'The water is far out. For now.' : ph>=0.66||ph<0.06 ? 'The sea is coming in.' : 'The sea is drawing back.'; sp.title='A tide table would tell you to the hour.'; } }; }
 // ── inside
 AREAS.bilge={ ...CROOM('The Bilge & Barnacle',7,7,'wrackhaven','fromBilge', ()=>[   // the tavern, and the brewhouse at its front west: the L of the house outside
-    {type:'counter', i:5, j:1, fp:[1,3]}, {type:'barrel', i:6, j:0}, {type:'barrel', i:6, j:4}, {type:'kegrack', i:0, j:5, fp:[2,1]}, {type:'barrel', i:0, j:6}, {type:'hearth', i:0, j:1},
-    {type:'table', i:1, j:2}, {type:'table', i:3, j:1}, {type:'bench', i:1, j:4}, {type:'lantern', i:1, j:6}, {type:'lantern', i:4, j:0}, {type:'banner', i:2, j:0} ],
+    {type:'counter', i:5, j:1, fp:[1,2]}, {type:'barrel', i:6, j:0}, {type:'barrel', i:6, j:4}, {type:'kegrack', i:0, j:6, fp:[2,1]}, {type:'barrel', i:0, j:5}, {type:'hearth', i:0, j:1},
+    {type:'table', i:1, j:2}, {type:'table', i:3, j:1}, {type:'bench', i:2, j:4}, {type:'lantern', i:1, j:5, noblock:true}, {type:'lantern', i:4, j:0}, {type:'banner', i:2, j:0} ],
   ()=>[ { id:'saltlick', name:'Mama Saltlick', i:6, j:2, dir:1, opts:{race:'human',gender:'f',skin:4,hair:4,hairColor:1,face:0,equip:{head:'hood_red',torso:'smock',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}} },
         { id:'barnbet', name:'Barnacle Bet', i:2, j:2, dir:1, sit:true, opts:GOBLIN({gender:'f', skin:21, hair:3, equip:{head:'straw_hat',torso:'smock',armor:null,hands:null,legs:'hose_grey',feet:null,weapon:null,offhand:null}}) },
         { id:'grubb', name:'Grubb the Bouncer', i:4, j:4, dir:2, ogre:true, pirate:true, scarf:'#2a4a8a', sash:'#c8a04a', opts:{equip:{}} },
@@ -32013,7 +32031,7 @@ for(const area in GROW){ const A=AREAS[area]; if(!A) continue; const oF=A.object
     const big=L.filter(o=>o.grown);
     const inBig=(i,j)=>big.some(b=>i>=b.i&&j>=b.j&&i<b.i+b.fp[0]&&j<b.j+b.fp[1]);
     const busy=new Set(); L.forEach(o=>{ if(o.noblock&&o.dz!=null&&o.dz<-90) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) busy.add((o.i+a)+','+(o.j+b)); });
-    const doors=new Set(big.filter(b=>b.inside).map(b=>{ const [di,dj]=doorTile(b); return [[di,dj],[di+(b.door==='r'?1:0),dj+(b.door==='r'?0:1)]]; }).flat().map(([a,c])=>a+','+c));   // a doorstep, and the step in front of it, stay clear
+    const doors=new Set(big.filter(b=>b.inside).map(b=>{ const [di,dj]=doorTile(b), R=b.door==='r'; const s=[]; for(let k=-1;k<=1;k++) for(let f=0;f<3;f++) s.push(R?[di+f,dj+k]:[di+k,dj+f]); return s; }).flat().map(([a,c])=>a+','+c));   // the doorstep, the tiles either side of it and the row in front stay clear
     const bad=(i,j)=>inBig(i,j)||doors.has(i+','+j);
     return L.map(o=>{ if(o.grown || o.fp || o.a || o.type==='teleporter' || (o.noblock && (o.flat || (o.dz!=null && o.dz<-90))) || !(o.noblock ? inBig(o.i,o.j) : bad(o.i,o.j))) return o;   // (a flower bed or a critter too: nothing grows inside a wall)   // a small thing the house grew over, or left on its doorstep: set it down just outside
       for(let r=1;r<6;r++) for(let dj=0;dj<=r;dj++) for(const di of [0,-r,r,-1,1]){ const i=o.i+di, j=o.j+dj; if(i<0||j<0||i>=A.w||j>=A.h||bad(i,j)||busy.has(i+','+j)) continue; busy.add(i+','+j); return {...o, i, j}; }

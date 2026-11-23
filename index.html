@@ -7162,6 +7162,13 @@ function windowSky(){
   if(dawn) { top=mix(top,'#e4a8b4',dawn*0.7); bot=mix(bot,'#6a5a5a',dawn*0.4); }
   return { top, bot, stars:Math.max(0,(n-0.6)/0.4), key:Math.round(n*10)+'/'+Math.round(dusk*4)+'/'+Math.round(dawn*4) };
 }
+// what each room is built of: walls (log, daub, plaster, stone, salvage) and floor (plank, earth, flag, parquet, deck)
+const ROOM_MAT={ farmhouse:{wall:'daub',floor:'earth'}, lodge:{wall:'log',floor:'earth'}, wheatsheaf:{wall:'daub',floor:'plank'}, wheatsheaf_up:{wall:'daub',floor:'plank'},
+  elderhouse:{wall:'log',floor:'plank'}, inn:{wall:'plaster',floor:'flag'}, inn_up:{wall:'plaster',floor:'plank'}, guildhall:{wall:'plaster',floor:'parquet'}, guildhall_up:{wall:'plaster',floor:'parquet'},
+  goldhouse:{wall:'plaster',floor:'parquet'}, goldhouse_up:{wall:'plaster',floor:'parquet'}, fearnhouse:{wall:'plaster',floor:'parquet'}, tailorshop:{wall:'plaster',floor:'plank'},
+  smithy:{wall:'stone',floor:'flag'}, barracks:{wall:'stone',floor:'flag'}, barracks_up:{wall:'stone',floor:'plank'}, steamcellar:{wall:'stone',floor:'flag'}, dicenden:{wall:'daub',floor:'earth'},
+  bilge:{wall:'salvage',floor:'deck'}, chandlery:{wall:'salvage',floor:'deck'} };
+const roomMat=()=>{ const A=AREAS[areaId]; return ROOM_MAT[areaId] || (A && A.mat) || (A && REGION_OF && REGION_OF[areaId]==='The Wrack Coast' && A.theme==='interior' && !A.cave ? {wall:'salvage',floor:'deck'} : {wall:'log',floor:'plank'}); };
 function paintInteriorWalls(){
   if(AREAS[areaId] && AREAS[areaId].ucq && typeof paintUcWalls==='function') return paintUcWalls(AREAS[areaId].ucq);
   if(AREAS[areaId] && AREAS[areaId].cave){              // rock, with the dark (or daylit) mouths of the passages out
@@ -7186,12 +7193,48 @@ function paintInteriorWalls(){
   if(AREAS[areaId] && AREAS[areaId].tent) return paintTentWalls();
   if(AREAS[areaId] && AREAS[areaId].elfhall) return paintElfHallWalls();
   const {w,h}=ROOM, H=118, o=P(0,0), rEnd=P(w,0), lEnd=P(0,h);
+  const MAT=roomMat().wall;
   const wall=(a,b,c1,c2,side,seg)=>{
-    const gr=g.createLinearGradient(0,Math.min(a.y,b.y)-H,0,Math.max(a.y,b.y)); gr.addColorStop(0,c2); gr.addColorStop(1,c1);
-    g.fillStyle=gr; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(b.x,b.y-H); g.lineTo(a.x,a.y-H); g.closePath(); g.fill();
-    // stacked logs
-    for(let hh=6;hh<H;hh+=9){ g.strokeStyle='rgba(20,10,4,0.6)'; g.lineWidth=1.4; g.beginPath(); g.moveTo(a.x,a.y-hh); g.lineTo(b.x,b.y-hh); g.stroke();
-      g.strokeStyle='rgba(255,220,170,0.10)'; g.lineWidth=0.8; g.beginPath(); g.moveTo(a.x,a.y-hh-3.5); g.lineTo(b.x,b.y-hh-3.5); g.stroke(); }
+    const lit=side==='r', at=(t,hh)=>({x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t-hh}), quad=(t0,t1,h0,h1,f)=>{ const p=[at(t0,h0),at(t1,h0),at(t1,h1),at(t0,h1)]; g.beginPath(); g.moveTo(p[0].x,p[0].y); p.slice(1).forEach(q=>g.lineTo(q.x,q.y)); g.closePath(); g.fillStyle=f; g.fill(); };
+    const nLen=Math.max(1,Math.hypot(b.x-a.x,b.y-a.y)/(TW/2)/1.118), sd=Math.round(a.x*7+a.y*3);
+    if(MAT==='log'){
+      const gr=g.createLinearGradient(0,Math.min(a.y,b.y)-H,0,Math.max(a.y,b.y)); gr.addColorStop(0,c2); gr.addColorStop(1,c1);
+      g.fillStyle=gr; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(b.x,b.y-H); g.lineTo(a.x,a.y-H); g.closePath(); g.fill();
+      for(let hh=6;hh<H;hh+=9){ g.strokeStyle='rgba(20,10,4,0.6)'; g.lineWidth=1.4; g.beginPath(); g.moveTo(a.x,a.y-hh); g.lineTo(b.x,b.y-hh); g.stroke();   // stacked logs
+        g.strokeStyle='rgba(255,220,170,0.10)'; g.lineWidth=0.8; g.beginPath(); g.moveTo(a.x,a.y-hh-3.5); g.lineTo(b.x,b.y-hh-3.5); g.stroke(); }
+      for(let t=0.07;t<1;t+=0.13+0.05*rnd01(Math.round(t*90),sd,301)){ if(rnd01(Math.round(t*50),sd,302)<0.5) continue; const c=at(t,6+9*Math.floor(rnd01(Math.round(t*70),sd,303)*12)); g.fillStyle='rgba(30,16,6,0.5)'; g.beginPath(); g.ellipse(c.x,c.y-4,1.6,1.1,0,0,Math.PI*2); g.fill(); }   // knots
+    } else if(MAT==='daub' || MAT==='plaster'){
+      const town=MAT==='plaster', pl=town?(lit?'#e6dcc4':'#c2b598'):(lit?'#d8cba8':'#b2a37e'), tb=town?(lit?'#4a2e1a':'#3a2414'):(lit?'#5a3c20':'#43301a');
+      quad(0,1,0,H,pl);
+      for(let k=0;k<26;k++){ const t=rnd01(k,sd,311), h=10+rnd01(k,sd,312)*(H-20), c=at(t,h); g.fillStyle=`rgba(${town?'120,100,70':'110,90,55'},${0.06+0.08*rnd01(k,sd,313)})`; g.beginPath(); g.ellipse(c.x,c.y,8+rnd01(k,sd,314)*16,3+rnd01(k,sd,315)*6,0,0,Math.PI*2); g.fill(); }   // stains and patching in the lime
+      const dg=g.createLinearGradient(0,a.y-30,0,a.y); dg.addColorStop(0,'rgba(60,40,20,0)'); dg.addColorStop(1,'rgba(60,40,20,0.3)'); g.fillStyle=dg; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(b.x,b.y-30); g.lineTo(a.x,a.y-30); g.closePath(); g.fill();
+      if(town){ quad(0,1,0,34,lit?'#6a4426':'#4e321c'); g.strokeStyle='rgba(20,10,4,0.5)'; g.lineWidth=0.8; for(let t=0;t<1;t+=0.5/nLen){ const u=at(t,2), v=at(t,32); g.beginPath(); g.moveTo(u.x,u.y); g.lineTo(v.x,v.y); g.stroke(); }   // a panelled wainscot
+        g.strokeStyle=tb; g.lineWidth=3; [34,H-2].forEach(hh=>{ const u=at(0,hh), v=at(1,hh); g.beginPath(); g.moveTo(u.x,u.y); g.lineTo(v.x,v.y); g.stroke(); }); }
+      g.strokeStyle=tb; g.lineWidth=town?3.4:4; const posts=Math.max(2,Math.round(nLen*(town?1:1.3)));
+      for(let n=0;n<=posts;n++){ const t=n/posts, u=at(t,town?34:0), v=at(t,H); g.beginPath(); g.moveTo(u.x,u.y); g.lineTo(v.x,v.y); g.stroke();
+        if(!town && n<posts && (n+sd)%2===0){ const w=at((n+1)/posts,H*0.55); g.lineWidth=3; g.beginPath(); g.moveTo(u.x,u.y-H*0.02); g.lineTo(w.x,w.y); g.stroke(); g.lineWidth=4; } }   // a brace in every other bay
+      if(!town){ const u=at(0,H*0.55), v=at(1,H*0.55); g.lineWidth=3.4; g.beginPath(); g.moveTo(u.x,u.y); g.lineTo(v.x,v.y); g.stroke(); }
+      g.strokeStyle='rgba(80,60,40,0.35)'; g.lineWidth=0.6; for(let k=0;k<4;k++){ const t=rnd01(k,sd,316), h=20+rnd01(k,sd,317)*(H-40); let c=at(t,h); g.beginPath(); g.moveTo(c.x,c.y); for(let m=0;m<4;m++){ c={x:c.x+(rnd01(k*5+m,sd,318)-0.5)*8,y:c.y+4+rnd01(k*5+m,sd,319)*5}; g.lineTo(c.x,c.y); } g.stroke(); }   // hairline cracks
+    } else if(MAT==='stone'){
+      quad(0,1,0,H,lit?'#8a857a':'#6a665e');
+      for(let r=0,hh=0;hh<H;r++){ const rh=11+((r*7+sd)%3)*2; let t=((r%2)?0.5:0)/(nLen*2.2);   // coursed ashlar, each block its own tone
+        while(t<1){ const w=(0.5+rnd01(r*13+Math.round(t*40),sd,321)*0.5)/(nLen*2.2), t1=Math.min(1,t+w), sh=rnd01(r*31+Math.round(t*60),sd,322);
+          quad(t+0.004,t1-0.004,hh+1,Math.min(H,hh+rh-1),lit?`rgb(${132+sh*28|0},${126+sh*24|0},${114+sh*20|0})`:`rgb(${100+sh*22|0},${96+sh*20|0},${88+sh*16|0})`); t=t1; }
+        hh+=rh; }
+      const dg=g.createLinearGradient(0,a.y-40,0,a.y); dg.addColorStop(0,'rgba(40,50,30,0)'); dg.addColorStop(1,'rgba(40,50,30,0.35)'); g.fillStyle=dg; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(b.x,b.y-40); g.lineTo(a.x,a.y-40); g.closePath(); g.fill();   // damp at the foot
+    } else if(MAT==='salvage'){
+      quad(0,1,0,H,'#1a1410');
+      const cols=['#8a8478','#7a7468','#6e6a60','#9a8a6c','#5a4a38','#857a66','#3a3430','#8a8478','#a89a7a','#7a8a8e','#8e5a44'];   // driftwood greys, tarred black, the odd board of old hull paint
+      let t=0, n=0; while(t<1){ const w=(0.6+rnd01(n,sd,331)*0.9)/(nLen*2.4), t1=Math.min(1,t+w), c0=cols[Math.floor(rnd01(n,sd,332)*cols.length)], top=H-rnd01(n,sd,333)*10;
+        quad(t+0.003,t1-0.003,0,top,tone(c0,lit?0:-0.22));
+        g.strokeStyle='rgba(20,14,8,0.35)'; g.lineWidth=0.6; for(let k=0;k<3;k++){ const tt=t+(t1-t)*(0.25+k*0.25), u=at(tt,4), v=at(tt+0.002,top-4); g.beginPath(); g.moveTo(u.x,u.y); g.lineTo(v.x,v.y); g.stroke(); }   // grain
+        g.fillStyle='rgba(30,26,22,0.8)'; [12,top-10].forEach(hh=>{ const c=at((t+t1)/2,hh); g.fillRect(c.x-1,c.y-1,2,2); });   // nails
+        t=t1; n++; }
+      g.strokeStyle=lit?'#5a4a38':'#40352a'; g.lineWidth=5; [[0.05,0.38,26,26],[0.55,0.95,H*0.62,H*0.62]].forEach(([t0,t1,h0,h1])=>{ const u=at(t0,h0), v=at(t1,h1); g.beginPath(); g.moveTo(u.x,u.y); g.lineTo(v.x,v.y); g.stroke(); });   // battens across
+      { const pt0=0.18+rnd01(1,sd,334)*0.5, u=at(pt0,18), v=at(pt0+0.22/nLen,H*0.5); g.strokeStyle=lit?'#7a6a52':'#584a3a'; g.lineWidth=6; g.beginPath(); g.moveTo(u.x,u.y); g.lineTo(v.x,v.y); g.stroke(); }   // a board nailed on aslant over a hole
+      for(let k=0;k<3;k++){ const c=at(rnd01(k,sd,335),H*(0.2+rnd01(k,sd,336)*0.6)); g.fillStyle='rgba(15,12,10,0.4)'; g.beginPath(); g.ellipse(c.x,c.y,6+k*3,10,0,0,Math.PI*2); g.fill(); }   // tar daubed over the cracks
+      { const c=at(0.12+rnd01(2,sd,337)*0.2,H*0.72); g.strokeStyle='#a8905a'; g.lineWidth=2; for(let r=0;r<3;r++){ g.beginPath(); g.ellipse(c.x,c.y+r*1.5,9-r,4,0,0,Math.PI*2); g.stroke(); } g.beginPath(); g.moveTo(c.x,c.y-4); g.lineTo(c.x,c.y-14); g.stroke(); }   // a coil of rope on a peg
+    }
     // a small shuttered window near the middle
     const len=side==='r'?w:h, L=(t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
     const tall=o=>o.type==='hearth'||o.type==='forge';
@@ -7199,6 +7242,8 @@ function paintInteriorWalls(){
     if(side==='r' && !seg) busy.push([0.9,2.9]);                                             // the shelf of pots on the right wall   // never a window behind a chimney or a forge hood
     const along=t=>seg ? (side==='l' ? seg.u1+(seg.u0-seg.u1)*t : seg.u0+(seg.u1-seg.u0)*t) : side==='l'?h*(1-t):w*t, ok=t=>{ const u0=along(t-0.08), u1=along(t+0.08), lo2=Math.min(u0,u1), hi2=Math.max(u0,u1); return !busy.some(([p,q])=>hi2>p && lo2<q); };
     const tc=[0.5,0.3,0.7,0.2,0.8,0.12,0.88].find(ok); if(tc==null) return; const t0=tc-0.08, t1=tc+0.08;
+    if(MAT==='salvage'){ const c=L(tc); const WS=windowSky(); g.fillStyle='#8a6a30'; g.beginPath(); g.ellipse(c.x,c.y-70,15,17,0,0,Math.PI*2); g.fill(); g.fillStyle=WS.bot; g.beginPath(); g.ellipse(c.x,c.y-70,11,13,0,0,Math.PI*2); g.fill();   // a ship's porthole, brass and all
+      g.fillStyle='rgba(255,255,255,0.25)'; g.beginPath(); g.ellipse(c.x-3,c.y-74,4,5,0,0,Math.PI*2); g.fill(); g.fillStyle='#5a4420'; for(let k=0;k<6;k++){ const an=k*Math.PI/3; g.beginPath(); g.arc(c.x+Math.cos(an)*13,c.y-70+Math.sin(an)*15,1.2,0,Math.PI*2); g.fill(); } return; }
     const p0=L(t0), p1=L(t1), lo=52, hi=84;
     g.fillStyle='#24160a'; g.beginPath(); g.moveTo(p0.x,p0.y-lo+2); g.lineTo(p1.x,p1.y-lo+2); g.lineTo(p1.x,p1.y-hi-2); g.lineTo(p0.x,p0.y-hi-2); g.closePath(); g.fill();
     const WS=windowSky(), sky=g.createLinearGradient(0,p0.y-hi,0,p0.y-lo); sky.addColorStop(0,WS.top); sky.addColorStop(1,WS.bot);
@@ -7210,11 +7255,13 @@ function paintInteriorWalls(){
   if(roomShape()){   // an L or a T: a wall along every back edge of the floor, posts at the corners, the beam along the top
     const segs=shapeWalls().filter(sg=>sg.ln===0);   // only the two long back walls; round the inner corner of the L the cut-away simply stays dark
     segs.forEach(sg=>{ const a=sg.side==='r'?P(sg.u0,sg.ln):P(sg.ln,sg.u1), b=sg.side==='r'?P(sg.u1,sg.ln):P(sg.ln,sg.u0); if(sg.side==='r') wall(a,b,'#6a4a2a','#3e2a16','r',sg); else wall(a,b,'#54391f','#2e1f10','l',sg); });
-    g.strokeStyle='#2a1a0c'; segs.forEach(sg=>{ const a=sg.side==='r'?P(sg.u0,sg.ln):P(sg.ln,sg.u1), b=sg.side==='r'?P(sg.u1,sg.ln):P(sg.ln,sg.u0);
+    if(MAT!=='stone' && MAT!=='salvage') { g.strokeStyle='#2a1a0c'; } else return;
+    segs.forEach(sg=>{ const a=sg.side==='r'?P(sg.u0,sg.ln):P(sg.ln,sg.u1), b=sg.side==='r'?P(sg.u1,sg.ln):P(sg.ln,sg.u0);
       g.lineWidth=5; g.beginPath(); g.moveTo(a.x,a.y-H); g.lineTo(b.x,b.y-H); g.stroke(); g.lineWidth=6; [a,b].forEach(q=>{ g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(q.x,q.y-H); g.stroke(); }); });
     return; }
   wall(o,rEnd,'#6a4a2a','#3e2a16','r'); wall(lEnd,o,'#54391f','#2e1f10','l');
   // corner post and top beam
+  if(MAT==='stone' || MAT==='salvage'){ return; }
   g.strokeStyle='#2a1a0c'; g.lineWidth=6; g.beginPath(); g.moveTo(o.x,o.y); g.lineTo(o.x,o.y-H); g.stroke();
   g.lineWidth=5; g.beginPath(); g.moveTo(lEnd.x,lEnd.y-H); g.lineTo(o.x,o.y-H); g.lineTo(rEnd.x,rEnd.y-H); g.stroke();
   // hanging herbs and a shelf with pots on the right wall
@@ -8279,12 +8326,26 @@ function paintBuilding(X,Y,o){
       const posts=Math.max(2,Math.round(len*2)); g.lineWidth=2.6;
       for(let n=0;n<=posts;n++){ const t=n/posts, u=q(t,stoneH), v=q(t,WH); g.beginPath(); g.moveTo(u.x,u.y); g.lineTo(v.x,v.y); g.stroke();
         if(n<posts && (n+o.v)%3===0){ const u2=q((n+1)/posts,WH); g.beginPath(); g.moveTo(u.x,u.y); g.lineTo(u2.x,u2.y); g.stroke(); } } }
+    if(o.makeshift){ const sd=o.v*17+(lit?3:9)+fw*5+fh, cols=['#8a8478','#7a7468','#6e6a60','#9a8a6c','#5a4a38','#857a66','#3a3430','#8a8478','#6a5a44','#7a8a8e','#94867a','#8e5a44'], base=16;
+      poly([q(0,0),q(1,0),q(1,base),q(0,base)],tone('#6a6458',k)); g.strokeStyle='rgba(30,26,22,0.6)'; g.lineWidth=0.7; for(let t=0.03;t<1;t+=0.07){ const u=q(t,0), v=q(t+0.01,base); g.beginPath(); g.moveTo(u.x,u.y); g.lineTo(v.x,v.y); g.stroke(); }   // a footing of beach stones
+      let t=0, n=0; while(t<1){ const w=(0.6+rnd01(n,sd,341)*0.9)/(len*2.2), t1=Math.min(1,t+w), c0=cols[Math.floor(rnd01(n,sd,342)*cols.length)], topH=WH-2-rnd01(n,sd,343)*7;   // boards of every width and colour, ragged at the top
+        poly([q(t+0.002,base),q(t1-0.002,base),q(t1-0.002,topH),q(t+0.002,topH)],tone(c0,k));
+        g.strokeStyle='rgba(20,14,8,0.3)'; g.lineWidth=0.6; for(let m=1;m<3;m++){ const tt=t+(t1-t)*m/3, u=q(tt,base+3), v=q(tt,topH-3); g.beginPath(); g.moveTo(u.x,u.y); g.lineTo(v.x,v.y); g.stroke(); }
+        g.fillStyle='rgba(28,24,20,0.9)'; [base+8,WH*0.5,topH-6].forEach(hh=>{ const c=q((t+t1)/2,hh); g.fillRect(c.x-1,c.y-1,2,2); });
+        if(rnd01(n,sd,344)<0.12){ poly([q(t,WH*0.3),q(t1,WH*0.3),q(t1,WH*0.3+18),q(t,WH*0.3+18)],'rgba(20,16,12,0.55)'); }   // a hole, tarred over
+        t=t1; n++; }
+      g.strokeStyle=tone('#4a3a2a',k); g.lineWidth=5; [[0,1,base+4,base+4],[0,1,WH*0.55,WH*0.58],[0,1,WH-6,WH-6]].forEach(([a0,a1,h0,h1])=>{ const u=q(a0,h0), v=q(a1,h1); g.beginPath(); g.moveTo(u.x,u.y); g.lineTo(v.x,v.y); g.stroke(); });   // rails to hold it all together
+      for(let m=0;m<Math.max(1,Math.round(len*0.7));m++){ const t0=rnd01(m,sd,345)*0.7, u=q(t0,base+6), v=q(t0+0.22/Math.max(1,len),WH*0.5); g.strokeStyle=tone(cols[(m+o.v)%cols.length],k-0.05); g.lineWidth=7; g.beginPath(); g.moveTo(u.x,u.y); g.lineTo(v.x,v.y); g.stroke(); g.strokeStyle='rgba(20,14,8,0.45)'; g.lineWidth=0.8; g.stroke(); }   // planks nailed on aslant
+      { const c=q(0.08+rnd01(1,sd,346)*0.2,WH*0.75); g.strokeStyle='#a8905a'; g.lineWidth=2; for(let r=0;r<3;r++){ g.beginPath(); g.ellipse(c.x,c.y+r*1.6,10-r,4.5,0,0,Math.PI*2); g.stroke(); } }   // rope hung on a nail
+      if(lit && rnd01(2,sd,347)<0.6){ const c=q(0.78,WH*0.78); g.fillStyle='#e8dcc0'; g.beginPath(); g.moveTo(c.x-12,c.y); g.lineTo(c.x+10,c.y+5); g.lineTo(c.x+8,c.y+24); g.lineTo(c.x-14,c.y+18); g.closePath(); g.fill(); g.strokeStyle='rgba(60,50,30,0.5)'; g.stroke(); }   // a scrap of sailcloth tacked over a gap
+    }
     const win=(t0,t1,h0,h1,lit2)=>{ if(o.slits){ const c=(t0+t1)/2, hw=0.09/Math.max(1,len); t0=c-hw; t1=c+hw; h0+=6; h1-=8; lit2=false; }   // a keep has arrow slits, not cottage windows
       poly([q(t0,h0),q(t1,h0),q(t1,h1),q(t0,h1)], lit2?'#f0c060':'#1c1814', tone(pal.tb,-0.2),1.4);
       if(lit2){ const gw=g.createRadialGradient(q((t0+t1)/2,(h0+h1)/2).x,q((t0+t1)/2,(h0+h1)/2).y,1,q((t0+t1)/2,(h0+h1)/2).x,q((t0+t1)/2,(h0+h1)/2).y,14); gw.addColorStop(0,'rgba(255,230,160,0.9)'); gw.addColorStop(1,'rgba(255,200,100,0.2)'); poly([q(t0,h0),q(t1,h0),q(t1,h1),q(t0,h1)],gw); }
       g.strokeStyle=tone(pal.tb,-0.3); g.lineWidth=1; const m1=q((t0+t1)/2,h0), m2=q((t0+t1)/2,h1); g.beginPath(); g.moveTo(m1.x,m1.y); g.lineTo(m2.x,m2.y); g.stroke();
       { const c1=q((t0+t1)/2,(h0+h1)/2), c2=q((t0+t1)/2+0.02,(h0+h1)/2); g.strokeStyle=tone(pal.tb,-0.3); g.lineWidth=0.8; g.beginPath(); g.moveTo(q(t0,(h0+h1)/2).x,q(t0,(h0+h1)/2).y); g.lineTo(q(t1,(h0+h1)/2).x,q(t1,(h0+h1)/2).y); g.stroke(); }   // the glazing bar
       poly([q(t0-0.02,h0+1),q(t1+0.02,h0+1),q(t1+0.02,h0-2.5),q(t0-0.02,h0-2.5)],tone(pal.st,k+0.12),tone(pal.st,-0.4,0.6),0.6);   // the sill
+      if(o.makeshift) return;
       if(h0>WH-30 && rnd01(Math.round(t0*100),o.v+(lit?3:4),236)<0.45 && !o.stone){ poly([q(t0-0.01,h0-2.5),q(t1+0.01,h0-2.5),q(t1+0.01,h0-9),q(t0-0.01,h0-9)],tone('#6a4a2a',k),'rgba(30,18,8,0.6)',0.6);   // a box of flowers
         for(let f=0;f<6;f++){ const u=q(t0+(t1-t0)*(f+0.5)/6,h0+1.5); g.fillStyle=tone('#4a7a34',k); g.beginPath(); g.arc(u.x,u.y,2.4,0,Math.PI*2); g.fill(); g.fillStyle=['#d84a4a','#f0d050','#e8e0f0','#c870c0'][(f+o.v)%4]; g.beginPath(); g.arc(u.x+0.6,u.y-1.6,1.3,0,Math.PI*2); g.fill(); } }
       if(o.slits) return;
@@ -8331,7 +8392,11 @@ function paintBuilding(X,Y,o){
       for(let c=0;c<n;c++){ const s0=(c+(r%2)*0.5)/n, s1=s0+1/n, h=rnd01(r*31+c,seed,233); if(h<0.07||h>0.96){ const a=lp(u0,v0,s0), b=lp(u0,v0,Math.min(1,s1)), c2=lp(u1,v1,Math.min(1,s1)), d=lp(u1,v1,s0); g.fillStyle=h<0.07?tone(col,-0.22,0.45):tone(col,0.14,0.35); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c2.x,c2.y); g.lineTo(d.x,d.y); g.closePath(); g.fill(); }
         const j0=lp(u0,v0,s0), j1=lp(u1,v1,s0); g.strokeStyle=tone(col,-0.5,0.5); g.lineWidth=0.6; g.beginPath(); g.moveTo(j0.x,j0.y); g.lineTo(j1.x,j1.y); g.stroke(); }
       g.strokeStyle=tone(col,-0.45,0.8); g.lineWidth=0.8; g.beginPath(); g.moveTo(u0.x,u0.y); g.lineTo(v0.x,v0.y); g.stroke(); g.strokeStyle=tone(col,0.2,0.35); g.lineWidth=0.6; g.beginPath(); g.moveTo(u0.x,u0.y-1.2); g.lineTo(v0.x,v0.y-1.2); g.stroke(); }
-    if(o.v%2===0 && !o.stone){ for(let m=0;m<5;m++){ const t=rnd01(m,seed,240)*0.25, s2=rnd01(m,seed,241), c=lp(lp(e0,r0,t),lp(e1,r1,t),s2); g.fillStyle=`rgba(80,110,50,${0.35+0.2*rnd01(m,seed,242)})`; g.beginPath(); g.ellipse(c.x,c.y,6+rnd01(m,seed,243)*6,2.6,-0.46,0,Math.PI*2); g.fill(); } }
+    if(o.makeshift){ for(let m=0;m<9;m++){ const ta=rnd01(m,seed,351)*0.8, sa=rnd01(m,seed,352)*0.8, tb2=ta+0.12+rnd01(m,seed,353)*0.18, sb=sa+0.1+rnd01(m,seed,354)*0.2, cs=['#e0d4b4','#5a4a38','#3a3430','#7a6a52','#c8b88e'][m%5];   // patches: sailcloth, tarred boards, odd planks
+        const a=lp(lp(e0,r0,ta),lp(e1,r1,ta),sa), b=lp(lp(e0,r0,ta),lp(e1,r1,ta),Math.min(1,sb)), c=lp(lp(e0,r0,Math.min(1,tb2)),lp(e1,r1,Math.min(1,tb2)),Math.min(1,sb)), d=lp(lp(e0,r0,Math.min(1,tb2)),lp(e1,r1,Math.min(1,tb2)),sa);
+        g.fillStyle=cs; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c.x,c.y); g.lineTo(d.x,d.y); g.closePath(); g.fill(); g.strokeStyle='rgba(20,14,8,0.5)'; g.lineWidth=0.8; g.stroke(); }
+      for(let m=0;m<4;m++){ const ta=0.15+m*0.2, a=lp(e0,r0,ta), b=lp(e1,r1,ta); g.strokeStyle='rgba(168,144,90,0.8)'; g.lineWidth=1.4; g.beginPath(); g.moveTo(a.x,a.y); g.quadraticCurveTo((a.x+b.x)/2,(a.y+b.y)/2+6,b.x,b.y); g.stroke(); } }   // ropes lashed over it against the wind
+    if(o.v%2===0 && !o.stone && !o.makeshift){ for(let m=0;m<5;m++){ const t=rnd01(m,seed,240)*0.25, s2=rnd01(m,seed,241), c=lp(lp(e0,r0,t),lp(e1,r1,t),s2); g.fillStyle=`rgba(80,110,50,${0.35+0.2*rnd01(m,seed,242)})`; g.beginPath(); g.ellipse(c.x,c.y,6+rnd01(m,seed,243)*6,2.6,-0.46,0,Math.PI*2); g.fill(); } }
     g.restore(); };
   const ridgeCap=(a,b)=>{ g.lineCap='round'; g.strokeStyle=tone(pal.rf,-0.55); g.lineWidth=5; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); g.strokeStyle=tone(pal.rf,0.05); g.lineWidth=3; g.beginPath(); g.moveTo(a.x,a.y-1); g.lineTo(b.x,b.y-1); g.stroke();
     g.strokeStyle=tone(pal.rf,-0.4,0.8); g.lineWidth=0.7; for(let t=0.04;t<1;t+=0.07){ const c=lp(a,b,t); g.beginPath(); g.moveTo(c.x-1,c.y-2.6); g.lineTo(c.x+1,c.y+1); g.stroke(); } g.lineCap='butt'; };
@@ -9364,7 +9429,7 @@ function drawObject(o){
     const behind = player.x<o.i+o.fp[0]+0.3 && player.y<o.j+o.fp[1]+0.3 && !(player.x>o.i+o.fp[0]-0.2 || player.y>o.j+o.fp[1]-0.2)
       && pp.x>a.x-o.fp[0]*64-8 && pp.x<a.x+o.fp[1]*64+8 && pp.y>topY+14 && pp.y<a.y+10;
     o.fade=lerpN(o.fade??1, behind?0.34:1, 0.2); const ga=g.globalAlpha; g.globalAlpha=ga*o.fade;
-    drawCached('B'+o.fp+'_'+o.v+(o.door||'')+(o.dt??'')+(o.ridge||'')+(o.h||'')+(o.wing?'w'+(o.joinN?'n':'')+(o.joinW?'e':'')+(o.rExt||0):'')+(o.sign||'')+(o.shield||'')+(o.shopfront?'s':'')+(o.stone?'t':''),a.x,a.y,S.w,S.h,S.ax,S.ay,(X,Y)=>paintBuilding(X,Y,{...o,fw:o.fp[0],fh:o.fp[1]}),1);
+    drawCached('B'+o.fp+'_'+o.v+(o.door||'')+(o.dt??'')+(o.ridge||'')+(o.h||'')+(o.wing?'w'+(o.joinN?'n':'')+(o.joinW?'e':'')+(o.rExt||0):'')+(o.makeshift?'M':'')+(o.sign||'')+(o.shield||'')+(o.shopfront?'s':'')+(o.stone?'t':''),a.x,a.y,S.w,S.h,S.ax,S.ay,(X,Y)=>paintBuilding(X,Y,{...o,fw:o.fp[0],fh:o.fp[1]}),1);
     g.globalAlpha=ga;
     if(o.inside) drawDoorMark(o);
   } else if(o.type==='keep' || o.type==='chapel'){
@@ -9452,16 +9517,16 @@ function drawObject(o){
   } else if(o.type==='tree'){
     drawTree(o);
   } else if(o.type==='house'){
-    const a=P(o.i+o.fp[0],o.j+o.fp[1]);
+    const a=P(o.i+o.fp[0],o.j+o.fp[1]); COTTAGE_WALL=o.wall||'boards'; const WK=COTTAGE_WALL==='boards'?'':COTTAGE_WALL;
     const N=o.fp[0], D=o.fp[1]||N, dt=o.dt??1, dr=o.door||o.wdoor||'r', big=N>3||D!==N||o.low;
     const CW=big?Math.max(720,(N+D)*64+240):560, CH2=big?Math.max(620,(N+D)*32+440):500, AX=big?120+N*64:280;
     if(o.arm){ const n=D, d=N, AXm=120+d*64;   // an arm of an L: the ridge runs across, so draw it flipped (its i and j swap places)
-      drawCached('housearm'+o.roof+n+'x'+d+'_'+o.wh,a.x,a.y,CW,CH2,AXm,CH2-60,(ax,ay)=>{ g.save(); g.translate(ax,0); g.scale(-1,1); g.translate(-ax,0); paintCottage(ax,ay,o.roof,'none',n,1,d,false,true,o.wh); g.restore(); }); return; }
+      drawCached('housearm'+WK+o.roof+n+'x'+d+'_'+o.wh,a.x,a.y,CW,CH2,AXm,CH2-60,(ax,ay)=>{ g.save(); g.translate(ax,0); g.scale(-1,1); g.translate(-ax,0); paintCottage(ax,ay,o.roof,'none',n,1,d,false,true,o.wh); g.restore(); }); return; }
     if(o.ridgeI){ const n=D, d=N, AXm=120+d*64, front=o.door==='l', dm=front?'r':'l', dtm=front?N-1-dt:dt;   // the long side to the front: drawn flipped; the door on the long face, or in the east gable end
-      drawCached('houseI'+o.roof+n+'x'+d+'_'+dm+dtm,a.x,a.y,CW,CH2,AXm,CH2-60,(ax,ay)=>{ g.save(); g.translate(ax,0); g.scale(-1,1); g.translate(-ax,0); paintCottage(ax,ay,o.roof,dm,n,dtm,d,false,true,0); g.restore(); }); if(o.inside) drawDoorMark(o);
+      drawCached('houseI'+WK+o.roof+n+'x'+d+'_'+dm+dtm,a.x,a.y,CW,CH2,AXm,CH2-60,(ax,ay)=>{ g.save(); g.translate(ax,0); g.scale(-1,1); g.translate(-ax,0); paintCottage(ax,ay,o.roof,dm,n,dtm,d,false,true,0); g.restore(); }); if(o.inside) drawDoorMark(o);
       const CH=COTTAGE_CHIMS[n+'x'+d]||COTTAGE_CHIM, cx=a.x-CH.dx, cy=a.y+CH.dy; g.save(); for(let k=0;k<6;k++){ const t=((gt*0.18+k/6)%1); g.fillStyle=`rgba(200,196,188,${0.22*(1-t)})`; g.beginPath(); g.arc(cx+Math.sin(t*5+k)*5+t*14, cy-t*60, 4+t*9, 0, Math.PI*2); g.fill(); } g.restore(); return; }
-    if(o.wing2){ drawCached('housewing'+o.roof+N+'x'+D+'_'+o.wh+'_'+o.rExt,a.x,a.y,CW,CH2,AX,CH2-60,(ax,ay)=>paintCottage(ax,ay,o.roof,'none',N,1,D,false,false,o.wh,o.rExt||0,-0.2)); return; }
-    drawCached('house'+o.roof+dr+(big?'_'+N+'x'+D+'_'+dt+(o.low?'l':''):''),a.x,a.y,CW,CH2,AX,big?CH2-60:440,(ax,ay)=>paintCottage(ax,ay,o.roof,dr,N,dt,D,!!o.low)); if(o.inside) drawDoorMark(o);
+    if(o.wing2){ drawCached('housewing'+WK+o.roof+N+'x'+D+'_'+o.wh+'_'+o.rExt,a.x,a.y,CW,CH2,AX,CH2-60,(ax,ay)=>paintCottage(ax,ay,o.roof,'none',N,1,D,false,false,o.wh,o.rExt||0,-0.2)); return; }
+    drawCached('house'+WK+o.roof+dr+(big?'_'+N+'x'+D+'_'+dt+(o.low?'l':''):''),a.x,a.y,CW,CH2,AX,big?CH2-60:440,(ax,ay)=>paintCottage(ax,ay,o.roof,dr,N,dt,D,!!o.low)); if(o.inside) drawDoorMark(o);
     // a thin curl of chimney smoke, live
     g.save(); g.globalCompositeOperation='source-over';
     const CH=COTTAGE_CHIMS[o.fp[0]+'x'+(o.fp[1]||o.fp[0])+(o.low?'l':'')]||COTTAGE_CHIM, cx=a.x+CH.dx, cy=a.y+CH.dy;
@@ -9902,6 +9967,7 @@ function paintLeanTo(x,y,o){ const w=o.fp[0], d=o.fp[1], T=TW/2, H2=TH/2, t=o.to
 }
 OBJ_DRAW.lean=o=>{ const a=P(o.i+o.fp[0],o.j+o.fp[1]), w=o.fp[0], d=o.fp[1], CW=(w+d)*TW/2+120, CH=(w+d)*TH/2+o.hHi+80;
   drawCached('lean'+w+'x'+d+o.touch+o.hHi+'_'+o.hLo+(o.town?'t'+o.v:'w'+o.roof),a.x,a.y,CW,CH,w*TW/2+60,CH-30,(X,Y)=>paintLeanTo(X,Y,o)); };
+let COTTAGE_WALL='boards';
 function paintCottage(x,y,roof,door='r',N=3,dt=1,D=0,low=false,mirror=false,whO=0,rExt=0,backIn=null){   // rExt: a wing's ridge runs on back this far, into the house's roof; backIn: its back wall reaches into the house        // N: the footprint along i (the gable face), D along j (the ridge); a bigger house stands a little taller
   D=D||N; const W=N, T=TW/2, H2=TH/2, ins=0.12, WH=whO||(132+(Math.max(W,D)-3)*14)*(low?0.74:1), RH=86*W/3*(low?0.8:1);   // mirror: drawn flipped, so the ridge runs the other way; the light must not flip with it
   const pt=(gi,gj,h=0)=>({x:x+(gi-gj)*T, y:y+(gi+gj)*H2-h});          // local grid, (N,N) is the anchor at x,y
@@ -9922,7 +9988,12 @@ function paintCottage(x,y,roof,door='r',N=3,dt=1,D=0,low=false,mirror=false,whO=
   // plaster: mottled lime wash, damp staining near the ground, a few cracks
   const face=(p,q,fn)=>{ g.save(); g.beginPath(); g.moveTo(up2(p,8).x,up2(p,8).y); g.lineTo(up2(q,8).x,up2(q,8).y); g.lineTo(up2(q,WH).x,up2(q,WH).y); g.lineTo(up2(p,WH).x,up2(p,WH).y); g.closePath(); g.clip(); fn(p,q); g.restore(); };
   [[L,Bm,0],[Bm,R,1]].forEach(([p,q,f])=>face(p,q,()=>{
-    // horizontal boards: seams, grain and the odd knot
+    if(COTTAGE_WALL==='daub'){ const a0=up2(p,8), b0=up2(q,8), lit=(f===0)!==mirror;   // wattle and daub: lime-washed panels, stained low down and patched where it cracked
+      g.fillStyle=lit?'#ddd0ae':'#ab9c78'; g.fillRect(Math.min(a0.x,b0.x)-2,Math.min(a0.y,b0.y)-WH-40,Math.abs(b0.x-a0.x)+4,Math.abs(b0.y-a0.y)+WH+50);
+      for(let k=0;k<18;k++){ const t=rnd01(k,f+3,371), h=14+rnd01(k,f,372)*(WH-24), c=up2(lerp(p,q,t),h); g.fillStyle=`rgba(120,96,60,${0.06+0.1*rnd01(k,f,373)})`; g.beginPath(); g.ellipse(c.x,c.y,6+rnd01(k,f,374)*14,3+rnd01(k,f,375)*5,0,0,Math.PI*2); g.fill(); }
+      for(let k=0;k<3;k++){ const t=0.15+rnd01(k,f,376)*0.7, c=up2(lerp(p,q,t),30+rnd01(k,f,377)*(WH-60)); g.strokeStyle='rgba(90,66,40,0.5)'; g.lineWidth=0.7; g.beginPath(); g.moveTo(c.x,c.y); g.lineTo(c.x+4,c.y+6); g.lineTo(c.x+1,c.y+12); g.stroke();
+        if(k===0){ g.fillStyle='rgba(120,90,50,0.35)'; for(let m=0;m<5;m++){ g.fillRect(c.x-6+m*3,c.y+14,1.4,6); } } }   // where the daub has fallen off, the wattle shows
+    } else
     for(let h=12;h<WH;h+=7.5){ const a=up2(p,h), b=up2(q,h);
       g.strokeStyle='rgba(30,16,6,0.55)'; g.lineWidth=0.9; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke();
       g.strokeStyle='rgba(255,220,170,0.14)'; g.lineWidth=0.6; g.beginPath(); g.moveTo(a.x,a.y-1); g.lineTo(b.x,b.y-1); g.stroke();
@@ -10398,6 +10469,17 @@ function paintGroundTexture(){
       const o=(py*TWp+px)*4, k=1-0.18*(1-smooth(0,1.3,Math.min(gx,gy)));
       D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
     if(theme==='interior' && AREAS[areaId].shape && !inShape(Math.floor(gx),Math.floor(gy))){ D[(py*TWp+px)*4+3]=0; continue; }   // the cut-away corner of an L: no floor
+    if(theme==='interior' && !AREAS[areaId].volcanic && roomMat().floor!=='plank'){ const F=roomMat().floor, o=(py*TWp+px)*4, k=1-0.3*(1-smooth(0,1.3,Math.min(gx,gy))); let pc;
+      if(F==='earth'){ const n=fbm(gx*1.3,gy*1.3,71), n2=fbm(gx*6,gy*6,72); pc=mixC([96,74,50],[122,96,64],n); pc=mixC(pc,[70,54,36],smooth(0.6,0.8,n2)*0.5);   // packed earth, swept, with straw strewn on it
+        const sx=gx*5+fbm(gx,gy,73)*3, st=Math.abs(Math.sin(sx*2.1+gy*9.3))>0.985 && fbm(gx*2,gy*2,74)>0.45; if(st) pc=mixC(pc,[196,168,96],0.7); }
+      else if(F==='flag'){ const row=Math.floor(gy*1.6), fx=gx*1.6+((row*37)%5)*0.31, cx=Math.floor(fx), fy=gy*1.6-row, ex=fx-cx, ed=Math.min(ex,1-ex,fy,1-fy), sh=(hsh(cx*7+3,row*11+5)%1000)/1000;   // big flagstones, worn smooth in the middle
+        pc=mixC([96,92,84],[134,128,116],sh); pc=mixC(pc,[150,144,130],fbm(gx*3,gy*3,75)*0.25); if(ed<0.04) pc=[46,42,38]; else if(ed<0.08) pc=mixC(pc,[60,56,50],0.5); }
+      else if(F==='parquet'){ const cx=Math.floor(gx*2), cy=Math.floor(gy*2), dir=(cx+cy)&1, u=dir?gx*2-cx:gy*2-cy, v=dir?gy*8:gx*8, seam=Math.abs(u*4-Math.round(u*4))<0.08 || Math.abs(gx*2-cx)<0.03 || Math.abs(gy*2-cy)<0.03;   // basket-weave oak, polished
+        pc=mixC(dir?[150,104,58]:[124,84,46],[96,62,32],fbm(v*0.6+cx,u*3+cy,76)*0.6); if(seam) pc=mixC(pc,[40,26,14],0.6); }
+      else { const plank=Math.floor(gx*2.6), seam=Math.abs(gx*2.6-plank-0.5)>0.44, sh=(hsh(plank*13+7,Math.floor(gy*0.7+plank*0.37)*5)%1000)/1000;   // a ship's deck: grey weathered boards, tarred seams, odd boards from other wrecks
+        pc=mixC([118,108,92],[86,78,66],fbm(gx*18+plank*7,gy*2.5,77)); if(sh>0.82) pc=mixC(pc,[110,70,48],0.5); else if(sh<0.1) pc=mixC(pc,[70,84,90],0.45); if(seam) pc=[22,18,14];
+        const bx=gy*0.7+plank*0.37; if(Math.abs(bx-Math.round(bx))<0.02) pc=[30,24,18]; if(((Math.floor(gy*3)+plank)%7)===0 && Math.abs(gx*2.6-plank-0.5)<0.06 && Math.abs(gy*3-Math.floor(gy*3)-0.5)<0.08) pc=[40,36,32]; }
+      D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
     if(theme==='interior' && !AREAS[areaId].volcanic){ const plank=Math.floor(gy*2.2), seam=Math.abs(gy*2.2-plank-0.5)>0.46, grain=fbm(gx*3,gy*18+plank*7,15);
       let pc=mixC([128,90,54],[96,66,38],grain); if(seam) pc=mixC(pc,[40,26,14],0.7); if(((plank*37)%11)<2) pc=mixC(pc,[150,110,70],0.3);
       const o=(py*TWp+px)*4, k=1-0.3*(1-smooth(0,1.3,Math.min(gx,gy)));
@@ -13453,7 +13535,7 @@ Object.assign(AREAS,{
   goldhouse: CROOM('Gold Brothers Trading Company',8,6,'market','fromGold', ()=>[{type:'counter', i:1, j:1, fp:[3,1]}, {type:'table', i:5, j:2}, {type:'crate', i:7, j:0}, {type:'crate', i:7, j:1}, {type:'barrel', i:6, j:0}, {type:'rack', i:0, j:3}, {type:'hearth', i:0, j:0}],
     ()=>[
       { id:'mira', name:'Mira Quell, Clerk', i:2, j:2, dir:0, opts:{gender:'f',skin:0,hair:1,hairColor:3,face:1,equip:{head:null,torso:'tunic_blue',armor:null,hands:null,legs:'hose_grey',feet:'boots',weapon:null,offhand:null}} } ]),
-  barracks: CROOM('The Barracks',8,4,'keepward','fromBarracks', ()=>[{type:'bed', i:0, j:0, fp:[2,1]}, {type:'bed', i:0, j:1, fp:[2,1]}, {type:'rack', i:7, j:0}, {type:'rack', i:7, j:1}, {type:'table', i:1, j:2}, {type:'barrel', i:5, j:0}],
+  barracks: CROOM('The Barracks',6,6,'keepward','fromBarracks', ()=>[{type:'bed', i:0, j:0, fp:[2,1]}, {type:'bed', i:0, j:1, fp:[2,1]}, {type:'rack', i:0, j:4}, {type:'rack', i:1, j:4}, {type:'table', i:1, j:2}, {type:'barrel', i:5, j:0}],
     ()=>[ { id:'voss', name:'Captain Voss', i:4, j:1, dir:1, opts:{gender:'f',skin:2,hair:0,hairColor:2,face:0,beard:0,equip:{head:null,torso:'tunic_red',armor:'brightmail',hands:'gauntlets',legs:'breeches',feet:'riding_boots',weapon:'longsword',offhand:null}} },
       { id:'recruit', name:'A Tired Guard', i:3, j:3, dir:2, opts:GUARD({skin:1,hair:1,beard:0,equip:{head:'kettle',torso:'tunic_red',armor:'gambeson',hands:null,legs:'hose_grey',feet:'boots',weapon:null,offhand:null}}) } ]),
 });
@@ -13820,7 +13902,8 @@ Object.assign(AREAS,{
 });
 AREAS.fearnhouse.shape=[[0,0,6,4],[4,4,2,2]];   // the trading room, and the counting-room at its front east: the L of the Mother House outside
 AREAS.fearnhouse.objects=(o=>()=>o().map(x=>x.type==='teleporter'&&x.to==='portfearn'?{...x, i:5, j:2}:x))(AREAS.fearnhouse.objects); AREAS.fearnhouse.entries.fromCity={i:4,j:2};
-AREAS.barracks.shape=[[0,0,6,4],[6,0,2,3]];   // the barrack room, and the armoury at its east end
+AREAS.barracks.shape=[[0,0,6,4],[0,4,2,2]];   // the barrack room, and the armoury standing out at its front west
+AREAS.barracks.objects=(o=>()=>o().map(x=>x.type==='teleporter'&&x.to==='keepward'?{...x, i:4, j:3}:x))(AREAS.barracks.objects); AREAS.barracks.entries.fromCity={i:4,j:2};
 AREA_PATHS.portfearn=[ [[7.5,6],[7.5,13.5]], [[0,9.5],[18,9.5]] ];
 { const o=AREAS.portfearn.objects().find(o=>o.inside==='fearnhouse'); AREAS.portfearn.entries.fromHouse={i:doorTile(o)[0], j:doorTile(o)[1]}; }
 const sail=(to,entry,msg)=>{ closeDialog(); dayClock+=DAY_LEN*0.5; switchArea(to,entry); logMsg(msg,'#9fc8e0'); };
@@ -25285,7 +25368,7 @@ function ucEerie(kind){ try{ SND.fx('whoosh',0.35); }catch(e){} shake=Math.max(s
 // ════════ UNDERCITY SHORTCUTS AND SET PIECES ════════
 //   Shortcuts: deep in each quarter a ladder goes up to a grate in the street, bolted from below. Knock the bolt loose once and the grate is a way straight back down
 //   to that deep chamber. Set pieces: a couple of chambers in each quarter dressed as somewhere in particular, to steer by among all the samey halls
-const UC_SHORT={ under_nw:{ area:'keepward', at:[21,19], ent:[20,19], name:'the Keep Ward' }, under_ne:{ area:'lowstreets', at:[9,12], ent:[9,13], name:'the Lowstreets' },
+const UC_SHORT={ under_nw:{ area:'keepward', at:[18,19], ent:[18,18], name:'the Keep Ward' }, under_ne:{ area:'lowstreets', at:[9,12], ent:[9,13], name:'the Lowstreets' },
   under_sw:{ area:'chapelin', at:[1,5], ent:[2,5], name:'the chapel above' }, under_se:{ area:'market', at:[2,14], ent:[2,15], name:'the Market Ward' } };
 (()=>{ UC_QS.forEach(q=>{ const starts=Object.values(UCR).filter(r=>r.q===q && Object.values(r.ex).some(([to])=>!UCR[to] || UCR[to].q!==q)).map(r=>r.id), dist={}, Q=[...starts]; starts.forEach(x=>dist[x]=0);
     while(Q.length){ const id=Q.shift(); Object.values(UCR[id].ex).forEach(([to])=>{ if(UCR[to] && UCR[to].q===q && dist[to]==null){ dist[to]=dist[id]+1; Q.push(to); } }); }
@@ -27116,7 +27199,7 @@ function climbStairs(o){ if(player.climb) return; if(o.locked && o.locked()){ o.
   ['guildhall',[ {type:'rug', i:1, j:3, fp:[5,2], col:'#2a3a5a', trim:'#c8a050', flat:true, noblock:true, dz:-99}, {type:'lectern', i:2, j:0}, {type:'notice', i:6, j:0}, {type:'strongbox', i:7, j:5} ]],
   ['goldhouse',[ {type:'rug', i:1, j:3, fp:[3,2], col:'#5a2a1a', trim:'#d8b050', flat:true, noblock:true, dz:-99}, {type:'strongbox', i:1, j:0}, {type:'strongbox', i:3, j:0} ],{counttable:[5,2]}],
   ['fearnhouse',[ {type:'rug', i:1, j:3, fp:[3,1], col:'#5a2a1a', trim:'#d8b050', flat:true, noblock:true, dz:-99}, {type:'strongbox', i:4, j:5}, {type:'strongbox', i:5, j:5} ],{counttable:[4,0]}],
-  ['barracks',[ {type:'footlocker', i:2, j:0}, {type:'footlocker', i:2, j:1}, {type:'armorstand', i:7, j:2}, {type:'armorstand', i:6, j:2}, {type:'crates', i:0, j:3} ]],
+  ['barracks',[ {type:'footlocker', i:2, j:0}, {type:'footlocker', i:2, j:1}, {type:'armorstand', i:0, j:5}, {type:'armorstand', i:1, j:5}, {type:'crates', i:5, j:3} ]],
   ['dicenden',[ {type:'kegrack', i:1, j:0, fp:[2,1]}, {type:'barrel', i:4, j:0} ],{dicetable:[4,2]}],
   ['gbtunnel',[ {type:'puddle', i:0, j:2, flat:true, noblock:true, dz:-99}, {type:'puddle', i:1, j:4, s:0.8, flat:true, noblock:true, dz:-99}, {type:'puddle', i:0, j:6, s:1.2, flat:true, noblock:true, dz:-99}, {type:'crate', i:1, j:2}, {type:'barrel', i:1, j:5}, {type:'rubble', i:0, j:7, noblock:true} ]],
   ['tunnel',[ {type:'puddle', i:6, j:1, flat:true, noblock:true, dz:-99}, {type:'puddle', i:15, j:1, s:1.2, flat:true, noblock:true, dz:-99}, {type:'puddle', i:21, j:1, s:0.8, ox:0.2, flat:true, noblock:true, dz:-99} ]] ].forEach(([area,add,swap])=>wrap(area,'objects',l=>{
@@ -31766,22 +31849,23 @@ onUse(['drowngate'],o=>{ if(CHOICE.gateKey){ pzSay('The key turns. Something bel
 { const _nb=TALKERS.wrackboard; }
 
 // ════════ buildings as big outside as they are inside: each grows away from its door (into the back of the map, or over the edge), so the door, and everything in front of it, stays where it was ════════
+wrap('wrackhaven','objects',l=>l.map(o=>o.type==='bldg'?{...o, makeshift:true}:o));   // Wrackhaven builds from whatever the sea brings it
 const GROW={
-  farm:{ farmhouse:{W:4,H:4, fp:[5,3], at:[-1,0], dt:2, ridgeI:true, wings:[[0,3,2,2]]} },   // the farmhouse: a long front to the yard, the kitchen wing standing out at its west end, the door in the east gable   // the farmhouse, and a dairy built on at its front corner
-  village:{ wheatsheaf:{W:4,H:4, fp:[6,4], at:[-3,-1], dt:3, ridgeI:true, wings:[[4,4,2,2]]},   // the inn: a long taproom fronting the square, the kitchen wing standing out at its east end, the door in the east gable
+  farm:{ farmhouse:{W:4,H:4, fp:[5,3], at:[-1,0], dt:2, ridgeI:true, wall:'daub', wings:[[0,3,2,2]]} },   // the farmhouse: a long front to the yard, the kitchen wing standing out at its west end, the door in the east gable   // the farmhouse, and a dairy built on at its front corner
+  village:{ wheatsheaf:{W:4,H:4, fp:[6,4], at:[-3,-1], dt:3, ridgeI:true, wall:'daub', wings:[[4,4,2,2]]},   // the inn: a long taproom fronting the square, the kitchen wing standing out at its east end, the door in the east gable
              elderhouse:{W:4,H:4, fp:[6,3], at:[8,1], dt:4, ridgeI:true, wings:[[0,3,3,2]]} },   // Hamond's: a long house fronting the square, and a gabled sleeping wing standing out from it
   clearing:{ lodge:{W:4,H:3, east:1} },   // a hunter's cabin: no wings   // Brann's lodge, and a woodshed against it
   citygate:{ inn:{W:6,H:4, fp:[6,4], at:[-1,2], dt:3, wings:[[4,4,2,2]]} },   // the Crooked Lantern: the taproom, and the bar and tap-room standing out at its front east   // the Crooked Lantern, and its stable behind
   sylvhaven:{ weavetent:{W:3,H:3}, moonbath:{W:3,H:3}, guesttent:{W:3,H:3} },   // elven tents: light, no bigger than they need to be
   market:{ guildhall:{W:4,H:5}, tailorshop:{W:4,H:5}, smithy:{W:4,H:5}, goldhouse:{W:5,H:4} },   // a row of town houses, each only a little deeper than it was
   lowstreets:{ steamcellar:{W:4,H:4}, dicenden:{W:4,H:4, south:1} },
-  keepward:{ barracks:{W:5,H:5, fp:[6,4], at:[20,14], dt:4, wings:[[6,0,2,3]]} },   // the barracks, and the armoury built on at its east end   // the barracks, and its armoury on the east end
+  keepward:{ barracks:{W:5,H:5, fp:[6,4], at:[20,14], dt:4, wings:[[0,4,2,2]]} },   // the barracks, and the armoury built on at its east end   // the barracks, and its armoury on the east end
   portfearn:{ fearnhouse:{W:5,H:4, fp:[6,4], at:[-1,6], dt:2, wings:[[4,4,2,2]]}   /* the Mother House, and its counting-room at the front east */ },   // the Mother House, and its counting-room behind
   wrackhaven:{ bilge:{W:6,H:4, fp:[7,5], at:[1,-2], dt:3, wings:[[0,5,2,2]]}, chandlery:{W:4,H:4} } };   // the Bilge & Barnacle, and its brewhouse on the west
 function growBuilding(o,G){ const [fw,fh]=o.fp, W=Math.max(fw,G.W), H=Math.max(fh,G.H), dt=o.dt??1, out={...o, fp:[W,H], grown:true};
   if(o.door==='l'){ out.j=o.j+fh-H; const east=G.east||0, west=W-fw-east; out.i=o.i-west; out.dt=dt+west; }   // the south face stays put: grow north, and sideways as told
   else { out.i=o.i+fw-W; const south=G.south||0, north=H-fh-south; out.j=o.j-north; out.dt=dt+north; }       // the east face stays put: grow west, and north
-  if(G.ridgeI) out.ridgeI=true;
+  if(G.ridgeI) out.ridgeI=true; if(G.wall) out.wall=G.wall;
   if(G.at){ out.movedFrom=doorTile(out); if(G.fp) out.fp=[...G.fp]; out.i=G.at[0]; out.j=G.at[1]; if(G.dt!=null) out.dt=G.dt; }   // or set down somewhere else entirely
   return out; }
 // the map grew a margin behind the big houses: what stood along the old edge (crates by the fence, a field, a way out) moves out to the new one,
@@ -31816,8 +31900,8 @@ for(const area in GROW){ const A=AREAS[area]; if(!A) continue; const oF=A.object
       if(!behind) o.dz=Math.min(o.dz??1e9, wi+wj+w+h-1.25);   // a wing in front of the house: the house is drawn first, so it never paints over the wing   // an arm on the far side tucks its end into the house: draw it first, so the house covers the join
       const ew = wi+w===o.i || wi===o.i+W;   // the arm's ridge runs away from the wall it stands against, and the arm stands a little lower than the house
       L.push(o.type==='bldg'
-        ? {type:'bldg', i:wi, j:wj, fp:[w,h], v:o.v, h:bWH(o), stone:o.stone, ...(ew?{}:{ridge:'j'}), ...(behind?{}:(ew?{joinW:true, rExt:Math.min(o.fp[0],2)*0.5}:{joinN:true, rExt:Math.min(o.fp[1],2)*0.5})), nochim:true, dz, grown:true, wing:o.inside}
-        : {type:o.type, i:wi, j:wj, fp:[w,h], roof:o.roof, arm:ew, wing2:!ew, wh:132+(Math.max(W,H)-3)*14, rExt:ew?0:w/2+0.12, dz, grown:true, wing:o.inside}); }));
+        ? {type:'bldg', i:wi, j:wj, fp:[w,h], v:o.v, h:bWH(o), stone:o.stone, makeshift:o.makeshift, ...(ew?{}:{ridge:'j'}), ...(behind?{}:(ew?{joinW:true, rExt:Math.min(o.fp[0],2)*0.5}:{joinN:true, rExt:Math.min(o.fp[1],2)*0.5})), nochim:true, dz, grown:true, wing:o.inside}
+        : {type:o.type, i:wi, j:wj, fp:[w,h], roof:o.roof, wall:o.wall, arm:ew, wing2:!ew, wh:132+(Math.max(W,H)-3)*14, rExt:ew?0:w/2+0.12, dz, grown:true, wing:o.inside}); }));
     const big=L.filter(o=>o.grown);
     const inBig=(i,j)=>big.some(b=>i>=b.i&&j>=b.j&&i<b.i+b.fp[0]&&j<b.j+b.fp[1]);
     const busy=new Set(); L.forEach(o=>{ if(o.noblock&&o.dz!=null&&o.dz<-90) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) busy.add((o.i+a)+','+(o.j+b)); });

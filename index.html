@@ -6426,7 +6426,7 @@ function switchArea(id,entryKey){
   updateMinimap();
   banner(A.label,'#e8c878',1300);
   skelFollowArea(); stonesHint(id); fenOpenCheck(id); fenRumour(id); poolsArea(id); introScene(id,entryKey);
-  markElves(); tentBlock(id); shapeBlock(id); corridorBlock(id); repairReach(id);
+  markElves(); tentBlock(id); shapeBlock(id); corridorBlock(id); clearRound(); repairReach(id);
   try{ pupArea(); }catch(err){ console.error(err); }
   transitArea(prev,id);
   autosaveSoon();
@@ -18061,6 +18061,8 @@ function repairReach(id){ const A=AREAS[id]; if(!A || A.maze || A.ucq) return; c
     if(chair){ OBJECTS.splice(OBJECTS.indexOf(chair),1); blocked.delete(chair.i+','+chair.j); continue; }
     if(!outdoors) return; let soft=null; for(const t of bad){ soft=softFor(t,seen); if(soft) break; }   // outdoors a tree, lamp or stump that closes the pocket gives way
     if(!soft) return; for(let n=OBJECTS.length-1;n>=0;n--){ const o=OBJECTS[n]; if(o.i===soft.i&&o.j===soft.j&&SOFT_T.test(o.type)&&!o.noblock) OBJECTS.splice(n,1); } blocked.delete(soft.i+','+soft.j); } }
+// a thing meant to be found (o.clear) keeps its own tile and the ring round it free of trees and bushes, whatever the forest pass grew there
+function clearRound(){ OBJECTS.filter(o=>o.clear).forEach(c=>{ for(let n=OBJECTS.length-1;n>=0;n--){ const o=OBJECTS[n]; if(o!==c && /^(tree|pine|birch|oak|deadtree|bush|shrub|stump)$/.test(o.type) && Math.abs(o.i-c.i)<=1 && o.j>=c.j-(c.clear>1?1:0) && o.j<=c.j+1){ OBJECTS.splice(n,1); if(!OBJECTS.some(x=>x.i===o.i&&x.j===o.j&&!x.noblock)) blocked.delete(o.i+','+o.j); } } }); }
 const SOFT_T=/^(tree|pine|birch|oak|deadtree|lamp|lantern|stump|haystack|bush|shrub)$/;
 function shapeBlock(id){ if(!AREAS[id] || !AREAS[id].shape) return; for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++) if(!inShape(i,j)) blocked.add(i+','+j); }
 function shapeWalls(){ const out=[], W=ROOM.w, H=ROOM.h;   // every back edge of the floor: 'r' runs along a row (i0..i1 at j), 'l' along a column (j0..j1 at i)
@@ -29812,12 +29814,15 @@ let BD_CHAIN=0, BD_READY=false;
 const bladeQ=()=>CHOICE.bladeQ||null, bladeMarks=()=>Array.isArray(CHOICE.bladeMarks)?CHOICE.bladeMarks:(CHOICE.bladeMarks=[]);
 const techCount=()=>Object.values(TECHS).filter(T=>techKnown(T.id)).length;
 const BLADE_SITES={ road:{area:'road', i:12, j:1, name:'the wayside shrine on the Forest Road'}, crossroads:{area:'crossroads', i:6, j:6, name:'the signpost at the Crossroads'}, kingsroad:{area:'kingsroad', i:3, j:13, name:"the old milestone on the King's Road"} };
-Object.entries(BLADE_SITES).forEach(([k,S])=>wrap(S.area,'objects',l=> bladeQ()==='asked' && !bladeMarks().includes(k) ? [...l,{type:'bladespot', k, i:S.i, j:S.j, noblock:true}] : l));
+Object.entries(BLADE_SITES).forEach(([k,S])=>wrap(S.area,'objects',l=> bladeQ()==='asked' && !bladeMarks().includes(k) ? [...l,{type:'bladespot', k, i:S.i, j:S.j, noblock:true, clear:1}] : l));
 NEAR_NAME.bladespot='a duellist\'s mark';
-OBJ_DRAW.bladespot=o=>{ const q=P(o.i+0.5,o.j+0.5), T=gt; g.save();
+OBJ_DRAW.bladespot=o=>{ const q0=P(o.i+0.5,o.j+0.5), T=gt; g.save();
+  g.fillStyle='rgba(20,16,10,0.28)'; g.beginPath(); g.ellipse(q0.x,q0.y+1,15,6,0,0,Math.PI*2); g.fill();   // its shadow
+  g.translate(q0.x,q0.y); g.scale(1.8,1.8); const q={x:0,y:0};   // drawn big enough to see from the road
   g.fillStyle='#6a6458'; g.beginPath(); g.moveTo(q.x-7,q.y+2); g.lineTo(q.x-5,q.y-16); g.quadraticCurveTo(q.x,q.y-20,q.x+5,q.y-16); g.lineTo(q.x+7,q.y+2); g.closePath(); g.fill();   // a knee-high stone
   g.strokeStyle='#2a2620'; g.lineWidth=1.2; g.beginPath(); g.moveTo(q.x-3,q.y-13); g.lineTo(q.x+3,q.y-5); g.moveTo(q.x+3,q.y-13); g.lineTo(q.x-3,q.y-5); g.moveTo(q.x,q.y-15); g.lineTo(q.x,q.y-3); g.stroke();   // three cuts, crossed
-  g.globalCompositeOperation='lighter'; glow(q.x,q.y-9,10,9,'180,210,255',0.18+Math.sin(T*2)*0.06); g.restore(); };
+  g.strokeStyle='rgba(200,220,255,0.55)'; g.lineWidth=0.6; g.beginPath(); g.moveTo(q.x-3,q.y-13.6); g.lineTo(q.x+3,q.y-5.6); g.moveTo(q.x+3,q.y-13.6); g.lineTo(q.x-3,q.y-5.6); g.stroke();   // the cuts catch the light
+  g.globalCompositeOperation='lighter'; glow(q.x,q.y-9,12,11,'180,210,255',0.3+Math.sin(T*2)*0.1); g.restore(); };
 Object.assign(WEAPONS,{ echo_blade:{ wind:0.26, dmg:11, len:30 } });
 FOES.echo={ label:'Echo', base:70, stagger:0.9, pattern:[{wait:0.6,wind:0.55,after:0.4,dir:'left'},{wait:0.25,wind:0.5,after:0.4,dir:'right',feint:'left'},{wait:0.9,wind:0.7,after:0.55,dir:'up'},{wait:0.3,wind:0.45,after:0.35,dir:'right'},{wait:0.8,wind:0.65,after:0.5,dir:'left',feint:'up'}] };
 BEASTS.push({ k:'echo', is:f=>f.type==='echo', name:"Corvin's Echoes", kind:'Old fights, still going · the roads', how:'Quick cuts from either side, an overhead blow, and feints: what you see first is not always what comes.', res:'Not there enough to bleed.', aff:'Win cleanly. They only fade when they are beaten.' });

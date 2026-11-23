@@ -4895,6 +4895,26 @@ function drawHead(c, x, B, opts, view=0){
       c.strokeStyle=tone(ELFC.silver,-0.4); c.lineWidth=0.4; c.stroke();
       c.fillStyle='rgba(255,255,255,0.85)'; c.beginPath(); c.arc(x+gx-0.4,B+gy-0.4,0.4,0,Math.PI*2); c.fill(); }
   }
+  // the bear-skull cloak: the bear's own skull worn as a hood, fur ruff behind it, the upper jaw over your brow
+  if(/^(t_)?bearskull_cloak$/.test(EQ.cloak||'') && !EQ.head && !opts.shell){ const BN='#e4d8bc', BD='#7a6a4e', FUR='#4a3424', top=Y.SKULL_TOP, front=V.turn>-0.25, prof=pr>0.8, fd=1;
+    c.save(); c.translate(x+LN,B+top+6); c.scale(1.32,1.32); c.translate(-(x+LN),-(B+top+6.6));   // a bear's skull is bigger than yours c.fillStyle=FUR; c.beginPath(); c.ellipse(x+LN-(prof?1.5:0),B+top+4.5,HW+2.6,6.4,0,Math.PI,0); c.lineTo(x+LN+HW+2.6-(prof?1.5:0),B+top+7.5); c.quadraticCurveTo(x+LN,B+top+5.5,x+LN-HW-2.6-(prof?1.5:0),B+top+7.5); c.closePath(); c.fill();   // the fur ruff over the crown
+    c.strokeStyle=tone(FUR,0.2); c.lineWidth=0.5; for(let k=0;k<7;k++){ const a=Math.PI*(1.05+k*0.13); c.beginPath(); c.moveTo(x+LN+Math.cos(a)*(HW+1.2),B+top+4.5+Math.sin(a)*5.6); c.lineTo(x+LN+Math.cos(a)*(HW+2.8),B+top+4.5+Math.sin(a)*6.8); c.stroke(); }
+    const cx=x+LN+(prof?0.6:0), cy=B+top+1.6;   // the cranium, a bone dome on top
+    c.fillStyle=BN; c.beginPath(); c.ellipse(cx,cy,HW*0.92,4.4,0,0,Math.PI*2); c.fill(); c.strokeStyle=BD; c.lineWidth=0.6; c.stroke();
+    c.strokeStyle=tone(BN,-0.25); c.lineWidth=0.5; c.beginPath(); c.moveTo(cx-(prof?2:0),cy-4.2); c.lineTo(cx-(prof?2.4:0),cy+1.5); c.stroke();   // the ridge down the middle
+    if(!front){ c.restore(); }
+    else if(prof){ const fx=x+LN+HW*0.6, sy=B+Y.HAIRLINE-0.6;   // side on: the long snout out over the face
+      c.fillStyle=BN; c.beginPath(); c.moveTo(fx-2,cy-2.6); c.quadraticCurveTo(fx+4,cy-2.2,fx+HW+3.6,sy-1.2); c.lineTo(fx+HW+4.2,sy+1.2); c.lineTo(fx-1,sy+1.6); c.closePath(); c.fill(); c.strokeStyle=BD; c.lineWidth=0.6; c.stroke();
+      c.fillStyle='#2a2016'; c.beginPath(); c.ellipse(fx-0.6,cy+0.4,1.5,1.2,0,0,Math.PI*2); c.fill();   // the socket
+      c.beginPath(); c.ellipse(fx+HW+3.2,sy-0.3,0.7,0.6,0,0,Math.PI*2); c.fill();   // the nose hole
+      c.fillStyle='#f4ecd8'; for(let k=0;k<4;k++){ const tx=fx+1+k*(HW+2)/4; c.beginPath(); c.moveTo(tx-0.6,sy+1.4); c.lineTo(tx,sy+(k===0?3.6:2.6)); c.lineTo(tx+0.6,sy+1.4); c.closePath(); c.fill(); }
+      c.restore(); }
+    else { const off=faceOff(pr)*0.6, sy=B+Y.HAIRLINE-0.2, w=HW*0.62;   // face on: the muzzle comes at you over the brow
+      c.fillStyle='#2a2016'; [-1,1].forEach(sd=>{ c.beginPath(); c.ellipse(cx+off+sd*HW*0.45,cy+0.8,1.5,1.2,sd*0.3,0,Math.PI*2); c.fill(); });   // the sockets
+      c.fillStyle=BN; c.beginPath(); c.moveTo(x+LN+off-w,cy+0.2); c.quadraticCurveTo(x+LN+off,cy-1.4,x+LN+off+w,cy+0.2); c.lineTo(x+LN+off+w*0.85,sy+1); c.lineTo(x+LN+off-w*0.85,sy+1); c.closePath(); c.fill(); c.strokeStyle=BD; c.lineWidth=0.6; c.stroke();
+      c.fillStyle='#2a2016'; c.beginPath(); c.ellipse(x+LN+off,sy-1.6,1.2,0.8,0,0,Math.PI*2); c.fill();   // the nose hole
+      c.fillStyle='#f4ecd8'; for(let k=-2;k<=2;k++){ const tx=x+LN+off+k*w*0.38, long=Math.abs(k)===2; c.beginPath(); c.moveTo(tx-0.6,sy+0.8); c.lineTo(tx,sy+(long?3.4:2.2)); c.lineTo(tx+0.6,sy+0.8); c.closePath(); c.fill(); }   // the upper teeth, fangs at the corners
+      c.restore(); } }
 }
 
 // Headgear is drawn in head space (same LN lean as the face).
@@ -13590,9 +13610,14 @@ function rulerTalk(){
 wrap('kingsroad','npcs',l=> BARON_DOWN() && !CHOICE.unpaid && CHOICE.ruler!=='voss' && nightAmt()>0.5 ? [...l,{ id:'harl', name:'Sergeant Harl', i:4, j:10, dir:1,
   opts:BANDIT({skin:3,hair:0,hairColor:2,beard:4,face:0,equip:{head:'coif',torso:'tunic_red',armor:'blackmail',hands:'gloves',legs:'hose_grey',feet:'boots',weapon:'longsword',offhand:null}}) }] : l);
 // Captain Voss drilled under the same sergeants as Harl: if Harl cannot teach you the riposte, she will, for coin
-function vossRiposte(...a){ if(typeof techKnown!=='function' || techKnown('riposte') || CHOICE.unpaid==='paid') return vossTalk(...a); const V='Captain Voss', fee=90;
-  say(V,["“You hold a blade like someone who has had a lesson or two. Not the riposte, though. I can see it in your feet.”"],[
-    {label:'“Teach me the riposte.” (-'+fee+'c)', off:player.purse<fee, fn:()=>{ player.purse-=fee; updateHud(); say(V,["“The Baron's drill: you set yourself, you take his blow on the right, and you answer in the same breath. Not before. Not after.”","<i>An hour in the yard behind the barracks, and a bruise on your ribs that will last the week.</i> “Good. Again tomorrow, on your own.”"],[{label:'Learn the Riposte.', fn:()=>{ learnTech('riposte'); closeDialog(); }}]); }},
+function vossRiposte(...a){ if(typeof techKnown!=='function') return vossTalk(...a); const V='Captain Voss';
+  const LESSON={ riposte:{fee:90, lines:["“The Baron's drill: you set yourself, you take his blow on the right, and you answer in the same breath. Not before. Not after.”"]},
+    lunge:{fee:70, lines:["“Long arm, long step, and all your weight behind the point. Through his guard, not round it. Again. Lower.”"]},
+    bash:{fee:80, lines:["“A shield is a fist with a board on it. Step in behind it and put it in his face, then cut while he's still blinking.”"]} };
+  const miss=Object.values(TECHS).filter(T=>!techKnown(T.id) && LESSON[T.id] && !(T.id==='riposte' && CHOICE.unpaid==='paid'));   // Harl owes you the riposte himself
+  if(!miss.length) return vossTalk(...a);
+  say(V,["“You hold a blade like someone who has had a lesson or two. Not every lesson, though. I can see it in your feet.”"],[
+    ...miss.map(T=>{ const L=LESSON[T.id]; return {label:'“Teach me the '+T.name.toLowerCase()+'.” (-'+L.fee+'c)', off:player.purse<L.fee, fn:()=>{ player.purse-=L.fee; updateHud(); say(V,[...L.lines,"<i>An hour in the yard behind the barracks, and a bruise that will last the week.</i> “Good. Again tomorrow, on your own.”"],[{label:'Learn the '+T.name+'.', fn:()=>{ learnTech(T.id); closeDialog(); }}]); }}; }),
     {label:'Something else.', fn:()=>vossTalk(...a)}, bye]); }
 function harlSpawn(){ closeDialog(); FIGHT_UNDO=()=>{ CHOICE.unpaid=null; }; CHOICE.unpaid='fought'; MOB_SPAWNS.length=0;
   MOB_SPAWNS.push({ name:'Sergeant Harl', type:'brute', i:4, j:10, faction:'unpaid', opts:BANDIT({skin:3,hair:0,hairColor:2,beard:4,equip:{head:'helm_full',torso:'tunic_red',armor:'blackmail',hands:'gloves',legs:'hose_grey',feet:'boots',weapon:'longsword',offhand:null}}) },
@@ -21650,7 +21675,7 @@ function techTeachIntro(){ if(!inFight() || !meleeHeld() || !anyTech()) return;
   teach('momentum','Momentum',["The <b>gold bar</b> under your health is <b>momentum</b>. Your sword techniques spend it.","It fills when you <b>block</b>, <b>parry</b> (a perfect parry most of all) and land <b>clean hits</b>. Getting hit drains it.","Your techniques and what they do are in the <b>Spells</b> book (<b>B</b>), on the Sword page."]); }
 function techReadyTeach(){ if(!inFight() || !meleeHeld()) return; const mom=player.mom||0;
   Object.values(TECHS).forEach(T=>{ if(techKnown(T.id) && mom>=T.cost && !(T.id==='bash' && !/shield/.test(player.opts.equip.offhand||''))) teach('tech_'+T.id,T.name+' is ready',TECH_TEACH[T.id]); }); }
-function techWhere(T){ return T.id==='lunge'?(QUEST.wolves>=2?'Brann the Hunter will teach it for two cuts of raw meat.':'Brann the Hunter might teach it once the wolves are dealt with.'):T.id==='bash'?'Oswin the Armourer in Hollowmere teaches it, if you bring a shield.':(CHOICE.unpaid==='paid'?'Harl the Watchman, by the well in Dunhollow, owes you a lesson.':CHOICE.unpaid?'Captain Voss, in the barracks in the Keep Ward, drilled under the same sergeants. She will teach it, for a fee.':typeof BARON_DOWN==='function'&&BARON_DOWN()?'Sergeant Harl, who once ran the Baron’s drill yard, waits on the King’s Road at night with his unpaid men. Settle with them and he may teach it. (Captain Voss in the barracks knows it too.)':'Someone who served in the Baron’s drill yard would know it: Captain Voss, in the barracks in the Keep Ward, for one.'); }
+function techWhere(T){ return T.id==='lunge'?(QUEST.wolves>=2?'Brann the Hunter will teach it for two cuts of raw meat. (Captain Voss in the Keep Ward barracks teaches it too, for coin.)':'Brann the Hunter might teach it once the wolves are dealt with. (Captain Voss in the Keep Ward barracks teaches it too, for coin.)'):T.id==='bash'?'Oswin the Armourer in Hollowmere teaches it, if you bring a shield. (Captain Voss in the Keep Ward barracks teaches it too, for coin.)':(CHOICE.unpaid==='paid'?'Harl the Watchman, by the well in Dunhollow, owes you a lesson.':CHOICE.unpaid?'Captain Voss, in the barracks in the Keep Ward, drilled under the same sergeants. She will teach it, for a fee.':typeof BARON_DOWN==='function'&&BARON_DOWN()?'Sergeant Harl, who once ran the Baron’s drill yard, waits on the King’s Road at night with his unpaid men. Settle with them and he may teach it. (Captain Voss in the barracks knows it too.)':'Someone who served in the Baron’s drill yard would know it: Captain Voss, in the barracks in the Keep Ward, for one.'); }
 function learnTech(id){ CHOICE.tech={...(CHOICE.tech||{}), [id]:true}; const T=Object.values(TECHS).find(x=>x.id===id);
   logMsg('You learned '+T.name+'. In a fight with a blade, hold that side and press Q (or the Technique button). It is written up in your Spells book (B), on the Sword page.','#f0c060'); banner(T.name,'#f0c060',1800);
   try{ SND.fx('quest'); }catch(e){} updateHud(); try{ autosaveSoon(400); }catch(e){} }

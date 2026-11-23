@@ -7169,6 +7169,64 @@ const ROOM_MAT={ farmhouse:{wall:'daub',floor:'earth'}, lodge:{wall:'log',floor:
   smithy:{wall:'stone',floor:'flag'}, barracks:{wall:'stone',floor:'flag'}, barracks_up:{wall:'stone',floor:'plank'}, steamcellar:{wall:'stone',floor:'flag'}, dicenden:{wall:'daub',floor:'earth'},
   bilge:{wall:'salvage',floor:'deck'}, chandlery:{wall:'salvage',floor:'deck'} };
 const roomMat=()=>{ const A=AREAS[areaId]; return ROOM_MAT[areaId] || (A && A.mat) || (A && REGION_OF && REGION_OF[areaId]==='The Wrack Coast' && A.theme==='interior' && !A.cave ? {wall:'salvage',floor:'deck'} : {wall:'log',floor:'plank'}); };
+// the things people hang on their walls: what a room holds depends on who lives there
+const DECOR_SETS={ village:['shelf','herbs','pegs','picture','sconce','garlic','pans','shelf'], town:['picture','shelf','sconce','picture','books','tapestry','pegs'],
+  rich:['picture','tapestry','map','sconce','books','picture','charter'], lodge:['antlers','pelt','pegs','herbs','shelf','bow'], soldier:['shield','spears','sconce','pegs','shield','map'],
+  harbour:['net','oar','pegs','shelf','sconce','lantern','rope'], stone:['sconce','shelf','tools','sconce'] };
+function decorSet(MAT){ const id=areaId; if(/lodge/.test(id)) return 'lodge'; if(/barracks|keephall|guard/.test(id)) return 'soldier'; if(/guildhall|goldhouse|fearnhouse|keep/.test(id)) return 'rich';
+  if(MAT==='salvage') return 'harbour'; if(MAT==='stone') return 'stone'; if(MAT==='plaster') return 'town'; return 'village'; }
+function wallDecor(a,b,side,seg,winT,MAT,lenTiles){ if(AREAS[areaId] && AREAS[areaId].noDecor) return;
+  const LN=seg?seg.ln:0, at=(t,hh)=>({x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t-hh}), n=Math.max(1,Math.round(lenTiles)), set=DECOR_SETS[decorSet(MAT)], sd=[...areaId].reduce((s,c)=>s*31+c.charCodeAt(0)|0,7)+(side==='l'?99:0)+LN*13;
+  const along=t=>seg ? (side==='l' ? seg.u1+(seg.u0-seg.u1)*t : seg.u0+(seg.u1-seg.u0)*t) : side==='l'?ROOM.h*(1-t):ROOM.w*t;
+  const tallT=/hearth|forge|stairs|rack|shelf|armorstand|kegrack|loom|bookcase|wardrobe|counter|clothtable|tapestry/;
+  const busy=(OBJECTS||[]).filter(o=>tallT.test(o.type) && (side==='l' ? o.i===LN : o.j===LN)).map(o=>side==='l'?[o.j-0.3,o.j+(o.fp?o.fp[1]:1)+0.3]:[o.i-0.3,o.i+(o.fp?o.fp[0]:1)+0.3]);
+  const lit=side==='r', k=lit?0:-0.18, wood=tone('#5a4026',k), dark=tone('#2e2016',k), cloth=c=>tone(c,k-0.1);
+  for(let m=0;m<n;m++){ const t=(m+0.5)/n; if(winT!=null && Math.abs(t-winT)<0.16) continue; const u=along(t); if(busy.some(([p,q])=>u>p-0.3 && u<q+0.3)) continue;
+    if(rnd01(m,sd,401)<0.12) continue; const kind=set[Math.floor(rnd01(m,sd,402)*set.length)], c=at(t,0), y0=c.y, x0=c.x, dx=(b.x-a.x)/lenTiles/2, dy=(b.y-a.y)/lenTiles/2;   // (dx,dy): half a tile along the wall
+    const L=(f,h)=>({x:x0+dx*f, y:y0+dy*f-h});
+    const quad=(f0,f1,h0,h1,col,st)=>{ const p=[L(f0,h0),L(f1,h0),L(f1,h1),L(f0,h1)]; g.beginPath(); g.moveTo(p[0].x,p[0].y); p.slice(1).forEach(q=>g.lineTo(q.x,q.y)); g.closePath(); g.fillStyle=col; g.fill(); if(st){ g.strokeStyle=st; g.lineWidth=1; g.stroke(); } };
+    const line=(p,q,col,w)=>{ g.strokeStyle=col; g.lineWidth=w; g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(q.x,q.y); g.stroke(); };
+    g.save(); g.globalAlpha=0.92; g.translate(x0,y0-68); g.scale(1.6,1.6); g.translate(-x0,-(y0-68));   // big enough to read, centred on the middle of the wall
+    if(kind==='picture' || kind==='charter'){ const big=rnd01(m,sd,403)<0.4, w=big?0.55:0.38, h0=58, h1=h0+(big?34:26);
+      quad(-w,w,h0-3,h1+3,tone(kind==='charter'?'#6a5a30':'#4a3420',k),'rgba(10,6,2,0.5)');
+      if(kind==='charter'){ quad(-w+0.06,w-0.06,h0,h1,tone('#b8a888',k-0.12)); for(let r=0;r<4;r++) line(L(-w+0.14,h1-6-r*5),L(w-0.18,h1-6-r*5),'rgba(60,44,28,0.5)',0.8); g.fillStyle=tone('#7a2a22',k); const s0=L(w-0.2,h0+5); g.beginPath(); g.arc(s0.x,s0.y,2.6,0,Math.PI*2); g.fill(); }
+      else { const pal=[['#5e6e74','#4e5a3e','#3a4630'],['#6a5e48','#4a4030','#2e2a22'],['#4e5664','#3a3e2e','#5e4e34']][Math.floor(rnd01(m,sd,404)*3)];   // a faded painting: sky, hills, a dark tree, or a portrait
+        quad(-w+0.06,w-0.06,h0,h1,tone(pal[0],k-0.12));
+        if(rnd01(m,sd,405)<0.6){ quad(-w+0.06,w-0.06,h0,h0+(h1-h0)*0.45,tone(pal[1],k-0.12)); quad(-w+0.06,w-0.06,h0,h0+(h1-h0)*0.22,tone(pal[2],k-0.12)); const tr=L(-w*0.3,h0+(h1-h0)*0.5); g.fillStyle=tone('#2a2a1e',k); g.beginPath(); g.ellipse(tr.x,tr.y,3,5,0,0,Math.PI*2); g.fill(); }
+        else { const f=L(0,(h0+h1)/2+2); g.fillStyle=tone('#8a7058',k-0.15); g.beginPath(); g.ellipse(f.x,f.y-3,3.4,4.4,0,0,Math.PI*2); g.fill(); g.fillStyle=tone('#2e2a26',k); g.beginPath(); g.ellipse(f.x,f.y+7,7,5,0,Math.PI,0); g.fill(); } } }
+    else if(kind==='shelf' || kind==='books'){ const hs=64; line(L(-0.7,hs),L(0.7,hs),wood,4); line(L(-0.5,hs),L(-0.5,hs-8),dark,2); line(L(0.5,hs),L(0.5,hs-8),dark,2);
+      for(let q=0;q<6;q++){ const f=-0.6+q*0.24, it=rnd01(q+m*7,sd,406), p=L(f,hs+2);
+        if(kind==='books'||it<0.3){ const hb=8+it*5; g.fillStyle=tone(['#5a2a22','#2e3a4a','#4a4026','#3a2a1e'][q%4],k-0.05); g.fillRect(p.x-2,p.y-hb,4,hb); }
+        else if(it<0.65){ g.fillStyle=tone(['#8a6a48','#6e7a6a','#7a5a3a'][q%3],k); g.beginPath(); g.ellipse(p.x,p.y-5,3.4,5,0,0,Math.PI*2); g.fill(); g.fillStyle=dark; g.fillRect(p.x-1.6,p.y-11,3.2,2); }   // crocks and jars
+        else if(it<0.85){ g.fillStyle=tone('#6a6a62',k); g.beginPath(); g.ellipse(p.x,p.y-2,4.5,2.2,0,0,Math.PI*2); g.fill(); } } }   // a bowl
+    else if(kind==='herbs' || kind==='garlic'){ line(L(-0.6,92),L(0.6,92),dark,2.4); for(let q=0;q<4;q++){ const p=L(-0.45+q*0.3,92); line(p,{x:p.x,y:p.y+8},'rgba(60,44,28,0.7)',0.8);
+        if(kind==='garlic'){ g.fillStyle=tone('#c8bca0',k-0.15); for(let r=0;r<3;r++){ g.beginPath(); g.arc(p.x+(r-1)*2.5,p.y+11+r*2,2.6,0,Math.PI*2); g.fill(); } }
+        else { g.fillStyle=tone(['#5a6a3a','#6e6a40','#4a5a34'][q%3],k-0.1); g.beginPath(); g.moveTo(p.x-3,p.y+8); g.lineTo(p.x+3,p.y+8); g.lineTo(p.x+1,p.y+22); g.lineTo(p.x-1,p.y+22); g.closePath(); g.fill(); } } }
+    else if(kind==='pegs' || kind==='pans' || kind==='tools'){ line(L(-0.6,78),L(0.6,78),wood,3.4); for(let q=0;q<3;q++){ const p=L(-0.4+q*0.4,78), it=(q+m+(kind==='pans'?1:kind==='tools'?2:0))%3;
+        g.fillStyle=dark; g.fillRect(p.x-1,p.y-1,2,4);
+        if(kind==='pans'){ g.fillStyle=tone('#3a3632',k); g.beginPath(); g.ellipse(p.x,p.y+12,6,6,0,0,Math.PI*2); g.fill(); line(p,{x:p.x,y:p.y+6},tone('#3a3632',k),2); }
+        else if(kind==='tools'){ line({x:p.x,y:p.y+2},{x:p.x,y:p.y+26},tone('#6a4a2a',k),2); g.fillStyle=tone('#6a6862',k); g.fillRect(p.x-4,p.y+24,8,4); }
+        else if(it===0){ g.fillStyle=cloth(['#4a4234','#3e4a3e','#5a3a2e'][(m+q)%3]); g.beginPath(); g.moveTo(p.x-3,p.y+2); g.lineTo(p.x+3,p.y+2); g.lineTo(p.x+7,p.y+30); g.lineTo(p.x-7,p.y+30); g.closePath(); g.fill(); }   // a cloak hung up
+        else if(it===1){ g.fillStyle=cloth('#6a5a3a'); g.beginPath(); g.ellipse(p.x,p.y+5,6,3,0,0,Math.PI*2); g.fill(); g.beginPath(); g.ellipse(p.x,p.y+3,3.5,3,0,Math.PI,0); g.fill(); }   // a hat
+        else { g.strokeStyle=tone('#8a7a5a',k); g.lineWidth=1.4; g.beginPath(); g.ellipse(p.x,p.y+9,5,7,0,0,Math.PI*2); g.stroke(); } } }   // a coil of rope or a basket handle
+    else if(kind==='sconce' || kind==='lantern'){ const p=L(0,72); g.fillStyle=dark; g.fillRect(p.x-1.5,p.y-2,3,8); g.fillStyle=tone('#e8dcc0',k); g.fillRect(p.x-1.5,p.y-10,3,8);
+      g.fillStyle='#ffd070'; g.beginPath(); g.ellipse(p.x,p.y-13,1.6,3,0,0,Math.PI*2); g.fill(); g.fillStyle='rgba(255,200,110,0.12)'; g.beginPath(); g.ellipse(p.x,p.y-12,14,16,0,0,Math.PI*2); g.fill();
+      g.fillStyle='rgba(20,12,4,0.25)'; g.beginPath(); g.ellipse(p.x,p.y-28,5,10,0,0,Math.PI*2); g.fill(); }   // soot above the flame
+    else if(kind==='tapestry' || kind==='map'){ const w=kind==='map'?0.5:0.6; quad(-w,w,kind==='map'?54:40,kind==='map'?90:98,tone(kind==='map'?'#a89a76':['#5a2e2a','#2e3a4e','#4a3e2a'][m%3],k-0.15),'rgba(10,6,2,0.4)');
+      if(kind==='map'){ g.strokeStyle='rgba(70,56,36,0.6)'; g.lineWidth=0.9; const p=L(-w+0.1,70); g.beginPath(); g.moveTo(p.x,p.y); for(let r=1;r<6;r++){ const q=L(-w+0.1+r*0.16,70+Math.sin(r*1.7)*9); g.lineTo(q.x,q.y); } g.stroke(); }
+      else { line(L(-w-0.05,98),L(w+0.05,98),wood,3); g.strokeStyle=tone('#a08a58',k-0.2); g.lineWidth=1; [52,86].forEach(hh=>line(L(-w+0.05,hh),L(w-0.05,hh),tone('#a08a58',k-0.25),1.2)); } }
+    else if(kind==='antlers'){ const p=L(0,84); g.fillStyle=wood; g.beginPath(); g.ellipse(p.x,p.y,5,6,0,0,Math.PI*2); g.fill(); g.strokeStyle=tone('#c8b898',k-0.1); g.lineWidth=2;
+      [-1,1].forEach(sx=>{ g.beginPath(); g.moveTo(p.x,p.y-3); g.quadraticCurveTo(p.x+sx*12,p.y-10,p.x+sx*14,p.y-24); g.stroke(); g.beginPath(); g.moveTo(p.x+sx*9,p.y-9); g.lineTo(p.x+sx*4,p.y-18); g.stroke(); }); }
+    else if(kind==='pelt'){ const p=L(0,70); g.fillStyle=tone('#6a5038',k); g.beginPath(); g.moveTo(p.x-10,p.y-16); g.quadraticCurveTo(p.x,p.y-22,p.x+10,p.y-16); g.lineTo(p.x+13,p.y+8); g.lineTo(p.x+5,p.y+4); g.lineTo(p.x,p.y+16); g.lineTo(p.x-5,p.y+4); g.lineTo(p.x-13,p.y+8); g.closePath(); g.fill(); }
+    else if(kind==='bow'){ const p=L(-0.3,60), q=L(0.3,96); g.strokeStyle=tone('#6a4626',k); g.lineWidth=2.2; g.beginPath(); g.moveTo(p.x,p.y); g.quadraticCurveTo((p.x+q.x)/2+10,(p.y+q.y)/2,q.x,q.y); g.stroke(); line(p,q,'rgba(200,190,160,0.6)',0.6); }
+    else if(kind==='shield'){ const p=L(0,76); g.fillStyle=tone(['#6a2a24','#2e3e5a','#5a4a26'][m%3],k-0.1); g.beginPath(); g.moveTo(p.x-9,p.y-12); g.lineTo(p.x+9,p.y-12); g.lineTo(p.x+9,p.y+1); g.quadraticCurveTo(p.x,p.y+14,p.x,p.y+14); g.quadraticCurveTo(p.x,p.y+14,p.x-9,p.y+1); g.closePath(); g.fill(); g.strokeStyle=tone('#8a8478',k); g.lineWidth=1.4; g.stroke(); line({x:p.x,y:p.y-12},{x:p.x,y:p.y+13},tone('#c8b070',k-0.2),1.4); }
+    else if(kind==='spears'){ const p=L(0,74); [-1,1].forEach(sx=>{ const a1={x:p.x-sx*16,y:p.y+16}, a2={x:p.x+sx*16,y:p.y-18}; line(a1,a2,tone('#6a4a2a',k),2); g.fillStyle=tone('#8a8a84',k); g.beginPath(); g.moveTo(a2.x,a2.y); g.lineTo(a2.x+sx*5,a2.y-6); g.lineTo(a2.x-sx*1,a2.y-3); g.closePath(); g.fill(); }); }
+    else if(kind==='net'){ g.strokeStyle=tone('#8a7a5a',k-0.1); g.lineWidth=0.7; const p0=L(-0.7,96), p1=L(0.7,96); for(let r=0;r<7;r++){ const f=r/6, top=L(-0.7+1.4*f,96), bot=L(-0.5+1.0*f,40+Math.sin(f*3)*6); g.beginPath(); g.moveTo(top.x,top.y); g.quadraticCurveTo((top.x+bot.x)/2+4,(top.y+bot.y)/2,bot.x,bot.y); g.stroke(); }
+      for(let r=1;r<5;r++){ const hh=96-r*12; g.beginPath(); g.moveTo(L(-0.68+r*0.04,hh).x,L(-0.68+r*0.04,hh).y); g.quadraticCurveTo(L(0,hh-6).x,L(0,hh-6).y,L(0.68-r*0.04,hh).x,L(0.68-r*0.04,hh).y); g.stroke(); }
+      g.fillStyle=tone('#b8a070',k); [0.2,0.5,0.8].forEach(f=>{ const q=L(-0.6+1.2*f,58); g.beginPath(); g.arc(q.x,q.y,2.4,0,Math.PI*2); g.fill(); }); }   // floats
+    else if(kind==='oar'){ const p=L(-0.5,44), q=L(0.45,100); line(p,q,tone('#7a6448',k),3); g.fillStyle=tone('#7a6448',k); g.beginPath(); g.ellipse(p.x,p.y,4,10,-0.3,0,Math.PI*2); g.fill(); }
+    else if(kind==='rope'){ const p=L(0,80); g.strokeStyle=tone('#8a7a5a',k); g.lineWidth=1.8; for(let r=0;r<4;r++){ g.beginPath(); g.ellipse(p.x,p.y+r*1.6,10-r,4.5,0,0,Math.PI*2); g.stroke(); } }
+    g.restore(); } }
 function paintInteriorWalls(){
   if(AREAS[areaId] && AREAS[areaId].ucq && typeof paintUcWalls==='function') return paintUcWalls(AREAS[areaId].ucq);
   if(AREAS[areaId] && AREAS[areaId].cave){              // rock, with the dark (or daylit) mouths of the passages out
@@ -7241,7 +7299,7 @@ function paintInteriorWalls(){
     const LN=seg?seg.ln:0, busy=(OBJECTS||[]).filter(o=>tall(o) && (side==='l' ? o.i===LN : o.j===LN)).map(o=>side==='l'?[o.j-0.6,o.j+1.6]:[o.i-0.6,o.i+1.6]);
     if(side==='r' && !seg) busy.push([0.9,2.9]);                                             // the shelf of pots on the right wall   // never a window behind a chimney or a forge hood
     const along=t=>seg ? (side==='l' ? seg.u1+(seg.u0-seg.u1)*t : seg.u0+(seg.u1-seg.u0)*t) : side==='l'?h*(1-t):w*t, ok=t=>{ const u0=along(t-0.08), u1=along(t+0.08), lo2=Math.min(u0,u1), hi2=Math.max(u0,u1); return !busy.some(([p,q])=>hi2>p && lo2<q); };
-    const tc=[0.5,0.3,0.7,0.2,0.8,0.12,0.88].find(ok); if(tc==null) return; const t0=tc-0.08, t1=tc+0.08;
+    const tc=[0.5,0.3,0.7,0.2,0.8,0.12,0.88].find(ok); wallDecor(a,b,side,seg,tc,MAT,nLen); if(tc==null) return; const t0=tc-0.08, t1=tc+0.08;
     if(false){ const c=L(tc); const WS=windowSky(); g.fillStyle='#8a6a30'; g.beginPath(); g.ellipse(c.x,c.y-70,15,17,0,0,Math.PI*2); g.fill(); g.fillStyle=WS.bot; g.beginPath(); g.ellipse(c.x,c.y-70,11,13,0,0,Math.PI*2); g.fill();   // a ship's porthole, brass and all
       g.fillStyle='rgba(255,255,255,0.25)'; g.beginPath(); g.ellipse(c.x-3,c.y-74,4,5,0,0,Math.PI*2); g.fill(); g.fillStyle='#5a4420'; for(let k=0;k<6;k++){ const an=k*Math.PI/3; g.beginPath(); g.arc(c.x+Math.cos(an)*13,c.y-70+Math.sin(an)*15,1.2,0,Math.PI*2); g.fill(); } return; }
     const p0=L(t0), p1=L(t1), lo=52, hi=84;
@@ -8005,7 +8063,27 @@ function paintTable(x, y) {
 }
 
 // ════════════════ the elven country: water, white stone, silk and silver ════════════════
+// the open sea at Wrackhaven: it fills the corner and runs on off the map, a plank quay along the boardwalk, a curving beach to the east
+const seaShore=(o,j)=>o.i+o.fp[0]-0.4+(fbm(j*0.35,3.1,61)-0.5)*2.2+(j-o.j)*0.12;   // where the beach meets the water, row by row
+function paintSea(o){ const [fw,fh]=o.fp, j0=o.j, h=o.j+fh, EXT=3, S=0.25;
+  const depth=(i,j)=>Math.min(j-j0+0.3, seaShore(o,j)-i)+Math.max(0,-i)*0.6+Math.max(0,j-h)*0.6;   // how far out from quay or beach
+  for(let j=j0;j<h+EXT;j+=S) for(let i=-EXT;i<seaShore(o,j)+0.6;i+=S){ const ic=i+S/2, jc=j+S/2, sh=seaShore(o,jc);
+      const off=Math.max(0,-ic, jc-h), fade=Math.max(0,1-off/EXT); if(fade<=0) continue;
+      const d=depth(ic,jc);
+      if(ic>sh){ const wet=clamp01(1-(ic-sh)/0.6); g.fillStyle=`rgba(120,104,78,${0.5*wet*fade})`; }   // wet sand where the waves run up
+      else { const t=clamp01(d/5), n=fbm(ic*0.5,jc*0.5,62)*0.25, c=mixC(mixC([96,150,142],[36,74,84],t),[24,46,58],clamp01(d/12)*0.7);   // pale and green in the shallows, deep blue-green out beyond the boats
+        const cc=mixC(c,[60,92,96],n); g.fillStyle=`rgba(${cc[0]|0},${cc[1]|0},${cc[2]|0},${fade})`; }
+      const a=P(i,j), b=P(i+S+0.02,j), c2=P(i+S+0.02,j+S+0.02), dd=P(i,j+S+0.02); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c2.x,c2.y); g.lineTo(dd.x,dd.y); g.closePath(); g.fill(); }
+  const shoreLine=(off)=>{ g.beginPath(); for(let j=j0+0.2,n=0;j<=h+EXT;j+=0.2,n++){ const q=P(seaShore(o,j)-off,j); n?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y); } };
+  [[0.05,'rgba(240,244,236,0.55)',2.2],[0.45,'rgba(220,234,230,0.25)',1.4],[1.1,'rgba(220,234,230,0.12)',1.2]].forEach(([off,col,lw])=>{ g.strokeStyle=col; g.lineWidth=lw; shoreLine(off); g.stroke(); });   // lines of foam along the beach
+  for(let k=0;k<60;k++){ const ic=-EXT+rnd01(k,1,63)*(fw+EXT), jc=j0+0.6+rnd01(k,2,64)*(fh+EXT-1); if(ic>seaShore(o,jc)-0.3) continue; const q=P(ic,jc); g.fillStyle='rgba(230,240,236,0.10)'; g.beginPath(); g.ellipse(q.x,q.y,12+rnd01(k,3,65)*18,1.6,0,0,Math.PI*2); g.fill(); }   // glints on the swell
+  { const a=P(-EXT,j0), b=P(Math.min(seaShore(o,j0),fw+o.i),j0), drop=10;   // the quay: a timber edge along the boardwalk, wet and green at the waterline
+    g.fillStyle='#3e3428'; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(b.x,b.y+drop); g.lineTo(a.x,a.y+drop); g.closePath(); g.fill();
+    g.fillStyle='rgba(70,96,60,0.6)'; g.beginPath(); g.moveTo(a.x,a.y+drop-3); g.lineTo(b.x,b.y+drop-3); g.lineTo(b.x,b.y+drop); g.lineTo(a.x,a.y+drop); g.closePath(); g.fill();
+    g.strokeStyle='#2a221a'; g.lineWidth=3; for(let i=-EXT+0.5;i<b.x;i+=1.5){ const q=P(i,j0); if(q.x>b.x) break; g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(q.x,q.y+drop+4); g.stroke(); } }   // piles
+}
 function paintPool(o){                                   // flat water baked into the ground: soft shore, reeds or lilies
+  if(o.kind==='sea') return paintSea(o);
   const [fw,fh]=o.fp, ci=o.i+fw/2, cj=o.j+fh/2, moon=o.kind==='moon', N=36;
   const ring=(k,sc)=>{ const pts=[]; for(let n=0;n<N;n++){ const a=n/N*Math.PI*2, w=1+(fbm(Math.cos(a)*2+ci,Math.sin(a)*2+cj,17+k)-0.5)*(o.round?0.04:0.35);   // a built bath is a clean circle
       pts.push(P(ci+Math.cos(a)*(fw/2+0.15)*w*sc, cj+Math.sin(a)*(fh/2+0.15)*w*sc)); } return pts; };
@@ -9389,6 +9467,9 @@ function drawObject(o){
       g.save(); g.translate(x,y); g.scale(0.5,0.5); g.translate(-x,-y); drawWolf(x,y,pe,(Math.floor(gt*0.5+(o.v||0)*2)%8),null); g.restore(); }
     else if(o.kind==='goatroof'){ const h=OBJECTS.find(q=>q.type==='house'); if(h){ const N=h.fp[0], a=P(h.i+1.2*N/3,h.j+1.2*N/3); drawCached('goat',a.x,a.y-190-(N-3)*42+Math.sin(gt*0.7)*0.8,50,40,25,34,paintGoat); } }
     else if(o.kind==='flowers'){ drawCached('flowers',x,y,60,30,30,20,paintFlowers); }
+  } else if(o.type==='pool' && o.kind==='sea'){   // the surf runs up the beach and draws back
+    const t=(gt*0.22)%1, run=Math.sin(t*Math.PI)*0.45; g.save(); g.strokeStyle=`rgba(245,248,240,${0.45*(1-t)})`; g.lineWidth=2;
+    g.beginPath(); for(let j=o.j+0.3,n=0;j<=o.j+o.fp[1]+2;j+=0.25,n++){ const q=P(seaShore(o,j)-0.5+run+Math.sin(j*1.7+gt)*0.05,j); n?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y); } g.stroke(); g.restore();
   } else if(o.type==='pool'){
     // baked into the ground; only a slow shimmer is live
     const [fw,fh]=o.fp, c0=P(o.i+fw/2,o.j+fh/2), t=((gt*0.3+o.i)%1+1)%1;
@@ -31677,7 +31758,7 @@ function spawnCrab(i,j,big){ try{ const m={ name:big?'Wreck Crab':'Mud Crab', ty
           {type:'stilthut', i:31, j:8, fp:[3,3]}, {type:'stilthut', i:1, j:10, fp:[3,3]},
           {type:'cstall', i:9, j:8, v:1}, {type:'cstall', i:12, j:8, v:3}, {type:'cstall', i:17, j:8, v:5},
           {type:'bellframe', i:26, j:9}, {type:'noticeboard', i:20, j:7}, {type:'gallows', i:33, j:1},
-          {type:'pool', i:0, j:16, fp:[24,10]}, {type:'boardwalk', i:6, j:12, dir:'j', len:9, jetty:true, noblock:true, dz:-98}, {type:'boardwalk', i:14, j:12, dir:'j', len:10, jetty:true, noblock:true, dz:-98}, {type:'boardwalk', i:0, j:15, dir:'i', len:24, noblock:true, dz:-98},
+          {type:'pool', i:0, j:16, fp:[24,10], kind:'sea'}, {type:'boardwalk', i:6, j:12, dir:'j', len:9, jetty:true, noblock:true, dz:-98}, {type:'boardwalk', i:14, j:12, dir:'j', len:10, jetty:true, noblock:true, dz:-98}, {type:'boardwalk', i:0, j:15, dir:'i', len:24, noblock:true, dz:-98},
           {type:'cog', i:3, j:20}, {type:'cog', i:10, j:21}, {type:'boat', i:18, j:18, s:1.05}, {type:'boat', i:20, j:20, s:1}, {type:'boat', i:16, j:23, s:0.95, flip:true},
           {type:'barrels', i:4, j:13}, {type:'crates', i:8, j:13}, {type:'barrel', i:12, j:13}, {type:'crates', i:16, j:13}, {type:'kegrack', i:3, j:4, fp:[2,1]}, {type:'lamp', i:9, j:6}, {type:'lamp', i:21, j:4}, {type:'lamp', i:28, j:7}, {type:'lamp', i:14, j:11},
           {type:'bunting', i:9, j:5, a:[9,6.6], b:[21,6.4], h:80, noblock:true}, {type:'washline', i:30, j:13, noblock:true}, {type:'logpile', i:34, j:11},
@@ -31934,6 +32015,41 @@ for(const area in GROW){ const A=AREAS[area]; if(!A || !A.npcs) continue; const 
     const inBig=(i,j)=>big.some(b=>i>=b.i&&j>=b.j&&i<b.i+b.fp[0]&&j<b.j+b.fp[1]);
     return L.map(n=>{ if(!inBig(n.i,n.j)) return n; const b=big.find(b=>n.i>=b.i&&n.j>=b.j&&n.i<b.i+b.fp[0]&&n.j<b.j+b.fp[1]); for(let k=1;k<6;k++) for(const di of [0,-1,1,-2,2]){ const i=n.i+di, j=b.j+b.fp[1]-1+k; if(i>=0 && i<A.w && j<A.h && !inBig(i,j) && !busy.has(i+','+j)){ busy.add(i+','+j); return {...n, i, j}; } } return n; }); }; }
 
+// ════════ RUGS: every lived-in room gets one or two, of a kind that suits it ════════
+OBJ_DRAW.rug2=o=>{ const [fw,fh]=o.fp, ci=o.i+fw/2, cj=o.j+fh/2, sh=o.shape, k=o.kind, c0=o.col;
+  const poly=pts=>{ g.beginPath(); pts.forEach((q,n)=>n?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.closePath(); };
+  const ell=(sc)=>{ const p=[]; for(let n=0;n<32;n++){ const a=n/32*Math.PI*2; p.push(P(ci+Math.cos(a)*fw/2*sc*0.92, cj+Math.sin(a)*fh/2*sc*0.92)); } return p; };
+  const rect=(sc)=>[P(ci-fw/2*sc+0.08,cj-fh/2*sc+0.08),P(ci+fw/2*sc-0.08,cj-fh/2*sc+0.08),P(ci+fw/2*sc-0.08,cj+fh/2*sc-0.08),P(ci-fw/2*sc+0.08,cj+fh/2*sc-0.08)];
+  g.save(); g.globalAlpha=0.9;
+  if(k==='hide'){ const p=[]; for(let n=0;n<24;n++){ const a=n/24*Math.PI*2, w=1+0.22*Math.sin(a*4+o.i)+(n%6===0?0.18:0); p.push(P(ci+Math.cos(a)*fw/2*0.85*w, cj+Math.sin(a)*fh/2*0.85*w)); }   // a hide, legs and all
+    poly(p); g.fillStyle=c0; g.fill(); g.strokeStyle='rgba(30,20,12,0.4)'; g.lineWidth=1; g.stroke(); poly(ell(0.55)); g.fillStyle=tone(c0,0.1,0.5); g.fill(); g.restore(); return; }
+  const shape=sc=>sh==='oval'||sh==='round'?ell(sc):rect(sc);
+  poly(shape(1)); g.fillStyle=c0; g.fill();
+  if(k==='braid'){ for(let r=1;r<6;r++){ poly(shape(1-r*0.15)); g.strokeStyle=r%2?tone(c0,-0.18,0.8):tone(o.col2||c0,0.12,0.7); g.lineWidth=3; g.stroke(); } }   // a braided rag rug, ring on ring
+  else if(k==='reed'){ g.save(); poly(shape(1)); g.clip(); g.strokeStyle=tone(c0,-0.2,0.5); g.lineWidth=0.8; for(let t=0;t<=1;t+=0.06){ const a=P(o.i+t*fw,o.j), b=P(o.i+t*fw,o.j+fh); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); } g.restore(); }
+  else { poly(shape(0.86)); g.strokeStyle=o.col2||tone(c0,0.2); g.lineWidth=2; g.stroke(); poly(shape(0.7)); g.strokeStyle=tone(c0,-0.2,0.8); g.lineWidth=1.2; g.stroke();   // a woven wool rug: border bands and a lozenge
+    const m=[P(ci,cj-fh*0.22),P(ci+fw*0.22,cj),P(ci,cj+fh*0.22),P(ci-fw*0.22,cj)]; poly(m); g.fillStyle=o.col2||tone(c0,0.2,0.8); g.fill();
+    if(sh!=='oval' && sh!=='round'){ g.strokeStyle=tone(o.col2||'#b8a888',-0.1,0.7); g.lineWidth=0.8; const L=fw>=fh; for(let t=0.08;t<1;t+=0.08){ [0,1].forEach(e=>{ const a= L? P(o.i+e*fw+(e?-0.05:0.05),o.j+t*fh) : P(o.i+t*fw,o.j+e*fh+(e?-0.05:0.05)), b= L? P(o.i+e*fw+(e?0.1:-0.1),o.j+t*fh) : P(o.i+t*fw,o.j+e*fh+(e?0.1:-0.1)); g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke(); }); } } }   // fringe at the ends
+  g.globalAlpha=0.35; poly(shape(1)); const sg=g.createLinearGradient(P(o.i,o.j).x,0,P(o.i+fw,o.j+fh).x,0); sg.addColorStop(0,'rgba(0,0,0,0)'); sg.addColorStop(1,'rgba(30,20,10,0.6)'); g.fillStyle=sg; g.fill();   // worn and dusty
+  g.restore(); };
+{ const RUG_OK=id=>{ const A=AREAS[id]; return A && A.theme==='interior' && !A.cave && !A.tent && !A.maze && !A.ucq && !A.hollow && !A.elfhall && !A.owRoom && !A.dwarf && !A.temple && !A.mine && !A.volcanic && !/cell|crypt|vault|tomb|sewer|tunnel|cellar|steam/.test(id); };
+  const PAL={ village:[['braid','#6a5a40','#8a4a34'],['braid','#5a5038','#6a6a4a'],['wool','#6a3a2e','#b0985e'],['runner','#5a4a3a','#8a6a44']], town:[['wool','#5a2e2a','#a88a58'],['wool','#2e3a4e','#a08a58'],['runner','#4e3a2a','#9a7a48'],['round','#4a3a2e','#8a6a3a']],
+    lodge:[['hide','#6a5038'],['hide','#7a6448']], soldier:[['hide','#5a4a3a'],['runner','#4a3a2e','#7a2a24']], harbour:[['reed','#8a7a58'],['reed','#7a6a4e'],['braid','#4e5052','#6a5a44']] };
+  const KIND=id=>/lodge/.test(id)?'lodge':/barracks|guard/.test(id)?'soldier':(ROOM_MAT[id]&&ROOM_MAT[id].wall==='salvage')||(REGION_OF[id]==='The Wrack Coast')?'harbour':(ROOM_MAT[id]&&ROOM_MAT[id].wall==='plaster')?'town':'village';
+  const hard=/stairs|hearth|forge|counter|bed|teleporter|stash|trapdoor|pool|loom|rack|armorstand|kegrack/;
+  Object.keys(AREAS).forEach(id=>{ if(!RUG_OK(id)) return; const A=AREAS[id], oF=A.objects; if(!oF) return;
+    A.objects=()=>{ const l=oF(); if(l.some(o=>o.type==='rug'||o.type==='rug2')) return l; const W=A.w, H=A.h, inS=(i,j)=>!A.shape ? (i>=0&&j>=0&&i<W&&j<H) : A.shape.some(([a,b,w,h])=>i>=a&&j>=b&&i<a+w&&j<b+h);
+      const occ=new Set(); l.forEach(o=>{ if(!hard.test(o.type) && o.type!=='teleporter') return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let c=0;c<fh;c++) occ.add((o.i+a)+','+(o.j+c)); });
+      const ent=Object.values(A.entries||{}); ent.forEach(e=>occ.add(e.i+','+e.j));
+      const fits=(i,j,w,h)=>{ for(let a=0;a<w;a++) for(let c=0;c<h;c++){ if(!inS(i+a,j+c) || occ.has((i+a)+','+(j+c))) return false; } return true; };
+      const seed=[...id].reduce((s,c)=>s*31+c.charCodeAt(0)|0,11), pal=PAL[KIND(id)], out=[];
+      const sizes=[[3,2],[2,3],[2,2],[4,2],[2,4],[1,3],[3,1],[3,3]];
+      for(let pass=0;pass<(W*H>=28?2:1);pass++){ let best=null, bd=1e9; const cx=W/2, cy=H/2;
+        sizes.forEach(([w,h],si)=>{ for(let j=0;j<=H-h;j++) for(let i=0;i<=W-w;i++){ if(!fits(i,j,w,h)) continue; const d=Math.hypot(i+w/2-cx,j+h/2-cy)*(pass?-1:1)-w*h*0.35+rnd01(si,seed+pass,411)*0.8; if(d<bd){ bd=d; best=[i,j,w,h]; } } });
+        if(!best) break; const [i,j,w,h]=best, p=pal[Math.floor(rnd01(pass,seed,412)*pal.length)], runner=p[0]==='runner'||w===1||h===1;
+        out.push({type:'rug2', i, j, fp:[w,h], kind:p[0]==='round'||p[0]==='runner'?'wool':p[0], shape:p[0]==='round'||(p[0]==='braid'&&!runner)?'oval':'rect', col:p[1], col2:p[2], flat:true, noblock:true, dz:-99});
+        for(let a=0;a<w;a++) for(let c=0;c<h;c++) occ.add((i+a)+','+(j+c)); }
+      return [...out, ...l]; }; }); }
 // ════════ THE WRACK COAST, part three: the Green Deep and its troop, Old Stripe, Hob's debt, Skrag's map, and the Drowned Eye under the lowest water ════════
 // ── the silverback as a foe: a chest-beat before the great overhead pound, then sweeps and a fast double slap
 FOES.gorilla={ label:'Silverback', base:96, stagger:1.25, pattern:[

@@ -13589,6 +13589,11 @@ function rulerTalk(){
 // the Baron's unpaid men turn to the King's Road
 wrap('kingsroad','npcs',l=> BARON_DOWN() && !CHOICE.unpaid && CHOICE.ruler!=='voss' && nightAmt()>0.5 ? [...l,{ id:'harl', name:'Sergeant Harl', i:4, j:10, dir:1,
   opts:BANDIT({skin:3,hair:0,hairColor:2,beard:4,face:0,equip:{head:'coif',torso:'tunic_red',armor:'blackmail',hands:'gloves',legs:'hose_grey',feet:'boots',weapon:'longsword',offhand:null}}) }] : l);
+// Captain Voss drilled under the same sergeants as Harl: if Harl cannot teach you the riposte, she will, for coin
+function vossRiposte(...a){ if(typeof techKnown!=='function' || techKnown('riposte') || CHOICE.unpaid==='paid') return vossTalk(...a); const V='Captain Voss', fee=90;
+  say(V,["“You hold a blade like someone who has had a lesson or two. Not the riposte, though. I can see it in your feet.”"],[
+    {label:'“Teach me the riposte.” (-'+fee+'c)', off:player.purse<fee, fn:()=>{ player.purse-=fee; updateHud(); say(V,["“The Baron's drill: you set yourself, you take his blow on the right, and you answer in the same breath. Not before. Not after.”","<i>An hour in the yard behind the barracks, and a bruise on your ribs that will last the week.</i> “Good. Again tomorrow, on your own.”"],[{label:'Learn the Riposte.', fn:()=>{ learnTech('riposte'); closeDialog(); }}]); }},
+    {label:'Something else.', fn:()=>vossTalk(...a)}, bye]); }
 function harlSpawn(){ closeDialog(); FIGHT_UNDO=()=>{ CHOICE.unpaid=null; }; CHOICE.unpaid='fought'; MOB_SPAWNS.length=0;
   MOB_SPAWNS.push({ name:'Sergeant Harl', type:'brute', i:4, j:10, faction:'unpaid', opts:BANDIT({skin:3,hair:0,hairColor:2,beard:4,equip:{head:'helm_full',torso:'tunic_red',armor:'blackmail',hands:'gloves',legs:'hose_grey',feet:'boots',weapon:'longsword',offhand:null}}) },
     { name:'Deserter', type:'bandit', i:3, j:12, faction:'unpaid', opts:BANDIT({skin:1,hair:2,equip:{head:'kettle',torso:'tunic_red',armor:'gambeson',hands:null,legs:'trousers',feet:'boots',weapon:'spear',offhand:'shield'}}) });
@@ -13694,7 +13699,7 @@ function vossTalk(){
     : BARON_DOWN() ? ["“Half my guards are unpaid and the other half are thinking about it. If you see men in red on the King's Road after dark, they were mine.”"]
     : ["“The guard serves Hollowmere. The Baron pays the guard. Some days those are the same thing.”"];
   say('Captain Voss',t,[bye]); }
-Object.assign(TALKERS,{ voss:vossTalk, recruit:()=>say('A Tired Guard',BARON_DOWN()&&CHOICE.ruler!=='voss'?"“Paid? Ha. I'm guarding my own bed so nobody steals it.”":"“Double shift. Always a double shift.”",[bye]) });
+Object.assign(TALKERS,{ voss:(...a)=>vossRiposte(...a), recruit:()=>say('A Tired Guard',BARON_DOWN()&&CHOICE.ruler!=='voss'?"“Paid? Ha. I'm guarding my own bed so nobody steals it.”":"“Double shift. Always a double shift.”",[bye]) });
 
 // ════════ The Gold Brothers Trading Company ════════
 Object.assign(ITEMS,{
@@ -15173,7 +15178,7 @@ function formatCoin(cu){
   return parts.join(' ');
 }
 let loreNoteGiven=false;
-var SELL_MISC=new Set(['wolf_fang','pelt','bog_coins','silver_torc','amber_brooch','wight_ring','rusted_blade','grave_ring']);
+var SELL_MISC=new Set(['wolf_fang','pelt','bear_fur','bear_skull','bog_coins','silver_torc','amber_brooch','wight_ring','rusted_blade','grave_ring']);
 const LOOT_TIERS=[
   ['shirt','trousers','hood','boots','gloves','dagger','club','hatchet','jerkin','hose_grey','smock'],
   ['jerkin','gambeson','kettle','shield','sword','mace','hood_red','studded','spear','breeches','bandana'],
@@ -15197,7 +15202,7 @@ function victory(faction,partial){
     const tier=lootTier(m), free=()=>player.inv.indexOf(null), R=Math.random;
     const give=id=>{ const f=slotFor(id); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name,'#8ac070'); } else logMsg('Inventory is full.','#e0b070'); };
     const coin=(a,b)=>{ const c=a+Math.floor(R()*(b-a+1)); player.purse+=c; updateHud(); logMsg('Loot: '+formatCoin(c),'#e8c060'); };
-    if(m.type==='wolf'){ if(R()<0.25) give('raw_meat'); if(m.maxHp>=60 && R()<0.08) give('raw_meat');   /* about one wolf in four leaves meat worth taking */ if(R()<0.3) give('wolf_fang'); return; }           // meat and teeth, not trousers
+    if(m.type==='wolf'){ if(R()<0.25) give('raw_meat'); if(m.maxHp>=60 && R()<0.08) give('raw_meat');   /* about one wolf in four leaves meat worth taking */ if(R()<0.3) give('wolf_fang'); if(R()<0.28) give('pelt');   /* and about one in four is worth skinning */ return; }           // meat and teeth, not trousers
     if(m.type==='skeleton'){ if(R()<0.35) coin(1,5); if(R()<0.5) give('old_bone'); if(R()<0.15) give('old_skull'); if(R()<0.15) give(m.opts.equip.weapon);   // bones, a skull, the blade it held
       if(R()<0.08) give('rusted_blade'); if(R()<0.04) give('grave_ring'); return; }                                                                 // and now and then something it was buried with
     if(m.type==='lurker'){ if(R()<0.4) coin(2,5); if(R()<0.2){ const pool=LOOT_TIERS[0]; give(pool[Math.floor(R()*pool.length)]); logMsg('…something it swallowed, a while ago.','#a8a080'); } return; }
@@ -20898,7 +20903,8 @@ function renderBlade(){ const arrow={left:'◀ Left · A',up:'▲ Up · W',right
     return `<div style="margin:8px 0;padding:7px 9px;border-radius:7px;border:1px solid ${k?'#8a6a2a':'#3a2a14'};background:${k?'rgba(240,192,96,0.06)':'transparent'}">
       <div style="display:flex;justify-content:space-between"><b style="color:${k?'#f0c060':'#8a7858'}">${k?T.name:'? ? ?'}</b><span style="font-size:11px;color:#a08050">hold ${arrow[d]}, press <b style="color:#f0dca0">Q</b></span></div>
       <div style="font-size:12px;color:${k?'#e0d0b0':'#8a7858'};margin-top:3px">${k?TECH_TEACH[T.id].join(' ')+` <span style="color:#d8b060">Costs ${T.cost} momentum.</span>`:'Not learned. '+techWhere(T)}</div></div>`; }).join('');
-  bookPanel.innerHTML=`<div style="font-size:11px;letter-spacing:2px;color:#a08050;margin-bottom:8px">SWORD TECHNIQUES</div>${bookTabs('blade')}${rows}
+  const bd=CHOICE.bladeQ==='done' ? `<div style="margin:8px 0;padding:7px 9px;border-radius:7px;border:1px solid #8a6a2a;background:rgba(240,192,96,0.06)"><div style="display:flex;justify-content:space-between"><b style="color:#f0c060">Blade Dance</b><span style="font-size:11px;color:#a08050">always on</span></div><div style="font-size:12px;color:#e0d0b0;margin-top:3px">Block three blows in a row without being hit, and your next attack strikes three times.</div></div>` : '';
+  bookPanel.innerHTML=`<div style="font-size:11px;letter-spacing:2px;color:#a08050;margin-bottom:8px">SWORD TECHNIQUES</div>${bookTabs('blade')}${rows}${bd}
     <div style="font-size:12px;color:#e0d0b0;margin-top:10px;border-top:1px solid #3a2a14;padding-top:8px;line-height:1.5">
       <div style="font-size:11px;letter-spacing:2px;color:#a08050;margin-bottom:4px">HOW TO USE ONE</div>
       <b style="color:#f0c060">1.</b> Fight with a <b>blade</b>. A staff casts spells instead.<br>
@@ -21644,7 +21650,7 @@ function techTeachIntro(){ if(!inFight() || !meleeHeld() || !anyTech()) return;
   teach('momentum','Momentum',["The <b>gold bar</b> under your health is <b>momentum</b>. Your sword techniques spend it.","It fills when you <b>block</b>, <b>parry</b> (a perfect parry most of all) and land <b>clean hits</b>. Getting hit drains it.","Your techniques and what they do are in the <b>Spells</b> book (<b>B</b>), on the Sword page."]); }
 function techReadyTeach(){ if(!inFight() || !meleeHeld()) return; const mom=player.mom||0;
   Object.values(TECHS).forEach(T=>{ if(techKnown(T.id) && mom>=T.cost && !(T.id==='bash' && !/shield/.test(player.opts.equip.offhand||''))) teach('tech_'+T.id,T.name+' is ready',TECH_TEACH[T.id]); }); }
-function techWhere(T){ return T.id==='lunge'?(QUEST.wolves>=2?'Brann the Hunter will teach it for two cuts of raw meat.':'Brann the Hunter might teach it once the wolves are dealt with.'):T.id==='bash'?'Oswin the Armourer in Hollowmere teaches it, if you bring a shield.':(CHOICE.unpaid==='paid'?'Harl the Watchman, by the well in Dunhollow, owes you a lesson.':CHOICE.unpaid==='fought'?'The man who could have taught it is dead.':'Someone who served in the Baron’s drill yard would know it.'); }
+function techWhere(T){ return T.id==='lunge'?(QUEST.wolves>=2?'Brann the Hunter will teach it for two cuts of raw meat.':'Brann the Hunter might teach it once the wolves are dealt with.'):T.id==='bash'?'Oswin the Armourer in Hollowmere teaches it, if you bring a shield.':(CHOICE.unpaid==='paid'?'Harl the Watchman, by the well in Dunhollow, owes you a lesson.':CHOICE.unpaid?'Captain Voss, in the barracks in the Keep Ward, drilled under the same sergeants. She will teach it, for a fee.':typeof BARON_DOWN==='function'&&BARON_DOWN()?'Sergeant Harl, who once ran the Baron’s drill yard, waits on the King’s Road at night with his unpaid men. Settle with them and he may teach it. (Captain Voss in the barracks knows it too.)':'Someone who served in the Baron’s drill yard would know it: Captain Voss, in the barracks in the Keep Ward, for one.'); }
 function learnTech(id){ CHOICE.tech={...(CHOICE.tech||{}), [id]:true}; const T=Object.values(TECHS).find(x=>x.id===id);
   logMsg('You learned '+T.name+'. In a fight with a blade, hold that side and press Q (or the Technique button). It is written up in your Spells book (B), on the Sword page.','#f0c060'); banner(T.name,'#f0c060',1800);
   try{ SND.fx('quest'); }catch(e){} updateHud(); try{ autosaveSoon(400); }catch(e){} }
@@ -26892,7 +26898,8 @@ function cloakForFoe(m,area){ const o=m.opts; if(!o || !o.gender || !o.equip || 
     return r; }; }
 // Bess sells the plain cloaks; the Bearskin from the old hunter; the Baron's mantle stays in his solar
 { const _t=tailorTalk; tailorTalk=function(){ const _sf=shopFrom; shopFrom=function(name,stock,...r){ shopFrom=_sf; return _sf.call(this,name,[...stock,...todaysStock('bess_cl',['wool_cloak','short_cape','fur_cloak','hunter_capelet'],2)],...r); }; try{ return _t.apply(this,arguments); } finally{ shopFrom=_sf; } }; TALKERS.tailor=tailorTalk; }
-{ const prevH=TALKERS.hunter; TALKERS.hunter=()=>{ if(CHOICE.bearPaid && !CHOICE.bearCloak){ say('Brann the Hunter',["“One more thing. I had Old Brumm's hide off him before the crows did, and my sister tanned it. It's a cloak now, if you want it. You earned the bear. I'll only ask what the tanning cost me.”"],
+{ const prevH=TALKERS.hunter; TALKERS.hunter=()=>{ const ownsBear=[...player.inv, ...Object.values(player.opts&&player.opts.equip||{})].some(id=>typeof id==='string' && /^(t_)?bear(skull)?_cloak$/.test(id)); if(ownsBear && !CHOICE.bearCloak) CHOICE.bearCloak=1;   // you have a bear cloak already: he does not sell you another
+  if(CHOICE.bearPaid && !CHOICE.bearCloak){ say('Brann the Hunter',["“One more thing. I had Old Brumm's hide off him before the crows did, and my sister tanned it. It's a cloak now, if you want it. You earned the bear. I'll only ask what the tanning cost me.”"],
       [{label:'Buy the Bearskin Cloak. (-80c)', off:player.purse<80, fn:()=>{ player.purse-=80; updateHud(); CHOICE.bearCloak=1; giveQuestItem('bear_cloak',true); logMsg('Loot: Bearskin Cloak','#8ac070'); say('Brann the Hunter',"“Suits you. You'll smell of bear for a week. Worth it.”",[bye]); }},
        {label:'“Not now.”', fn:()=>prevH()}]); return; } return prevH(); }; }
 // ════════ BEARS ON THE ROADS, AND WHAT THEY LEAVE: a brown bear wanders out onto a forest track now and then, the way the wolves do; a dead bear leaves its fur,

@@ -32015,6 +32015,45 @@ for(const area in GROW){ const A=AREAS[area]; if(!A || !A.npcs) continue; const 
     const inBig=(i,j)=>big.some(b=>i>=b.i&&j>=b.j&&i<b.i+b.fp[0]&&j<b.j+b.fp[1]);
     return L.map(n=>{ if(!inBig(n.i,n.j)) return n; const b=big.find(b=>n.i>=b.i&&n.j>=b.j&&n.i<b.i+b.fp[0]&&n.j<b.j+b.fp[1]); for(let k=1;k<6;k++) for(const di of [0,-1,1,-2,2]){ const i=n.i+di, j=b.j+b.fp[1]-1+k; if(i>=0 && i<A.w && j<A.h && !inBig(i,j) && !busy.has(i+','+j)){ busy.add(i+','+j); return {...n, i, j}; } } return n; }); }; }
 
+// ════════ STREET CLUTTER: the small things people leave against their walls ════════
+OBJ_DRAW.clutter=o=>{ const q=P(o.i+0.5+(o.ox||0),o.j+0.5+(o.oy||0)), x=q.x, y=q.y, k=o.kind, T=gt; g.save(); g.translate(x,y); g.scale(1.7,1.7); g.translate(-x,-y); try{ drawClutter(o,x,y,k,T); } finally{ g.restore(); } };
+function drawClutter(o,x,y,k,T){
+  const sh=(w,h)=>{ g.fillStyle='rgba(10,6,2,0.28)'; g.beginPath(); g.ellipse(x+3,y+2,w,h,0,0,Math.PI*2); g.fill(); };
+  const el=(cx,cy,rx,ry,col)=>{ g.fillStyle=col; g.beginPath(); g.ellipse(cx,cy,rx,ry,0,0,Math.PI*2); g.fill(); };
+  if(k==='sacks'){ sh(18,6); [[-7,0,'#a8946a'],[6,1,'#9a8660'],[0,-9,'#b09c72']].forEach(([dx,dy,c])=>{ el(x+dx,y-8+dy,8,10,c); g.fillStyle=tone(c,-0.25); g.fillRect(x+dx-3,y-19+dy,6,3); g.strokeStyle='rgba(60,44,24,0.4)'; g.lineWidth=0.7; g.beginPath(); g.moveTo(x+dx-4,y-4+dy); g.lineTo(x+dx+4,y-6+dy); g.stroke(); }); }
+  else if(k==='basket' || k==='fishbasket'){ sh(12,5); g.fillStyle='#8a6a3e'; g.beginPath(); g.moveTo(x-11,y-12); g.lineTo(x+11,y-12); g.lineTo(x+8,y); g.lineTo(x-8,y); g.closePath(); g.fill(); g.strokeStyle='rgba(50,34,16,0.6)'; g.lineWidth=0.8; for(let r=0;r<3;r++){ g.beginPath(); g.moveTo(x-10+r,y-9+r*3); g.lineTo(x+10-r,y-9+r*3); g.stroke(); }
+    el(x,y-12,11,4,'#6a4e2c'); const cols=k==='fishbasket'?['#9aa8a8','#b8c0bc','#8a989a']:['#a83a2a','#b84a2a','#8a9a3a']; for(let n=0;n<5;n++) el(x-6+n*3,y-14-(n%2)*2,3,k==='fishbasket'?1.6:3,cols[n%3]); }
+  else if(k==='bucket'){ sh(8,3); g.fillStyle='#6a5034'; g.beginPath(); g.moveTo(x-6,y-12); g.lineTo(x+6,y-12); g.lineTo(x+5,y); g.lineTo(x-5,y); g.closePath(); g.fill(); g.fillStyle='#3a3632'; g.fillRect(x-6,y-10,12,1.5); g.fillRect(x-5.5,y-4,11,1.5); el(x,y-12,6,2.2,'#3a4a4a'); g.strokeStyle='#3a3632'; g.lineWidth=1; g.beginPath(); g.arc(x,y-12,6,Math.PI,0); g.stroke(); }
+  else if(k==='broom'){ g.strokeStyle='#7a5a34'; g.lineWidth=2; g.beginPath(); g.moveTo(x-4,y-44); g.lineTo(x+2,y-8); g.stroke(); g.fillStyle='#b09a5a'; g.beginPath(); g.moveTo(x-2,y-10); g.lineTo(x+7,y-10); g.lineTo(x+9,y+1); g.lineTo(x-4,y+1); g.closePath(); g.fill(); }
+  else if(k==='firewood'){ sh(14,5); for(let r=0;r<3;r++) for(let n=0;n<3-r;n++){ const cx=x-8+n*7+r*3.5, cy=y-3-r*5; el(cx,cy,3.6,3.2,'#5a4026'); el(cx,cy,2.4,2.1,'#c8a878'); } }
+  else if(k==='pot' || k==='herbpot'){ sh(9,3); g.fillStyle='#8a5a3a'; g.beginPath(); g.moveTo(x-7,y-12); g.lineTo(x+7,y-12); g.lineTo(x+5,y); g.lineTo(x-5,y); g.closePath(); g.fill(); g.fillStyle='#6a4028'; g.fillRect(x-7.5,y-13,15,2.5);
+    for(let n=0;n<7;n++){ const a=-Math.PI/2+(n-3)*0.35; g.strokeStyle=['#4a6a34','#5a7a3a','#3e5a2c'][n%3]; g.lineWidth=2; g.beginPath(); g.moveTo(x,y-13); g.quadraticCurveTo(x+Math.cos(a)*6,y-18,x+Math.cos(a)*9,y-24-Math.sin(n)*2); g.stroke(); }
+    if(k==='pot') for(let n=0;n<3;n++) el(x-5+n*5,y-24-n%2*2,2.2,2.2,['#c84a5a','#e0c050','#e8e0f0'][n]); }
+  else if(k==='handcart'){ sh(22,7); g.fillStyle='#6a4c2e'; g.beginPath(); g.moveTo(x-18,y-14); g.lineTo(x+14,y-20); g.lineTo(x+14,y-8); g.lineTo(x-18,y-2); g.closePath(); g.fill(); g.strokeStyle='#3e2c1a'; g.lineWidth=1; g.stroke(); el(x-8,y-2,6,7,'#3e2c1a'); el(x-8,y-2,4,5,'#6a4c2e');
+    g.strokeStyle='#5a4026'; g.lineWidth=2; g.beginPath(); g.moveTo(x+14,y-14); g.lineTo(x+26,y-6); g.stroke(); el(x-4,y-18,6,4,'#a8946a'); el(x+5,y-20,5,4,'#9a8660'); }
+  else if(k==='cat'){ const tw=Math.sin(T*1.6+o.i)*0.4; sh(9,3); const c=o.col||'#3a3430'; el(x,y-6,7,6,c); el(x+5,y-13,4.5,4,c); g.fillStyle=c; g.beginPath(); g.moveTo(x+2,y-15); g.lineTo(x+3,y-20); g.lineTo(x+5,y-16); g.moveTo(x+6,y-16); g.lineTo(x+8,y-20); g.lineTo(x+9,y-15); g.fill();   // a cat, curled by the door, tail flicking
+    g.strokeStyle=c; g.lineWidth=2.4; g.lineCap='round'; g.beginPath(); g.moveTo(x-6,y-3); g.quadraticCurveTo(x-13,y-2,x-12+tw*6,y-10); g.stroke(); g.lineCap='butt'; g.fillStyle='#c8b040'; g.fillRect(x+4,y-14,1.2,1); g.fillRect(x+7,y-14,1.2,1); }
+  else if(k==='lobsterpot'){ sh(12,4); g.strokeStyle='#7a6448'; g.lineWidth=1.4; g.beginPath(); g.ellipse(x,y-6,11,6,0,Math.PI,0); g.stroke(); for(let n=-2;n<=2;n++){ g.beginPath(); g.moveTo(x+n*4.5,y); g.quadraticCurveTo(x+n*4,y-12,x+n*2,y-12); g.stroke(); } g.beginPath(); g.ellipse(x,y,11,3,0,0,Math.PI*2); g.stroke(); }
+  else if(k==='rope'){ sh(12,4); g.strokeStyle='#8a7652'; g.lineWidth=2.2; for(let r=0;r<4;r++){ g.beginPath(); g.ellipse(x,y-2-r*2.2,11-r*1.5,4.5-r*0.6,0,0,Math.PI*2); g.stroke(); } }
+  else if(k==='netrack' || k==='fishrack'){ sh(24,6); const a={x:x-22,y:y-4}, b={x:x+18,y:y-14}; g.strokeStyle='#5a4a36'; g.lineWidth=2.6; [a,b].forEach(p=>{ g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(p.x,p.y-38); g.stroke(); }); g.beginPath(); g.moveTo(a.x,a.y-38); g.lineTo(b.x,b.y-38); g.stroke();
+    if(k==='netrack'){ g.strokeStyle='rgba(120,108,80,0.8)'; g.lineWidth=0.8; for(let n=0;n<=8;n++){ const t=n/8, px=a.x+(b.x-a.x)*t, py=a.y-38+(b.y-a.y)*t; g.beginPath(); g.moveTo(px,py); g.quadraticCurveTo(px+3,py+14,px+1,py+26+Math.sin(T+n)*1); g.stroke(); } for(let r=1;r<4;r++){ g.beginPath(); g.moveTo(a.x,a.y-38+r*8); g.quadraticCurveTo((a.x+b.x)/2,(a.y+b.y)/2-34+r*9,b.x,b.y-38+r*8); g.stroke(); }
+      [0.25,0.55,0.85].forEach(t=>el(a.x+(b.x-a.x)*t,a.y-14+(b.y-a.y)*t,2.4,2.4,'#b89a60')); }
+    else for(let n=0;n<6;n++){ const t=(n+0.5)/6, px=a.x+(b.x-a.x)*t, py=a.y-38+(b.y-a.y)*t; g.strokeStyle='#4a3e30'; g.lineWidth=0.8; g.beginPath(); g.moveTo(px,py); g.lineTo(px,py+5); g.stroke(); g.fillStyle=['#9aa0a0','#8a9494','#a8a89c'][n%3]; g.beginPath(); g.ellipse(px,py+12+Math.sin(T*0.8+n)*0.5,2.6,7,0,0,Math.PI*2); g.fill(); } }   // fish split and hung to dry
+  else if(k==='oars'){ g.strokeStyle='#7a6448'; g.lineWidth=2.4; [[-5,0],[4,2]].forEach(([dx,dy])=>{ g.beginPath(); g.moveTo(x+dx-3,y-48+dy); g.lineTo(x+dx+3,y-2+dy); g.stroke(); el(x+dx+3,y-6+dy,3.4,8,'#7a6448'); }); }
+};
+{ const CLUT={ village:['sacks','basket','bucket','broom','firewood','herbpot','pot','cat','sacks','firewood'], city:['sacks','bucket','pot','broom','handcart','cat','basket','sacks'],
+    harbour:['lobsterpot','rope','netrack','fishrack','oars','fishbasket','bucket','cat','rope','lobsterpot'] };
+  const kindOf=A=>A.coast||A.theme==='sand'?'harbour':A.theme==='city'?'city':'village';
+  Object.keys(AREAS).forEach(id=>{ const A=AREAS[id]; if(!A || A.theme==='interior' || !A.objects) return; const oF=A.objects;
+    A.objects=()=>{ const l=oF(), bl=l.filter(o=>/^(house|bldg|roundhut)$/.test(o.type) && o.fp && !o.burnt); if(!bl.length) return l;
+      const W=A.w, H=A.h, occ=new Set(); l.forEach(o=>{ const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let c=0;c<fh;c++) occ.add((o.i+a)+','+(o.j+c)); });
+      Object.values(A.entries||{}).forEach(e=>occ.add(e.i+','+e.j)); bl.filter(b=>b.inside||b.door).forEach(b=>{ try{ const [di,dj]=doorTile(b); [[0,0],[1,0],[0,1],[-1,0],[0,-1],[1,1]].forEach(([x,y])=>occ.add((di+x)+','+(dj+y))); }catch(e){} });
+      const set=CLUT[kindOf(A)], out=[], sd=[...id].reduce((s,c)=>s*31+c.charCodeAt(0)|0,5);
+      bl.forEach((b,bn)=>{ const [fw,fh]=b.fp, spots=[]; for(let a=0;a<fw;a++) spots.push([b.i+a,b.j+fh,0,-0.28]); for(let c=0;c<fh;c++) spots.push([b.i+fw,b.j+c,-0.28,0]);   // along the street faces, tucked against the wall
+        let put=0; spots.forEach(([i,j,ox,oy],n)=>{ if(put>=3+(fw*fh>12?1:0) || i<0||j<0||i>=W||j>=H || occ.has(i+','+j)) return; if(rnd01(n+bn*17,sd,421)<0.3) return;
+          const kd=set[Math.floor(rnd01(n+bn*31,sd,422)*set.length)]; if(kd==='cat' && out.some(o=>o.kind==='cat')) return;
+          out.push({type:'clutter', kind:kd, i, j, ox, oy, noblock:true, col:['#3a3430','#8a6a44','#c8c0b0','#5a5450'][Math.floor(rnd01(n,sd,423)*4)]}); occ.add(i+','+j); put++; }); });
+      return [...l, ...out]; }; }); }
 // ════════ RUGS: every lived-in room gets one or two, of a kind that suits it ════════
 OBJ_DRAW.rug2=o=>{ const [fw,fh]=o.fp, ci=o.i+fw/2, cj=o.j+fh/2, sh=o.shape, k=o.kind, c0=o.col;
   const poly=pts=>{ g.beginPath(); pts.forEach((q,n)=>n?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.closePath(); };

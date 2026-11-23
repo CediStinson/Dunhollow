@@ -10251,7 +10251,7 @@ function findPathRaw(si,sj,ti,tj){
     for(const [di,dj] of dirs){
       const ni=i+di, nj=j+dj;
       if(!walkable(ni,nj) || prev.has(key(ni,nj)) || fenceBetween(i,j,ni,nj)) continue;
-      if(di && dj && (blocked.has(ni+','+j) || blocked.has(i+','+nj))) continue;   // no cutting the corner of a rock or a stall on a diagonal
+      if(di && dj && blocked.has(ni+','+j) && blocked.has(i+','+nj)) continue;   // a diagonal step may skirt the corner of a rock or a stall, but not squeeze between two
       prev.set(key(ni,nj),[i,j]); q.push([ni,nj]);
     }
   }
@@ -18047,7 +18047,7 @@ const inShape=(i,j)=>{ const S=roomShape(); if(!S) return i>=0&&j>=0&&i<ROOM.w&&
 // nothing you can use may be walled in: if a door, a way in or a chest can't be reached, the chairs round the tables give way, one at a time
 const REACH_T=/berrybush|forage|crate|barrel|chest|stash|pickup|strongbox|footlocker|notice|lectern|trapdoor|ucgrate|teleporter|bed|anvil|cauldron|hearth|stairs|bathchest|wardrobe/;
 function repairReach(id){ const A=AREAS[id]; if(!A || A.maze || A.ucq) return; const ents=Object.values(A.entries||{}).filter(e=>!blocked.has(e.i+','+e.j)); if(!ents.length) return;
-  const reach=()=>{ const s=ents[0], seen=new Set([s.i+','+s.j]), q=[[s.i,s.j]]; while(q.length){ const [i,j]=q.shift(); for(const [di,dj] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){ const ni=i+di, nj=j+dj, k=ni+','+nj; if(seen.has(k)||!walkable(ni,nj)||fenceBetween(i,j,ni,nj)) continue; if(di&&dj&&(blocked.has(ni+','+j)||blocked.has(i+','+nj))) continue; seen.add(k); q.push([ni,nj]); } } return seen; };
+  const reach=()=>{ const s=ents[0], seen=new Set([s.i+','+s.j]), q=[[s.i,s.j]]; while(q.length){ const [i,j]=q.shift(); for(const [di,dj] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){ const ni=i+di, nj=j+dj, k=ni+','+nj; if(seen.has(k)||!walkable(ni,nj)||fenceBetween(i,j,ni,nj)) continue; if(di&&dj&&blocked.has(ni+','+j)&&blocked.has(i+','+nj)) continue; seen.add(k); q.push([ni,nj]); } } return seen; };
   const targets=()=>[...OBJECTS.filter(o=>REACH_T.test(o.type)&&!o.decor&&o.type!=='clutter'), ...OBJECTS.filter(o=>o.inside).map(o=>{ const [i,j]=doorTile(o); return {i,j,fp:[1,1],door:1}; }), ...ents.map(e=>({i:e.i,j:e.j,fp:[1,1],door:1}))];
   const near=(o,seen)=>{ const [fw,fh]=o.fp||[1,1]; if(o.door) return seen.has(o.i+','+o.j); for(let a=-1;a<=fw;a++) for(let b=-1;b<=fh;b++) if(seen.has((o.i+a)+','+(o.j+b))) return true; return false; };
   const touches=(o,set)=>[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]].some(([a,b])=>set.has((o.i+a)+','+(o.j+b)));

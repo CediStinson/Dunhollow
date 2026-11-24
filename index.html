@@ -9696,7 +9696,11 @@ function sitArmLook(opts){ const F=opts.gender==='f';
     if(E.torso==='shirt') sl = vT.startsWith('tunic_') ? {col:CLOTH.shirt,len:0.88} : vT==='smock' ? {col:CLOTH.shirt,len:0.62} : {col:CLOTH.shirt,len:F?0.28:0.46};
     else if(E.torso==='elf_robe') sl={col:ELFC.robe,len:0.97}; else if(E.torso==='elf_tunic') sl={col:ELFC.tunic,len:0.9};
     if(vA==='gambeson'||vA==='cv_suit'||vA==='cv_suit_iron') sl={col:GEAR.jerkin,len:0.86};
-    return { sl, glove: E.hands==='gloves' ? GEAR.glove : null }; }); }
+    { const it=ITEMS[vA]||ITEMS[E.armor]||{}, col=it.col || (E.armor==='mail'?GEAR.mail:E.armor==='robe'?GEAR.robe:null);   // armour with sleeves of its own: robes and long coats to the wrist, mail and plate to the elbow
+      if(col){ if(E.armor==='robe' || /duster|pirate_coat|_robe|robe_|magister|starfall|crimson|indigo|caravan/.test(vA)) sl={col,len:0.95};
+        else if(E.armor==='mail' || /plate|scale|lamellar|hauberk|cuirass|mail/.test(vA)) sl={col,len:0.55}; } }
+    const SL=typeof SHOULDER_LOOK!=='undefined' && o.equip && o.equip.shoulders && SHOULDER_LOOK[unWoven(o.equip.shoulders)];
+    return { sl, glove: E.hands==='gloves' ? GEAR.glove : (E.hands && ITEMS[E.hands] && ITEMS[E.hands].col) || null, sh: SL ? {col:SL.col, trim:SL.trim||tone(SL.col,-0.4), one:!!SL.one, big:(SL.big||1)*(SL.kind==='pauldron'||SL.kind==='metal'?1.15:1)} : null }; }); }
 // the round of the seat seen from behind, bare: shared by the standing figure and the sitting pose (body-local units)
 function cheekGeom(F,V,sit){ const P=F?PROP.f:PROP.m, HI=P.hipHW*V.sw, WA=P.waistHW*V.sw;
   const wT=BODY.WAIST+0.8, wW=(F?HI*0.82+0.4:WA+0.6)-0.2, yH=F?-41:-40;
@@ -9730,9 +9734,9 @@ function drawSitting(c,x,B,opts,dir,mode){
   // a sitting NPC is drawn without its standing arms; the arms are posed here instead
   // one clone per seat height: sitGround tells the figure where the floor is (in its own units), so the seat can rest on it
   let SOs=opts._sitOs; if(!SOs){ SOs={}; try{ Object.defineProperty(opts,'_sitOs',{value:SOs,enumerable:false,configurable:true}); }catch(e){} }
-  const soKey=DROP.toFixed(2); let so=SOs[soKey];
+  const soKey=DROP.toFixed(2)+'|'+JSON.stringify(opts.equip||{})+'|'+JSON.stringify(opts.vari||{}); let so=SOs[soKey];   /* keyed by what you wear, so a change of gear shows in the saddle */
   if(!so){ so={...opts, noArm:1, sitSeat:1, sitGround:+((-DROP+0.3)/RS[1]).toFixed(2), equip: opts.equip ? {...opts.equip, weapon:null, offhand:null} : opts.equip}; delete so._ck; SOs[soKey]=so; }
-  const AL=opts._sitA || (()=>{ const a=sitArmLook(opts); try{ Object.defineProperty(opts,'_sitA',{value:a,enumerable:false,configurable:true}); }catch(e){} return a; })();
+  const AL=(opts._sitA && opts._sitA._k===JSON.stringify(opts.equip||{})) ? opts._sitA : (()=>{ const a=sitArmLook(opts); a._k=JSON.stringify(opts.equip||{}); try{ Object.defineProperty(opts,'_sitA',{value:a,enumerable:false,configurable:true}); }catch(e){} return a; })();
 
   // a whole limb as one soft tapered shape: a faint rim underneath, then the fill, so the bones join without seams
   const segFill=(sg,grow,style)=>{ c.fillStyle=style; sg.forEach(([x1,y1,x2,y2,w1,w2])=>{ const L=Math.hypot(x2-x1,y2-y1)||1, nx=-(y2-y1)/L, ny=(x2-x1)/L, r1=w1+grow, r2=w2+grow;
@@ -9820,6 +9824,11 @@ function drawSitting(c,x,B,opts,dir,mode){
       for(const q of sg){ const L=Math.hypot(q[2]-q[0],q[3]-q[1]); if(left<=0) break; const f=Math.min(1,left/L);
         part.push([q[0],q[1],q[0]+(q[2]-q[0])*f,q[1]+(q[3]-q[1])*f,q[4]+0.7,q[4]+(q[5]-q[4])*f+0.7]); left-=L; }
       limbs(part,o.far?tone(AL.sl.col,-0.12):AL.sl.col); }
+    if(AL.sh && !(AL.sh.one && sd<0)){ const r=AW*1.05*AL.sh.big, pc=o.far?tone(AL.sh.col,-0.15):AL.sh.col, ang=Math.atan2(E[1]-sy,E[0]-sx);   // a shoulder piece capping the top of the arm
+      c.save(); c.translate(sx,sy); c.rotate(ang-Math.PI/2);
+      for(let k=1;k>=0;k--){ c.beginPath(); c.ellipse(0,k*2.2,r*(1-k*0.08),r*0.78,0,Math.PI,Math.PI*2); c.lineTo(r,k*2.2+r*0.25); c.lineTo(-r,k*2.2+r*0.25); c.closePath();
+        const gr=c.createLinearGradient(-r,0,r,0); gr.addColorStop(0,tone(pc,0.22)); gr.addColorStop(1,tone(pc,-0.3)); c.fillStyle=gr; c.fill(); c.strokeStyle=tone(pc,-0.6); c.lineWidth=0.6; c.stroke(); }
+      c.strokeStyle=AL.sh.trim; c.lineWidth=0.5; c.beginPath(); c.moveTo(-r+0.6,r*0.2); c.lineTo(r-0.6,r*0.2); c.stroke(); c.restore(); }
     if(H){ const hc=AL.glove||col, dx=H[0]-E[0], dy=H[1]-E[1], L=Math.hypot(dx,dy)||1;
       c.save(); c.translate(H[0],H[1]);
       if(o.planted){ c.fillStyle=tone(hc,-0.32,0.75); c.beginPath(); c.ellipse(sd*1.2,0.6,3.4*RS[0]+0.5,1.6+0.5,0,0,Math.PI*2); c.fill();

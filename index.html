@@ -26973,11 +26973,24 @@ function cloakForFoe(m,area){ const o=m.opts; if(!o || !o.gender || !o.equip || 
   if(/footpad|thief|highway|cutpurse/i.test(N)) return h<55 ? 'short_cape' : null;
   if(h<30) return (t>=3 ? ['fur_cloak','sell_halfcloak','wool_cloak','wolf_mantle'] : ['wool_cloak','short_cape','hunter_capelet','wolf_mantle'])[h%4];
   return null; }
-{ const _rm=resetMobs; resetMobs=function(){ const r=_rm.apply(this,arguments); try{ mobs.forEach(m=>{ const ck=cloakForFoe(m,areaId); if(ck) m.opts={...m.opts, equip:{...m.opts.equip, cloak:ck}}; }); }catch(e){} return r; }; }
+// veterans' cloaks: the same cuts gone grey with years of hard roads, worn by foes of level 16 and up, and as good as anything a tailor sells
+const VET_CLOAKS={ duel_shoulder:["Duellist's Grey Cape",{hp:9,agi:4},"The duellist's short cape again, but in grey, edged in tarnished silver. Only the ones who have won a great many fights bother to keep it this plain."],
+  sell_halfcloak:["Veteran's Half-cloak",{hp:11,ap:2},"Grey over one shoulder, strapped across the chest, patched in a dozen places and never once replaced."],
+  fur_cloak:["Greyfur Cloak",{hp:13},"Heavy grey fur, frost-pale at the tips. Whoever wore it had stopped feeling the cold years ago."],
+  wool_cloak:["Grey Wanderer's Cloak",{hp:11,agi:1},"Long grey wool, hood up, the hem worn ragged by a thousand miles of road."],
+  short_cape:["Grey Riding Cape",{hp:8,agi:3},"A short grey cape for riding hard, the dust of three regions beaten into it."],
+  hunter_capelet:["Grey Stalker's Capelet",{hp:8,agi:4},"Shoulders and a hood, in the grey of rock and dusk. You lose sight of it standing still."],
+  wolf_mantle:["Old Grey Mantle",{hp:13,ap:1},"The pelt of a wolf that must have been old when it died, grey to the roots."],
+  raven_cloak:["Grey-feather Cloak",{hp:10,magic:4},"Tattered grey wool and a collar of heron-grey feathers. It whispers when you move."] };
+{ const grey=(hex,k)=>{ const n=parseInt(hex.slice(1),16), r=n>>16&255, g=n>>8&255, b=n&255, l0=Math.round(0.3*r+0.59*g+0.11*b), l=Math.max(l0,74), m=v=>Math.min(255,Math.round(v*(1-k)+l*k+(l-l0)*0.6));   /* near-black goes to a dark slate grey, not black */ return '#'+[m(r),m(g),m(b)].map(v=>v.toString(16).padStart(2,'0')).join(''); };
+  Object.entries(VET_CLOAKS).forEach(([id,[name,st,title]])=>{ const v='vet_'+id, L=CLOAK_LOOK[id]; if(!L) return;
+    ITEMS[v]={ name, slot:'cloak', title }; CLOAK_LOOK[v]={ ...L, main:grey(L.main,0.85), lining:grey(L.lining||L.main,0.8), ...(L.fur?{fur:grey(L.fur,0.9)}:{}), ...(L.trim?{trim:'#a8acb4'}:{}), clasp:'#c8ccd4' };
+    ITEM_ICON[v]=(g2,i2,size)=>paintItemArtBase(g2,i2,size); GEAR_HP[v]=st.hp; ITEM_STATS[v]=st; PRICES[v]=Math.round((PRICES[id]||60)*2.6); ITEM_LEVEL_FIX[v]=5; }); }
+{ const _rm=resetMobs; resetMobs=function(){ const r=_rm.apply(this,arguments); try{ mobs.forEach(m=>{ let ck=cloakForFoe(m,areaId); if(ck && VET_CLOAKS[ck] && foeLevel(m)>=16) ck='vet_'+ck; if(ck) m.opts={...m.opts, equip:{...m.opts.equip, cloak:ck}}; }); }catch(e){} return r; }; }
 // a foe that wore a cloak sometimes leaves it: about one in eight (one in sixteen on the roads, where they come back every day)
 { const _v=victory; victory=function(faction){ const dead=(typeof mobs!=='undefined'?mobs:[]).filter(m=>m.hostile && m.dead && !m.looted && (!faction||m.faction===faction) && m.opts && m.opts.equip && m.opts.equip.cloak && CLOAK_LOOK[m.opts.equip.cloak]);
     const r=_v.apply(this,arguments);
-    dead.forEach(m=>{ if(Math.random() >= (m.daily?0.06:0.125)) return; const id=m.opts.equip.cloak, f=slotFor(id); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name+', off its back','#8ac070'); } });
+    dead.forEach(m=>{ const dl=/duel/.test(m.opts.equip.cloak||''); if(Math.random() >= (dl?0.3:m.daily?0.06:0.125)) return; const id=m.opts.equip.cloak,   /* a duellist is a hard fight: his cape comes off him a third of the time */ f=slotFor(id); if(f>=0){ player.inv[f]=id; logMsg('Loot: '+ITEMS[id].name+', off its back','#8ac070'); } });
     return r; }; }
 // Bess sells the plain cloaks; the Bearskin from the old hunter; the Baron's mantle stays in his solar
 { const _t=tailorTalk; tailorTalk=function(){ const _sf=shopFrom; shopFrom=function(name,stock,...r){ shopFrom=_sf; return _sf.call(this,name,[...stock,...todaysStock('bess_cl',['wool_cloak','short_cape','fur_cloak','hunter_capelet'],2)],...r); }; try{ return _t.apply(this,arguments); } finally{ shopFrom=_sf; } }; TALKERS.tailor=tailorTalk; }

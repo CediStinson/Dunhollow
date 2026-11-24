@@ -3551,7 +3551,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       c.restore();
       if(front && L.clasp){ c.fillStyle=L.clasp; c.beginPath(); c.arc(x+cx,B+top+1.8,1.2,0,Math.PI*2); c.fill(); c.strokeStyle=tone(L.clasp,-0.5); c.lineWidth=0.4; c.stroke(); }
       return; }   // drawn with each arm, like the armour they come from
-    if(L.kind==='pauldron'){ drawPauldrons(L.pk, pr>0.3 && pr<=0.8 ? 'near' : 'both'); return; }
+    if(L.kind==='pauldron'){ if(pr>0.3 && pr<=0.8){ drawPauldrons(L.pk,'far'); drawPauldrons(L.pk,'near'); } else drawPauldrons(L.pk,'both'); return; }   /* three-quarter: the far pad too, over the far arm, not lost behind the body */
     const side=pr>0.8, q3=pr>0.3 && !side, k0=(L.big||1)*(F?0.85:1);
     [-1,1].forEach(sd=>{ if(L.one && sd!==(front?1:-1) && !side) return; if(side && sd<0) return;
       const near = side ? true : q3 ? sd===-1 : true;
@@ -3665,8 +3665,8 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   // the camera; turning away (NE) it's the screen-right side.
   const nearS = V.turn > -0.25 ? -1 : 1;
   const farDepth = V.prof*0.85;
-  { const HVf=E.armor==='mail' && !('shoulders' in E) ? ({anvil_plate:'anvil',delver_lamellar:'delver',rune_plate:'rune'})[vA] : null;   /* built-in pauldrons only on folk without a shoulder slot */ if(HVf && pr>0.3 && pr<=0.8) drawPauldrons(HVf,'far'); { const SLf=E.shoulders && typeof SHOULDER_LOOK!=='undefined' && SHOULDER_LOOK[unWoven(E.shoulders)]; if(SLf && SLf.kind==='pauldron' && SLf.pk!==HVf && pr>0.3 && pr<=0.8) drawPauldrons(SLf.pk,'far'); } }   // the far shoulder's pad, behind the body
   if(V.prof>0.3){ drawArm(-nearS,farDepth); if(E.offhand==='shield' && offHandAt && offHandAt.behind && V.prof>0.6 && V.turn>=-0.2) drawShieldOnArm(c,offHandAt.x,offHandAt.y,V.prof,false); if(E.offhand==='morwen_lantern' && offHandAt && offHandAt.behind && V.prof>0.6) drawLanternInHand(c,offHandAt.x,offHandAt.y); }   // only a true profile hides the shield behind you
+  { const HVf=E.armor==='mail' && !('shoulders' in E) ? ({anvil_plate:'anvil',delver_lamellar:'delver',rune_plate:'rune'})[vA] : null;   /* built-in pauldrons only on folk without a shoulder slot */ if(HVf && pr>0.3 && pr<=0.8) drawPauldrons(HVf,'far'); { const SLf=E.shoulders && typeof SHOULDER_LOOK!=='undefined' && SHOULDER_LOOK[unWoven(E.shoulders)]; if(SLf && SLf.kind==='pauldron' && SLf.pk!==HVf && pr>0.3 && pr<=0.8) drawPauldrons(SLf.pk,'far'); } }   // the far shoulder's pad, behind the body
   if(E.offhand==='shield' && V.turn<-0.2 && !SHIELD_DRY){                 // walking away, the shield is carried in front of you: behind your body, its back to us
     const k=view+'|'+opts.gender+'|'+(opts.race||'')+'|'+Math.round(swing*2)+'|'+(CUR_POSE?CUR_POSE.kind+(CUR_POSE.dir||''):'');
     let r=SHIELD_POS.get(k); if(!r){ SHIELD_DRY=true; LAST_OFF=null; try{ drawCharBody(DRY_CTX,0,0,opts,swing,view); } catch(e){} finally{ SHIELD_DRY=false; } r=LAST_OFF; if(r) SHIELD_POS.set(k,r); }
@@ -24025,7 +24025,8 @@ OBJ_DRAW.orecart=o=>{ const I=o.i, J=o.j, AU=o.along!=='j', Q=(u,v,h)=>{ const p
   poly([B(u0,v0),B(u1,v0),B(u1,v1),B(u0,v1)],'#1a1714');   // the floor of the tub
   poly([T(u0-e,v0-e),T(u1+e,v0-e),B(u1,v0),B(u0,v0)],'#4a3c2e','#2a1e14'); poly([T(u0-e,v0-e),T(u0-e,v1+e),B(u0,v1),B(u0,v0)],'#3e3226','#2a1e14');   // the far walls, seen from inside
   // the ore heaped in it, standing proud of the rim
-  const sd=I*7+J*13; [[0.3,0.36,'#6a6a72'],[0.5,0.34,'#5e5e66'],[0.7,0.38,'#7a7a82'],[0.28,0.6,'#6a6a72'],[0.72,0.62,'#8a8a92'],[0.4,0.46,'#7a7a82'],[0.62,0.48,'#8a8a92'],[0.5,0.64,'#6a6a72'],[0.36,0.56,'#c8b070'],[0.56,0.42,'#9a9aa2'],[0.48,0.52,'#d8c080'],[0.6,0.58,'#7a7a82']].forEach(([u,v,c],k)=>{ const mid=1-Math.hypot(u-0.5,v-0.5)*2.2, [px,py]=Q(u,v,ht-3+mid*9+((sd+k*5)%3)); g.fillStyle=c; g.beginPath(); g.ellipse(px,py,6+(k%3),4+(k%2),0.3,0,Math.PI*2); g.fill(); g.fillStyle='rgba(255,255,255,0.18)'; g.beginPath(); g.ellipse(px-1.4,py-1.2,2,1.2,0.3,0,Math.PI*2); g.fill(); });
+  poly([Q(u0-e*0.6,v0-e*0.6,ht-5),Q(u1+e*0.6,v0-e*0.6,ht-5),Q(u1+e*0.6,v1+e*0.6,ht-5),Q(u0-e*0.6,v1+e*0.6,ht-5)],'#3e3e44');   /* the bed of ore filling the tub to just under the rim */
+  const sd=I*7+J*13; [[0.3,0.36,'#6a6a72'],[0.5,0.34,'#5e5e66'],[0.7,0.38,'#7a7a82'],[0.28,0.6,'#6a6a72'],[0.72,0.62,'#8a8a92'],[0.4,0.46,'#7a7a82'],[0.62,0.48,'#8a8a92'],[0.5,0.64,'#6a6a72'],[0.36,0.56,'#c8b070'],[0.56,0.42,'#9a9aa2'],[0.48,0.52,'#d8c080'],[0.6,0.58,'#7a7a82']].forEach(([u,v,c],k)=>{ const mid=Math.max(0,1-Math.hypot(u-0.5,v-0.5)*2.4), [px,py]=Q(u,v,ht-6+mid*7+((sd+k*5)%2)); g.fillStyle=c; g.beginPath(); g.ellipse(px,py,6+(k%3),4+(k%2),0.3,0,Math.PI*2); g.fill(); g.fillStyle='rgba(255,255,255,0.18)'; g.beginPath(); g.ellipse(px-1.4,py-1.2,2,1.2,0.3,0,Math.PI*2); g.fill(); });
   // the near walls: planks, iron bands at the corners and round the rim
   const front=[[T(u1+e,v0-e),T(u1+e,v1+e),B(u1,v1),B(u1,v0)],[T(u0-e,v1+e),T(u1+e,v1+e),B(u1,v1),B(u0,v1)]], fc=['#6a5238','#584430'];
   front.forEach((F,k)=>{ poly(F,fc[k],'#2a1e14'); g.strokeStyle='rgba(30,20,12,0.55)'; g.lineWidth=0.8; for(let q=1;q<3;q++){ const t=q/3, a=[F[0][0]+(F[3][0]-F[0][0])*t, F[0][1]+(F[3][1]-F[0][1])*t], b2=[F[1][0]+(F[2][0]-F[1][0])*t, F[1][1]+(F[2][1]-F[1][1])*t]; g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(b2[0],b2[1]); g.stroke(); } });   // plank seams

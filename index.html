@@ -27476,12 +27476,25 @@ function gormTalk(){ const G='Master Smith Gorm'; say(G,["<i>He does not look up
 // the runeforged and Varrow pieces are not sold off a rack: Gorm forges each to order, for coin and the silver of the seams
 const GORM_SET=id=>/^(rune_|varrow_)/.test(id) && id!=='varrow_silver';
 const gormSilver=id=>/plate|maul|mail/.test(id)?8:/^rune_/.test(id)?5:3;
-function gormForge(){ const G='Master Smith Gorm', disc=vq()==='done'?0.85:1.15, have=invCount('varrow_silver');
-  const L=VARROW_GEAR().filter(GORM_SET).map(id=>{ const c=Math.round(PRICES[id]*0.55*disc), n=gormSilver(id), ok=player.purse>=c && have>=n;
-    return {label:`${ITEMS[id].name} <small>(${formatCoin(c)} and ${n} silver)</small>`, off:!ok, fn:()=>{ player.purse-=c; for(let k=0;k<n;k++){ const q=player.inv.indexOf('varrow_silver'); if(q>=0) player.inv[q]=null; }
-      const f=slotFor(id); if(f>=0){ player.inv[f]=id; logMsg('Gorm forges you: '+ITEMS[id].name+'.','#8ac070'); } else { player.purse+=c; for(let k=0;k<n;k++){ const e=player.inv.indexOf(null); if(e>=0) player.inv[e]='varrow_silver'; } logMsg('Inventory is full.','#e0b070'); }
-      updateHud(); try{ autosaveSoon(400); }catch(e){} say(G,["<i>He weighs the silver in his palm, grunts, and throws it in the crucible. Half a day of hammering later, he sets the piece down in front of you, still warm.</i> “Wear it well. Or give it back and I will melt it.”"],[{label:'Back.', fn:gormTalk}, bye]); }}; });
-  say(G,["“The hold's own work is not for a rack. Bring me silver from the seams, lump for lump, and coin for the coal, and I forge it for you.”",`<i>You carry ${have} lump${have===1?'':'s'} of Varrow silver.</i>`],[...L, {label:'Back.', fn:gormTalk}, bye]); }
+function gormForge(){ const G='Master Smith Gorm', disc=vq()==='done'?0.85:1.15, have=invCount('varrow_silver');   // laid out like Maelis's loom: each piece, and under it what it costs
+  say(G,["“The hold's own work is not for a rack. Bring me silver from the seams, lump for lump, and coin for the coal, and I forge it for you.”",`<i>You carry <b>${have}</b> lump${have===1?'':'s'} of Varrow silver.</i>`],[{label:'Back.', fn:gormTalk}, bye],true);
+  const box=document.getElementById('dlg-opts'), grid=document.createElement('div'); grid.className='shop-grid';
+  const lump=()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=40; cv.style.width=cv.style.height='14px'; cv.style.verticalAlign='-2px'; try{ ITEM_ICON.varrow_silver(cv.getContext('2d'),'varrow_silver',40); }catch(e){} return cv; };
+  VARROW_GEAR().filter(GORM_SET).forEach(id=>{ const c=Math.round(PRICES[id]*0.55*disc), n=gormSilver(id), ok=player.purse>=c && have>=n;
+    const cell=document.createElement('div'); cell.className='shop-cell'+(ok?'':' off');
+    const sl=document.createElement('div'); sl.className='slot filled shop-slot'; sl.dataset.item=id; const cv=document.createElement('canvas'); cv.width=cv.height=104; cv.style.width=cv.style.height='52px'; drawItemIcon(cv.getContext('2d'),id,104); sl.appendChild(cv);
+    const pl=document.createElement('div'); pl.className='shop-price'; pl.style.color='#d8dce4'; pl.style.lineHeight='1.25'; pl.style.textAlign='center'; pl.append(formatCoin(c)); pl.appendChild(document.createElement('br')); pl.append(n+' '); pl.appendChild(lump());   // coin on one line, the silver under it
+    cell.appendChild(sl); cell.appendChild(pl);
+    cell.addEventListener('pointerdown',e=>{ cell._touch=e.pointerType==='touch'; });
+    cell.addEventListener('click',()=>{ if(cell._touch && !cell.classList.contains('armed')){ grid.querySelectorAll('.armed').forEach(x=>x.classList.remove('armed')); cell.classList.add('armed'); return; }
+      const t=document.getElementById('item-tip'), t2=document.getElementById('item-tip2'); if(t) t.style.display='none'; if(t2) t2.style.display='none';
+      if(player.purse<c || invCount('varrow_silver')<n){ say(G,player.purse<c?"“Coin for the coal first.”":"“Silver. "+n+" lumps of it. I do not forge air.”",[{label:'Back.', fn:gormForge}, bye],true); return; }
+      for(let k=0;k<n;k++){ const q=player.inv.indexOf('varrow_silver'); if(q>=0) player.inv[q]=null; }
+      const f=slotFor(id); if(f<0){ for(let k=0;k<n;k++){ const e=player.inv.indexOf(null); if(e>=0) player.inv[e]='varrow_silver'; } say(G,"“Your pack is full. I will keep it on the anvil until you have room.”",[{label:'Back.', fn:gormForge}, bye],true); return; }
+      player.purse-=c; player.inv[f]=id; updateHud(); logMsg('Gorm forges you: '+ITEMS[id].name+'.','#8ac070'); try{ SND.clang(0.6); }catch(e){} try{ autosaveSoon(400); }catch(e){} gormForge(); });
+    grid.appendChild(cell); });
+  const hint=document.createElement('div'); hint.className='shop-hint'; hint.textContent=matchMedia('(hover:none)').matches?'Tap to inspect, tap again to have it forged.':'Hover to inspect, click to have it forged.';
+  box.prepend(hint); box.prepend(grid); GEST_SHOP=true; }
 function ullaTalk(){ const U='Ulla the Trader'; say(U,["“Bread from the valley, draughts from Hollowmere, antidote from somewhere nobody should go.” <i>She grins.</i> “Everything comes up the pass, and everything costs more for the climb.”"],
   [{label:'“What have you got?”', fn:()=>shopFrom(U,['tunic_deep','smith_apron','hobnail_boots','iron_bracers','dwarf_harness','potion','mana_potion','antidote','bread','cooked_meat','apple'].filter(id=>ITEMS[id]&&PRICES[id]),1.1,["“Coin first, then goods. A mountain custom.”"],ullaTalk)}, bye]); }
 function brakkaTalk(){ const M='Old Mother Brakka'; say(M,["<i>An old dwarf woman stirs a pot as big as a barrel by the hearth. She has seen you come in and has already filled a bowl.</i> “Eat. Nobody talks in my hall on an empty stomach.”",

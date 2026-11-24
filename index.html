@@ -16969,11 +16969,12 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
   const idOf=el=> el.classList.contains('shop-slot') ? el.dataset.item : getAt(slotLoc(el));
   const isEq=el=>{ const l=!el.classList.contains('shop-slot') && slotLoc(el); return !!(l && l.kind==='eq'); };
   const hide=()=>{ tip.style.display='none'; tip2.style.display='none'; };
+  const mwTag=(T,id)=>{ try{ const r=typeof mwRank==='function'?mwRank(id):0; if(!r) return; const b=T.querySelector('b'); if(b) b.insertAdjacentHTML('afterend',`<div style="color:#e8c060;font:italic 11px Georgia,serif;margin:1px 0 2px">✦ Masterwork ${MW_ROMAN[r]}: Gorm's work, ${mwStaff(id)?'+'+(2*r)+' spell power':'+'+(12*r)+'% damage'}</div>`); }catch(e){} };   // Gorm's ranks show on the piece itself
   const show=(el,x,y)=>{ const id=idOf(el); if(!id||!ITEMS[id]){ hide(); return; }
     const sl=ITEMS[id].slot, cur=(!isEq(el) && player.opts && SLOTS.includes(sl)) ? player.opts.equip[sl] : null, cmp=cur && cur!==id && ITEMS[cur] ? cur : null;
-    tip.innerHTML=ITEMS[id].slot==='misc'?misc(id):html(id,cmp,false); tip.style.display='block';
+    tip.innerHTML=ITEMS[id].slot==='misc'?misc(id):html(id,cmp,false); mwTag(tip,id); tip.style.display='block';
     const w=tip.offsetWidth, h=tip.offsetHeight; let lx=Math.min(innerWidth-w-6,x+14); const ty=Math.max(6,Math.min(innerHeight-h-6,y-h-8));
-    if(cmp){ tip2.innerHTML=html(cmp,null,true); tip2.style.display='block'; const w2=tip2.offsetWidth, h2=tip2.offsetHeight;
+    if(cmp){ tip2.innerHTML=html(cmp,null,true); mwTag(tip2,cmp); tip2.style.display='block'; const w2=tip2.offsetWidth, h2=tip2.offsetHeight;
       // the pair stays on screen
       lx=Math.max(6,Math.min(innerWidth-(w+6+w2)-6,x+14)); const l2=lx+w+6;   // what you are looking at on the left, what you wear on the right
       tip2.style.left=l2+'px'; tip2.style.top=Math.max(6,Math.min(innerHeight-h2-6,ty))+'px'; } else tip2.style.display='none';
@@ -17018,7 +17019,7 @@ function deadSil(x,y,ht,col,lit,seed){ const r=k=>rnd01(seed,k,760);
 
 // ── chopping: a woodsman's swing, as a pose the character drawing already understands ──
 function chopPose(e){ const ph=((gt*0.9+(e.chopPh||0))%1); if(ph<0.7) return {kind:'raise', t:ph/0.7, dir:'up'}; return {kind:'strike', t:(ph-0.7)/0.1, dir:'up'}; }
-function NPC_POSE(n){ return n && n.bar ? {kind:'guard', dir:'up'} : n && n.chop ? chopPose(n) : null; }   // bar: a spear held across the way
+function NPC_POSE(n){ return n && n.bar ? {kind:'guard', dir:'up'} : n && n.chop && !(n.smith && typeof dlgIsOpen==='function' && dlgIsOpen()) ? chopPose(n) : null; }   // a smith puts the hammer down to talk   // bar: a spear held across the way
 // the loggers in the Fellings are at work until you interrupt them
 wrap('fellings','mobs',l=>l.map((m,k)=> m.name==='Logger Wat' ? {...m, chop:true, chopPh:0.1} : m.name==='Logger Hobb' ? {...m, chop:true, chopPh:0.55} : m));
 // chips fly when the axe bites
@@ -17026,6 +17027,12 @@ function drawChopChips(){                          // wood chips and spadefuls o
     const list=[...NPCS.filter(n=>n.chop), ...mobs.filter(m=>m.chop && !m.dead && !(combat.active && combat.foe===m))];
     list.forEach(e=>{ const ph=((gt*0.9+(e.chopPh||0))%1); if(ph<0.8 || ph>0.95) return; const q=P(e.x??e.i+0.5,e.y??e.j+0.5), k=(ph-0.8)/0.15;
       const W=e.opts&&e.opts.equip&&e.opts.equip.weapon;
+      if(e.smith && typeof dlgIsOpen==='function' && dlgIsOpen()) return;
+      if(e.smith){ const an=OBJECTS.find(o=>o.type==='anvil' && Math.abs(o.i+0.5-(e.x??e.i+0.5))<=1.6 && Math.abs(o.j+0.5-(e.y??e.j+0.5))<=1.6), a=an?P(an.i+0.5,an.j+0.5):q;   // sparks off the hot iron on the anvil
+        if(k<0.12 && !e._clang){ e._clang=1; try{ if(Math.hypot(player.x-(e.x??e.i), player.y-(e.y??e.j))<7) SND.clang(0.18); }catch(err){} } if(k>0.5) e._clang=0;
+        g.save(); g.globalCompositeOperation='lighter'; try{ glow(a.x,a.y-22,18*(1-k)+4,10*(1-k)+3,'255,170,60',0.6*(1-k)); }catch(err){}
+        for(let n=0;n<9;n++){ const ang=-Math.PI*(0.15+0.7*rnd01(n,e.i,881)), d=4+k*(14+rnd01(n,e.j,882)*16); g.fillStyle=`rgba(255,${190+n*6},${90+n*10},${1-k})`;
+          g.fillRect(a.x+Math.cos(ang)*d*1.3, a.y-22+Math.sin(ang)*d+k*k*14, 1.6, 1.6); } g.restore(); return; }
       if(W==='shovel'){ const side=(e.dir>=4?-1:1); for(let n=0;n<6;n++){ const a=-1.0-n*0.32, d=4+k*(18+n*2); g.fillStyle='rgba('+(78+n*6)+','+(58+n*4)+',36,'+(1-k*0.8)+')';   // a spadeful of earth over his shoulder
           g.beginPath(); g.arc(q.x-side*(4+Math.cos(a)*d),q.y-14+Math.sin(a)*d+k*k*18,1.4+(n%3)*0.6,0,Math.PI*2); g.fill(); } return; }
       for(let n=0;n<4;n++){ const a=-1.2-n*0.5, d=6+k*16; g.fillStyle='rgba(222,196,140,'+(1-k)+')'; g.fillRect(q.x+14+Math.cos(a)*d,q.y-30+Math.sin(a)*d+k*k*10,2.4,1.6); } }); }
@@ -23897,7 +23904,7 @@ Object.assign(AREAS,{
       {type:'cstall', i:2, j:10, v:1}, {type:'cstall', i:2, j:13, v:4}, {type:'crates', i:0, j:12}, {type:'barrels', i:0, j:14},
       {type:'mineframe', i:16, j:6}, {type:'brazier', i:8, j:1}, {type:'brazier', i:11, j:1}, {type:'brazier', i:16, j:10}, {type:'brazier', i:7, j:14}, {type:'brazier', i:11, j:14},
       {type:'bed', i:16, j:4}, {type:'banner', i:9, j:0} ],
-    ()=>VARROW_FOLK.filter(n=>!n.when || n.when()).map(n=>({ id:n.id, name:n.name, named:true, i:n.i, j:n.j, dir:n.dir, opts:n.opts })),
+    ()=>VARROW_FOLK.filter(n=>!n.when || n.when()).map(n=>({ id:n.id, name:n.name, named:true, i:n.i, j:n.j, dir:n.dir, opts:n.opts, ...(n.chop?{chop:true, chopPh:n.chopPh, smith:n.smith}:{}) })),
     { entries:{ fromGate:{i:9,j:14}, fromMine:{i:16,j:7} } }),
   varrowmine: VCAVE('Varrowdeep · The Deep Mines',14,14, ()=>[ {type:'teleporter', i:0, j:7, to:'varrowhall', entry:'fromMine'},
       {type:'teleporter', i:7, j:13, to:'varrowtomb', entry:'fromMine', locked:()=>!vq(), onLocked:()=>pzSay('A chain as thick as your arm is padlocked across the lowest gallery. Foreman Halvard has the key.','#c8c0a8')},
@@ -27197,7 +27204,8 @@ mwApplyStats.base={};
 { const _ld=applySave; applySave=function(...a){ const r=_ld.apply(this,a); try{ mwApplyStats(); }catch(e){} return r; }; }
 // the name shows the rank wherever the stat panel names your weapon
 { const _rs=refreshStatPanel; refreshStatPanel=function(){ _rs.apply(this,arguments); try{ const id=player.opts.equip.weapon, r=mwRank(id); if(!r) return; const P2=document.getElementById('stat-panel'); const row=[...P2.querySelectorAll('.stat-row')].find(x=>x.querySelector('b') && x.querySelector('b').textContent==='Weapon');
-    if(row) row.querySelector('span').innerHTML=ITEMS[id].name+` <small style="color:#e8c060">✦ Masterwork ${MW_ROMAN[r]}</small>`; }catch(e){} }; }
+    const html=ITEMS[id].name+` <small style="color:#e8c060">✦ Masterwork ${MW_ROMAN[r]}</small>`;
+    if(row) row.querySelector('span').innerHTML=html; else if(P2){ const d=document.createElement('div'); d.className='stat-row'; d.innerHTML='<b>Weapon</b><span>'+html+'</span>'; d.dataset.help="Master Smith Gorm's work: each rank adds "+(mwStaff(id)?'2 spell power':'12% damage')+'.'; P2.appendChild(d); } }catch(e){} }; }   // the panel has no weapon row of its own any more: add one
 // silver from the seams: one lump from each seam a day
 { const _o=PUZ_ON.oreseam; onUse(['oreseam'],o=>{ const d=Math.floor(dayClock/DAY_LEN), k=areaId+':'+o.i+','+o.j; CHOICE.seamDay=CHOICE.seamDay||{};
     if(CHOICE.seamDay[k]===d){ pzSay("You have worked this seam for today. Your arms say so too. The rock will give up more tomorrow.",'#c8ccd4'); return; }
@@ -27470,7 +27478,7 @@ Object.assign(AREAS,{
 // the people of the Great Hall
 const VARROW_FOLK=[
   { id:'thane', name:'Thane Sigrid Varrowborn', i:9, j:3, dir:7, opts:DWARFO({gender:'f', skin:1, hair:7, hairColor:12, face:2, equip:{head:null, armor:'varrow_mail', hands:null, legs:'trousers', feet:'boots'}}) },
-  { id:'gorm', name:'Master Smith Gorm', i:3, j:3, dir:5, opts:DWARFO({gender:'m', skin:2, hair:2, hairColor:6, beard:8, face:5, equip:{torso:'tunic_deep', armor:'smith_apron', hands:'iron_bracers', feet:'hobnail_boots', weapon:'mace'}}) },
+  { id:'gorm', name:'Master Smith Gorm', i:2, j:2, dir:7, opts:DWARFO({gender:'m', skin:2, hair:2, hairColor:6, beard:8, face:5, equip:{torso:'tunic_deep', armor:'smith_apron', hands:'iron_bracers', feet:'hobnail_boots', weapon:'mace'}}), chop:true, chopPh:0.3, smith:true },   // at his anvil, hammering, until you talk to him
   { id:'ulla', name:'Ulla the Trader', i:3, j:11, dir:1, opts:DWARFO({gender:'f', skin:2, hair:3, hairColor:3, face:4, equip:{torso:'tunic_deep', feet:'hobnail_boots'}}) },
   { id:'brakka', name:'Old Mother Brakka', i:13, j:2, dir:6, opts:DWARFO({gender:'f', skin:1, hair:4, hairColor:13, face:5, equip:{torso:'tunic_deep', armor:'smith_apron'}}) },
   { id:'halvard', name:'Foreman Halvard', i:15, j:8, dir:5, opts:DWARFO({gender:'m', skin:1, hair:2, hairColor:3, beard:7, face:1, equip:{head:'kettle', torso:'tunic_deep', armor:'dwarf_harness', hands:'iron_bracers', feet:'hobnail_boots', weapon:'hatchet'}}) },
@@ -28787,7 +28795,7 @@ setTimeout(()=>{ const halo=(name,col,on,dy,rx)=>{ const prev=OBJ_DRAW[name]; if
       for(let k=0;k<3;k++){ const t=(gt*0.5+k/3+o.i*0.13)%1; g.fillStyle=`rgba(${col},${(1-t)*0.8})`; g.beginPath(); g.arc(q.x+Math.sin(k*2.1+gt)*R*0.5,q.y-dy-t*R*1.2,1.4,0,Math.PI*2); g.fill(); } g.restore(); } }catch(e){} return r; }; };   // a warm halo and a few motes rising
   halo('pickrack','255,220,150',()=>!hasItem('miner_pick'),18,20);
   halo('owlamps','255,200,110',()=>true,10,22);
-  halo('oreseam','210,225,255',o=>{ const k=areaId+':'+o.i+','+o.j; return !(CHOICE.seamDay||{})[k] || CHOICE.seamDay[k]!==Math.floor(dayClock/DAY_LEN); },22,18); },0);
+  halo('oreseam','210,225,255',o=>{ const k=areaId+':'+o.i+','+o.j; return (CHOICE.seamDay||{})[k]!==Math.floor(dayClock/DAY_LEN); },22,18); },0);   // (day 0 counts: a worked seam stops glowing on the first day too)
 onUse(['owlamps'],()=>pzSay("Four lamps, set in a row. The wicks are burned to nothing. Someone sat beside each one, once, and waited for it to go out.",'#d8c890'));
 onUse(['owgeode'],()=>pzSay("You stand in the mouth of the geode and the light comes through your hands. It is warm, a little, like a hearthstone the morning after.",'#b8f0e0'));
 // ════════ DUNGEON PROPS, redrawn to sit in the detailed rooms: a lantern is an iron cage on a stone plinth, bones lie scattered and shaded, an ore seam is a real outcrop ════════
@@ -28810,26 +28818,36 @@ DUNGEON_DRAW.bones=o=>{ const q=P(o.i+0.5,o.j+0.5), sd=o.i*13+o.j*7, R=k=>rnd01(
   if(R(9)<0.35){ const sx=q.x+10, sy=q.y-3, sk=g.createRadialGradient(sx-1.5,sy-3,0.5,sx,sy-2,5); sk.addColorStop(0,'#efe6d0'); sk.addColorStop(1,'#8a8068'); g.fillStyle=sk; g.beginPath(); g.ellipse(sx,sy-2,4.8,4.2,0,0,Math.PI*2); g.fill();
     g.fillStyle='#1a1614'; g.beginPath(); g.ellipse(sx-1.7,sy-2.2,1.2,1.4,0,0,Math.PI*2); g.ellipse(sx+1.7,sy-2.2,1.2,1.4,0,0,Math.PI*2); g.fill(); } };
 // an ore seam: an outcrop of broken dark rock, facets lit and shadowed, silver running through it, a pick left in it
-OBJ_DRAW.oreseam=o=>{ const [w,h]=o.fp||[1,1], q=P(o.i+w/2,o.j+h/2), sd=o.i*31+o.j*17, R=(k,s)=>rnd01(k,sd,s), W=(w+h)*TW*0.26, Hh=34+16*Math.sqrt(w*h);
-  softShadow(q.x+4,q.y+3,W*1.05,W*0.36,0.35,4);
-  const N=7, pts=[...Array(N)].map((_,k)=>{ const t=k/(N-1); return [q.x-W+t*2*W, q.y+Math.sin(t*Math.PI)*W*0.18-(Math.sin(t*Math.PI)*Hh*(0.7+0.5*R(k,2011)))]; });   // the ridge line
-  for(let k=0;k<N-1;k++){ const a=pts[k], b=pts[k+1], ba=[q.x-W+k/(N-1)*2*W, q.y+W*0.12], bb=[q.x-W+(k+1)/(N-1)*2*W, q.y+W*0.12], lit=0.12-k*0.07+(R(k,2012)-0.5)*0.16;
-    g.fillStyle=tone('#3a3632',lit-0.3); g.beginPath(); g.moveTo(ba[0],ba[1]); g.lineTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.lineTo(bb[0],bb[1]); g.closePath(); g.fill();
-    const m=[(a[0]+b[0])/2,(a[1]+b[1])/2+Hh*0.25]; g.fillStyle=tone('#3a3632',lit); g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.lineTo(m[0],m[1]); g.closePath(); g.fill();
-    g.strokeStyle='rgba(10,8,6,0.5)'; g.lineWidth=1; g.beginPath(); g.moveTo(ba[0],ba[1]); g.lineTo(a[0],a[1]); g.lineTo(m[0],m[1]); g.stroke(); }
-  const dug=(CHOICE.seamDay||{})[areaId+':'+o.i+','+o.j]===Math.floor(dayClock/DAY_LEN);   // worked out for today: the silver is gone, only pick scars are left
-  if(dug){ g.save(); g.lineCap='round'; for(let k=0;k<6;k++){ const x=q.x+(R(k,971)-0.5)*W*1.5, y=q.y-4-R(k,972)*Hh*0.6;
-      g.fillStyle='rgba(14,12,10,0.75)'; g.beginPath(); g.ellipse(x,y,4+R(k,978)*3,2.4+R(k,979)*1.6,(R(k,980)-0.5)*0.8,0,Math.PI*2); g.fill();   // the hollow the lump came out of
-      g.strokeStyle='rgba(150,146,138,0.7)'; g.lineWidth=1; for(let s2=0;s2<2;s2++){ const a=(R(k*3+s2,981)-0.5)*1.4; g.beginPath(); g.moveTo(x-6*Math.cos(a),y-6*Math.sin(a)-2+s2*3); g.lineTo(x+6*Math.cos(a),y+6*Math.sin(a)-2+s2*3); g.stroke(); } }   // fresh pick scratches
-    g.restore();
-    for(let k=0;k<8;k++){ const x=q.x+(R(k,2017)-0.5)*W*1.6, y=q.y+W*0.14+(R(k,2018)-0.5)*6, s2=1.5+R(k,2019)*2.5; g.fillStyle=tone('#6a6660',-R(k,2020)*0.3); g.beginPath(); g.moveTo(x-s2,y); g.lineTo(x,y-s2*0.9); g.lineTo(x+s2,y); g.closePath(); g.fill(); } }   // fresh spoil, paler than the old chips
-  else {
-  g.save(); g.lineCap='round'; for(let k=0;k<6;k++){ let x=q.x+(R(k,971)-0.5)*W*1.5, y=q.y-4-R(k,972)*Hh*0.6; g.strokeStyle='rgba(60,60,66,0.8)'; g.lineWidth=3; g.beginPath(); g.moveTo(x,y); const pp=[[x,y]];
-    for(let s=0;s<4;s++){ x+=(R(k*5+s,974)-0.3)*12; y+=(R(k*5+s,975)-0.6)*8; pp.push([x,y]); g.lineTo(x,y); } g.stroke(); g.strokeStyle='rgba(220,226,236,0.95)'; g.lineWidth=1.3; g.beginPath(); pp.forEach(([a,b],n)=>n?g.lineTo(a,b):g.moveTo(a,b)); g.stroke(); }
-  g.globalCompositeOperation='lighter'; for(let k=0;k<6;k++){ const t=(gt*0.5+k*0.31+sd*0.01)%1; if(t>0.25) continue; const px=q.x+(R(k,976)-0.5)*W*1.4, py=q.y-8-R(k,977)*Hh*0.55; g.fillStyle=`rgba(240,245,255,${1-t/0.25})`; g.fillRect(px-0.6,py-4,1.2,8); g.fillRect(px-4,py-0.6,8,1.2); }
-  g.restore(); }
-  for(let k=0;k<10;k++){ const x=q.x+(R(k,2013)-0.5)*W*2.2, y=q.y+W*0.1+(R(k,2014)-0.5)*8, s=2+R(k,2015)*3; g.fillStyle=tone('#4a4640',-0.1-R(k,2016)*0.3); g.beginPath(); g.moveTo(x-s,y); g.lineTo(x,y-s*0.8); g.lineTo(x+s,y); g.closePath(); g.fill(); }   // chips at its foot
-  const pk=P(o.i+w*0.3,o.j+h*0.9); g.strokeStyle='#4a3220'; g.lineWidth=3; g.lineCap='round'; g.beginPath(); g.moveTo(pk.x,pk.y-16); g.lineTo(pk.x-15,pk.y+2); g.stroke(); g.strokeStyle='#6a6c72'; g.lineWidth=2.4; g.beginPath(); g.moveTo(pk.x-5,pk.y-20); g.quadraticCurveTo(pk.x+2,pk.y-18,pk.x+5,pk.y-11); g.stroke(); };
+OBJ_DRAW.oreseam=o=>{ const q=P(o.i+0.5,o.j+0.5), sd=o.i*31+o.j*17, R=(k,s)=>rnd01(k,sd,s);   // one boulder on one tile, faceted, with the silver running across its face
+  const dug=(CHOICE.seamDay||{})[areaId+':'+o.i+','+o.j]===Math.floor(dayClock/DAY_LEN);
+  const N=10, H=30+R(0,2001)*8, ring=(rx,ry,lift,j0,jit)=>[...Array(N)].map((_,k)=>{ const a=k/N*Math.PI*2+R(k,2002)*0.22, r=1-jit/2+R(k,j0)*jit; return [q.x+Math.cos(a)*rx*r-lift*0.08, q.y+Math.sin(a)*ry*r-lift+(R(k,j0+1)-0.5)*lift*0.12, a]; });
+  const RG=[ring(42,20,0,2003,0.3), ring(39,18,H*0.42,2005,0.42), ring(27,13,H*0.8,2007,0.5), ring(13,6,H,2009,0.6)];   // the foot, the swell, the shoulder, the crown: a lump of rock, not a cone
+  softShadow(q.x+6,q.y+4,50,18,0.4,4);
+  const faces=[]; for(let L=0;L<RG.length-1;L++) for(let k=0;k<N;k++){ const n=(k+1)%N, A=RG[L][k], B=RG[L][n], am=Math.atan2(Math.sin(A[2])+Math.sin(B[2]),Math.cos(A[2])+Math.cos(B[2])); faces.push({L,k,n,am,y:(A[1]+B[1])/2-L*0.01}); }
+  faces.sort((A,B)=>A.L-B.L || A.y-B.y);
+  const shade=(am,L)=>{ const lx=-0.6, ly=-0.8; return 0.02+0.26*(Math.cos(am)*lx+Math.sin(am)*ly)-0.1*Math.max(0,Math.sin(am))+L*0.09; };
+  faces.forEach(F=>{ if(Math.sin(F.am)<-0.4 && F.L<2) return; const A=RG[F.L][F.k], B=RG[F.L][F.n], C=RG[F.L+1][F.n], D=RG[F.L+1][F.k];
+    g.fillStyle=tone('#3e3a35',shade(F.am,F.L)+(R(F.k+F.L*N,2011)-0.5)*0.08); g.beginPath(); g.moveTo(A[0],A[1]); g.lineTo(B[0],B[1]); g.lineTo(C[0],C[1]); g.lineTo(D[0],D[1]); g.closePath(); g.fill();
+    g.strokeStyle='rgba(12,10,8,'+(F.L<2&&R(F.k,2012)<0.5?0.4:0.18)+')'; g.lineWidth=1; g.stroke(); });
+  const top=RG[RG.length-1]; g.fillStyle=tone('#4a4640',0.3); g.beginPath(); top.forEach(([x,y],k)=>k?g.lineTo(x,y):g.moveTo(x,y)); g.closePath(); g.fill();   // the crown, catching the lamplight
+  const onFace=(F,u,v)=>{ const A=RG[F.L][F.k], B=RG[F.L][F.n], C=RG[F.L+1][F.n], D=RG[F.L+1][F.k]; const x1=A[0]+(B[0]-A[0])*u, y1=A[1]+(B[1]-A[1])*u, x2=D[0]+(C[0]-D[0])*u, y2=D[1]+(C[1]-D[1])*u; return [x1+(x2-x1)*v, y1+(y2-y1)*v]; };
+  const band=L=>faces.filter(F=>F.L===L && Math.sin(F.am)>0.1).sort((A,B)=>Math.cos(A.am)-Math.cos(B.am));
+  const front=band(1).concat(band(0).length?[]:[]);
+  g.save(); g.lineCap='round'; g.lineJoin='round';
+  if(!dug){ [[band(0),0.62],[band(1),0.4]].forEach(([fs,v0],r)=>{ const pp=[]; let v=v0; fs.forEach((F,fi)=>{ for(let s2=0;s2<2;s2++){ v=Math.max(0.12,Math.min(0.88,v+(R(fi*2+s2+r*11,2017)-0.5)*0.45)); pp.push(onFace(F,1-(s2+0.5)/2,v)); } });   /* a face runs right to left, the vein left to right */   // veins wandering across the face
+      if(pp.length<2) return; g.strokeStyle='rgba(40,40,46,0.85)'; g.lineWidth=r?2.6:3.4; g.beginPath(); pp.forEach(([x,y],n)=>n?g.lineTo(x,y):g.moveTo(x,y)); g.stroke();
+      g.strokeStyle='rgba(222,228,238,0.95)'; g.lineWidth=r?1:1.5; g.beginPath(); pp.forEach(([x,y],n)=>n?g.lineTo(x,y):g.moveTo(x,y)); g.stroke(); });
+    const nug=onFace(front[Math.floor(front.length/2)]||faces[0],0.5,0.5); g.fillStyle='#c8ccd4'; g.beginPath(); g.moveTo(nug[0]-4,nug[1]); g.lineTo(nug[0],nug[1]-4); g.lineTo(nug[0]+4,nug[1]); g.lineTo(nug[0],nug[1]+3); g.closePath(); g.fill(); g.fillStyle='#f4f6fa'; g.fillRect(nug[0]-1.5,nug[1]-2.5,2,2);   // the fattest lump
+    g.globalCompositeOperation='lighter'; for(let k=0;k<5;k++){ const t=(gt*0.5+k*0.31+sd*0.01)%1; if(t>0.25) continue; const F=front[k%Math.max(1,front.length)]; if(!F) continue; const [px,py]=onFace(F,R(k,976),0.3+R(k,977)*0.4);
+      g.fillStyle=`rgba(240,245,255,${1-t/0.25})`; g.fillRect(px-0.6,py-4,1.2,8); g.fillRect(px-4,py-0.6,8,1.2); } }
+  else { front.forEach((F,fi)=>{ for(let s2=0;s2<2;s2++){ const [x,y]=onFace(F,0.25+s2*0.5,0.3+R(fi*3+s2,978)*0.4);   // where the silver was: hollows and fresh pick scars
+      g.fillStyle='rgba(14,12,10,0.8)'; g.beginPath(); g.ellipse(x,y,3.2+R(fi+s2,979)*1.8,2+R(fi+s2,980),(R(fi,981)-0.5)*0.6,0,Math.PI*2); g.fill();
+      g.strokeStyle='rgba(160,156,148,0.75)'; g.lineWidth=1; g.beginPath(); g.moveTo(x-5,y-3); g.lineTo(x+4,y+2); g.stroke(); } }); }
+  g.restore();
+  for(let k=0;k<9;k++){ const a=R(k,2013)*Math.PI*0.9+0.1, x=q.x+Math.cos(a)*(46+R(k,2014)*8), y=q.y+Math.sin(a)*(20+R(k,2014)*5), s2=1.6+R(k,2015)*2.6;   // chips round its foot (fresh pale ones once it is dug)
+    g.fillStyle=tone(dug&&k%2?'#6e6a62':'#4a4640',-R(k,2016)*0.3); g.beginPath(); g.moveTo(x-s2,y); g.lineTo(x,y-s2*0.8); g.lineTo(x+s2,y); g.closePath(); g.fill(); }
+  const pk=[q.x-30,q.y+8]; g.strokeStyle='#4a3220'; g.lineWidth=3; g.lineCap='round'; g.beginPath(); g.moveTo(pk[0]+10,pk[1]-22); g.lineTo(pk[0]-4,pk[1]); g.stroke();   // a dropped pick leaning on it
+  g.strokeStyle='#6a6c72'; g.lineWidth=2.4; g.beginPath(); g.moveTo(pk[0]+3,pk[1]-27); g.quadraticCurveTo(pk[0]+11,pk[1]-25,pk[0]+15,pk[1]-17); g.stroke(); };
 // ════════ THE ROOTDEEP: under Sylvhaven the great tree's roots go down further than anyone has walked, and the rot the Hunger left behind went down with them.
 //   Built like the Undercity, chamber by chamber, four reaches: the Taproot Halls (under the tree, where the elves still keep a watch), the Fungal Deeps (glowing caps
 //   taller than a man), the Rot Warrens (black sap, husks growing in cocoons) and the Heartroot, where the Rot-Mother sits on the tree's oldest root and feeds.

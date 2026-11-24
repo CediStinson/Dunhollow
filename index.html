@@ -15777,6 +15777,7 @@ function drawActorBase(e){
   else if(e.type==='scorpion') drawScorpion(s.x,B,e,poseFor(e));
   else if(e.type==='sandworm') drawSandworm(s.x,B,e,poseFor(e));
   else if(e.type==='scarab') drawScarab(s.x,B,e,poseFor(e));
+  else if(e.type==='shardling') drawShardling(s.x,B,e,poseFor(e));
   else if(e.type==='ember') drawEmber(s.x,B,e,poseFor(e));
   else if(e.type==='rootmother') drawRootMother(s.x,B,e,poseFor(e));
   else if(e.type==='hunger') drawHunger(s.x,B,e,poseFor(e));
@@ -17047,7 +17048,7 @@ function drawChopChips(){                          // wood chips and spadefuls o
       for(let n=0;n<4;n++){ const a=-1.2-n*0.5, d=6+k*16; g.fillStyle='rgba(222,196,140,'+(1-k)+')'; g.fillRect(q.x+14+Math.cos(a)*d,q.y-30+Math.sin(a)*d+k*k*10,2.4,1.6); } }); }
 
 // ── the Bog Lurker: a heap of mud and reeds that stands up and reaches for you ──
-FOES.lurker={ label:'Lurker', base:62, stagger:1.25, pattern:[
+FOES.lurker={ label:'Lurker', unguarded:true, base:62, stagger:1.25, pattern:[
   {wait:1.5, wind:1.15, after:0.8, dir:'left'}, {wait:1.0, wind:0.85, after:0.5, dir:'right'}, {wait:1.7, wind:1.45, after:1.0, dir:'up'} ]};
 const LURK=(o)=>({gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:'club',offhand:null},...o});
 function drawLurker(x,B,e,pose){
@@ -22476,6 +22477,33 @@ Object.assign(WEAPONS,{ horn:{ wind:0.3, dmg:11, len:18 } });
 const SCARAB=o=>({gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:'horn',offhand:null},...o});
 BEASTS.push({ k:'scarab', is:f=>f.type==='scarab', name:'Giant Scarabs', kind:'Beasts · the Glass Dunes',
   how:'Two jabs of the horn, left and right, then a charge from high.', res:'Its shell guards one side: strike the other.', aff:'The charge knocks the wind out of you.', ans:'Read its guard like a man\'s. Tamir works its shell into armour.' });
+// the Geode Shardling: a thing of living crystal that grows in the Crystal Grotto under Varrowdeep, the size of a dog, the Shardback bigger. It has no guard to speak of:
+//   it turns its hardest facets toward your blade instead (a shell), and lunges with the sharp ones
+FOES.shardling={ label:'Geode Shardling', base:52, stagger:1.15, unguarded:true, shell:0.35, pattern:[
+  {wait:1.0, wind:0.6, after:0.4, dir:'left'}, {wait:0.3, wind:0.55, after:0.4, dir:'right'}, {wait:1.2, wind:1.05, after:0.9, dir:'up', charge:true} ]};
+Object.assign(WEAPONS,{ shard_edge:{ wind:0.28, dmg:12, len:16 } });
+const SHARD=o=>({gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:'shard_edge',offhand:null},...o});
+BEASTS.push({ k:'shardling', is:f=>f.type==='shardling', name:'Geode Shardlings', kind:'Living crystal · the Crystal Grotto under Varrowdeep',
+  how:'Two rakes of its sharp facets, left and right, then a lunge from above.', res:'It has no guard, but its crystal turns some of every blow.', aff:'Cuts that bleed light.', ans:'Strike it often; parry the lunge. The dwarves grind its shards into polish.' });
+function drawShardling(x,B,e,pose){ const o=e.opts||{}, big=o.big?1.35:1, v=o.v??((e.spawn?e.spawn[0]+e.spawn[1]:0)%3), raise=pose&&pose.kind==='raise'?Math.min(1,pose.t):0, strike=pose&&pose.kind==='strike'?Math.min(1,pose.t):0;
+  const pp=P(player.x??player.i+0.5,player.y??player.j+0.5), face=(combat.active&&combat.foe===e)?(pp.x>=x?1:-1):((e.dir||0)>=2&&(e.dir||0)<=5?-1:1);
+  const COL=[['#5ab8a8','#9ae8d8','120,220,200'],['#6a7ad8','#b8c4ff','150,170,255'],['#9a6ad0','#d8b0ff','200,140,255']][v], bob=Math.sin(gt*3+(e.i||0))*1.2, lean=(strike*10-raise*4)*face;
+  g.save(); g.translate(x,B); g.scale(big,big);
+  g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(0,1,30,9,0,0,Math.PI*2); g.fill();
+  g.save(); g.globalCompositeOperation='lighter'; try{ glow(lean,-26,34,22,COL[2],0.22+0.15*strike); }catch(err){} g.restore();
+  g.lineCap='round'; [[-16,1],[-6,3],[8,3],[18,1]].forEach(([lx,ly],k)=>{ const st=Math.sin(gt*6+k*1.7)*(e.moving?3:0.6); g.strokeStyle='#2a2a30'; g.lineWidth=5; g.beginPath(); g.moveTo(lx*0.7+lean*0.3,-14+bob); g.lineTo(lx+st,ly); g.stroke(); g.strokeStyle='#5a5a64'; g.lineWidth=3; g.stroke(); });   // stubby legs of dark rock
+  g.lineCap='butt';
+  g.fillStyle='#3a3a44'; g.beginPath(); g.ellipse(lean*0.4,-18+bob,22,10,0,0,Math.PI*2); g.fill(); g.strokeStyle='#18181e'; g.lineWidth=1; g.stroke();   // a rock body
+  const shard=(bx,by,h,w,tilt,k)=>{ g.save(); g.translate(bx,by); g.rotate(tilt); const gr=g.createLinearGradient(-w,0,w,0); gr.addColorStop(0,COL[1]); gr.addColorStop(0.5,COL[0]); gr.addColorStop(1,tone(COL[0],-0.35)); g.fillStyle=gr;
+    g.beginPath(); g.moveTo(-w,0); g.lineTo(-w*0.8,-h*0.75); g.lineTo(0,-h); g.lineTo(w*0.8,-h*0.75); g.lineTo(w,0); g.closePath(); g.fill(); g.strokeStyle=tone(COL[0],-0.6); g.lineWidth=0.9; g.stroke();
+    g.strokeStyle='rgba(255,255,255,0.45)'; g.lineWidth=0.7; g.beginPath(); g.moveTo(-w*0.3,-2); g.lineTo(0,-h*0.92); g.stroke();
+    if(((gt*0.7+k*0.37)%1)<0.08){ g.fillStyle='rgba(255,255,255,0.9)'; g.fillRect(-0.6,-h*0.7-3,1.2,6); g.fillRect(-3,-h*0.7-0.6,6,1.2); } g.restore(); };   // a glint
+  const bx=lean*0.4, by=-22+bob;
+  [[-14,16,6,-0.45],[14,18,6,0.4],[-6,26,7,-0.15],[6,30,7.5,0.1],[0,22,6,-0.05]].forEach(([dx,h,w,t],k)=>shard(bx+dx,by,h,w,t+lean*0.004,k));   // its back, a geode turned inside out
+  const hx=bx+face*20+face*strike*8, hy=by+4-raise*6;   // the head: a wedge of crystal, two pale points for eyes
+  g.fillStyle=COL[0]; g.beginPath(); g.moveTo(hx-face*8,hy-6); g.lineTo(hx+face*8,hy); g.lineTo(hx-face*8,hy+6); g.closePath(); g.fill(); g.strokeStyle=tone(COL[0],-0.6); g.lineWidth=0.9; g.stroke();
+  g.fillStyle='#ffffff'; g.beginPath(); g.arc(hx,hy-1.6,1.1,0,Math.PI*2); g.fill();
+  if(e.dead){ g.globalAlpha=0.6; } g.restore(); }
 function drawScarab(x,B,e,pose){ const raise=pose&&pose.kind==='raise'?Math.min(1,pose.t):0, strike=pose&&pose.kind==='strike'?Math.min(1,pose.t):0;
   const pp=P(player.x??player.i+0.5,player.y??player.j+0.5), face=(combat.active&&combat.foe===e)?(pp.x>=x?1:-1):((e.dir||0)>=2&&(e.dir||0)<=5?-1:1);
   const C='#2e6a64', D='#14302c', walk=e.moving?gt*14:0, lean=raise*0.35-strike*0.15, cx=x+face*strike*14;
@@ -26473,7 +26501,7 @@ Object.assign(ITEM_STATS,{ rat_gloves:{ agi:1, ap:1 } }); GEAR_HP.rat_gloves=3; 
 Object.assign(ITEM_LORE||{},{ rat_gloves:"Tuck's second-best pair. Oiled leather, bitten through in a dozen places and patched each time. Your hands come out of a rat-hole with all their fingers." });
 ITEM_ICON.rat_tail=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.strokeStyle='#d88a8a'; g2.lineWidth=2.6; g2.lineCap='round'; g2.beginPath(); g2.moveTo(9,30); g2.bezierCurveTo(16,8,26,34,32,10); g2.stroke(); g2.strokeStyle='#e8b0a8'; g2.lineWidth=1; g2.stroke(); g2.fillStyle='#6a5a4a'; g2.beginPath(); g2.ellipse(9,31,3.5,2.6,0,0,Math.PI*2); g2.fill(); g2.restore(); };
 Object.assign(WEAPONS,{ rat_teeth:{ wind:0.25, dmg:4, len:14 }, ratking_teeth:{ wind:0.28, dmg:8, len:20 } });
-FOES.rat={ label:'Sewer Rat', base:22, stagger:1.1, pattern:[{wait:0.8,wind:0.62,after:0.4,dir:'left'},{wait:0.5,wind:0.58,after:0.5,dir:'right'},{wait:1.0,wind:0.78,after:0.6,dir:'up'}] };
+FOES.rat={ label:'Sewer Rat', unguarded:true, base:22, stagger:1.1, pattern:[{wait:0.8,wind:0.62,after:0.4,dir:'left'},{wait:0.5,wind:0.58,after:0.5,dir:'right'},{wait:1.0,wind:0.78,after:0.6,dir:'up'}] };
 FOES.ratking={ label:'Rat King', base:78, stagger:0.9, pattern:[{wait:1.2,wind:0.95,after:0.35,dir:'left'},{wait:0.3,wind:0.65,after:0.35,dir:'right'},{wait:0.3,wind:0.65,after:0.7,dir:'left'},
   {wait:1.3,wind:1.15,after:0.8,dir:'up',feint:'right'},{wait:1.0,wind:0.85,after:0.6,dir:'right'}] };
 const RAT=()=>({ equip:{...NOEQ, weapon:'rat_teeth'} }), RATKING=()=>({ equip:{...NOEQ, weapon:'ratking_teeth'} });
@@ -27681,7 +27709,7 @@ onUse(['blacksap'],o=>{ if(CHOICE.hwQ==='sap' && !hasItem('black_sap')){ giveQue
 // the things the Hunger made: rotgnawers (their bite poisons), hollow husks (their blows wither), gloomcallers (drain, wither, raise the dead) and thorn-witches (fire, frost, arcane)
 SKINS[46]='#4a3a2c'; SKINS[47]='#6a5a7a'; SKINS[48]='#5a6a4c';
 Object.assign(WEAPONS,{ gnaw_jaw:{ wind:0.3, dmg:8, len:22 } });
-FOES.gnawer={ label:'Rotgnawer', base:46, stagger:1.0, pattern:[{wait:0.9,wind:0.7,after:0.5,dir:'left'},{wait:0.3,wind:0.55,after:0.4,dir:'right'},{wait:1.2,wind:0.95,after:0.7,dir:'up'}] };
+FOES.gnawer={ label:'Rotgnawer', unguarded:true, base:46, stagger:1.0, pattern:[{wait:0.9,wind:0.7,after:0.5,dir:'left'},{wait:0.3,wind:0.55,after:0.4,dir:'right'},{wait:1.2,wind:0.95,after:0.7,dir:'up'}] };
 FOES.husk={ label:'Hollow Husk', base:60, stagger:0.9, pattern:[{wait:1.2,wind:1.05,after:0.6,dir:'right'},{wait:0.6,wind:0.8,after:0.5,dir:'left'},{wait:1.4,wind:1.2,after:0.8,dir:'up',feint:'left'}] };
 FOES.gloomcaller={ label:'Gloomcaller', base:44, stagger:1.0, pattern:[{wait:1.4,wind:1.1,after:0.7,dir:'up'},{wait:1.0,wind:1.0,after:0.6,dir:'right'},{wait:1.6,wind:1.3,after:0.8,dir:'left'}] };
 FOES.thornwitch={ label:'Thorn-Witch', base:44, stagger:1.0, pattern:[{wait:1.3,wind:1.0,after:0.6,dir:'left'},{wait:0.9,wind:0.9,after:0.6,dir:'up'},{wait:1.5,wind:1.2,after:0.8,dir:'right'}] };
@@ -28493,10 +28521,10 @@ function owObjects(r){ const out=[], seed=r.hs, W=ucWalk(r), used=new Set(), tak
 const OW_FOLK={
   ow_nw:[ ()=>({name:'Tunnel Goblin', type:'goblin', opts:GOBLIN({skin:21,equip:{head:'hood',torso:'shirt',armor:null,hands:null,legs:'trousers',feet:null,weapon:'hatchet',offhand:null}})}),
           ()=>({name:'Goblin Rockbiter', type:'goblin', opts:GOBLIN({skin:20,hair:0,equip:{head:'kettle',torso:'smock',armor:'jerkin',hands:null,legs:null,feet:null,weapon:'spear',offhand:null}})}) ],
-  ow_ne:[ ()=>({name:'Vug Rat', type:'rat', opts:RAT()}), ()=>({name:'Fat Vug Rat', type:'rat', opts:RAT(), hpMul:1.4}) ],
+  ow_ne:[ ()=>({name:'Vug Rat', type:'rat', opts:RAT()}), ()=>({name:'Geode Shardling', type:'shardling', opts:SHARD({}), hpMul:1.1}), ()=>({name:'Fat Vug Rat', type:'rat', opts:RAT(), hpMul:1.4}), ()=>({name:'Grotto Shardback', type:'shardling', opts:SHARD({big:true, v:2}), hpMul:1.6}) ],
   ow_sw:[ ()=>({name:'Drowned-Level Lurker', type:'lurker', opts:LURK({})}) ],
   ow_se:[ ()=>({name:'Lost Miner', type:'bandit', opts:QMINER({})}), ()=>({name:'Lost Hewer', type:'brute', opts:QMINER({hair:1, hairColor:12, beard:6, equip:{armor:'mail', head:'kettle', weapon:'axe'}})}) ] };
-['Tunnel Goblin','Goblin Rockbiter','Vug Rat','Fat Vug Rat','Drowned-Level Lurker','Lost Miner','Lost Hewer'].forEach(n=>{ RESPAWNS.add(n); RESPAWNS.add(n+' '); });
+['Tunnel Goblin','Goblin Rockbiter','Vug Rat','Fat Vug Rat','Geode Shardling','Grotto Shardback','Drowned-Level Lurker','Lost Miner','Lost Hewer'].forEach(n=>{ RESPAWNS.add(n); RESPAWNS.add(n+' '); });
 function owMobs(r){ const out=[], F=OW_FOLK[r.q], h=r.hs;
   if(r.cavern && r.q==='ow_nw') out.push({ name:'Grubnik the Pick-Boss', type:'goblin', hpMul:1.9, faction:'ow_boss_'+r.id, opts:GOBLIN({skin:21,hair:0,equip:{head:'kettle',torso:'smock',armor:'studded',hands:'gloves',legs:'trousers',feet:null,weapon:'axe',offhand:null}}) },
                                     { ...F[0](), faction:'ow_boss_'+r.id }, { ...F[1](), name:'Goblin Rockbiter ', faction:'ow_boss_'+r.id });

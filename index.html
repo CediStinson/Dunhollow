@@ -3509,16 +3509,18 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   // pauldrons for the heavy sets: a domed cap over each shoulder with two lames beneath, drawn after the arms so they sit on top of them
   function drawPauldrons(kind,which){ const A=kind==='anvil', Bk=kind==='delver', Cr=kind==='rune';
     const S=A?'#a2a8b0':Bk?'#4c5056':'#2c2e33', TR=A?'#c8a040':Bk?'#b8703a':'#ffb050', side=pr>0.8, q3=pr>0.3 && !side;
-    [-1,1].forEach(sd=>{ const near = side ? sd>0 : q3 ? sd===-1 : true;
+    const away=V.turn<-0.2;   /* walking away, the shoulder nearer to us is the other one */
+    [-1,1].forEach(sd=>{ const near = side ? sd>0 : q3 ? (away ? sd===1 : sd===-1) : true, back=q3 && !near;
       if(which==='near' && !near) return; if(which==='far' && near) return; if(side && sd<0) return;
-      const sx=side ? LN+CH*0.1 : LN+sd*(CH+(sd>0?bR:bL)+(q3?-1.0:0.4))*(q3&&!near?0.86:1),   /* facing you they sit out on the shoulders; half-turned, closer in */ sy=Y.SHOULDER+0.8, k3=q3&&!near?0.75:1, tilt=side?0.12:sd*0.3;
+      const sx=side ? LN+CH*0.1 : LN+sd*(CH+(sd>0?bR:bL)+(q3?-1.0:0.4))*(q3&&!near?0.86:1),   /* facing you they sit out on the shoulders; half-turned, closer in */ sy=Y.SHOULDER+0.8, k3=back?0.72:(q3?1.08:1), tilt=side?0.12:sd*0.3;
       c.save(); c.translate(x+sx,B+sy); c.rotate(tilt);                                                        // tilted out and down over the upper arm
       for(let k=0;k<3;k++){ const fs2=F?0.8:1, rx=(7.2-k*0.7)*k3*(side?0.85:1)*fs2, ry=(3.8-k*0.2)*fs2, yy=(2-k)*2.6;               // two lames, then the domed cap on top
-        const gp=c.createLinearGradient(-rx,0,rx,0); gp.addColorStop(0,tone(S,0.32)); gp.addColorStop(0.5,tone(S,0.08)); gp.addColorStop(1,tone(S,-0.25));
+        const gp=c.createLinearGradient(-rx,0,rx,0), dk=back?-0.18:0; gp.addColorStop(0,tone(S,0.32+dk)); gp.addColorStop(0.5,tone(S,0.08+dk)); gp.addColorStop(1,tone(S,-0.25+dk));   /* the far pad turns away from the light */
         c.fillStyle=gp; c.beginPath(); c.ellipse(0,yy,rx,ry*(k===2?1.25:1),0,Math.PI,0); c.lineTo(rx,yy+0.9); c.lineTo(-rx,yy+0.9); c.closePath(); c.fill();
         c.strokeStyle=tone(S,-0.65); c.lineWidth=0.6; c.stroke();
         c.strokeStyle=TR; c.lineWidth=0.6; c.beginPath(); c.moveTo(-rx+0.5,yy+0.5); c.lineTo(rx-0.5,yy+0.5); c.stroke();
         c.fillStyle=tone(S,0.4); [-rx*0.7,rx*0.7].forEach(px=>{ c.beginPath(); c.arc(px,yy-0.4,0.45,0,Math.PI*2); c.fill(); }); }
+      if(back){ c.fillStyle='#3a2a1a'; c.fillRect(-1,-1.2,2,6.4); c.strokeStyle='#1a120a'; c.lineWidth=0.4; c.strokeRect(-1,-1.2,2,6.4); c.fillStyle='#8a8478'; c.fillRect(-0.9,4.2,1.8,1.2); c.restore(); return; }   /* seen side-on from beyond: the edge of the pad and its buckled strap, no face, no rune */
       c.fillStyle='rgba(255,255,255,0.2)'; c.beginPath(); c.ellipse(-1.6*k3,-2.6,2.6*k3,1.1,-0.2,0,Math.PI*2); c.fill();
       if(Cr){ c.globalCompositeOperation='lighter'; c.strokeStyle='rgba(255,150,60,0.85)'; c.lineWidth=0.6; c.beginPath(); c.moveTo(0,-3.6); c.lineTo(0,-0.6); c.moveTo(-1.2,-2.4); c.lineTo(0,-1.2); c.lineTo(1.2,-2.4); c.stroke(); }
       c.restore(); }); }

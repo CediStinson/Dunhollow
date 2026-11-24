@@ -28201,11 +28201,7 @@ const setOn=SET=>setCount(SET)>=Math.min(4,SET.length);
      [typeof STARFALL_SET!=='undefined'&&STARFALL_SET,'Starfall','Starfall set: one spell in four strikes twice.'],[typeof EMBER_SET!=='undefined'&&EMBER_SET,'Kindled','Emberforged set: your spells set foes burning.']].forEach(([S,nm,h])=>{ if(!S) return; const n=setCount(S); if(n<2) return;
       const on=n>=Math.min(4,S.length), d=document.createElement('div'); d.className='stat-row set-row'; d.dataset.help=h+(on?'':' Wear '+(4-n)+' more to wake it.');
       d.innerHTML='<b>Set</b><span style="color:'+(on?'#ffb050':'#8a7a5a')+'">'+(on?'✦ ':'')+nm+' '+Math.min(n,4)+'/4</span>'; P2.appendChild(d); }); }catch(e){} }; }
-// Forge-Heat awake: embers drift up off you, so you can see it
-{ const _dc=drawChopChips; drawChopChips=function(){ _dc.apply(this,arguments); try{ if(!runeSetOn() || !player || player.dead) return; const q=P(player.x??player.i+0.5,player.y??player.j+0.5);
-    g.save(); g.globalCompositeOperation='lighter'; for(let k=0;k<7;k++){ const t=(gt*0.45+k/7)%1, sx=Math.sin(k*2.3+gt*0.8)*10*(1-t*0.4); g.fillStyle=`rgba(255,${150+((k*37)%60)},60,${(1-t)*0.75})`;
-      g.beginPath(); g.arc(q.x+sx+(k%2?6:-6), q.y-14-t*52, 1.1+(k%3)*0.35, 0, Math.PI*2); g.fill(); }
-    try{ glow(q.x,q.y-34,16,26,'255,140,50',0.10+0.04*Math.sin(gt*3)); }catch(e){} g.restore(); }catch(e){} }; }   // any four pieces wake the set
+   // any four pieces wake the set
 let MAG_N=0, MAG_FREE=false, STAR_ECHO=false;
 { const _sc=spellCost; spellCost=function(S){ return MAG_FREE ? 0 : _sc.apply(this,arguments); }; }
 { const _c=castSpell; castSpell=function(){ const set=setOn(MAGISTER_SET), m0=player.mana; MAG_FREE = set && MAG_N===2; let r; try{ r=_c.apply(this,arguments); } finally{ var wasFree=MAG_FREE; MAG_FREE=false; }
@@ -29146,13 +29142,36 @@ AREAS.fellings.entries.fromRoots={i:11,j:4};
 //   Dwarf masonry at the east end gives way, stone by stone, to living roots the elves have coaxed down to hold the roof at the west ════════
 const DEEPWAY=()=>CHOICE.vqEnd==='atoned' && !(typeof havenBurnt==='function' && havenBurnt());
 AREAS.deepway=VCAVE('The Deepway',16,6, ()=>[ {type:'teleporter', i:15, j:3, to:'varrowhall', entry:'fromDeep'}, {type:'teleporter', i:0, j:3, to:'sylvhaven', entry:'fromDeep'},
-    {type:'brazier', i:13, j:1}, {type:'brazier', i:9, j:1}, {type:'mineframe', i:11, j:0}, {type:'crates', i:14, j:5}, {type:'dwroot', i:5, j:0}, {type:'dwroot', i:2, j:0, big:true}, {type:'dwroot', i:0, j:1, side:true},
-    {type:'lantern', i:4, j:5}, {type:'lantern', i:1, j:5}, {type:'dwmarker', i:8, j:0},
+    {type:'brazier', i:13, j:1}, {type:'brazier', i:10, j:1}, {type:'mineframe', i:12, j:0}, {type:'crates', i:14, j:5}, {type:'dwroot', i:6, j:0}, {type:'dwroot', i:4, j:0}, {type:'dwroot', i:2, j:0, big:true}, {type:'dwroot', i:0, j:1, side:true}, {type:'dwroot', i:0, j:4, side:true, big:true},
+    {type:'lantern', i:5, j:5}, {type:'lantern', i:2, j:5}, {type:'lantern', i:3, j:1}, {type:'dwmarker', i:8, j:0},
     {type:'rune', i:8, j:5, text:"A stone set into the floor where the dwarf work stops and the roots begin, cut in two scripts, dwarf runes on one half and elvish on the other. Both say the same thing: <i>Here we met in the middle. Durnhal's axe paid for the first yard.</i>"} ],
   ()=>[ { id:'dw_orsa', name:'Delver Orsa', i:11, j:3, dir:5, opts:DWARFO({gender:'f', skin:1, hair:3, hairColor:3, face:3, equip:{head:'kettle', torso:'tunic_deep', armor:'dwarf_harness', feet:'hobnail_boots', weapon:'smith_hammer'}}) },
         { id:'dw_thalien', name:'Thalien of the Roots', i:4, j:3, dir:1, opts:ELFO({gender:'m', skin:0, hair:4, hairColor:11, equip:{head:null, torso:'elf_tunic', armor:null, hands:null, legs:'elf_leggings', feet:'elf_boots', weapon:null, offhand:null}}) } ],
   { entries:{ fromHall:{i:14,j:3}, fromHaven:{i:1,j:3} } });
 AREA_TIER.deepway=3;
+// the west half fades from dwarf work into the elves' wood: moss and earth over the flags, moss up the walls, roots climbing them, flowers where the light comes down
+function deepwayFade(){ const {w,h}=ROOM, F=i=>Math.max(0,Math.min(1,(9-i)/8)), R=(k,s)=>rnd01(k,s,977);
+  for(let j=0;j<h;j++) for(let i=0;i<Math.min(w,10);i++){ const f=F(i+R(i*7+j,1)*1.2); if(f<=0) continue; const a=P(i,j), b=P(i+1,j), c2=P(i+1,j+1), d=P(i,j+1);
+    g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c2.x,c2.y); g.lineTo(d.x,d.y); g.closePath();
+    g.fillStyle=`rgba(${Math.round(70-20*f)},${Math.round(78+18*f)},${Math.round(48-6*f)},${0.25+0.6*f})`; g.fill();   // earth, then moss, closing over the joints of the stone
+    for(let k=0;k<Math.round(10*f);k++){ const u=R(k+i*31+j*7,2), v=R(k+i*31+j*7,3), q=P(i+u,j+v), col=['#5a7a3a','#6a8a42','#4a6a30','#7a9a4a'][k%4];   // tufts of grass
+      g.strokeStyle=col; g.lineWidth=1.2; g.beginPath(); for(let n=-1;n<=1;n++){ g.moveTo(q.x+n*1.5,q.y); g.lineTo(q.x+n*2.6,q.y-5-R(k,4)*4); } g.stroke(); }
+    if(f>0.6) for(let k=0;k<3;k++){ if(R(k+i*13+j,5)>0.45) continue; const q=P(i+R(k+i,6),j+R(k+j,7)); g.fillStyle=['#e8e0f0','#d8e8a0','#b8c8f0'][k%3]; g.beginPath(); g.arc(q.x,q.y-2,1.6,0,Math.PI*2); g.fill(); }   // small white and pale flowers
+    if(f>0.2 && f<0.8 && R(i+j*5,8)<0.35){ const q=P(i+0.5,j+0.5); g.fillStyle='rgba(120,110,96,0.9)'; g.beginPath(); g.ellipse(q.x,q.y,10,4,0,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(50,44,36,0.8)'; g.lineWidth=0.8; g.stroke(); } }   // the last few flagstones showing through
+  g.save(); { const a0=P(0,0), a1=P(w,0), a2=P(w,h), a3=P(0,h); g.beginPath(); g.moveTo(a0.x,a0.y); g.lineTo(a1.x,a1.y); g.lineTo(a2.x,a2.y); g.lineTo(a3.x,a3.y); g.closePath(); g.clip(); }   /* the moss stays on the floor */
+  for(let j=0;j<=h;j++) for(let i=0;i<=9;i++){ const f=F(i); if(f<0.35) continue; const q=P(i,j), r=18+R(i*5+j,12)*16;   // soft moss pillows over the joints, so the grid fades out
+    const gr=g.createRadialGradient(q.x,q.y,0,q.x,q.y,r*1.6); gr.addColorStop(0,`rgba(72,98,50,${0.75*f})`); gr.addColorStop(1,'rgba(72,98,50,0)'); g.fillStyle=gr; g.beginPath(); g.ellipse(q.x,q.y,r*1.6,r*0.8,0,0,Math.PI*2); g.fill(); }
+  g.restore();
+  const H=172, moss=(side,u0,u1)=>{ for(let u=u0;u<u1;u+=0.25){ const f=side==='l'?1:F(u); if(f<=0) continue; const top=20+120*f*(0.7+0.3*R(Math.round(u*4),9)), a=WPT(side,u,0), b=WPT(side,u+0.25,0), c2=WPT(side,u+0.25,top), d=WPT(side,u,top);
+      const gr=g.createLinearGradient(0,a.y,0,a.y-top); gr.addColorStop(0,`rgba(60,90,44,${0.75*f})`); gr.addColorStop(1,'rgba(60,90,44,0)'); g.fillStyle=gr; g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.lineTo(c2.x,c2.y); g.lineTo(d.x,d.y); g.closePath(); g.fill(); }
+    g.lineCap='round'; for(let k=0;k<(side==='l'?6:9);k++){ const u=side==='l'? (k+0.5)*h/6 : R(k,10)*8; const f=side==='l'?1:F(u); if(f<0.15) continue; const p0=WPT(side,u,0), p1=WPT(side,u+0.4*(R(k,11)-0.5),H*(0.4+0.6*f));   // roots climbing the wall
+      g.strokeStyle='#2e2216'; g.lineWidth=4; g.beginPath(); g.moveTo(p0.x,p0.y); g.bezierCurveTo(p0.x+10,p0.y-50,p1.x-10,p1.y+40,p1.x,p1.y); g.stroke(); g.strokeStyle='#6a5034'; g.lineWidth=2.2; g.stroke(); }
+    g.lineCap='butt'; };
+  moss('r',0,9); moss('l',0,h);
+  const gl=P(1.5,h/2); const gg=g.createRadialGradient(gl.x,gl.y-60,10,gl.x,gl.y-60,260); gg.addColorStop(0,'rgba(200,240,190,0.22)'); gg.addColorStop(1,'rgba(200,240,190,0)'); g.fillStyle=gg; g.fillRect(gl.x-300,gl.y-340,600,560);   // green daylight leaking in from the Haven
+}
+{ const _pp=paintPools; paintPools=function(){ const r=_pp.apply(this,arguments); try{ if(areaId==='deepway') deepwayFade(); }catch(e){} return r; }; }   // after the floor is laid, so the moss lies over it
+
 AREAS.deepway.entries.fromDeep=AREAS.deepway.entries.fromHall;
 AREAS.varrowhall.entries.fromDeep={i:1,j:5}; AREAS.sylvhaven.entries.fromDeep={i:4,j:1};
 // the teleporters in this tunnel lead out with the right entries

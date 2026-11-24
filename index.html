@@ -22945,7 +22945,11 @@ JOURNAL.push(['Beyond Your Level', ()=> !CHOICE.daring ? null : CHOICE.daring>=5
 //   about level 7 when the valley is done, 12-14 after the danger-3 lands, 19 after the swamp, 23 after the Undercity, 28-30 only deep in the desert
 const LV_OLD=[0,0,120,400,850,1500,2400,3400,4600,6000,7600,9400,11500,14000,17000], LV_K=13/29, oldLv=n=>1+(n-1)*LV_K, newLv=o=>Math.round(1+(o-1)/LV_K);
 const LV_MAX=30, XP_AT=[0,0]; for(let n=2;n<=LV_MAX;n++){ const o=oldLv(n), k=Math.min(13,Math.floor(o)), f=o-k; XP_AT[n]=Math.round((LV_OLD[k]+(LV_OLD[k+1]-LV_OLD[k])*f)/10)*10; }
-const playerLevel=()=>{ const x=CHOICE.xp||0; let L=1; for(let k=2;k<=LV_MAX;k++) if(x>=XP_AT[k]) L=k; return L; };
+const XP_AT_V1=XP_AT.slice(); for(let n=16;n<=LV_MAX;n++) XP_AT[n]=Math.round((XP_AT_V1[15]+(XP_AT_V1[n]-XP_AT_V1[15])*1.3)/10)*10;   // past 15 every level asks 30% more: the late regions carry you to 30 near the end, not halfway
+// a save from before the longer curve keeps its level (and how far into it it was): once, its experience is topped up to match
+function xpMigrate(){ if(CHOICE.xpCurve===2) return; const x=CHOICE.xp||0; let L=1; for(let k=2;k<=LV_MAX;k++) if(x>=XP_AT_V1[k]) L=k;
+  if(L>15){ const into=L<LV_MAX?(x-XP_AT_V1[L])/(XP_AT_V1[L+1]-XP_AT_V1[L]):0; CHOICE.xp=Math.round(XP_AT[L]+(L<LV_MAX?into*(XP_AT[L+1]-XP_AT[L]):0)); } CHOICE.xpCurve=2; }
+const playerLevel=()=>{ if(CHOICE.xpCurve!==2) xpMigrate(); const x=CHOICE.xp||0; let L=1; for(let k=2;k<=LV_MAX;k++) if(x>=XP_AT[k]) L=k; return L; };
 const xpInto=()=>{ const L=playerLevel(); return (CHOICE.xp||0)-XP_AT[L]; }, xpNeed=()=>{ const L=playerLevel(); return L>=LV_MAX?0:XP_AT[L+1]-XP_AT[L]; };
 const levelHp=()=>(playerLevel()-1)*3+(typeof perkHp==='function'?perkHp():0), levelDmgMult=()=>1+0.02*(playerLevel()-1);
 const foeLevel=f=>{ if(!f) return 1; const t=f.tier||tierOf(areaId)||1; return newLv(Math.min(15, 2*t + ((f.boss||(f.opts&&f.opts.big)||['barrowking','sunqueen','brute','sandworm'].includes(f.type))?1:0) + (/^(Old |Greater |The )/.test(f.name||'')?1:0))); };
@@ -22979,13 +22983,15 @@ function playerOutMult(f){ let m=levelDmgMult(); const id=player.opts&&player.op
 function foeDmgMult(f){ const t=Math.max(1,Math.min(6,(f&&f.tier)||1)); return (coachOn() && t<=2 ? FOE_SOFT_DMG[t] : FOE_DMG_T[t])*(1-armourCut()); }
 { const _rm=resetMobs; resetMobs=function(...a){ const r=_rm.apply(this,a); mobs.forEach(m=>{ if(m.type==='dummy' || !m.tier) return; const tt=Math.max(1,Math.min(6,m.tier)), k=coachOn() && tt<=2 ? FOE_SOFT_HP[tt] : FOE_HP_T[tt]; m.maxHp=Math.round(m.maxHp*k); if(!m.dead) m.hp=Math.round(m.hp*k); }); return r; }; }
 // experience: from every foe you fell (less for small fry, more for something beyond you), and a good deal for every task you see through
-function giveXp(n,why){ if(!n || n<1) return; const L0=playerLevel(); CHOICE.xp=(CHOICE.xp||0)+Math.round(n); const L1=playerLevel();
+function giveXp(n,why){ if(!n || n<1) return; xpMigrate();
+  if(why && typeof questLv==='function'){ let ql=null; try{ ql=questLv(why); }catch(e){} if(ql){ const gap=ql-playerLevel(); n*=gap>=0?Math.min(1.5,1+0.08*gap):Math.max(0.25,1+0.12*gap); } }   // a quest above your level pays more (to +50%), one below you less (down to a quarter)
+  const L0=playerLevel(); CHOICE.xp=(CHOICE.xp||0)+Math.round(n); const L1=playerLevel();
   floatText(tileOf(player),'+'+Math.round(n)+' xp','#e8d070');
   if(L1>L0){ refreshPlayerHp(false); player.hp=player.maxHp; updateHud(); setTimeout(()=>{ banner('Level '+L1+'!','#f0dc80',2000); try{ SND.perfect(); }catch(e){}
       logMsg('You are level '+L1+' now: '+player.maxHp+' health, and your blows land a little harder.','#f0dc80'); if(L1%5===0) setTimeout(()=>{ try{ perkOffer(); }catch(e){} },2400);
       teach('levels','Levels',["Every foe you fell and every task you finish gives <b>experience</b>. Each <b>level</b> gives you <b>+3 health</b> and <b>+2% damage</b>, and every <b>fifth</b> level lets you pick a <b>perk</b>.","Foes have levels too, shown over their heads. Seven or more levels above you, they carry a <b>☠</b>: a <b>hard fight</b> you can still win with good parries and good gear. <b>Eleven or more</b> above, and it will very likely kill you."]); },300); }
   updateHud(); }
-function killXp(f){ const d=(foeLevel(f)-playerLevel())*LV_K, base=6*oldLv(foeLevel(f)); return base*(d>=0 ? Math.min(2,1+0.2*d) : Math.max(0,1+0.25*d)); }
+function killXp(f){ const d=(foeLevel(f)-playerLevel())*LV_K, base=6*oldLv(foeLevel(f)); return base*(d>=0 ? Math.min(1.5,1+0.2*d) : Math.max(0,1+0.25*d)); }   // a foe above you is worth up to half again, not double
 { const _fd=foeDown; foeDown=function(f){ const xp=(f && f.type!=='dummy' && !combat.practice && !f.dead) ? killXp(f) : 0; const r=_fd.apply(this,arguments); if(xp>=1) setTimeout(()=>giveXp(xp),250); return r; }; }
 setInterval(()=>{ try{ if(!running || CHOICE.xpQuests==null) return; const n=renownDone(); if(n>CHOICE.xpQuests){ const k=n-CHOICE.xpQuests; CHOICE.xpQuests=n; giveXp(k*Math.max(20,12*tierOf(areaId)),'quest'); } }catch(e){} },2500);   // a task is worth more the deeper into the world it takes you
 // older saves: a level that fits what you have already done

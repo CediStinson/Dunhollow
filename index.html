@@ -1759,9 +1759,10 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
     if(E.armor==='mail' && vA==='rune_plate'){                // the plate's arms: a rerebrace down the upper arm, a couter over the elbow
       const S='#2c2e33', L=hy+2-top, eY=top+L*0.5, r0=top+3.2, ww=aw/2+0.9, ac=x0+aw/2;
       const rb=()=>{ c.beginPath(); c.moveTo(x+ac-ww,B+r0); c.lineTo(x+ac+ww,B+r0); c.lineTo(x+ac+ww-0.5,B+eY-1); c.lineTo(x+ac-ww+0.5,B+eY-1); c.closePath(); };
-      rb(); const rg=c.createLinearGradient(x+ac-ww,0,x+ac+ww,0); rg.addColorStop(0,tone(S,0.34-0.2*depth)); rg.addColorStop(0.5,tone(S,0.05-0.2*depth)); rg.addColorStop(1,tone(S,-0.3-0.1*depth)); c.fillStyle=rg; c.fill(); c.strokeStyle='#121316'; c.lineWidth=0.5; c.stroke();
+      const UNDER=!!CLOAK && V.turn<-0.2;   /* seen from behind, a cloak hangs over the upper arm: the rerebrace stays under it, only the couter shows */
+      if(!UNDER){ rb(); const rg=c.createLinearGradient(x+ac-ww,0,x+ac+ww,0); rg.addColorStop(0,tone(S,0.34-0.2*depth)); rg.addColorStop(0.5,tone(S,0.05-0.2*depth)); rg.addColorStop(1,tone(S,-0.3-0.1*depth)); c.fillStyle=rg; c.fill(); c.strokeStyle='#121316'; c.lineWidth=0.5; c.stroke();
       c.strokeStyle='#121316'; c.lineWidth=0.4; [0.35,0.68].forEach(t=>{ const yy=r0+(eY-1-r0)*t; c.beginPath(); c.moveTo(x+ac-ww+0.3,B+yy); c.quadraticCurveTo(x+ac,B+yy+0.6,x+ac+ww-0.3,B+yy); c.stroke(); });
-      c.strokeStyle='rgba(255,176,80,0.6)'; c.lineWidth=0.35; c.beginPath(); c.moveTo(x+ac-ww+0.5,B+eY-1.6); c.lineTo(x+ac+ww-0.5,B+eY-1.6); c.stroke();
+      c.strokeStyle='rgba(255,176,80,0.6)'; c.lineWidth=0.35; c.beginPath(); c.moveTo(x+ac-ww+0.5,B+eY-1.6); c.lineTo(x+ac+ww-0.5,B+eY-1.6); c.stroke(); }
       const cg=c.createRadialGradient(x+ac-0.6,B+eY-0.4,0.2,x+ac,B+eY,ww+0.6); cg.addColorStop(0,tone(S,0.4-0.2*depth)); cg.addColorStop(1,tone(S,-0.3-0.1*depth)); c.fillStyle=cg;
       c.beginPath(); c.ellipse(x+ac,B+eY+0.2,ww+0.3,2.2,0,0,Math.PI*2); c.fill(); c.strokeStyle='#121316'; c.lineWidth=0.5; c.stroke();
       fs('#8a8e96'); c.beginPath(); c.arc(x+ac+(s>0?1:-1)*(ww-0.6),B+eY+0.2,0.4,0,Math.PI*2); c.fill(); }
@@ -4047,7 +4048,9 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
     const hax = handAt.x + nearS*(STAFF?2:3.0)*(front?1:0.4);
     STAFF_REST=STAFF; try{ drawWeapon(c,hax,handAt.y,idle*Math.PI/180,wid); } finally{ STAFF_REST=false; }
     const hc = E.hands==='gloves' ? GEAR.glove : skin;
-    if(!posed) drawArm(nearS,0); else gripFingers(c,handAt.x,handAt.y,idle*Math.PI/180,hc);   // the hand drawn again over the grip, closed round it as a hand would be
+    if(!posed && (front || !(CLOAK || E.shoulders))) drawArm(nearS,0);
+    else if(!posed){ c.save(); c.beginPath(); c.rect(x-80,B+Y.SHOULDER+al*0.52,160,120); c.clip(); drawArm(nearS,0); c.restore(); }   /* from behind, the cloak and pauldron stay over the upper arm: only the forearm and hand come out from under them */
+    else gripFingers(c,handAt.x,handAt.y,idle*Math.PI/180,hc);   // the hand drawn again over the grip, closed round it as a hand would be
   }
   if(E.offhand==='shield' && offHandAt && (!offHandAt.behind || V.prof<=0.6) && V.turn>=-0.2) drawShieldOnArm(c,offHandAt.x,offHandAt.y,V.prof,false);
   if(EMB_F && front && pr>0.8){ const T=Y.WAIST+2.1, X=u=>x+LN+u, Yv=v=>B+T+v;   // side on, the back half: the string coming down off the hip to a small seat, tucked under the curve behind
@@ -24064,6 +24067,14 @@ WEAPON_ART.rune_maul=(c,hx,hy,ang,id,s)=>{ c.save(); c.translate(hx,hy); c.rotat
   c.save(); c.globalCompositeOperation='lighter'; c.strokeStyle='rgba(255,150,60,0.9)'; c.lineWidth=0.9; c.beginPath(); c.moveTo(27.5,-4.5); c.lineTo(27.5,4.5); c.moveTo(25,-1.5); c.lineTo(27.5,1); c.lineTo(30,-1.5); c.stroke();
   const gg=c.createRadialGradient(27.5,0,0,27.5,0,9); gg.addColorStop(0,'rgba(255,140,40,0.35)'); gg.addColorStop(1,'rgba(255,140,40,0)'); c.fillStyle=gg; c.fillRect(18,-9,19,18); c.restore();
   c.restore(); };
+// a smith's forging hammer: short ash handle, a squat steel head with a flat face and a cross-peen (Gorm's, not for sale)
+Object.assign(WEAPONS,{ smith_hammer:{ wind:0.2, dmg:8, len:14 } });
+WEAPON_ART.smith_hammer=(c,hx,hy,ang,id,s)=>{ c.save(); c.translate(hx,hy); c.rotate(ang); c.scale(s,s);
+  c.scale(1.35,1.35); c.fillStyle='#7a5a34'; c.fillRect(-4,-1,19,2); c.fillStyle='#5a3e22'; c.fillRect(-4,0.3,19,0.7); c.fillStyle='#3a2a18'; c.fillRect(-4,-1.2,3,2.4);   // the handle, darkened where the hand goes
+  const hg=c.createLinearGradient(0,-4,0,4); hg.addColorStop(0,'#b4b8c0'); hg.addColorStop(0.5,'#7a7e86'); hg.addColorStop(1,'#4a4d54'); c.fillStyle=hg;
+  c.beginPath(); c.moveTo(13,-5.2); c.lineTo(18,-5.2); c.lineTo(18,-1.6); c.lineTo(17.2,2); c.lineTo(16.2,5.6); c.lineTo(14.8,5.6); c.lineTo(13.8,2); c.lineTo(13,-1.6); c.closePath(); c.fill();   // flat face up, peen down
+  c.strokeStyle='#26282c'; c.lineWidth=0.6; c.stroke(); c.fillStyle='rgba(255,255,255,0.35)'; c.fillRect(13.4,-5,4.2,0.8);
+  c.restore(); };
 // Forge-Heat: with any four pieces on, every third blow you land bursts with fire
 let RUNE_HITS=0, RUNE_FIRE=false;
 const runeSetOn=()=>setOn(RUNE_SET);   // any four of the five
@@ -27479,7 +27490,7 @@ Object.assign(AREAS,{
 // the people of the Great Hall
 const VARROW_FOLK=[
   { id:'thane', name:'Thane Sigrid Varrowborn', i:9, j:3, dir:7, opts:DWARFO({gender:'f', skin:1, hair:7, hairColor:12, face:2, equip:{head:null, armor:'varrow_mail', hands:null, legs:'trousers', feet:'boots'}}) },
-  { id:'gorm', name:'Master Smith Gorm', i:2, j:2, dir:7, opts:DWARFO({gender:'m', skin:2, hair:2, hairColor:6, beard:8, face:5, equip:{torso:'tunic_deep', armor:'smith_apron', hands:'iron_bracers', feet:'hobnail_boots', weapon:'mace'}}), chop:true, chopPh:0.3, smith:true },   // at his anvil, hammering, until you talk to him
+  { id:'gorm', name:'Master Smith Gorm', i:2, j:2, dir:7, opts:DWARFO({gender:'m', skin:2, hair:2, hairColor:6, beard:8, face:5, equip:{torso:'tunic_deep', armor:'smith_apron', hands:'iron_bracers', feet:'hobnail_boots', weapon:'smith_hammer'}}), chop:true, chopPh:0.3, smith:true },   // at his anvil, hammering, until you talk to him
   { id:'ulla', name:'Ulla the Trader', i:3, j:11, dir:1, opts:DWARFO({gender:'f', skin:2, hair:3, hairColor:3, face:4, equip:{torso:'tunic_deep', feet:'hobnail_boots'}}) },
   { id:'brakka', name:'Old Mother Brakka', i:13, j:2, dir:6, opts:DWARFO({gender:'f', skin:1, hair:4, hairColor:13, face:5, equip:{torso:'tunic_deep', armor:'smith_apron'}}) },
   { id:'halvard', name:'Foreman Halvard', i:15, j:8, dir:5, opts:DWARFO({gender:'m', skin:1, hair:2, hairColor:3, beard:7, face:1, equip:{head:'kettle', torso:'tunic_deep', armor:'dwarf_harness', hands:'iron_bracers', feet:'hobnail_boots', weapon:'hatchet'}}) },

@@ -4550,7 +4550,7 @@ function drawHead(c, x, B, opts, view=0){
     c.beginPath(); c.moveTo(ex0+ew*0.62,ey0+0.9); c.quadraticCurveTo(ex0+0.5,ey0+0.8,ex0+0.6,ey0+eh*0.62); c.stroke();
     c.fillStyle=tone(skin,-0.14); c.beginPath(); c.ellipse(ex0+ew*0.85,ey0+eh*0.56,0.55,0.9,0,0,Math.PI*2); c.fill();   // tragus
   };
-  const EQ=opts.equip||defaultEquip(opts.gender), hooded=EQ.head==='hood';
+  const EQ=opts.equip||defaultEquip(opts.gender), BEARHOOD=!EQ.head && /^(t_)?bearskull_cloak$/.test(EQ.cloak||'') && !opts.shell, hooded=EQ.head==='hood' || BEARHOOD;   // the bear-skull cloak's head is worn up, as a hood
   if(hooded && showFace){                        // a skin backstop under the hood's face-hole, so a
     const hcx=LN+(pr>0.8?HW*0.62:faceOff(pr)*0.8), hcy=(Y.HAIRLINE+Y.CHIN)/2+0.8;   // slight mismatch between
     const hrx=pr>0.8?HW*0.6:(HW-1.3)*(1-pr*0.35), hry=(Y.CHIN-Y.HAIRLINE)/2+1.4;              // the hole and the face
@@ -4811,7 +4811,7 @@ function drawHead(c, x, B, opts, view=0){
     c.beginPath(); c.moveTo(x+LN-HW,B+Y.HAIRLINE+4.5); c.quadraticCurveTo(x+LN,B+Y.HAIRLINE+6.5,x+LN+HW,B+Y.HAIRLINE+4.5); c.stroke(); }
   if(opts.marks && opts.marks.neckTat && !GOB) drawNeckTat(c,x,B,P,pr,LN,V.turn>-0.25);
   HG_F=opts.gender==='f';
-  if(hooded) drawHeadgear(c,x,B,(opts.vari&&opts.vari.head)||'hood',P,view,LN);
+  if(hooded){ const h0=GEAR.hood; if(BEARHOOD) GEAR.hood='#4e3626'; try{ drawHeadgear(c,x,B,BEARHOOD?'hood':(opts.vari&&opts.vari.head)||'hood',P,view,LN); } finally{ GEAR.hood=h0; } }   // the bear hood is the cowl in bear fur
   if(!F && V.turn>-0.25 && !String(opts.race||'').startsWith('elf') && !GOB){
     // saves from before beards were separate: "Short + Beard" keeps its beard
     const beard = opts.beard ?? (opts.hair===1 ? 5 : 0);
@@ -4895,25 +4895,24 @@ function drawHead(c, x, B, opts, view=0){
       c.strokeStyle=tone(ELFC.silver,-0.4); c.lineWidth=0.4; c.stroke();
       c.fillStyle='rgba(255,255,255,0.85)'; c.beginPath(); c.arc(x+gx-0.4,B+gy-0.4,0.4,0,Math.PI*2); c.fill(); }
   }
-  // the bear-skull cloak: the bear's own skull worn as a hood, fur ruff behind it, the upper jaw over your brow
-  if(/^(t_)?bearskull_cloak$/.test(EQ.cloak||'') && !EQ.head && !opts.shell){ const BN='#e4d8bc', BD='#7a6a4e', FUR='#4a3424', top=Y.SKULL_TOP, front=V.turn>-0.25, prof=pr>0.8, fd=1;
-    c.save(); c.translate(x+LN,B+top+6); c.scale(1.32,1.32); c.translate(-(x+LN),-(B+top+6.6));   // a bear's skull is bigger than yours c.fillStyle=FUR; c.beginPath(); c.ellipse(x+LN-(prof?1.5:0),B+top+4.5,HW+2.6,6.4,0,Math.PI,0); c.lineTo(x+LN+HW+2.6-(prof?1.5:0),B+top+7.5); c.quadraticCurveTo(x+LN,B+top+5.5,x+LN-HW-2.6-(prof?1.5:0),B+top+7.5); c.closePath(); c.fill();   // the fur ruff over the crown
-    c.strokeStyle=tone(FUR,0.2); c.lineWidth=0.5; for(let k=0;k<7;k++){ const a=Math.PI*(1.05+k*0.13); c.beginPath(); c.moveTo(x+LN+Math.cos(a)*(HW+1.2),B+top+4.5+Math.sin(a)*5.6); c.lineTo(x+LN+Math.cos(a)*(HW+2.8),B+top+4.5+Math.sin(a)*6.8); c.stroke(); }
-    const cx=x+LN+(prof?0.6:0), cy=B+top+1.6;   // the cranium, a bone dome on top
-    c.fillStyle=BN; c.beginPath(); c.ellipse(cx,cy,HW*0.92,4.4,0,0,Math.PI*2); c.fill(); c.strokeStyle=BD; c.lineWidth=0.6; c.stroke();
-    c.strokeStyle=tone(BN,-0.25); c.lineWidth=0.5; c.beginPath(); c.moveTo(cx-(prof?2:0),cy-4.2); c.lineTo(cx-(prof?2.4:0),cy+1.5); c.stroke();   // the ridge down the middle
+  // the bear-skull cloak, hood up: the bear's ears on the crown, and its skull worn over the brow, the fangs hanging over your forehead
+  if(BEARHOOD){ const BN='#e2d6ba', BD='#7a6a4e', FUR='#4e3626', FD='#36241a', top=Y.SKULL_TOP-2.6, front=V.turn>-0.25, prof=pr>0.8;
+    c.save();
+    const ear=(ex)=>{ c.fillStyle=FUR; c.beginPath(); c.ellipse(ex,B+top+1.4,2.6,2.3,0,0,Math.PI*2); c.fill(); c.fillStyle=FD; c.beginPath(); c.ellipse(ex,B+top+1.7,1.3,1.2,0,0,Math.PI*2); c.fill(); };   // round bear ears
+    if(prof) ear(x+LN-HW*0.35); else { ear(x+LN-HW*0.72); ear(x+LN+HW*0.72); }
     if(!front){ c.restore(); }
-    else if(prof){ const fx=x+LN+HW*0.6, sy=B+Y.HAIRLINE-0.6;   // side on: the long snout out over the face
-      c.fillStyle=BN; c.beginPath(); c.moveTo(fx-2,cy-2.6); c.quadraticCurveTo(fx+4,cy-2.2,fx+HW+3.6,sy-1.2); c.lineTo(fx+HW+4.2,sy+1.2); c.lineTo(fx-1,sy+1.6); c.closePath(); c.fill(); c.strokeStyle=BD; c.lineWidth=0.6; c.stroke();
-      c.fillStyle='#2a2016'; c.beginPath(); c.ellipse(fx-0.6,cy+0.4,1.5,1.2,0,0,Math.PI*2); c.fill();   // the socket
-      c.beginPath(); c.ellipse(fx+HW+3.2,sy-0.3,0.7,0.6,0,0,Math.PI*2); c.fill();   // the nose hole
-      c.fillStyle='#f4ecd8'; for(let k=0;k<4;k++){ const tx=fx+1+k*(HW+2)/4; c.beginPath(); c.moveTo(tx-0.6,sy+1.4); c.lineTo(tx,sy+(k===0?3.6:2.6)); c.lineTo(tx+0.6,sy+1.4); c.closePath(); c.fill(); }
+    else if(prof){ const bx=x+LN+HW*0.2, by=B+Y.HAIRLINE-3.4;   // side on: the skull's long snout out past your face, the jaw's fangs down over the brow
+      c.fillStyle=BN; c.beginPath(); c.moveTo(bx-HW*0.9,by-1.8); c.quadraticCurveTo(bx,by-4.4,bx+HW*0.9,by-2); c.quadraticCurveTo(bx+HW+3.4,by-1.2,bx+HW+5.2,by+0.6); c.lineTo(bx+HW+4.8,by+2.6); c.lineTo(bx-HW*0.6,by+2.4); c.closePath(); c.fill(); c.strokeStyle=BD; c.lineWidth=0.55; c.stroke();
+      c.fillStyle='#241a12'; c.beginPath(); c.ellipse(bx+HW*0.25,by-0.6,1.3,1,0,0,Math.PI*2); c.fill(); c.beginPath(); c.ellipse(bx+HW+4.4,by+0.8,0.6,0.5,0,0,Math.PI*2); c.fill();
+      c.fillStyle='#f4ecd8'; [0,1.6,3.2,4.6].forEach((d,k)=>{ const tx=bx+HW*0.5+d; c.beginPath(); c.moveTo(tx-0.5,by+2.4); c.lineTo(tx,by+(k===0?5:3.8)); c.lineTo(tx+0.5,by+2.4); c.closePath(); c.fill(); });
       c.restore(); }
-    else { const off=faceOff(pr)*0.6, sy=B+Y.HAIRLINE-0.2, w=HW*0.62;   // face on: the muzzle comes at you over the brow
-      c.fillStyle='#2a2016'; [-1,1].forEach(sd=>{ c.beginPath(); c.ellipse(cx+off+sd*HW*0.45,cy+0.8,1.5,1.2,sd*0.3,0,Math.PI*2); c.fill(); });   // the sockets
-      c.fillStyle=BN; c.beginPath(); c.moveTo(x+LN+off-w,cy+0.2); c.quadraticCurveTo(x+LN+off,cy-1.4,x+LN+off+w,cy+0.2); c.lineTo(x+LN+off+w*0.85,sy+1); c.lineTo(x+LN+off-w*0.85,sy+1); c.closePath(); c.fill(); c.strokeStyle=BD; c.lineWidth=0.6; c.stroke();
-      c.fillStyle='#2a2016'; c.beginPath(); c.ellipse(x+LN+off,sy-1.6,1.2,0.8,0,0,Math.PI*2); c.fill();   // the nose hole
-      c.fillStyle='#f4ecd8'; for(let k=-2;k<=2;k++){ const tx=x+LN+off+k*w*0.38, long=Math.abs(k)===2; c.beginPath(); c.moveTo(tx-0.6,sy+0.8); c.lineTo(tx,sy+(long?3.4:2.2)); c.lineTo(tx+0.6,sy+0.8); c.closePath(); c.fill(); }   // the upper teeth, fangs at the corners
+    else { const off=faceOff(pr)*0.55, cx=x+LN+off, by=B+Y.HAIRLINE-2.2, w=HW*0.95;   // face on: the skull's face over yours, sockets and nose, the upper fangs over your forehead
+      c.fillStyle=BN; c.beginPath(); c.moveTo(cx-w,by+0.6); c.quadraticCurveTo(cx-w*0.95,by-4.6,cx,by-5.2); c.quadraticCurveTo(cx+w*0.95,by-4.6,cx+w,by+0.6); c.quadraticCurveTo(cx+w*0.45,by+1.6,cx+w*0.32,by+2.6); c.lineTo(cx-w*0.32,by+2.6); c.quadraticCurveTo(cx-w*0.45,by+1.6,cx-w,by+0.6); c.closePath(); c.fill(); c.strokeStyle=BD; c.lineWidth=0.55; c.stroke();
+      c.fillStyle='#241a12'; [-1,1].forEach(sd=>{ c.beginPath(); c.ellipse(cx+sd*w*0.5,by-1.2,1.5,1.15,sd*0.35,0,Math.PI*2); c.fill(); });   // the sockets
+      c.beginPath(); c.moveTo(cx-0.9,by+0.4); c.lineTo(cx+0.9,by+0.4); c.lineTo(cx,by+1.8); c.closePath(); c.fill();   // the nose hole
+      c.strokeStyle=tone(BN,-0.2); c.lineWidth=0.4; c.beginPath(); c.moveTo(cx,by-5); c.lineTo(cx,by-2.6); c.stroke();
+      c.fillStyle='#f4ecd8'; [-1,1].forEach(sd=>{ c.beginPath(); c.moveTo(cx+sd*w*0.34-0.6,by+2.4); c.lineTo(cx+sd*w*0.3,by+5); c.lineTo(cx+sd*w*0.26+0.6,by+2.4); c.closePath(); c.fill(); });   // two long fangs
+      for(let k=-1;k<=1;k++){ c.beginPath(); c.moveTo(cx+k*1.3-0.4,by+2.5); c.lineTo(cx+k*1.3,by+3.5); c.lineTo(cx+k*1.3+0.4,by+2.5); c.closePath(); c.fill(); }
       c.restore(); } }
 }
 

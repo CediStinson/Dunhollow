@@ -22565,7 +22565,10 @@ function wideDecor(seed,w,h,keep,specs){ const used=new Set(), out=[], key=(i,j)
       const o={type, i, j, ...(typeof props==='function'?props(k):props||{})}; if(fp) o.fp=[fw,fh]; out.push(o); k++; } });
   return out; }
 const wideCache={};
-const wideObjs=(id,f)=>()=>(wideCache[id]=wideCache[id]||f()).map(o=>({...o}));
+const poolTidy=L=>{ const P=L.filter(o=>o.type==='pool'), fp=o=>o.fp||[1,1], area=o=>fp(o)[0]*fp(o)[1], cut=new Set();   // a scattered pool that lands on a bigger one would draw as a pond inside a pond
+  P.slice().sort((x,y)=>area(y)-area(x)).forEach((o,k,S)=>{ if(cut.has(o)) return; for(const q of S.slice(k+1)){ if(cut.has(q)) continue; const [w,h]=fp(o), [w2,h2]=fp(q);
+      if(q.i < o.i+w+1 && q.i+w2+1 > o.i && q.j < o.j+h+1 && q.j+h2+1 > o.j) cut.add(q); } }); return cut.size ? L.filter(o=>!cut.has(o)) : L; };
+const wideObjs=(id,f)=>()=>(wideCache[id]=wideCache[id]||poolTidy(f())).map(o=>({...o}));
 const JACKAL=(n,i,j,c)=>({ name:n, type:'wolf', i, j, faction:'jackals', daily:true, coat:c||'#b8915a' });
 const NIGHT_DEAD=(n,i,j,f)=> ({ name:n, type:'skeleton', i, j, faction:f||'sanddead', daily:true, opts:{...RISEN(n), wrapped:true} });
 // ── the desert ──
@@ -26536,11 +26539,17 @@ onUse(['drownbell'],o=>{ const B=CHOICE.bwbell, night=nightAmt()>0.5;
         say('The Blackwater Bell',["The note goes out over the water, low and green and very old, and the whole Blackwater goes still to listen.","The pale shapes stop where they stand. One by one they turn their faces up to the sound, and then they are simply not there: only rings on the water, spreading, and then not even those.","You let go of the rope. The bell hums for a long time."],[{label:'Go and tell Pell.',fn:closeDialog}]); }},
     {label:'Not yet.', fn:closeDialog}]); });
 // Abel's bones, out in the Sunken Wood, the clapper still in his fist
-OBJ_DRAW.abelbones=o=>{ const q=P(o.i+0.5,o.j+0.5), x=q.x, y=q.y; g.fillStyle='rgba(30,40,30,0.4)'; g.beginPath(); g.ellipse(x,y+1,22,8,0,0,Math.PI*2); g.fill();
-  g.fillStyle='#d8d0b8'; g.beginPath(); g.ellipse(x-10,y-3,5,4,0,0,Math.PI*2); g.fill(); g.fillStyle='#2a2418'; g.fillRect(x-12,y-4,1.6,1.6); g.fillRect(x-9,y-4,1.6,1.6);   // the skull
-  g.strokeStyle='#cfc6ac'; g.lineWidth=2; for(let k=0;k<4;k++){ g.beginPath(); g.moveTo(x-5,y-2+k*1.6); g.quadraticCurveTo(x,y-5+k*1.6,x+5,y-2+k*1.6); g.stroke(); } g.beginPath(); g.moveTo(x+5,y); g.lineTo(x+16,y+3); g.stroke();   // ribs, and an arm flung out
-  if(!CHOICE.bellClapper){ const gr=g.createRadialGradient(x+17,y+2,1,x+18,y+3,5); gr.addColorStop(0,'#8ab89a'); gr.addColorStop(1,'#3a5a46'); g.fillStyle=gr; g.beginPath(); g.ellipse(x+18,y+3,4,4.6,0,0,Math.PI*2); g.fill(); }   // the clapper, still in his hand
-  g.fillStyle='rgba(70,100,60,0.5)'; g.beginPath(); g.ellipse(x+2,y+4,9,2.4,0,0,Math.PI*2); g.fill(); };
+OBJ_DRAW.abelbones=o=>{ const q=P(o.i+0.5,o.j+0.5), R=k=>rnd01(k,o.i,5523); g.save(); g.translate(q.x,q.y); g.scale(1.45,1.45); const x=0, y=0; try{   // the same heap of bones as Edric's, but the water had him: silt and weed, not blood
+  const silt=(px,py,r,rot,a)=>{ g.save(); g.translate(px,py); g.rotate(rot); g.scale(1,0.5); const gr=g.createRadialGradient(0,0,0,0,0,r*1.25);
+    gr.addColorStop(0,`rgba(34,40,26,${0.6*a})`); gr.addColorStop(0.55,`rgba(48,58,34,${0.45*a})`); gr.addColorStop(0.85,`rgba(60,70,40,${0.18*a})`); gr.addColorStop(1,'rgba(60,70,40,0)');
+    g.fillStyle=gr; g.beginPath(); g.arc(0,0,r*1.25,0,Math.PI*2); g.fill(); g.restore(); };
+  silt(x+2,y+2,22,0.1,1); silt(x-14,y-3,10,0.4,0.8); for(let k=0;k<5;k++){ const a=R(k)*Math.PI*2, d=16+R(k+40)*14; silt(x+Math.cos(a)*d*1.5,y+Math.sin(a)*d*0.5,2.5+R(k+80)*3,a,0.5+R(k+82)*0.3); }
+  g.fillStyle='rgba(74,70,52,0.9)'; g.beginPath(); g.moveTo(x-12,y-4); g.lineTo(x+6,y-8); g.lineTo(x+12,y-1); g.lineTo(x+4,y+5); g.lineTo(x-8,y+4); g.closePath(); g.fill();   // what is left of his coat
+  g.save(); g.scale(1/1.45,1/1.45); drawSkelFig(0,0,{pile:true, alpha:1, dir:2, weapon:null}); g.restore();
+  g.strokeStyle='rgba(70,104,52,0.85)'; g.lineWidth=1.1; for(let k=0;k<5;k++){ const sx=x-12+R(k+10)*24, sy=y-5+R(k+20)*9; g.beginPath(); g.moveTo(sx,sy); g.quadraticCurveTo(sx+4-R(k+30)*8,sy-3,sx+6-R(k+31)*12,sy+2); g.stroke(); }   // river weed caught in the bones
+  if(!CHOICE.bellClapper){ const gr=g.createRadialGradient(x+14,y+5,0.5,x+15,y+6,4); gr.addColorStop(0,'#8ab89a'); gr.addColorStop(1,'#3a5a46'); g.fillStyle=gr; g.beginPath(); g.ellipse(x+15,y+6,3,3.4,0,0,Math.PI*2); g.fill();
+    g.strokeStyle='#3a5a46'; g.lineWidth=1; g.beginPath(); g.moveTo(x+15,y+2.6); g.lineTo(x+15,y); g.stroke(); }   // the clapper, still in his hand
+  } finally{ g.restore(); } };
 NEAR_NAME.abelbones='old bones';
 wrap('sunkenwood','objects',l=>[...l, {type:'abelbones', i:11, j:7}]);
 onUse(['abelbones'],o=>{ if(CHOICE.bellClapper){ say('Old Bones',["Old Abel, or what the water left of him. You have taken what he was holding. He seems lighter for it."],[{label:'Leave him.',fn:closeDialog}]); return; }

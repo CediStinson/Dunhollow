@@ -6446,7 +6446,7 @@ function switchArea(id,entryKey){
   updateMinimap();
   banner(A.label,'#e8c878',1300);
   skelFollowArea(); stonesHint(id); fenOpenCheck(id); fenRumour(id); poolsArea(id); introScene(id,entryKey);
-  markElves(); tentBlock(id); shapeBlock(id); corridorBlock(id); clearRound(); repairReach(id);
+  markElves(); tentBlock(id); shapeBlock(id); corridorBlock(id); clearRound(); repairReach(id); alpineTrees(id);
   try{ pupArea(); }catch(err){ console.error(err); }
   transitArea(prev,id);
   autosaveSoon();
@@ -10609,19 +10609,8 @@ function paintGroundTexture(){
         let gc=mixC([58,82,34],[104,130,56],gn); if(bl>0.9) gc=mixC(gc,[140,150,80],0.4); sc=mixC(sc,gc,clamp01(gr*1.15)); }
       const ao=1-0.35*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.04-0.1*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.06), o=(py*TWp+px)*4;
       D[o]=sc[0]*k; D[o+1]=sc[1]*k; D[o+2]=sc[2]*k; D[o+3]=255; continue; }
-    if(AREAS[areaId] && AREAS[areaId].mountain){             // a high pass: grey granite, scree fans, old snow lying in the hollows (more of it up toward the gate), thin turf low down, a gravel road
-      const n=fbm(gx*0.4,gy*0.4,141), n2=fbm(gx*2.2,gy*2.2,142), n3=fbm(gx*8,gy*8,143), up=1-gy/h;
-      let pc=mixC([96,94,90],[132,128,120],n2); pc=mixC(pc,[74,72,68],smooth(0.55,0.8,n)*0.5);
-      const cr=Math.abs(fbm(gx*0.9,gy*0.9,144)-0.5); if(cr<0.02) pc=mixC(pc,[40,38,36],0.75*(1-cr/0.02));                         // cracks in the bedrock
-      const sc=smooth(0.5,0.68,fbm(gx*0.6+5,gy*0.6,145)); if(sc>0){ const Z=6, cx=Math.floor(gx*Z), cy=Math.floor(gy*Z+((cx&1)?0.5:0)), fx=gx*Z-cx, fy=gy*Z+((cx&1)?0.5:0)-cy;   // scree: loose rounded stones
-        const hs=hsh(cx*3+1,cy*5+2), jx=0.5+((hs%7)/7-0.5)*0.3, jy=0.5+(((hs>>3)%7)/7-0.5)*0.3, rr=0.3+((hs>>6)%5)*0.04, d=Math.hypot(fx-jx,(fy-jy)*1.15)/rr, st=(hs%100)/100;
-        if(d<1){ const sh=clamp01((fx-jx+fy-jy)/rr*0.5+0.5); pc=mixC(pc, mixC(st<0.33?[164,158,150]:st<0.66?[100,96,90]:[128,122,114],[52,50,46],sh*0.45), sc*0.85); if(d<0.45 && fx<jx && fy<jy) pc=mixC(pc,[206,202,196],sc*0.35); }
-        else pc=mixC(pc,[56,54,50],sc*0.55*clamp01((d-1)*3)); }
-      const tf=smooth(0.55,0.7,fbm(gx*0.5,gy*0.5,146))*(1-up*0.85); pc=mixC(pc, mixC([84,98,54],[124,128,74],n3), tf*0.8);       // thin turf
-      const sv=fbm(gx*0.45+11,gy*0.45,147), sn=smooth(0.64-up*0.32,0.7-up*0.32,sv);                                                 // snow
-      if(sn>0){ pc=mixC(pc, mixC([206,216,230],[246,249,253],n3*0.6+0.4*smooth(0.66-up*0.32,0.85-up*0.32,sv)), sn*0.94); }
-      if(G.path>0){ const tp=smooth(0.25,0.8,G.path), tr=mixC([132,120,104],[102,92,80],fbm(gx*2.6,gy*2.6,148)); pc=mixC(pc,tr,tp*0.86);
-        if(n3>0.7) pc=mixC(pc,[156,146,132],tp*0.45); if(sn>0.5 && up>0.6) pc=mixC(pc,[220,226,234],tp*0.35*(sn-0.5)); }                 // gravel; trodden slush up high
+    if(AREAS[areaId] && AREAS[areaId].mountain){             // a high pass: see mountainGround
+      const pc=mountainGround(gx,gy,1-gy/h,G);
       const ao=1-0.35*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1+((hsh(px,py)%1000)/1000-0.5)*0.08), o=(py*TWp+px)*4;
       D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
     if(theme==='sand'){                                      // the desert: warm sand in wind ripples, darker drifts, a hard-packed caravan track
@@ -10682,7 +10671,8 @@ function paintGroundTexture(){
       if(G.path>0){ let tr=mixC([96,78,50],[74,58,36],fbm(gx*2.2,gy*2.2,66)); tr=mixC(tr,[52,44,30],smooth(0.6,0.75,fbm(gx*1.4,gy*1.4,67))*0.6); pc=mixC(pc,tr,smooth(0.25,0.75,G.path)); }
       const ao=1-0.45*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.02-0.1*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.08), o=(py*TWp+px)*4;
       D[o]=pc[0]*k; D[o+1]=pc[1]*k; D[o+2]=pc[2]*k; D[o+3]=255; continue; }
-    if(theme==='road'){ const fc=roadGroundPixel(gx,gy,G,w,h), ao=1-0.42*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.04-0.1*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.08), o=(py*TWp+px)*4;
+    if(theme==='road'){ let fc=roadGroundPixel(gx,gy,G,w,h); { const AL=AREAS[areaId].alpine; if(AL){ const t=AL(gx,gy,w,h); if(t>0) fc=mixC(fc,mountainGround(gx,gy,t*0.55,G),t); } }   // climbing into the mountains: the pass's stone and snow creep in
+      const ao=1-0.42*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.04-0.1*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.08), o=(py*TWp+px)*4;
       D[o]=fc[0]*k; D[o+1]=fc[1]*k; D[o+2]=fc[2]*k; D[o+3]=255; continue; }
     if((theme==='farm' || (theme==='village' && !AREAS[areaId].boggy)) && !G.notch){ const fc=farmGroundPixel(gx,gy,G,w,h), ao=1-0.42*(1-smooth(0,1.1,Math.min(gx,gy))), k=ao*(1.06-0.12*clamp01((gx+gy)/(w+h)))*(1+((hsh(px,py)%1000)/1000-0.5)*0.08), o=(py*TWp+px)*4;
       D[o]=fc[0]*k; D[o+1]=fc[1]*k; D[o+2]=fc[2]*k; D[o+3]=255; continue; }
@@ -10706,6 +10696,7 @@ function paintGroundTexture(){
     const ao=1-0.42*(1-smooth(0,1.1,Math.min(gx,gy)));
     const key=1.06-0.12*clamp01((gx+gy)/(w+h));
     const grain=1+((hsh(px,py)%1000)/1000-0.5)*0.08;
+    { const AL=AREAS[areaId].alpine; if(AL){ const t=AL(gx,gy,w,h); if(t>0) c=mixC(c,mountainGround(gx,gy,t*0.55,G),t); } }   // a road climbing into the mountains: the pass's stone and snow creep in
     const k=ao*key*grain, o=(py*TWp+px)*4;
     D[o]=c[0]*k; D[o+1]=c[1]*k; D[o+2]=c[2]*k; D[o+3]=255;
   }
@@ -14554,6 +14545,21 @@ function mapGridPlace(G,pos){ const R=G.ids().map(id=>({id, A:AREAS[id], c:G.cel
   const at={}; R.forEach(({id,A,c:[X,Y]})=>{ pos[id]={u:cx[X]-Math.floor(A.w/2), v:cy[Y]-Math.floor(A.h/2)}; at[X+','+Y]=id; });
   R.forEach(({id,A,c:[X,Y]})=>{ (G.links(id)||[]).forEach(d=>{ if(d!=='e' && d!=='s') return; const to=at[(X+(d==='e'?1:0))+','+(Y+(d==='s'?1:0))]; if(!to) return; const B=AREAS[to];
       MAP_LINKS.push(d==='e' ? {a:id, ai:[A.w-1,Math.floor(A.h/2)], b:to, bi:[0,Math.floor(B.h/2)], du:1, dv:0, grid:true} : {a:id, ai:[Math.floor(A.w/2),A.h-1], b:to, bi:[Math.floor(B.w/2),0], du:0, dv:1, grid:true}); }); }); }
+// the high pass's ground at one point: granite, scree, thin turf, old snow (up: 0 low down, 1 by the gate), a gravel road
+function mountainGround(gx,gy,up,G){
+      const n=fbm(gx*0.4,gy*0.4,141), n2=fbm(gx*2.2,gy*2.2,142), n3=fbm(gx*8,gy*8,143);
+      let pc=mixC([96,94,90],[132,128,120],n2); pc=mixC(pc,[74,72,68],smooth(0.55,0.8,n)*0.5);
+      const cr=Math.abs(fbm(gx*0.9,gy*0.9,144)-0.5); if(cr<0.02) pc=mixC(pc,[40,38,36],0.75*(1-cr/0.02));                         // cracks in the bedrock
+      const sc=smooth(0.5,0.68,fbm(gx*0.6+5,gy*0.6,145)); if(sc>0){ const Z=6, cx=Math.floor(gx*Z), cy=Math.floor(gy*Z+((cx&1)?0.5:0)), fx=gx*Z-cx, fy=gy*Z+((cx&1)?0.5:0)-cy;   // scree: loose rounded stones
+        const hs=hsh(cx*3+1,cy*5+2), jx=0.5+((hs%7)/7-0.5)*0.3, jy=0.5+(((hs>>3)%7)/7-0.5)*0.3, rr=0.3+((hs>>6)%5)*0.04, d=Math.hypot(fx-jx,(fy-jy)*1.15)/rr, st=(hs%100)/100;
+        if(d<1){ const sh=clamp01((fx-jx+fy-jy)/rr*0.5+0.5); pc=mixC(pc, mixC(st<0.33?[164,158,150]:st<0.66?[100,96,90]:[128,122,114],[52,50,46],sh*0.45), sc*0.85); if(d<0.45 && fx<jx && fy<jy) pc=mixC(pc,[206,202,196],sc*0.35); }
+        else pc=mixC(pc,[56,54,50],sc*0.55*clamp01((d-1)*3)); }
+      const tf=smooth(0.55,0.7,fbm(gx*0.5,gy*0.5,146))*(1-up*0.85); pc=mixC(pc, mixC([84,98,54],[124,128,74],n3), tf*0.8);       // thin turf
+      const sv=fbm(gx*0.45+11,gy*0.45,147), sn=smooth(0.64-up*0.32,0.7-up*0.32,sv);                                                 // snow
+      if(sn>0){ pc=mixC(pc, mixC([206,216,230],[246,249,253],n3*0.6+0.4*smooth(0.66-up*0.32,0.85-up*0.32,sv)), sn*0.94); }
+      if(G.path>0){ const tp=smooth(0.25,0.8,G.path), tr=mixC([132,120,104],[102,92,80],fbm(gx*2.6,gy*2.6,148)); pc=mixC(pc,tr,tp*0.86);
+        if(n3>0.7) pc=mixC(pc,[156,146,132],tp*0.45); if(sn>0.5 && up>0.6) pc=mixC(pc,[220,226,234],tp*0.35*(sn-0.5)); }                 // gravel; trodden slush up high
+      return pc; }
 const MM_COL={ sand:'#c8a464', ash:'#5a3a30', bog:'#4e5434', farm:'#8a9a4a', road:'#4e6a34', crossroads:'#5a7a3a', village:'#9aa058', wood:'#3a5a2c', fen:'#44583e', elf:'#7a9a5a', mountain:'#9a9c9e' };
 function renderMap(cv,V){                             // V: {zoom, px, py, labels} — zoom/pan on top of fitting the whole explored world
   const c=cv.getContext('2d'), L=mapLayout();
@@ -18118,6 +18124,8 @@ function repairReach(id){ const A=AREAS[id]; if(!A || A.maze || A.ucq) return; c
     if(!outdoors) return; let soft=null; for(const t of bad){ soft=softFor(t,seen); if(soft) break; }   // outdoors a tree, lamp or stump that closes the pocket gives way
     if(!soft) return; for(let n=OBJECTS.length-1;n>=0;n--){ const o=OBJECTS[n]; if(o.i===soft.i&&o.j===soft.j&&SOFT_T.test(o.type)&&!o.noblock) OBJECTS.splice(n,1); } blocked.delete(soft.i+','+soft.j); } }
 // a thing meant to be found (o.clear) keeps its own tile and the ring round it free of trees and bushes, whatever the forest pass grew there
+// a road climbing into the mountains: up toward the pass the birches and broadleaves give way to pine
+function alpineTrees(id){ const A=AREAS[id]; if(!A || !A.alpine) return; OBJECTS.forEach(o=>{ if(o.type==='tree' && o.sp!=='pine' && A.alpine(o.i,o.j,A.w,A.h)>0.35+rnd01(o.i,o.j,173)*0.3) o.sp='pine'; }); }
 function clearRound(){ OBJECTS.filter(o=>o.clear).forEach(c=>{ for(let n=OBJECTS.length-1;n>=0;n--){ const o=OBJECTS[n]; if(o!==c && /^(tree|pine|birch|oak|deadtree|bush|shrub|stump)$/.test(o.type) && Math.abs(o.i-c.i)<=1 && o.j>=c.j-(c.clear>1?1:0) && o.j<=c.j+1){ OBJECTS.splice(n,1); if(!OBJECTS.some(x=>x.i===o.i&&x.j===o.j&&!x.noblock)) blocked.delete(o.i+','+o.j); } } }); }
 const SOFT_T=/^(tree|pine|birch|oak|deadtree|lamp|lantern|stump|haystack|bush|shrub)$/;
 function shapeBlock(id){ if(!AREAS[id] || !AREAS[id].shape) return; for(let j=0;j<ROOM.h;j++) for(let i=0;i<ROOM.w;i++) if(!inShape(i,j)) blocked.add(i+','+j); }
@@ -30518,7 +30526,7 @@ function styleShop(kind){ closeDialog(); const old=document.getElementById('styl
     entries:{ fromStones:{i:2,j:12}, fromFen:{i:45,j:1} } },
 
   // ── The Foothills: the road climbs through pine and scree toward the pass, a stream tumbling beside it ──
-  foothills:{ ...BASE, w:12, h:52, theme:'road', label:'The Foothills', dens:0.95,
+  foothills:{ ...BASE, w:12, h:52, theme:'road', label:'The Foothills', dens:0.95, alpine:(gx,gy,w,h)=>{ const t=clamp01(1-gy/24); return t*t*(3-2*t)*(0.85+0.15*fbm(gx*0.5,gy*0.5,171)); },   // the north end climbs into the Varrow Pass
     objects:()=>{ const l=[ {type:'teleporter', i:6, j:51, to:'northroad', entry:'fromPass'}, {type:'teleporter', i:5, j:0, to:'varrowpass', entry:'fromRoad'},
         {type:'brook', i:10, j:0, fp:[1,52], mean:0.9, ph:1.1, br:-9, noblock:true, dz:-99},
         {type:'fieldshelter', i:1, j:30}, {type:'campfire', i:2, j:33}, {type:'logpile', i:1, j:35}, {type:'felltree', i:Math.round(along(P_FOOT,44))-5, j:44, fp:[3,1]},

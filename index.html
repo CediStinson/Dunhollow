@@ -15203,6 +15203,10 @@ function formatCoin(cu){
   return parts.join(' ');
 }
 let loreNoteGiven=false;
+// what a misc thing is, when it is neither junk nor for sale: the tooltip's second line
+var MISC_KIND={ varrow_silver:'Material · for the smith', grave_thread:'Material', ashen_bone:'Material', ashen_skull:'Material',
+  pearl:'Collectible', black_pearl:'Collectible', sea_glass:'Collectible', sh_cowrie:'Collectible · shell', sh_conch:'Collectible · shell', sh_spiral:'Collectible · shell', sh_star:'Collectible · shell', sh_mirror:'Collectible · shell', sh_ghost:'Collectible · shell' };
+setTimeout(()=>{ try{ ['pit_token','saelle_note','saelle_picks','star_page','hamid_ring','temple_tablet','elfsilver','wrack_chest','miner_pick'].forEach(id=>{ if(ITEMS[id]) QUEST_ITEMS.add(id); }); }catch(e){} },0);   // story things: 'Quest item', not 'Keepsake'
 var SELL_MISC=new Set(['wolf_fang','pelt','bear_fur','bear_skull','bog_coins','silver_torc','amber_brooch','wight_ring','rusted_blade','grave_ring']);
 const LOOT_TIERS=[
   ['shirt','trousers','hood','boots','gloves','dagger','club','hatchet','jerkin','hose_grey','smock'],
@@ -16933,7 +16937,7 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
     greencrystal:'It hums faintly whenever there is gold nearby.',
     cartwheel:"Hobb's spare cart wheel. He will want it back.",
     brooch:'A silver brooch, worn smooth by some thumb that is not yours.' };
-  const misc=id=>{ const it=ITEMS[id]; return `<b>${it.name}</b><i>${it.junk?'Junk · worth a few coppers':it.tool?'Tool':it.currency?'Currency · '+it.currency:QUEST_ITEMS.has(id)?'Quest item':(typeof SELL_MISC!=='undefined'&&SELL_MISC.has(id))?'Valuable':'Keepsake'}</i><div class="fl lore">${flavorOf(id)}</div>`+(it.read?'<small>Double-click to read.</small>':'')+(it.currency?'':sellTip(id)); };   // junk and materials show what a trader gives, like gear
+  const misc=id=>{ const it=ITEMS[id]; return `<b>${it.name}</b><i>${it.junk?'Junk · worth a few coppers':it.tool?'Tool':it.currency?'Currency · '+it.currency:QUEST_ITEMS.has(id)?'Quest item':MISC_KIND[id]?MISC_KIND[id]:(typeof SELL_MISC!=='undefined'&&SELL_MISC.has(id))?'Valuable':'Keepsake'}</i><div class="fl lore">${flavorOf(id)}</div>`+(it.read?'<small>Double-click to read.</small>':'')+(it.currency?'':sellTip(id)); };   // junk and materials show what a trader gives, like gear
   const idOf=el=> el.classList.contains('shop-slot') ? el.dataset.item : getAt(slotLoc(el));
   const isEq=el=>{ const l=!el.classList.contains('shop-slot') && slotLoc(el); return !!(l && l.kind==='eq'); };
   const hide=()=>{ tip.style.display='none'; tip2.style.display='none'; };
@@ -26528,7 +26532,7 @@ Object.assign(AREAS,{
       entries:{ fromGallery:{i:3,j:8} } }),
   vm_seam: VCAVE('Varrowdeep · The Silver Seam',14,12, ()=>[ {type:'teleporter', i:0, j:5, to:'vm_gallery', entry:'fromSeam'},
       {type:'teleporter', i:6, j:11, to:'vm_flood', entry:'fromSeam'},
-      {type:'oreseam', i:3, j:0, fp:[3,1], v:1}, {type:'oreseam', i:9, j:1, fp:[2,2], v:2}, {type:'oreseam', i:11, j:6, fp:[2,2], v:3}, {type:'oreseam', i:1, j:8, fp:[2,2], v:0}, {type:'oreseam', i:9, j:9, fp:[3,1], v:1},
+      {type:'oreseam', i:4, j:0, fp:[1,1], v:1}, {type:'oreseam', i:13, j:7, fp:[1,1], v:3},
       {type:'orecart', i:7, j:5}, {type:'oreheap', i:6, j:2}, {type:'oreheap', i:4, j:9}, {type:'oreheap', i:12, j:3}, {type:'pickrack', i:0, j:1, fp:[1,2]},
       {type:'mineframe', i:3, j:3}, {type:'mineframe', i:9, j:4}, {type:'rubble', i:13, j:10, noblock:true}, {type:'rubble', i:7, j:1, noblock:true},
       {type:'chainlamp', i:4, j:5, noblock:true}, {type:'chainlamp', i:9, j:7, noblock:true}, {type:'chainlamp', i:6, j:9, noblock:true}, {type:'milestone', i:1, j:10, t:'DEEP 4'},
@@ -26552,6 +26556,8 @@ Object.assign(AREAS,{
     ()=>[], { mobs:()=> CHOICE.vqQuiet ? [ { name:'Cave Troll', type:'troll', i:3, j:9, faction:'mtroll', daily:true, hpMul:2.2, opts:TROLL() } ] : [],
       entries:{ fromFlood:{i:6,j:3}, fromTomb:{i:1,j:11} } }) });
 ['varrowmine','vm_gallery','vm_bunks','vm_shaft','vm_seam','vm_flood','vm_low'].forEach(id=>{ AREAS[id].mine=true; AREA_TIER[id]=id==='vm_bunks'?0:5; });
+wrap('vm_gallery','objects',l=>[...l,{type:'oreseam', i:5, j:0, fp:[1,1], v:2}]); wrap('vm_shaft','objects',l=>[...l,{type:'oreseam', i:0, j:3, fp:[1,1], v:0}]);
+wrap('vm_flood','objects',l=>[...l,{type:'oreseam', i:10, j:0, fp:[1,1], v:1}]); wrap('vm_low','objects',l=>[...l,{type:'oreseam', i:0, j:4, fp:[1,1], v:3}]);   // the silver runs through the whole mine, a thin vein here and there
 ['varrowhall','varrowmine','vm_gallery','vm_bunks','vm_shaft','vm_seam','vm_flood','vm_low','varrowtomb'].forEach(id=>{ if(AREAS[id]) AREAS[id].layer=-2; });   // the hold and its mine lie on the map below Varrowdeep, joined to the Old Workings door to door
 Object.assign(AREAS.varrowmine,{ rails:[['h',5.5,0,12]] }); Object.assign(AREAS.vm_gallery,{ rails:[['h',2.5,0,20]] }); Object.assign(AREAS.vm_seam,{ rails:[['h',5.5,0,8]] });
 wrap('varrowtomb','objects',l=>l.map(o=>o.type==='teleporter'&&o.to==='varrowmine' ? {...o, to:'vm_low', entry:'fromTomb'} : o));
@@ -27119,7 +27125,6 @@ mwApplyStats.base={};
     if(row) row.querySelector('span').innerHTML=ITEMS[id].name+` <small style="color:#e8c060">✦ Masterwork ${MW_ROMAN[r]}</small>`; }catch(e){} }; }
 // silver from the seams: one lump from each seam a day
 { const _o=PUZ_ON.oreseam; onUse(['oreseam'],o=>{ const d=Math.floor(dayClock/DAY_LEN), k=areaId+':'+o.i+','+o.j; CHOICE.seamDay=CHOICE.seamDay||{};
-    if(areaId!=='vm_seam'){ pzSay('Old pick marks, and a thin grey thread where the silver was. Worked out long ago. The good silver is in the Silver Seam, past the Long Gallery.','#c8ccd4'); return; }   // the silver is in one place: the Silver Seam
     if(CHOICE.seamDay[k]===d){ pzSay("You have worked this seam for today. Your arms say so too. The rock will give up more tomorrow.",'#c8ccd4'); return; }
     if(slotFor('varrow_silver')<0){ pzSay('Your pack is full.','#e0b070'); return; }
     CHOICE.seamDay[k]=d; const f=slotFor('varrow_silver'); player.inv[f]='varrow_silver'; updateHud();
@@ -28316,7 +28321,7 @@ function owObjects(r){ const out=[], seed=r.hs, W=ucWalk(r), used=new Set(), tak
     if(q==='ow_se') prop({type:'brazier'},seed%2); else prop({type:'chainlamp', noblock:true},(seed>>>2)%2);
     if(q==='ow_nw' && seed%2) prop(seed%4===1?{type:'orecart'}:{type:'oreheap'},1);
     if(q==='ow_sw' && r.kind!=='hall' && seed%2) prop({type:'minepump'},1);
-    if((q==='ow_nw'||q==='ow_ne') && (r.kind==='square'||r.kind==='vault') && keepsWay(0,0) && keepsWay(1,0) && free(0,0) && free(1,0)){ out.push({type:'oreseam', i:0, j:0, fp:[2,1], v:seed%4}); take(0,0); take(1,0); }
+    if((q==='ow_nw'||q==='ow_ne'||q==='ow_sw') && r.kind!=='hall' && seed%3===0 && keepsWay(0,0) && free(0,0)){ out.push({type:'oreseam', i:0, j:0, fp:[1,1], v:seed%4}); take(0,0); }   // now and then a thin vein the old miners missed
     if(q==='ow_ne'){ prop({type:'owcrystal', v:seed%3, big:true},2); prop({type:'owcrystal', v:(seed+1)%3, big:true},3); }
     if(r.kind==='hall' && seed%3===0) prop({type:'mineframe'},0); }
   // a word on the walls, here and there

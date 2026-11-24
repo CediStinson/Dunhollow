@@ -12946,30 +12946,44 @@ function todaysStock(who,pool,n){
   const day=Math.floor(dayClock/DAY_LEN), h=[...who].reduce((a,ch)=>a*31+ch.charCodeAt(0)|0,7);
   const out=pool.map((id,k)=>[id,rnd01(day*13+k,h,410)]).sort((a,b)=>a[1]-b[1]).slice(0,n).map(x=>x[0]).filter(id=>!SOLD_TODAY.has(who+day+id)); out.key=who; return out;
 }
+// buy back: the last ten things you sold, at what you were paid for them
+function soldNote(id,n,pr){ const L=CHOICE.buyback=Array.isArray(CHOICE.buyback)?CHOICE.buyback:[]; L.unshift({id,n,pr}); L.length=Math.min(L.length,10); try{ autosaveSoon(300); }catch(e){} }
+function buybackRow(box,grid,again){ const L=Array.isArray(CHOICE.buyback)?CHOICE.buyback.filter(e=>e&&ITEMS[e.id]):[]; if(!L.length) return;
+  const head=document.createElement('div'); head.className='shop-hint'; head.style.marginTop='8px'; head.textContent='Buy back (your last '+L.length+' sale'+(L.length>1?'s':'')+'):';
+  const row=document.createElement('div'); row.className='shop-grid';
+  L.forEach(e=>{ const cost=e.pr*e.n, cell=document.createElement('div'); cell.className='shop-cell'; if(player.purse<cost) cell.style.opacity='0.45';
+    const sl=document.createElement('div'); sl.className='slot filled shop-slot'; sl.dataset.item=e.id; const cv=document.createElement('canvas'); cv.width=cv.height=104; cv.style.width=cv.style.height='52px'; drawItemIcon(cv.getContext('2d'),e.id,104); sl.appendChild(cv);
+    if(e.n>1){ const b=document.createElement('span'); b.textContent=e.n; b.style.cssText='position:absolute;right:3px;bottom:1px;font:bold 11px Georgia,serif;color:#f0dca0;text-shadow:0 1px 2px #000'; sl.style.position='relative'; sl.appendChild(b); }
+    const pl=document.createElement('div'); pl.className='shop-price'; pl.textContent='−'+formatCoin(cost); cell.appendChild(sl); cell.appendChild(pl);
+    cell.addEventListener('click',()=>{ if(player.purse<cost){ logMsg('You cannot afford to buy that back.','#e0b070'); return; } let got=0; for(let q=0;q<e.n;q++){ const f=slotFor(e.id); if(f<0) break; player.inv[f]=e.id; got++; }
+      if(!got){ logMsg('Your pack is full.','#e0b070'); return; } player.purse-=e.pr*got; if(got<e.n) e.n-=got; else CHOICE.buyback.splice(CHOICE.buyback.indexOf(e),1);
+      updateHud(); logMsg('Bought back '+(got>1?got+'× ':'')+ITEMS[e.id].name+' for '+formatCoin(e.pr*got)+'.','#e8c060'); try{ autosaveSoon(300); }catch(err){} again(); });
+    row.appendChild(cell); });
+  grid.after(head); head.after(row); }
 // selling: any trader buys what is in your pack (not story items), at forty percent of its price
 function sellTo(who,back,o){                     // o (optional): only these items, at this buyer's own price, with his own words
   const goods=player.inv.map((id,k)=>({id,k})).filter(({id,k})=>id && PRICES[id] && !(id==='fishing_rod' && player.inv.indexOf(id)===k) && !(typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(id)) && (ITEMS[id].slot!=='misc' || SELL_MISC.has(id) || (o && o.only && o.only.has(id))) && (!o || !o.only || o.only.has(id)));
   const grave=!o && typeof VESNA_BUYS!=='undefined' ? [...new Set(player.inv.filter(id=>id && VESNA_BUYS.only.has(id) && !SELL_MISC.has(id)))].map(id=>ITEMS[id].name.replace(/^(An?|The) /,'').toLowerCase()) : [];   // grave goods: only the grave-speaker deals in those
   const graveNote=grave.length?`“And that ${grave.join(', ')}: not from me, not at any price. Things off the dead go to the grave-speaker, Vesna. She buys them.”`:'';
   say(who,[goods.length?(o&&o.greet||"“Let us see what you have.” <i>Only what is in your pack can be sold, not what you wear.</i>"):(o&&o.none||"“Nothing in your pack I'd buy.”"), ...(graveNote?[graveNote]:[])],[{label:'Back.',fn:back},bye],true);
-  if(!goods.length) return;
+  if(!goods.length){ const bx=document.getElementById('dlg-opts'), an=document.createElement('div'); if(bx){ bx.prepend(an); buybackRow(bx,an,()=>sellTo(who,back,o)); } return; }   // nothing to sell: you can still buy back
   const box=document.getElementById('dlg-opts'), grid=document.createElement('div'); grid.className='shop-grid';
   goods.forEach(({id,k})=>{ const pr=o&&o.price?o.price(id):Math.max(1,Math.round(PRICES[id]*sellRate())); const cell=document.createElement('div'); cell.className='shop-cell';
     const sl=document.createElement('div'); sl.className='slot filled shop-slot'; sl.dataset.item=id; const cv=document.createElement('canvas'); cv.width=cv.height=104; cv.style.width=cv.style.height='52px'; drawItemIcon(cv.getContext('2d'),id,104); sl.appendChild(cv); if(stackAt(k)>1) sl.insertAdjacentHTML('beforeend','<span class="stk">'+stackAt(k)+'</span>');
     const pl=document.createElement('div'); pl.className='shop-price'; pl.textContent='+'+formatCoin(pr); cell.appendChild(sl); cell.appendChild(pl);
     const nPile=stackAt(k); if(nPile>1){ const all=document.createElement('div'); all.className='shop-all'; all.textContent='all ×'+nPile+' +'+formatCoin(pr*nPile); all.title='Sell the whole pile';   // the whole pile at once, not one click a berry
-      all.addEventListener('click',e=>{ e.stopPropagation(); if(player.inv[k]!==id) return; const n=stackAt(k); for(let q=0;q<n;q++) player.inv[k]=null; player.purse+=pr*n; updateHud(); logMsg('Sold '+n+'× '+ITEMS[id].name+' for '+formatCoin(pr*n)+'.','#e8c060'); sellTo(who,back,o); }); cell.appendChild(all); }
+      all.addEventListener('click',e=>{ e.stopPropagation(); if(player.inv[k]!==id) return; const n=stackAt(k); for(let q=0;q<n;q++) player.inv[k]=null; player.purse+=pr*n; soldNote(id,n,pr); updateHud(); logMsg('Sold '+n+'× '+ITEMS[id].name+' for '+formatCoin(pr*n)+'.','#e8c060'); sellTo(who,back,o); }); cell.appendChild(all); }
     cell.addEventListener('pointerdown',e=>{ cell._touch=e.pointerType==='touch'; });
     cell.addEventListener('click',()=>{ if(cell._touch && !cell.classList.contains('armed')){ grid.querySelectorAll('.armed').forEach(x=>x.classList.remove('armed')); cell.classList.add('armed'); return; }
-      if(player.inv[k]!==id) return; player.inv[k]=null; player.purse+=pr; updateHud(); logMsg('Sold '+ITEMS[id].name+' for '+formatCoin(pr)+'.','#e8c060');
+      if(player.inv[k]!==id) return; player.inv[k]=null; player.purse+=pr; soldNote(id,1,pr); updateHud(); logMsg('Sold '+ITEMS[id].name+' for '+formatCoin(pr)+'.','#e8c060');
       const t=document.getElementById('item-tip'), t2=document.getElementById('item-tip2'); if(t) t.style.display='none'; if(t2) t2.style.display='none'; sellTo(who,back,o); });
     grid.appendChild(cell); });
   const hint=document.createElement('div'); hint.className='shop-hint'; hint.textContent=matchMedia('(hover:none)').matches?'Tap to inspect, tap again to sell.':'Hover to inspect, click to sell.';
-  box.prepend(hint); box.prepend(grid); GEST_SHOP=true;
+  box.prepend(hint); box.prepend(grid); GEST_SHOP=true; buybackRow(box,grid,()=>sellTo(who,back,o));
   const JUNK=new Set([...(typeof JUNK_COMMON!=='undefined'?JUNK_COMMON:[]),...(typeof JUNK_FINE!=='undefined'?JUNK_FINE:[])]), junk=goods.filter(({id})=>JUNK.has(id));   // odds and ends from crates and pockets: away in one go
   if(junk.length){ const price=id=>o&&o.price?o.price(id):Math.max(1,Math.round(PRICES[id]*sellRate())); let n=0, c=0; junk.forEach(({id,k})=>{ const m=stackAt(k); n+=m; c+=price(id)*m; });
     const jb=document.createElement('button'); jb.className='dlg-opt'; jb.innerHTML='<span>Sell all junk ('+n+' odds and ends)</span><small>+'+formatCoin(c)+'</small>';
-    jb.addEventListener('click',()=>{ let got=0, cnt=0; junk.forEach(({id})=>{ for(let k=player.inv.indexOf(id); k>=0; k=player.inv.indexOf(id)){ player.inv[k]=null; got+=price(id); cnt++; } }); player.purse+=got; updateHud(); logMsg('Sold '+cnt+' odds and ends for '+formatCoin(got)+'.','#e8c060'); sellTo(who,back,o); });
+    jb.addEventListener('click',()=>{ let got=0, cnt=0; junk.forEach(({id})=>{ let m=0; for(let k=player.inv.indexOf(id); k>=0; k=player.inv.indexOf(id)){ player.inv[k]=null; got+=price(id); cnt++; m++; } if(m) soldNote(id,m,price(id)); }); player.purse+=got; updateHud(); logMsg('Sold '+cnt+' odds and ends for '+formatCoin(got)+'.','#e8c060'); sellTo(who,back,o); });
     box.insertBefore(jb, hint.nextSibling); }   // a shop screen: what you buy and sell just changes hands, no flying about
 }
 function shopFrom(who,stock,disc,greet,back){

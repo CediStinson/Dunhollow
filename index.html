@@ -16914,10 +16914,10 @@ function itemStatLines(id){ const L=[]; const st=ITEM_STATS[id]||{};
   if(st.agi) L.push(['Agility','+'+st.agi]);   // what a point is worth shows on the stat panel, under the mouse
   if(st.ap) L.push(['Attack power','+'+st.ap]);
   if(st.aspd) L.push(['Swing speed','+'+st.aspd+'%']);
-  if(typeof RUNE_SET!=='undefined' && RUNE_SET.includes(unWoven(id))) L.push(['Forge-Heat (any four pieces)','every third blow you land bursts with fire for extra damage']);
-  if(typeof MAGISTER_SET!=='undefined' && MAGISTER_SET.includes(unWoven(id))) L.push(["The Magister's Economy (any four pieces)",'every third spell you cast costs no mana']);
-  if(typeof STARFALL_SET!=='undefined' && STARFALL_SET.includes(unWoven(id))) L.push(['Starfall (any four pieces)','one spell in four strikes twice, the second for half']);
-  if(typeof EMBER_SET!=='undefined' && EMBER_SET.includes(unWoven(id))) L.push(['Kindled (any four pieces)','your spells set foes burning, and a foe that strikes you is sometimes lashed by flame']);
+  { const SETS=[[typeof RUNE_SET!=='undefined'&&RUNE_SET,'Forge-Heat','every third blow you land bursts with fire for extra damage'],[typeof MAGISTER_SET!=='undefined'&&MAGISTER_SET,"The Magister's Economy",'every third spell you cast costs no mana'],
+      [typeof STARFALL_SET!=='undefined'&&STARFALL_SET,'Starfall','one spell in four strikes twice, the second for half'],[typeof EMBER_SET!=='undefined'&&EMBER_SET,'Kindled','your spells set foes burning, and a foe that strikes you is sometimes lashed by flame']];
+    SETS.forEach(([S,nm,txt])=>{ if(!S || !S.includes(unWoven(id))) return; const n=typeof setCount==='function'?setCount(S):0, on=n>=Math.min(4,S.length);   // how many you have on, and whether it is awake
+      L.push([nm+' (any four pieces)', txt+(on?' <span style="color:#e8a040">✦ active</span>':' <small>('+n+' of 4 worn)</small>')]); }); }
   if(id==='duel_boots') L.push(['Riposte Step','after you dodge a blow, your next strike within 2 seconds lands 40% harder']);
   if(st.magic) L.push(['Spell power','+'+st.magic]);
   if(st.mreg) L.push(['Mana regeneration','+'+st.mreg+'/s']);
@@ -24047,7 +24047,7 @@ Object.assign(ITEMS,{
   rune_greaves:{ name:'Runeforged Greaves', slot:'legs', base:'trousers', col:'#24262a' },
   rune_boots:{ name:'Runeforged Sabatons', slot:'feet', base:'boots', col:'#303238' },
   rune_maul:{ name:'Runeforged Maul', slot:'weapon' } });
-const RUNE_SET=['rune_helm','rune_plate','rune_gauntlets','rune_greaves','rune_boots'];
+const RUNE_SET=['rune_helm','rune_plate','rune_gauntlets','rune_greaves','rune_boots','rune_maul'];   // the maul counts as a piece too
 Object.assign(ITEM_STATS,{ rune_helm:{hp:5,ap:2,aspd:-3}, rune_plate:{hp:12,ap:4,aspd:-5}, rune_gauntlets:{hp:3,ap:3,aspd:-3}, rune_greaves:{hp:5,ap:2,aspd:-2}, rune_boots:{hp:4,ap:1,aspd:-2}, rune_maul:{ap:3} });
 Object.assign(GEAR_HP,{ rune_helm:5, rune_plate:12, rune_gauntlets:3, rune_greaves:5, rune_boots:4 });
 Object.assign(WEAPONS,{ rune_maul:{ wind:0.34, dmg:24, len:26, recoverExtra:0.3 } });
@@ -24077,7 +24077,7 @@ WEAPON_ART.smith_hammer=(c,hx,hy,ang,id,s)=>{ c.save(); c.translate(hx,hy); c.ro
   c.restore(); };
 // Forge-Heat: with any four pieces on, every third blow you land bursts with fire
 let RUNE_HITS=0, RUNE_FIRE=false;
-const runeSetOn=()=>setOn(RUNE_SET);   // any four of the five
+const runeSetOn=()=>setOn(RUNE_SET);   // any four of the six
 { const _w=wound; wound=function(f,n,label,col){ const r=_w.apply(this,arguments);
     try{ if(!RUNE_FIRE && f && f!==player && HIT_SRC==='melee' && n>0 && !f.warded && f.type!=='dummy' && runeSetOn()){ RUNE_HITS++;
         if(RUNE_HITS>=3 && !f.dead && f.hp>0){ RUNE_HITS=0; const W=WEAPONS[player.opts.equip.weapon]||WEAPONS.fists, extra=Math.max(4,Math.round((W.dmg||6)*0.6+gearSum('ap')*0.3));
@@ -28173,7 +28173,19 @@ function drawFocusInHand(c,hx,hy,id){ const x=hx, y=hy; c.save();
   c.restore(); }
 // the set bonuses: the Magister's Economy (every third spell free) and Starfall (one spell in four strikes twice)
 const SET_ALIAS={ ember_crown:['ember_hood'] };   // pieces that stand in for each other in a set
-const setOn=SET=>{ const E=(player.opts&&player.opts.equip)||{}; return SET.filter(id=>Object.values(E).some(v=>v && (unWoven(v)===id || (SET_ALIAS[id]||[]).includes(unWoven(v))))).length>=Math.min(4,SET.length); };   // any four pieces wake the set
+const setCount=SET=>{ const E=(player.opts&&player.opts.equip)||{}; return SET.filter(id=>Object.values(E).some(v=>v && (unWoven(v)===id || (SET_ALIAS[id]||[]).includes(unWoven(v))))).length; };
+const setOn=SET=>setCount(SET)>=Math.min(4,SET.length);
+// an awake set shows on the stat panel: its name, lit, and what it does under the mouse
+{ const _rs=refreshStatPanel; refreshStatPanel=function(){ _rs.apply(this,arguments); try{ const P2=document.getElementById('stat-panel'); if(!P2) return; P2.querySelectorAll('.set-row').forEach(x=>x.remove());
+    [[typeof RUNE_SET!=='undefined'&&RUNE_SET,'Forge-Heat','Runeforged set: every third blow you land bursts with fire.'],[typeof MAGISTER_SET!=='undefined'&&MAGISTER_SET,"Magister's Economy",'Magister set: every third spell costs no mana.'],
+     [typeof STARFALL_SET!=='undefined'&&STARFALL_SET,'Starfall','Starfall set: one spell in four strikes twice.'],[typeof EMBER_SET!=='undefined'&&EMBER_SET,'Kindled','Emberforged set: your spells set foes burning.']].forEach(([S,nm,h])=>{ if(!S) return; const n=setCount(S); if(n<2) return;
+      const on=n>=Math.min(4,S.length), d=document.createElement('div'); d.className='stat-row set-row'; d.dataset.help=h+(on?'':' Wear '+(4-n)+' more to wake it.');
+      d.innerHTML='<b>Set</b><span style="color:'+(on?'#ffb050':'#8a7a5a')+'">'+(on?'✦ ':'')+nm+' '+Math.min(n,4)+'/4</span>'; P2.appendChild(d); }); }catch(e){} }; }
+// Forge-Heat awake: embers drift up off you, so you can see it
+{ const _dc=drawChopChips; drawChopChips=function(){ _dc.apply(this,arguments); try{ if(!runeSetOn() || !player || player.dead) return; const q=P(player.x??player.i+0.5,player.y??player.j+0.5);
+    g.save(); g.globalCompositeOperation='lighter'; for(let k=0;k<7;k++){ const t=(gt*0.45+k/7)%1, sx=Math.sin(k*2.3+gt*0.8)*10*(1-t*0.4); g.fillStyle=`rgba(255,${150+((k*37)%60)},60,${(1-t)*0.75})`;
+      g.beginPath(); g.arc(q.x+sx+(k%2?6:-6), q.y-14-t*52, 1.1+(k%3)*0.35, 0, Math.PI*2); g.fill(); }
+    try{ glow(q.x,q.y-34,16,26,'255,140,50',0.10+0.04*Math.sin(gt*3)); }catch(e){} g.restore(); }catch(e){} }; }   // any four pieces wake the set
 let MAG_N=0, MAG_FREE=false, STAR_ECHO=false;
 { const _sc=spellCost; spellCost=function(S){ return MAG_FREE ? 0 : _sc.apply(this,arguments); }; }
 { const _c=castSpell; castSpell=function(){ const set=setOn(MAGISTER_SET), m0=player.mana; MAG_FREE = set && MAG_N===2; let r; try{ r=_c.apply(this,arguments); } finally{ var wasFree=MAG_FREE; MAG_FREE=false; }

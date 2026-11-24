@@ -29138,6 +29138,52 @@ JOURNAL.push(['The Rot Below', ()=> !rcQ() ? null : rcQ()==='done' ? ['done',"Yo
 AREAS.sylvhaven.entries.fromRoots={i:7,j:11};
 wrap('sylvhaven','objects',l=>[...l.filter(o=>!(o.i===7&&o.j===10&&!o.noblock)), {type:'rcmouth', i:7, j:10, noblock:true}, {type:'teleporter', i:7, j:10, to:rcId(0,0), entry:'fromN', adit:true}]);   // the way down is through the great tree herself: a hollow between her roots
 AREAS.fellings.entries.fromRoots={i:11,j:4};
+// ════════ THE DEEPWAY: once Durnhal's axe went west and the elves took the apology, dwarves and elves cut a road together under the hills, Varrowdeep's Great Hall to Sylvhaven.
+//   Dwarf masonry at the east end gives way, stone by stone, to living roots the elves have coaxed down to hold the roof at the west ════════
+const DEEPWAY=()=>CHOICE.vqEnd==='atoned' && !(typeof havenBurnt==='function' && havenBurnt());
+AREAS.deepway=VCAVE('The Deepway',16,6, ()=>[ {type:'teleporter', i:15, j:3, to:'varrowhall', entry:'fromDeep'}, {type:'teleporter', i:0, j:3, to:'sylvhaven', entry:'fromDeep'},
+    {type:'brazier', i:13, j:1}, {type:'brazier', i:9, j:1}, {type:'mineframe', i:11, j:0}, {type:'crates', i:14, j:5}, {type:'dwroot', i:5, j:0}, {type:'dwroot', i:2, j:0, big:true}, {type:'dwroot', i:0, j:1, side:true},
+    {type:'lantern', i:4, j:5}, {type:'lantern', i:1, j:5}, {type:'dwmarker', i:8, j:0},
+    {type:'rune', i:8, j:5, text:"A stone set into the floor where the dwarf work stops and the roots begin, cut in two scripts, dwarf runes on one half and elvish on the other. Both say the same thing: <i>Here we met in the middle. Durnhal's axe paid for the first yard.</i>"} ],
+  ()=>[ { id:'dw_orsa', name:'Delver Orsa', i:11, j:3, dir:5, opts:DWARFO({gender:'f', skin:1, hair:3, hairColor:3, face:3, equip:{head:'kettle', torso:'tunic_deep', armor:'dwarf_harness', feet:'hobnail_boots', weapon:'smith_hammer'}}) },
+        { id:'dw_thalien', name:'Thalien of the Roots', i:4, j:3, dir:1, opts:ELFO({gender:'m', skin:0, hair:4, hairColor:11, equip:{head:null, torso:'elf_tunic', armor:null, hands:null, legs:'elf_leggings', feet:'elf_boots', weapon:null, offhand:null}}) } ],
+  { entries:{ fromHall:{i:14,j:3}, fromHaven:{i:1,j:3} } });
+AREA_TIER.deepway=3;
+AREAS.deepway.entries.fromDeep=AREAS.deepway.entries.fromHall;
+AREAS.varrowhall.entries.fromDeep={i:1,j:5}; AREAS.sylvhaven.entries.fromDeep={i:4,j:1};
+// the teleporters in this tunnel lead out with the right entries
+AREAS.deepway.objects=(f=>()=>f().map(o=>o.type==='teleporter'?{...o, entry:'fromDeep'}:o))(AREAS.deepway.objects);
+wrap('varrowhall','objects',l=>DEEPWAY()?[...l.filter(o=>!(o.i===0&&o.j===5)), {type:'teleporter', i:0, j:5, to:'deepway', entry:'fromHall', adit:true}]:l);
+wrap('sylvhaven','objects',l=>DEEPWAY()?[...l.filter(o=>!(o.i===4&&o.j===0&&!o.noblock)), {type:'dwmouth', i:4, j:0, noblock:true}, {type:'teleporter', i:4, j:0, to:'deepway', entry:'fromHaven', adit:true}]:l);
+{ const _sw=switchArea; switchArea=function(id,entry,...rest){ const r=_sw.call(this,id,entry,...rest); try{ if(id==='deepway' && !CHOICE.deepwaySeen){ CHOICE.deepwaySeen=1; banner('The Deepway','#e0c890',2200); logMsg('A new road under the hills: dwarf stone at one end, elven roots at the other, Varrowdeep to Sylvhaven.','#e0c890'); } }catch(e){} return r; }; }
+// once peace is made, word of the new road reaches you
+setInterval(()=>{ try{ if(running && DEEPWAY() && !CHOICE.deepwayTold && !(typeof dlgIsOpen==='function'&&dlgIsOpen())){ CHOICE.deepwayTold=1; logMsg('Word from Varrowdeep: dwarves and elves are cutting a tunnel together, from the Great Hall to Sylvhaven. The Deepway is open.','#e0c890'); } }catch(e){} },4000);
+OBJ_DRAW.dwroot=o=>{ const q=P(o.i+0.5,o.j+(o.side?0.5:0.05)), s=o.big?1.3:1, sd=o.i*11+o.j*5;   // living roots coming down out of the dark to hold the roof
+  g.save(); g.lineCap='round'; for(let k=0;k<(o.big?6:4);k++){ const x0=q.x+(k-2)*9*s+(o.side?-20:0), w=(5-k%3)*s;
+    g.strokeStyle='#2e2216'; g.lineWidth=w+2; g.beginPath(); g.moveTo(x0,q.y-170); g.bezierCurveTo(x0+12*Math.sin(k+sd),q.y-110,x0-10*Math.cos(k),q.y-50,x0+(k-2)*6,q.y); g.stroke();
+    g.strokeStyle='#6a5034'; g.lineWidth=w; g.stroke(); g.strokeStyle='rgba(200,170,120,0.25)'; g.lineWidth=w*0.35; g.stroke(); }
+  for(let k=0;k<5;k++){ const x=q.x+(rnd01(k,sd,7)-0.5)*40*s, y=q.y-30-rnd01(k,sd,8)*110; g.fillStyle='rgba(150,230,170,'+(0.35+0.25*Math.sin(gt*1.5+k))+')'; g.beginPath(); g.arc(x,y,1.6,0,Math.PI*2); g.fill(); }   // a few glimmers of elf-light caught in them
+  g.restore(); };
+OBJ_DRAW.dwmarker=o=>{ const q=P(o.i+0.5,o.j+0.5); g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(q.x+4,q.y+2,14,5,0,0,Math.PI*2); g.fill();   // a boundary pillar: half dwarf-cut granite, half wrapped in root
+  g.fillStyle='#7a746a'; g.fillRect(q.x-8,q.y-56,8,56); g.fillStyle='#5a554e'; g.fillRect(q.x,q.y-56,8,56); g.strokeStyle='#2a2622'; g.lineWidth=1; g.strokeRect(q.x-8,q.y-56,16,56);
+  g.strokeStyle='#c8a050'; g.lineWidth=0.9; for(let k=0;k<3;k++){ g.beginPath(); g.moveTo(q.x-6,q.y-46+k*12); g.lineTo(q.x-2,q.y-50+k*12); g.lineTo(q.x-6,q.y-42+k*12); g.stroke(); }
+  g.strokeStyle='#4a3622'; g.lineWidth=2.6; g.lineCap='round'; for(let k=0;k<3;k++){ g.beginPath(); g.moveTo(q.x+8,q.y-54+k*4); g.bezierCurveTo(q.x+2,q.y-40+k*6,q.x+10,q.y-24,q.x+3,q.y-4-k*3); g.stroke(); } g.lineCap='butt'; };
+OBJ_DRAW.dwmouth=o=>{ const q=P(o.i+0.5,o.j+0.2), x=q.x, y=q.y;   // the Deepway's western mouth: a dwarf-cut arch in grey stone, the roots of the great tree grown over it
+  g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(x,y+4,40,12,0,0,Math.PI*2); g.fill();
+  g.fillStyle='#6a665e'; g.beginPath(); g.moveTo(x-38,y); g.lineTo(x-38,y-58); g.quadraticCurveTo(x,y-96,x+38,y-58); g.lineTo(x+38,y); g.closePath(); g.fill(); g.strokeStyle='#2a2622'; g.lineWidth=1.2; g.stroke();
+  g.fillStyle='#0e0c0a'; g.beginPath(); g.moveTo(x-24,y); g.lineTo(x-24,y-50); g.quadraticCurveTo(x,y-78,x+24,y-50); g.lineTo(x+24,y); g.closePath(); g.fill();
+  const gr=g.createLinearGradient(0,y-70,0,y); gr.addColorStop(0,'rgba(255,170,80,0.0)'); gr.addColorStop(1,'rgba(255,170,80,0.22)'); g.fillStyle=gr; g.fill();   // braziers far down the tunnel
+  g.strokeStyle='rgba(30,26,22,0.6)'; g.lineWidth=0.8; for(let k=0;k<7;k++){ const a=Math.PI*(0.08+k*0.14); g.beginPath(); g.moveTo(x-Math.cos(a)*24,y-50-Math.sin(a)*24); g.lineTo(x-Math.cos(a)*38,y-58-Math.sin(a)*34); g.stroke(); }   // the voussoirs
+  g.fillStyle='#8a8478'; g.fillRect(x-6,y-90,12,10); g.strokeStyle='#c8a050'; g.lineWidth=0.8; g.strokeRect(x-6,y-90,12,10);   // the keystone, a rune in gold
+  g.beginPath(); g.moveTo(x-2,y-87); g.lineTo(x+2,y-84); g.lineTo(x-2,y-82); g.stroke();
+  g.lineCap='round'; for(let k=0;k<5;k++){ const sx=x+18+k*5, w=4-k*0.5; g.strokeStyle='#2e2216'; g.lineWidth=w+2; g.beginPath(); g.moveTo(sx,y-96+k*4); g.bezierCurveTo(sx+14,y-70,sx+2,y-40,sx+10+k*3,y); g.stroke(); g.strokeStyle='#6a5034'; g.lineWidth=w; g.stroke(); }   // roots over the right shoulder
+  for(let k=0;k<3;k++){ const sx=x-30+k*6; g.strokeStyle='#2e2216'; g.lineWidth=4; g.beginPath(); g.moveTo(sx,y-70-k*6); g.bezierCurveTo(sx-10,y-50,sx-4,y-24,sx-12,y); g.stroke(); g.strokeStyle='#6a5034'; g.lineWidth=2.4; g.stroke(); }
+  g.lineCap='butt'; };
+NEAR_NAME.dwmouth='the Deepway';
+NEAR_NAME.dwmarker='the meeting stone'; NEAR_NAME.dwroot='living roots';
+TALKERS.dw_orsa=()=>say('Delver Orsa',["“Mind the props. We cut from the Hall, they grew from the tree, and we met under the old boundary hill. Nine feet out, the both of us. Nine feet!”","“Took a while to stop arguing about whose roof it was. Now it's the road's roof.”"],[{label:'“Good work, the both of you.”', fn:()=>say('Delver Orsa',"“Tell Thalien that. Twice. He's smug enough already, but it's earned.”",[bye])},bye]);
+TALKERS.dw_thalien=()=>say('Thalien of the Roots',["“The tree lent us the roots, and the dwarves lent us their patience, which I am told is rarer.”","“Walk it whenever you like. From the Great Hall to the Haven is now an hour's walk, not a week's.”"],[{label:'“Was it hard, working with them?”', fn:()=>say('Thalien of the Roots',"“Yes. They sing badly and they are always right about stone. I would not change a yard of it.”",[bye])},bye]);
+
 wrap('fellings','objects',l=>[...l.filter(o=>!(o.i===12&&o.j===4&&!o.noblock)), {type:'rcstump', i:12, j:4, noblock:true}, {type:'teleporter', i:12, j:4, to:rcId(7,7), entry:'fromE', adit:true, locked:()=>!CHOICE.rcStump, onLocked:()=>pzSay("An old stump, hollow, roots going down into black. They are woven shut from below.",'#c8c0a8')}]);
 { const _sw=switchArea; switchArea=function(id,entry,...rest){ const r=_sw.call(this,id,entry,...rest); try{ if(id===rcId(7,7) && !CHOICE.rcStump){ CHOICE.rcStump=true; logMsg('A stair of roots climbs from here up into the light: the Fellings, a stump hollowed out from below. The roots part for you.','#c8d8a8'); } }catch(e){} return r; }; }
 // the roots shift as night falls and as day comes, round you if you are down there

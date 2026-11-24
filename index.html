@@ -28290,7 +28290,29 @@ ITEM_ICON.ember_pauldron=iconWrap(g2=>{ g2.translate(20,26); for(let k=0;k<4;k++
     try{ const f=combat.foe; if(player.hp<h0 && f && !f.dead && f.hp>0 && setOn(EMBER_SET) && Math.random()<0.25){ const was=HIT_SRC; HIT_SRC='spell'; try{ woundRaw(f,5,'Flame lash','#ff9a40'); } finally{ HIT_SRC=was; } burst(f,player,'#ff8a30',10); } }catch(e){}
     return r; }; }
 // Ilka sells it at the Sunken Forge
-{ const _sf=shopFrom; shopFrom=function(name,stock,...r){ if(/^Ilka/.test(name||'') && Array.isArray(stock)) stock=[...stock,...EMBER_SET.filter(id=>!stock.includes(id))]; return _sf.call(this,name,stock,...r); }; }
+// the Emberforged set is not off a rack: Ilka forges each piece to order, for coin and Ember Cores (the heart of the fire goes into it)
+const EMBER_CORES={ ember_crown:2, ember_cuirass:4, ember_pauldron:2, ember_gauntlets:2, ember_breeches:3, ember_sabatons:2 };
+function ilkaForge(){ const I='Ilka, Spirit of the Forge', have=invCount('ember_core');
+  say(I,["“Cloth will not hold this fire. Bring me cores, the hearts of things that burned, and I will weave them into the work.”",`<i>You carry <b>${have}</b> Ember Core${have===1?'':'s'}.</i>`],[{label:'Back.', fn:ilkaTalk}, bye],true);
+  const box=document.getElementById('dlg-opts'), grid=document.createElement('div'); grid.className='shop-grid';
+  const core=()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=40; cv.style.width=cv.style.height='14px'; cv.style.verticalAlign='-2px'; try{ drawItemIcon(cv.getContext('2d'),'ember_core',40); }catch(e){} return cv; };
+  EMBER_SET.filter(id=>ITEMS[id]).forEach(id=>{ const c=Math.round((PRICES[id]||200)*0.6), n=EMBER_CORES[id]||2, ok=player.purse>=c && have>=n;
+    const cell=document.createElement('div'); cell.className='shop-cell'+(ok?'':' off');
+    const sl=document.createElement('div'); sl.className='slot filled shop-slot'; sl.dataset.item=id; const cv=document.createElement('canvas'); cv.width=cv.height=104; cv.style.width=cv.style.height='52px'; drawItemIcon(cv.getContext('2d'),id,104); sl.appendChild(cv);
+    const pl=document.createElement('div'); pl.className='shop-price'; pl.style.color='#ffc890'; pl.style.lineHeight='1.25'; pl.style.textAlign='center'; pl.append(formatCoin(c)); pl.appendChild(document.createElement('br')); pl.append(n+' '); pl.appendChild(core());
+    cell.appendChild(sl); cell.appendChild(pl);
+    cell.addEventListener('pointerdown',e=>{ cell._touch=e.pointerType==='touch'; });
+    cell.addEventListener('click',()=>{ if(cell._touch && !cell.classList.contains('armed')){ grid.querySelectorAll('.armed').forEach(x=>x.classList.remove('armed')); cell.classList.add('armed'); return; }
+      const t=document.getElementById('item-tip'), t2=document.getElementById('item-tip2'); if(t) t.style.display='none'; if(t2) t2.style.display='none';
+      if(player.purse<c || invCount('ember_core')<n){ say(I,player.purse<c?"“Coin for the coal. Even spirits keep a forge.”":"“"+n+" cores for that one. Bring me fire, and I will give it back to you, shaped.”",[{label:'Back.', fn:ilkaForge}, bye],true); return; }
+      for(let k=0;k<n;k++){ const q=player.inv.indexOf('ember_core'); if(q>=0) player.inv[q]=null; }
+      const f=slotFor(id); if(f<0){ for(let k=0;k<n;k++){ const e=player.inv.indexOf(null); if(e>=0) player.inv[e]='ember_core'; } say(I,"“Your pack is full. It will wait in the coals.”",[{label:'Back.', fn:ilkaForge}, bye],true); return; }
+      player.purse-=c; player.inv[f]=id; updateHud(); logMsg('Ilka forges you: '+ITEMS[id].name+'.','#ffb060'); try{ SND.clang(0.6); }catch(e){} try{ autosaveSoon(400); }catch(e){} ilkaForge(); });
+    grid.appendChild(cell); });
+  const hint=document.createElement('div'); hint.className='shop-hint'; hint.textContent=matchMedia('(hover:none)').matches?'Tap to inspect, tap again to have it forged.':'Hover to inspect, click to have it forged.';
+  box.prepend(hint); box.prepend(grid); GEST_SHOP=true; }
+{ const _it=ilkaTalk; ilkaTalk=function(){ const r=_it.apply(this,arguments); try{ const box=document.getElementById('dlg-opts'); if(box && /Ilka/.test(document.getElementById('dlg-name')?.textContent||'') && !box.querySelector('.ember-forge') && [...box.querySelectorAll('.dlg-opt')].some(b=>/wares/i.test(b.textContent))){
+      const b=document.createElement('button'); b.className='dlg-opt ember-forge'; b.innerHTML='<span>“Forge me something with the Ember Cores.”</span>'; b.addEventListener('click',ilkaForge); box.insertBefore(b,box.lastElementChild); } }catch(e){} return r; }; TALKERS.ilka=ilkaTalk; }
 // ════════ late twins: items added after the weave and temper twins were made (the caster gear, the battlemage set, shoulders…) get theirs too ════════
 for(const id of Object.keys(ITEMS)){ const it=ITEMS[id]; if(/^[tw]_/.test(id) || !WEAVE_TWIN_SLOTS.includes(it.slot) || ITEMS['w_'+id]) continue;
   ITEMS['w_'+id]={...it, name:it.name+' (woven)', woven:true};

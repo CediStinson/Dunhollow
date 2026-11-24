@@ -25053,9 +25053,10 @@ function succGraveTick(dt){ const n=succNpc();
     NPCS.push({ id:'vesper', name:CHOICE.succName?'Vesperine':'A Pale Woman', i:7, j:3, x:7.5, y:3.5, dir:0, alpha:0, opts:SUCC({}) });
     try{ SND.fx('whoosh',0.4); }catch(e){} logMsg('The air in the graveyard turns warm, and smells of roses.','#e0a0c0'); SUCC_RUN=0; SUCC_STILL=0; SUCC_LP=[player.x,player.y]; return; }
   if(n._going) return; n.alpha=Math.min(1,(n.alpha??0)+dt*0.7); n.dir=dirFromDelta(player.x-n.x,player.y-n.y);
-  if(!SUCC_HOUR() && !dlgIsOpen()){ n.bark={text:'Another night, perhaps.',t:0}; n._going=1; fadeOff(n,{slow:2.5}); return; }
+  const late=(((dayClock%DAY_LEN)+DAY_LEN)%DAY_LEN/DAY_LEN)-0.5, dP=Math.hypot(player.x-n.x,player.y-n.y);   /* she lingers past the hour while you are near and patient: she leaves only when you are far off, or the night is well on */
+  if(!SUCC_HOUR() && !dlgIsOpen() && (dP>8.5 || late<0 || late>0.16)){ n.bark={text:'Another night, perhaps.',t:0}; n._going=1; fadeOff(n,{slow:2.5}); return; }
   const d=Math.hypot(player.x-n.x,player.y-n.y), mv=SUCC_LP?Math.hypot(player.x-SUCC_LP[0],player.y-SUCC_LP[1]):0; SUCC_LP=[player.x,player.y];
-  if(mv>0.0004){ SUCC_RUN+=dt; SUCC_STILL=0; } else { SUCC_STILL+=dt; if(SUCC_STILL>0.3) SUCC_RUN=0; }       // a step, then stillness: the count starts over
+  if(mv>0.004 && (player.moving || (player.path&&player.path.length))){ SUCC_RUN+=dt; SUCC_STILL=0; } else { SUCC_STILL+=dt; if(SUCC_STILL>0.3) SUCC_RUN=0; }       // a step, then stillness: the count starts over
   if(d<7.5 && !n._warned){ n._warned=1; n.bark={text:'Slowly, little mortal. One step… and then another.',t:0}; }
   if(d<6.5 && d>1.3 && SUCC_RUN>0.62){ n._going=1; player.path=[]; n.bark={text:'Ah. Too eager.',t:0}; CHOICE.succFled=SUCC_NIGHT();
     logMsg('She is gone the moment you hurry. The roses linger a while. Another midnight, perhaps, and slower.','#e0a0c0'); fadeOff(n,{slow:1.4}); } }
@@ -27049,8 +27050,8 @@ function furCollar(c,cx,cy,hw,K,front){ const col=K.fur, dk=tone(col,-0.35), lt=
   if(st==='mantle'){                                                                    // a broad cape of pelt over the shoulders, the hair combed down and ragged at the edge
     const gr=c.createLinearGradient(cx-hw,0,cx+hw,0); gr.addColorStop(0,lt); gr.addColorStop(0.55,col); gr.addColorStop(1,dk);
     c.fillStyle=gr; c.beginPath(); c.moveTo(cx-hw-3,cy+7); c.quadraticCurveTo(cx-hw-2,cy-3,cx-hw*0.4,cy-(front?3.4:1.4)); c.quadraticCurveTo(cx,cy-(front?1:3),cx+hw*0.4,cy-(front?3.4:1.4)); c.quadraticCurveTo(cx+hw+2,cy-3,cx+hw+3,cy+7);
-    for(let k=0;k<=12;k++){ const t=k/12, px=cx+hw+3-t*(hw*2+6), py=cy+7+(front?Math.sin(t*Math.PI)*2.4:Math.sin(t*Math.PI)*4)+(k%2?2.4:0); c.lineTo(px,py); } c.closePath(); c.fill();
-    c.strokeStyle=dk; c.lineWidth=0.5; for(let k=0;k<16;k++){ const t=(k+0.5)/16, px=cx-hw-1.5+t*(hw*2+3), py=cy+(front?-1:0.5)+Math.abs(t-0.5)*3; c.beginPath(); c.moveTo(px,py); c.quadraticCurveTo(px+0.6,py+4,px+(t-0.5)*1.6,py+8); c.stroke(); }
+    for(let k=0;k<=12;k++){ const t=k/12, px=cx+hw+3-t*(hw*2+6), py=cy+7+(front?(K.slim?-Math.sin(t*Math.PI)*4.6:Math.sin(t*Math.PI)*2.4):Math.sin(t*Math.PI)*4)+(k%2?(K.slim&&front?1.6:2.4):0); c.lineTo(px,py); }   /* slim: deep on the shoulders, lifted off the chest in front */ c.closePath(); c.fill();
+    c.strokeStyle=dk; c.lineWidth=0.5; for(let k=0;k<16;k++){ const t=(k+0.5)/16, px=cx-hw-1.5+t*(hw*2+3), py=cy+(front?-1:0.5)+Math.abs(t-0.5)*3; c.beginPath(); c.moveTo(px,py); const ln=K.slim&&front?8-Math.sin(t*Math.PI)*4.4:8; c.quadraticCurveTo(px+0.6,py+ln/2,px+(t-0.5)*1.6,py+ln); c.stroke(); }
     c.restore(); return; }
   if(st==='feather'){                                                                   // black feathers, overlapping, a blue-green sheen on the long ones
     for(let row=0;row<2;row++){ const n=row?9:11, r0=row?hw*0.82:hw+1.2, yy=cy+(row?-0.6:2.2);
@@ -27936,7 +27937,7 @@ Object.assign(ITEMS,{
 SEAL_KEYS.forEach(k=>{ const I=SEAL_INFO[k]; ITEMS['seal_'+k]={ name:I.name, slot:'misc', title:`A wedge of old bronze, one seventh of a great round seal, with ${I.mark}. It is warm, and hums very faintly when you hold it near the ground.` }; QUEST_ITEMS.add('seal_'+k); });
 QUEST_ITEMS.add('valley_seal'); QUEST_ITEMS.add('reliquary_key');
 Object.assign(PRICES,{ warden_mantle:400 }); Object.assign(GEAR_HP,{ warden_mantle:10 }); Object.assign(ITEM_STATS,{ warden_mantle:{hp:10, ap:1, magic:1, agi:1} });
-CLOAK_LOOK.warden_mantle={ main:'#1e2a44', lining:'#6a7a98', fur:'#ece8e0', clasp:'#c89a48', trim:'#c8ccd8', collar:'mantle', shape:{hem:-6, flare:8, folds:4} };
+CLOAK_LOOK.warden_mantle={ main:'#1e2a44', lining:'#6a7a98', fur:'#ece8e0', clasp:'#c89a48', trim:'#c8ccd8', collar:'mantle', slim:true, shape:{hem:-6, flare:8, folds:4} };
 ITEM_ICON.warden_mantle=(g2,i2,size)=>paintItemArtBase(g2,i2,size);
 const wedgeIcon=(col)=>(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.translate(20,22);
   const gp=g2.createLinearGradient(-12,-12,12,12); gp.addColorStop(0,'#c89a58'); gp.addColorStop(1,'#6a4a22'); g2.fillStyle=gp;

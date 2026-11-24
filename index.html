@@ -11966,9 +11966,17 @@ function moveItemRaw(from,to){
 // throwing things away: drag onto the bin, then confirm. Story items cannot be thrown away.
 function askDiscard(loc){
   const id=getAt(loc); if(!id) return;
+  const pile=(loc.kind!=='eq' && loc.kind!=='stash' && typeof stackAt==='function') ? stackAt(loc.key) : 1;   // a stack: throw away one, or the lot
   const needs=(typeof questsNeeding==='function' && ((typeof QUEST_ITEMS!=='undefined' && QUEST_ITEMS.has(id)) || ITEMS[id].read)) ? questsNeeding(id) : [];   // a quest still open that wants this
-  clearTimeout(msgTimer); invMsg.innerHTML=`Throw away <b>${ITEMS[id].name}</b> for good?`+(needs.length?` <span style="color:#e0806a">${needs.map(t=>'“'+t+'”').join(', ')} still ${needs.length>1?'need':'needs'} it: the quest will fail.</span>`:'')+`<button class="danger" id="dis-yes">Throw away</button><button id="dis-no">Keep</button>`;
-  document.getElementById('dis-yes').onclick=()=>{ if(getAt(loc)===id){ if(needs.length){ CHOICE.failedQ={...(CHOICE.failedQ||{})}; needs.forEach(t=>{ CHOICE.failedQ[t]=id; logMsg('Quest failed: '+t+'. You threw away the '+ITEMS[id].name+' it needed.','#e0806a'); }); } setAt(loc,null); logMsg('You throw away '+ITEMS[id].name+'.','#a89878'); refreshInventory(); updateHud(); autosaveSoon(200); } invMsg.textContent=''; };
+  const drop=n=>{ if(getAt(loc)!==id) return; const left=pile>1?stackAt(loc.key):1, m=Math.min(n,left);
+    if(needs.length && m>=left){ CHOICE.failedQ={...(CHOICE.failedQ||{})}; needs.forEach(t=>{ CHOICE.failedQ[t]=id; logMsg('Quest failed: '+t+'. You threw away the '+ITEMS[id].name+' it needed.','#e0806a'); }); }
+    for(let q=0;q<m;q++) setAt(loc,null);   // on a stack, each clear takes one off the pile
+    logMsg(m>1?'You throw away '+m+'× '+ITEMS[id].name+'.':'You throw away '+ITEMS[id].name+'.','#a89878'); refreshInventory(); updateHud(); autosaveSoon(200); invMsg.textContent=''; };
+  clearTimeout(msgTimer);
+  invMsg.innerHTML=(pile>1?`Throw away <b>${ITEMS[id].name}</b> <small>(×${pile})</small>?`:`Throw away <b>${ITEMS[id].name}</b> for good?`)+(needs.length?` <span style="color:#e0806a">${needs.map(t=>'“'+t+'”').join(', ')} still ${needs.length>1?'need':'needs'} it: the quest will fail.</span>`:'')
+    +(pile>1?`<button class="danger" id="dis-one">Throw away 1</button><button class="danger" id="dis-all">Throw away all ×${pile}</button>`:`<button class="danger" id="dis-yes">Throw away</button>`)+`<button id="dis-no">Keep</button>`;
+  if(pile>1){ document.getElementById('dis-one').onclick=()=>drop(1); document.getElementById('dis-all').onclick=()=>drop(pile); }
+  else document.getElementById('dis-yes').onclick=()=>drop(1);
   document.getElementById('dis-no').onclick=()=>{ invMsg.textContent=''; };
 }
 // provisions: eat or drink to win back health, in or out of a fight

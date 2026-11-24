@@ -31535,7 +31535,7 @@ const daub=(c,xs,ys,clip,col,sd)=>{ if(!col) return; const x0=Math.min(...xs), x
   NEAR_NAME.cvlantern="Odra's Lantern";
   let TRIAL=null; window.cvTrial=()=>TRIAL;
   const trialStart=()=>{ closeDialog(); TRIAL={fails:0}; switchArea('cvyard','fromCamp'); logMsg('Odra hangs her lantern at the far end of the Ember Yard. “Bring it back. Wake no one.”','#c8a0e0'); };
-  onUse(['cvlantern'],()=>{ if(!TRIAL) return; TRIAL=null; CHOICE.cvC='done'; CHOICE.cvHush=true; switchArea('cvcamp','fromYard'); remember('cvhush','done',"The Hushling is yours: a little Skitter of smoked glass that bends the light around you. Foes ten levels or more below you will not notice you pass.");
+  onUse(['cvlantern'],()=>{ if(!TRIAL) return; TRIAL=null; CHOICE.cvC='done'; CHOICE.cvHush=true; giveQuestItem('hush_ring',true); switchArea('cvcamp','fromYard'); remember('cvhush','done',"The Hushling is yours: a little Skitter of smoked glass that bends the light around you. Foes ten levels or more below you will not notice you pass.");
     banner('The Hushling','#c8e8f0',2600); logMsg('You walk the lantern back. Odra takes it, and something small and glassy unfolds from under her coat and runs up your arm. “It likes you. It hides you. Do not make it regret either.”','#8ac070'); autosaveSoon(800); });
   { const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{ if(!running) return r;
       if(areaId==='cvyard'){ if(!TRIAL) TRIAL={fails:0}; for(const o of OBJECTS){ if(o.type!=='cvsleeper') continue; if(Math.hypot(player.x-(o.i+0.5),player.y-(o.j+0.5))<ringR(o)){ TRIAL.fails++;
@@ -31552,7 +31552,9 @@ const daub=(c,xs,ys,clip,col,sd)=>{ if(!col) return; const x0=Math.min(...xs), x
   const canRide=()=>openGround() && !combat.active && !player.sitChair && !(typeof FISH!=='undefined' && FISH);
   const riding=()=>!!((CHOICE.cvStrider && CHOICE.cvRiding) || RACE) && canRide();
   window.cvRiding=riding; window.cvRideMul=()=>riding()?1.4:1;
-  window.cvHush=m=>!!(RACE && m && !m.provoked) || !!(CHOICE.cvHush && m && !m.provoked && !m.boss && foeLevel(m)<=playerLevel()-10);
+  const hushOn=()=>!!CHOICE.cvHush && unWoven((player.opts&&player.opts.equip&&player.opts.equip.special)||'')==='hush_ring';   // the Hushling only works while you wear its ring
+  window.hushOn=hushOn;
+  window.cvHush=m=>!!(RACE && m && !m.provoked) || !!(hushOn() && m && !m.provoked && !m.boss && foeLevel(m)<=playerLevel()-10);
   { const _w=drawPlayerWading; drawPlayerWading=function(e){ if(!riding()) return _w.apply(this,arguments);
       const q=P(player.x,player.y), d=player.dir||0, mv=player.path.length>0, ph=mv?gt*7:null, S=1.3, z=ph==null?0:Math.abs(Math.sin(ph*2))*1.2;
       CVM3.strutter(g,q.x,q.y,S,d,ph,true,CHOICE.cvPaint); SADDLE_SWAY=ph==null?0:Math.sin(ph)*2.2; const th=(45-d*45)*Math.PI/180, lx=2, sx=q.x+(lx*Math.cos(th)-lx*Math.sin(th))*0.7071*S, sy=q.y+(lx*Math.cos(th)+lx*Math.sin(th))*0.3536*S-(57+z)*S;
@@ -31567,7 +31569,7 @@ const daub=(c,xs,ys,clip,col,sd)=>{ if(!col) return; const x0=Math.min(...xs), x
       if(typeof invBuilt!=='undefined' && invBuilt){ const n=invGrid.querySelectorAll('.slot').length||invGrid.children.length; for(let i=n;i<INV_SIZE;i++) invGrid.appendChild(makeSlot('inv',i)); if(invOverlay.classList.contains('open')) refreshInventory(); } } }catch(e){} },300);
   // followers: a little hauler and a glassy skitter, trailing you like the drake does
   const FOL={pack:null,hush:null,strider:null}; let folArea=null;
-  const folOn=k=>k==='pack'?!!CHOICE.cvPack && !(AREAS[areaId]||{}).inside : k==='hush'?!!CHOICE.cvHush : k==='strider'?!!CHOICE.cvStrider && !riding() && openGround() : false;
+  const folOn=k=>k==='pack'?!!CHOICE.cvPack && !(AREAS[areaId]||{}).inside : k==='hush'?hushOn() : k==='strider'?!!CHOICE.cvStrider && !riding() && openGround() : false;
   { const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{ if(!running || !player.opts) return r; if(G){ player.path=[]; } const reset=folArea!==areaId; folArea=areaId; const fd=DIR_DELTA[player.dir||0]||[1,1];
       [['pack',1.7,0.7],['hush',1.0,-0.6],['strider',2.4,-0.3]].forEach(([k,back,side])=>{ if(!folOn(k)){ FOL[k]=null; return; }
         const n=Math.hypot(fd[0],fd[1])||1, tx=player.x-fd[0]/n*back+(-fd[1]/n)*side, ty=player.y-fd[1]/n*back+(fd[0]/n)*side; let F=FOL[k];
@@ -31579,7 +31581,7 @@ const daub=(c,xs,ys,clip,col,sd)=>{ if(!col) return; const x0=Math.min(...xs), x
       const F2=FOL.hush; if(F2) items.push({d:F2.x+F2.y, ax:F2.x, ay:F2.y, fn:()=>{ const q=P(F2.x,F2.y); g.save(); g.globalAlpha*=0.5+Math.sin(gt*2.4)*0.12; CVM3.skitter(g,q.x,q.y,0.55,F2.dir,F2.moving?gt*12:null); g.restore();
         const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(q.x,q.y-14,22,14,'190,230,255',0.18+Math.sin(gt*3)*0.06); g.globalCompositeOperation=gs; }}); }catch(e){} }; }
   // the Hushling works on you, too: a faint shimmer at your edges while lesser foes are near
-  { const _w=drawPlayerWading; drawPlayerWading=function(e){ const r=_w.apply(this,arguments); try{ if(CHOICE.cvHush && mobs.some(m=>m.hostile && !m.dead && cvHush(m) && cheb(tileOf(m),tileOf(player))<=5)){ const q=P(player.x,player.y);
+  { const _w=drawPlayerWading; drawPlayerWading=function(e){ const r=_w.apply(this,arguments); try{ if(hushOn() && mobs.some(m=>m.hostile && !m.dead && cvHush(m) && cheb(tileOf(m),tileOf(player))<=5)){ const q=P(player.x,player.y);
         const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(q.x,q.y-50,34,60,'180,220,255',0.06+Math.sin(gt*4)*0.025); g.globalCompositeOperation=gs; } }catch(e){} return r; }; }
 
   // ════ the talk ════
@@ -32625,6 +32627,13 @@ setTimeout(()=>{ const K='#1e1610';
     g.strokeStyle='#5a3e22'; g.lineWidth=2.2; [[22,10,30,4],[22,10,15,5],[22,10,28,13]].forEach(([a,b,c2,d])=>{ g.beginPath(); g.moveTo(a,b); g.quadraticCurveTo((a+c2)/2+2,(b+d)/2-2,c2,d); g.stroke(); });   // roots splaying at the head
     g.fillStyle='#6aa84a'; g.beginPath(); g.ellipse(26,18,4,2,0.6,0,Math.PI*2); g.fill(); ink(g,0.8); g.strokeStyle='#3a6a2a'; g.lineWidth=0.6; g.beginPath(); g.moveTo(23,16); g.lineTo(29,20); g.stroke(); });   // a leaf open on it
   try{ ICON_CACHE.clear && ICON_CACHE.clear(); }catch(e){} },0);
+// the Hushling's ring: wear it and the little glass Skitter comes with you and bends the light round you; take it off and it stays at home, and you are seen again
+Object.assign(ITEMS,{ hush_ring:{ name:"The Hushling's Ring", slot:'special', title:"A ring of smoked glass on a copper band. While you wear it, the Hushling follows you and foes ten levels or more below you do not notice you pass. Take it off to be seen." } });
+PRICES.hush_ring=0; QUEST_ITEMS.add('hush_ring');
+ITEM_ICON.hush_ring=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.strokeStyle='#1e1610'; g2.lineWidth=5.4; g2.beginPath(); g2.ellipse(20,24,10,8,0,0,Math.PI*2); g2.stroke(); g2.strokeStyle='#b8743c'; g2.lineWidth=3.4; g2.stroke(); g2.strokeStyle='rgba(255,220,170,0.6)'; g2.lineWidth=1; g2.beginPath(); g2.ellipse(20,24,10,8,0,Math.PI*1.1,Math.PI*1.6); g2.stroke();
+  const gr=g2.createRadialGradient(18,12,1,20,14,8); gr.addColorStop(0,'rgba(220,230,240,0.95)'); gr.addColorStop(0.6,'rgba(110,120,140,0.8)'); gr.addColorStop(1,'rgba(40,44,56,0.9)'); g2.fillStyle=gr; g2.beginPath(); g2.moveTo(20,6); g2.lineTo(27,13); g2.lineTo(20,20); g2.lineTo(13,13); g2.closePath(); g2.fill(); g2.strokeStyle='#1e1610'; g2.lineWidth=1.1; g2.stroke(); g2.restore(); };
+setInterval(()=>{ try{ if(!running || !CHOICE.cvHush || CHOICE.hushRingGiven) return; CHOICE.hushRingGiven=1; const E=player.opts.equip, have=invFlat().includes('hush_ring') || E.special==='hush_ring'; if(have) return;
+    if(!E.special){ E.special='hush_ring'; } else giveQuestItem('hush_ring',true); logMsg("The Hushling's Ring: wear it in your ring slot to have the Hushling with you, take it off to be seen again.",'#b8c8e0'); try{ updateHud(); }catch(e){} }catch(e){} },2000);   // saves from before the ring: hand it over, worn if the finger is free
 OBJ_DRAW.rug2=o=>{ const [fw,fh]=o.fp, ci=o.i+fw/2, cj=o.j+fh/2, sh=o.shape, k=o.kind, c0=o.col;
   const poly=pts=>{ g.beginPath(); pts.forEach((q,n)=>n?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.closePath(); };
   const ell=(sc)=>{ const p=[]; for(let n=0;n<32;n++){ const a=n/32*Math.PI*2; p.push(P(ci+Math.cos(a)*fw/2*sc*0.92, cj+Math.sin(a)*fh/2*sc*0.92)); } return p; };

@@ -497,6 +497,12 @@ html,body{touch-action:none;overscroll-behavior:none;-webkit-tap-highlight-color
           <div class="swatch-row" id="skin-swatches"></div>
         </div>
       </div>
+      <div class="opt-section"><div class="opt-label">Starting Weapon <small style="opacity:.6;letter-spacing:0;text-transform:none">· what leans by the farmhouse door</small></div>
+        <div class="gender-row">
+          <button class="gender-btn sw-btn active" data-sw="pitchfork" type="button" title="A farm tool with reach. Fight up close.">Pitchfork</button>
+          <button class="gender-btn sw-btn" data-sw="willow_wand" type="button" title="A hedge-wizard's first stick: Fire, Frost and the pure strike.">Willow Wand</button>
+          <button class="gender-btn sw-btn" data-sw="grave_twig" type="button" title="A gravedigger's charm: Drain, Raise Dead and Wither.">Grave Twig</button>
+        </div></div>
       <div class="opt-section"><div class="opt-label">Face</div><div class="chip-row" id="face-styles"></div></div>
       <div class="opt-section"><div class="opt-label">Eye Color</div><div class="swatch-row" id="eye-colors"></div></div>
       <div class="opt-section"><div class="opt-label">Face Details</div><div class="chip-row" id="face-details"></div></div>
@@ -6079,6 +6085,7 @@ function refreshCreator(){
 }
 
 function buildCreatorUI(){
+  document.querySelectorAll('.sw-btn').forEach(btn=>{ btn.addEventListener('click',()=>{ charOpts.startW=btn.dataset.sw; document.querySelectorAll('.sw-btn').forEach(b=>b.classList.toggle('active', b===btn)); }); });   // what you start the game with
   document.querySelectorAll('.race-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
       charOpts.race = btn.dataset.race;
@@ -6235,7 +6242,7 @@ const AREAS = {
       {type:'well',   i:7, j:4},
       {type:'house', i:0, j:0, fp:[3,3], roof:'#c0a050', door:'r', inside:'farmhouse'},
       // the pitchfork leans against the wall beside the door, tines down (older saves took it from 7,4)
-      ...(collectedPickups.has('farm:3,2') || collectedPickups.has('farm:7,4') ? [] : [{type:'pickup', i:3, j:2, item:'pitchfork', lean:true}]),
+      ...(collectedPickups.has('farm:3,2') || collectedPickups.has('farm:7,4') ? [] : [{type:'pickup', i:3, j:2, item:(typeof CHOICE!=='undefined' && CHOICE.startW) || 'pitchfork', lean:true}]),
       {type:'barrel', i:1, j:3, breakable:true},          // against the house, right of the firewood
       {type:'crate',  i:2, j:3, breakable:true},
       {type:'crate',  i:5, j:0, breakable:true},          // along the east fence
@@ -11241,7 +11248,7 @@ function startGame(){
   collectedPickups.clear();
   destroyedBreakables.clear(); Object.keys(OPENED_KIND).forEach(k=>delete OPENED_KIND[k]); SOLD_TODAY.clear();
   defeatedMobs.clear();
-  QUEST.letter=0; QUEST.wolves=0; QUEST.camp=0; Object.keys(CHOICE).forEach(k=>CHOICE[k]=null);
+  QUEST.letter=0; QUEST.wolves=0; QUEST.camp=0; Object.keys(CHOICE).forEach(k=>CHOICE[k]=null); CHOICE.startW=['willow_wand','grave_twig'].includes(charOpts.startW)?charOpts.startW:'pitchfork';
   dayClock=DAY_LEN*0.5;                                   // the middle of the night
   if(worldCache) worldCache.area=null;
   switchArea('farmhouse','bed');
@@ -11254,7 +11261,7 @@ function wakeUp(){
   if(areaId!=='farmhouse') return;
   say('Midnight',["You wake with a start. The hearth has burned down to embers and the window is black.",
     "Outside, something heavy crashes against the fence. A laugh, low and ugly, and a second voice hushing it. Then the crunch of splintering wood.",
-    "Someone is in the yard. Your pitchfork leans against the wall outside, by the door."],
+    "Someone is in the yard. "+({willow_wand:"Your willow wand leans against the wall outside, by the door, where you left it to dry.",grave_twig:"Your grave twig hangs from its nail outside, by the door. The knucklebone on it is clicking softly."}[CHOICE.startW]||"Your pitchfork leans against the wall outside, by the door.")],
     [{label:'Get up and look.', fn:closeDialog}]);
 }
 
@@ -15970,7 +15977,8 @@ const HEX_SPELLS = { up:  { name:'Drain', col:'#8ae07a', rgb:'140,230,120', cost
                      left:{ name:'Raise Dead', col:'#e8e4d0', rgb:'230,225,200', cost:35, dmg:2, fx:f=>raiseSkeleton(f) },
                      right:{ name:'Wither', col:'#b07ad0', rgb:'170,110,200', cost:20, dmg:3, fx:f=>addStatus(f,'weak',5,0) } };
 const NECRO_STAVES=['staff_hex','staff_bone','staff_bog','staff_barrow'];
-const spellsFor=()=> (typeof PLAYER_BOOK==='function') ? PLAYER_BOOK() : NECRO_STAVES.includes(player.opts&&player.opts.equip.weapon) ? HEX_SPELLS : SPELLS;   // your three slotted spells
+const NECRO_HAND=w=>NECRO_STAVES.includes(w) || w==='grave_twig';   // the starter twig speaks to the dead too, but it is no grave-speaker's staff
+const spellsFor=()=> (typeof PLAYER_BOOK==='function') ? PLAYER_BOOK() : NECRO_HAND(player.opts&&player.opts.equip.weapon) ? HEX_SPELLS : SPELLS;   // your three slotted spells
 let SKEL=null, SKEL_PILES=[];                    // the risen skeleton: fights beside you, follows you a while after, then falls into a heap of bones
 const SKEL_PILE_LIFE=60;                         // seconds a fallen heap lies there before it sinks away
 const SPM=()=>((WEAPONS[player.opts&&player.opts.equip.weapon]||{}).magic||1)*(1+(typeof gearSum==='function'?gearSum('magic'):0)*0.04);   // staff × gear: each point of spell power on your gear adds 6%   // spell power, as a multiplier
@@ -16413,7 +16421,7 @@ function puzAct(o){                                 // you use something in the 
     return; }
   if(o.type==='water'){
     const W=WEAPONS[player.opts.equip.weapon]||{};
-    if(W.magic && NECRO_STAVES.includes(player.opts.equip.weapon)){ pzSay('Your staff knows death, not frost. A heavy stone might fill it.','#b8a8e8'); return; }
+    if(W.magic && NECRO_HAND(player.opts.equip.weapon)){ pzSay('Your staff knows death, not frost. A heavy stone might fill it.','#b8a8e8'); return; }
     if(W.magic){ player.maxMana=100; if(player.mana==null) player.mana=100; if(player.mana<24){ pzSay('Not enough mana for frost.','#a8a0c8'); return; }
       player.mana-=24; OBJECTS.splice(OBJECTS.indexOf(o),1); OBJECTS.push({type:'ice', i:o.i, j:o.j, noblock:true}); (P.ice=P.ice||[]).push(o.i+','+o.j); pzRebuild();
       bolts.push({from:{x:player.x,y:player.y}, to:{x:o.i+0.5,y:o.j+0.5}, t:0, S:SPELLS.up}); pzSay('Frost! The water freezes solid.','#8ac8f0'); return; }
@@ -16421,7 +16429,7 @@ function puzAct(o){                                 // you use something in the 
   if(o.type==='thorns'){
     const id=player.opts.equip.weapon, W=WEAPONS[id]||{};
     const burn=()=>{ OBJECTS.splice(OBJECTS.indexOf(o),1); P.thorns=true; pzRebuild(); };
-    if(W.magic && NECRO_STAVES.includes(id)){ player.maxMana=100; if(player.mana==null) player.mana=100; if(player.mana<20){ pzSay('Not enough mana to wither them.','#a8a0c8'); return; }   // no fire in a necromancer's hand: Wither takes the life out of the hedge instead
+    if(W.magic && NECRO_HAND(id)){ player.maxMana=100; if(player.mana==null) player.mana=100; if(player.mana<20){ pzSay('Not enough mana to wither them.','#a8a0c8'); return; }   // no fire in a necromancer's hand: Wither takes the life out of the hedge instead
       player.mana-=20; bolts.push({from:{x:player.x,y:player.y}, to:{x:o.i+0.5,y:o.j+0.5}, t:0, S:HEX_SPELLS.right}); burn(); pzSay('Wither! The thorns grey, shrivel and crumble to dust.','#b07ad0'); return; }
     if(W.magic){ player.maxMana=100; if(player.mana==null) player.mana=100; if(player.mana<30){ pzSay('Not enough mana for fire.','#a8a0c8'); return; }
       player.mana-=30; bolts.push({from:{x:player.x,y:player.y}, to:{x:o.i+0.5,y:o.j+0.5}, t:0, S:SPELLS.left}); burn(); pzSay('Fire! The thorns curl up and burn away.','#f08a30'); return; }
@@ -20950,7 +20958,7 @@ const PED=()=>{ if(!CHOICE.pedd || typeof CHOICE.pedd!=='object') CHOICE.pedd={k
   walkRoutes=(orig=>function(dt){ orig.apply(this,arguments); pedTick(); })(walkRoutes);      // every frame, like everyone else who walks
   setInterval(()=>{ if(!running) pedTick(); },500); }
 // ════════ The spellbook: every staff knows its three common words; teachers add rarer ones, and you choose which three you carry ════════
-const SCHOOL=()=> NECRO_STAVES.includes(player.opts&&player.opts.equip.weapon) ? 'necro' : 'mage';
+const SCHOOL=()=> NECRO_HAND(player.opts&&player.opts.equip.weapon) ? 'necro' : 'mage';
 let DOPP=null;
 const SPELL_DEF={ fire:SPELLS.left, frost:SPELLS.up, arcane:SPELLS.right, raise:HEX_SPELLS.left, drain:HEX_SPELLS.up, wither:HEX_SPELLS.right,
   iceward:{ name:'Ice Ward', col:'#bfe6ff', rgb:'190,230,255', cost:40, dmg:0, self:true, fx:()=>{ player.ward={kind:'ice', t:8}; floatText(tileOf(player),'Ice Ward','#bfe6ff'); } },
@@ -21005,7 +21013,7 @@ function bookItems(items){                            // the doppelganger and yo
 const SPELL_TIP=(id,m)=>{ const S=SPELL_DEF[id], d=Math.round((S.dmg||0)*m), c=Math.round(S.cost*(CHOICE.tessLesson && ['fire','frost','arcane','kindle','iceward','doppel'].includes(id)?0.75:1));
   return S.name+': '+({ fire:d+' damage, then burns', frost:d+' damage, slows his swing', arcane:d+' damage', raise:'a skeleton fights beside you'+(NECRO_EXTRA('golem')?' (cast again: Flesh Golem)':''), blood:'pay '+(typeof bloodPrice==='function'?bloodPrice():0)+' health: '+Math.round((typeof bloodPrice==='function'?bloodPrice():0)*0.7*m)+' damage, he bleeds', drain:d+' damage, heals you', wither:d+' damage, he hits for half',
     iceward:'the next blow breaks on it and numbs him', kindle:'a fire that grows each second', doppel:'your double fights beside you', spear:d+' damage, through any guard', hour:'once a fight: he moves at half speed for a few breaths', grasp:d+' damage, holds him: interrupts his swing' })[id]+' · '+(id==='blood'?'no mana':c+' mana'); };
-function bookTip(id){ const sc=NECRO_STAVES.includes(id)?'necro':['staff_oak','staff_star','staff_cinder','staff_crystal'].includes(id)?'mage':null; if(!sc) return null;
+function bookTip(id){ const sc=NECRO_HAND(id)?'necro':['staff_oak','staff_star','staff_cinder','staff_crystal'].includes(id)?'mage':null; if(!sc) return null;
   const m=WEAPONS[id].magic*(1+(typeof gearSum==='function'?gearSum('magic'):0)*0.04), b=BOOK(sc), C=sc==='necro'?'#b8a8e8':'#9adcf0', arrow={left:'◀',up:'▲',right:'▶'};
   const lore=window.itemFlavor && window.itemFlavor(id) ? `<div class="fl lore">${window.itemFlavor(id)}</div>`:'';
   const rows=['left','up','right'].map(d=>arrow[d]+' '+SPELL_TIP(b[d],m)).join('<br>');
@@ -33105,6 +33113,26 @@ function solidDecor(){ try{ if(!ROOM) return; const W=ROOM.w, H=ROOM.h, P0=padNo
         if(people.some(([i,j])=>Math.abs(i-o.i)<=0 && Math.abs(j-o.j)<=0)) drop.add(o);
         if(ws){ const [fw,fh]=ws.fp, onI=o.i>=ws.i+fw && o.i<=ws.i+fw && o.j>=ws.j-1 && o.j<=ws.j+fh, onJ=o.j>=ws.j+fh && o.j<=ws.j+fh && o.i>=ws.i-1 && o.i<=ws.i+fw; if(onI||onJ) drop.add(o); } });
       if(drop.size){ OBJECTS=OBJECTS.filter(o=>{ if(!drop.has(o)) return true; if(o.solid) blocked.delete(o.i+','+o.j); return false; }); } } }catch(e){ console.warn(e); } return r; }; }
+
+// ════════ THE STARTING WEAPONS: what leans by the farmhouse door, chosen when you make your hero. Weaker than any staff you will earn ════════
+Object.assign(ITEMS,{
+  willow_wand:{ name:'Willow Wand', slot:'weapon', title:"A peeled willow switch with a blue glass bead bound to its tip in twine. Hedge-wizards cut their first ones by the brook. It knows Fire, Frost and the pure strike, barely." },
+  grave_twig:{ name:'Grave Twig', slot:'weapon', title:"Blackthorn, cut from a churchyard hedge, with a knucklebone tied to it on a red thread. The dead hear it, faintly. It knows Drain, Raise Dead and Wither, barely." } });
+Object.assign(WEAPONS,{ willow_wand:{ wind:0.22, dmg:2, len:24, magic:0.8 }, grave_twig:{ wind:0.24, dmg:2, len:24, magic:0.85 } });
+Object.assign(PRICES,{ willow_wand:6, grave_twig:6 });
+{ const go=(fn)=>(c,hx,hy,ang,id,s)=>{ c.save(); c.translate(hx,hy); c.rotate(ang); c.scale(s,s); try{ fn(c); } finally{ c.restore(); } };
+  WEAPON_ART.willow_wand=go(c=>{ c.lineCap='round'; c.strokeStyle='#3a2a16'; c.lineWidth=2.6; c.beginPath(); c.moveTo(-5,0); c.quadraticCurveTo(9,-1.4,22,0.6); c.stroke(); c.strokeStyle='#c8b078'; c.lineWidth=1.6; c.stroke();   // peeled pale willow
+    c.strokeStyle='rgba(110,80,40,0.7)'; c.lineWidth=0.5; [3,9,15].forEach(x=>{ c.beginPath(); c.moveTo(x,-0.8); c.lineTo(x+0.8,0.8); c.stroke(); });   // knots
+    c.strokeStyle='#8a6a3a'; c.lineWidth=0.7; for(let k=0;k<4;k++){ c.beginPath(); c.moveTo(19+k*0.7,-1.4); c.lineTo(19.6+k*0.7,1.6); c.stroke(); }   // the twine
+    const gl=c.createRadialGradient(23.4,0.4,0,23.4,0.4,4); gl.addColorStop(0,'rgba(190,230,255,0.9)'); gl.addColorStop(1,'rgba(120,180,255,0)'); c.fillStyle=gl; c.beginPath(); c.arc(23.4,0.4,4,0,Math.PI*2); c.fill();
+    c.fillStyle='#5a9ad8'; c.beginPath(); c.arc(23.4,0.4,1.8,0,Math.PI*2); c.fill(); c.fillStyle='rgba(255,255,255,0.75)'; c.beginPath(); c.arc(22.9,-0.2,0.6,0,Math.PI*2); c.fill(); });   // the bead
+  WEAPON_ART.grave_twig=go(c=>{ c.lineCap='round'; c.strokeStyle='#120e0c'; c.lineWidth=2.8; c.beginPath(); c.moveTo(-5,0); c.lineTo(6,0.6); c.lineTo(12,-0.6); c.lineTo(22,0.4); c.stroke(); c.strokeStyle='#2e2622'; c.lineWidth=1.7; c.stroke();   // crooked blackthorn
+    c.strokeStyle='#2e2622'; c.lineWidth=0.9; [[6,0.6,4,-2.6],[12,-0.6,14,-3],[17,0,18.4,2.4]].forEach(([a,b,x,y])=>{ c.beginPath(); c.moveTo(a,b); c.lineTo(x,y); c.stroke(); });   // thorns
+    c.strokeStyle='#8a2a22'; c.lineWidth=0.6; c.beginPath(); c.moveTo(20,0.4); c.quadraticCurveTo(21,3,20.4,5.2); c.stroke();   // the red thread
+    c.fillStyle='#e0d6bc'; c.beginPath(); c.ellipse(20.4,6.4,1.6,1.1,0.4,0,Math.PI*2); c.fill(); c.strokeStyle='rgba(60,50,30,0.7)'; c.lineWidth=0.4; c.stroke();   // the knucklebone
+    const gl=c.createRadialGradient(22,0.4,0,22,0.4,4); gl.addColorStop(0,'rgba(170,240,180,0.55)'); gl.addColorStop(1,'rgba(120,220,140,0)'); c.fillStyle=gl; c.beginPath(); c.arc(22,0.4,4,0,Math.PI*2); c.fill(); });   // a faint grave-light
+}
+['willow_wand','grave_twig'].forEach(id=>{ ITEM_ICON[id]=(g)=>{ g.save(); g.translate(8,32); g.rotate(-Math.PI/4); WEAPON_ART[id](g,0,0,0,id,1.3); g.restore(); }; });
 </script>
 </body>
 </html>

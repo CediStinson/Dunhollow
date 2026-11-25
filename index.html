@@ -33080,6 +33080,16 @@ function solidDecor(){ try{ if(!ROOM) return; const W=ROOM.w, H=ROOM.h, P0=padNo
       if(R2.size<size-ks.length-6 || need.some(t=>!nearOK(R2,t))) ks.forEach(k=>blocked.delete(k)); else { o.solid=true; size=R2.size; } });   // it may close off a corner, never a way through
   }catch(e){ console.warn(e); } }
 { const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); solidDecor(); return r; }; }
+
+// ════════ the village square kept tidy: nothing underfoot where Hamond stands, less lying about before his house, and the Wheatsheaf's front left clear of sacks and beds ════════
+{ const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); try{ if(areaId==='village'){
+      const ws=OBJECTS.find(o=>/^(house|bldg)$/.test(o.type) && o.inside==='wheatsheaf'), drop=new Set();
+      const people=NPCS.map(n=>[Math.floor(n.x??n.i+0.5),Math.floor(n.y??n.j+0.5)]);
+      OBJECTS.forEach(o=>{ const decor=o.type==='clutter'||o.type==='flowerbed'; if(!decor) return;
+        if(o.type==='clutter' && ['sacks','broom','basket'].includes(o.kind) && Math.hypot(o.i-8,o.j-6)<5) drop.add(o);   // the square: a bucket by the well and the woodpile will do
+        if(people.some(([i,j])=>Math.abs(i-o.i)<=0 && Math.abs(j-o.j)<=0)) drop.add(o);
+        if(ws){ const [fw,fh]=ws.fp, onI=o.i>=ws.i+fw && o.i<=ws.i+fw && o.j>=ws.j-1 && o.j<=ws.j+fh, onJ=o.j>=ws.j+fh && o.j<=ws.j+fh && o.i>=ws.i-1 && o.i<=ws.i+fw; if(onI||onJ) drop.add(o); } });
+      if(drop.size){ OBJECTS=OBJECTS.filter(o=>{ if(!drop.has(o)) return true; if(o.solid) blocked.delete(o.i+','+o.j); return false; }); } } }catch(e){ console.warn(e); } return r; }; }
 </script>
 </body>
 </html>

@@ -17472,9 +17472,10 @@ function drawNPCFigure(n){ drawNPCBody(n); if(!n.carryLog || FEN_OPEN()) return;
 function poolAt(x,y){ return OBJECTS.find(o=>o.type==='pool' && (()=>{ const [fw,fh]=o.fp, cx=o.i+fw/2, cy=o.j+fh/2, rx=fw/2+0.1, ry=fh/2+0.1; return ((x-cx)/rx)**2+((y-cy)/ry)**2<1; })()); }
 function poolDepth(x,y){ const o=poolAt(x,y); if(!o) return 0; const [fw,fh]=o.fp, r=Math.sqrt(((x-o.i-fw/2)/(fw/2+0.1))**2+((y-o.j-fh/2)/(fh/2+0.1))**2); return Math.min(1,(1-r)/0.35); }
 // pools no longer block: you can wade in
-function poolsArea(id){ OBJECTS.forEach(o=>{ if(o.type!=='pool') return; for(let a=0;a<o.fp[0];a++) for(let b=0;b<o.fp[1];b++){ const k=(o.i+a)+','+(o.j+b); if(!OBJECTS.some(x=>x!==o && x.type!=='pool' && !x.noblock && x.type!=='teleporter' && a+o.i>=x.i && a+o.i<x.i+((x.fp||[1,1])[0]) && b+o.j>=x.j && b+o.j<x.j+((x.fp||[1,1])[1]))) blocked.delete(k); } });
+function poolsArea(id){ OBJECTS.forEach(o=>{ if(o.type!=='pool') return; if(o.kind==='sea'){ seaBoards(o); return; }   /* the sea is not a bathing pool: only the boards over it can be walked */ for(let a=0;a<o.fp[0];a++) for(let b=0;b<o.fp[1];b++){ const k=(o.i+a)+','+(o.j+b); if(!OBJECTS.some(x=>x!==o && x.type!=='pool' && !x.noblock && x.type!=='teleporter' && a+o.i>=x.i && a+o.i<x.i+((x.fp||[1,1])[0]) && b+o.j>=x.j && b+o.j<x.j+((x.fp||[1,1])[1]))) blocked.delete(k); } });
     if(CHOICE.bathChest && CHOICE.bathChest.area===id){ const c=CHOICE.bathChest; OBJECTS.push({type:'bathchest', i:c.i, j:c.j}); blocked.add(c.i+','+c.j); }
     player.sink=poolDepth(player.x,player.y)*56; }
+function seaBoards(o){ OBJECTS.forEach(w=>{ if(w.type!=='boardwalk') return; for(let n=0;n<(w.len||1);n++){ const i=w.i+(w.dir==='j'?0:n), j=w.j+(w.dir==='j'?n:0); if(i>=o.i && i<o.i+o.fp[0] && j>=o.j && j<o.j+o.fp[1]) blocked.delete(i+','+j); } }); }
 // the player sinks as deep as the bathers do
 function drawPlayerWading(e){                       // out of a fight: you sink into pools, get wet, and drip
     const tgt=poolDepth(player.x,player.y)*56; player.sink=(player.sink||0)+(tgt-(player.sink||0))*0.12; const sk=player.sink;
@@ -32361,7 +32362,7 @@ TALKERS.barnbet=()=>{ const o=[], back=()=>TALKERS.barnbet();
 TALKERS.ferryman=()=>say('Old Corrie, Ferryman',["“Port Fearn, round the headland. Half a day if the wind likes you. Twenty copper whether it does or not.”"],[{label:'Sail to Port Fearn. (-20c)', off:player.purse<20, fn:()=>{ player.purse-=20; updateHud(); closeDialog(); dayClock+=DAY_LEN*0.4; const E=AREAS.portfearn&&AREAS.portfearn.entries?Object.keys(AREAS.portfearn.entries)[0]:null; switchArea('portfearn',E); logMsg('Corrie\'s cutter beats round the headland in a shower of spray. Port Fearn, with its own harbour stink.','#9fc8e0'); }}, bye]);
 wrap('portfearn','npcs',l=>[...l,{ id:'ferryman2', name:'Old Corrie, Ferryman', i:15, j:12, dir:1, opts:{race:'human',gender:'m',skin:3,hair:0,hairColor:7,beard:5,face:1,equip:{head:'straw_hat',torso:'tunic_linen',armor:null,hands:null,legs:'breeches',feet:null,weapon:null,offhand:null}} }]);
 TALKERS.ferryman2=()=>say('Old Corrie, Ferryman',["“Back to Wrackhaven? Twenty copper. I'll have you there for low water if you don't dawdle.”"],[{label:'Sail to Wrackhaven. (-20c)', off:player.purse<20, fn:()=>{ player.purse-=20; updateHud(); closeDialog(); dayClock+=DAY_LEN*0.4; switchArea('wrackhaven','fromFerry'); logMsg('The cutter runs in past the harbour wall, and the bell on the tide-tower swings in the wind.','#9fc8e0'); }}, bye]);
-AREAS.wrackhaven.entries.fromFerry={i:15,j:17};
+AREAS.wrackhaven.entries.fromFerry={i:14,j:19};   // on the east jetty, by the ferry
 // ── Nobb's mudlark race: five flags out on the flats before his whistle; win and he gives up his boots
 const RACE={ on:false, t:0, got:0, flags:[] };
 TALKERS.nobb=()=>{ const lv=tideLevel(); const o=[];

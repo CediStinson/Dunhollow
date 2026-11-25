@@ -16297,11 +16297,11 @@ wrap('ruin','mobs',l=> CHOICE.appr==='asked' ? [...l, ACOLYTE('Cinder Acolyte',2
 wrap('ruin','npcs',l=> CHOICE.appr==='asked' && !CHOICE.apprFight ? [...l,{ id:'tessaly', name:'Tessaly', i:4, j:2, dir:0, opts:{gender:'f',skin:1,hair:1,hairColor:6,face:3,equip:{head:null,torso:'elf_robe',armor:null,hands:null,legs:null,feet:null,weapon:'staff_star',offhand:null}} }] : l);
 function orvellTalk(){
   const shop=()=>shopFrom('Magister Orvell',['staff_oak'],1,["“One staff at a time, and only the oak. The starwood ones must be earned. Or stolen, apparently.”"]);
-  const opts=CHOICE.appr==='taken' ? [{label:'Buy a staff.', fn:shop}] : [{label:mageAskLabel(), fn:mageTalk},{label:'Buy a staff.', fn:shop}];
+  const opts=CHOICE.appr==='taken' ? [] : [{label:mageAskLabel(), fn:mageTalk}];   /* a staff is earned, not bought: he cuts you one from wood you fetch */
   if(!CHOICE.appr) opts.unshift({label:'“You look troubled.”', fn:()=>say('Magister Orvell',["“My apprentice, Tessaly, took my starwood staff and ran. She has found others who think fire is an argument. They are in the Drowned Shrine, past the Mistmere.”","“I came down from Hollowmere after her. I am too old to wade through a fen and too proud to ask the Baron's men.”","“Bring her back. Or bring the staff back. I will not pretend I know which matters more to me.”"],[
     {label:'“I will find her.”', fn:()=>{ remember('appr','asked','Magister Orvell\'s apprentice Tessaly fled to the Drowned Shrine with his starwood staff and a band of fire-cultists.'); say('Magister Orvell',"“Her friends burn. Frost will slow them. Or simply hit them very hard.”",[bye]); }}, bye])});
-  if(CHOICE.appr==='brought') opts.unshift({label:'“Tessaly is back.”', fn:()=>{ remember('appr','returned','You brought Tessaly back to Magister Orvell.'); player.purse+=25; updateHud();
-      say('Magister Orvell',["<i>He looks past you to where Tessaly sits by the fire, very busy not looking at him.</i>","“So she is. And the staff with her. Here. Twenty-five copper. Do not make me say anything else.” <i>You receive 25 copper.</i>"],[bye]); }});
+  if(CHOICE.appr==='brought') opts.unshift({label:'“Tessaly is back.”', fn:()=>{ remember('appr','returned','You brought Tessaly back to Magister Orvell.'); player.purse+=25; giveQuestItem('crystal_orb',true); updateHud();
+      say('Magister Orvell',["<i>He looks past you to where Tessaly sits by the fire, very busy not looking at him.</i>","“So she is. And the staff with her. Here. Twenty-five copper, and this: the orb from my own desk. It has watched me fail at things for forty years. Do not make me say anything else.” <i>You receive 25 copper and a Crystal Orb.</i>"],[bye]); }});
   if(CHOICE.appr==='returned') opts.unshift({label:'Ask after Tessaly.', fn:()=>say('Magister Orvell',(typeof ORVELL_AT_INN==='function' && ORVELL_AT_INN() ? "“She is sitting by the fire pretending not to listen. We go home when you have finished your lessons. ":"“She is in the tower. ")+"She hates me. She is studying again. Both of those are progress.”",[bye])});
   if(CHOICE.appr==='taken') opts.unshift({label:'Tell him how you got the staff.', fn:()=>say('Magister Orvell',["“You beat a frightened girl in a swamp for a stick. Keep it. I find I do not want it any more. And do not ask me to teach you anything again.”"],[bye])});
   if(CHOICE.appr==='freed') opts.unshift({label:'Tell him Tessaly is gone.', fn:()=>say('Magister Orvell',"“Then she chose. I suppose I should have let her choose sooner.”",[bye])});
@@ -23049,6 +23049,7 @@ const foeLevel=f=>{ if(!f) return 1; const t=f.tier||tierOf(areaId)||1; return n
 // what each piece is worth
 const HEAVY=/mail|plate|scale|lamellar|chitin|cuirass|hauberk|helm|kettle|coif|bevor|gauntlet|keffiyeh|crown|obsidian/;
 function armourOf(id){ if(!id || !ITEMS[id]) return 0; const it=ITEMS[id], base=(typeof unWoven==='function'?unWoven(id):id), b=it.base||base, lvl=itemLevel(id), heavy=HEAVY.test(base)||HEAVY.test(b);
+  if(/^straw_hat$/.test(base)) return 0;   /* straw keeps the sun off, not a blade */
   if(/^duel_/.test(base)) return ({armor:6, head:2, hands:2, feet:2})[it.slot]||0;
   if(it.slot==='armor') return heavy ? 2+2*lvl : /jerkin|studded|gambeson|leather|sun_|mantle/.test(base+b) ? Math.round(1+1.2*lvl) : Math.round(lvl*0.5);
   if(it.slot==='head') return heavy ? lvl+1 : Math.round(lvl*0.4);
@@ -27461,6 +27462,7 @@ function lootKind(id){ const it=ITEMS[id]||{}, s=it.slot, b=id.replace(/^(t_)?(w
   if(/potion|antidote|tonic|rue_water|green_bottle|bottled_wisp|glass_jar/.test(id)) return 'bottle';
   if(id==='burn_salve') return 'tin'; if(id==='apple') return 'apple'; if(id==='bread') return 'bread'; if(/meat/.test(id)) return 'meat'; if(/fish/.test(id)) return 'fish'; if(id==='dates') return 'dates'; if(id==='linen_wrap'||id==='hand_wraps') return 'wrap';
   if(s==='feet') return 'boots'; if(s==='hands') return /bracer/.test(b)?'bracers':'gloves';
+  if(b==='straw_hat') return 'strawhat';
   if(s==='head') return /circlet|crown|band/.test(b)?'crown':LOOT_METAL.test(b)?'helm':'cap';
   if(s==='torso'||s==='armor'||s==='legs') return 'bundle'; if(s==='offhand') return /lantern/.test(b)?'lantern':'shield';
   if(s==='neck') return 'chain'; if(s==='special'||/_ring$/.test(id)) return 'ring';
@@ -27505,6 +27507,13 @@ function drawLootModel(kind,id,o,pulse){ const C=lootColors(id), dk=tone(C,-0.38
   case 'bracers': { [[-5,-1],[4,2]].forEach(([bx,by])=>{ E(bx+4,by-4,2.4,4,dk); g.fillStyle=C; g.fillRect(bx-4,by-8,8,8); E(bx-4,by-4,2.4,4,lt); shine(bx,by-6.5,3,0.8,metal?0.6:0.25); }); break; }
   case 'helm': { const st=metal?C:'#8a8c90'; const rg=g.createRadialGradient(-3,-11,1,0,-7,11); rg.addColorStop(0,tone(st,0.45)); rg.addColorStop(1,tone(st,-0.35)); g.fillStyle=rg;   // a helmet rolled on its side
       g.beginPath(); g.ellipse(0,-7,10,8,-0.3,Math.PI*0.95,Math.PI*2.05); g.closePath(); g.fill(); E(1.5,-3.2,11,3,tone(st,-0.45),-0.3); E(1.5,-3.6,9,2.2,'#1a1614',-0.3); shine(-4,-11,3,1.4,0.6); break; }
+  case 'strawhat': { g.fillStyle='rgba(20,14,6,0.28)'; g.beginPath(); g.ellipse(1,1.5,16,6,0,0,Math.PI*2); g.fill();   /* a straw hat lying on its brim, as it looks in your pack */
+    g.fillStyle='#b89a52'; g.beginPath(); g.ellipse(0,-1,15,5.6,0,0,Math.PI*2); g.fill(); g.strokeStyle='#6a5226'; g.lineWidth=0.9; g.stroke();
+    g.strokeStyle='rgba(120,92,40,0.55)'; g.lineWidth=0.5; for(let k=1;k<4;k++){ g.beginPath(); g.ellipse(0,-1,15-k*2.6,5.6-k*0.95,0,0,Math.PI*2); g.stroke(); }   // the plaited rings of the brim
+    g.fillStyle='#d2b468'; g.beginPath(); g.moveTo(-7,-2); g.quadraticCurveTo(-7,-11,0,-12); g.quadraticCurveTo(7,-11,7,-2); g.quadraticCurveTo(0,0.5,-7,-2); g.fill(); g.strokeStyle='#6a5226'; g.lineWidth=0.9; g.stroke();
+    g.fillStyle='#8a3a2a'; g.beginPath(); g.moveTo(-7,-4); g.quadraticCurveTo(0,-1.8,7,-4); g.lineTo(7,-6); g.quadraticCurveTo(0,-3.8,-7,-6); g.closePath(); g.fill();   // the ribbon band
+    g.strokeStyle='rgba(255,240,190,0.5)'; g.lineWidth=0.6; g.beginPath(); g.moveTo(-4,-9); g.quadraticCurveTo(-1,-11,3,-10); g.stroke();
+    g.strokeStyle='#c8a860'; g.lineWidth=0.5; [[-14,0],[-12,3],[13,1],[11,-3]].forEach(([x,y])=>{ g.beginPath(); g.moveTo(x,y); g.lineTo(x+(x<0?-2:2),y+1); g.stroke(); }); break; }   // loose straws at the edge
   case 'cap': { g.fillStyle=C; g.beginPath(); g.moveTo(-10,-1); g.quadraticCurveTo(-9,-11,0,-11); g.quadraticCurveTo(9,-10,10,-1); g.quadraticCurveTo(0,2,-10,-1); g.fill();   // a soft hat in a heap
       g.strokeStyle=dk; g.lineWidth=0.8; g.beginPath(); g.moveTo(-4,-9); g.quadraticCurveTo(-2,-5,-5,-2); g.moveTo(4,-9); g.quadraticCurveTo(2,-4,4,-1); g.stroke(); E(-1,-8,4,1.4,lt); break; }
   case 'crown': { g.strokeStyle=C; g.lineWidth=2.6; g.beginPath(); g.ellipse(0,-3,9,3.6,0,0,Math.PI*2); g.stroke(); g.strokeStyle=lt; g.lineWidth=0.8; g.beginPath(); g.ellipse(0,-3.6,9,3.6,0,Math.PI*1.1,Math.PI*1.9); g.stroke();
@@ -28307,8 +28316,14 @@ let MAG_N=0, MAG_FREE=false, STAR_ECHO=false;
         setTimeout(()=>{ try{ if(!f.dead && f.hp>0 && combat.active && combat.foe===f){ const was=HIT_SRC; HIT_SRC='spell'; try{ _w(f,Math.max(1,Math.round(n*0.5)),'Starfall!','#c8d8ff'); } finally{ HIT_SRC=was; } burst(f,player,'#dce6ff',12); } }catch(e){} STAR_ECHO=false; },260); } }catch(e){ STAR_ECHO=false; }
     return r; }; }
 // where to get them: Orvell (the regalia, the orb, the grimoire, and the starfall if Tessaly is not to be found), Tessaly (the starfall), Bess, Vesna, Maelis, Yusra
-{ const _o=orvellTalk; orvellTalk=function(){ return withExtraOpt(()=>_o.apply(this,arguments), {label:'“Do you sell robes, or only staves?”', fn:()=>{ const K=CHOICE.mageKnown||[], tessGone=!['returned','freed','brought'].includes(CHOICE.appr);
-      shopFrom('Magister Orvell',todaysStock('orvell_reg',[...MAGISTER_SET,'crystal_orb','grimoire',...(K.length>=3 && tessGone ? STARFALL_SET : [])],3),1,["“The regalia of the tower. Wear all of it and the staff stops arguing with you about every third spell.”","“I keep a few pieces out at a time. The rest are being mended, or aired, or argued over. Come back another day.”"],orvellTalk); }}); }; TALKERS.orvell=orvellTalk; }
+// Orvell sells nothing: the tower's regalia come to you one piece at a time, as he teaches you
+TALKERS.orvell=orvellTalk;
+const ORV_REWARD={ 1:['magister_circlet','grimoire'], 2:['magister_gloves','magister_slippers'], 3:['magister_robe','magister_sash'] };
+const ORV_LINES={ 1:"“And take these. A circlet, so your thoughts stay inside your head, and my old grimoire. Mind the margins: I was young.”", 2:"“Gloves and slippers of the tower. Cold hands cast badly, and cold feet worse.”", 3:"“The robe, and its sash. You have earned the colours. Wear the lot and the staff stops arguing with you about every third spell.”" };
+const ownsAny=id=>player.inv.includes(id) || Object.values((player.opts&&player.opts.equip)||{}).some(v=>v && unWoven(v)===id);
+setInterval(()=>{ try{ if(typeof running==='undefined' || !running || !Array.isArray(CHOICE.mageKnown)) return; const n=Math.min(3,CHOICE.mageKnown.length), had=CHOICE.orvRew|0; if(n<=had) return;
+    for(let k=had+1;k<=n;k++){ const got=(ORV_REWARD[k]||[]).filter(id=>ITEMS[id] && !ownsAny(id)); got.forEach(id=>giveQuestItem(id,true)); if(got.length){ logMsg('Magister Orvell gives you '+got.map(id=>ITEMS[id].name).join(' and ')+'.','#9adcf0'); if(had===k-1 && document.getElementById('dlg-text')) try{ document.getElementById('dlg-text').insertAdjacentHTML('beforeend','<p>'+ORV_LINES[k]+'</p>'); }catch(e){} } }
+    CHOICE.orvRew=n; updateHud(); }catch(e){} },600);
 ['tessaly_s','tessaly_k'].forEach(id=>{ const prev=TALKERS[id]; if(!prev) return; TALKERS[id]=function(...a){ const K=CHOICE.mageKnown||[]; if(K.length<3 || CHOICE.appr==='brought') return prev.apply(this,a);
   return withExtraOpt(()=>prev.apply(this,a), {label:'“What are you sewing?”', fn:()=>shopFrom('Tessaly',STARFALL_SET,1,["“Night-cloth. I draw the constellations on it and the stars come by themselves. Do not ask me how. Orvell would want a treatise.”","“Wear all of it and now and then a spell lands twice. The sky is generous.”"],()=>TALKERS[id]())}); }; });
 { const _t=tailorTalk; tailorTalk=function(){ const _sf=shopFrom; shopFrom=function(name,stock,...r){ shopFrom=_sf; return _sf.call(this,name,[...stock,...(rnd01(Math.floor(dayClock/DAY_LEN),5,431)<0.45?['silk_gloves']:[])],...r); }; try{ return _t.apply(this,arguments); } finally{ shopFrom=_sf; } }; }

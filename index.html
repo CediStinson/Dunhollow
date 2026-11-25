@@ -6544,6 +6544,10 @@ function drawForestNotch(n){ if(LOW_FX && n.kind!=='plough') return drawForestNo
 function drawForestNotchRaw(n){
   const {i0,j0}=n, i1=i0+(n.w||3), j1=j0+(n.h||3);
   if(n.kind==='plough'){                           // a ploughed field: furrows with young sprouts
+    { const c4=[P(i0,j0),P(i1,j0),P(i1,j1),P(i0,j1)]; g.save(); g.beginPath(); c4.forEach((q,k)=>k?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.closePath();   /* the whole field turned to brown earth, edge to edge */
+      const gr=g.createLinearGradient(c4[0].x,c4[0].y,c4[2].x,c4[2].y); gr.addColorStop(0,'#6a4a2a'); gr.addColorStop(0.5,'#5c3f22'); gr.addColorStop(1,'#664626'); g.fillStyle=gr; g.fill(); g.clip();
+      for(let k=0;k<60;k++){ const u=((k*37)%100)/100, v=((k*61)%100)/100, q=P(i0+u*(i1-i0),j0+v*(j1-j0)); g.fillStyle=k%3?'rgba(40,26,12,0.25)':'rgba(150,112,70,0.25)'; g.beginPath(); g.ellipse(q.x,q.y,5+(k%4),2,0,0,Math.PI*2); g.fill(); }   // clods
+      g.restore(); }
     for(let r=0;r<Math.floor((j1-j0)/0.24);r++){ const jj=j0+0.12+r*0.24;
       const a=P(i0+0.05,jj), b=P(i1-0.05,jj);
       g.strokeStyle='rgba(40,26,12,0.55)'; g.lineWidth=2.2; g.beginPath(); g.moveTo(a.x,a.y+1); g.lineTo(b.x,b.y+1); g.stroke();
@@ -11036,6 +11040,7 @@ function draw(){
   const onScr=(gi,gj,mx,up)=>{ const q=P(gi,gj); return q.x>-mx && q.x<W+mx && q.y>-60 && q.y<H+up; };
   OBJECTS.forEach(o=>{ const fw=o.fp?o.fp[0]:1, fh=o.fp?o.fp[1]:1;
     if(!onScr(o.i+fw/2,o.j+fh/2,120+(fw+fh)*70,260+(o.tall||(o.type==='tree'?200:o.fp?420:120)))) return;
+    if(o.type==='garden' && o.fp && !o.cell){ for(let a=0;a<o.fp[0];a++) for(let c=0;c<o.fp[1];c++){ const ci=o.i+a, cj=o.j+c; items.push({d:ci+cj+1.05, fn:()=>{ GARDEN_CELL=[ci,cj]; try{ drawObject(o); } finally{ GARDEN_CELL=null; } }}); } return; }   /* a kitchen garden is drawn plant-row by plant-row, so you walk among the cabbages, not under them */
     items.push({d:o.dz!=null?o.dz:o.fp?o.i+o.j+o.fp[0]+o.fp[1]-1.2:(o.type==='debris'?o.i+o.j+0.2:o.i+o.j+1), fn:()=>drawObject(o)}); });
   NPCS.forEach(n=>{ const nx=n.x??n.i+0.5, ny=n.y??n.j+0.5; if(!onScr(nx,ny,80,200)) return; items.push({d:nx+ny+0.01, fn:()=>drawNPC(n), ax:nx, ay:ny}); });
   mobs.forEach(m=>{ if(!m.gone) items.push({d:m.x+m.y+0.01, fn:()=>drawActor(m), ax:m.x, ay:m.y}); });
@@ -18865,7 +18870,7 @@ const BENCH_FACE={ 'steamcellar:0,1':[1,0], 'steamcellar:7,1':[-1,0], 'wheatshea
 Object.keys(AREAS).forEach(a=>{ if(typeof AREAS[a].objects!=='function') return;
   wrap(a,'objects',l=>{ const out=l.map(o=>o.type==='bench' && BENCH_FACE[a+':'+o.i+','+o.j] ? {...o, face:BENCH_FACE[a+':'+o.i+','+o.j]} : o);
     const A=AREAS[a]; if(!A.inside) return out;
-    const busy=(i,j)=> i<0||j<0||i>=A.w||j>=A.h || out.some(o=>{ const fw=o.fp?o.fp[0]:1, fh=o.fp?o.fp[1]:1; return i>=o.i&&i<o.i+fw&&j>=o.j&&j<o.j+fh; }) || Object.values(A.entries||{}).some(e=>e.i===i&&e.j===j);
+    const busy=(i,j)=> i<0||j<0||i>=A.w||j>=A.h || (A.shape && !A.shape.some(([x,y,w,h])=>i>=x&&j>=y&&i<x+w&&j<y+h)) || out.some(o=>{ const fw=o.fp?o.fp[0]:1, fh=o.fp?o.fp[1]:1; return i>=o.i&&i<o.i+fw&&j>=o.j&&j<o.j+fh; }) || Object.values(A.entries||{}).some(e=>e.i===i&&e.j===j);
     out.filter(o=>o.type==='table').forEach(t=>{ [[0,1,[0,-1]],[1,0,[-1,0]]].forEach(([di,dj,face])=>{ const i=t.i+di, j=t.j+dj; if(!busy(i,j)) out.push({type:'chair', i, j, face, byTable:true}); }); });
     return out; }); });
 // every bed its own blanket: red, blue, green, ochre, brown or grey, the same one each time you look
@@ -27389,11 +27394,12 @@ OBJ_DRAW.pen=o=>{ const T=TW/2, H2=TH/2, pt=(gi,gj,h=0)=>({x:P(gi,gj).x, y:P(gi,
     { const h=pt(i0+0.55,j1), e=pt(i0,j1); g.strokeStyle='#8a6440'; g.lineWidth=2.6; g.lineCap='round'; [6,13,20].forEach(y2=>{ g.beginPath(); g.moveTo(h.x,h.y-y2); g.lineTo(e.x,e.y-y2); g.stroke(); }); g.lineWidth=2.2; g.beginPath(); g.moveTo(h.x,h.y-6); g.lineTo(e.x,e.y-20); g.stroke();   // the gate, shut, with a brace across it
       g.strokeStyle='#3a3430'; g.lineWidth=1.4; g.beginPath(); g.moveTo(h.x-2,h.y-14); g.lineTo(h.x+2,h.y-15); g.stroke(); } } };   // and its latch
 // the kitchen garden in the ploughed corner: rows of cabbages, carrots, beans on poles, onions and a few fat pumpkins, a scarecrow over all of it
+var GARDEN_CELL=null;
 OBJ_DRAW.garden=o=>{ const plants=[], T=gt;
   for(let r=0;r<Math.floor(o.fp[1]/0.47);r++){ const gy=o.j+0.28+r*0.47, kind=['cabbage','carrot','beans','onion','pumpkin','cabbage','carrot','beans'][r%8];
     for(let gx=o.i+0.22;gx<o.i+o.fp[0]-0.1;gx+=kind==='pumpkin'?0.62:kind==='beans'?0.42:0.3){ if(Math.hypot(gx-(o.i+o.fp[0]/2),gy-(o.j+o.fp[1]/2))<0.32) continue; plants.push({gx:gx+(rnd01(Math.round(gx*10),r,960)-0.5)*0.06,gy,kind,s:0.85+rnd01(r,Math.round(gx*10),961)*0.3}); } }
   plants.push({gx:o.i+o.fp[0]/2,gy:o.j+o.fp[1]/2,kind:'scarecrow',s:1});
-  plants.sort((a,b)=>(a.gx+a.gy)-(b.gx+b.gy)).forEach(p=>{ const q=P(p.gx,p.gy), x=q.x, y=q.y, s=p.s, sw=Math.sin(T*1.3+p.gx*2)*0.6;
+  plants.filter(p=>!GARDEN_CELL || (Math.floor(p.gx)===GARDEN_CELL[0] && Math.floor(p.gy)===GARDEN_CELL[1])).sort((a,b)=>(a.gx+a.gy)-(b.gx+b.gy)).forEach(p=>{ const q=P(p.gx,p.gy), x=q.x, y=q.y, s=p.s, sw=Math.sin(T*1.3+p.gx*2)*0.6;
     if(p.kind==='cabbage'){ g.fillStyle='rgba(20,14,6,0.3)'; g.beginPath(); g.ellipse(x+1,y+1,7*s,3*s,0,0,Math.PI*2); g.fill();
       [['#3e6a2e',6.6,3.4,0],['#5a8a3a',5.4,3.2,-1.2],['#86b25a',3.8,2.6,-2.4],['#b8d488',2.2,1.7,-3.4]].forEach(([c,rx,ry,dy])=>{ g.fillStyle=c; g.beginPath(); g.ellipse(x,y-2+dy*s,rx*s,ry*s,0,0,Math.PI*2); g.fill(); });
       g.strokeStyle='rgba(30,60,20,0.5)'; g.lineWidth=0.5; for(let k=0;k<4;k++){ const a=k*1.6; g.beginPath(); g.moveTo(x,y-4*s); g.lineTo(x+Math.cos(a)*5*s,y-2*s+Math.sin(a)*2*s); g.stroke(); } }
@@ -32674,7 +32680,10 @@ OBJ_DRAW.rug2=o=>{ const [fw,fh]=o.fp, ci=o.i+fw/2, cj=o.j+fh/2, sh=o.shape, k=o
       const fits=(i,j,w,h)=>{ for(let a=0;a<w;a++) for(let c=0;c<h;c++){ if(!inS(i+a,j+c) || occ.has((i+a)+','+(j+c))) return false; } return true; };
       const seed=[...id].reduce((s,c)=>s*31+c.charCodeAt(0)|0,11), pal=PAL[KIND(id)], out=[];
       const sizes=[[3,2],[2,3],[2,2],[4,2],[2,4],[1,3],[3,1],[3,3]];
-      for(let pass=0;pass<(W*H>=28?2:1);pass++){ let best=null, bd=1e9; const cx=W/2, cy=H/2;
+      { const bed=l.find(o=>o.type==='bed' && !o.hammock && !o.roll); if(bed){ const [bw,bh]=bed.fp||[2,1], ri=bw>=bh?bed.i:bed.i+bw, rj=bw>=bh?bed.j+bh:bed.j, rw=bw>=bh?bw:1, rh=bw>=bh?1:bh;   /* a rug at the bedside, where your feet go in the morning */
+          const entK=new Set(ent.map(e=>e.i+','+e.j)), fitsBed=(i,j,w,hh)=>{ for(let a=0;a<w;a++) for(let c=0;c<hh;c++){ const k=(i+a)+','+(j+c); if(!inS(i+a,j+c) || (occ.has(k) && !entK.has(k))) return false; } return true; };   /* you may wake standing on it */
+          if(fitsBed(ri,rj,rw,rh)){ const p=pal[Math.floor(rnd01(7,seed,412)*pal.length)]; out.push({type:'rug2', i:ri, j:rj, fp:[rw,rh], kind:p[0]==='round'||p[0]==='runner'?'wool':p[0], shape:'rect', col:p[1], col2:p[2], flat:true, noblock:true, dz:-99}); for(let a=0;a<rw;a++) for(let c=0;c<rh;c++) occ.add((ri+a)+','+(rj+c)); } } }
+      for(let pass=out.length?1:0;pass<(W*H>=28?2:1);pass++){ let best=null, bd=1e9; const cx=W/2, cy=H/2;
         sizes.forEach(([w,h],si)=>{ for(let j=0;j<=H-h;j++) for(let i=0;i<=W-w;i++){ if(!fits(i,j,w,h)) continue; const d=Math.hypot(i+w/2-cx,j+h/2-cy)*(pass?-1:1)-w*h*0.35+rnd01(si,seed+pass,411)*0.8; if(d<bd){ bd=d; best=[i,j,w,h]; } } });
         if(!best) break; const [i,j,w,h]=best, p=pal[Math.floor(rnd01(pass,seed,412)*pal.length)], runner=p[0]==='runner'||w===1||h===1;
         out.push({type:'rug2', i, j, fp:[w,h], kind:p[0]==='round'||p[0]==='runner'?'wool':p[0], shape:p[0]==='round'||(p[0]==='braid'&&!runner)?'oval':'rect', col:p[1], col2:p[2], flat:true, noblock:true, dz:-99});
@@ -33056,6 +33065,21 @@ function drawHammock(o){ const a=P(o.i+0.12,o.j+0.5), b=P(o.i+1.88,o.j+0.5), H=4
 { const _b=drawBed3; drawBed3=function(o){ return o.hammock ? drawHammock(o) : _b(o); }; if(typeof OBJ_DRAW!=='undefined' && OBJ_DRAW.bed) OBJ_DRAW.bed=drawBed3; }
 wrap('wrackhaven','objects',l=>[...l, {type:'bed', hammock:true, i:33, j:18, fp:[2,1]}, {type:'bed', hammock:true, i:33, j:21, fp:[2,1]}]);
 { const _bc=bedChoice; bedChoice=function(){ const r=_bc.apply(this,arguments); try{ if(areaId==='wrackhaven'){ const n=document.getElementById('dlg-name'), t=document.getElementById('dlg-text'); if(n) n.textContent='A Hammock'; if(t) t.innerHTML='<p>Sailcloth between two posts, the sea a few strides off. It swings when you climb in, and then it rocks you. How long do you sleep?</p>'; } }catch(e){} return r; }; }
+
+// ════════ SOLID THINGS ON THE FLOOR: sacks, buckets, carts, stools, loose rocks and the like are in the way, not ghosts. Each one only stands in the way if it cuts nobody off:
+//   every door, person and thing you could reach before must still be reachable ════════
+const SOLID_DECOR=o=>(o.type==='clutter' && !/^(rope)$/.test(o.kind)) || /^(rocks|mossrock|stooks|carcass|rcfallen|goldheap|pen)$/.test(o.type);
+function solidDecor(){ try{ if(!ROOM) return; const W=ROOM.w, H=ROOM.h, P0=padNow(), key=(i,j)=>i+','+j;
+    const reach=()=>{ const s=new Set(), q=[[player.i,player.j]]; s.add(key(player.i,player.j)); while(q.length){ const [i,j]=q.shift(); for(const [a,b] of [[1,0],[-1,0],[0,1],[0,-1]]){ const ni=i+a, nj=j+b, k=key(ni,nj); if(s.has(k) || ni<-P0.l||nj<-P0.t||ni>=W||nj>=H || blocked.has(k)) continue; s.add(k); q.push([ni,nj]); } } return s; };
+    const targets=[]; OBJECTS.forEach(o=>{ if(o.type==='teleporter'||o.type==='pickup'||/chest|crate|barrel|notice|bed|stash|lectern|anvil|stall|counter/.test(o.type)) targets.push(o); }); NPCS.forEach(n=>targets.push({i:Math.floor(n.x??n.i+0.5), j:Math.floor(n.y??n.j+0.5)}));
+    const nearOK=(R,t)=>{ const fw=(t.fp||[1,1])[0], fh=(t.fp||[1,1])[1]; for(let a=-1;a<=fw;a++) for(let c=-1;c<=fh;c++) if(R.has(key(t.i+a,t.j+c))) return true; return false; };
+    let R=reach(); const need=targets.filter(t=>nearOK(R,t)); let size=R.size;
+    const busy=new Set([key(player.i,player.j), ...Object.values((AREAS[areaId]||{}).entries||{}).map(e=>key(e.i,e.j)), ...NPCS.map(n=>key(Math.floor(n.x??n.i+0.5),Math.floor(n.y??n.j+0.5))), ...(typeof mobs!=='undefined'?mobs:[]).map(m=>key(Math.floor(m.x??m.i),Math.floor(m.y??m.j)))]);
+    OBJECTS.filter(SOLID_DECOR).forEach(o=>{ const [fw,fh]=o.fp||[1,1], ks=[]; for(let a=0;a<fw;a++) for(let c=0;c<fh;c++){ const k=key(o.i+a,o.j+c); if(!blocked.has(k) && !busy.has(k)) ks.push(k); } if(!ks.length) return;
+      ks.forEach(k=>blocked.add(k)); const R2=reach();
+      if(R2.size<size-ks.length-6 || need.some(t=>!nearOK(R2,t))) ks.forEach(k=>blocked.delete(k)); else { o.solid=true; size=R2.size; } });   // it may close off a corner, never a way through
+  }catch(e){ console.warn(e); } }
+{ const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); solidDecor(); return r; }; }
 </script>
 </body>
 </html>

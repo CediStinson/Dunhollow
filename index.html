@@ -497,12 +497,12 @@ html,body{touch-action:none;overscroll-behavior:none;-webkit-tap-highlight-color
           <div class="swatch-row" id="skin-swatches"></div>
         </div>
       </div>
-      <div class="opt-section"><div class="opt-label">Starting Weapon <small style="opacity:.6;letter-spacing:0;text-transform:none">· what leans by the farmhouse door</small></div>
+      <div class="opt-section"><div class="opt-label">Class <small style="opacity:.6;letter-spacing:0;text-transform:none">· shown in the gear you may one day earn</small></div>
         <div class="gender-row">
-          <button class="gender-btn sw-btn active" data-sw="pitchfork" type="button" title="A farm tool with reach. Fight up close.">Pitchfork</button>
-          <button class="gender-btn sw-btn" data-sw="willow_wand" type="button" title="A hedge-wizard's first stick: Fire, Frost and the pure strike.">Willow Wand</button>
-          <button class="gender-btn sw-btn" data-sw="grave_twig" type="button" title="A gravedigger's charm: Drain, Raise Dead and Wither.">Grave Twig</button>
-        </div></div>
+          <button class="gender-btn sw-btn active" data-cls="warrior" type="button" title="Steel and nerve. You start with the pitchfork by the door; the Runeforged plate of the dwarves is what it can become.">Warrior</button>
+          <button class="gender-btn sw-btn" data-cls="mage" type="button" title="Fire, Frost and the pure strike. You start with a willow wand; the elves' Starfall regalia is what it can become.">Mage</button>
+          <button class="gender-btn sw-btn" data-cls="necro" type="button" title="Drain, Raise Dead and Wither. You start with a grave twig; the fen-witch's bones and black wool are what it can become.">Necromancer</button>
+        </div><div id="cls-note" style="font-size:12px;opacity:.7;margin-top:6px;font-style:italic">Steel and nerve. You start with the pitchfork that leans by the farmhouse door.</div></div>
       <div class="opt-section"><div class="opt-label">Face</div><div class="chip-row" id="face-styles"></div></div>
       <div class="opt-section"><div class="opt-label">Eye Color</div><div class="swatch-row" id="eye-colors"></div></div>
       <div class="opt-section"><div class="opt-label">Face Details</div><div class="chip-row" id="face-details"></div></div>
@@ -6017,7 +6017,12 @@ const NUDE_EQUIP={ head:null, torso:null, armor:null, hands:null, legs:null, fee
 let creatorDir=0, creatorClothed=true;
 const DWARF_START={ torso:'tunic_deep', feet:'hobnail_boots' };   // dwarves start in deepwool and hobnails
 function dressedEquip(){ return charOpts.race==='elf' ? {...NUDE_EQUIP, ...ELF_START} : charOpts.race==='dwarf' ? {...defaultEquip(), ...DWARF_START} : defaultEquip(); }
-function creatorEquip(){ return creatorClothed ? dressedEquip() : {...NUDE_EQUIP}; }
+const CLASS_LOOK={ warrior:{ head:'rune_helm', armor:'rune_plate', hands:'rune_gauntlets', legs:'rune_greaves', feet:'rune_boots', weapon:'rune_maul', offhand:null, cloak:null, shoulders:null },
+  mage:{ head:'starfall_diadem', armor:'starfall_robe', cloak:'starfall_mantle', hands:'starfall_gloves', feet:'starfall_boots', weapon:'staff_star', offhand:null, shoulders:null },
+  necro:{ head:null, armor:'necro_robe', cloak:'cowl_black', shoulders:'bone_pauldron', hands:'grave_wraps', legs:'necro_leggings', feet:'boots', weapon:'staff_bone', offhand:'bone_fetish' } };
+const CLASS_NOTE={ warrior:'Steel and nerve. You start with the pitchfork that leans by the farmhouse door.', mage:'Fire, Frost and the pure strike. You start with a willow wand, barely more than a stick.', necro:'Drain, Raise Dead and Wither. You start with a grave twig and a knucklebone on a thread.' };
+const CLASS_WEAPON={ warrior:'pitchfork', mage:'willow_wand', necro:'grave_twig' };
+function creatorEquip(){ if(!creatorClothed) return {...NUDE_EQUIP}; const L=CLASS_LOOK[charOpts.cls||'warrior'], E={...dressedEquip()}; if(L) Object.entries(L).forEach(([k,v])=>{ if(!v || ITEMS[v] || k==='offhand') E[k]=v && ITEMS[v] ? v : (v?E[k]:null); }); return E; }   // the class's finest gear, over the clothes you start in
 function drawCreator(){ drawLitFigure(cc, {...charOpts, equip:creatorEquip()}, creatorDir,44,5.0,CREATOR_FIG); }
 
 
@@ -6085,7 +6090,8 @@ function refreshCreator(){
 }
 
 function buildCreatorUI(){
-  document.querySelectorAll('.sw-btn').forEach(btn=>{ btn.addEventListener('click',()=>{ charOpts.startW=btn.dataset.sw; document.querySelectorAll('.sw-btn').forEach(b=>b.classList.toggle('active', b===btn)); }); });   // what you start the game with
+  document.querySelectorAll('.sw-btn').forEach(btn=>{ btn.addEventListener('click',()=>{ charOpts.cls=btn.dataset.cls; creatorClothed=true; document.querySelectorAll('.sw-btn').forEach(b=>b.classList.toggle('active', b===btn));
+      const n=document.getElementById('cls-note'); if(n) n.textContent=CLASS_NOTE[charOpts.cls]||''; refreshCreator(); }); });   // the class you play: shown in its finest gear, started with its humblest weapon
   document.querySelectorAll('.race-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
       charOpts.race = btn.dataset.race;
@@ -11248,7 +11254,7 @@ function startGame(){
   collectedPickups.clear();
   destroyedBreakables.clear(); Object.keys(OPENED_KIND).forEach(k=>delete OPENED_KIND[k]); SOLD_TODAY.clear();
   defeatedMobs.clear();
-  QUEST.letter=0; QUEST.wolves=0; QUEST.camp=0; Object.keys(CHOICE).forEach(k=>CHOICE[k]=null); CHOICE.startW=['willow_wand','grave_twig'].includes(charOpts.startW)?charOpts.startW:'pitchfork';
+  QUEST.letter=0; QUEST.wolves=0; QUEST.camp=0; Object.keys(CHOICE).forEach(k=>CHOICE[k]=null); CHOICE.cls=CLASS_WEAPON[charOpts.cls]?charOpts.cls:'warrior'; CHOICE.startW=CLASS_WEAPON[CHOICE.cls];
   dayClock=DAY_LEN*0.5;                                   // the middle of the night
   if(worldCache) worldCache.area=null;
   switchArea('farmhouse','bed');

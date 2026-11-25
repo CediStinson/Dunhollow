@@ -12964,7 +12964,7 @@ Object.assign(AREAS,{
       {type:'barrel', i:4, j:5, decor:true}, {type:'barrel', i:5, j:5, decor:true}, {type:'barrel', i:4, j:4, decor:true},   // Hilde's beer, behind her bar: not yours to smash
     ].filter(o=>!o.breakable || !destroyedBreakables.has('inn:'+o.i+','+o.j)),
     npcs:()=>[
-      { id:'hilde', name:'Hilde the Innkeeper', i:5, j:4, dir:2, opts:{gender:'f',skin:1,hair:4,hairColor:5,face:0,equip:{head:null,torso:'tunic_green',armor:null,hands:null,legs:'breeches',feet:'boots',weapon:null,offhand:null}} },
+      { id:'hilde', name:'Hilde the Innkeeper', i:5, j:4, dir:6, faceKeep:true, opts:{gender:'f',skin:1,hair:4,hairColor:5,face:0,equip:{head:null,torso:'tunic_green',armor:null,hands:null,legs:'breeches',feet:'boots',weapon:null,offhand:null}} },
       { id:'pipcousin', name:'Pim the Lutenist', i:3, j:1, dir:1, opts:{gender:'m',skin:0,hair:1,hairColor:7,beard:2,face:2,equip:{head:'hood',torso:'tunic_blue',armor:null,hands:null,legs:'hose_grey',feet:'boots',weapon:null,offhand:null}} } ],
     entries:{ fromCity:{i:3,j:2} } },
 });
@@ -32326,8 +32326,8 @@ AREAS.bilge={ ...CROOM('The Bilge & Barnacle',7,7,'wrackhaven','fromBilge', ()=>
     {type:'table', i:1, j:2}, {type:'table', i:3, j:1}, {type:'bench', i:2, j:4}, {type:'lantern', i:1, j:5, noblock:true}, {type:'lantern', i:4, j:0}, {type:'banner', i:2, j:0} ],
   ()=>[ { id:'saltlick', name:'Mama Saltlick', i:6, j:2, dir:1, opts:{race:'human',gender:'f',skin:4,hair:4,hairColor:1,face:0,equip:{head:'hood_red',torso:'smock',armor:null,hands:null,legs:'trousers',feet:'boots',weapon:null,offhand:null}} },
         { id:'barnbet', name:'Barnacle Bet', i:2, j:2, dir:1, sit:true, opts:GOBLIN({gender:'f', skin:21, hair:3, equip:{head:'straw_hat',torso:'smock',armor:null,hands:null,legs:'hose_grey',feet:null,weapon:null,offhand:null}}) },
-        { id:'grubb', name:'Grubb the Bouncer', i:4, j:4, dir:2, ogre:true, pirate:true, scarf:'#2a4a8a', sash:'#c8a04a', opts:{equip:{}} },
-        { id:'fiddler', name:'One-String Wil', i:1, j:1, dir:2, opts:{race:'human',gender:'m',skin:2,hair:2,hairColor:3,beard:2,face:1,equip:{head:'tricorn',torso:'shirt',armor:null,hands:null,legs:'breeches',feet:'boots',weapon:null,offhand:null}} } ]) };
+        { id:'grubb', name:'Grubb the Bouncer', i:1, j:4, dir:1, faceKeep:true, ogre:true, pirate:true, scarf:'#2a4a8a', sash:'#c8a04a', opts:{equip:{}} },
+        { id:'fiddler', name:'One-String Wil', i:1, j:1, dir:0, opts:{race:'human',gender:'m',skin:2,hair:2,hairColor:3,beard:2,face:1,equip:{head:'tricorn',torso:'shirt',armor:null,hands:null,legs:'breeches',feet:'boots',weapon:null,offhand:null}} } ]) };
 AREAS.bilge.shape=[[0,0,7,5],[0,5,2,2]];
 AREAS.bilge.objects=(o=>()=>o().map(x=>x.type==='teleporter'&&x.to==='wrackhaven'?{...x, i:3, j:4}:x))(AREAS.bilge.objects); AREAS.bilge.entries.fromCity={i:3,j:3};
 AREAS.chandlery={ ...CROOM('Gall\'s Chandlery',6,5,'wrackhaven','fromChand', ()=>[
@@ -32997,6 +32997,65 @@ function ysoldeOpen(all){ const Y='Ysolde Brine, Harbourmistress', n=all?invCoun
 ITEMS.wrack_chest.title="A small iron-bound chest, crusted shut. Something shifts inside. Ysolde Brine's dockhands open such things, for a third of the coin.";
 // Old Corrie waits at the end of the east jetty, by his boat, not out on the water
 wrap('wrackhaven','npcs',l=>l.map(n=>n.id==='ferryman' ? {...n, i:14, j:21, dir:3} : n));
+
+// ════════ PEOPLE FACE WHAT THEY ARE DOING: run once as each place is laid out. Keepers stand behind their counters, smiths and the devout face the anvil or the shrine,
+//   and nobody stares at a blank wall or turns their back on the room with nothing in front of them ════════
+const FACE_WORK=/^(anvil|shrine|altar|cauldron|workbench|forge|lectern|grindstone|whetstone|easel|chopblock)/, FACE_COUNTER=/^(counter|bar)$/;
+function faceSense(){ try{ if(!ROOM) return []; const A=AREAS[areaId]||{}, shape=A.shape, changed=[];
+    const inRoom=(i,j)=>i>=0&&j>=0&&i<ROOM.w&&j<ROOM.h && (!shape || shape.some(([x,y,w,h])=>i>=x&&j>=y&&i<x+w&&j<y+h));
+    const objAt=(i,j)=>OBJECTS.find(o=>o.type!=='teleporter' && i>=o.i && j>=o.j && i<o.i+((o.fp||[1,1])[0]) && j<o.j+((o.fp||[1,1])[1]));
+    const taken=(i,j,me)=>blocked.has(i+','+j) || OBJECTS.some(o=>o.type==='teleporter'&&o.i===i&&o.j===j) || NPCS.some(m=>m!==me && Math.floor(m.x??m.i+0.5)===i && Math.floor(m.y??m.j+0.5)===j) || Object.values(A.entries||{}).some(e=>e.i===i&&e.j===j);
+    const dirOf=(di,dj)=>dirFromDelta(di,dj);
+    for(const n of NPCS){ if(n.dir==null || n.route || n.wander || n.follow || n.sit || n.bathe || n.sleepBed || n.goto || n.faceKeep || (n.path&&n.path.length) || n.ogre&&n.id!=='grubb' && false) continue;
+      const i=Math.floor(n.x??n.i+0.5), j=Math.floor(n.y??n.j+0.5), d0=n.dir|0;
+      // 1. a keeper on the customers' side of a counter steps round behind it
+      let done=false;
+      const staffSide=OBJECTS.some(o=>/^(barrel|barrels|kegrack|keg|shelf|shelves|casks)$/.test(o.type) && Math.max(Math.abs(o.i-i),Math.abs(o.j-j))===1);   /* casks at their elbow: they are already behind the bar */
+      if(!staffSide) for(const [di,dj] of [[-1,0],[0,-1]]){ const o=objAt(i+di,j+dj); if(!o || !FACE_COUNTER.test(o.type)) continue;
+        const fw=o.fp||[1,1], bi=di?o.i-1:i, bj=dj?o.j-1:j;   // the tile behind the counter, straight across
+        if(inRoom(bi,bj) && !taken(bi,bj,n)){ n.i=bi; n.j=bj; if(n.x!=null){ n.x=bi+0.5; n.y=bj+0.5; } n.dir=dirOf(-di,-dj); changed.push(n.name+': behind the '+o.type); done=true; break; } }
+      if(done) continue;
+      // 2. their work is beside them: face it
+      let best=null, facing=false; const e0=DIR_DELTA[d0]; OBJECTS.forEach(o=>{ if(!FACE_WORK.test(o.type)) return; const fw=o.fp||[1,1]; for(let a=0;a<fw[0];a++) for(let b=0;b<fw[1];b++){ const di=o.i+a-i, dj=o.j+b-j; if(Math.max(Math.abs(di),Math.abs(dj))!==1) continue; if((di*e0[0]+dj*e0[1])/(Math.hypot(di,dj)*Math.hypot(...e0))>=0.3) facing=true; if(!best || Math.hypot(di,dj)<Math.hypot(best[0],best[1])) best=[di,dj,o.type]; } });
+      if(best){ if(!facing){ const L=Math.hypot(best[0],best[1]); n.dir=[0,1,7,2,6,3,5,4].find(k=>{ const e=DIR_DELTA[k]; return (best[0]*e[0]+best[1]*e[1])/(L*Math.hypot(...e))>=0.7; })??dirOf(best[0],best[1]);   /* a side view of the work over a back turned on you */ changed.push(n.name+': faces the '+best[2]); } continue; }   /* already at one of their tools: leave them be */
+      // 3. turned away from the room, or nose to the back wall, with nothing in front: turn round to face the room
+      const e=DIR_DELTA[d0], fi=i+e[0], fj=j+e[1];
+      const something=OBJECTS.some(o=>{ if(o.type==='teleporter') return false; const fw=o.fp||[1,1]; for(let a=0;a<fw[0];a++) for(let b=0;b<fw[1];b++){ const v=[o.i+a-i,o.j+b-j], L=Math.hypot(...v); if(L<0.5||L>3.2) continue; if((v[0]*e[0]+v[1]*e[1])/(L*Math.hypot(...e))>0.7) return true; } return false; })
+        || NPCS.some(m=>{ if(m===n) return false; const v=[(m.x??m.i+0.5)-(i+0.5),(m.y??m.j+0.5)-(j+0.5)], L=Math.hypot(...v); return L>0.3 && L<3.5 && (v[0]*e[0]+v[1]*e[1])/(L*Math.hypot(...e))>0.7; });
+      const back=[3,4,5].includes(d0), wall=!inRoom(fi,fj) && (fi<i||fj<j);
+      if((back || wall) && !something){ n.dir={3:1,4:0,5:7,2:1,6:7}[d0]??0; changed.push(n.name+': turns to the room'); } }
+    return changed; }catch(e){ console.warn(e); return []; } }
+{ const _sw=switchArea; switchArea=function(...a){ const r=_sw.apply(this,a); try{ FACE_LOG=faceSense(); }catch(e){} return r; }; }
+var FACE_LOG=[];
+
+// ════════ HAMMOCKS: a sailor's bed between two posts on the beach. A bed like any other (sleep, and wake here), slung low and swaying ════════
+function drawHammock(o){ const a=P(o.i+0.12,o.j+0.5), b=P(o.i+1.88,o.j+0.5), H=46, top=26, sw=Math.sin(gt*0.9+o.i)*1.6, cx=(a.x+b.x)/2, cy=(a.y+b.y)/2;
+  g.save();
+  g.fillStyle='rgba(0,0,0,0.22)'; g.beginPath(); g.ellipse(cx,cy+2,(b.x-a.x)/2+6,7,0,0,Math.PI*2); g.fill();   // its shadow on the sand
+  const post=(p,lean)=>{ g.fillStyle='#5a4028'; g.beginPath(); g.moveTo(p.x-2.6,p.y+1); g.lineTo(p.x-2+lean,p.y-H); g.lineTo(p.x+2+lean,p.y-H); g.lineTo(p.x+2.6,p.y+1); g.closePath(); g.fill();
+    g.strokeStyle='rgba(20,12,6,0.8)'; g.lineWidth=0.8; g.stroke(); g.fillStyle='rgba(255,230,190,0.18)'; g.fillRect(p.x-2+lean*0.5,p.y-H+2,1.2,H-3);
+    g.strokeStyle='#8a7350'; g.lineWidth=1.4; g.beginPath(); g.moveTo(p.x-2.4+lean,p.y-H+6); g.lineTo(p.x+2.4+lean,p.y-H+9); g.moveTo(p.x-2.4+lean,p.y-H+9); g.lineTo(p.x+2.4+lean,p.y-H+12); g.stroke(); };   // a lashing of rope at the top
+  post(a,-1.5); post(b,1.5);
+  const ax=a.x+4, ay=a.y-top-12, bx=b.x-4, by=b.y-top-12;   // where the ropes meet the cloth
+  g.strokeStyle='#a8916a'; g.lineWidth=0.9; [-2,0,2].forEach(k=>{ g.beginPath(); g.moveTo(a.x-1.5,a.y-H+8); g.lineTo(ax,ay+k); g.moveTo(b.x+1.5,b.y-H+8); g.lineTo(bx,by+k); g.stroke(); });
+  const sag=16+sw, W=0.34, pj=P(o.i+1,o.j+0.5+W), pk=P(o.i+1,o.j+0.5), ox=pj.x-pk.x, oy=pj.y-pk.y;   // the sling has width across its length: a near edge and a far edge
+  const edge=(s,dz)=>{ const mx=(ax+bx)/2+ox*s, my=(ay+by)/2+oy*s+sag*2+dz; return [[ax+ox*s*0.25,ay+oy*s*0.25],[mx,my],[bx+ox*s*0.25,by+oy*s*0.25]]; };
+  const far=edge(-1,-2), near=edge(1,2);
+  const sling=()=>{ g.beginPath(); g.moveTo(far[0][0],far[0][1]); g.quadraticCurveTo(far[1][0],far[1][1],far[2][0],far[2][1]); g.lineTo(near[2][0],near[2][1]); g.quadraticCurveTo(near[1][0],near[1][1],near[0][0],near[0][1]); g.closePath(); };
+  sling(); const gr=g.createLinearGradient(0,ay,0,ay+sag+14); gr.addColorStop(0,'#cdbd96'); gr.addColorStop(1,'#9a8660'); g.fillStyle=gr; g.fill();
+  g.save(); sling(); g.clip();
+    g.strokeStyle='rgba(130,44,32,0.6)'; g.lineWidth=2.6; [0.28,0.72].forEach(t=>{ g.beginPath(); for(let u=0;u<=1.001;u+=0.1){ const q=(a,b,c)=>a*(1-u)*(1-u)+2*b*u*(1-u)+c*u*u; const fx=q(far[0][0],far[1][0],far[2][0]), fy=q(far[0][1],far[1][1],far[2][1]), nx=q(near[0][0],near[1][0],near[2][0]), ny=q(near[0][1],near[1][1],near[2][1]); const x=fx+(nx-fx)*t, y=fy+(ny-fy)*t; u?g.lineTo(x,y):g.moveTo(x,y); } g.stroke(); });   // two faded red stripes along it
+    g.strokeStyle='rgba(60,44,24,0.28)'; g.lineWidth=0.5; for(let u=0.08;u<1;u+=0.08){ const q=(a,b,c)=>a*(1-u)*(1-u)+2*b*u*(1-u)+c*u*u; g.beginPath(); g.moveTo(q(far[0][0],far[1][0],far[2][0]),q(far[0][1],far[1][1],far[2][1])); g.lineTo(q(near[0][0],near[1][0],near[2][0]),q(near[0][1],near[1][1],near[2][1])); g.stroke(); }   // the weave
+    g.fillStyle='rgba(70,50,30,0.25)'; g.beginPath(); g.ellipse((far[1][0]+near[1][0])/2,(far[1][1]+near[1][1])/2-sag*0.5,(bx-ax)*0.22,4,0,0,Math.PI*2); g.fill();   // the hollow where you lie
+  g.restore();
+  g.strokeStyle='rgba(40,28,14,0.85)'; g.lineWidth=0.9; sling(); g.stroke();
+  g.strokeStyle='#e0d2ae'; g.lineWidth=1.2; g.beginPath(); g.moveTo(near[0][0],near[0][1]); g.quadraticCurveTo(near[1][0],near[1][1],near[2][0],near[2][1]); g.stroke();   // the near hem catching light
+  g.strokeStyle='rgba(168,145,106,0.95)'; g.lineWidth=0.6; for(let u=0.1;u<0.95;u+=0.07){ const q=(a,b,c)=>a*(1-u)*(1-u)+2*b*u*(1-u)+c*u*u; const x=q(near[0][0],near[1][0],near[2][0]), y=q(near[0][1],near[1][1],near[2][1]); g.beginPath(); g.moveTo(x,y); g.lineTo(x+0.5,y+4); g.stroke(); }   // the fringe
+  g.fillStyle='#7a6a8a'; g.beginPath(); g.ellipse((far[1][0]+near[1][0])/2+10,(far[1][1]+near[1][1])/2-sag*0.45,6,2.4,-0.3,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(30,20,30,0.6)'; g.lineWidth=0.6; g.stroke();   // a rolled blanket
+  g.restore(); }
+{ const _b=drawBed3; drawBed3=function(o){ return o.hammock ? drawHammock(o) : _b(o); }; if(typeof OBJ_DRAW!=='undefined' && OBJ_DRAW.bed) OBJ_DRAW.bed=drawBed3; }
+wrap('wrackhaven','objects',l=>[...l, {type:'bed', hammock:true, i:33, j:18, fp:[2,1]}, {type:'bed', hammock:true, i:33, j:21, fp:[2,1]}]);
+{ const _bc=bedChoice; bedChoice=function(){ const r=_bc.apply(this,arguments); try{ if(areaId==='wrackhaven'){ const n=document.getElementById('dlg-name'), t=document.getElementById('dlg-text'); if(n) n.textContent='A Hammock'; if(t) t.innerHTML='<p>Sailcloth between two posts, the sea a few strides off. It swings when you climb in, and then it rocks you. How long do you sleep?</p>'; } }catch(e){} return r; }; }
 </script>
 </body>
 </html>

@@ -33593,6 +33593,20 @@ function mogPick(sl,id){ const have=[...new Set((player.inv||[]).filter(x=>typeo
      {label:'Back.',fn:ellinTalk}],true); }
 TALKERS.ellin=ellinTalk;
 wrap('tailorshop','npcs',l=>l.map(n=>n.id==='ellin' ? {...n, name:'Ellin the Seamstress'} : n));
+
+// ════════ never stuck inside a wall: after a load or an area change, a player standing on a solid tile is moved to the nearest open tile that leads somewhere ════════
+function unstickPlayer(){ try{ if(typeof running!=='undefined' && !running) return false; if(!player || !ROOM || player.sitChair || (typeof CS!=='undefined' && CS.on)) return false; const P=padNow(), W=ROOM.w, H=ROOM.h, key=(i,j)=>i+','+j, inb=(i,j)=>i>=-P.l&&j>=-P.t&&i<W&&j<H, free=(i,j)=>inb(i,j)&&!blocked.has(key(i,j));
+    const i0=Math.floor(player.x??player.i+0.5), j0=Math.floor(player.y??player.j+0.5); if(free(i0,j0) && Number.isFinite(player.x) && Number.isFinite(player.y)){
+      let n=0; for(const [a,b] of [[1,0],[-1,0],[0,1],[0,-1]]) if(free(i0+a,j0+b)) n++; if(n) return false; }   /* fine where it is */
+    const done=new Set(); let best=null;   /* the biggest open region is where the doors and the people are */
+    for(let sj=-P.t;sj<H;sj++) for(let si=-P.l;si<W;si++){ const k0=key(si,sj); if(done.has(k0)||!free(si,sj)) continue; const comp=[[si,sj]], q=[[si,sj]]; done.add(k0);
+      while(q.length){ const [i,j]=q.pop(); for(const [a,b] of [[1,0],[-1,0],[0,1],[0,-1]]){ const ni=i+a,nj=j+b,k=key(ni,nj); if(!done.has(k)&&free(ni,nj)){ done.add(k); comp.push([ni,nj]); q.push([ni,nj]); } } }
+      if(!best || comp.length>best.length) best=comp; }
+    if(!best) return false; let pick=null, bd=1e9; best.forEach(([i,j])=>{ const d=Math.hypot(i-i0,j-j0); if(d<bd){ bd=d; pick=[i,j]; } });
+    player.i=pick[0]; player.j=pick[1]; player.x=pick[0]+0.5; player.y=pick[1]+0.5; player.path=[]; player.moving=false; player.sink=0;
+    try{ if(typeof centerCamera==='function') centerCamera(); }catch(e){} console.warn('[unstick] moved the player out of a wall to',pick.join(',')); return true; }catch(e){ return false; } }
+{ const _as=applySave; applySave=function(...a){ const r=_as.apply(this,a); setTimeout(unstickPlayer,60); return r; }; }
+{ const _sw2=switchArea; switchArea=function(...a){ const r=_sw2.apply(this,a); unstickPlayer(); return r; }; }
 </script>
 </body>
 </html>

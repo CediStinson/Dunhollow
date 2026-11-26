@@ -6470,7 +6470,7 @@ function switchArea(id,entryKey){
   DUMMY_SPAWN=A.dummy;
   MOB_SPAWNS.length=0; MOB_SPAWNS.push(...A.mobs());
   NPCS.length=0; if(A.npcs) NPCS.push(...A.npcs());
-  OBJECTS.push(...genTrees(id));
+  OBJECTS.push(...genTrees(id)); clearOfTrees();
   // broken crates and barrels leave their boards behind, even after you come back
   OBJECTS.forEach(o=>{ if(o.type==='crates' || o.type==='barrels'){ o.breakable=true; return; }        // stacks placed by hand (Marta's stock) open too, and keep their look
     if((o.type!=='crate' && o.type!=='barrel') || o.decor) return; o.breakable=true;           // every container can be opened
@@ -6676,18 +6676,29 @@ function paintRock(x,y,s){
 }
 // ── trees are real, depth-sorted objects (they block their tile, so nobody walks through a trunk) ──
 const TREE_DENSITY = { farm:0.08, road:1.0, crossroads:0.85, village:0.2, wood:1.2, fen:0.65, elf:0.85, bog:0.3 };
+function clearOfTrees(){ try{ const T=new Set(OBJECTS.filter(o=>o.type==='tree').map(o=>o.i+','+o.j)); if(!T.size) return; const W=ROOM.w, H=ROOM.h;
+    const solid=new Set(); OBJECTS.forEach(o=>{ if(o.type==='tree'||o.noblock||o.type==='teleporter') return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) solid.add((o.i+a)+','+(o.j+b)); });
+    const free=(i,j,fw,fh,me)=>{ for(let a=0;a<fw;a++) for(let b=0;b<fh;b++){ const k=(i+a)+','+(j+b); if(i+a<0||j+b<0||i+a>=W||j+b>=H||T.has(k)) return false; if(me && solid.has(k) && !(i+a>=me.i&&i+a<me.i+fw&&j+b>=me.j&&j+b<me.j+fh)) return false; } return true; };
+    const near=(i,j,fw,fh,me)=>{ for(let r=1;r<=6;r++) for(let a=-r;a<=r;a++) for(let b=-r;b<=r;b++){ if(Math.max(Math.abs(a),Math.abs(b))!==r) continue; if(free(i+a,j+b,fw,fh,me)) return [i+a,j+b]; } return null; };
+    OBJECTS.forEach(o=>{ if(o.type==='tree' || o.type==='teleporter' || o.flat || (o.noblock && o.dz!=null && o.dz<-90)) return; const [fw,fh]=o.fp||[1,1]; let hit=false; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) if(T.has((o.i+a)+','+(o.j+b))) hit=true; if(!hit) return;
+      const p=near(o.i,o.j,fw,fh,o); if(p){ o.i=p[0]; o.j=p[1]; } });                                        // a quest's new tent or crate goes up beside the trees, not inside one
+    NPCS.forEach(n=>{ const i=Math.floor(n.x??n.i+0.5), j=Math.floor(n.y??n.j+0.5); if(!T.has(i+','+j)) return; const p=near(i,j,1,1,null); if(p){ n.i=p[0]; n.j=p[1]; if(n.x!=null){ n.x=p[0]+0.5; n.y=p[1]+0.5; } } });
+    MOB_SPAWNS.forEach(m=>{ if(!T.has(m.i+','+m.j)) return; const p=near(m.i,m.j,1,1,null); if(p){ m.i=p[0]; m.j=p[1]; } }); }catch(e){ console.warn(e); } }
 function genTrees(id){
   const A=AREAS[id], dens=A.dens??(TREE_DENSITY[A.theme]||0); if(!dens) return [];
   const saveArea=areaId; areaId=id;                           // groundAt reads the current area's paths
   const keep=[];
   const busy=new Set();
   const mark=(i,j,r)=>{ for(let a=-r;a<=r;a++) for(let b=-r;b<=r;b++) busy.add((i+a)+','+(j+b)); };
-  OBJECTS.forEach(o=>{ if(o.type==='dapple' || (o.noblock && o.dz!=null && o.dz<-90 && o.type!=='brook')) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) mark(o.i+a,o.j+b,o.noblock?0:(o.fp||['teleporter','house','berrybush','barrel','barrels','crate','crates','chest','pickup','stash'].includes(o.type))?1:0); });   // nothing worth opening is ever grown shut in   // a berry bush keeps room round it to be picked   // flowers, stones, light: no ring kept clear round them
-  NPCS.forEach(n=>mark(n.i,n.j,0)); MOB_SPAWNS.forEach(m=>mark(m.i,m.j,0));
-  try{ const snap={...CHOICE}; Object.keys(CHOICE).forEach(k=>{ CHOICE[k]=null; });   /* and whatever stood here at the start of the game: a tent struck or a camp gone keeps its clearing, so no trees spring up where it was */
-    try{ (A.objects?A.objects():[]).forEach(o=>{ if(o.type==='dapple' || o.type==='tree' || (o.noblock && o.dz!=null && o.dz<-90 && o.type!=='brook')) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) mark(o.i+a,o.j+b,o.noblock?0:(o.fp||['teleporter','house','berrybush','barrel','barrels','crate','crates','chest','pickup','stash'].includes(o.type))?1:0); });
-      (A.npcs?A.npcs():[]).forEach(n=>mark(n.i,n.j,0)); (A.mobs?A.mobs():[]).forEach(m=>mark(m.i,m.j,0)); }
-    finally{ Object.keys(CHOICE).forEach(k=>{ if(!(k in snap)) delete CHOICE[k]; }); Object.assign(CHOICE,snap); } }catch(e){}   // only the very tile someone stands on: a wider clearing round people made the wood shift whenever they came and went
+  // the woods grow round the place as it was laid out at the start of the game, at noon and at midnight, every spot a townsfolk's day takes them to included;
+  //   never round whoever or whatever happens to be here now, so the trees stand exactly where they stood on your first visit, whatever has happened since
+  { const snap={...CHOICE}, cp=new Set(collectedPickups), db=new Set(destroyedBreakables), dm=new Set(defeatedMobs), dc=dayClock;
+    const markObj=o=>{ if(o.type==='dapple' || o.type==='tree' || (o.noblock && o.dz!=null && o.dz<-90 && o.type!=='brook')) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) mark(o.i+a,o.j+b,o.noblock?0:(o.fp||['teleporter','house','berrybush','barrel','barrels','crate','crates','chest','pickup','stash'].includes(o.type))?1:0); };
+    try{ Object.keys(CHOICE).forEach(k=>{ CHOICE[k]=null; }); collectedPickups.clear(); destroyedBreakables.clear(); defeatedMobs.clear();
+      for(const t of [0.25,0.75]){ dayClock=Math.floor(dc/DAY_LEN)*DAY_LEN+DAY_LEN*t;
+        try{ (A.objects?A.objects():[]).forEach(markObj); }catch(e){} try{ (A.npcs?A.npcs():[]).forEach(n=>mark(n.i,n.j,0)); }catch(e){} try{ (A.mobs?A.mobs():[]).forEach(m=>mark(m.i,m.j,0)); }catch(e){} } }
+    finally{ Object.keys(CHOICE).forEach(k=>{ if(!(k in snap)) delete CHOICE[k]; }); Object.assign(CHOICE,snap); cp.forEach(k=>collectedPickups.add(k)); db.forEach(k=>destroyedBreakables.add(k)); dm.forEach(k=>defeatedMobs.add(k)); dayClock=dc; }
+    try{ Object.values(typeof ROUTINES!=='undefined'?ROUTINES:{}).forEach(R=>(R.slots||[]).forEach(s=>{ if(s.area===id && s.at) mark(s.at[0],s.at[1],0); })); }catch(e){} }
   Object.values(A.entries).forEach(e=>mark(e.i,e.j,1));
   const busyNow=busy; const busy0=new Set(); Object.values(A.entries).forEach(e=>{ for(let a=-1;a<=1;a++) for(let b=-1;b<=1;b++) busy0.add((e.i+a)+','+(e.j+b)); });   // the grove is laid out the same every visit, whoever is about; only then are the trees standing on someone (or something) left out
   for(let j=0;j<A.h;j++) for(let i=0;i<A.w;i++){
@@ -6709,7 +6720,7 @@ function genTrees(id){
     }
   }
   areaId=saveArea;
-  return keep.filter(t=>!busyNow.has(t.i+','+t.j));
+  return keep.filter(t=>!busyNow.has(t.i+','+t.j));   // busyNow is the fixed layout above, not the present
 }
 const TREE_COLS = {
   oak:  [['#8cb24e','#4e7a2a','#1c3012'],['#9aba58','#587c2c','#223414'],['#7aa244','#446e26','#182a10']],
@@ -12519,7 +12530,7 @@ wrap('camp','objects',list=>{
   const pk=(i,j)=>destroyedBreakables.has('camp:'+i+','+j)||destroyedBreakables.has('pits:'+i+','+(j-6));
   [[2,9],[9,9],[3,12],[9,12]].forEach(([i,j])=>l.push({type:'kiln', i, j, cold:CHOICE.camp!=='spared'}));
   if(CHOICE.camp==='fought' && !collectedPickups.has('pits:6,5') && !collectedPickups.has('camp:6,11') && !collectedPickups.has('camp:4,3')) l.push({type:'pickup', i:4, j:3, item:'journal'});   // dropped by Mara's tent
-  if(CHOICE.camp==='bribed') [[5,12],[6,12],[7,12],[6,13]].forEach(([i,j])=>{ if(!pk(i,j)) l.push({type:'crate', i, j, breakable:true, rich:true}); });
+  if(CHOICE.camp==='bribed') [[5,10],[6,10],[7,10],[6,9]].forEach(([i,j])=>{ if(!pk(i,j)) l.push({type:'crate', i, j, breakable:true, rich:true}); });   // Mara's stock, stacked out in the open by the kilns, not shoved into the trees
   if(CHOICE.camp==='spared') l.push({type:'campfire', i:6, j:11});
   l.push({type:'teleporter', i:6, j:14, to:'drywash', entry:'fromPits'});
   return l; });
@@ -23854,6 +23865,7 @@ ITEM_ICON.heart_seeds=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.f
 ITEM_LORE.heart_seeds='The great tree’s first seedlings since the Hunger. Elowen wants them in the Fellings, in the stumps the loggers left.';
 const SEED_STUMPS=[[3,1],[10,3],[9,6]];                    // stumps that stand whatever became of the loggers
 const seedsQ=()=>CHOICE.seedQ||null, seedsIn=()=>SEED_STUMPS.filter((s,k)=>(CHOICE.seeded||{})[k]!=null).length;
+wrap('fellings','objects',l=>l.map(o=>o.type==='stump' && SEED_STUMPS.some(([i,j])=>i===o.i&&j===o.j) && !o.clear ? {...o, clear:2} : o));   // the seed-stumps keep their clearing always, not only while the seeds are wanted
 wrap('fellings','objects',l=>{ if(!seedsQ()) return l; return l.map(o=>{ if(o.type!=='stump') return o; const k=SEED_STUMPS.findIndex(([i,j])=>i===o.i&&j===o.j); return k<0?o:{...o, type:'seedstump', k, clear:2, alias:[[o.i-1,o.j],[o.i,o.j-1],[o.i-1,o.j-1]]}; }); });   // a click on the top of the stump lands on the ground behind it: that counts too   // no tree may stand in front of a stump you must plant in
 OBJ_DRAW.seedstump=o=>{ drawObject({...o, type:'stump'}); const at=(CHOICE.seeded||{})[o.k], q=P(o.i+0.5,o.j+0.5);
   if(at==null){ if(seedsQ()!=='given') return; g.save(); g.globalCompositeOperation='lighter'; glow(q.x,q.y-8,16,9,'200,240,200',0.18+0.1*Math.sin(gt*2+o.k)); g.restore(); return; }   // a stump waiting for one

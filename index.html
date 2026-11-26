@@ -4476,34 +4476,76 @@ function drawLanternInHand(c,hx,hy){                   // Vesna's lantern hangin
   c.globalCompositeOperation='lighter'; const gg=c.createRadialGradient(x,y+1.4+H*0.5,0,x,y+1.4+H*0.5,14); gg.addColorStop(0,'rgba(220,235,140,0.45)'); gg.addColorStop(1,'rgba(200,220,110,0)');
   c.fillStyle=gg; c.beginPath(); c.arc(x,y+1.4+H*0.5,14,0,Math.PI*2); c.fill();
   c.restore(); }
+const SHIELD_SHAPE={ shield_iron:'kite', shield_red:'heater', wyrm_shield:'wyrm', sun_shield:'sun', hide_shield:'hide', scarab_shield:'scarab', kingroot_shield:'bulwark' };
 function drawShieldOnArm(c,x,y,prof,back){        // back: seen from behind, you see its wooden back, the straps and the grip
-  const KITE=SHIELD_KIND==='shield_iron', HEATER=SHIELD_KIND==='shield_red', col=SHIELD_COL||(HEATER?'#8a2a24':KITE?'#6a7480':'#8a5a28');
-  c.save(); c.translate(x,y-1); c.rotate((KITE||HEATER?0.12:0.18)-prof*0.22); c.scale((1-prof*0.35)*1.3,1.3);   // a proper shield, not a buckler   // the bottom tucks in toward the body a little
+  const K=SHIELD_SHAPE[SHIELD_KIND]||'round', KITE=K==='kite'||K==='wyrm', HEATER=K==='heater', TALL=K==='bulwark'||K==='hide';
+  const col=SHIELD_COL||({heater:'#8a2a24',kite:'#6a7480',wyrm:'#b8884a',sun:'#c8963a',hide:'#a07848',scarab:'#2e6a64',bulwark:'#5e4a2c'}[K])||'#8a5a28';
+  c.save(); c.translate(x,y-1); c.rotate((KITE||HEATER||TALL?0.12:0.18)-prof*0.22); c.scale((1-prof*0.35)*1.3,1.3);   // a proper shield, not a buckler   // the bottom tucks in toward the body a little
   const shape=()=>{ c.beginPath(); if(KITE){ c.moveTo(-6.4,-8); c.quadraticCurveTo(0,-11.5,6.4,-8); c.quadraticCurveTo(6.6,2,0,13); c.quadraticCurveTo(-6.6,2,-6.4,-8); }
     else if(HEATER){ c.moveTo(-7,-7.4); c.lineTo(7,-7.4); c.lineTo(7,0); c.quadraticCurveTo(6,6.8,0,10); c.quadraticCurveTo(-6,6.8,-7,0); }
+    else if(K==='hide') c.ellipse(0,0.6,5.8,9.6,0,0,Math.PI*2);
+    else if(K==='scarab') c.ellipse(0,0.5,6.8,8.4,0,0,Math.PI*2);
+    else if(K==='bulwark') c.roundRect(-6.4,-10.5,12.8,22,[5,5,3,3]);
     else c.arc(0,0,7.4,0,Math.PI*2); c.closePath(); };
   if(back){                                        // the inside: planks, a padded strap for the forearm and a grip for the hand
-    shape(); c.fillStyle=KITE||HEATER?tone(col,-0.5):'#4a2e14'; c.fill();
-    c.save(); c.scale(0.86,0.88); shape(); c.clip(); const gw=c.createLinearGradient(-7,0,7,0); gw.addColorStop(0,'#7a5634'); gw.addColorStop(1,'#4e3420'); c.fillStyle=gw; c.fillRect(-9,-12,18,26);
-    c.strokeStyle='rgba(30,18,8,0.55)'; c.lineWidth=0.6; for(let px=-6;px<=6;px+=3){ c.beginPath(); c.moveTo(px,-12); c.lineTo(px,14); c.stroke(); } c.restore();
+    shape(); c.fillStyle=K==='round'||K==='sun'?'#4a2e14':tone(col,-0.5); c.fill();
+    c.save(); c.scale(0.86,0.88); shape(); c.clip(); const gw=c.createLinearGradient(-7,0,7,0); gw.addColorStop(0,K==='hide'?'#8a6a48':K==='scarab'?'#2a3a34':'#7a5634'); gw.addColorStop(1,K==='hide'?'#5a4028':K==='scarab'?'#18221e':'#4e3420'); c.fillStyle=gw; c.fillRect(-9,-12,18,26);
+    c.strokeStyle='rgba(30,18,8,0.55)'; c.lineWidth=0.6; if(K==='hide'){ for(let px=-4;px<=4;px+=4){ c.beginPath(); c.moveTo(px,-10); c.lineTo(px,11); c.stroke(); } } else for(let px=-6;px<=6;px+=3){ c.beginPath(); c.moveTo(px,-12); c.lineTo(px,14); c.stroke(); } c.restore();
     c.fillStyle='#3a2410'; c.fillRect(-6,-3.2,12,2.4); c.fillRect(-4.5,2.2,9,2.2);                 // the strap and the grip
     c.fillStyle='#8a7a5a'; [[-5.4,-2],[5.4,-2],[-3.8,3.3],[3.8,3.3]].forEach(([a,b2])=>{ c.beginPath(); c.arc(a,b2,0.6,0,Math.PI*2); c.fill(); });
     c.restore(); return; }
-  if(KITE||HEATER){
-    shape(); c.fillStyle=tone(col,-0.45); c.fill();
-    c.save(); c.scale(0.86,0.88); shape(); const gs=c.createLinearGradient(-7,0,7,0); gs.addColorStop(0,tone(col,0.2)); gs.addColorStop(1,tone(col,-0.25)); c.fillStyle=gs; c.fill(); c.restore();
-    if(KITE){ c.fillStyle='#8a929c'; c.fillRect(-0.9,-9.5,1.8,20); c.fillRect(-5.8,-3,11.6,1.6); c.fillStyle='#d8dce0'; [[-5,-6.5],[5,-6.5],[0,10],[-4.6,3],[4.6,3]].forEach(([a,b2])=>{ c.beginPath(); c.arc(a,b2,0.7,0,Math.PI*2); c.fill(); }); }
+  const rim=()=>{ shape(); c.fillStyle=tone(col,-0.45); c.fill(); };
+  const face=(g0,g1)=>{ c.save(); c.scale(0.86,0.9); shape(); const gs=c.createLinearGradient(-7,0,7,0); gs.addColorStop(0,g0||tone(col,0.2)); gs.addColorStop(1,g1||tone(col,-0.25)); c.fillStyle=gs; c.fill(); c.restore(); };
+  const shine=(a,b,rx,ry)=>{ c.fillStyle='rgba(255,255,255,0.14)'; c.beginPath(); c.ellipse(a,b,rx,ry,-0.4,0,Math.PI*2); c.fill(); };
+  if(K==='kite'||K==='heater'){
+    rim(); face();
+    if(K==='kite'){ c.fillStyle='#8a929c'; c.fillRect(-0.9,-9.5,1.8,20); c.fillRect(-5.8,-3,11.6,1.6); c.fillStyle='#d8dce0'; [[-5,-6.5],[5,-6.5],[0,10],[-4.6,3],[4.6,3]].forEach(([a,b2])=>{ c.beginPath(); c.arc(a,b2,0.7,0,Math.PI*2); c.fill(); }); }
     else { c.fillStyle='#e0c050'; c.beginPath(); c.moveTo(-6,2); c.lineTo(0,-3.6); c.lineTo(6,2); c.lineTo(6,4.6); c.lineTo(0,-1); c.lineTo(-6,4.6); c.closePath(); c.fill(); }
-    c.fillStyle='rgba(255,255,255,0.14)'; c.beginPath(); c.ellipse(-3,-4,2.4,1.4,-0.4,0,Math.PI*2); c.fill();
+    shine(-3,-4,2.4,1.4); c.restore(); return; }
+  if(K==='wyrm'){                                   // a long kite clad in overlapping wyrm-scales, a bronze rim, an amber eye at the boss
+    shape(); c.fillStyle='#6a4a20'; c.fill(); face(tone(col,0.15),tone(col,-0.35));
+    c.save(); c.scale(0.86,0.9); shape(); c.clip(); for(let r=0;r<8;r++) for(let q=-3;q<=3;q++){ const sx=q*2.6+(r%2?1.3:0), sy=-9+r*2.8; c.fillStyle=(r+q)%3?tone(col,-0.18):tone(col,0.06); c.beginPath(); c.arc(sx,sy,1.7,0,Math.PI); c.fill(); c.strokeStyle='rgba(40,24,8,0.55)'; c.lineWidth=0.35; c.stroke(); } c.restore();
+    c.strokeStyle='#c8a050'; c.lineWidth=0.9; shape(); c.stroke();
+    c.fillStyle='#4a2a10'; c.beginPath(); c.ellipse(0,-1,2.6,1.9,0,0,Math.PI*2); c.fill(); c.fillStyle='#e8a030'; c.beginPath(); c.ellipse(0,-1,1.8,1.3,0,0,Math.PI*2); c.fill(); c.fillStyle='#1a0e04'; c.beginPath(); c.ellipse(0,-1,0.4,1.1,0,0,Math.PI*2); c.fill();   // a slit-pupilled eye
+    shine(-3,-5,2,1.2); c.restore(); return; }
+  if(K==='sun'){                                    // bronze, round, a sun face beaten into it with rays all round, rivets on the rim
+    rim(); face(tone(col,0.25),tone(col,-0.3));
+    c.fillStyle=tone(col,-0.15); for(let k=0;k<12;k++){ const an=k/12*Math.PI*2; c.beginPath(); c.moveTo(Math.cos(an-0.12)*2.9,Math.sin(an-0.12)*2.9); c.lineTo(Math.cos(an)*5.4,Math.sin(an)*5.4); c.lineTo(Math.cos(an+0.12)*2.9,Math.sin(an+0.12)*2.9); c.closePath(); c.fill(); }
+    c.fillStyle=tone(col,0.35); c.beginPath(); c.arc(0,0,2.8,0,Math.PI*2); c.fill(); c.strokeStyle=tone(col,-0.45); c.lineWidth=0.5; c.stroke();
+    c.fillStyle=tone(col,-0.5); [[-0.9,-0.5],[0.9,-0.5]].forEach(([a,b2])=>{ c.beginPath(); c.arc(a,b2,0.35,0,Math.PI*2); c.fill(); }); c.beginPath(); c.arc(0,0.4,1,0.2,Math.PI-0.2); c.strokeStyle=tone(col,-0.5); c.lineWidth=0.4; c.stroke();   // its face
+    c.fillStyle='#e8d8a0'; for(let k=0;k<10;k++){ const an=k/10*Math.PI*2; c.beginPath(); c.arc(Math.cos(an)*6.6,Math.sin(an)*6.6,0.45,0,Math.PI*2); c.fill(); }
+    shine(-2.6,-3,2.2,1.3); c.restore(); return; }
+  if(K==='hide'){                                   // a tall oval of stretched hide over a withy frame, laced round the edge, crossed with thongs, a tuft of fur at the top
+    shape(); c.fillStyle='#4a3420'; c.fill(); face(tone(col,0.15),tone(col,-0.25));
+    c.save(); c.scale(0.86,0.9); shape(); c.clip(); c.fillStyle='rgba(70,44,20,0.3)'; [[-2,-4,2.2,1.4],[2.4,3,1.8,2.4],[-1.4,6,1.6,1]].forEach(([a,b2,rx,ry])=>{ c.beginPath(); c.ellipse(a,b2,rx,ry,0.3,0,Math.PI*2); c.fill(); }); c.restore();   // the hide's own markings
+    c.strokeStyle='#3a2414'; c.lineWidth=0.5; for(let k=0;k<14;k++){ const an=k/14*Math.PI*2; c.beginPath(); c.moveTo(Math.cos(an)*4.6,0.6+Math.sin(an)*8.2); c.lineTo(Math.cos(an)*5.8,0.6+Math.sin(an)*9.6); c.stroke(); }   // the lacing
+    c.strokeStyle='#5a3a1e'; c.lineWidth=0.7; c.beginPath(); c.moveTo(-4,-5); c.lineTo(4,6); c.moveTo(4,-5); c.lineTo(-4,6); c.stroke();
+    c.fillStyle='#6a5034'; [[-1.4,-9.6],[0,-10.4],[1.4,-9.6]].forEach(([a,b2])=>{ c.beginPath(); c.ellipse(a,b2,0.9,1.6,0,0,Math.PI*2); c.fill(); });   // a tuft of fur
+    c.restore(); return; }
+  if(K==='scarab'){                                 // a beetle's shell: two ridged wing-cases, a seam down the middle, a little head at the top, sheen like oil
+    shape(); c.fillStyle=tone(col,-0.55); c.fill(); face(tone(col,0.3),tone(col,-0.3));
+    c.strokeStyle=tone(col,-0.6); c.lineWidth=0.7; c.beginPath(); c.moveTo(0,-5.6); c.lineTo(0,8.4); c.stroke();
+    c.strokeStyle=tone(col,-0.4); c.lineWidth=0.4; [-1,1].forEach(sd=>{ for(let k=1;k<4;k++){ c.beginPath(); c.moveTo(sd*k*1.5,-4.6+k*0.4); c.quadraticCurveTo(sd*k*1.7,2,sd*k*1.1,7.6-k*0.6); c.stroke(); } });   // ridges on the wing-cases
+    c.fillStyle=tone(col,-0.35); c.beginPath(); c.ellipse(0,-6.6,3.2,1.8,0,0,Math.PI*2); c.fill(); c.fillStyle='#c8963a'; c.beginPath(); c.ellipse(0,-6.8,1.4,0.8,0,0,Math.PI*2); c.fill();   // the head, and a bronze stud
+    c.fillStyle='rgba(200,255,230,0.22)'; c.beginPath(); c.ellipse(-2.6,-1.4,1.6,3.6,0.15,0,Math.PI*2); c.fill(); c.fillStyle='rgba(255,220,160,0.12)'; c.beginPath(); c.ellipse(2.8,2.4,1.2,2.6,-0.1,0,Math.PI*2); c.fill();
+    c.restore(); return; }
+  if(K==='bulwark'){                                // a tall shield of oak planks, and the king's root grown right across it, a green bud at the top
+    shape(); c.fillStyle=tone(col,-0.45); c.fill(); face(tone(col,0.15),tone(col,-0.3));
+    c.save(); c.scale(0.86,0.9); shape(); c.clip(); c.strokeStyle='rgba(30,18,8,0.5)'; c.lineWidth=0.5; [-3.2,0,3.2].forEach(px=>{ c.beginPath(); c.moveTo(px,-12); c.lineTo(px,12); c.stroke(); }); c.restore();
+    c.lineCap='round'; c.strokeStyle='#3a2a16'; c.lineWidth=1.8; c.beginPath(); c.moveTo(-5,9); c.bezierCurveTo(-3,3,3,4,1,-3); c.bezierCurveTo(-1,-7,3,-8,2,-10); c.stroke();
+    c.lineWidth=1; c.beginPath(); c.moveTo(1,-3); c.quadraticCurveTo(4,-2,5,1); c.moveTo(-2,4); c.quadraticCurveTo(-5,2,-5.6,-2); c.moveTo(-1,5.5); c.quadraticCurveTo(2,8,4.6,8.4); c.stroke();
+    c.strokeStyle='rgba(200,170,120,0.35)'; c.lineWidth=0.5; c.beginPath(); c.moveTo(-4.6,8.4); c.bezierCurveTo(-2.6,3,2.6,4,0.8,-2.6); c.stroke();
+    c.fillStyle='#6a9a3a'; c.beginPath(); c.ellipse(2.6,-10.4,1.6,0.9,-0.6,0,Math.PI*2); c.fill(); c.fillStyle='#8ac050'; c.beginPath(); c.ellipse(1.2,-10.8,1.1,0.6,0.5,0,Math.PI*2); c.fill();   // a leaf, living
+    c.fillStyle='#8a7a5a'; [[-4.6,-8],[4.6,-8],[-4.6,9],[4.6,9]].forEach(([a,b2])=>{ c.beginPath(); c.arc(a,b2,0.55,0,Math.PI*2); c.fill(); });
     c.restore(); return; }
   c.fillStyle=SHIELD_COL?tone(SHIELD_COL,-0.3):'#6a4018'; c.beginPath(); c.arc(0,0,7.4,0,Math.PI*2); c.fill();
   c.fillStyle=SHIELD_COL||'#8a5a28'; c.beginPath(); c.arc(0,0,6.2,0,Math.PI*2); c.fill();
   c.strokeStyle='#4a2e14'; c.lineWidth=1; c.beginPath(); c.arc(0,0,6.2,0,Math.PI*2); c.stroke();
+  c.strokeStyle='rgba(40,24,10,0.45)'; c.lineWidth=0.5; [-3,0,3].forEach(px=>{ const hh=Math.sqrt(Math.max(0,38-px*px)); c.beginPath(); c.moveTo(px,-hh); c.lineTo(px,hh); c.stroke(); });   // the planks
   c.fillStyle='#c09040'; c.beginPath(); c.arc(0,0,2.2,0,Math.PI*2); c.fill();     // boss
   c.fillStyle='rgba(255,255,255,0.14)'; c.beginPath(); c.arc(-2,-2.4,2.2,0,Math.PI*2); c.fill();
   c.restore();
 }
-
 function drawHead(c, x, B, opts, view=0){
   const GOB=String(opts.race||'').startsWith('goblin'), DWF=String(opts.race||'').startsWith('dwarf'), skin=SKINS[opts.skin], hair=HAIR_COLORS[opts.hairColor];
   const FC=GOB?{...faceOf(opts),eye:'#d8b020',brow:1.5}:DWF?(f=>opts.gender==='f'
@@ -33183,6 +33225,10 @@ Object.assign(PRICES,{ willow_wand:6, grave_twig:6 });
     const gl=c.createRadialGradient(22,0.4,0,22,0.4,4); gl.addColorStop(0,'rgba(170,240,180,0.55)'); gl.addColorStop(1,'rgba(120,220,140,0)'); c.fillStyle=gl; c.beginPath(); c.arc(22,0.4,4,0,Math.PI*2); c.fill(); });   // a faint grave-light
 }
 ['willow_wand','grave_twig'].forEach(id=>{ ITEM_ICON[id]=(g)=>{ g.save(); g.translate(8,32); g.rotate(-Math.PI/4); WEAPON_ART[id](g,0,0,0,id,1.3); g.restore(); }; });
+
+// the icon of a shield is the shield itself, face on and a little larger
+['shield','shield_red','shield_iron','hide_shield','sun_shield','scarab_shield','wyrm_shield','kingroot_shield'].forEach(id=>{ ITEM_ICON[id]=(g2,i2,size)=>{ const k0=SHIELD_KIND, c0=SHIELD_COL; SHIELD_KIND=id; SHIELD_COL=(ITEMS[id]&&ITEMS[id].col)||null; g2.save(); g2.scale(size/40,size/40);
+  try{ g2.fillStyle='rgba(0,0,0,0.25)'; g2.beginPath(); g2.ellipse(21,36,9,2.2,0,0,Math.PI*2); g2.fill(); g2.translate(20,19); g2.scale(1.45,1.45); g2.rotate(-0.15); drawShieldOnArm(g2,0,0,0,false); } finally{ g2.restore(); SHIELD_KIND=k0; SHIELD_COL=c0; } }; });
 </script>
 </body>
 </html>

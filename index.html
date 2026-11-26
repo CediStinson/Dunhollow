@@ -1013,23 +1013,25 @@ function poseAngles(p){
 }
 // Dyed variants reuse the base garment's drawing with their own cloth colour.
 const DYE_SLOT = { torso:[CLOTH,'shirt'], legs:[CLOTH,'pants'], feet:[CLOTH,'boot'], armor:null, head:null, hands:[GEAR,'glove'], offhand:null };
-let SHIELD_COL=null, SHIELD_KIND=null;
+let SHIELD_COL=null, SHIELD_KIND=null, UNDIE_LOOK=null;
 function withLook(opts,fn){
   if(opts.equip && (opts.hideHelm || opts.hide)){ const H=opts.hide||{}, e={...opts.equip}; let ch=false;     // pieces the player chose to hide: still worn (stats count), just not drawn
     for(const k in e){ if(e[k] && (H[k] || (k==='head' && opts.hideHelm))){ e[k]=null; ch=true; } } if(ch) opts={...opts, equip:e}; }
   let e=opts.equip; if(!e) return fn(opts);
+  if(opts.mog){ let ch=false; const e2={...e}; for(const k in e2){ const m=e2[k] && opts.mog[e2[k]]; if(m && ITEMS[m]){ e2[k]=m; ch=true; } } if(ch){ e=e2; opts={...opts, equip:e2}; } }   /* re-sewn by Ellin: a worn piece drawn in another piece's cut (its own stats stay) */
   if(Object.values(e).some(v=>v && v.startsWith && /^[tw]_/.test(v))){ e={...e}; for(const k in e) e[k]=unWoven(e[k]); opts={...opts, equip:e}; }
   const saved=[], look={...e}; let any=false;
   const set=(obj,k,v)=>{ saved.push([obj,k,obj[k]]); obj[k]=v; };
   const vari={};
-  for(const k in e){ const it=ITEMS[e[k]]; if(!it || !it.base || (k==='weapon' && typeof WEAPON_ART!=='undefined' && WEAPON_ART[e[k]])) continue;   /* a weapon with its own drawing keeps it */ any=true; look[k]=it.base; vari[k]=e[k];
+  for(const k in e){ const it=ITEMS[e[k]]; if(it && it.undie && k==='legs'){ any=true; look.legs=null; UNDIE_LOOK=it.undie; continue; }   /* underwear: no trousers, only what is under them */
+    if(!it || !it.base || (k==='weapon' && typeof WEAPON_ART!=='undefined' && WEAPON_ART[e[k]])) continue;   /* a weapon with its own drawing keeps it */ any=true; look[k]=it.base; vari[k]=e[k];
     if(it.elfc){ Object.entries(it.elfc).forEach(([kk,v])=>set(ELFC,kk,v)); continue; }   // worn elven clothes: the same cut, travel-stained colours
     if(k==='armor'){ if(it.tint!==false) set(GEAR, it.base==='mail'?'mail':it.base==='robe'?'robe':'jerkin', it.col); }
     else if(k==='head') set(GEAR, it.base==='hood'?'hood':'steel', it.col);
     else if(k==='offhand'){ SHIELD_COL=it.col; SHIELD_KIND=e[k]; }
     else if(DYE_SLOT[k]) set(DYE_SLOT[k][0],DYE_SLOT[k][1],it.col); }
   if(!any) return fn(opts);
-  try{ return fn({...opts, equip:look, vari}); } finally { saved.reverse().forEach(([o,k,v])=>o[k]=v); SHIELD_COL=null; SHIELD_KIND=null; }
+  try{ return fn({...opts, equip:look, vari}); } finally { saved.reverse().forEach(([o,k,v])=>o[k]=v); SHIELD_COL=null; SHIELD_KIND=null; UNDIE_LOOK=null; }
 }
 // In the lighter mode (phones, weak machines) finished figures are cached as small bitmaps:
 // idle and walking frames repeat, so most figures cost one drawImage instead of hundreds of paths.
@@ -2290,6 +2292,26 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       c.strokeStyle=tone(U,0.3); c.lineWidth=0.55; c.beginPath(); c.moveTo(x+cx-w,B+baseY); c.quadraticCurveTo(x+cx,B+baseY+1.0,x+cx+w,B+baseY); c.stroke();
       fs(tone(U,0.3)); c.beginPath(); c.ellipse(x+cx-0.7,B+baseY+0.6,0.7,0.45,0.4,0,Math.PI*2); c.ellipse(x+cx+0.7,B+baseY+0.6,0.7,0.45,-0.4,0,Math.PI*2); c.fill();
     }
+  }
+  // underwear bottoms from the Hollow Choir: briefs for her (a cut of each), close-fitting smallclothes for him, each with its trimming
+  function drawUndies(U){ const col=U.col, k=U.kind, back=!front, top=-43.4, crotch=-34.9, cx=LN+(back?0:po*0.5), tr=U.trim||tone(col,0.35);
+    if(F && k!=='string'){ const sv=LINGERIE.base; LINGERIE.base=col; try{ drawBriefs(); } finally { LINGERIE.base=sv; } }
+    else if(F){ c.strokeStyle=col; c.lineWidth=0.8; c.lineCap='round'; c.beginPath(); c.moveTo(x+LN-HI+0.4,B+top-1); c.quadraticCurveTo(x+cx,B+top+2,x+LN+HI-0.4,B+top-1); c.stroke();   /* a string: a thread at the hips and a scrap of silk */
+      fs(col); c.beginPath(); if(back){ c.moveTo(x+cx-1.2,B+top+0.8); c.lineTo(x+cx+1.2,B+top+0.8); c.lineTo(x+cx+0.25,B+crotch); c.lineTo(x+cx-0.25,B+crotch); }
+        else { c.moveTo(x+cx-3,B+top+1.2); c.quadraticCurveTo(x+cx,B+top+2,x+cx+3,B+top+1.2); c.quadraticCurveTo(x+cx+1.4,B+crotch-2,x+cx+0.6,B+crotch+0.2); c.lineTo(x+cx-0.6,B+crotch+0.2); c.quadraticCurveTo(x+cx-1.4,B+crotch-2,x+cx-3,B+top+1.2); }
+      c.closePath(); c.fill(); c.strokeStyle=tone(col,-0.5); c.lineWidth=0.4; c.stroke(); }
+    else { const t2=Y.WAIST+1.5, bt=crotch-0.5, pts=[[LN-HI-0.6,t2],[LN+HI+0.6,t2],[LN+HI+0.4,t2+2],[LN+lo+lw/2+1.1,-31.5],[LN+lo*0.3,-31.2],[LN+1.2,-34.4],[LN-1.2,-34.4],[LN-lo*0.3,-31.2],[LN-lo-lw/2-1.1,-31.5],[LN-HI-0.4,t2+2]];   /* his: close-cut silk trunks */
+      blob(pts); const g2=c.createLinearGradient(x+LN-HI,0,x+LN+HI,0); g2.addColorStop(0,tone(col,0.22)); g2.addColorStop(0.5,col); g2.addColorStop(1,tone(col,-0.35)); c.fillStyle=g2; c.fill(); c.strokeStyle=tone(col,-0.5); c.lineWidth=0.6; c.stroke();
+      fs(tr); r(LN-HI-0.5,t2,(HI+0.5)*2,1); if(front){ fs(tone(col,-0.3,0.7)); r(LN+po*0.4-0.3,t2+1.6,0.6,bt-t2-3); } }
+    const wy=F?top:Y.WAIST+1.5, hw=F?HI-0.4:HI+0.5;
+    if(k==='lace'){ c.strokeStyle=tr; c.lineWidth=0.4; for(let q=0;q<9;q++){ const xx=LN-hw+q*(hw*2)/8; c.beginPath(); c.arc(x+xx,B+wy+(F?0.4:0.8),0.75,0,Math.PI); c.stroke(); }   /* a scalloped lace edge, and sheer flowers */
+      if(front){ fs(tone(col,0.3,0.55)); [[-1.6,4],[1.4,5.2],[0,7]].forEach(([dx,dy])=>{ c.beginPath(); c.arc(x+cx+dx,B+wy+dy,0.55,0,Math.PI*2); c.fill(); }); } }
+    if(k==='garter'){ const by=F?top-3.6:Y.WAIST-1.4; fs(col); c.fillRect(x+LN-HI-0.6,B+by,(HI+0.6)*2,2.4); fs(tr); c.fillRect(x+LN-HI-0.6,B+by+0.2,(HI+0.6)*2,0.45);   /* a garter belt over them, its straps down the thighs */
+      c.strokeStyle=col; c.lineWidth=0.6; [-1,1].forEach(sd=>[0.35,0.75].forEach(t=>{ if((back && t<0.5) || (pr>0.8 && (t<0.5 || sd<0))) return; const sx=pr>0.8 ? LN+lo*0.3 : LN+sd*(lo*0.4+lw*(t-0.2)); c.beginPath(); c.moveTo(x+LN+sd*HI*(t+0.15),B+by+2.4); c.lineTo(x+sx,B-27); c.stroke(); fs(tr); c.fillRect(x+sx-0.5,B-27.4,1,0.8); })); }
+    if(k==='ribbon'){ [-1,1].forEach(sd=>{ const bx=LN+sd*(hw-0.2), by=wy+0.6; fs(tr); c.beginPath(); c.ellipse(x+bx-0.8,B+by,0.9,0.55,0.4,0,Math.PI*2); c.ellipse(x+bx+0.8,B+by,0.9,0.55,-0.4,0,Math.PI*2); c.fill();   /* silk ribbon tied in a bow at each hip */
+      c.strokeStyle=tr; c.lineWidth=0.4; c.beginPath(); c.moveTo(x+bx,B+by); c.lineTo(x+bx-0.6+sd*0.2,B+by+3); c.moveTo(x+bx,B+by); c.lineTo(x+bx+0.7,B+by+2.6); c.stroke(); }); }
+    if(k==='chain'){ c.strokeStyle='#d8b048'; c.lineWidth=0.45; for(let s2=0;s2<2;s2++){ c.beginPath(); c.moveTo(x+LN-hw-0.4,B+wy-0.6); c.quadraticCurveTo(x+cx,B+wy+3.4+s2*2.2,x+LN+hw+0.4,B+wy-0.6); c.stroke(); }   /* gold chains slung low, little coins hanging */
+      if(front||F) for(let q=1;q<6;q++){ const t=q/6, px=LN-hw+t*hw*2, py=wy-0.6+4*t*(1-t)*(4+2.2); c.fillStyle='#e8c060'; c.beginPath(); c.arc(x+px,B+py+0.9,0.55,0,Math.PI*2); c.fill(); } }
   }
   // bra: two rounded balconette cups with a trim edge, a small bow at the centre, thin straps
   function drawBreastBand(bare=false){
@@ -4027,6 +4049,7 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   else drawBraies();
   if(F) drawBreastBand(bare);
   drawFormDetails();
+  if(UNDIE_LOOK && !E.legs) drawUndies(UNDIE_LOOK);   // over the body's own lines, so it reads as cloth
   if(DUEL_F) drawDuelBrief();                // over the hips' own lines, so from behind it is cloth, not skin
   // seen from the side the seat curves out behind the hips (skin, or the cloth over it)
   if(front && pr>0.8){
@@ -33471,6 +33494,45 @@ function talkSpots(np){ const out=[...DIR_DELTA]; for(let di=-2;di<=2;di++) for(
       else { g.fillStyle='#3a2a1a'; [-8,6].forEach(y=>g.fillRect(-5.4,y,10.8,2.4)); g.fillStyle='#d0d4da'; [-9.4,9.6].forEach(y=>[-3,3].forEach(x2=>{ g.beginPath(); g.arc(x2,y,0.8,0,Math.PI*2); g.fill(); })); }
       g.restore(); }); g.restore(); };
   if(ITEMS.bronze_bracers) ITEM_ICON.bronze_bracers=bracer('#b08a4a',true); if(ITEMS.iron_bracers) ITEM_ICON.iron_bracers=bracer('#7a7e84',false); }
+
+// ════════ the Hollow Choir's underthings, and Ellin the seamstress who re-sews one piece in the cut of another ════════
+const UNDIES={ choir_lace:["Black Lace Briefs",'#1a1014','lace','#5a4a52',{agi:1},55], choir_string:["Thorn-red String",'#8a1424','string',null,{agi:2},70],
+  choir_garter:["Plum Garter Briefs",'#4a1a3a','garter','#c8a0b8',{magic:1,agi:1},85], choir_ribbon:["Ivory Ribbon-ties",'#e8dcc8','ribbon','#c84a5a',{magic:1},60],
+  choir_coins:["Coin-chain Briefs",'#6a1020','chain','#e8c060',{agi:1,magic:1},110] };
+Object.entries(UNDIES).forEach(([id,[name,col,kind,trim,st,price]])=>{ ITEMS[id]={ name, slot:'legs', col, undie:{kind,col,trim}, title:{choir_lace:"Black lace, cut low, sheer over the hip. Ashmira says it was made by moonlight by someone who is no longer alive to make more.",
+    choir_string:"Barely there: a thread at the hips and a scrap of red silk. The Choir think trousers are a sad human habit.", choir_garter:"Plum silk briefs under a garter belt with nothing to hold up. 'For the look of the straps,' says Ashmira.",
+    choir_ribbon:"Ivory silk tied at each hip with a red ribbon. One pull and the bow comes loose, which is apparently the point.", choir_coins:"Wine-red silk slung with fine gold chains and little coins. You can be heard coming, and seen going."}[id] };
+  ITEM_STATS[id]=st; PRICES[id]=price; GEAR_HP[id]=0; if(typeof ITEM_LEVEL_FIX!=='undefined') ITEM_LEVEL_FIX[id]=3;
+  ITEM_ICON[id]=(g,i,s)=>{ g.save(); g.scale(s/40,s/40); g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(20,33,12,2.2,0,0,Math.PI*2); g.fill(); const tr=trim||tone(col,0.35);
+    g.beginPath(); if(kind==='string'){ g.moveTo(8,13); g.quadraticCurveTo(20,17,32,13); g.lineWidth=1.4; g.strokeStyle=col; g.stroke(); g.beginPath(); g.moveTo(15,15.5); g.quadraticCurveTo(20,16.5,25,15.5); g.quadraticCurveTo(22,24,20.6,28); g.lineTo(19.4,28); g.quadraticCurveTo(18,24,15,15.5); }
+      else { g.moveTo(8,13); g.quadraticCurveTo(20,16,32,13); g.bezierCurveTo(28,19,23,25,22,29); g.quadraticCurveTo(20,30.4,18,29); g.bezierCurveTo(17,25,12,19,8,13); }
+    g.closePath(); const gr=g.createLinearGradient(8,0,32,0); gr.addColorStop(0,tone(col,0.25)); gr.addColorStop(0.5,col); gr.addColorStop(1,tone(col,-0.3)); g.fillStyle=gr; g.fill(); g.strokeStyle=tone(col,-0.55); g.lineWidth=0.9; g.stroke();
+    if(kind==='lace'){ g.strokeStyle=tr; g.lineWidth=0.8; for(let q=0;q<8;q++){ g.beginPath(); g.arc(9.5+q*3,14+Math.sin(q/7*Math.PI)*1.4,1.4,0,Math.PI); g.stroke(); } }
+    if(kind==='garter'){ g.fillStyle=col; g.fillRect(7,8,26,3.4); g.fillStyle=tr; g.fillRect(7,8.4,26,0.8); g.strokeStyle=col; g.lineWidth=1; [[10,7],[15,12],[25,28],[30,33]].forEach(([a,b])=>{ g.beginPath(); g.moveTo(a,11.4); g.lineTo(b,30); g.stroke(); }); }
+    if(kind==='ribbon'){ g.fillStyle=tr; [8.5,31.5].forEach(bx=>{ g.beginPath(); g.ellipse(bx-1.8,13,2,1.2,0.4,0,Math.PI*2); g.ellipse(bx+1.8,13,2,1.2,-0.4,0,Math.PI*2); g.fill(); }); }
+    if(kind==='chain'){ g.strokeStyle='#d8b048'; g.lineWidth=0.9; [0,1].forEach(s2=>{ g.beginPath(); g.moveTo(7,12.5); g.quadraticCurveTo(20,20+s2*4,33,12.5); g.stroke(); }); g.fillStyle='#e8c060'; [12,16,20,24,28].forEach((px,q)=>{ g.beginPath(); g.arc(px,18.4+Math.sin(q/4*Math.PI)*2.6,1.1,0,Math.PI*2); g.fill(); }); }
+    g.restore(); }; });
+// Ashmira keeps a little trade in the Weeping Hollow after the feast, by night, if the Choir was left alive
+wrap('hollowrite','npcs',l=> RITE_DONE() && CHOICE.succ!=='fought' && nightAmt()>0.35 ? [...l,{ id:'ashmira_s', name:'Ashmira', i:7, j:5, dir:6, opts:SUCC({skin:41,hairColor:13,succ:{horn:'#e8dcc8',wing:'#3a2a4a'},equip:{head:null,torso:'succ_bodice',armor:null,hands:null,legs:'choir_coins',feet:null,weapon:null,offhand:null}}) }] : l);
+TALKERS.ashmira_s=()=>shopFrom('Ashmira',Object.keys(UNDIES),1,[CHOICE.succ==='joined' ? "“Sister-in-blood.” Ashmira smiles with all her teeth. “You knelt in our circle. Let me dress you properly underneath, at least. The rest of you can stay as dull as you like.”"
+  : "“The little watcher in the dark.” Ashmira laughs. “You stayed hidden at the feast. Hide something pretty, then. Silk, lace, a thread or two. We never cared much for what goes on top.”"]);
+// Ellin re-sews: the worn piece keeps every stat and is only drawn in another piece's cut; she can unpick it again
+const MOG_SLOTS=['head','torso','armor','cloak','shoulders','hands','legs','feet'], mogCost=id=>20+Math.round((PRICES[unWoven(id)]||30)/5), MOG_UNDO=15;
+const mogOf=id=>(player.opts.mog||{})[id];
+function ellinTalk(){ const E=player.opts.equip, worn=MOG_SLOTS.filter(sl=>E[sl] && ITEMS[E[sl]]);
+  const opts=worn.map(sl=>{ const id=E[sl], m=mogOf(id), nm=ITEMS[id].name;
+    return m ? {label:`Unpick the ${nm} (sewn as ${ITEMS[m].name}).`, note:'-'+formatCoin(MOG_UNDO), off:player.purse<MOG_UNDO, fn:()=>{ player.purse-=MOG_UNDO; delete player.opts.mog[id]; delete player.opts._ck; updateHud(); logMsg(`Ellin unpicks her stitches. Your ${nm} looks like itself again.`,'#e8d0a0'); autosaveSoon(200); ellinTalk(); }}
+      : {label:`Re-sew the ${nm}…`, fn:()=>mogPick(sl,id)}; });
+  say('Ellin the Seamstress',[worn.length ? "Ellin bites off a thread. “Bring me two pieces for the same place on you, and I'll sew the one you wear into the cut of the other. It stays just as good as it was. Only the look changes. If you tire of it, I'll unpick it again for a few coppers.”" : "“Come back wearing something and I'll see what I can do with it.”"],
+    [...opts,{label:'Back.',fn:closeDialog}],true); }
+function mogPick(sl,id){ const have=[...new Set((player.inv||[]).filter(x=>typeof x==='string' && ITEMS[x] && ITEMS[x].slot===sl && unWoven(x)!==unWoven(id)))].filter(x=>!/^(t_)/.test(x)), cost=mogCost(id), nm=ITEMS[id].name;
+  if(!have.length){ say('Ellin the Seamstress',[`“I need something to copy. Carry another piece for the same place as your ${nm}, and I'll cut it to match.”`],[{label:'Back.',fn:ellinTalk}],true); return; }
+  say('Ellin the Seamstress',[`“Which cut should your ${nm} take? You keep the other piece; I only need to look at it.” <i>The ${nm} keeps all its own stats.</i>`],
+    [...have.slice(0,10).map(x=>({label:`Sew it to look like the ${ITEMS[x].name}.`, note:'-'+formatCoin(cost), off:player.purse<cost, fn:()=>{ player.purse-=cost; player.opts.mog=player.opts.mog||{}; player.opts.mog[id]=unWoven(x); delete player.opts._ck; updateHud();
+        try{ drawDoll(); }catch(e){} logMsg(`Ellin re-sews your ${nm}. It looks like the ${ITEMS[x].name} now, and is every bit as good as it was.`,'#e8d0a0'); autosaveSoon(200); ellinTalk(); }})),
+     {label:'Back.',fn:ellinTalk}],true); }
+TALKERS.ellin=ellinTalk;
+wrap('tailorshop','npcs',l=>l.map(n=>n.id==='ellin' ? {...n, name:'Ellin the Seamstress'} : n));
 </script>
 </body>
 </html>

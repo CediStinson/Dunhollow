@@ -6683,7 +6683,11 @@ function genTrees(id){
   const busy=new Set();
   const mark=(i,j,r)=>{ for(let a=-r;a<=r;a++) for(let b=-r;b<=r;b++) busy.add((i+a)+','+(j+b)); };
   OBJECTS.forEach(o=>{ if(o.type==='dapple' || (o.noblock && o.dz!=null && o.dz<-90 && o.type!=='brook')) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) mark(o.i+a,o.j+b,o.noblock?0:(o.fp||['teleporter','house','berrybush','barrel','barrels','crate','crates','chest','pickup','stash'].includes(o.type))?1:0); });   // nothing worth opening is ever grown shut in   // a berry bush keeps room round it to be picked   // flowers, stones, light: no ring kept clear round them
-  NPCS.forEach(n=>mark(n.i,n.j,0)); MOB_SPAWNS.forEach(m=>mark(m.i,m.j,0));   // only the very tile someone stands on: a wider clearing round people made the wood shift whenever they came and went
+  NPCS.forEach(n=>mark(n.i,n.j,0)); MOB_SPAWNS.forEach(m=>mark(m.i,m.j,0));
+  try{ const snap={...CHOICE}; Object.keys(CHOICE).forEach(k=>{ CHOICE[k]=null; });   /* and whatever stood here at the start of the game: a tent struck or a camp gone keeps its clearing, so no trees spring up where it was */
+    try{ (A.objects?A.objects():[]).forEach(o=>{ if(o.type==='dapple' || o.type==='tree' || (o.noblock && o.dz!=null && o.dz<-90 && o.type!=='brook')) return; const [fw,fh]=o.fp||[1,1]; for(let a=0;a<fw;a++) for(let b=0;b<fh;b++) mark(o.i+a,o.j+b,o.noblock?0:(o.fp||['teleporter','house','berrybush','barrel','barrels','crate','crates','chest','pickup','stash'].includes(o.type))?1:0); });
+      (A.npcs?A.npcs():[]).forEach(n=>mark(n.i,n.j,0)); (A.mobs?A.mobs():[]).forEach(m=>mark(m.i,m.j,0)); }
+    finally{ Object.keys(CHOICE).forEach(k=>{ if(!(k in snap)) delete CHOICE[k]; }); Object.assign(CHOICE,snap); } }catch(e){}   // only the very tile someone stands on: a wider clearing round people made the wood shift whenever they came and went
   Object.values(A.entries).forEach(e=>mark(e.i,e.j,1));
   const busyNow=busy; const busy0=new Set(); Object.values(A.entries).forEach(e=>{ for(let a=-1;a<=1;a++) for(let b=-1;b<=1;b++) busy0.add((e.i+a)+','+(e.j+b)); });   // the grove is laid out the same every visit, whoever is about; only then are the trees standing on someone (or something) left out
   for(let j=0;j<A.h;j++) for(let i=0;i<A.w;i++){

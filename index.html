@@ -836,7 +836,7 @@ const WEAPONS = {
   elf_blade:   { wind:0.17, dmg:12, len:26 },
 };
 const weaponOf = e => (e.type==='wolf') ? {wind:0.35,dmg:9} : WEAPONS[(e.opts && e.opts.equip && e.opts.equip.weapon) || 'fists'] || WEAPONS.fists;
-let INV_SIZE = 30;   // a Packling adds to it
+let INV_SIZE = 30;
 function defaultEquip(){ return { head:null, torso:'shirt', armor:null, cloak:null, shoulders:null, hands:null, legs:'trousers', feet:null, weapon:null, offhand:null, neck:null, special:null }; }
 function defaultInv(){
   return Array(INV_SIZE).fill(null);   // the farm gives up its gear reluctantly
@@ -1083,13 +1083,6 @@ function drawCharInner(c,x,B,opts,swing=0,dir=0,pose=null){
     try{ drawCharInner(c,x,B,o2,swing,dir,pose); } finally{ c.restore(); }
     } finally{ c.restore(); }
     } finally{ Object.assign(PROP.m,sv.m); Object.assign(PROP.f,sv.f); } return; }
-  if(opts.race==='cinderveil'){   // tall, gaunt, arms that hang too long, a wrapped tail under the coat: whatever they are, they dress to pass for human
-    const sv={m:{...PROP.m}, f:{...PROP.f}}; ['m','f'].forEach(k=>Object.assign(PROP[k],{limbW:Math.min(PROP[k].limbW,5.8), waistHW:Math.min(PROP[k].waistHW,9.5), chestHW:Math.min(PROP[k].chestHW,12.4)}));   // gaunt in the body; legs left alone so the clothes still fit them
-    const pb=CV_BITS, back=[3,4,5].includes(dir); CV_LONGARM=true; CV_BITS=opts.cvBits??0;
-    c.save(); c.translate(x,B); c.scale(0.9,1.12); c.translate(-x,-B);
-    const nk=unWoven(((opts.equip||{}).neck)||''), scarf=/^cv_scarf/.test(nk) ? ()=>cvScarves(c,x,B,dir,nk==='cv_scarf_grey'?'#5a5650':'#7a2a22') : ()=>{};
-    try{ if(!back && opts.cvPack) cvPack(c,x,B,dir,opts); cvTail(c,x,B,dir,swing,opts); drawCharInner(c,x,B,{...opts,race:'cinderveil_'},swing,dir,pose); scarf(); if(back && opts.cvPack) cvPack(c,x,B,dir,opts); }
-    finally{ c.restore(); Object.assign(PROP.m,sv.m); Object.assign(PROP.f,sv.f); CV_LONGARM=false; CV_BITS=pb; } return; }
   if(opts.race==='elf'){ c.save(); c.translate(x,B); c.scale(0.93,1.055); c.translate(-x,-B);
     try{ drawCharInner(c,x,B,{...opts,race:'elf_'},swing,dir,pose); } finally{ c.restore(); } return; }
   const flip=dirMirrored(dir), view=dirView(dir);
@@ -1097,7 +1090,7 @@ function drawCharInner(c,x,B,opts,swing=0,dir=0,pose=null){
   CUR_POSE=pose; CUR_FLIP=flip;
   try{ drawCharBody(c,x,B,opts,swing,view); } finally{ CUR_POSE=null; CUR_FLIP=false; }
   if(flip) c.restore();
-  { const nk=unWoven(((opts.equip||{}).neck)||''); if(/^cv_scarf/.test(nk) && typeof cvScarves==='function' && !String(opts.race||'').startsWith('cinderveil') && !(opts.hide&&opts.hide.neck)) cvScarves(c,x,B,dir,nk==='cv_scarf_grey'?'#5a5650':'#7a2a22'); }   // the scarves on anyone, not only the Cinderveil
+
 }
 
 // ════════════════════════════════════════════════════════════
@@ -2531,20 +2524,6 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
       c.fillStyle=tone(J,0.08); path([[LN+k*2.6+po,sd-0.8],[LN+k*5.6+po*0.6,sd-0.2],[LN+k*5.2+po*0.6,sd-5],[LN+k*2.4+po,sd-4.8]],1); c.fill(); c.strokeStyle=tone(J,-0.6); c.lineWidth=0.7; c.stroke(); });   // the high collar, turned up
     if(K==='cv_duster_elder') trophies([LN-CH+2,LN-CH+3.8,LN-CH+5.6,LN+CH-4,LN+CH-2.2],sd+8); seaBits('front');
     if(SHORT){ c.fillStyle='#1a181c'; c.fillRect(x+LN-WA-2,B+W0-1.2,WA*2+4,2.6); [[-0.6],[-0.2],[0.25],[0.6]].forEach(([t])=>{ c.fillStyle='#2e2a30'; c.fillRect(x+LN+t*WA*2-1.4,B+W0-0.6,2.8,3.2); }); }   // a belt of pockets
-  }
-  // ── the tinker's harness: two straps crossed over the chest through a brass gauge, a belt of pouches, a wrench and an oil can
-  function drawCVHarness(){ const sd=Y.SHOULDER, W0=Y.WAIST, LE='#2a1e14', LB='#5a3e26', BRS='#b08a3a', cx=LN+po*0.9, side=pr>0.75;
-    const strap=(pts,w)=>{ c.lineCap='round'; c.strokeStyle=LE; c.lineWidth=w+0.7; c.beginPath(); pts.forEach(([a,b2],k)=>k?c.lineTo(x+a,B+b2):c.moveTo(x+a,B+b2)); c.stroke(); c.strokeStyle=LB; c.lineWidth=w; c.stroke(); };
-    const pouch=(px,py,w,h)=>{ c.fillStyle=LE; c.fillRect(x+px-0.4,B+py-0.4,w+0.8,h+0.8); c.fillStyle=LB; c.fillRect(x+px,B+py,w,h); c.fillStyle=tone(LB,0.15); c.fillRect(x+px,B+py,w,h*0.35); c.fillStyle=BRS; c.fillRect(x+px+w/2-0.4,B+py+h*0.3,0.8,0.8); };
-    if(side){ strap([[LN+CH*0.3,sd],[LN-WA*0.2,W0-1]],1.6); strap([[LN-WA-1,W0+1],[LN+WA+1,W0+1]],2); pouch(LN-1.8,W0+2,3.6,3.4);
-      c.strokeStyle='#5a3e26'; c.lineWidth=1; c.beginPath(); c.moveTo(x+LN+WA*0.6,B+W0+2); c.lineTo(x+LN+WA*0.7,B+W0+10); c.stroke(); c.fillStyle='#4a4642'; c.fillRect(x+LN+WA*0.7-2,B+W0+9.2,4,1.8); return; }
-    if(!front){ strap([[LN-CH*0.6,sd],[LN+WA*0.7,W0-1]],1.6); strap([[LN+CH*0.6,sd],[LN-WA*0.7,W0-1]],1.6); strap([[LN-WA-1,W0+1],[LN+WA+1,W0+1]],2); pouch(LN-2.4,W0+2,4.8,4); return; }
-    strap([[LN-CH*0.66+po,sd],[cx,sd+9],[LN+WA*0.8,W0]],1.6); strap([[LN+CH*0.66+po,sd],[cx,sd+9],[LN-WA*0.8,W0]],1.6);
-    c.fillStyle=LE; c.beginPath(); c.arc(x+cx,B+sd+9,2.7,0,Math.PI*2); c.fill(); c.fillStyle=BRS; c.beginPath(); c.arc(x+cx,B+sd+9,2.2,0,Math.PI*2); c.fill();
-    c.strokeStyle='#5a4010'; c.lineWidth=0.4; c.beginPath(); for(let k=0;k<4;k++){ const a=k*Math.PI/2; c.moveTo(x+cx,B+sd+9); c.lineTo(x+cx+Math.cos(a)*1.9,B+sd+9+Math.sin(a)*1.9); } c.stroke(); c.beginPath(); c.arc(x+cx,B+sd+9,1.1,0,Math.PI*2); c.stroke();   // a brass compass-sigil, its arms engraved
-    strap([[LN-WA-1.2,W0+1],[LN+WA+1.2,W0+1]],2.2); [-0.7,-0.25,0.3].forEach(t=>pouch(LN+t*WA*1.6-1.8,W0+2.2,3.6,3.6));
-    c.strokeStyle='#5a3e26'; c.lineWidth=1; c.beginPath(); c.moveTo(x+LN+WA*0.85,B+W0+2); c.lineTo(x+LN+WA*0.9,B+W0+10); c.stroke(); c.fillStyle='#4a4642'; c.fillRect(x+LN+WA*0.9-2,B+W0+9.2,4,1.8); c.fillStyle='#7a7670'; c.fillRect(x+LN+WA*0.9-2,B+W0+9.2,4,0.6);   // a smith's hammer, hanging head down
-    c.fillStyle='#4a3020'; c.beginPath(); c.ellipse(x+LN-WA*0.95,B+W0+4.6,1.7,2.4,0,0,Math.PI*2); c.fill(); c.fillStyle='#2a1a10'; c.fillRect(x+LN-WA*0.95-0.5,B+W0+1.2,1,1.6); c.strokeStyle='#6a5030'; c.lineWidth=0.3; c.beginPath(); c.moveTo(x+LN-WA*0.95-1.5,B+W0+4); c.lineTo(x+LN-WA*0.95+1.5,B+W0+4); c.stroke();   // a leather flask
   }
   function drawApron(){                                  // a smith's apron: a heavy leather bib on a neck strap, tied at the waist, falling to the knee
     const J=GEAR.jerkin, top=Y.SHOULDER+(F?7:4), knee=Y.KNEE+1.5;
@@ -4215,7 +4194,6 @@ function drawCharBody(c, x, B, opts, swing=0, view=0){
   const NSH=(E.armor==='robe' && vA==='necro_robe' && !('shoulders' in E)) || (E.shoulders && unWoven(E.shoulders)==='bone_pauldron');   // the fen-witch's feathered shawl belongs to the skull pauldron now; Vesna, with no shoulder slot, keeps it on her robe
   if(NSH) drawNecroShawl();
   { const HVp=E.armor==='mail' && !('shoulders' in E) ? ({anvil_plate:'anvil',delver_lamellar:'delver',rune_plate:'rune'})[vA] : null; if(HVp) drawPauldrons(HVp, pr>0.3 && pr<=0.8 ? 'near' : 'both'); }
-  if(unWoven(E.shoulders||'')==='cv_harness') drawCVHarness();
   if(CLOAK){
     if(!front){ heldOff(); cloakBack(true); }   // from behind the off hand hangs under the cloak: draw what it holds first, so the cloak covers it
     else if(CKL.ember){ if(pr<0.9) emberChoker(); }
@@ -5220,140 +5198,9 @@ function drawHead(c, x, B, opts, view=0){
 
 // Headgear is drawn in head space (same LN lean as the face).
 var HG_F=false;   // whether the head being dressed is a woman's (set by the caller)
-// ════════ CINDERVEIL masks: every one hand-built from scrap; the face beneath is never shown ════════
-const CV_MASKS=new Set(['cv_mask_weld','cv_mask_resp','cv_mask_elder','cv_mask_plain','cv_helm_suit']);
-function drawCVMask(c,x,B,kind,P,view,LN){
-  const Y=BODY, V=VIEW[view], HW=P.headHW, pr=V.prof, front=V.turn>-0.25, side=pr>0.8, TOP=Y.SKULL_TOP, LINE=Y.HAIRLINE;
-  const sx=side?0.5:(1-pr*0.4), fx=LN+(side?HW*0.62:faceOff(pr)), ey=Y.EYE_TOP+1.4;
-  const IRON='#3e3a36', IRD='#1e1c1a', BR='#b08a3a', BRD='#6e5420', CU='#a8603a';
-  const P2=(pts)=>{ c.beginPath(); pts.forEach(([a,b2],k)=>k?c.lineTo(x+a,B+b2):c.moveTo(x+a,B+b2)); c.closePath(); };
-  const dot=(a,b2,r,col)=>{ c.fillStyle=col; c.beginPath(); c.arc(x+a,B+b2,r,0,Math.PI*2); c.fill(); };
-  const lens=(a,b2,r,glass,rim)=>{ dot(a,b2,r+0.75,IRD); dot(a,b2,r+0.45,rim||BR); dot(a,b2,r,IRD); const g2=c.createRadialGradient(x+a-r*0.3,B+b2-r*0.3,0.2,x+a,B+b2,r); g2.addColorStop(0,'#fff6d8'); g2.addColorStop(0.35,glass); g2.addColorStop(1,tone(glass,-0.55)); c.fillStyle=g2; c.beginPath(); c.arc(x+a,B+b2,r*0.82,0,Math.PI*2); c.fill(); };
-  const rivets=(pts,col)=>pts.forEach(([a,b2])=>{ dot(a,b2,0.42,IRD); dot(a-0.1,b2-0.1,0.28,col||'#c8b080'); });
-  // the hood-wrap behind every mask but the suit's dome
-  if(kind!=='cv_helm_suit'){ const W=HW+1.0, nk=Y.CHIN+1.2, CHc=P.chestHW*V.sw*0.55, hem=Y.SHOULDER+0.6, WR=kind==='cv_mask_elder'?'#5a3a2a':kind==='cv_mask_plain'?'#26242a':'#4a4038';
-    c.beginPath(); c.moveTo(x+LN-W+1,B+nk); c.lineTo(x+LN-W-0.3,B+Y.CHIN-6); const pk=side?(front?-2.4:2.4):(front?-0.6:0.6); c.bezierCurveTo(x+LN-W-0.4,B+TOP+1,x+LN-W*0.7,B+TOP-1.2,x+LN+pk-1.4,B+TOP-2.2); c.quadraticCurveTo(x+LN+pk,B+TOP-4.2,x+LN+pk+1.4,B+TOP-2.2); c.bezierCurveTo(x+LN+W*0.7,B+TOP-1.2,x+LN+W+0.4,B+TOP+1,x+LN+W+0.3,B+Y.CHIN-6);
-    c.lineTo(x+LN+W-1,B+nk); c.quadraticCurveTo(x+LN+CHc-1,B+nk+1.4,x+LN+CHc,B+hem); c.quadraticCurveTo(x+LN,B+hem+2,x+LN-CHc,B+hem); c.quadraticCurveTo(x+LN-CHc+1,B+nk+1.4,x+LN-W+1,B+nk); c.closePath();
-    const wg=c.createLinearGradient(x+LN-W,0,x+LN+W,0); wg.addColorStop(0,tone(WR,0.18)); wg.addColorStop(1,tone(WR,-0.35)); c.fillStyle=wg; c.fill(); c.strokeStyle=tone(WR,-0.6); c.lineWidth=0.8; c.stroke();
-    c.strokeStyle=tone(WR,-0.3,0.7); c.lineWidth=0.4; [[-0.55,TOP+1,-0.7,Y.CHIN],[0.5,TOP+0.5,0.66,Y.CHIN-1],[-0.2,Y.CHIN+1,-0.35,hem]].forEach(([k,y0,k2,y1])=>{ c.beginPath(); c.moveTo(x+LN+k*W,B+y0); c.quadraticCurveTo(x+LN+(k+k2)*W*0.6,B+(y0+y1)/2,x+LN+k2*W,B+y1); c.stroke(); });
-    { const pk=side?(front?-2.4:2.4):(front?-0.6:0.6); c.strokeStyle=tone(WR,-0.45,0.8); c.lineWidth=0.5; c.beginPath(); c.moveTo(x+LN+pk,B+TOP-3.6); c.quadraticCurveTo(x+LN+pk*0.4,B+TOP+3,x+LN+(front?pk*0.2:0),B+(front?LINE-1:Y.CHIN)); c.stroke(); }   // the seam up the cowl to its peak
-    if(front){ c.strokeStyle=tone(WR,-0.55); c.lineWidth=1.3; c.beginPath(); c.ellipse(x+fx-(side?0.8:0),B+ey+1.2,side?HW*0.5:HW*0.84*(1-pr*0.25),HW*0.98,0,0,Math.PI*2); c.stroke(); c.strokeStyle=tone(WR,0.2,0.8); c.lineWidth=0.5; c.beginPath(); c.ellipse(x+fx-(side?0.8:0),B+ey+1.2,(side?HW*0.5:HW*0.84*(1-pr*0.25))+0.9,HW*0.98+0.9,0,0,Math.PI*2); c.stroke(); }   // the rim of the cowl round the face
-    if(!front){ c.strokeStyle='#2a2420'; c.lineWidth=1; c.beginPath(); c.moveTo(x+LN-W+0.6,B+ey+0.4); c.lineTo(x+LN+W-0.6,B+ey+0.4); c.stroke(); c.fillStyle=BR; c.fillRect(x+LN-1,B+ey-0.6,2,2); return; } }   // from behind: the mask's strap and buckle
-  const K=HW*0.14; c.save(); c.translate(x+fx,B+ey); c.scale(K,K); c.translate(-(x+fx),-(B+ey));
-  if(kind==='cv_helm_suit'){ c.restore(); c.save(); }   // the helm is sized to the head already
-  if(kind==='cv_mask_weld'){   // the welder's face: a flat riveted plate, two round amber lenses, a grille at the mouth, a filter on the cheek
-    const L=fx-5.2*sx, R=fx+5.2*sx, t=ey-4.4, b=ey+6.4;
-    P2([[L,t+1.2],[L+1.2,t],[R-1.2,t],[R,t+1.2],[R-0.4,b-1.4],[fx,b],[L+0.4,b-1.4]]); const g2=c.createLinearGradient(x+L,0,x+R,0); g2.addColorStop(0,'#5a5450'); g2.addColorStop(0.5,IRON); g2.addColorStop(1,IRD); c.fillStyle=g2; c.fill(); c.strokeStyle=IRD; c.lineWidth=0.8; c.stroke();
-    c.strokeStyle=BRD; c.lineWidth=0.45; P2([[L+0.7,t+1.4],[L+1.4,t+0.7],[R-1.4,t+0.7],[R-0.7,t+1.4],[R-1,b-1.8],[fx,b-0.6],[L+1,b-1.8]]); c.stroke();
-    [-1,1].forEach(k=>{ if(side && k<0) return; lens(fx+k*2.3*sx,ey+0.4,1.8,'#e8a040'); });
-    for(let k=0;k<4;k++){ c.fillStyle=IRD; c.fillRect(x+fx-2.4*sx,B+Y.MOUTH-1.4+k*1.05,4.8*sx,0.5); }
-    rivets([[L+0.9,t+1.6],[R-0.9,t+1.6],[L+1.1,b-2.4],[R-1.1,b-2.4],[fx,t+0.9]]);
-    if(!side){ const cx2=R+0.9, cy2=Y.MOUTH; c.fillStyle=BRD; c.fillRect(x+cx2-1.2,B+cy2-1.6,2.4,3.2); c.fillStyle=BR; c.fillRect(x+cx2-1.0,B+cy2-1.4,2.0,0.6); c.fillRect(x+cx2-1.0,B+cy2+0.6,2.0,0.5); } }
-  else if(kind==='cv_mask_resp'){   // the salvager's rig: brass goggles on a strap, a leather snout with two filter cans
-    { const hw=(HW+1.1)/K, l=fx+(LN-fx)/K; c.strokeStyle='#2a2420'; c.lineWidth=1.4/K*1.6; c.beginPath(); c.moveTo(x+l-hw,B+ey+0.3); c.lineTo(x+l+hw,B+ey+0.3); c.stroke(); }
-    [-1,1].forEach(k=>{ if(side && k<0) return; lens(fx+k*2.5*sx,ey+0.2,2.0,'#7aa890'); });
-    if(!side) { c.fillStyle=BR; c.fillRect(x+fx-0.7,B+ey-0.2,1.4,0.8); }
-    const t=ey+2.6, b=ey+6.6; P2([[fx-3.6*sx,t],[fx+3.6*sx,t],[fx+4.2*sx,b-1.6],[fx,b],[fx-4.2*sx,b-1.6]]); c.fillStyle='#4a3a2c'; c.fill(); c.strokeStyle='#1e1612'; c.lineWidth=0.7; c.stroke();
-    dot(fx,(t+b)/2,1.5,IRD); dot(fx,(t+b)/2,1.15,'#6a6058'); c.strokeStyle=IRD; c.lineWidth=0.3; for(let k=-1;k<=1;k++){ c.beginPath(); c.moveTo(x+fx+k*0.6,B+(t+b)/2-1); c.lineTo(x+fx+k*0.6,B+(t+b)/2+1); c.stroke(); }
-    [-1,1].forEach(k=>{ if(side && k<0) return; const cx2=fx+k*4.1*sx, cy2=b-1.4; c.save(); c.translate(x+cx2,B+cy2); c.rotate(k*0.5); c.fillStyle=IRD; c.fillRect(-1.4,-1.8,2.8,3.6); c.fillStyle='#7a7068'; c.fillRect(-1.1,-1.6,2.2,3.2); c.fillStyle=BR; c.fillRect(-1.2,-1.8,2.4,0.6); c.fillRect(-1.2,1.2,2.4,0.6); c.restore(); }); }
-  else if(kind==='cv_mask_elder'){   // an elder's mask: brass grown over with a lifetime's patches, a crest of gear-teeth, a big lens and a small one, trophies on chains
-    const t=ey-5.6, b=ey+6.6, w=5.8*sx;
-    for(let k=0;k<9;k++){ const a=Math.PI*(0.08+k*0.105), rr=w+2.2; c.save(); c.translate(x+fx+Math.cos(a)*rr*(k%2?1:0.96)*(-1),B+t+3-Math.sin(a)*rr*0.7); c.rotate(-a+Math.PI/2); c.fillStyle=k%2?BR:BRD; c.fillRect(-0.7,-1.4,1.4,2.2); c.restore(); }   // the crest
-    c.beginPath(); c.ellipse(x+fx,B+(t+b)/2,w,(b-t)/2,0,0,Math.PI*2); const g2=c.createLinearGradient(x+fx-w,0,x+fx+w,0); g2.addColorStop(0,'#e0bc6a'); g2.addColorStop(0.45,BR); g2.addColorStop(1,BRD); c.fillStyle=g2; c.fill(); c.strokeStyle='#4a3410'; c.lineWidth=0.8; c.stroke();
-    c.save(); c.beginPath(); c.ellipse(x+fx,B+(t+b)/2,w,(b-t)/2,0,0,Math.PI*2); c.clip();
-      [[fx-w*0.9,t+6,3.2,3.4,CU],[fx+w*0.2,b-4.2,3.6,2.6,IRON],[fx+w*0.45,t+1.6,2.6,2.4,'#8a8a86']].forEach(([a,b2,pw,ph,col])=>{ c.fillStyle=col; c.fillRect(x+a,B+b2,pw,ph); c.strokeStyle=tone(col,-0.5); c.lineWidth=0.35; c.strokeRect(x+a,B+b2,pw,ph); rivets([[a+0.5,b2+0.5],[a+pw-0.5,b2+0.5],[a+0.5,b2+ph-0.5],[a+pw-0.5,b2+ph-0.5]],'#e8d8a8'); });
-    c.restore();
-    if(!side) lens(fx-2.4*sx,ey,2.3,'#d8483a'); lens(fx+2.6*sx,ey+0.3,1.4,'#d8483a');
-    c.fillStyle='#2a1a0a'; c.fillRect(x+fx-2*sx,B+Y.MOUTH,4*sx,0.7);
-    [[-1.6,3,'#e8e0c8'],[0,4.2,BR],[1.8,2.6,'#e8e0c8']].forEach(([dx,l,col])=>{ const a=fx+dx*sx; c.strokeStyle='#6a5a3a'; c.lineWidth=0.3; c.beginPath(); c.moveTo(x+a,B+b-0.6); c.lineTo(x+a,B+b+l-1); c.stroke(); dot(a,b+l-0.6,0.6,col); }); }   // a tooth, a coin, a tooth
-  else if(kind==='cv_mask_plain'){   // a thief's mask: smooth blackened iron, two slits, nothing to remember it by
-    const t=ey-5, b=ey+6, w=5.2*sx;
-    c.beginPath(); c.ellipse(x+fx,B+(t+b)/2,w,(b-t)/2,0,0,Math.PI*2); const g2=c.createRadialGradient(x+fx-w*0.4,B+t+3,0.5,x+fx,B+(t+b)/2,w*1.4); g2.addColorStop(0,'#5a5660'); g2.addColorStop(0.5,'#2c2a2e'); g2.addColorStop(1,'#141216'); c.fillStyle=g2; c.fill(); c.strokeStyle='#0a080a'; c.lineWidth=0.7; c.stroke();
-    [-1,1].forEach(k=>{ if(side && k<0) return; c.fillStyle='#080608'; c.beginPath(); c.ellipse(x+fx+k*2.2*sx,B+ey+0.3,1.5*sx+0.3,0.55,k*0.12,0,Math.PI*2); c.fill(); c.fillStyle='rgba(230,90,60,0.55)'; c.beginPath(); c.ellipse(x+fx+k*2.2*sx,B+ey+0.3,0.7*sx+0.15,0.25,0,0,Math.PI*2); c.fill(); });
-    c.strokeStyle='rgba(255,255,255,0.12)'; c.lineWidth=0.4; c.beginPath(); c.moveTo(x+fx-w*0.6,B+t+2); c.quadraticCurveTo(x+fx-w*0.9,B+(t+b)/2,x+fx-w*0.5,B+b-2); c.stroke(); }
-  else if(kind==='cv_helm_suit'){   // the suit's helm: close riveted iron, a long vented beak of a respirator, two round lenses, a neck-guard of lames
-    const R=HW+1.2, top=TOP-1.2, bot=Y.CHIN+1, IR2='#4a4642';
-    const shell=()=>{ c.beginPath(); c.moveTo(x+LN-R-0.6,B+bot); c.bezierCurveTo(x+LN-R-0.4,B+bot-8,x+LN-R+0.2,B+top+4,x+LN-R*0.62,B+top+0.6); c.quadraticCurveTo(x+LN,B+top-3.4,x+LN+R*0.62,B+top+0.6); c.bezierCurveTo(x+LN+R-0.2,B+top+4,x+LN+R+0.4,B+bot-8,x+LN+R+0.6,B+bot); c.quadraticCurveTo(x+LN,B+bot+2.4,x+LN-R-0.6,B+bot); c.closePath(); };
-    for(let k=0;k<3;k++){ const yy=bot+0.6+k*1.6, w=R+0.6+k*0.9; c.fillStyle=k%2?'#3a3632':IR2; c.beginPath(); c.ellipse(x+LN,B+yy,w,1.8,0,0,Math.PI); c.lineTo(x+LN-w,B+yy); c.fill(); c.strokeStyle=IRD; c.lineWidth=0.5; c.stroke(); }   // the neck-guard lames
-    shell(); const hg=c.createLinearGradient(x+LN-R,0,x+LN+R,0); hg.addColorStop(0,'#7a746c'); hg.addColorStop(0.4,IR2); hg.addColorStop(1,'#1e1c1a'); c.fillStyle=hg; c.fill(); c.strokeStyle=IRD; c.lineWidth=0.9; c.stroke();
-    c.save(); shell(); c.clip(); c.fillStyle='#2e2a26'; c.fillRect(x+LN-R,B+top+3.6,R*2,1.4); c.strokeStyle='rgba(255,255,255,0.18)'; c.lineWidth=0.8; c.beginPath(); c.moveTo(x+LN-R*0.55,B+top+1); c.lineTo(x+LN-R*0.62,B+bot-2); c.stroke(); c.restore();
-    rivets([[LN-R+1.2,top+4.3],[LN-R*0.4,top+4.3],[LN+R*0.4,top+4.3],[LN+R-1.2,top+4.3],[LN-R+1.2,bot-1],[LN+R-1.2,bot-1]]);
-    if(front){ c.save(); c.translate(x+fx,B+ey); c.scale(K,K); c.translate(-(x+fx),-(B+ey)); const bx=fx, by=ey+1.6, dir=side?1:(pr>0.3?0.55:0), bl=side?9:6.2, bw=3.4;
-      [-1,1].forEach(k=>{ if(side && k<0) return; lens(bx+k*(side?0:2.9*sx)-(side?1.2:0),ey-0.6,1.9,'#e8a040'); });
-      const tip=[bx+dir*bl, by+5.6-(side?1.2:0)];   // the beak: a tapered vented snout from the face down and out
-      c.beginPath(); c.moveTo(x+bx-bw*sx,B+by); c.lineTo(x+bx+bw*sx+(side?1.4:0),B+by); c.quadraticCurveTo(x+tip[0]+1.6,B+tip[1]-2.4,x+tip[0],B+tip[1]); c.quadraticCurveTo(x+tip[0]-2.2,B+tip[1]-1.6,x+bx-bw*sx,B+by+0.2); c.closePath();
-      const bg=c.createLinearGradient(x+bx-bw,B+by,x+tip[0],B+tip[1]); bg.addColorStop(0,'#6e6860'); bg.addColorStop(1,'#2a2622'); c.fillStyle=bg; c.fill(); c.strokeStyle=IRD; c.lineWidth=0.7; c.stroke();
-      c.strokeStyle=IRD; c.lineWidth=0.35; for(let t=0.2;t<0.85;t+=0.17){ const ax=bx+(tip[0]-bx)*t, ay=by+(tip[1]-by)*t; c.beginPath(); c.moveTo(x+ax-(1-t)*bw*sx*0.8,B+ay-0.2); c.lineTo(x+ax+(1-t)*bw*sx*0.8,B+ay+0.3); c.stroke(); }   // vents along it
-      c.fillStyle=BR; c.fillRect(x+bx-bw*sx-0.2,B+by-0.4,(bw*2*sx)+0.4+(side?1.4:0),0.9); dot(tip[0],tip[1],0.7,BRD); c.restore(); }
-    else { c.fillStyle=BR; c.fillRect(x+LN-1,B+top+3.4,2,2); }
-  }
-  if(kind!=='cv_helm_suit' && CV_BITS) cvFittings(c,x,B,fx,ey,sx,side,CV_BITS);
-  c.restore();
-}
-let CV_LONGARM=false, CV_BITS=0;
-// what each Cinderveil has bolted to their mask: no two alike (bits pick up to three)
-function cvFittings(c,x,B,fx,ey,sx,side,bits){
-  const BR='#b08a3a', BRD='#6e5420', IRD='#1e1c1a', CU='#a8603a';
-  const dot=(a,b2,r,col)=>{ c.fillStyle=col; c.beginPath(); c.arc(x+a,B+b2,r,0,Math.PI*2); c.fill(); };
-  const line=(pts,col,w)=>{ c.strokeStyle=col; c.lineWidth=w; c.lineCap='round'; c.beginPath(); pts.forEach(([a,b2],k)=>k?c.lineTo(x+a,B+b2):c.moveTo(x+a,B+b2)); c.stroke(); };
-  const pick=[]; for(let k=0;k<9 && pick.length<3;k++) if((bits>>k)&1) pick.push(k);
-  pick.forEach(k=>{
-    if(k===0) [-1,1].forEach(sd=>{ if(side && sd<0) return; const a=fx+sd*5.4*sx; c.fillStyle=BRD; c.beginPath(); c.moveTo(x+a,B+ey-1); c.lineTo(x+a+sd*3.6,B+ey-3.2); c.lineTo(x+a+sd*3.6,B+ey+2.6); c.lineTo(x+a,B+ey+1); c.closePath(); c.fill(); c.fillStyle=BR; c.beginPath(); c.ellipse(x+a+sd*3.6,B+ey-0.3,0.9,2.9,0,0,Math.PI*2); c.fill(); dot(a+sd*3.6,ey-0.3,0.5,IRD); });   // ear-trumpets
-    else if(k===1) [[3.6,-4.6,0.5,7],[2.4,-4.9,0.2,6],[4.6,-4.2,0.85,5.6]].forEach(([dx,dy,a,l])=>{ c.save(); c.translate(x+fx+dx*sx,B+ey+dy); c.rotate(a); c.fillStyle='#1a1a20'; c.beginPath(); c.moveTo(0,0); c.quadraticCurveTo(1.3,-l*0.5,0.2,-l); c.quadraticCurveTo(-1.1,-l*0.5,0,0); c.fill(); c.strokeStyle='#4a4a5a'; c.lineWidth=0.25; c.beginPath(); c.moveTo(0,0); c.lineTo(0.15,-l*0.9); c.stroke(); c.restore(); });   // a crest of crow feathers
-    else if(k===2){ const a=fx-5.6*sx, b2=ey-3; c.fillStyle=IRD; c.fillRect(x+a-1.4,B+b2-1.4,2.8,2.8); dot(a,b2,1.1,'#ffd880'); const g=c.createRadialGradient(x+a,B+b2,0,x+a,B+b2,6); g.addColorStop(0,'rgba(255,210,120,0.55)'); g.addColorStop(1,'rgba(255,210,120,0)'); c.fillStyle=g; c.beginPath(); c.arc(x+a,B+b2,6,0,Math.PI*2); c.fill(); }   // a temple lamp
-    else if(k===3){ line([[fx+5*sx,ey-4.2],[fx+4.6*sx,ey-2.2]],BRD,0.6); dot(fx+3.8*sx,ey-1.2,1.6,BRD); dot(fx+3.8*sx,ey-1.2,1.15,'#7ad0a0'); dot(fx+3.4*sx,ey-1.6,0.35,'#ffffff'); }   // a swing-down loupe
-    else if(k===4){ const pts=[]; for(let t=0;t<=1;t+=0.1) pts.push([fx+2*sx+t*7*sx+Math.sin(t*3)*1.2, ey+5.4+t*5]); line(pts,IRD,1.7); line(pts,'#5a5048',1.1); pts.forEach(([a,b2],i)=>{ if(i%2) dot(a,b2,0.55,'#7a7068'); }); }   // a breathing hose
-    else if(k===5) for(let i=0;i<4;i++){ const b2=ey-5.2-i*1.5; c.fillStyle=IRD; c.beginPath(); c.moveTo(x+fx-0.8,B+b2+0.4); c.lineTo(x+fx,B+b2-1.3); c.lineTo(x+fx+0.8,B+b2+0.4); c.fill(); dot(fx,b2,0.4,'#c8b080'); }   // a crest of bolts
-    else if(k===6){ c.save(); c.globalAlpha=0.8; c.strokeStyle=(bits>>9)&1?'#e8e4d8':'#b02a22'; c.lineWidth=1.1; c.beginPath(); c.moveTo(x+fx-4*sx,B+ey-3.6); c.lineTo(x+fx+3.6*sx,B+ey+5); c.stroke(); c.lineWidth=0.6; c.beginPath(); c.moveTo(x+fx-2.6*sx,B+ey-4.4); c.lineTo(x+fx+4.4*sx,B+ey+3.4); c.stroke(); c.restore(); }   // war paint
-    else if(k===7) [-1.6,0,1.6].forEach((dx,i)=>{ const a=fx+dx*sx; line([[a,ey+6],[a,ey+7.6+i*0.6]],'#6a5a3a',0.25); c.fillStyle=i===1?CU:'#8a8a86'; c.fillRect(x+a-0.7,B+ey+7.6+i*0.6,1.4,1.8); });   // stamped tags
-    else if(k===8){ c.fillStyle=IRD; c.fillRect(x+fx-1.6*sx-0.8,B+ey-10,1.6,4.4); c.fillStyle=BRD; c.fillRect(x+fx-1.6*sx-1.1,B+ey-10.4,2.2,0.8); [0,1,2].forEach(i=>{ c.fillStyle=`rgba(200,196,190,${0.45-i*0.12})`; c.beginPath(); c.arc(x+fx-1.6*sx+i*0.8,B+ey-11.6-i*1.8,0.9+i*0.6,0,Math.PI*2); c.fill(); }); }   // a little chimney
-  }); }
-// the ember-pot: a banded iron brazier carried on the back, smouldering under a pierced lid, a stitched leather tube over the shoulder to the mask
-function cvPack(c,x,B,dir,opts){ const flip=dirMirrored(dir), v=dirView(dir), s=flip?-1:1, V=VIEW[v], Y=BODY, L=V.lean, sd=Y.SHOULDER;
-  const bx= v===0 ? 0 : v===1 ? -4 : v===2 ? -9 : v===3 ? -3 : 0, front=v<=2, W=v===2?5.4:8, top=sd-4, bot=Y.WAIST-3, X=x+s*(L+bx), mid=(top+bot)/2;
-  c.save();
-  c.beginPath(); c.moveTo(X-W*0.8,B+top); c.quadraticCurveTo(X-W*1.15,B+mid,X-W*0.85,B+bot); c.lineTo(X+W*0.85,B+bot); c.quadraticCurveTo(X+W*1.15,B+mid,X+W*0.8,B+top); c.closePath();   // a squat, bellied pot
-  const g=c.createLinearGradient(X-W,0,X+W,0); g.addColorStop(0,'#6a625a'); g.addColorStop(0.45,'#3a3632'); g.addColorStop(1,'#141210'); c.fillStyle=g; c.fill(); c.strokeStyle='#0e0c0a'; c.lineWidth=0.9; c.stroke();
-  c.fillStyle='#6e5420'; [top+1.6,mid,bot-2.2].forEach(yy=>{ const w2=yy===mid?W*1.12:W*0.92; c.fillRect(X-w2,B+yy-0.6,w2*2,1.3); });   // iron hoops, brass-bright where they rub
-  if(!front){ c.fillStyle='#1a120c'; for(let k=-1;k<=1;k++){ c.beginPath(); c.arc(X+k*W*0.45,B+mid+3,0.9,0,Math.PI*2); c.fill(); c.fillStyle='rgba(255,140,50,0.85)'; c.beginPath(); c.arc(X+k*W*0.45,B+mid+3,0.55,0,Math.PI*2); c.fill(); c.fillStyle='#1a120c'; } }   // the ember-glow through its piercings
-  c.fillStyle='#2a2622'; c.beginPath(); c.moveTo(X-W*0.85,B+top+0.4); c.lineTo(X,B+top-4.4); c.lineTo(X+W*0.85,B+top+0.4); c.closePath(); c.fill(); c.strokeStyle='#0e0c0a'; c.stroke();   // its pierced conical lid
-  c.fillStyle='rgba(255,140,50,0.7)'; [-0.4,0,0.4].forEach(t=>{ c.beginPath(); c.arc(X+t*W,B+top-1.2,0.45,0,Math.PI*2); c.fill(); });
-  [0,1,2].forEach(i=>{ c.fillStyle=`rgba(170,164,156,${0.45-i*0.12})`; c.beginPath(); c.arc(X+i*1.2*s,B+top-6-i*2.8,1.4+i*0.9,0,Math.PI*2); c.fill(); });
-  if(!front){ c.strokeStyle='#2a1e14'; c.lineWidth=1.4; [-1,1].forEach(k=>{ c.beginPath(); c.moveTo(X+k*W*0.7,B+top+1); c.lineTo(X+k*(W+2.6),B+sd-1); c.stroke(); c.beginPath(); c.moveTo(X+k*W*0.8,B+bot-1); c.lineTo(X+k*(W+2),B+bot+2); c.stroke(); }); }   // the carrying straps
-  if(v<=2){ const p0=[X+s*(W*0.5),B+top-1], p1=[x+s*(L+(v===2?2:9)),B+sd-9], p2=[x+s*(L+(v===2?6:4)),B+sd-3];
-    c.strokeStyle='#2a1a10'; c.lineWidth=2.4; c.beginPath(); c.moveTo(...p0); c.quadraticCurveTo(...p1,...p2); c.stroke(); c.strokeStyle='#6a4a2c'; c.lineWidth=1.5; c.stroke();
-    c.strokeStyle='#c8b080'; c.lineWidth=0.35; c.setLineDash([0.6,0.7]); c.beginPath(); c.moveTo(...p0); c.quadraticCurveTo(...p1,...p2); c.stroke(); c.setLineDash([]); }   // a stitched leather tube over the shoulder
-  c.restore(); }
-// scarves, wound high round the hood's neck and over the shoulders, one end hanging
-function cvScarves(c,x,B,dir,col){ const flip=dirMirrored(dir), v=dirView(dir), s=flip?-1:1, V=VIEW[v], Y=BODY, L=V.lean, sd=Y.SHOULDER, front=v<=2, side=v===2;
-  const X=x+s*L, w=side?7:11;
-  c.save(); c.lineCap='round';
-  for(let k=0;k<3;k++){ const yy=sd-1.2+k*1.8, ww=w+1.2-k*0.8; c.fillStyle=tone(col,k===1?0.08:-0.1); c.beginPath(); c.ellipse(X,B+yy,ww,2.6,0,0,Math.PI*2); c.fill(); c.strokeStyle=tone(col,-0.5); c.lineWidth=0.6; c.stroke(); c.strokeStyle=tone(col,0.2,0.6); c.lineWidth=0.4; c.beginPath(); c.ellipse(X,B+yy-0.8,ww*0.7,1.2,0,Math.PI*1.1,Math.PI*1.9); c.stroke(); }
-  const end=front ? [[X+s*(side?3:4),B+sd+2],[X+s*(side?5:6),B+sd+10],[X+s*(side?4:5.4),B+sd+17]] : [[X-s*2,B+sd+2],[X-s*3,B+sd+11],[X-s*1,B+sd+19]];   // one end hangs: over the chest in front, down the back behind
-  c.strokeStyle=tone(col,-0.5); c.lineWidth=5.6; c.beginPath(); c.moveTo(end[0][0],end[0][1]); c.quadraticCurveTo(end[1][0],end[1][1],end[2][0],end[2][1]); c.stroke(); c.strokeStyle=col; c.lineWidth=4.4; c.stroke();
-  c.strokeStyle=tone(col,0.25,0.6); c.lineWidth=0.5; [ -1,1].forEach(o=>{ c.beginPath(); c.moveTo(end[0][0]+o,end[0][1]); c.quadraticCurveTo(end[1][0]+o,end[1][1],end[2][0]+o,end[2][1]); c.stroke(); });
-  c.strokeStyle=tone(col,-0.2); c.lineWidth=0.5; for(let i=-2;i<=2;i++){ c.beginPath(); c.moveTo(end[2][0]+i*0.8,end[2][1]); c.lineTo(end[2][0]+i*0.9,end[2][1]+2.6); c.stroke(); }   // the fringe
-  c.restore(); }
-// the tail they keep wrapped and hidden under the coat: bound in cloth strips, capped in brass
-function cvTail(c,x,B,dir,swing,opts){ const flip=dirMirrored(dir), v=dirView(dir), s=flip?-1:1, sw=Math.sin((swing||0)*1.3)*1.5;
-  const P0= v===0 ? [[3,-14],[7,-7],[10,-2],[13,-3]] : v===1 ? [[-4,-16],[-9,-8],[-12,-2],[-15,-3]] : v===2 ? [[-6,-24],[-12,-14],[-15,-5],[-18,-6]] : v===3 ? [[-3,-24],[-7,-14],[-10,-5],[-14,-6]] : [[0,-24],[3,-14],[6,-5],[10,-6]];   // only the end of it ever shows, below the hem
-  const pts=P0.map(([a,b2],i)=>[x+s*(a+(i?sw*i*0.5:0)),B+b2]);
-  const tp=()=>{ c.beginPath(); c.moveTo(pts[0][0],pts[0][1]); c.bezierCurveTo(pts[1][0],pts[1][1],pts[2][0],pts[2][1],pts[3][0],pts[3][1]); };
-  c.save(); c.lineCap='round'; tp(); c.strokeStyle='#1a1614'; c.lineWidth=5.4; c.stroke(); tp(); c.strokeStyle=v===0||v===1?'#4a4038':'#5a4e44'; c.lineWidth=4.2; c.stroke();
-  c.strokeStyle='rgba(20,16,12,0.6)'; c.lineWidth=0.6; for(let t=0.12;t<0.92;t+=0.11){ const u=1-t, bx=u*u*u*pts[0][0]+3*u*u*t*pts[1][0]+3*u*t*t*pts[2][0]+t*t*t*pts[3][0], by=u*u*u*pts[0][1]+3*u*u*t*pts[1][1]+3*u*t*t*pts[2][1]+t*t*t*pts[3][1]; c.beginPath(); c.moveTo(bx-1.8,by-1.6); c.lineTo(bx+1.6,by+1.8); c.stroke(); }   // the binding strips
-  const e=pts[3]; c.fillStyle='#6e5420'; c.beginPath(); c.ellipse(e[0],e[1],2.4,1.8,0,0,Math.PI*2); c.fill(); c.fillStyle='#b08a3a'; c.beginPath(); c.ellipse(e[0]-0.4*s,e[1]-0.4,1.6,1.1,0,0,Math.PI*2); c.fill();
-  c.restore(); }
-Object.assign(ITEMS,{ cv_mask_weld:{ name:'Cinderveil Welding Mask', slot:'head', base:'kettle', col:'#3e3a36' }, cv_mask_resp:{ name:'Cinderveil Salvage Rig', slot:'head', base:'kettle', col:'#4a3a2c' },
-  cv_mask_elder:{ name:"Cinderveil Elder's Mask", slot:'head', base:'kettle', col:'#b08a3a' }, cv_mask_plain:{ name:'Blank Iron Mask', slot:'head', base:'kettle', col:'#2c2a2e' }, cv_helm_suit:{ name:'Cinderveil Beaked Helm', slot:'head', base:'kettle', col:'#4a4642' },
-  cv_suit:{ name:'Cinderveil Pressure Suit', slot:'armor', base:'gambeson', col:'#5e3e24' }, cv_suit_iron:{ name:'Cinderveil Iron Suit', slot:'armor', base:'gambeson', col:'#3a3632' }, cv_suit_legs:{ name:'Suit Leggings', slot:'legs', base:'trousers', col:'#4a3220' }, cv_suit_legs_iron:{ name:'Iron Suit Leggings', slot:'legs', base:'trousers', col:'#2e2c2a' },
-  cv_duster:{ name:'Ash Duster', slot:'armor', base:'jerkin', col:'#3a3632' }, cv_duster_rust:{ name:'Rust Duster', slot:'armor', base:'jerkin', col:'#6a3e26' }, cv_duster_red:{ name:'Faded Red Duster', slot:'armor', base:'jerkin', col:'#6a2a24' },
-  cv_duster_elder:{ name:"Elder's Long Coat", slot:'armor', base:'jerkin', col:'#4a2a22' }, cv_wrap:{ name:'Thief\'s Wrap-Coat', slot:'armor', base:'jerkin', col:'#26242a' },
-  cv_harness:{ name:'Tinker\'s Harness', slot:'shoulders' }, cv_gauntlets:{ name:'Cinderveil Gauntlets', slot:'hands', base:'gloves', col:'#3a2a1e' }, cv_wrapboots:{ name:'Bound Boots', slot:'feet', base:'boots', col:'#2e2620' },
-  cv_scarf:{ name:'Cinderveil Scarves', slot:'neck' }, cv_scarf_grey:{ name:'Grey Cinderveil Scarves', slot:'neck' },
-  cv_apron:{ name:'Oilcloth Apron', slot:'armor', base:'jerkin', col:'#2e2a26' }, cv_apron_rust:{ name:'Rust-Leather Apron', slot:'armor', base:'jerkin', col:'#6a3e26' } });
+const CV_MASKS=new Set(); let CV_LONGARM=false, CV_BITS=0;   // (the Cinderveil are gone; kept so older checks stay harmless)
 
 function drawHeadgear(c,x,B,kind,P,view,LN){
-  if(CV_MASKS.has(kind)){ drawCVMask(c,x,B,kind,P,view,LN); return; }   // the Cinderveil's masks (see CINDERVEIL)
   if(kind==='ember_crown' || kind==='ember_hood'){ drawEmberCrystal(c,x,B,P,view,LN); return; }   // the Pyromancer's headpiece: nothing on the head at all, only a crystal of fire hanging in the air before the brow
   if(kind==='obsidian_helm' || kind==='wyrm_helm') kind='kettle'; if(kind==='tw_tricorn') kind='tricorn';           // re-coloured kettle hats keep the kettle's shape
   const Y=BODY, V=VIEW[view], HW=P.headHW, pr=V.prof, front=V.turn>-0.25;
@@ -31240,7 +31087,7 @@ function styleShop(kind){ closeDialog(); const old=document.getElementById('styl
     mobs:()=> nightAmt()>0.6 ? [{ name:'Brook Wolf', type:'wolf', i:42, j:2, faction:'brookwolf', daily:true, coat:'#6a6056' }] : [],
     entries:{ fromCross:{i:1,j:5}, fromMill:{i:48,j:4} } },
   });
-  Object.assign(AREA_TIER,{ hedgerow:1, longmeadow:2, scrubland:3, cvyard:3, heath:3, foothills:3, alderbrook:2 });
+  Object.assign(AREA_TIER,{ hedgerow:1, longmeadow:2, scrubland:3, heath:3, foothills:3, alderbrook:2 });
 
   // the old neighbours now open onto the new roads
   const redoor=(area,to,nto,nentry)=>wrap(area,'objects',l=>l.map(o=>o.type==='teleporter' && o.to===to ? {...o, to:nto, entry:nentry} : o));
@@ -31279,778 +31126,6 @@ function styleShop(kind){ closeDialog(); const old=document.getElementById('styl
   if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
 }
 
-// Cinderveil contraptions as small 3D models, projected the way the game projects the world, so every one turns to all eight directions and walks.
-// Local axes: +x forward, +y left, +z up. dir 0..7 = S, SE, E, NE, N, NW, W, SW (as the game's facings).
-const CVM3=(()=>{
-  const sh=(hex,a)=>{ const n=parseInt(hex.slice(1),16); let r=n>>16,g=(n>>8)&255,b=n&255; const f=v=>Math.max(0,Math.min(255,Math.round(a>=0?v+(255-v)*a:v*(1+a)))); return '#'+((1<<24)+(f(r)<<16)+(f(g)<<8)+f(b)).toString(16).slice(1); };
-  const IRON='#4a4540', IRD='#1e1c1a', BR='#b08a3a', BRD='#6e5420', CU='#a8603a', WOOD='#7a5a3a', CLOTH='#8a3a2a', TIMB='#6a4a2c', HOOP='#2e2a26';
-  const VIEW=[0.612,0.612,0.5], LIGHT=(()=>{ const v=[0.15,0.55,0.82], l=Math.hypot(...v); return v.map(a=>a/l); })();
-  const dot3=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2], add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]], mul=(a,k)=>[a[0]*k,a[1]*k,a[2]*k], sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
-  const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]], norm=a=>{ const l=Math.hypot(...a)||1; return a.map(v=>v/l); };
-  // desert wear: every colour sanded toward dust, dust banked on the lower half of every shell, a scatter of grit
-  const SAND='#b49c74', mixH=(a,b,t)=>{ const p=h=>parseInt(h.slice(1),16), A=p(a), Bq=p(b), ch=(s0)=>Math.round(((A>>s0)&255)*(1-t)+((Bq>>s0)&255)*t); return '#'+((1<<24)+(ch(16)<<16)+(ch(8)<<8)+ch(0)).toString(16).slice(1); };
-  const D=c0=>(typeof c0==='string' && /^#[0-9a-f]{6}$/i.test(c0)) ? mixH(c0,SAND,0.4) : c0;
-const daub=(c,xs,ys,clip,col,sd)=>{ if(!col) return; const x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys), W0=x1-x0, H0=y1-y0; let q=sd%997+3; const r=()=>(q=(q*577+101)%997)/997; c.save(); clip(); c.clip(); c.globalAlpha=0.62; c.fillStyle=col;
-    for(let k=0;k<4;k++){ const cx=x0+W0*(0.15+r()*0.7), cy=y0+H0*(0.15+r()*0.6), rx=W0*(0.18+r()*0.2), ry=H0*(0.16+r()*0.18); c.beginPath(); for(let a=0;a<=12;a++){ const t=a/12*Math.PI*2, j=0.75+r()*0.4; const px=cx+Math.cos(t)*rx*j, py=cy+Math.sin(t)*ry*j; a?c.lineTo(px,py):c.moveTo(px,py); } c.closePath(); c.fill(); }   // paint slapped on with a rag, in patches
-    c.globalAlpha=0.35; c.strokeStyle=col; c.lineWidth=1.2; for(let k=0;k<3;k++){ const yy=y0+H0*(0.2+r()*0.6), xx=x0+W0*r()*0.5; c.beginPath(); c.moveTo(xx,yy); c.lineTo(xx+W0*(0.2+r()*0.3),yy+(r()-0.5)*3); c.stroke(); } c.restore(); };   // and a few dry strokes
-  const grime=(c,x0,y0,x1,y1,clip,sdIn)=>{ const W0=x1-x0, H0=y1-y0; if(W0<2||H0<2) return; c.save(); clip(); c.clip();
-    const g=c.createLinearGradient(0,y0,0,y1); g.addColorStop(0,'rgba(180,156,116,0.06)'); g.addColorStop(0.5,'rgba(180,156,116,0.2)'); g.addColorStop(1,'rgba(200,176,132,0.62)'); c.fillStyle=g; c.fillRect(x0,y0,W0,H0);   // sand banked low
-    let sd=(sdIn!=null?sdIn:Math.abs(Math.round(x0*7+y0*13+W0*3)))%997+1; const r=()=>(sd=(sd*577+101)%997)/997;
-    const NR=W0*H0>500?3:W0*H0>160?1:0; for(let k=0;k<NR;k++){ const cx=x0+W0*r(), cy=y0+H0*(0.15+r()*0.7), rr=Math.max(1.2,Math.min(W0,H0)*(0.08+r()*0.12)); c.fillStyle=`rgba(${120+Math.round(r()*30)},${58+Math.round(r()*16)},28,0.38)`; c.beginPath(); c.ellipse(cx,cy,rr*1.3,rr*0.8,r()*3,0,Math.PI*2); c.fill();   // rust blooms
-      if(rr>2){ c.strokeStyle='rgba(118,56,26,0.28)'; c.lineWidth=Math.max(0.6,rr*0.3); c.beginPath(); c.moveTo(cx,cy); c.lineTo(cx+(r()-0.5)*1.5,cy+rr*(1.5+r()*2)); c.stroke(); } }   // and its run-off
-    if(W0>14 && H0>9 && r()<0.6){ const pw=W0*(0.18+r()*0.14), ph=H0*(0.16+r()*0.14), px=x0+W0*(0.1+r()*0.6), py=y0+H0*(0.15+r()*0.45); c.save(); c.translate(px+pw/2,py+ph/2); c.rotate((r()-0.5)*0.5);
-      c.fillStyle=['rgba(92,86,78,0.9)','rgba(150,92,54,0.88)','rgba(74,62,50,0.9)','rgba(120,104,70,0.88)'][Math.floor(r()*4)]; c.fillRect(-pw/2,-ph/2,pw,ph); c.strokeStyle='rgba(30,24,18,0.85)'; c.lineWidth=0.8; c.strokeRect(-pw/2,-ph/2,pw,ph);
-      c.fillStyle='rgba(222,206,170,0.7)'; [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([a,b])=>{ if(r()<0.85){ c.beginPath(); c.arc(a*(pw/2-1.4),b*(ph/2-1.4),0.75,0,Math.PI*2); c.fill(); } }); c.restore(); }   // a patch of some other metal, riveted over a hole
-    c.fillStyle='rgba(60,44,28,0.38)'; for(let k=0,n=Math.min(16,Math.round(W0*H0/60));k<n;k++) c.fillRect(x0+W0*r(),y0+H0*(0.2+r()*0.8),1.1,1.1);   // grit
-    c.fillStyle='rgba(222,204,164,0.35)'; for(let k=0;k<6;k++) c.fillRect(x0+W0*r(),y0+H0*(0.5+r()*0.5),1.3,0.9);   // sand caught in the seams
-    c.restore(); };
-  const WOODS=['#4a3420','#5a4028','#3e2c1c','#6a4c30','#54402a','#76583a','#30241a'];   // every limb a pole of some timber or other
-  const MATS={ wood:'#6e5034', iron:'#4e4842', rust:'#6e3e24', copper:'#9a5a36', bone:'#a89878' }, MKEYS=Object.keys(MATS), FAB=['#9a6a3a','#7a3a2e','#3e4a5e','#8a8060','#5a6a3a','#6a4a5a'];
-  const woodish=c0=>/^#(6|7|8)[0-9a-f]{5}$/i.test(c0) && parseInt(c0.slice(1,3),16)>parseInt(c0.slice(5,7),16)+20;
-  let NEXT_SEED=null;   // each machine its own heap of scrap: a seed set just before it is drawn
-  function Scene(c,ox,oy,S,dir){ const th=(45-dir*45)*Math.PI/180, cs=Math.cos(th), sn=Math.sin(th); const OL=0.9; let SD=NEXT_SEED!=null?(Math.abs(NEXT_SEED)%2147483640)+7:7919; IDL=(SD%628)/100; NEXT_SEED=null; const rnd=()=>(SD=(SD*16807)%2147483647)/2147483647;   // the same scrap every frame: the dice are re-rolled from the same seed
-    const R=p=>[p[0]*cs-p[1]*sn, p[0]*sn+p[1]*cs, p[2]];   // local → world (rotation only; vectors too)
-    const prj=P=>[ox+(P[0]-P[1])*0.7071*S, oy+(P[0]+P[1])*0.3536*S-P[2]*S];
-    const ops=[]; let FORCE=null, SEQ=0; const push=(d,fn)=>ops.push({d:FORCE!=null?FORCE+(SEQ+=1e-4):d,fn});   // a leg is laid down whole, behind or in front of the body by where it stands
-    const depth=P=>P[0]+P[1]+P[2]*0.02;
-    const lit=(col,n)=>sh(col, dot3(n,LIGHT)*0.32-0.14);
-    const path=pts=>{ c.beginPath(); pts.forEach(([x,y],k)=>k?c.lineTo(x,y):c.moveTo(x,y)); c.closePath(); };
-    const sc={ c, S, R, prj, sh, IRON, IRD, BR, BRD, CU, WOOD, CLOTH,
-      box(cen,w,d,h,col,opt={}){ col=D(col); const gs=Math.floor(rnd()*900), P=[], o=cen; for(const [a,b,z] of [[-1,-1,0],[1,-1,0],[1,1,0],[-1,1,0],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]]) P.push(R([o[0]+a*w/2,o[1]+b*d/2,o[2]+z*h]));
-        const F=[[[1,2,6,5],[1,0,0]],[[3,0,4,7],[-1,0,0]],[[2,3,7,6],[0,1,0]],[[0,1,5,4],[0,-1,0]],[[4,5,6,7],[0,0,1]]].map(([ix,n])=>({ix,n:R(n)})).filter(f=>dot3(f.n,VIEW)>0.01);
-        const cw=R(o); push(depth([cw[0],cw[1],o[2]+h/2])+(opt.top||0)*100,()=>{ F.forEach(f=>{ const pts=f.ix.map(i=>prj(P[i])); path(pts); c.fillStyle=lit(col,f.n); c.fill(); if(opt.daub){ daub(c,pts.map(p=>p[0]),pts.map(p=>p[1]),()=>path(pts),opt.daub,gs+F.indexOf(f)*53); } if(f.n[2]<0.5){ const ys=pts.map(p=>p[1]), xs=pts.map(p=>p[0]); grime(c,Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys),()=>path(pts),gs+F.indexOf(f)*37); } path(pts); c.strokeStyle=IRD; c.lineWidth=OL; c.lineJoin='round'; c.stroke();
-            if(opt.planks && f.n[2]<0.5){ c.strokeStyle='rgba(0,0,0,0.25)'; c.lineWidth=0.6; for(let t=1;t<opt.planks;t++){ const k=t/opt.planks, a=pts[0], b=pts[1], a2=pts[3], b2=pts[2]; c.beginPath(); c.moveTo(a[0]+(b[0]-a[0])*k,a[1]+(b[1]-a[1])*k); c.lineTo(a2[0]+(b2[0]-a2[0])*k,a2[1]+(b2[1]-a2[1])*k); c.stroke(); } }
-            if(opt.rivets && f.n[2]<0.5){ const a=pts[3], b=pts[2]; for(let t=0.08;t<1;t+=0.14){ c.fillStyle='#c8b080'; c.beginPath(); c.arc(a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t+2.2*S,0.8*S,0,Math.PI*2); c.fill(); } }
-            if(opt.face && f.n===F.find(q=>Math.abs(q.n[0]-R(opt.face.n)[0])<0.01 && Math.abs(q.n[1]-R(opt.face.n)[1])<0.01)?.n) opt.face.fn(pts,c,S); }); }); },
-      cylV(cen,r,h,col,top=0){ col=D(col); const w=R(cen), b=prj(w), t=prj([w[0],w[1],w[2]+h]); push(depth([w[0],w[1],w[2]+h/2])+top*100,()=>{ const rx=r*S, ry=r*S*0.5, g=c.createLinearGradient(b[0]-rx,0,b[0]+rx,0); g.addColorStop(0,sh(col,0.25)); g.addColorStop(0.45,col); g.addColorStop(1,sh(col,-0.5));
-          c.fillStyle=g; c.beginPath(); c.ellipse(b[0],b[1],rx,ry,0,0,Math.PI); c.lineTo(t[0]-rx,t[1]); c.ellipse(t[0],t[1],rx,ry,0,Math.PI,0,true); c.closePath(); c.fill(); c.strokeStyle=IRD; c.lineWidth=OL; c.stroke();
-          c.fillStyle=sh(col,0.15); c.beginPath(); c.ellipse(t[0],t[1],rx,ry,0,0,Math.PI*2); c.fill(); c.stroke(); }); return [w[0],w[1],w[2]+h]; },
-      cone(cen,r0,r1,h,col,opt={}){ col=D(col); const w=R(cen), b=prj(w), t=prj([w[0],w[1],w[2]+h]); push(depth([w[0],w[1],w[2]+h/2])+(opt.bias||0),()=>{ const a0=r0*S, a1=r1*S, sh0=path=>{ c.beginPath(); c.ellipse(b[0],b[1],a0,a0*0.5,0,0,Math.PI); c.lineTo(t[0]-a1,t[1]); c.ellipse(t[0],t[1],a1,a1*0.5,0,Math.PI,0,true); c.closePath(); };
-          const g=c.createLinearGradient(b[0]-a0,0,b[0]+a0,0); g.addColorStop(0,sh(col,0.22)); g.addColorStop(0.42,col); g.addColorStop(1,sh(col,-0.55)); sh0(); c.fillStyle=g; c.fill();
-          if(opt.brick){ c.save(); sh0(); c.clip(); c.strokeStyle='rgba(30,16,10,0.4)'; c.lineWidth=Math.max(0.5,0.35*S); const n=Math.max(2,Math.round(h/4));
-            for(let k=1;k<n;k++){ const f=k/n, cx2=b[0]+(t[0]-b[0])*f, cy2=b[1]+(t[1]-b[1])*f, rr=a0+(a1-a0)*f; c.beginPath(); c.ellipse(cx2,cy2,rr,rr*0.5,0,0,Math.PI); c.stroke();
-              for(let q=0;q<7;q++){ const ang=((q+(k%2)*0.5)/7)*Math.PI; c.beginPath(); c.moveTo(cx2+Math.cos(ang)*rr,cy2+Math.sin(ang)*rr*0.5); c.lineTo(cx2+Math.cos(ang)*rr,cy2+Math.sin(ang)*rr*0.5-h*S/n); c.stroke(); } } c.restore(); }
-          sh0(); c.strokeStyle=IRD; c.lineWidth=OL; c.stroke();
-          if(opt.hoops) opt.hoops.forEach(f=>{ const cx2=b[0]+(t[0]-b[0])*f, cy2=b[1]+(t[1]-b[1])*f, rr=a0+(a1-a0)*f; c.strokeStyle=IRD; c.lineWidth=2.6*S*0.6; c.beginPath(); c.ellipse(cx2,cy2,rr+0.4,(rr+0.4)*0.5,0,0,Math.PI); c.stroke(); c.strokeStyle='#5a5650'; c.lineWidth=1.4*S*0.6; c.stroke(); });
-          if(opt.cap){ c.fillStyle=sh(opt.cap,0.1); c.beginPath(); c.ellipse(t[0],t[1],a1,a1*0.5,0,0,Math.PI*2); c.fill(); c.strokeStyle=IRD; c.lineWidth=OL; c.stroke(); } }); },
-      ring(cen,n,r,k=24){ const N=norm(n), u=norm(Math.abs(N[2])>0.9?cross(N,[1,0,0]):cross(N,[0,0,1])), v=cross(N,u), pts=[]; for(let i=0;i<k;i++){ const a=i/k*Math.PI*2; pts.push(prj(add(cen,add(mul(u,Math.cos(a)*r),mul(v,Math.sin(a)*r))))); } return pts; },
-      disk(cenL,nL,r,col,opt={}){ if(!opt.glass) col=D(col); const cen=R(cenL), n=norm(R(nL)); if(dot3(n,VIEW)<=0.02 && !opt.always) return; push(depth(cen)+(opt.bias||0.5),()=>{ const pts=sc.ring(cen,n,r); path(pts);
-          if(opt.glass){ const p0=prj(cen), g=c.createRadialGradient(p0[0]-r*S*0.3,p0[1]-r*S*0.3,0.5,p0[0],p0[1],r*S*1.1); g.addColorStop(0,'#fff8e0'); g.addColorStop(0.3,col); g.addColorStop(1,sh(col,-0.6)); c.fillStyle=g; } else c.fillStyle=lit(col,n);
-          c.fill(); c.strokeStyle=opt.rim||IRD; c.lineWidth=opt.rim?OL*1.8:OL; c.stroke(); if(opt.glow){ const p0=prj(cen), fl=0.82+0.18*Math.sin(T_()*11+IDL*3)*Math.sin(T_()*4.3+IDL), g=c.createRadialGradient(p0[0],p0[1],0,p0[0],p0[1],r*S*3*fl); g.addColorStop(0,col+'88'); g.addColorStop(1,col+'00'); c.fillStyle=g; c.beginPath(); c.arc(p0[0],p0[1],r*S*3,0,Math.PI*2); c.fill(); } if(opt.spokes){ const p0=prj(cen); c.strokeStyle=BR; c.lineWidth=1; for(let i=0;i<pts.length;i+=4){ c.beginPath(); c.moveTo(p0[0],p0[1]); c.lineTo(pts[i][0],pts[i][1]); c.stroke(); } } }); },
-      cylH(aL,bL,r,col,opt={}){ col=D(col); const gs=Math.floor(rnd()*900), a=R(aL), b=R(bL), d=norm(sub(b,a)), A=sc.ring(a,d,r,28), Bp=sc.ring(b,d,r,28);
-        push(depth(mul(add(a,b),0.5)),()=>{ const all=[...A,...Bp].sort((p,q)=>p[0]-q[0]||p[1]-q[1]), cr=(o,p,q)=>(p[0]-o[0])*(q[1]-o[1])-(p[1]-o[1])*(q[0]-o[0]), lo=[], hi=[];
-          for(const p of all){ while(lo.length>=2 && cr(lo[lo.length-2],lo[lo.length-1],p)<=0) lo.pop(); lo.push(p); } for(const p of all.slice().reverse()){ while(hi.length>=2 && cr(hi[hi.length-2],hi[hi.length-1],p)<=0) hi.pop(); hi.push(p); }
-          const hull=[...lo.slice(0,-1),...hi.slice(0,-1)], pa=prj(a), pb=prj(b), mx=(pa[0]+pb[0])/2, my=(pa[1]+pb[1])/2, nx=-(pb[1]-pa[1]), ny=(pb[0]-pa[0]), nl=Math.hypot(nx,ny)||1;
-          const g=c.createLinearGradient(mx-nx/nl*r*S,my-ny/nl*r*S,mx+nx/nl*r*S,my+ny/nl*r*S); g.addColorStop(0,sh(col,0.3)); g.addColorStop(0.42,col); g.addColorStop(1,sh(col,-0.55)); path(hull); c.fillStyle=g; c.fill(); { const xs=hull.map(p=>p[0]), ys=hull.map(p=>p[1]); daub(c,xs,ys,()=>path(hull),opt.daub,gs); grime(c,Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys),()=>path(hull),gs); } path(hull); c.strokeStyle=IRD; c.lineWidth=OL; c.stroke();
-          if(opt.bands){ c.save(); path(hull); c.clip(); c.strokeStyle=opt.bandCol||BRD; c.lineWidth=1.6*S*0.8; c.lineCap='butt';
-            const u=norm(Math.abs(d[2])>0.9?cross(d,[1,0,0]):cross(d,[0,0,1])), v=cross(d,u), K2=32;
-            opt.bands.forEach(t=>{ const cen=add(a,mul(sub(b,a),t)); let open=false; c.beginPath(); for(let i=0;i<=K2;i++){ const an=i/K2*Math.PI*2, nrm=add(mul(u,Math.cos(an)),mul(v,Math.sin(an))), p=prj(add(cen,mul(nrm,r))); if(dot3(nrm,VIEW)>-0.02){ if(open) c.lineTo(p[0],p[1]); else { c.moveTo(p[0],p[1]); open=true; } } else open=false; } c.stroke(); });   // only the front of each hoop: the back is behind the staves
-            c.restore(); }
-          const end=dot3(d,VIEW)>0?{p:b,n:d}:{p:a,n:mul(d,-1)}; path(sc.ring(end.p,end.n,r)); c.fillStyle=lit(sh(col,-0.05),end.n); c.fill(); c.strokeStyle=IRD; c.stroke(); }); },
-      sphere(cenL,r,col,opt={}){ col=D(col); const gs=Math.floor(rnd()*900), w=R(cenL), p=prj(w); push(depth(w)+(opt.bias||0),()=>{ const g=c.createRadialGradient(p[0]-r*S*0.35,p[1]-r*S*0.4,r*S*0.1,p[0],p[1],r*S*1.05); g.addColorStop(0,sh(col,0.2)); g.addColorStop(0.55,col); g.addColorStop(1,sh(col,-0.55));
-          c.fillStyle=g; const shp=()=>{ c.beginPath(); if(opt.sy) c.ellipse(p[0],p[1],r*S,r*S*opt.sy,0,0,Math.PI*2); else c.arc(p[0],p[1],r*S,0,Math.PI*2); }; shp(); c.fill(); const ry=r*S*(opt.sy||1); grime(c,p[0]-r*S,p[1]-ry,p[0]+r*S,p[1]+ry,shp,gs); shp(); c.strokeStyle=IRD; c.lineWidth=OL; c.stroke(); }); },
-      seg(aL,bL,w,col,bias=0,mat){ col=D(col); const a=R(aL), b=R(bL), pa=prj(a), pb=prj(b); push(depth(mul(add(a,b),0.5))+bias,()=>{ c.lineCap='round'; c.strokeStyle=IRD; c.lineWidth=w*S*0.55+OL; c.beginPath(); c.moveTo(pa[0],pa[1]); c.lineTo(pb[0],pb[1]); c.stroke(); c.strokeStyle=col; c.lineWidth=w*S*0.55; c.stroke(); c.strokeStyle='rgba(230,214,176,0.12)'; c.lineWidth=w*S*0.16; c.beginPath(); c.moveTo(pa[0]-1,pa[1]-1); c.lineTo(pb[0]-1,pb[1]-1); c.stroke();
-          if(w>=2){ const L0=Math.hypot(pb[0]-pa[0],pb[1]-pa[1]); c.beginPath(); c.moveTo(pa[0],pa[1]); c.lineTo(pb[0],pb[1]); c.lineWidth=w*S*0.42; c.lineCap='butt';
-            if(mat!=='wood'){ c.setLineDash([1.6,3.4+((Math.round(pa[0]+pb[1])%3)+3)%3]); c.strokeStyle='rgba(124,60,28,0.42)'; c.stroke(); }   // rust flecks along an iron limb
-            c.setLineDash([1,mat==='wood'?9:5]); c.lineDashOffset=2; c.strokeStyle='rgba(206,184,140,0.35)'; c.stroke(); c.setLineDash([]); c.lineDashOffset=0;   // and caked sand
-            if(mat==='wood'){ const nx=-(pb[1]-pa[1])/(L0||1), ny=(pb[0]-pa[0])/(L0||1), o=w*S*0.13; c.strokeStyle='rgba(40,26,14,0.5)'; c.lineWidth=0.5; c.lineCap='round'; [-1,1].forEach(q=>{ c.beginPath(); c.moveTo(pa[0]+nx*o*q,pa[1]+ny*o*q); c.lineTo(pb[0]+nx*o*q*0.6,pb[1]+ny*o*q*0.6); c.stroke(); }); }   // the grain of a pole
-            else if(mat){ c.fillStyle='rgba(222,206,170,0.7)'; [0.18,0.82].forEach(t=>{ c.beginPath(); c.arc(pa[0]+(pb[0]-pa[0])*t,pa[1]+(pb[1]-pa[1])*t,Math.max(0.6,w*S*0.09),0,Math.PI*2); c.fill(); }); }   // bolts where a scrap of pipe was fixed on
-            if(L0>8){ const t=0.82, fx=pa[0]+(pb[0]-pa[0])*t, fy=pa[1]+(pb[1]-pa[1])*t; c.strokeStyle='rgba(196,172,128,0.45)'; c.lineWidth=w*S*0.5; c.lineCap='round'; c.beginPath(); c.moveTo(fx,fy); c.lineTo(pb[0],pb[1]); c.stroke(); } } }); },   // the low end of every limb, dusted
-      joint(pL,r,bias=0.05,iron,kind){ const w=R(pL), p=prj(w);
-        if(kind==='lash') return push(depth(w)+bias,()=>{ const L=r*S*0.95; c.lineCap='round'; [[0.7,-1],[-0.7,0],[0.7,1]].forEach(([a,o])=>{ const ox2=o*r*S*0.28; c.strokeStyle=IRD; c.lineWidth=r*S*0.28+OL; c.beginPath(); c.moveTo(p[0]-Math.cos(a)*L+ox2,p[1]-Math.sin(a)*L); c.lineTo(p[0]+Math.cos(a)*L+ox2,p[1]+Math.sin(a)*L); c.stroke(); c.strokeStyle=D('#9a8a62'); c.lineWidth=r*S*0.28; c.stroke(); });
-            c.strokeStyle=D('#8a7a52'); c.lineWidth=r*S*0.18; c.beginPath(); c.moveTo(p[0]+r*S*0.5,p[1]+r*S*0.3); c.quadraticCurveTo(p[0]+r*S*0.9,p[1]+r*S*1.2,p[0]+r*S*0.6,p[1]+r*S*2); c.stroke(); });   // rope lashed round and round, a loose end
-        if(kind==='plate') return push(depth(w)+bias,()=>{ const h2=r*S*0.62; c.save(); c.translate(p[0],p[1]); c.rotate(0.35); c.fillStyle=D('#4a4540'); c.fillRect(-h2,-h2,h2*2,h2*2); c.strokeStyle=IRD; c.lineWidth=OL; c.strokeRect(-h2,-h2,h2*2,h2*2);
-            c.fillStyle='rgba(222,206,170,0.75)'; [[-1,-1],[1,1],[1,-1]].forEach(([a,b])=>{ c.beginPath(); c.arc(a*h2*0.6,b*h2*0.6,Math.max(0.6,h2*0.16),0,Math.PI*2); c.fill(); }); c.fillStyle='rgba(124,60,28,0.4)'; c.fillRect(-h2*0.2,h2*0.1,h2*0.9,h2*0.7); c.restore(); });   // a bolted plate, one bolt lost
-        push(depth(w)+bias,()=>{ c.fillStyle=IRD; c.beginPath(); c.arc(p[0],p[1],r*S*0.6+OL/2,0,Math.PI*2); c.fill(); c.fillStyle=D(iron?'#5a5650':BR); c.beginPath(); c.arc(p[0],p[1],r*S*0.6,0,Math.PI*2); c.fill(); c.fillStyle='rgba(230,214,176,0.55)'; c.beginPath(); c.arc(p[0]-r*S*0.15,p[1]-r*S*0.15,r*S*0.2,0,Math.PI*2); c.fill(); }); },
-      poly(ptsL,col,bias=0){ col=D(col); const W=ptsL.map(R), cen=W.reduce((s,p)=>add(s,mul(p,1/W.length)),[0,0,0]); push(depth(cen)+bias,()=>{ path(W.map(prj)); c.fillStyle=col; c.fill(); c.strokeStyle=IRD; c.lineWidth=OL; c.stroke(); }); },
-      smoke(pL,s=4){ const p=prj(R(pL)); push(1e6,()=>{ const T0=T_()*0.35+IDL; for(let k=0;k<6;k++){ const t=((k/6)+T0)%1; c.fillStyle=`rgba(${80+t*100},${76+t*100},${72+t*100},${(0.5-t*0.45)*Math.min(1,t*6)})`; c.beginPath(); c.arc(p[0]+Math.sin(t*5+k)*s*t*2*S-s*t*S*1.5,p[1]-s*t*8*S,s*S*(0.6+t*1.6),0,Math.PI*2); c.fill(); } }); },   // puffs rising and thinning, one after another
-      glow(pL,r,col){ const w=R(pL), p=prj(w); push(depth(w)+0.3,()=>{ const fl=0.8+0.2*Math.sin(T_()*9+IDL*2)*Math.sin(T_()*3.1+IDL), g=c.createRadialGradient(p[0],p[1],0,p[0],p[1],r*S*fl); g.addColorStop(0,col); g.addColorStop(1,'rgba(0,0,0,0)'); c.fillStyle=g; c.beginPath(); c.arc(p[0],p[1],r*S,0,Math.PI*2); c.fill(); }); },
-      shadow(rx,ry){ push(-1e6,()=>{ c.fillStyle='rgba(0,0,0,0.3)'; c.beginPath(); c.ellipse(ox,oy,rx*S,ry*S,0,0,Math.PI*2); c.fill(); }); },
-      leg(ptsL,w,col,off,walk,toes,nohip){ const segM=[], jK=[]; for(let k=1;k<ptsL.length;k++) segM.push([WOODS[Math.floor(rnd()*WOODS.length)],'wood']); for(let k=0;k<ptsL.length;k++){ const q=rnd(); jK.push(q<0.4?'ball':q<0.72?'lash':'plate'); } const wrap=rnd()<0.45, fab=FAB[Math.floor(rnd()*FAB.length)];   /* a limb from whatever was lying about */ const h=R(ptsL[0]), f0=R(ptsL[ptsL.length-1]), fr=((h[0]+f0[0])+(h[1]+f0[1]))/2; FORCE=(fr>0?5000:-5000)+fr*10; if(walk && off!=null){ const ph=walk.ph+off, f=ptsL[ptsL.length-1], n=ptsL.length-1, lift=Math.max(0,Math.sin(ph))*walk.lift, dx=-Math.cos(ph)*walk.stride;   /* the foot swings forward while it is up, and pushes back while it is down */ ptsL=ptsL.map((p,i)=>i===0?p:[p[0]+dx*(i/n)*(i===n?1:0.6),p[1],p[2]+lift*(i/n)*(i===n?1:0.9)]); }
-        for(let k=1;k<ptsL.length;k++) sc.seg(ptsL[k-1],ptsL[k],w*(1.12-k*0.14),segM[k-1][0],0,segM[k-1][1]);   // a stout thigh, tapering to the foot: each piece from a different heap
-        { const n0=ptsL.length, a=ptsL[n0-2], b=ptsL[n0-1]; sc.seg(add(a,mul(sub(b,a),0.8)),b,w*0.78,'#2a2018',0.02); }   // the foot of each pole tarred black against the sand
-        if(wrap && ptsL.length>2){ const [a,b]=ptsL, m0=add(a,mul(sub(b,a),0.4)), m1=add(a,mul(sub(b,a),0.62)); sc.seg(m0,m1,w*1.3,fab,0.03); sc.poly([m1,add(m1,[1.5,0,-8]),add(m1,[-1.2,0,-6.5])],sh(fab,-0.15),0.04); }   // a rag bound round it, its end hanging
-        if(ptsL.length>2 && col!==IRON){ const [a,b,d]=ptsL; sc.seg(add(a,mul(sub(b,a),0.3)),add(b,mul(sub(d,b),0.3)),Math.max(1,w*0.2),'#8a7a5a',0.02); }   // a rope lashing across the knee
-        ptsL.slice(nohip?1:0,-1).forEach((p,q)=>sc.joint(p,w*0.6,0.05,col!==IRON,jK[q+(nohip?1:0)]));   // an insect's hip sits inside its body: no ball drawn there
-        if(toes){ const f=ptsL[ptsL.length-1]; sc.cylV([f[0],f[1],0],w*0.75,w*0.45,'#3a3632'); }   // a round iron hoof-cap
-        FORCE=null; const f=ptsL[ptsL.length-1]; sc.disk([f[0],f[1],0.1],[0,0,1],w*0.95,IRD,{always:true,bias:-1e5}); },
-      rag(pL,u,w,h,col,stripe,bias=0.6){ col=D(col); const nu=norm(u), A=add(pL,mul(nu,-w/2)), B=add(pL,mul(nu,w/2)), drops=[0.7,1.05,0.8,1.15,0.75,0.95].map(d0=>d0*(0.85+rnd()*0.3)), SW=Math.sin(T_()*1.9+IDL+pL[0]*0.1)*h*0.08, BOT=drops.map((d0,k)=>add(add(B,mul(nu,-w*k/(drops.length-1))),[SW*(0.6+d0*0.4),SW*0.5,-h*d0])), P=[A,add(pL,[0,0,-h*0.12]),B,...BOT].map(q=>prj(R(q)));   // the top sags between its ties; the bottom hangs ragged   // a scrap of cloth hung where it was handy
-        const rp=()=>{ c.beginPath(); c.moveTo(P[0][0],P[0][1]); c.quadraticCurveTo(P[1][0],P[1][1],P[2][0],P[2][1]); for(let k=3;k<P.length;k++){ const q=P[k], p0=P[k-1]; c.quadraticCurveTo((p0[0]+q[0])/2,Math.max(p0[1],q[1])+1.5,q[0],q[1]); } c.closePath(); };
-        push(depth(R(pL))+bias,()=>{ const N=P.length, L0=P[N-1], R0=P[3]; rp(); c.fillStyle=col; c.fill();
-          if(stripe){ c.save(); rp(); c.clip(); c.strokeStyle=sh(col,stripe==='light'?0.35:-0.35); c.lineWidth=Math.max(1,h*S*0.12); [0.35,0.62].forEach(t=>{ c.beginPath(); c.moveTo(P[0][0]+(L0[0]-P[0][0])*t,P[0][1]+(L0[1]-P[0][1])*t); c.lineTo(P[2][0]+(R0[0]-P[2][0])*t,P[2][1]+(R0[1]-P[2][1])*t); c.stroke(); }); c.restore(); }
-          { const g=c.createLinearGradient(0,P[1][1],0,Math.max(...P.map(q=>q[1]))); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(196,172,128,0.5)'); rp(); c.fillStyle=g; c.fill(); }
-          c.strokeStyle=IRD; c.lineWidth=OL; rp(); c.stroke();
-          c.strokeStyle=sh(col,-0.3); c.lineWidth=0.5; [4,6].forEach(k=>{ if(!P[k]) return; const top=[P[0][0]+(P[2][0]-P[0][0])*(1-(k-3)/(N-4)),P[1][1]]; c.beginPath(); c.moveTo(top[0],top[1]); c.quadraticCurveTo(top[0]+1,(top[1]+P[k][1])/2,P[k][0],P[k][1]-1); c.stroke(); });   // folds
-          c.strokeStyle=sh(col,-0.2); for(let k=3;k<N;k++){ c.beginPath(); c.moveTo(P[k][0],P[k][1]); c.lineTo(P[k][0]+0.4,P[k][1]+2.2); c.stroke(); } }); },   // frayed threads
-      rope(aL,bL,sag=3,bias=0.5,w=1.3){ const n=5; let prev=aL; for(let k=1;k<=n;k++){ const t=k/n, p=add(add(aL,mul(sub(bL,aL),t)),[0,0,-Math.sin(t*Math.PI)*sag]); sc.seg(prev,p,w,'#9a8a62',bias); prev=p; } },   // a rope, sagging
-      coil(pL,r,bias=1){ const w=R(pL), p=prj(w); push(depth(w)+bias,()=>{ for(let k=0;k<3;k++){ c.strokeStyle=IRD; c.lineWidth=1.1*S*0.55+OL; c.beginPath(); c.ellipse(p[0]+k*0.6,p[1]+k*1.2*S,r*S,r*S*0.55,0,0,Math.PI*2); c.stroke(); c.strokeStyle=D('#9a8a62'); c.lineWidth=1.1*S*0.55; c.stroke(); } }); },   // a coil of rope hung on a peg
-      wheel(cenL,nL,r,bias=1){ sc.disk(cenL,nL,r,'#6a4a2c',{spokes:true,rim:D('#4a3424'),bias}); },   // a cartwheel off some old cart, bolted on
-      _push:push,
-      draw(){ ops.sort((a,b)=>a.d-b.d).forEach(o=>o.fn()); } };
-    return sc; }
-  const W=(ph,stride,lift)=>ph==null?null:{ph,stride,lift};
-  const ops_push=(sc,d,fn)=>sc._push(d,fn);
-  const T_=()=>typeof gt!=='undefined'?gt:0; let IDL=0;   // standing still they still breathe: a slow rise and settle, each machine a little out of step
-  const bob=(ph,a)=>ph==null?(Math.sin(T_()*1.7+IDL)*0.5+0.5)*a*0.45:Math.abs(Math.sin(ph*2))*a;
-
-  function skitter(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,3,4), z=bob(ph,0.8); s.shadow(30,14);
-    [[0.5,0],[1.15,1],[1.95,0],[2.6,1]].forEach(([a,g],k)=>[1,-1].forEach(sd=>{ const ang=sd*a, cx=Math.cos(ang), cy=Math.sin(ang);   // four legs a side, front to back: hip at the body's rim, knee high and out, foot planted wide
-      s.leg([[cx*9,cy*9,13+z],[cx*19,cy*21,24+z],[cx*27,cy*31,0]],3.2,IRON,((g+(sd>0?0:1))%2)*Math.PI,wk); }));
-    s.cone([0,0,5+z],11,11,15,'#7a5a3a',{hoops:[0.14,0.86],cap:'#5a4028'}); s.disk([0,0,5+z],[0,0,-1],10,IRD,{always:true,bias:-2});   // a keg on legs
-    s.disk([11,0,16+z],[1,0,0.15],4.2,'#f08a30',{glass:true,glow:true,rim:BR,bias:2}); s.disk([8,4,22+z],[0.6,0.6,0.4],1.4,'#e84030',{glass:true,bias:2}); s.disk([8,-4,22+z],[0.6,-0.6,0.4],1.4,'#e84030',{glass:true,bias:2});
-    const t=s.cylV([-6,0,24+z],2,5,IRD); s.smoke([-6,0,31+z],2.2); s.rag([-4,9,20+z],[1,0,0],8,6,'#7a3a2e','dark'); s.rope([-9,-6,16+z],[9,-6,16+z],-2,3,1);
-    s.seg([11,3,10+z],[19,4,6+z],2.2,IRON,1); s.seg([11,-3,10+z],[19,-4,6+z],2.2,IRON,1); s.sphere([21,0,5+z],5,'#6a4426',{bias:1}); s.sphere([22,1.5,8+z],1.4,'#f0c850',{bias:2});
-    s.draw(); }
-
-  // the Strutter (and the Strider kin build from one): a pond-skater. A low lacquered thorax, a long plated body behind, four long legs splayed wide with the knees high, glass eyes and feelers
-  const SK_PAINT={ moss:{shell:'#3e4a2a',leg:'#2e2a22',eye:'#e8a040',cloth:'#8a3a2a'}, amber:{shell:'#8a5a22',leg:'#3a2a1a',eye:'#e8d060',cloth:'#2e4a5a'}, ember:{shell:'#3a1e1a',leg:'#1e1816',eye:'#ff7040',cloth:'#c89040'} };
-  function strutter(c,x,y,S,dir,ph,rid,paint){ const PT=SK_PAINT[paint]||SK_PAINT.moss, SK_SHELL=PT.shell, SK_LEG=PT.leg, SK_EYE=PT.eye, SK_CLOTH=PT.cloth; const s=Scene(c,x,y,S,dir), wk=W(ph,6,8), z=bob(ph,1.2), gait=[0,Math.PI,Math.PI,0]; s.shadow(46,22);
-    [[14,1],[14,-1],[-10,1],[-10,-1]].forEach(([xx,sd],k)=>s.leg([[xx,sd*9,40+z],[xx*1.3+(xx>0?6:-6),sd*26,56+z],[xx*1.6+(xx>0?8:-8),sd*33,0]],10,SK_LEG,gait[k],wk,false,true));
-    s.cylH([-8,0,41+z],[16,0,42+z],10,'#7a5a3a',{bands:[0.12,0.5,0.88],bandCol:HOOP,daub:SK_SHELL});   // the thorax: a barrel on its side, paint slapped on in patches
-    s.box([-14,0,31+z],12,15,13,'#7a5a3a',{planks:3,daub:SK_SHELL}); s.cylH([-32,0,36+z],[-19.5,0,37+z],7,'#6e5034',{bands:[0.2,0.8],bandCol:HOOP}); s.box([-34,0,31+z],5,8,9,'#6a4a2c',{planks:2});   // butted end to end, each against the next   // the body behind: a crate, a keg, a box at the tail
-    const fw=s.R([1,0,0]), HB=fw[0]+fw[1]>0.2 ? 6000 : 0;   // facing you: the head sits over the front legs, which are laid down whole
-    s.box([21,0,40+z],10,10,9,'#6a4a2c',{planks:2,top:HB/100,daub:SK_SHELL});   // the head: a little crate
-    [1,-1].forEach(sd=>s.disk([23,sd*4.5,48+z],[0.5,sd,0.25],3.2,SK_EYE,{glass:true,glow:true,rim:'#2a1e14',bias:HB+2}));   // two glass eyes
-    s.seg([24,2,51+z],[34,9,66+z],1.2,IRD,HB+3); s.seg([24,-2,51+z],[34,-9,66+z],1.2,IRD,HB+3);   // feelers
-    s.box([2,0,51+z],20,24,1.4,SK_CLOTH,{top:1}); s.box([2,0,52.4+z],16,13,4,'#5a3420',{top:1}); s.box([-6,0,56.4+z],4,13,6,'#4a2a18',{top:1}); s.box([10,0,56.4+z],3,8,4,'#4a2a18',{top:1});   // blanket, seat, cantle, pommel
-    [1,-1].forEach(sd=>{ if(rid){ s.seg([2,sd*7,55+z],[4,sd*16,42+z],1.3,'#3a2414',100); s.box([4,sd*16,39.5+z],6,2.6,2.4,'#5a5650',{top:1}); } else { s.seg([2,sd*7,55+z],[2,sd*16,34+z],1.3,'#3a2414',100); s.box([2,sd*16,31+z],6,2.6,2.6,'#5a5650',{top:1}); } });   // stirrups, drawn up to the rider's feet
-    s.cylV([-12,6,48+z],2.2,9,IRD,1); s.smoke([-12,6,59+z],2.4);
-    s.rag([-19,-10.5,47+z],[1,0,0.15],14,13,'#9a6a3a','dark'); s.rag([-4,13,53+z],[1,0,0],10,16,'#3e4a5e');
-    s.wheel([4,-10.6,41+z],[0,-1,0],7.5,0.8);   // a cartwheel bolted to one side of the barrel
-    s.rope([-20,-8,44.5+z],[-8,8,44.5+z],0.5,0.9); s.rope([-20,8,44.5+z],[-8,-8,44.5+z],0.5,0.9);   // the crate roped on, crosswise
-    s.rope([-8,9,50+z],[-22,10,42+z],2,0.6); s.coil([-26,9,41+z],2.6,0.7);   // a line from the saddle, and a coil of it hung at the back   // a striped rag over the tail on one side, a long blanket end on the other
-    s.seg([34,9,66+z],[33,11,60+z],2.2,'#7a3a2e',3.5);   // a strip of red cloth knotted to one feeler
-    s.draw(); }
-  // the Hauler: a pack beetle. A domed back split down the middle, six short legs, the load lashed on top and slung under the wing-cases, a horn with a lamp
-  function hauler(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,4,5), z=bob(ph,1.2), SH='#5a4a2a'; s.shadow(44,22);
-    [20,0,-20].forEach((xx,k)=>[1,-1].forEach(sd=>s.leg([[xx,sd*13,30+z],[xx*1.15,sd*29,40+z],[xx*1.3,sd*34,0]],10,'#2e2a22',(k+(sd>0?0:1))%2?Math.PI:0,wk,false,true)));
-    s.cylH([-28,0,37+z],[22,0,38+z],16,'#6a5034',{bands:[0.08,0.36,0.64,0.92],bandCol:HOOP});   // the back: a great cask, banded
-    s.box([-8,19,30+z],18,6,12,'#7a5a3a',{planks:3,top:0.5}); s.box([-12,-19,28+z],14,6,10,'#6a4a2a',{planks:2,top:0.5});   // crates slung at its sides, not a matched pair
-    s.box([-6,0,55+z],26,20,9,WOOD,{planks:3,top:1}); s.box([-13,2,64+z],12,12,9,'#8a6a40',{planks:2,top:2}); s.sphere([6,-3,61+z],6,'#6a5a3a',{sy:0.7,bias:100});   // the load, roped on
-    s.box([28,0,30+z],13,13,13,'#5a4028',{planks:3}); [1,-1].forEach(sd=>s.disk([34.6,sd*3.6,39+z],[1,sd*0.2,0.1],2.8,'#e8a040',{glass:true,glow:true,rim:'#2a1e14',bias:2}));   // a crate for a head, two lamps in it
-    s.seg([32,0,46+z],[44,0,60+z],4.4,sh(SH,-0.35),3); s.seg([44,0,60+z],[48,0,56+z],2.8,sh(SH,-0.35),3); s.sphere([49,0,54+z],2.6,'#f0b050',{bias:4}); s.glow([49,0,54+z],13,'rgba(255,180,80,0.7)');
-    s.cylV([-26,8,50+z],3,12,IRD,1); s.smoke([-26,8,64+z],4);
-    s.rag([-8,10.5,63+z],[1,0,0],24,16,'#8a8060'); s.rag([-16,-10.5,64+z],[1,0,0],12,10,'#7a3a2e','light');
-    s.wheel([-6,-17,38+z],[0,-1,0],10,0.8);   // an old cartwheel lashed to its flank
-    [-16,-2,8].forEach(xx=>s.rope([xx,-11,60+z],[xx+2,11,60+z],-3,40)); s.rope([-22,-10,66+z],[10,-10,64+z],1,40);   // ropes thrown over the load and hitched down   // a tarp thrown over the load, slipping down one side; a scrap of red on the other
-    s.draw(); }
-
-  function crawler(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,6,7), z=bob(ph,1.5); s.shadow(64,30);
-    [-26,0,26].forEach((xx,k)=>[1,-1].forEach(sd=>s.leg([[xx,sd*20,30+z],[xx*1.25,sd*40,50+z],[xx*1.45,sd*58,0]],11,TIMB,(k+(sd>0?0:1))%2?Math.PI:0,wk)));
-    s.cylH([-38,0,34+z],[34,0,34+z],19,'#6a5038',{bands:[0.08,0.35,0.65,0.92],bandCol:HOOP});   // a planked, hooped hull, round as a cask
-    s.sphere([-8,0,50+z],20,'#7a5a3a',{sy:0.55,bias:100});   // a hide canopy stretched over it
-    s.box([18,0,48+z],18,16,18,'#5a4632',{planks:3,top:1.2}); s.disk([27.5,0,58+z],[1,0,0],5.5,'#5a8a8a',{glass:true,rim:BR,bias:3});
-    [-24,-32].forEach(xx=>{ s.cylV([xx,6,46+z],3.2,16,IRD,1.3); s.smoke([xx,6,64+z],3.4); });
-    s.seg([34,14,34+z],[54,22,26+z],5,IRON); s.seg([54,22,26+z],[70,26,14+z],4,IRON); s.seg([70,26,14+z],[80,24,20+z],3,IRD); s.seg([70,26,14+z],[80,30,8+z],3,IRD);
-    s.seg([34,-14,30+z],[52,-20,18+z],4,IRON); s.seg([52,-20,18+z],[64,-22,8+z],3.2,IRON); s.glow([67,-23,7+z],14,'rgba(120,180,255,0.8)');
-    s.rag([-10,19,46+z],[1,0,0],22,14,'#5a6a3a','dark'); s.rag([-30,-18,42+z],[1,0,0],10,9,'#6a4a5a');
-    s.wheel([12,-19.5,34+z],[0,-1,0],11,0.8); s.rope([-30,0,66+z],[10,0,66+z],-6,120); s.coil([-36,14,48+z],3.4,1);
-    s.draw(); }
-
-  function bellows(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,9,9), z=bob(ph,2.5); s.shadow(100,62);   // a great kiln-beetle: six jointed legs, the round deck its back, a head with mandibles before it
-    [46,0,-46].forEach((xx,k)=>[1,-1].forEach(sd=>s.leg([[xx*0.9,sd*40,72+z],[xx*1.2,sd*80,104+z],[xx*1.4,sd*96,0]],18,TIMB,(k+(sd>0?0:1))%2?Math.PI:0,wk,false,true)));
-    s.sphere([0,0,62+z],64,'#4a3a26',{sy:0.32}); s.cylV([0,0,74+z],62,6,TIMB,-10);   // the shell, and the deck laid on it
-    for(let k=0;k<12;k++){ const a=k/12*Math.PI*2; s.seg([Math.cos(a)*60,Math.sin(a)*60,80+z],[Math.cos(a)*60,Math.sin(a)*60,91+z],2.4,TIMB); }
-    s.box([80,0,46+z],32,30,30,'#4a3a26',{planks:4}); [1,-1].forEach(sd=>{ s.disk([96.5,sd*8,66+z],[1,sd*0.2,0.1],5.5,'#ff8a3a',{glass:true,glow:true,rim:'#2a1e14',bias:2}); s.seg([96,sd*10,58+z],[112,sd*16,52+z],5,'#2a2016',2); s.seg([112,sd*16,52+z],[114,sd*6,48+z],4,'#2a2016',2); });   // the head: ember eyes and iron mandibles
-    s.cylH([-96,0,56+z],[-66,0,58+z],20,'#4a3a26',{bands:[0.1,0.5,0.9],bandCol:HOOP}); s.box([-101,0,40+z],16,22,22,'#3e3020',{planks:3});   // the body behind: a tun and a crate
-    const CL='#9a6a40';   // the kiln is a termite mound: packed clay, knobbly, spired, honeycombed with vents
-    s.cone([0,0,81+z],46,40,28,CL,{cap:CL}); s.cone([4,-3,109+z],40,20,40,'#8e6038',{bias:14,cap:'#8e6038'}); s.cone([-3,2,149+z],18,5,38,'#845a34',{bias:28,cap:'#3a2414'});   // stacked: each section always over the one beneath it
-    [[28,18,10,34],[-24,-22,9,30],[12,-32,7,22],[-30,16,6,18]].forEach(([xx,yy,r0,h0],k)=>s.cone([xx,yy,81+z],r0,1.5,h0,k%2?'#8e6038':CL,{bias:0.3+k*0.01,cap:CL}));   // lesser spires at its foot
-    [[1,0.3,104,4],[0.2,1,120,3],[-0.8,0.6,96,3.4],[0.7,-0.7,132,2.6],[-0.3,-1,110,3],[0.9,0.1,150,2.2]].forEach(([nx,ny,zz,r0])=>{ const rr=zz<109?46-(zz-81)*0.21:40-(zz-109)*0.5; s.disk([nx*rr*0.98,ny*rr*0.98,zz+z],[nx,ny,0.2],r0,'#2a1810',{bias:2}); });   // vent holes
-    s.smoke([0,0,188+z],16);
-    [[50,30],[-40,46],[20,-56]].forEach(([xx,yy])=>s.rope([0,0,170+z],[xx,yy,92+z],6,2,1.6));   // guy-ropes from the chimney to the rail
-    s.wheel([60,-36,96+z],[0.6,-0.8,0],16,1.5);
-    s.rag([30,58,90+z],[1,-0.3,0],34,22,'#8a8060','dark',1); s.rag([-40,-52,90+z],[1,0.4,0],20,16,'#7a3a2e'); s.rag([-58,20,90+z],[0.3,1,0],16,12,'#3e4a5e','light',1);   // hides and sacking hung from the rail, wherever they were thrown
-    { const w=s.R([46.5,0,92+z]), n=s.R([1,0,0]); if(n[0]*0.612+n[1]*0.612>0.05){ const p=s.prj(w); s.glow([50,0,94+z],40+Math.sin(T_()*2.3)*6,'rgba(255,120,40,0.55)'); ops_push(s,(w[0]+w[1])+5,()=>{ const sc2=S; c.fillStyle='#1a120c'; c.beginPath(); c.moveTo(p[0]-9*sc2,p[1]+2*sc2); c.lineTo(p[0]-9*sc2,p[1]-10*sc2); c.arc(p[0],p[1]-10*sc2,9*sc2,Math.PI,0); c.lineTo(p[0]+9*sc2,p[1]+2*sc2); c.closePath(); c.fill();
-        const g=c.createLinearGradient(0,p[1]-18*sc2,0,p[1]+2*sc2); g.addColorStop(0,'#ffe080'); g.addColorStop(1,'#e04010'); c.fillStyle=g; c.beginPath(); c.moveTo(p[0]-7*sc2,p[1]+1*sc2); c.lineTo(p[0]-7*sc2,p[1]-10*sc2); c.arc(p[0],p[1]-10*sc2,7*sc2,Math.PI,0); c.lineTo(p[0]+7*sc2,p[1]+1*sc2); c.closePath(); c.fill();
-        c.strokeStyle='#2a2622'; c.lineWidth=2*sc2*0.6; c.beginPath(); c.arc(p[0],p[1]-10*sc2,10*sc2,Math.PI,0); c.stroke(); }); } }   // the arched furnace mouth, glowing
-    { const by=-55;   // the bellows on the deck beside the kiln: two boards, pleated leather between, a handle, and an iron nozzle into the fire
-      s.box([-2,by,81+z],34,16,2.5,TIMB); s.box([-2,by,83.5+z],30,14,7,'#6a3a22',{planks:6}); s.box([-2,by,90.5+z],34,16,2.5,TIMB);
-      s.seg([-2,by+8,86+z],[-2,-44,88+z],3,'#3a3632'); s.seg([-19,by,92+z],[-30,by,104+z],2.4,TIMB); s.seg([-30,by-6,104+z],[-30,by+6,104+z],2.2,TIMB); }
-    s.box([56,0,81+z],16,20,5,IRON); s.box([58,0,86+z],10,6,6,'#2a2a2e',{top:0.002});   // an anvil on the deck before the mouth
-    s.seg([-40,40,81+z],[-40,40,126+z],1.6,WOOD); s.poly([[-40,40,126+z],[-40,56,122+z],[-40,40,116+z]],CLOTH);
-    s.draw(); }
-  function magpie(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), wk=W(ph,12,12), z=bob(ph,3); s.shadow(60,30);   // a harvestman: the lookout is its body, slung high between six long thin legs, the knees above the roof
-    [24,0,-24].forEach((xx,k)=>[1,-1].forEach(sd=>s.leg([[xx*0.6,sd*16,146+z],[xx*1.6,sd*52,214+z],[xx*2.4,sd*76,0]],11,'#2e2a22',(k+(sd>0?0:1))%2?Math.PI:0,wk,false,true)));
-    s.cylH([-18,0,134+z],[18,0,134+z],11,'#5a4630',{bands:[0.15,0.5,0.85],bandCol:HOOP}); s.box([30,0,128+z],12,12,12,'#4a3a26',{planks:2}); [1,-1].forEach(sd=>s.disk([36.4,sd*3.4,136+z],[1,sd*0.2,0.1],2.6,'#e8a040',{glass:true,glow:true,rim:'#2a1e14',bias:2}));
-    s.seg([38,3,146+z],[56,14,170+z],1.4,IRD,3); s.seg([38,-3,146+z],[56,-14,170+z],1.4,IRD,3);   // its head and feelers, under the cabin
-    { const RG=[[146,22,26,8],[154,26,27,10],[164,27,24,10],[174,24,18,9],[183,18,9,7],[190,9,2,4]];   // the lookout is a straw skep: coil on coil of bound straw, domed
-      RG.forEach(([zz,r0,r1,h0],k)=>s.cone([0,0,zz+z],r0,r1,h0,k%2?'#b0905a':'#bc9c62',{hoops:[0.5],bias:k*3,cap:k===RG.length-1?'#9a7a48':(k%2?'#b0905a':'#bc9c62')})); }
-    s.disk([26.6,0,160+z],[1,0,0.1],6,'#1a120a',{bias:3}); s.disk([24.5,0,176+z],[1,0,0.3],3.2,'#f0d070',{glass:true,glow:true,rim:'#5a4020',bias:4});   // its entrance, and a lamp in a peep-hole above
-    s.seg([0,0,192+z],[0,0,214+z],2,WOOD); s.poly([[0,0,214+z],[0,16,210+z],[0,0,204+z]],'#9a8a62',200); s.seg([22,0,160+z],[34,0,166+z],2.4,BR,3);   // a rag flag on top, a spyglass out of the door
-    [[-14,'#f0c850'],[-4,'#c8d0d8'],[6,'#f0c850'],[14,'#d84030']].forEach(([yy,col],k)=>{ s.seg([10,yy,150+z],[10,yy,140-k*3+z],0.6,'#6a5a3a',2); s.sphere([10,yy,138-k*3+z],2.2,col,{bias:2}); });
-    s.cylV([-8,-6,182+z],2.6,12,IRD,1.5); s.smoke([-8,-6,196+z],4);
-    { const lx=6, ly=24; s.rope([lx-3,ly,150+z],[lx-3,ly,60+z],0,25,1.1); s.rope([lx+3,ly,150+z],[lx+3,ly,60+z],0,25,1.1); for(let zz=70;zz<150;zz+=12) s.seg([lx-3,ly,zz+z],[lx+3,ly,zz+z],1.4,'#7a5a3a',25.5); }   // a rope ladder down from the cabin
-    s.wheel([-27,0,166+z],[-1,0,0],11,40);   // a cartwheel strapped to the back of the skep
-    s.rag([18,20,148+z],[1,-0.4,0],18,24,'#9a6a3a','dark',30); s.rag([-20,-20,146+z],[1,0.5,0],12,30,'#6a4a5a',null,30);   // canvas strips hanging under the cabin, ragged
-    s.draw(); }
-  function strutterCantle(c,x,y,S,dir,ph){ const s=Scene(c,x,y,S,dir), z=bob(ph,1.2); s.box([-6,0,56.4+z],4,13,6,'#4a2a18',{top:1}); s.draw(); }   // the high back of the saddle, drawn again over a rider seen from behind
-  return { seed:v=>{ NEXT_SEED=v; }, skitter, strutter, hauler, crawler, bellows, magpie, strutterCantle, Scene, W, bob, IRON, IRD, BR, BRD, WOOD, TIMB, HOOP };
-})();
-
-// ════════ THE CINDERVEIL: masked salvagers who walk the long roads. "What lies, rides": anything unattended is salvage to them. ════════
-//   Their camp lies off the Scrublands road. A Skitter (a brass spider of theirs) may take your whole purse on the long roads: catch it, or go and get it back.
-//   Trust (CHOICE.cvTrust) is earned with salvage: 1 lets them trade with you and share their fire (after which they never take from you again), 2 better prices and the elder's mask.
-{ const ROADS=['hedgerow','longmeadow','scrubland','alderbrook','heath','foothills'];
-  const day=()=>Math.floor(dayClock/DAY_LEN), trust=()=>CHOICE.cvTrust||0;
-  const CV=(o)=>({race:'cinderveil', skin:2, hair:0, hairColor:3, beard:0, face:1, gender:'m', ...o, equip:{head:'cv_mask_resp', torso:'tunic_deep', armor:'cv_duster', shoulders:null, hands:'cv_gauntlets', legs:'hose_grey', feet:'cv_wrapboots', neck:null, weapon:null, offhand:null, ...(o.equip||{})}});
-  // ── salvage ──
-  ITEMS.cv_scrap={ name:'Salvage', slot:'misc', stack:true, stackMax:20, title:"Bent iron, a cart-hoop, nails, a hinge, half a lock. The Cinderveil want every scrap of it." }; PRICES.cv_scrap=3; if(typeof SELL_MISC!=='undefined') SELL_MISC.add?.('cv_scrap');
-  ICON_EXTRA.cv_scrap=(g2,E)=>{ g2.strokeStyle='#2a2622'; g2.lineWidth=3; g2.beginPath(); g2.arc(17,22,8,0.3,4.6); g2.stroke(); g2.strokeStyle='#6a6660'; g2.lineWidth=1.8; g2.stroke();
-    g2.fillStyle='#4a4642'; g2.fillRect(22,12,10,4); g2.fillStyle='#8a8680'; g2.fillRect(22,12,10,1.4); g2.fillStyle='#5a3e26'; g2.fillRect(12,27,14,4); [[25,26],[29,30],[14,14]].forEach(([x,y])=>{ g2.strokeStyle='#8a8680'; g2.lineWidth=1.2; g2.beginPath(); g2.moveTo(x,y); g2.lineTo(x+4,y+5); g2.stroke(); }); };
-  OBJ_DRAW.scrapheap=o=>{ const q=P(o.i+0.5,o.j+0.5), sd=(o.i*7+o.j*3)%5;   // a heap of old iron half sunk in the sand: a cartwheel, barrel staves and hoops, a bent plate, a pipe, chain, a crate lid
-    drawCached('scrapB'+sd,q.x,q.y,110,80,55,58,(X,Y)=>{ let r0=sd*97+13; const R=()=>(r0=(r0*577+101)%997)/997;
-      g.fillStyle='rgba(0,0,0,0.28)'; g.beginPath(); g.ellipse(X+3,Y+3,36,11,0,0,Math.PI*2); g.fill();
-      const md=g.createLinearGradient(0,Y-16,0,Y+2); md.addColorStop(0,'#8a7656'); md.addColorStop(1,'#5e4c34'); g.fillStyle=md; g.beginPath(); g.ellipse(X,Y-3,31,10,0,Math.PI,0); g.quadraticCurveTo(X+31,Y+3,X,Y+4); g.quadraticCurveTo(X-31,Y+3,X-31,Y-3); g.fill();   // a mound of sand and rust
-      const OL='#1e1814';
-      // barrel staves fanned out
-      for(let k=0;k<4;k++){ const a=-0.9+k*0.42+R()*0.15; g.save(); g.translate(X-14+k*3,Y-6); g.rotate(a); g.fillStyle=k%2?'#7a5a3a':'#6a4c30'; g.fillRect(-2.2,-16,4.4,16); g.strokeStyle=OL; g.lineWidth=0.8; g.strokeRect(-2.2,-16,4.4,16); g.restore(); }
-      // a bent plate of iron, rusted
-      g.fillStyle='#5a544c'; g.beginPath(); g.moveTo(X+2,Y-6); g.lineTo(X+22,Y-12); g.lineTo(X+26,Y-4); g.lineTo(X+6,Y+1); g.closePath(); g.fill(); g.strokeStyle=OL; g.lineWidth=0.9; g.stroke();
-      g.fillStyle='rgba(130,64,30,0.55)'; g.beginPath(); g.ellipse(X+15,Y-6,5,2.4,-0.3,0,Math.PI*2); g.fill(); g.fillStyle='#c8b090'; [[X+5,Y-4],[X+22,Y-10],[X+24,Y-5]].forEach(([a,b])=>{ g.beginPath(); g.arc(a,b,0.8,0,Math.PI*2); g.fill(); });
-      // a broken cartwheel leaning in the heap
-      const wx=X-6+sd*1.5, wy=Y-16; g.strokeStyle=OL; g.lineWidth=4; g.beginPath(); g.ellipse(wx,wy,11,10,0.25,0.4,Math.PI*2-0.2); g.stroke(); g.strokeStyle='#7a5636'; g.lineWidth=2.4; g.stroke();
-      g.lineWidth=1.6; for(let k=0;k<6;k++){ if(k===2) continue; const a=k*Math.PI/3+0.3; g.strokeStyle=OL; g.lineWidth=2.4; g.beginPath(); g.moveTo(wx,wy); g.lineTo(wx+Math.cos(a)*10,wy+Math.sin(a)*9); g.stroke(); g.strokeStyle='#8a6a44'; g.lineWidth=1.3; g.stroke(); }
-      g.fillStyle='#3a3430'; g.beginPath(); g.arc(wx,wy,2.6,0,Math.PI*2); g.fill(); g.strokeStyle=OL; g.lineWidth=0.8; g.stroke();
-      // a barrel hoop and a length of pipe
-      g.strokeStyle=OL; g.lineWidth=3; g.beginPath(); g.ellipse(X+14,Y-16,8,3.6,-0.25,0,Math.PI*2); g.stroke(); g.strokeStyle='#6a5e52'; g.lineWidth=1.5; g.stroke();
-      g.strokeStyle=OL; g.lineWidth=4.4; g.lineCap='round'; g.beginPath(); g.moveTo(X-24,Y-4); g.lineTo(X-6,Y-12); g.stroke(); g.strokeStyle='#8a5a3a'; g.lineWidth=2.8; g.stroke(); g.lineCap='butt';
-      // a crate lid, and chain trailing into the sand
-      g.fillStyle='#8a6a44'; g.beginPath(); g.moveTo(X+18,Y-22); g.lineTo(X+30,Y-18); g.lineTo(X+27,Y-10); g.lineTo(X+15,Y-14); g.closePath(); g.fill(); g.strokeStyle=OL; g.lineWidth=0.8; g.stroke(); g.beginPath(); g.moveTo(X+16.5,Y-18); g.lineTo(X+28.5,Y-14); g.stroke();
-      g.strokeStyle='#4a4640'; g.lineWidth=1.3; for(let k=0;k<6;k++){ g.beginPath(); g.ellipse(X-22+k*3.2,Y+1-(k%2)*0.8,1.7,1.1,0,0,Math.PI*2); g.stroke(); }
-      g.fillStyle='rgba(200,180,140,0.35)'; for(let k=0;k<14;k++) g.fillRect(X-28+R()*56,Y-6+R()*8,1.4,0.9); }); };   // sand blown over it
-  onUse(['scrapheap'],o=>{ if(o.camp){ logMsg("The Cinderveil's own heap. Hands off.",'#c8a860'); return; } CHOICE.cvHeaps=CHOICE.cvHeaps||{}; const k=areaId+':'+o.i+','+o.j;
-    if(CHOICE.cvHeaps[k]===day()){ logMsg('Nothing worth having left in this heap today.','#c8a860'); return; }
-    const n=1+(rnd01(day(),o.i+o.j,77)<0.5?1:0); let got=0; for(let t=0;t<n;t++){ const f=slotFor('cv_scrap'); if(f>=0){ player.inv[f]='cv_scrap'; got++; } }
-    if(got){ CHOICE.cvHeaps[k]=day(); const at=OBJECTS.indexOf(o); if(at>=0){ OBJECTS.splice(at,1); blocked.delete(o.i+','+o.j); } logMsg('You pick through the old iron and take what is worth carrying: '+got+' Salvage.','#8ac070'); try{ SND.fx('page'); }catch(e){} updateHud(); } else logMsg('Inventory is full.','#e0b070'); });
-  NEAR_NAME.scrapheap='Scrap Heap';
-  // heaps turn up somewhere new each day (the wind uncovers them, the Cinderveil carry them off), and a picked heap is gone
-  [['scrubland',4],['heath',2],['foothills',2],['longmeadow',2],['alderbrook',1]].forEach(([a,N])=>wrap(a,'objects',l=>{ const A=AREAS[a], d=day(), out=[], taken=new Set(); l.forEach(o=>{ const [fw,fh]=o.fp||[1,1]; for(let x=-1;x<=fw;x++) for(let y=-1;y<=fh;y++) taken.add((o.i+x)+','+(o.j+y)); });
-    Object.values(A.entries||{}).forEach(e=>{ for(let x=-2;x<=2;x++) for(let y=-2;y<=2;y++) taken.add((e.i+x)+','+(e.j+y)); });
-    const sv=areaId; areaId=a; try{ for(let t=0, k=0; t<60 && k<N; t++){ const i=1+Math.floor(rnd01(d,t,701+a.length)*(A.w-2)), j=1+Math.floor(rnd01(d,t,709+a.length)*(A.h-2)), key=i+','+j;
-        if(taken.has(key)) continue; const G=groundAt(i+0.5,j+0.5); if(G.path>0.2 || (typeof poolAt==='function' && poolAt(i+0.5,j+0.5))) continue;
-        if((CHOICE.cvHeaps||{})[a+':'+key]===d) { taken.add(key); k++; continue; }   // picked today: gone
-        out.push({type:'scrapheap',i,j}); for(let x=-2;x<=2;x++) for(let y=-2;y<=2;y++) taken.add((i+x)+','+(j+y)); k++; } } finally{ areaId=sv; }
-    return [...l,...out]; }));
-
-  // ── the machines, standing in the world ──
-  OBJ_DRAW.cvwalker=o=>{ const [fw,fh]=o.fp||[1,1], q=P(o.i+fw/2,o.j+fh/2); CVM3.seed(o.i*7919+o.j*131+17); CVM3[o.kind](g,q.x,q.y,o.s||1,o.dir||0,null); };
-  OBJ_DRAW.skitter=o=>{ const q=P(o.x,o.y); if(o.st==='dead'){ g.save(); g.translate(q.x,q.y); g.rotate(1.2); CVM3.skitter(g,0,0,0.85,o.dir,null); g.restore(); return; }
-    CVM3.skitter(g,q.x,q.y+(o.st==='rest'?Math.sin(gt*20)*0.8:0),0.85,o.dir,o.moving?gt*14:null);
-    if(o.purse && o.st==='rest'){ g.fillStyle='#f0c850'; const t=(gt*3)%1; g.globalAlpha=1-t; g.beginPath(); g.arc(q.x+8,q.y-24-t*14,2.4,0,Math.PI*2); g.fill(); g.globalAlpha=1; } };   // counting your coins
-  NEAR_NAME.skitter='Skitter'; NEAR_NAME.cvwalker='';
-
-  // ── the camp ──
-  AREA_PATHS.cvcamp=[ [[-0.5,10.5],[5,10.4],[10,11],[13,11.2]], [[13,11],[16,8],[17,6]] ];
-  AREA_PATHS.scrubland=AREA_PATHS.scrubland||[]; AREA_PATHS.scrubland.push([[7.2,26.5],[12.5,26.5]]);
-  AREAS.cvcamp={ fence:{r:false,l:false}, mini:{x:0,y:0}, notches:()=>[], dummy:null, w:26, h:20, theme:'sand', sandKind:'clay', scrub:gy=>0.55, label:'Cinderveil Camp',
-    objects:()=>[ {type:'teleporter', i:0, j:10, to:'scrubland', entry:'fromCamp2'},
-      {type:'cvwalker', kind:'bellows', i:14, j:1, fp:[5,5], dir:1, s:1.4}, {type:'cvwalker', kind:'magpie', i:21, j:11, fp:[2,2], dir:7, s:1.1}, {type:'cvwalker', kind:'hauler', i:7, j:15, fp:[3,2], dir:0, s:1.35},
-      {type:'cvwalker', kind:'strutter', i:3, j:4, fp:[2,2], dir:2, s:1.15}, {type:'cvwalker', kind:'skitter', i:10, j:7, fp:[1,1], dir:5, s:0.85}, {type:'cvwalker', kind:'skitter', i:19, j:16, fp:[1,1], dir:3, s:0.85},
-      {type:'tent', i:5, j:1, fp:[2,2]}, {type:'tent', i:9, j:1, fp:[2,2]}, {type:'tent', i:2, j:14, fp:[2,2]}, {type:'tent', i:22, j:3, fp:[2,2]},
-      {type:'campfire', i:12, j:11}, {type:'logseat', i:11, j:12}, {type:'logseat', i:13, j:12, r:1}, {type:'logseat', i:11, j:10},
-      {type:'brazier', i:4, j:9}, {type:'brazier', i:4, j:12}, {type:'brazier', i:19, j:8},
-      {type:'anvil', i:17, j:10}, {type:'forge', i:23, j:6}, {type:'scrapheap', i:16, j:14, camp:true}, {type:'scrapheap', i:22, j:16, camp:true}, {type:'scrapheap', i:12, j:16, camp:true},
-      {type:'washline', i:7, j:6, noblock:true}, {type:'crate', i:24, j:8}, {type:'barrel', i:24, j:9}, {type:'barrel', i:9, j:17}, {type:'sandrock', i:0, j:2, v:1}, {type:'sandrock', i:25, j:18, v:3}, {type:'deadtree', i:1, j:18, s:0.8} ],
-    npcs:()=>[
-      { id:'cvodra', name:'Ashmother Odra', i:12, j:9, dir:0, opts:CV({gender:'f', cvBits:0b010000101, equip:{head:'cv_mask_elder', torso:'tunic_red', armor:'cv_duster_elder', neck:'cv_scarf'}}) },
-      { id:'cvbrannock', name:'Brannock the Fused', i:17, j:11, dir:6, opts:CV({cvBits:0b000001100, equip:{head:'cv_mask_weld', armor:'cv_apron', neck:'cv_scarf'}}) },
-      { id:'cvtinny', name:'Tinny', i:8, j:13, dir:1, wander:[[8,13],[11,14],[6,11]], speed:0.6, opts:CV({gender:'f', cvBits:0b100010010, cvPack:true, equip:{head:'cv_mask_resp', armor:'cv_duster_rust', shoulders:'cv_harness', neck:'cv_scarf_grey'}}) },
-      { id:'cvwarden', name:'Veil-Warden', i:2, j:8, dir:2, opts:CV({cvPack:true, equip:{head:'cv_helm_suit', armor:'cv_suit_iron', weapon:'morningstar'}}) } ],
-    mobs:()=>[], entries:{ fromScrub:{i:1,j:10} } };
-  AREA_TIER.cvcamp=2;
-  wrap('scrubland','objects',l=>[...l,{type:'teleporter', i:11, j:26, to:'cvcamp', entry:'fromScrub'}]);
-  AREAS.scrubland.entries.fromCamp2={i:10,j:26};
-
-  // ── the purse and how you get it back ──
-  const job=()=>CHOICE.cvJob, scrap=()=>invCount('cv_scrap');
-  const takeScrap=n=>{ for(let k=0;k<n;k++){ const j=player.inv.indexOf('cv_scrap'); if(j>=0) player.inv[j]=null; } };
-  const back=()=>TALKERS.cvodra();
-  const CVSHOP=()=>['cv_mask_resp','cv_mask_weld','cv_mask_plain','cv_duster','cv_duster_rust','cv_duster_red','cv_wrap','cv_gauntlets','cv_wrapboots','cv_scarf','cv_scarf_grey','cv_harness',...(trust()>=2?['cv_mask_elder','cv_duster_elder']:[])].filter(id=>ITEMS[id]);
-  Object.assign(PRICES,{ cv_mask_resp:40, cv_mask_weld:45, cv_mask_plain:30, cv_mask_elder:160, cv_duster:55, cv_duster_rust:55, cv_duster_red:60, cv_duster_elder:180, cv_wrap:40, cv_gauntlets:35, cv_wrapboots:30, cv_scarf:12, cv_scarf_grey:12, cv_harness:45 });
-  TALKERS.cvodra=()=>{ const st=CHOICE.cvStolen||0, o=[];
-    const intro = st ? "“You followed it here. Few do.” <i>The mask tilts; something behind it clicks.</i> “What lies, rides. Your purse lay on the road, unwatched; by our law it is ours. But you came for it, and we respect the ones who come.”"
-      : trust()===0 ? "“We do not trade with faces we do not know. You have a face. That is already one thing against you.”"
-      : trust()===1 ? "“Road-friend. Sit, if you like. Mind the pot, it bites.”" : "“Ah. The one who brings us iron. Sit by me.”";
-    if(st){ if(job()!=='purse') o.push({label:'“How do I earn it back?”', fn:()=>{ CHOICE.cvJob='purse'; remember('cvpurse','job',"Ashmother Odra will give back the purse the Skitter took for five pieces of Salvage: old iron, from the heaps in the Scrublands, the heath, the foothills, or off the masked cutpurses on the roads."); say('Ashmother Odra',"“Iron. Five pieces of it. Old cart-hoops, chain, hinges, from the heaps along the roads. The crewless cutpurses carry some too, if you can take it off them. We will not mourn them.”",[{label:'Back.',fn:back},bye]); }});
-      else o.push({label:'Hand over five Salvage.'+(scrap()<5?' ('+scrap()+'/5)':''), off:scrap()<5, fn:()=>{ takeScrap(5); player.purse+=st; CHOICE.cvStolen=0; CHOICE.cvJob=null; CHOICE.cvTrust=Math.max(trust(),1); remember('cvpurse','back',"You earned your purse back from the Cinderveil. Ashmother Odra calls you road-friend now."); updateHud();
-        say('Ashmother Odra',"“Good iron.” <i>She weighs the purse once in a three-fingered glove and drops it in your hand. Every coin is there.</i> “Road-friend, then. You may trade with us. And if you sit at our fire, no Skitter of ours will touch you again.”",[{label:'Back.',fn:back},bye]); }});
-      o.push({label:'Pay the finder\'s tithe (a quarter of it).', note:'-'+Math.ceil(st/4)+'c', fn:()=>{ player.purse+=st-Math.ceil(st/4); CHOICE.cvStolen=0; CHOICE.cvJob=null; remember('cvpurse','tithe',"You paid the Cinderveil a quarter of your purse to have the rest back."); updateHud(); say('Ashmother Odra',"“A fair finder's tithe.” <i>She counts out your coin, all but a quarter.</i> “We are not thieves. We are finders.”",[bye]); }}); }
-    else if(trust()===0){ if(job()!=='trust') o.push({label:'“How does a stranger stop being one?”', fn:()=>{ CHOICE.cvJob='trust'; remember('cvjob','trust',"Ashmother Odra will trade with you if you bring the Cinderveil five pieces of Salvage."); say('Ashmother Odra',"“Bring us iron. Five pieces. Then we will know your hands, if not your face.”",[{label:'Back.',fn:back},bye]); }});
-      else o.push({label:'Hand over five Salvage.'+(scrap()<5?' ('+scrap()+'/5)':''), off:scrap()<5, fn:()=>{ takeScrap(5); CHOICE.cvTrust=1; CHOICE.cvJob=null; player.purse+=20; remember('cvjob','done',"You brought the Cinderveil iron. They will trade with you now."); updateHud(); say('Ashmother Odra',"“Good hands.” <i>She presses twenty coppers on you, for the iron.</i> “We trade with you now, road-friend.”",[{label:'Back.',fn:back},bye]); }}); }
-    if(trust()>=1){
-      if(!CHOICE.cvFire) o.push({label:'Sit at their fire.', fn:()=>{ CHOICE.cvFire=true; remember('cvfire','yes',"You sat at the Cinderveil's fire. No Skitter of theirs will take from you again."); say('Ashmother Odra',"<i>You sit. Nobody speaks. Somewhere under a coat, something shifts and settles, like a cat curling up.</i> “Now you have shared our fire,” she says at last. “Our law has a door in it, and you have walked through it. Nothing of yours lies unwatched to us again.”",[bye]); }});
-      if(trust()===1 && !CHOICE.cvCrawl) o.push({label:'“Is there work for a road-friend?”', fn:()=>{ CHOICE.cvCrawl='asked'; remember('cvcrawl','asked',"A crewless gang stole a Cinderveil Crawler, a six-legged salvage engine, and raid with it in the Foothills. Ashmother Odra wants it stopped, and the gang broken.");
-        say('Ashmother Odra',"“Crewless. Blank masks, no fire, no law. They took one of our Crawlers and drive it up and down the Foothills road, cutting carts open like loaves. Break them. Break it, if you must. We can build another. We cannot build trust in the roads once it is gone.”",[{label:'Back.',fn:back},bye]); }});
-      if(CHOICE.cvCrawl==='slain') o.push({label:'“The Crawler is down, and its crew.”', fn:()=>{ CHOICE.cvCrawl='done'; player.purse+=60; remember('cvcrawl','done',"You broke the crewless gang and their stolen Crawler. Ashmother Odra paid you, and spoke of kinship."); updateHud();
-        say('Ashmother Odra',"<i>She listens to the whole of it without a word, then counts sixty coppers into your palm.</i> “Good. Now feed the Bellows an ember core and five pieces of iron, and you are near enough kin.”",[{label:'Back.',fn:back},bye]); }});
-      if(trust()===1 && CHOICE.cvCrawl==='done'){ if(job()!=='trust2') o.push({label:'“Is there more I can do for you?”', fn:()=>{ CHOICE.cvJob='trust2'; remember('cvjob','trust2',"Ashmother Odra wants five pieces of Salvage and an ember core, for the Bellows' firebox."); say('Ashmother Odra',"“The Bellows eats. Five pieces of iron, and an ember core for its firebox. Do that and you are kin to us, near enough.”",[{label:'Back.',fn:back},bye]); }});
-        else o.push({label:'Bring five Salvage and an ember core.'+(scrap()<5||!invCount('ember_core')?' ('+scrap()+'/5'+(invCount('ember_core')?', core':', no core')+')':''), off:scrap()<5||!invCount('ember_core'), fn:()=>{ takeScrap(5); const j=player.inv.indexOf('ember_core'); if(j>=0) player.inv[j]=null; CHOICE.cvTrust=2; CHOICE.cvJob=null; remember('cvjob','done2',"You fed the Bellows. The Cinderveil count you near enough kin: better prices, and the elders' masks."); updateHud(); say('Ashmother Odra',"<i>The Bellows roars as the core goes in; smoke climbs, and someone behind a mask laughs.</i> “Near enough kin. We will sell you an elder's mask now, and cheaper. Do not wear it badly.”",[{label:'Back.',fn:back},bye]); }}); } }
-    if(trust()>=2 && CHOICE.cvFire && !CHOICE.cvFace) o.push({label:'“Will you show me your face?”', fn:()=>{ CHOICE.cvFace=true; remember('cvface','seen',"Ashmother Odra showed you what lies under a Cinderveil mask. You will not speak of it.");
-      say('Ashmother Odra',["<i>For a long time she does nothing. Then she sends the others from the fire with a click of her fingers, and turns her back to the camp.</i>",
-        "<i>The buckle. The hood. The mask comes away with a soft sound, like a seal breaking.</i>",
-        "<i>You will remember the eyes most: too many of them, small and gold as coins, all of them on you. The rest you will not be able to describe afterwards, and you will find you do not want to.</i>",
-        "“Now you know why we keep the fire hot,” she says, and the mask goes back on. “And why we never stay. Kin.” <i>It is the first time she has said it without 'near enough'.</i>"],[bye]); }});
-    o.push({label:'“What are you, under all that?”', fn:()=>say('Ashmother Odra',["“Cold,” she says. “Always cold.” <i>It is not an answer, and she knows it.</i>"],[{label:'Back.',fn:back},bye])}, bye);
-    say('Ashmother Odra',[intro],o); };
-  TALKERS.cvbrannock=()=>{ const n=scrap(); say('Brannock the Fused',["“Iron? I pay four a piece. Good iron, five. There is no bad iron.”"+(trust()===0?" <i>He does not look up from the anvil. He has not decided about you.</i>":"")],[
-    ...(n?[{label:'Sell your Salvage ('+n+').', note:'+'+(n*(trust()>=1?5:4))+'c', fn:()=>{ takeScrap(n); player.purse+=n*(trust()>=1?5:4); updateHud(); say('Brannock the Fused',"<i>He sorts it without looking: hinge, hoop, nail, chain.</i> “Good.”",[bye]); }}]:[]), bye]); };
-  TALKERS.cvtinny=()=>say('Tinny',[["“Heaps in the Scrublands, two along the road and one by the old ruin. One on the heath by the shepherd's lean-to, one in the foothills, one in the meadow, one by the brook. They grow back. Iron always grows back.”","“The crewless ones with the blank masks? Not ours. Cutpurses. Take their iron, we won't weep.”","“The Skitters only go for purses left unwatched. Yours was in your hand? Then you weren't watching your hand.”"][day()%3]],[bye]);
-  TALKERS.cvwarden=()=>say('Veil-Warden',[trust()>=1?"<i>The beaked helm dips: you may pass.</i>":"<i>The beaked helm turns to follow you. It says nothing. The ember-pot on its back ticks as it cools.</i>"],[bye]);
-  JOURNAL.push(['The Cinderveil', ()=>{ const st=CHOICE.cvStolen||0, t=trust();
-    if(!st && !t && !CHOICE.cvJob && !CHOICE.cvMet) return null;
-    if(st) return ['active', job()==='purse' ? "A Skitter took your purse ("+st+"c). Ashmother Odra will give it back for five pieces of Salvage ("+scrap()+"/5), from the scrap heaps on the long roads." : "A brass Skitter took your whole purse ("+st+"c) and ran. Its people, the masked Cinderveil, keep camp off the Scrublands road."];
-    if(t===0) return ['active', job()==='trust' ? "Bring the Cinderveil five pieces of Salvage so they will trade with you ("+scrap()+"/5)." : "The Cinderveil, masked salvagers, keep camp off the Scrublands road. They do not trade with strangers."];
-    if(t===1) return ['active', CHOICE.cvCrawl==='asked' ? "Break the crewless gang and their stolen Crawler in the Foothills." : CHOICE.cvCrawl==='slain' ? "The stolen Crawler is down. Tell Ashmother Odra." : job()==='trust2' ? "Ashmother Odra wants five Salvage ("+scrap()+"/5) and an ember core for the Bellows' firebox." : "The Cinderveil trade with you now"+(CHOICE.cvFire?", and you have shared their fire.":". Sit at their fire, and their Skitters will leave you be.")];
-    return ['done', "The Cinderveil count you near enough kin."+(CHOICE.cvFire?" You have shared their fire.":"")]; }]);
-  if(typeof PURSUITS!=='undefined') PURSUITS.add('The Cinderveil');
-  { const _h=npcHasNews; npcHasNews=function(n){ if(n && n.id==='cvodra'){ if((job()==='purse'||job()==='trust') && scrap()>=5 || (job()==='trust2' && scrap()>=5 && invCount('ember_core')) || CHOICE.cvCrawl==='slain') return '?'; if((CHOICE.cvStolen && job()!=='purse') || (!trust() && !job()) || (trust()===1 && !job() && CHOICE.cvCrawl!=='asked')) return '!'; return null; } return _h.apply(this,arguments); }; }
-
-  // ── the Skitter: it creeps up, takes the whole purse, and runs for the far edge, stopping now and then to count. Catch it before it gets there. ──
-  let lastArea=null;
-  const exitFar=()=>{ const t=OBJECTS.filter(o=>o.type==='teleporter'); let best=null, bd=-1; t.forEach(o=>{ const d=Math.hypot(o.i+0.5-player.x,o.j+0.5-player.y); if(d>bd){ bd=d; best=o; } }); return best?[best.i+0.5,best.j+0.5]:[AREAS[areaId].w-0.5,AREAS[areaId].h/2]; };
-  const lose=o=>{ CHOICE.cvStolen=(CHOICE.cvStolen||0)+o.purse; CHOICE.cvMet=true; o.purse=0; const k=OBJECTS.indexOf(o); if(k>=0) OBJECTS.splice(k,1);
-    if(o.slow) remember('cvlaw','fire',"The Cinderveil's law: anything unwatched is theirs to take, but never from someone who has shared their fire. Their camp lies off the Scrublands road; a stolen purse waits there, and is never spent.");
-    remember('cvpurse','taken',"A brass Skitter ran off with your purse. Its people, the masked Cinderveil, keep camp off the Scrublands road, where the smoke rises."); logMsg('The Skitter is gone, and your purse with it.','#e07050'); };
-  const SPEED={stalk:2.3, flee:4.2};
-  { const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{
-    if(!running || !player) return r;
-    if(areaId!==lastArea){ const prev=lastArea; lastArea=areaId;
-      if(ROADS.includes(areaId) && player.purse>=25 && playerLevel()>=10 && !CHOICE.cvStolen && !CHOICE.cvFire && (CHOICE.cvSkit||{})[areaId]!==day() && (!CHOICE.cvFirst || encounter('skit'+areaId,0.25))){
-        CHOICE.cvSkit={...(CHOICE.cvSkit||{}), [areaId]:day()}; const A=AREAS[areaId]; let sx=0, sy=0;
-        for(let t=0;t<20;t++){ sx=1+Math.random()*(A.w-2); sy=1+Math.random()*(A.h-2); if(Math.hypot(sx-player.x,sy-player.y)>6) break; }
-        OBJECTS.push({type:'skitter', x:sx, y:sy, i:Math.floor(sx), j:Math.floor(sy), st:'stalk', t:0, dir:0, noblock:true, purse:0, slow:!CHOICE.cvFirst}); CHOICE.cvFirst=true; } }
-    const sk=OBJECTS.filter(o=>o.type==='skitter'); if(!sk.length) return r;
-    for(const o of sk){ o.t+=dt; const dx=player.x-o.x, dy=player.y-o.y, d=Math.hypot(dx,dy); o.moving=false;
-      if(o.st==='dead'){ if(o.t>4){ OBJECTS.splice(OBJECTS.indexOf(o),1); } continue; }
-      if(o.st==='stalk'){ if(d<0.75){ o.purse=player.purse; player.purse=0; o.st='flee'; o.t=0; o.grace=0.7; o.x-=dx/(d||1)*1.8; o.y-=dy/(d||1)*1.8; o.goal=exitFar(); CHOICE.cvMet=true; updateHud(); banner('Your purse!','#e07050',1800); logMsg('Something brass skitters out of nowhere, and your purse is gone! Catch it!','#e07050'); try{ SND.fx('hit'); }catch(e){} }
-        else if(d<14){ const k=SPEED.stalk*dt/d; o.x+=dx*k; o.y+=dy*k; o.dir=dirFromDelta(dx,dy); o.moving=true; } }
-      else if(o.st==='flee' || o.st==='rest'){
-        if(o.grace>0) o.grace-=dt;
-        if(d<1.1 && !(o.grace>0)){ player.purse+=o.purse; o.purse=0; o.st='dead'; o.t=0; const f=slotFor('cv_scrap'); if(f>=0) player.inv[f]='cv_scrap'; updateHud(); banner('Caught it!','#8ac070',1400); logMsg('You grab the Skitter by a leg. It drops your purse, twitches, and goes still. (Loot: Salvage)','#8ac070'); if(o.slow) remember('cvlaw','fire',"The Cinderveil's law: anything unwatched is theirs to take, but never from someone who has shared their fire. Their camp lies off the Scrublands road; a stolen purse waits there, and is never spent."); continue; }
-        if(o.st==='rest'){ if(o.t>(o.slow?2.6:1.3)){ o.st='flee'; o.t=0; } continue; }
-        if(o.t>(o.slow?1.1:1.7)){ o.st='rest'; o.t=0; continue; }   // it stops to count your coins (the first one you meet, often: it is young, and greedy)
-        const gx=o.goal[0]-o.x, gy=o.goal[1]-o.y, gd=Math.hypot(gx,gy); if(gd<0.6){ lose(o); continue; }
-        let ax=gx/gd, ay=gy/gd; if(d<4){ ax-=dx/d*0.6; ay-=dy/d*0.6; const l=Math.hypot(ax,ay)||1; ax/=l; ay/=l; }   // and veers from you as it runs
-        const sp=SPEED.flee*(o.slow?0.55:1); o.x+=ax*sp*dt; o.y+=ay*sp*dt; o.x=Math.max(0.3,Math.min(AREAS[areaId].w-0.3,o.x)); o.y=Math.max(0.3,Math.min(AREAS[areaId].h-0.3,o.y)); o.dir=dirFromDelta(ax,ay); o.moving=true; }
-      o.i=Math.floor(o.x); o.j=Math.floor(o.y); }
-    }catch(e){ console.error(e); } return r; }; }
-  { const _s=switchArea; switchArea=function(...a){ try{ (typeof OBJECTS!=='undefined'?OBJECTS:[]).filter(o=>o.type==='skitter' && o.purse).forEach(lose); }catch(e){} return _s.apply(this,a); }; }   // walk away and it is gone, purse and all
-
-  // ── the crewless: cutpurses in blank masks on the long roads ──
-  ROADS.forEach(a=>wrap(a,'mobs',l=>{ if(!encounter('cvthief'+a,0.45)) return l; const A=AREAS[a], n=nightAmt()>0.5?2:1, out=[];
-    for(let k=0;k<n;k++){ const i=Math.max(1,Math.min(A.w-2,Math.round(A.w*(0.3+0.4*rnd01(day(),k,a.length)) ))), j=Math.max(1,Math.min(A.h-2,Math.round(A.h*(0.25+0.5*rnd01(k,day(),a.length+3)))));
-      out.push({ name:'Crewless Cutpurse', type:'bandit', i, j, faction:'veilthief', daily:true, opts:CV({cvBits:[0b001000000,0b000000100,0b010000000][k%3], equip:{head:'cv_mask_plain', armor:'cv_wrap', hands:'gloves', weapon:'dagger'}}) }); }
-    return [...l,...out]; }));
-  dqVictory(()=>{ mobs.filter(m=>m.dead && m.faction==='veilthief' && !m.cvLoot).forEach(m=>{ m.cvLoot=true; const n=Math.random()<0.35?1:0; for(let k=0;k<n;k++){ const f=slotFor('cv_scrap'); if(f>=0) player.inv[f]='cv_scrap'; } const c2=3+Math.floor(Math.random()*8); player.purse+=c2; logMsg('Loot: '+(n?n+' Salvage, ':'')+c2+'c','#8ac070');   /* salvage now and then, not off every thief */ }); updateHud(); });
-  if(typeof MAP_LAYOUT!=='undefined') MAP_LAYOUT=null;
-}
-
-// ════════ the Cinderveil on the move: a hauler and a strutter walk the long roads some days, back and forth along the track; and the face under the mask, for kin ════════
-{ const LEN=pts=>{ const c=[0]; for(let k=1;k<pts.length;k++) c.push(c[k-1]+Math.hypot(pts[k][0]-pts[k-1][0],pts[k][1]-pts[k-1][1])); return c; };
-  const at=(pts,cum,d)=>{ for(let k=1;k<pts.length;k++) if(d<=cum[k]){ const t=(d-cum[k-1])/((cum[k]-cum[k-1])||1); return [pts[k-1][0]+(pts[k][0]-pts[k-1][0])*t, pts[k-1][1]+(pts[k][1]-pts[k-1][1])*t]; } return pts[pts.length-1]; };
-  const CAR=['hedgerow','longmeadow','heath','scrubland'];
-  CAR.forEach(a=>wrap(a,'objects',l=>encounter('cvcar'+a,0.4) ? [...l,{type:'cvcaravan', x:0, y:0, i:0, j:0, t:rnd01(Math.floor(dayClock/DAY_LEN),a.length,55)*200, noblock:true}] : l));
-  OBJ_DRAW.cvcaravan=o=>{ if(!o.ok) return; const h=P(o.x,o.y), s=P(o.sx,o.sy); const ph=gt*5.5;
-    const ds=()=>{ CVM3.seed(4441); CVM3.strutter(g,s.x,s.y,1.15,o.dir,ph); }, dh=()=>{ CVM3.seed(9109); CVM3.hauler(g,h.x,h.y,1.35,o.dir,ph+1); }; if(o.sx+o.sy<o.x+o.y){ ds(); dh(); } else { dh(); ds(); } };
-  NEAR_NAME.cvcaravan='Cinderveil Caravan';
-  onUse(['cvcaravan'],o=>{ const t=CHOICE.cvTrust||0; logMsg(t>=1 ? "The hauler's driver raises a three-fingered hand to you: road-friend. The caravan clanks on toward the camp." : "A masked rider on the strutter turns to watch you as the hauler trudges by. Nobody speaks.",'#c8a860'); CHOICE.cvMet=true; });
-  { const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{ if(!running) return r; for(const o of OBJECTS){ if(o.type!=='cvcaravan') continue;
-      const pts=(AREA_PATHS[areaId]||[])[0]; if(!pts) continue; const cum=LEN(pts), L=cum[cum.length-1]; o.t+=dt*0.9;
-      const m=o.t%(2*L), fwd=m<L, d=fwd?m:2*L-m, p=at(pts,cum,Math.max(0.5,Math.min(L-0.5,d))), q=at(pts,cum,Math.max(0.5,Math.min(L-0.5,d+(fwd?3.2:-3.2))));
-      o.x=p[0]; o.y=p[1]; o.sx=q[0]; o.sy=q[1]; o.dir=dirFromDelta(q[0]-p[0],q[1]-p[1]); o.i=Math.floor(o.x); o.j=Math.floor(o.y); o.dz=Math.max(o.x+o.y,o.sx+o.sy)+0.5; o.ok=true; } }catch(e){ console.error(e); } return r; }; }
-
-
-}
-
-// ════════ Cinderveil, round two: the stolen Crawler, chalk in the crypts, finds on the heath and in the foothills ════════
-{ const trust=()=>CHOICE.cvTrust||0;
-  // ── the Rogue Crawler, a foe ──
-  FOES.crawler={ label:'Rogue Crawler', base:105, stagger:1.45, pattern:[ {wait:1.6,wind:1.35,after:0.9,dir:'right'}, {wait:1.0,wind:1.1,after:0.7,dir:'left'}, {wait:0.3,wind:0.8,after:1.0,dir:'up'}, {wait:1.8,wind:1.4,after:0.9,dir:'left',feint:'right'} ] };
-  window.drawCrawlerFoe=(x,B,e)=>{ CVM3.crawler(g,x,B+4,1.05,e.dir||0,(e.moving||e.state==='windup')?gt*(e.state==='windup'?3:8):null);
-    if(e.state==='windup' && !e.dead){ const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(x,B-30,70,40,'120,180,255',0.35+Math.sin(gt*20)*0.12); g.globalCompositeOperation=gs; } };   // the torch flares before it lunges
-  wrap('foothills','mobs',l=>CHOICE.cvCrawl==='asked' ? [...l,
-    { name:'Rogue Crawler', type:'crawler', i:6, j:24, faction:'rogueveil', hpMul:2.2, opts:{gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:null,offhand:null}} },
-    { name:'Crewless Driver', type:'bandit', i:4, j:22, faction:'rogueveil', opts:{race:'cinderveil',skin:2,hair:0,hairColor:3,beard:0,face:1,gender:'m',cvBits:0b010000000,equip:{head:'cv_mask_plain',torso:'tunic_deep',armor:'cv_wrap',hands:'cv_gauntlets',legs:'hose_grey',feet:'cv_wrapboots',weapon:'morningstar',offhand:null}} },
-    { name:'Crewless Cutter', type:'bandit', i:8, j:27, faction:'rogueveil', opts:{race:'cinderveil',skin:2,hair:0,hairColor:3,beard:0,face:1,gender:'f',cvBits:0b001000000,equip:{head:'cv_mask_plain',torso:'tunic_deep',armor:'cv_wrap',hands:'gloves',legs:'hose_grey',feet:'cv_wrapboots',weapon:'dagger',offhand:null}} } ] : l);
-  dqVictory(()=>{ if(CHOICE.cvCrawl!=='asked') return; if(mobs.some(m=>m.faction==='rogueveil' && m.type==='crawler' && m.dead)){ CHOICE.cvCrawl='slain';
-      for(let k=0;k<4;k++){ const f=slotFor('cv_scrap'); if(f>=0) player.inv[f]='cv_scrap'; } updateHud();
-      remember('cvcrawl','slain',"The stolen Crawler lies in pieces in the Foothills. Back to Ashmother Odra with the news."); logMsg('The Crawler shudders, sags on its legs and goes still. You pry loose some good iron. (Loot: 4 Salvage)','#8ac070'); } });
-  if(typeof BEASTS!=='undefined') BEASTS.push({ k:'crawler', is:f=>f.type==='crawler', name:'Crawlers', kind:'Engines · the Cinderveil', lore:"Six-legged salvage engines of timber and iron, a hide canopy over a cask-round hull, a claw and a cutting torch at the front. The Cinderveil build them to strip wrecks. In the wrong hands they strip carts." });
-
-  onUse(['cvwalker'],o=>{ if(o.kind==='strutter') logMsg('A Strutter, knees folded, saddle empty. The rider eyes you: these legs are spoken for. Build your own, they say.','#c8a860'); else if(o.kind==='hauler') logMsg('The hauler stands with its legs folded, crates lashed on its back. It ticks as it cools.','#c8a860'); else if(o.kind==='bellows') logMsg('Heat rolls off the kiln. Somewhere inside, the fire breathes in time with the bellows.','#c8a860'); else if(o.kind==='magpie') logMsg('High up in the lookout, something with a spyglass is watching the road.','#c8a860'); else logMsg('A Skitter, folded up and still. One eye opens and follows you.','#c8a860'); });
-  NEAR_NAME.cvwalker='Cinderveil Engine';
-
-  // ── chalk in the crypt mazes: at every crossing, an arrow toward the nearest way through ──
-  OBJ_DRAW.ucarrow=o=>{ const a=P(o.i+0.5-o.di*0.18,o.j+0.5-o.dj*0.18), b=P(o.i+0.5+o.di*0.3,o.j+0.5+o.dj*0.3), ang=Math.atan2(b.y-a.y,b.x-a.x); g.save(); g.strokeStyle='rgba(232,228,214,0.7)'; g.lineWidth=2.2; g.lineCap='round';
-    g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.moveTo(b.x,b.y); g.lineTo(b.x-Math.cos(ang-0.5)*9,b.y-Math.sin(ang-0.5)*9); g.moveTo(b.x,b.y); g.lineTo(b.x-Math.cos(ang+0.5)*9,b.y-Math.sin(ang+0.5)*9); g.stroke(); g.restore(); };
-  NEAR_NAME.ucarrow='Chalk Arrow';
-  onUse(['ucarrow'],()=>logMsg('A chalk arrow, fresh-ish. The lamplighters mark the way up for each other: follow them and you come out under the sky.','#c8b890'));
-  // the Undercity rooms: beside the doorway that leads nearer the surface, a chalk arrow pointing through it
-  let UCWAY=null;
-  const ucWay=()=>{ if(UCWAY) return UCWAY; const ids=Object.keys(AREAS).filter(k=>/^uc_/.test(k)), doors={}, dist={}, q=[]; MAP_ALL=true;
-    try{ ids.forEach(id=>{ let t=[]; try{ t=AREAS[id].objects().filter(o=>o.type==='teleporter'); }catch(e){} doors[id]=t; if(t.some(o=>o.to && !/^uc_/.test(o.to))){ dist[id]=0; q.push(id); } }); } finally{ MAP_ALL=false; }
-    for(let h=0;h<q.length;h++){ const a=q[h]; ids.forEach(b=>{ if(dist[b]!=null) return; if((doors[b]||[]).some(o=>o.to===a)){ dist[b]=dist[a]+1; q.push(b); } }); }
-    return UCWAY={doors,dist}; };
-  Object.keys(AREAS).filter(k=>/^uc_/.test(k)).forEach(id=>wrap(id,'objects',l=>{ if(MAP_ALL) return l; const W=ucWay(), d=W.dist[id]; if(d==null||d===0) return l;
-    const door=(W.doors[id]||[]).filter(o=>W.dist[o.to]!=null && W.dist[o.to]<d).sort((a,b)=>W.dist[a.to]-W.dist[b.to])[0]; if(!door) return l;
-    const A=AREAS[id], cx=(A.w-1)/2, cy=(A.h-1)/2, di=Math.sign(Math.round(door.i-cx)), dj=Math.sign(Math.round(door.j-cy)), ai=door.i-di, aj=door.j-dj;
-    const busy=new Set(l.filter(o=>!o.noblock).map(o=>o.i+','+o.j)); const spot=[[ai,aj],[ai-di,aj-dj],[ai+(dj?1:0),aj+(di?1:0)]].find(([i,j])=>i>=0&&j>=0&&i<A.w&&j<A.h&&!busy.has(i+','+j));
-    return spot ? [...l,{type:'ucarrow', i:spot[0], j:spot[1], di:di||0, dj:dj||0, noblock:true, flat:true, dz:-97}] : l; }));
-
-  // ── reasons to stop on the long roads ──
-  // the heath's ring of stones keeps something for whoever comes after dark
-  OBJ_DRAW.ringaltar=o=>{ const q=P(o.i+0.5,o.j+0.5); g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(q.x,q.y+3,22,8,0,0,Math.PI*2); g.fill(); g.fillStyle='#7a7a74'; g.beginPath(); g.ellipse(q.x,q.y-2,20,8,0,0,Math.PI*2); g.fill(); g.fillStyle='#8e8e88'; g.beginPath(); g.ellipse(q.x,q.y-5,18,6.5,0,0,Math.PI*2); g.fill();
-    g.strokeStyle='rgba(60,60,56,0.7)'; g.lineWidth=1; g.beginPath(); g.arc(q.x,q.y-5,6,0,Math.PI*2); g.stroke(); if(nightAmt()>0.5 && !CHOICE.heathCache){ const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(q.x,q.y-6,24,10,'170,200,255',0.35+Math.sin(gt*2)*0.1); g.globalCompositeOperation=gs; } };
-  NEAR_NAME.ringaltar='Flat Stone';
-  wrap('heath','objects',l=>[...l,{type:'ringaltar', i:21, j:3}]);
-  onUse(['ringaltar'],()=>{ if(CHOICE.heathCache){ logMsg('Only the flat stone, and the ring standing round it.','#c8b890'); return; }
-    if(nightAmt()<0.5){ say('A Flat Stone',["A flat stone in the middle of the ring, a circle cut into it. In daylight it is only a stone."],[bye]); return; }
-    say('A Flat Stone',["The circle cut into the stone is glowing, faintly, the colour of moonlight on water. Something is under it."],[{label:'Lift the stone.', fn:()=>{ CHOICE.heathCache=true; player.purse+=45; const f=slotFor('amber_brooch'); if(f>=0 && ITEMS.amber_brooch) player.inv[f]='amber_brooch'; updateHud();
-      remember('heathcache','found',"You lifted the flat stone in Greywater Heath's ring by night, and found an old offering beneath it."); say('A Flat Stone',"Under it: a hollow lined with moss, old coins gone green, and an amber brooch. Someone left these for the stones, a long time ago. The stones, you feel, do not mind.",[bye]); }}, bye]); });
-  // a prospector's stash under a cairn in the foothills
-  OBJ_DRAW.stashcairn=o=>drawObject({...o,type:'cairn'}); NEAR_NAME.stashcairn='Cairn';
-  wrap('foothills','objects',l=>[...l,{type:'stashcairn', i:9, j:33, s:1.1}]);
-  onUse(['stashcairn'],()=>{ if(CHOICE.footStash){ logMsg('Just a cairn. You put the stones back the way you found them.','#c8b890'); return; }
-    say('A Cairn',["A cairn of river stones beside the road, taller than the others. One stone near the bottom is a different colour, and loose."],[{label:'Pull out the loose stone.', fn:()=>{ CHOICE.footStash=true; player.purse+=30; for(let k=0;k<3;k++){ const f=slotFor('cv_scrap'); if(f>=0) player.inv[f]='cv_scrap'; } updateHud();
-      remember('footstash','found',"You found a prospector's stash in a cairn in the Foothills."); say('A Cairn',"Behind it, an oilskin bundle: thirty coppers, a bent pick-head, hinges, a coil of wire. A prospector's stash, never collected. (3 Salvage)",[bye]); }}, bye]); });
-}
-
-// ════════ Cinderveil kin: three long chains, each ending in an engine of your own. A Strider to ride (faster legs), a Packling that
-// carries for you (more pack space), and a Hushling that hides you from lesser foes. All for kin only. Minigames: forge, gait, balance, lens. ════════
-{ const trust=()=>CHOICE.cvTrust||0, kin=()=>trust()>=2, day=()=>Math.floor(dayClock/DAY_LEN), KIN_LV=16, seasoned=()=>playerLevel()>=KIN_LV;   // the engines are mid-game: kin, and a road-worn level 16
-  const scrap=()=>invCount('cv_scrap'), take=(id,n)=>{ for(let k=0;k<n;k++){ const j=player.inv.indexOf(id); if(j>=0) player.inv[j]=null; } };
-  const give=(id,n=1)=>{ let got=0; for(let k=0;k<n;k++){ const f=slotFor(id); if(f>=0){ player.inv[f]=id; got++; } } updateHud(); if(invOverlay.classList.contains('open')) refreshInventory(); return got; };
-  const qA=()=>CHOICE.cvA, qB=()=>CHOICE.cvB, qC=()=>CHOICE.cvC;
-  const night=()=>nightAmt()>0.5;
-
-  // ── things to carry ──
-  Object.assign(ITEMS,{
-    cv_ashpole:{ name:'Ash Pole', slot:'misc', stack:true, stackMax:8, title:"A straight, seasoned ash pole from the Fellings, as long as you are tall. Brannock wants four for a Strider's legs." },
-    cv_spring:{ name:'Hauler Mainspring', slot:'misc', title:"A coil of black spring-steel the size of a cartwheel hub, out of a dead hauler. It hums when you tap it." },
-    cv_lensglass:{ name:'Crater Glass', slot:'misc', title:"A lump of clear, sand-fused glass from the Glass Crater, cloudy on the outside, clean as water within." },
-    cv_lens:{ name:'Ground Lens', slot:'misc', title:"A lens ground by your own hand at the Cinderveil wheel. Look through it and the world goes soft at the edges." },
-    cv_cocoon:{ name:'Nightmoth Cocoon', slot:'misc', stack:true, stackMax:5, title:"A cocoon spun by the Mistmere's nightmoths. In the dark it gives off a faint, cold shine, like breath on glass." } });
-  Object.assign(PRICES,{ cv_ashpole:0, cv_spring:0, cv_lensglass:0, cv_lens:0, cv_cocoon:0 });
-  ['cv_ashpole','cv_spring','cv_lensglass','cv_lens','cv_cocoon'].forEach(id=>QUEST_ITEMS.add(id));
-  ICON_EXTRA.cv_ashpole=g2=>{ g2.lineCap='round'; [[8,34,30,6,'#c8b08a'],[12,36,34,10,'#b89a70'],[6,30,26,4,'#d8c098']].forEach(([a,b,c2,d,col])=>{ g2.strokeStyle='#4a3a28'; g2.lineWidth=5; g2.beginPath(); g2.moveTo(a,b); g2.lineTo(c2,d); g2.stroke(); g2.strokeStyle=col; g2.lineWidth=3; g2.stroke(); }); };
-  const coil=(g2,col,edge)=>{ g2.strokeStyle='#1a1816'; g2.lineWidth=4.4; g2.beginPath(); for(let t=0;t<=6*Math.PI;t+=0.2){ const r=3+t*0.75; g2.lineTo(20+Math.cos(t)*r,20+Math.sin(t)*r); } g2.stroke(); g2.strokeStyle=col; g2.lineWidth=2.2; g2.stroke(); if(edge){ g2.strokeStyle=edge; g2.lineWidth=0.8; g2.stroke(); } };
-  ICON_EXTRA.cv_spring=g2=>coil(g2,'#4a4640');
-  ICON_EXTRA.cv_lensglass=g2=>{ g2.fillStyle='rgba(200,220,215,0.85)'; g2.strokeStyle='#5a6a68'; g2.lineWidth=1.4; g2.beginPath(); g2.moveTo(9,26); g2.lineTo(14,11); g2.lineTo(27,8); g2.lineTo(33,21); g2.lineTo(25,32); g2.lineTo(13,33); g2.closePath(); g2.fill(); g2.stroke(); g2.fillStyle='rgba(255,255,255,0.7)'; g2.beginPath(); g2.moveTo(15,14); g2.lineTo(24,12); g2.lineTo(18,20); g2.closePath(); g2.fill(); };
-  ICON_EXTRA.cv_lens=g2=>{ g2.fillStyle='#6a4a2c'; g2.beginPath(); g2.arc(20,20,14,0,Math.PI*2); g2.fill(); const gr=g2.createRadialGradient(16,15,2,20,20,11); gr.addColorStop(0,'#ffffff'); gr.addColorStop(1,'#8ab8c0'); g2.fillStyle=gr; g2.beginPath(); g2.arc(20,20,11,0,Math.PI*2); g2.fill(); g2.strokeStyle='#2e2a26'; g2.lineWidth=1.2; g2.stroke(); };
-  ICON_EXTRA.cv_cocoon=g2=>{ g2.fillStyle='#d8dcd0'; g2.strokeStyle='#8a8c80'; g2.lineWidth=1; g2.beginPath(); g2.ellipse(20,22,8,13,0.3,0,Math.PI*2); g2.fill(); g2.stroke(); g2.strokeStyle='rgba(120,120,110,0.6)'; for(let k=-2;k<=2;k++){ g2.beginPath(); g2.ellipse(20,22+k*4,7.5-Math.abs(k),2,0.3,0,Math.PI); g2.stroke(); } g2.strokeStyle='#8a8c80'; g2.beginPath(); g2.moveTo(17,9); g2.lineTo(15,3); g2.stroke(); };
-
-  // ════ the minigame table: a small panel over the world, a canvas, keys and clicks ════
-  const MG=document.createElement('div'); MG.id='cv-mg';
-  MG.style.cssText='position:fixed;left:50%;top:46%;transform:translate(-50%,-50%);z-index:60;display:none;width:360px;padding:12px 14px 10px;border-radius:10px;border:1px solid #8a6a3a;background:rgba(20,14,7,0.96);color:#f0dca0;font:13px Georgia,serif;text-align:center;user-select:none;touch-action:none;box-shadow:0 8px 30px rgba(0,0,0,0.6)';
-  MG.innerHTML='<div id="cvmg-t" style="font-weight:bold;font-size:15px;letter-spacing:0.5px"></div><div id="cvmg-m" style="min-height:34px;margin:4px 0"></div><canvas id="cvmg-cv" width="320" height="210" style="display:block;margin:0 auto;width:320px;height:210px;border-radius:6px;background:#140e08"></canvas><div id="cvmg-h" style="margin-top:6px;font-size:11px;color:#a08050"></div>';
-  document.body.appendChild(MG);
-  const $=id=>document.getElementById(id), mgMsg=t=>{ $('cvmg-m').innerHTML=t; };
-  let G=null; window.CVMG=()=>G;
-  const GAMES={};
-  function cvGame(kind,win,lose){ if(G) return; closeDialog(); player.path=[]; player.moving=false; G={kind,win,lose,st:'play',t:0,hold:0,...GAMES[kind].init()}; $('cvmg-t').textContent=GAMES[kind].title; $('cvmg-h').innerHTML=GAMES[kind].help+' · Esc to stop'; mgMsg(GAMES[kind].start); MG.style.display='block'; }
-  window.cvGame=cvGame;
-  const mgEnd=(ok,msg)=>{ if(!G || G.st!=='play') return; G.st='end'; G.ok=ok; G.endT=ok?1.6:1.9; mgMsg(msg); try{ SND.fx(ok?'catch':'miss'); }catch(e){} };
-  const mgClose=(abort)=>{ const g0=G; if(!g0) return; G=null; MG.style.display='none'; if(abort) return; if(g0.ok) g0.win&&g0.win(); else g0.lose&&g0.lose(); };
-  let mgLast=performance.now();
-  setInterval(()=>{ const now=performance.now(), dt=Math.min(0.1,(now-mgLast)/1000); mgLast=now; if(!G) return; try{ if(combat.active){ mgClose(true); return; }
-    if(G.st==='end'){ G.endT-=dt; if(G.endT<=0) return mgClose(false); } else { G.t+=dt; GAMES[G.kind].tick(G,dt); }
-    if(G) GAMES[G.kind].draw(G,$('cvmg-cv').getContext('2d')); }catch(e){ console.error(e); mgClose(true); } },33);
-  const press=k=>{ if(G && G.st==='play' && GAMES[G.kind].press) GAMES[G.kind].press(G,k); };
-  window.addEventListener('keydown',e=>{ if(!G) return; if(e.target && e.target.tagName==='INPUT') return; e.preventDefault(); e.stopPropagation();
-    if(e.key==='Escape'){ mgClose(true); logMsg('You set the work down for now.','#a89a80'); return; }
-    if(e.repeat) return; const k=e.key===' '||e.key==='Enter'?'go':e.key==='ArrowLeft'||e.key==='a'||e.key==='A'?'left':e.key==='ArrowRight'||e.key==='d'||e.key==='D'?'right':e.key==='ArrowUp'||e.key==='w'||e.key==='W'?'up':e.key==='ArrowDown'||e.key==='s'||e.key==='S'?'down':null;
-    if(k==='left') G.hold=-1; if(k==='right') G.hold=1; if(k) press(k); },true);
-  window.addEventListener('keyup',e=>{ if(!G) return; e.stopPropagation(); if(['ArrowLeft','ArrowRight','a','A','d','D'].includes(e.key)) G.hold=0; },true);
-  $('cvmg-cv').addEventListener('pointerdown',e=>{ if(!G) return; e.preventDefault(); e.stopPropagation(); const r=e.target.getBoundingClientRect(), x=(e.clientX-r.left)*320/r.width, y=(e.clientY-r.top)*210/r.height;
-    if(GAMES[G.kind].click) GAMES[G.kind].click(G,x,y); else { G.hold=x<160?-1:1; press('go'); } });
-  window.addEventListener('pointerup',()=>{ if(G) G.hold=0; },true);
-  MG.addEventListener('click',e=>e.stopPropagation()); MG.addEventListener('pointerdown',e=>e.stopPropagation());
-  const pips=(c,x,y,n,of,col)=>{ for(let k=0;k<of;k++){ c.beginPath(); c.arc(x+k*14,y,4.5,0,Math.PI*2); c.fillStyle=k<n?col:'#3a2c1a'; c.fill(); c.strokeStyle='#8a6a3a'; c.lineWidth=1; c.stroke(); } };
-
-  // 1 · the forge: strike the spring while the heat sits in the gold
-  GAMES.forge={ title:"Brannock's Anvil", help:'Space / click when the marker sits in the gold', start:'Draw the temper. Strike while the steel glows <b>gold</b>: five clean blows.',
-    init:()=>({p:0,v:0.85,dir:1,c:0.55,w:0.22,hits:0,miss:0,fx:0}),
-    tick:(G,dt)=>{ G.p+=G.v*G.dir*dt; if(G.p>1){ G.p=1; G.dir=-1; } if(G.p<0){ G.p=0; G.dir=1; } G.fx=Math.max(0,G.fx-dt); },
-    press:(G)=>{ if(Math.abs(G.p-G.c)<=G.w/2){ G.hits++; G.fx=0.35; G.good=true; try{ SND.fx('hit'); }catch(e){} if(G.hits>=5) return mgEnd(true,'<b>The spring rings true.</b> Brannock grunts, which is a great deal, from him.');
-        G.w=Math.max(0.09,G.w-0.03); G.v*=1.14; G.c=0.15+Math.random()*0.7; mgMsg('A clean blow. '+(5-G.hits)+' more.'); }
-      else { G.miss++; G.fx=0.35; G.good=false; if(G.miss>=3) return mgEnd(false,'The steel goes dull and grey. <i>“Again,”</i> says Brannock, and puts it back in the fire.'); mgMsg(G.p<G.c?'Too hot. The steel spits.':'Too cold. The blow rings flat.'); } },
-    draw:(G,c)=>{ c.clearRect(0,0,320,210); const x0=30,w=260,y=128;
-      const gr=c.createLinearGradient(x0,0,x0+w,0); gr.addColorStop(0,'#3a1a10'); gr.addColorStop(0.35,'#a83a18'); gr.addColorStop(0.6,'#f0a030'); gr.addColorStop(0.85,'#fff0b0'); gr.addColorStop(1,'#ffffff'); c.fillStyle=gr; c.fillRect(x0,y,w,20);
-      c.fillStyle='rgba(240,200,80,0.35)'; c.fillRect(x0+(G.c-G.w/2)*w,y-6,G.w*w,32); c.strokeStyle='#f2c84a'; c.lineWidth=2; c.strokeRect(x0+(G.c-G.w/2)*w,y-6,G.w*w,32);
-      const mx=x0+G.p*w; c.fillStyle='#e8e0d0'; c.beginPath(); c.moveTo(mx,y-10); c.lineTo(mx-7,y-22); c.lineTo(mx+7,y-22); c.closePath(); c.fill(); c.fillRect(mx-1.5,y-10,3,40);
-      // the anvil and the coil on it
-      c.fillStyle='#2e2a26'; c.fillRect(110,72,100,18); c.fillRect(140,90,40,14); c.beginPath(); c.moveTo(210,72); c.lineTo(236,76); c.lineTo(210,84); c.fill();
-      const heat=Math.min(1,G.hits/5); c.strokeStyle=`rgb(${80+heat*170|0},${70+heat*60|0},${60+heat*120|0})`; c.lineWidth=4; c.beginPath(); for(let t=0;t<=5*Math.PI;t+=0.25){ const r=4+t*1.6; c.lineTo(160+Math.cos(t)*r,58+Math.sin(t)*r*0.45); } c.stroke();
-      if(G.fx>0){ c.globalAlpha=G.fx/0.35; c.fillStyle=G.good?'#ffe080':'#a0a0a0'; for(let k=0;k<10;k++){ const a=k*0.63+G.t*9; c.fillRect(160+Math.cos(a)*(14+G.fx*60),58+Math.sin(a)*(6+G.fx*30),3,3); } c.globalAlpha=1; }
-      pips(c,30,186,G.hits,5,'#f2c84a'); c.fillStyle='#a08050'; c.font='11px Georgia'; c.textAlign='right'; c.fillText('misses',258,190); pips(c,266,186,G.miss,3,'#c05030'); } };
-
-  // 2 · the gait: the leg-frame shows you its step; you play it back
-  const LEGS=[['up',160,40],['right',236,105],['down',160,170],['left',84,105]];
-  GAMES.gait={ title:'Teaching the Gait', help:'Arrow keys / WASD or click the legs, in order', start:'Watch the legs. Then step them in the same order.',
-    init:()=>{ const seq=[]; for(let k=0;k<7;k++) seq.push(Math.floor(Math.random()*4)); return {seq,round:0,lens:[3,4,5,6],show:0,inp:0,mode:'show',lit:-1,litT:0,flash:0}; },
-    tick:(G,dt)=>{ G.litT-=dt; if(G.litT<=0) G.lit=-1; G.flash=Math.max(0,G.flash-dt);
-      if(G.mode==='show'){ G.show+=dt; const n=G.lens[G.round], k=Math.floor((G.show-0.6)/0.62), f=(G.show-0.6)/0.62-k; if(k>=0 && k<n){ G.lit=f<0.72?G.seq[k]:-1; G.litT=0.05; } if(k>=n){ G.mode='play'; G.inp=0; G.lit=-1; mgMsg('Your turn: '+n+' steps.'); } } },
-    press:(G,k)=>{ if(G.mode!=='play') return; const i=LEGS.findIndex(l=>l[0]===k); if(i<0) return; G.lit=i; G.litT=0.25;
-      if(i!==G.seq[G.inp]){ return mgEnd(false,'The frame lurches and sits down hard in the dust. <i>Brannock waits for you to stop laughing. He is not laughing.</i>'); }
-      G.inp++; try{ SND.fx('step'); }catch(e){} if(G.inp>=G.lens[G.round]){ G.round++; G.flash=0.5; if(G.round>=G.lens.length) return mgEnd(true,'<b>It walks.</b> Four steps, eight, a dozen: the frame strides off and stops by itself.'); G.mode='show'; G.show=0; mgMsg('Good. Again, longer.'); } },
-    click:(G,x,y)=>{ const l=LEGS.map((L,k)=>[k,Math.hypot(x-L[1],y-L[2])]).sort((a,b)=>a[1]-b[1])[0]; if(l[1]<44) GAMES.gait.press(G,LEGS[l[0]][0]); },
-    draw:(G,c)=>{ c.clearRect(0,0,320,210); c.fillStyle='#5a3a22'; c.beginPath(); c.ellipse(160,105,38,26,0,0,Math.PI*2); c.fill(); c.strokeStyle='#2e2a26'; c.lineWidth=3; c.stroke(); c.fillStyle='#3a2414'; c.fillRect(150,96,20,18);
-      LEGS.forEach(([k,x,y],i)=>{ c.strokeStyle='#6a4a2c'; c.lineWidth=7; c.beginPath(); c.moveTo(160+(x-160)*0.35,105+(y-105)*0.35); c.lineTo(x,y); c.stroke();
-        c.beginPath(); c.arc(x,y,17,0,Math.PI*2); c.fillStyle=G.lit===i?'#f2c84a':'#3a2c1a'; c.fill(); c.strokeStyle=G.lit===i?'#fff0b0':'#8a6a3a'; c.lineWidth=2; c.stroke();
-        c.fillStyle=G.lit===i?'#2a1a08':'#a08050'; c.font='bold 14px Georgia'; c.textAlign='center'; c.fillText({up:'↑',right:'→',down:'↓',left:'←'}[k],x,y+5); });
-      c.fillStyle='#a08050'; c.font='11px Georgia'; c.textAlign='left'; c.fillText(G.mode==='show'?'watch…':'your step',12,20); pips(c,12,198,G.round,4,'#8ae08a');
-      if(G.flash>0){ c.fillStyle=`rgba(140,224,140,${G.flash*0.5})`; c.fillRect(0,0,320,210); } } };
-
-  // 3 · the balance: crates go on the Packling's back; keep its spine level
-  GAMES.balance={ title:"Loading the Packling", help:'Hold ← / → (or press either side) to lean against it', start:'Tinny piles on the crates. Keep the little hauler <b>level</b> until she has done.',
-    init:()=>({a:0,va:0,wind:0,wt:0,bias:0,crates:[],next:1.4,dur:20}),
-    tick:(G,dt)=>{ G.wt-=dt; if(G.wt<=0){ G.wt=0.8+Math.random()*1.2; G.wind=(Math.random()*2-1)*0.8; }
-      G.next-=dt; if(G.next<=0 && G.t<G.dur-1){ G.next=2.2+Math.random()*0.8; const side=Math.random()<0.7?-Math.sign(G.bias||(Math.random()-0.5)):Math.sign(Math.random()-0.5)||1, pos=side*(0.25+Math.random()*0.6); G.crates.push(pos); G.bias+=pos*0.45; G.va+=pos*0.5; }
-      G.va+=(G.wind+G.bias+G.hold*2.8+G.a*0.65)*dt; G.va*=Math.pow(0.35,dt); G.a+=G.va*dt;
-      if(Math.abs(G.a)>=1) return mgEnd(false,'Over she goes: crates in the dust, legs in the air. <i>Tinny sighs and starts picking up.</i>');
-      if(G.t>=G.dur) mgEnd(true,'<b>Level as a table.</b> Tinny pats the crates: “It knows its own weight now.”'); },
-    draw:(G,c)=>{ c.clearRect(0,0,320,210); c.save(); c.translate(160,128); c.rotate(G.a*0.5);
-      c.fillStyle='#7a5a3a'; c.beginPath(); c.ellipse(0,0,92,20,0,0,Math.PI*2); c.fill(); c.strokeStyle='#2e2a26'; c.lineWidth=2.4; c.stroke(); [-60,-20,20,60].forEach(x=>{ c.beginPath(); c.moveTo(x,-19); c.lineTo(x,19); c.stroke(); });
-      const stack={}; G.crates.forEach(p=>{ const k=Math.round(p*4); stack[k]=(stack[k]||0)+1; const h=stack[k]; c.fillStyle='#9a7a48'; c.fillRect(p*90-13,-20-h*22,26,22); c.strokeStyle='#4a3420'; c.lineWidth=1.4; c.strokeRect(p*90-13,-20-h*22,26,22); c.beginPath(); c.moveTo(p*90-13,-20-h*22); c.lineTo(p*90+13,-20-(h-1)*22); c.stroke(); });
-      c.restore(); c.fillStyle='#2e2a26'; c.beginPath(); c.moveTo(150,146); c.lineTo(170,146); c.lineTo(176,176); c.lineTo(144,176); c.closePath(); c.fill();
-      // the level: a bubble in a tube
-      c.fillStyle='#2a1e10'; c.fillRect(60,190,200,12); c.fillStyle='rgba(140,224,140,0.35)'; c.fillRect(140,190,40,12); const bx=160+Math.max(-1,Math.min(1,G.a))*96; c.fillStyle=Math.abs(G.a)>0.7?'#e07050':'#c8e8f0'; c.beginPath(); c.ellipse(bx,196,8,5,0,0,Math.PI*2); c.fill();
-      c.fillStyle='#a08050'; c.font='11px Georgia'; c.textAlign='left'; c.fillText(Math.max(0,Math.ceil(G.dur-G.t))+'s',12,20); c.textAlign='right'; c.fillText(G.wind>0.4?'gust →':G.wind<-0.4?'← gust':'',308,20); } };
-
-  // 4 · the lens: stop the grinding-stone's mark on the bright arc, each time narrower
-  GAMES.lens={ title:'The Grinding Wheel', help:'Space / click when the mark crosses the bright arc', start:'Grind the glass true. Six passes, each finer than the last.',
-    init:()=>({th:0,w:2.1,dir:1,phi:1.2+Math.random()*3,hw:0.55,hits:0,miss:0,fx:0}),
-    tick:(G,dt)=>{ G.th+=G.w*G.dir*dt; G.fx=Math.max(0,G.fx-dt); },
-    press:(G)=>{ let d=((G.th-G.phi)%(2*Math.PI)+3*Math.PI)%(2*Math.PI)-Math.PI; if(Math.abs(d)<=G.hw){ G.hits++; G.fx=0.4; G.good=true; try{ SND.fx('hit'); }catch(e){} if(G.hits>=6) return mgEnd(true,'<b>Clear as rain.</b> The lens throws a small, perfect light on your palm.');
-        G.hw=Math.max(0.16,G.hw-0.075); G.w*=1.1; G.dir*=-1; G.phi=G.th+Math.PI*(0.6+Math.random()*0.8)*(Math.random()<0.5?1:-1); mgMsg('A true pass. '+(6-G.hits)+' more.'); }
-      else { G.miss++; G.fx=0.4; G.good=false; if(G.miss>=3) return mgEnd(false,'A crack runs through the glass with a tiny sound. <i>The heart of it is still good: you can start again.</i>'); mgMsg('The stone skips. Scratched, but not ruined.'); } },
-    draw:(G,c)=>{ c.clearRect(0,0,320,210); const cx=160, cy=100, R=72; c.fillStyle='#4a4038'; c.beginPath(); c.arc(cx,cy,R+12,0,Math.PI*2); c.fill(); c.fillStyle='#6a5e52'; c.beginPath(); c.arc(cx,cy,R,0,Math.PI*2); c.fill();
-      const gr=c.createRadialGradient(cx-10,cy-12,4,cx,cy,34); gr.addColorStop(0,'rgba(255,255,255,'+(0.3+G.hits*0.1)+')'); gr.addColorStop(1,'rgba(140,180,190,0.5)'); c.fillStyle=gr; c.beginPath(); c.arc(cx,cy,34,0,Math.PI*2); c.fill();
-      c.strokeStyle='#f2e8a0'; c.lineWidth=10; c.beginPath(); c.arc(cx,cy,R+6,G.phi-G.hw,G.phi+G.hw); c.stroke();
-      c.strokeStyle='#1a1410'; c.lineWidth=4; c.beginPath(); c.moveTo(cx+Math.cos(G.th)*(R-14),cy+Math.sin(G.th)*(R-14)); c.lineTo(cx+Math.cos(G.th)*(R+14),cy+Math.sin(G.th)*(R+14)); c.stroke();
-      c.fillStyle='#e8e0d0'; c.beginPath(); c.arc(cx+Math.cos(G.th)*(R+6),cy+Math.sin(G.th)*(R+6),5,0,Math.PI*2); c.fill();
-      if(G.fx>0){ c.globalAlpha=G.fx/0.4; c.strokeStyle=G.good?'#ffffff':'#c05030'; c.lineWidth=2; c.beginPath(); c.arc(cx,cy,34+(0.4-G.fx)*60,0,Math.PI*2); c.stroke(); c.globalAlpha=1; }
-      pips(c,30,196,G.hits,6,'#f2e8a0'); c.fillStyle='#a08050'; c.font='11px Georgia'; c.textAlign='right'; c.fillText('cracks',258,200); pips(c,266,196,G.miss,3,'#c05030'); } };
-
-  // ════ props in the world ════
-  OBJ_DRAW.ashstack=o=>{ const q=P(o.i+0.5,o.j+0.5); if(CHOICE['cvAsh'+o.k]){ g.fillStyle='rgba(60,40,20,0.35)'; g.beginPath(); g.ellipse(q.x,q.y,16,6,0,0,Math.PI*2); g.fill(); return; }
-    g.lineCap='round'; for(let k=0;k<5;k++){ const a=-0.3+k*0.15, b=q.x-14+k*7; g.strokeStyle='#3a2a18'; g.lineWidth=5; g.beginPath(); g.moveTo(b,q.y+2); g.lineTo(b+Math.sin(a)*30+4,q.y-46+k*2); g.stroke(); g.strokeStyle=k%2?'#c8b08a':'#b89a70'; g.lineWidth=3; g.stroke(); }
-    g.strokeStyle='#5a4028'; g.lineWidth=1.6; g.beginPath(); g.moveTo(q.x-16,q.y-22); g.quadraticCurveTo(q.x,q.y-16,q.x+18,q.y-24); g.stroke(); };
-  NEAR_NAME.ashstack='Seasoned Ash Poles';
-  wrap('fellings','objects',l=>[...l,{type:'ashstack',i:2,j:1,k:0},{type:'ashstack',i:7,j:6,k:1}]);
-  onUse(['ashstack'],o=>{ if(CHOICE['cvAsh'+o.k]) return logMsg('Only bark and shavings left.','#a89a80');
-    if(qA()!=='poles') return logMsg('Ash poles, stacked to season, straight as arrows. Someone took care choosing them.','#c8b890');
-    if(give('cv_ashpole',2)<2) return flash('Your pack is full.'); CHOICE['cvAsh'+o.k]=true; logMsg('You shoulder two of the seasoned ash poles. (Ash Poles: '+invCount('cv_ashpole')+'/4)','#8ac070');
-    if(invCount('cv_ashpole')>=4) remember('cvstrider','poles2',"You have four ash poles. Bring them to Brannock at the Cinderveil camp."); });
-
-  // the dead hauler on the heath, and the feral Skitters nesting in it
-  OBJ_DRAW.cvwreck=o=>{ const q=P(o.i+1,o.j+1); g.fillStyle='rgba(30,22,14,0.35)'; g.beginPath(); g.ellipse(q.x+4,q.y+4,62,18,0,0,Math.PI*2); g.fill();
-    g.save(); g.beginPath(); g.rect(q.x-120,q.y-160,240,166); g.clip(); g.translate(q.x,q.y); g.rotate(0.38); g.translate(-q.x,-q.y); CVM3.hauler(g,q.x,q.y+30,1.2,o.dir||3,null); g.restore();   // keeled over, half sunk
-    g.save(); g.globalCompositeOperation='multiply'; g.fillStyle='rgba(120,90,70,0.45)'; g.beginPath(); g.ellipse(q.x,q.y-34,62,40,0.38,0,Math.PI*2); g.fill(); g.restore();   // rust and weather
-    for(let k=0;k<11;k++){ const x=q.x-54+k*11+Math.sin(k*2.3)*4, y=q.y+2+Math.cos(k*1.7)*5; g.fillStyle=k%2?'#3e4a2c':'#4a5634'; g.beginPath(); g.ellipse(x,y,9,6,0,0,Math.PI*2); g.fill(); g.fillStyle='#8a5a8a'; g.fillRect(x-1,y-5,2,2); } };   // heather over the legs
-  NEAR_NAME.cvwreck='Dead Hauler';
-  wrap('heath','objects',l=>[...l,{type:'cvwreck',i:24,j:5,fp:[2,2],dir:3}]);
-  FOES.feralskit={ label:'Feral Skitter', base:34, stagger:1.0, unguarded:true, pattern:[{wait:0.7,wind:0.55,after:0.35,dir:'left'},{wait:0.4,wind:0.5,after:0.45,dir:'right'},{wait:0.9,wind:0.7,after:0.4,dir:'up'},{wait:0.5,wind:0.6,after:0.4,dir:'right',feint:'left'}] };
-  window.drawFeralSkit=(x,B,e)=>{ if(e.dead){ g.save(); g.globalAlpha*=0.7; g.translate(x,B); g.scale(1,0.55); g.translate(-x,-B); CVM3.skitter(g,x,B,0.75,e.dir||0,null); g.restore(); return; }
-    CVM3.skitter(g,x,B,0.75,e.dir||0,(e.moving||e.state==='windup')?gt*(e.state==='windup'?4:11):null);
-    if(e.state==='windup'){ const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(x,B-22,30,20,'255,160,60',0.4); g.globalCompositeOperation=gs; } };
-  const MON={gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:null,offhand:null}};
-  wrap('heath','mobs',l=>qA()==='spring' && !hasItem('cv_spring') ? [...l,
-    { name:'Feral Skitter', type:'feralskit', i:22, j:7, faction:'feralskit', tier:4, opts:MON }, { name:'Feral Skitter', type:'feralskit', i:27, j:7, faction:'feralskit', tier:4, opts:MON }, { name:'Feral Skitter', type:'feralskit', i:23, j:9, faction:'feralskit', tier:4, opts:MON },
-    { name:'Old Rust-Skitter', type:'feralskit', i:25, j:9, faction:'feralskit', tier:4, hpMul:1.8, opts:MON } ] : l);
-  onUse(['cvwreck'],()=>{ if(qA()!=='spring'||hasItem('cv_spring')) return logMsg('A dead hauler, half sunk in the heather. Whatever could be taken has been.','#a89a80');
-    if(mobs.some(m=>m.faction==='feralskit' && !m.dead)) return logMsg('Something clicks inside the wreck, then many somethings. The feral Skitters will not let you near.','#e0a060');
-    if(give('cv_spring')<1) return flash('Your pack is full.'); remember('cvstrider','spring',"You pried the mainspring out of the dead hauler on Greywater Heath. Brannock will want to temper it."); logMsg('You brace a boot on the hull and lever the mainspring free. It comes out with a groan and a long, falling hum.','#8ac070'); });
-  if(typeof BEASTS!=='undefined') BEASTS.push({ k:'feralskit', is:f=>f.type==='feralskit', name:'Feral Skitters', kind:'Engines · gone wild', lore:"Skitters whose makers died or lost them. They nest in wrecks and keep the old rule, take what lies unwatched, except now everything looks unwatched to them." });
-
-  // the hauler frame in the Scrublands, with scavengers picking it over
-  OBJ_DRAW.cvframe=o=>{ const q=P(o.i+0.5,o.j+0.5); if(CHOICE.cvB && CHOICE.cvB!=='frame'){ g.fillStyle='rgba(60,40,20,0.3)'; g.beginPath(); g.ellipse(q.x,q.y,24,8,0,0,Math.PI*2); g.fill(); return; }
-    g.save(); g.globalAlpha*=0.95; CVM3.hauler(g,q.x,q.y+4,0.62,o.dir||1,null); g.restore(); };
-  NEAR_NAME.cvframe='Little Hauler Frame';
-  wrap('scrubland','objects',l=>[...l,{type:'cvframe',i:3,j:40,dir:1}]);
-  const SCAV=(name,g0,w,i,j)=>({ name, type:'bandit', i, j, faction:'scavs', tier:4, hpMul:1.3, opts:{gender:g0,race:'human',skin:2,hair:1,hairColor:2,beard:g0==='m'?1:0,face:2,equip:{head:'hood',torso:'tunic_deep',armor:null,hands:'gloves',legs:'hose_grey',feet:'boots',weapon:w,offhand:null}} });
-  wrap('scrubland','mobs',l=>qB()==='frame' && !CHOICE.cvFrame ? [...l, SCAV('Wreck-Picker','m','club',5,42), SCAV('Wreck-Picker','f','dagger',8,39), SCAV('Wreck-Boss','m','mace',6,38)] : l);
-  onUse(['cvframe'],()=>{ if(qB()!=='frame') return logMsg('A little hauler frame, half buried. Somebody built it small on purpose.','#c8b890');
-    if(mobs.some(m=>m.faction==='scavs' && !m.dead)) return logMsg('“Ours,” says the wreck-picker, and spits. “Find your own.”','#e0a060');
-    CHOICE.cvFrame=true; CHOICE.cvB='parts'; remember('cvpack','parts',"You dragged the little hauler frame back to Tinny. She needs eight pieces of Salvage and two wolf pelts to make it whole."); logMsg('You dig the frame out and drag it all the way back to the camp road. Tinny will be pleased.','#8ac070'); });
-
-  // crater glass, and the nightmoths' cocoons
-  OBJ_DRAW.lensglass=o=>{ if(hasItem('cv_lensglass')||hasItem('cv_lens')||(qC()&&qC()!=='glass')) return; const q=P(o.i+0.5,o.j+0.5), s=Math.sin(gt*2)*0.5+0.5;
-    g.fillStyle='rgba(200,230,225,0.85)'; g.strokeStyle='#5a6a68'; g.lineWidth=1.2; g.beginPath(); g.moveTo(q.x-12,q.y); g.lineTo(q.x-6,q.y-16); g.lineTo(q.x+8,q.y-18); g.lineTo(q.x+14,q.y-4); g.lineTo(q.x+4,q.y+4); g.closePath(); g.fill(); g.stroke();
-    const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(q.x,q.y-10,22,16,'220,250,255',0.18+s*0.15); g.globalCompositeOperation=gs; };
-  NEAR_NAME.lensglass='Clear Crater Glass';
-  wrap('crater','objects',l=>[...l,{type:'lensglass',i:10,j:13}]);
-  onUse(['lensglass'],()=>{ if(qC()!=='glass') return logMsg('Glass, fused by some old heat. Pretty, and no use to you just now.','#c8b890'); if(hasItem('cv_lensglass')) return;
-    if(give('cv_lensglass')<1) return flash('Your pack is full.'); remember('cvhush','glass2',"You found clear glass in the Glass Crater. Take it to Ashmother Odra to grind."); logMsg('You work the clear lump free of the slag around it. Clean as water inside.','#8ac070'); });
-  OBJ_DRAW.mothcocoon=o=>{ if(CHOICE['cvMoth'+o.k]) return; const q=P(o.i+0.5,o.j+0.5), n=night(), y=q.y-34;
-    g.strokeStyle='#3a3020'; g.lineWidth=1; g.beginPath(); g.moveTo(q.x,q.y-60); g.lineTo(q.x,y-8); g.stroke(); g.fillStyle=n?'#e8f0e8':'#a8a89a'; g.beginPath(); g.ellipse(q.x,y,4.5,8,0,0,Math.PI*2); g.fill();
-    if(n){ const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(q.x,y,26,26,'200,240,230',0.25+Math.sin(gt*1.3+o.k)*0.1); g.globalCompositeOperation=gs; } };
-  NEAR_NAME.mothcocoon='Hanging Cocoon';
-  wrap('mistmere','objects',l=>[...l,{type:'mothcocoon',i:3,j:2,k:0},{type:'mothcocoon',i:13,j:1,k:1},{type:'mothcocoon',i:16,j:12,k:2}]);
-  onUse(['mothcocoon'],o=>{ if(CHOICE['cvMoth'+o.k]) return; if(qC()!=='moths') return logMsg('A cocoon hangs from a reed-stem on a thread of silk.','#c8b890');
-    if(!night()) return logMsg('By day the cocoon is grey and dead-looking. The silk you want only shines after dark.','#c8b890');
-    if(give('cv_cocoon')<1) return flash('Your pack is full.'); CHOICE['cvMoth'+o.k]=true; logMsg('You cut the shining cocoon down, carefully. (Cocoons: '+invCount('cv_cocoon')+'/3)','#8ac070');
-    if(invCount('cv_cocoon')>=3) remember('cvhush','moths2',"You have three nightmoth cocoons. Back to Ashmother Odra."); });
-
-  // ════ the strider's trial run: checkpoints down the Long Meadow ════
-  const RACE_PTS=[[40,3],[30,9],[20,2],[9,7],[4,5],[26,4]];
-  let RACE=null; window.cvRace=()=>RACE;
-  OBJ_DRAW.cvpost=o=>{ const q=P(o.i+0.5,o.j+0.5); g.fillStyle='#4a3420'; g.fillRect(q.x-2,q.y-54,4,54); g.fillStyle='#8a2a1a'; g.beginPath(); g.moveTo(q.x+2,q.y-54); g.lineTo(q.x+24,q.y-48+Math.sin(gt*3)*2); g.lineTo(q.x+2,q.y-40); g.closePath(); g.fill(); };
-  NEAR_NAME.cvpost='Trial Post';
-  wrap('longmeadow','objects',l=>qA()==='race'||qA()==='done' ? [...l,{type:'cvpost',i:48,j:8}] : l);
-  const raceHud=document.createElement('div'); raceHud.style.cssText='position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:42;display:none;padding:5px 14px;border-radius:8px;border:1px solid #8a6a3a;background:rgba(20,14,7,0.9);color:#f0dca0;font:600 14px Georgia,serif'; document.body.appendChild(raceHud);
-  const raceStart=()=>{ closeDialog(); let L=0, at=[player.i,player.j]; for(const [i,j] of [...RACE_PTS,[48,8]]){ const p=findPath(at[0],at[1],i,j); L+=p?p.length:Math.hypot(i-at[0],j-at[1])*1.4; at=[i,j]; }
-    RACE={k:0,t:Math.ceil(L*1.25/(3.2*1.4)+8),max:0}; RACE.max=RACE.t; logMsg('The frame shivers under you and stands. Brannock drops his hand: go!','#f2c84a'); banner('Ride!','#f2c84a',1200); };
-  const raceEnd=(ok)=>{ RACE=null; raceHud.style.display='none'; if(ok){ CHOICE.cvA='done'; CHOICE.cvStrider=true; CHOICE.cvRiding=true; remember('cvstrider','done',"Your own Strider, built with Brannock: ash legs, a tempered mainspring. It carries you faster on any open road. (R to mount or dismount.)");
-      banner('A Strider of Your Own','#f2c84a',2600); logMsg('You pull up by the post, the Strider blowing smoke. Brannock walks the last of it, looks at every joint, and nods once. It is yours.','#8ac070'); autosaveSoon(800); }
-    else logMsg('Too slow: the frame needs a full run in one go. Use the trial post to try again.','#e0a060'); };
-  onUse(['cvpost'],()=>{ if(qA()==='done') return logMsg('The trial post. Brannock has carved a notch in it with your time.','#c8b890'); if(RACE) return;
-    say('Brannock the Fused',["“Through every flag, then back to the post. One run, no stopping. Faster than the sun goes down.”"],[{label:'Ride the trial.',fn:raceStart},{label:'Not yet.',fn:closeDialog}]); });
-  OBJ_DRAW.cvflag=o=>{ if(!RACE||RACE.k!==o.k) return; const q=P(o.i+0.5,o.j+0.5); const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(q.x,q.y-20,40,40,'255,210,90',0.35+Math.sin(gt*6)*0.12); g.globalCompositeOperation=gs;
-    g.fillStyle='#4a3420'; g.fillRect(q.x-2,q.y-60,4,60); g.fillStyle='#f2c84a'; g.beginPath(); g.moveTo(q.x+2,q.y-60); g.lineTo(q.x+26,q.y-53+Math.sin(gt*5)*2); g.lineTo(q.x+2,q.y-45); g.closePath(); g.fill(); };
-  wrap('longmeadow','objects',l=>qA()==='race' ? [...l,...RACE_PTS.map(([i,j],k)=>({type:'cvflag',i,j,k,noblock:true}))] : l);
-
-  // ════ the Ember Yard: the Hushling's trial, at night, past sleeping wardens ════
-  AREAS.cvyard={ fence:{r:false,l:false}, mini:{x:0,y:0}, notches:()=>[], dummy:null, w:18, h:12, theme:'sand', sandKind:'clay', scrub:()=>0.4, label:'The Ember Yard',
-    objects:()=>[ {type:'teleporter', i:0, j:6, to:'cvcamp', entry:'fromYard'},
-      {type:'cvsleeper', i:5, j:6, r0:2.0, ph:0, dir:2}, {type:'cvsleeper', i:10, j:3, r0:1.8, ph:2.1, dir:0}, {type:'cvsleeper', i:10, j:9, r0:1.8, ph:4.0, dir:4}, {type:'cvsleeper', i:12, j:6, r0:1.6, ph:1.0, dir:6},
-      {type:'cvlantern', i:16, j:6}, {type:'tent', i:7, j:0, fp:[2,2]}, {type:'tent', i:14, j:10, fp:[2,2]}, {type:'crate', i:8, j:7}, {type:'barrel', i:12, j:1}, {type:'barrel', i:3, j:10}, {type:'scrapheap', i:15, j:2, camp:true},
-      {type:'brazier', i:1, j:3}, {type:'brazier', i:1, j:9} ],
-    npcs:()=>[], mobs:()=>[], entries:{ fromCamp:{i:1,j:6} } };
-  AREA_TIER.cvyard=3; AREAS.cvcamp.entries.fromYard={i:12,j:13};
-  const ringR=o=>o.r0+0.7*Math.sin(gt*0.9+o.ph);
-  const ring=(o,a)=>{ const q=P(o.i+0.5,o.j+0.5), r=ringR(o); g.save(); g.strokeStyle='rgba(255,180,90,'+a+')'; g.fillStyle='rgba(255,150,60,'+(a*0.16)+')'; g.lineWidth=2; g.setLineDash([6,5]); g.beginPath(); g.ellipse(q.x,q.y,r*TW/2*1.414,r*TH/2*1.414,0,0,Math.PI*2); g.fill(); g.stroke(); g.restore(); };
-  { const _ng=nightGlows; nightGlows=function(){ _ng(); try{ if(areaId==='cvyard') OBJECTS.forEach(o=>{ if(o.type==='cvsleeper'){ const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; ring(o,0.5*nightAmt()); g.globalCompositeOperation=gs; } }); }catch(e){} }; }   // the rings show through the dark
-  OBJ_DRAW.cvsleeper=o=>{ const q=P(o.i+0.5,o.j+0.5); ring(o,0.55);
-    drawLitSprite(q.x,q.y,()=>drawSitting(g,q.x,q.y,{race:'cinderveil',gender:'m',skin:2,hair:0,hairColor:3,beard:0,face:1,cvBits:0b000100000,cvPack:true,equip:{head:'cv_helm_suit',torso:'tunic_deep',armor:'cv_suit_iron',hands:'cv_gauntlets',legs:'hose_grey',feet:'cv_wrapboots',weapon:null,offhand:null}},o.dir,'knees'));
-    g.fillStyle='rgba(230,230,240,'+(0.5+Math.sin(gt*2+o.ph)*0.3)+')'; g.font='italic 12px Georgia'; g.textAlign='center'; g.fillText('z',q.x+14+Math.sin(gt+o.ph)*3,q.y-96-((gt*8+o.ph*5)%14)); };
-  NEAR_NAME.cvsleeper='Sleeping Warden';
-  OBJ_DRAW.cvlantern=o=>{ const q=P(o.i+0.5,o.j+0.5); g.fillStyle='#3a2a18'; g.fillRect(q.x-2,q.y-40,4,40); g.fillStyle='#2e2a26'; g.fillRect(q.x-7,q.y-56,14,16); g.fillStyle='#f0b050'; g.fillRect(q.x-4,q.y-53,8,10);
-    const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(q.x,q.y-48,40,30,'255,190,90',0.45); g.globalCompositeOperation=gs; };
-  NEAR_NAME.cvlantern="Odra's Lantern";
-  let TRIAL=null; window.cvTrial=()=>TRIAL;
-  const trialStart=()=>{ closeDialog(); TRIAL={fails:0}; switchArea('cvyard','fromCamp'); logMsg('Odra hangs her lantern at the far end of the Ember Yard. “Bring it back. Wake no one.”','#c8a0e0'); };
-  onUse(['cvlantern'],()=>{ if(!TRIAL) return; TRIAL=null; CHOICE.cvC='done'; CHOICE.cvHush=true; giveQuestItem('hush_ring',true); switchArea('cvcamp','fromYard'); remember('cvhush','done',"The Hushling is yours: a little Skitter of smoked glass that bends the light around you. Foes ten levels or more below you will not notice you pass.");
-    banner('The Hushling','#c8e8f0',2600); logMsg('You walk the lantern back. Odra takes it, and something small and glassy unfolds from under her coat and runs up your arm. “It likes you. It hides you. Do not make it regret either.”','#8ac070'); autosaveSoon(800); });
-  { const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{ if(!running) return r;
-      if(areaId==='cvyard'){ if(!TRIAL) TRIAL={fails:0}; for(const o of OBJECTS){ if(o.type!=='cvsleeper') continue; if(Math.hypot(player.x-(o.i+0.5),player.y-(o.j+0.5))<ringR(o)){ TRIAL.fails++;
-            floatText(tileOf(player),'Noticed!','#ffb070',true); logMsg('A warden stirs, and a beaked helm turns toward you. You freeze, and back away to the start.','#e0a060');
-            player.path=[]; player.x=1.5; player.y=6.5; player.i=1; player.j=6; break; } } }
-      else if(TRIAL && areaId!=='cvyard') TRIAL=null;
-      if(RACE){ if(areaId!=='longmeadow'||combat.active){ raceEnd(false); } else { RACE.t-=dt; const [i,j]=RACE.k<RACE_PTS.length?RACE_PTS[RACE.k]:[48,8]; raceHud.style.display='block';
-          raceHud.textContent=(RACE.k<RACE_PTS.length?'Flag '+(RACE.k+1)+' / '+RACE_PTS.length:'Back to the post!')+'  ·  '+Math.max(0,Math.ceil(RACE.t))+'s';
-          if(Math.hypot(player.x-(i+0.5),player.y-(j+0.5))<1.3){ RACE.k++; try{ SND.fx('page'); }catch(e){} if(RACE.k>RACE_PTS.length) raceEnd(true); }
-          else if(RACE.t<=0) raceEnd(false); } } }catch(e){ console.error(e); } return r; }; }
-
-  // ════ the engines: riding, and the two that follow ════
-  const openGround=()=>{ const A=AREAS[areaId]; return !!A && !A.inside && !A.cave && !/^uc_/.test(areaId) && areaId!=='cvyard'; };
-  const canRide=()=>openGround() && !combat.active && !player.sitChair && !(typeof FISH!=='undefined' && FISH);
-  const riding=()=>!!((CHOICE.cvStrider && CHOICE.cvRiding) || RACE) && canRide();
-  window.cvRiding=riding; window.cvRideMul=()=>riding()?1.4:1;
-  const hushOn=()=>!!CHOICE.cvHush && unWoven((player.opts&&player.opts.equip&&player.opts.equip.special)||'')==='hush_ring';   // the Hushling only works while you wear its ring
-  window.hushOn=hushOn;
-  window.cvHush=m=>!!(RACE && m && !m.provoked) || !!(hushOn() && m && !m.provoked && !m.boss && foeLevel(m)<=playerLevel()-10);
-  { const _w=drawPlayerWading; drawPlayerWading=function(e){ if(!riding()) return _w.apply(this,arguments);
-      const q=P(player.x,player.y), d=player.dir||0, mv=player.path.length>0, ph=mv?gt*7:null, S=1.3, z=ph==null?0:Math.abs(Math.sin(ph*2))*1.2;
-      CVM3.strutter(g,q.x,q.y,S,d,ph,true,CHOICE.cvPaint); SADDLE_SWAY=ph==null?0:Math.sin(ph)*2.2; const th=(45-d*45)*Math.PI/180, lx=2, sx=q.x+(lx*Math.cos(th)-lx*Math.sin(th))*0.7071*S, sy=q.y+(lx*Math.cos(th)+lx*Math.sin(th))*0.3536*S-(57+z)*S;
-      drawLitSprite(sx,sy+CHAIR_SEAT,()=>drawSitting(g,sx,sy+CHAIR_SEAT,player.opts,d,'saddle')); if(d>=3 && d<=5) CVM3.strutterCantle(g,q.x,q.y,S,d,ph); }; }
-  const rideBtn=document.createElement('button'); rideBtn.id='ride-btn'; rideBtn.style.cssText='position:fixed;left:12px;bottom:64px;z-index:40;display:none;padding:6px 12px;border-radius:8px;border:1px solid #8a6a3a;background:rgba(24,16,8,0.92);color:#f0dca0;font:600 12px Georgia,serif;cursor:pointer;'; document.body.appendChild(rideBtn);
-  const toggleRide=()=>{ if(!CHOICE.cvStrider) return; CHOICE.cvRiding=!CHOICE.cvRiding; logMsg(CHOICE.cvRiding?'You swing up into the Strider\'s saddle.':'You climb down. The Strider folds its knees and follows on its own.','#c8a860'); };
-  rideBtn.addEventListener('click',e=>{ e.stopPropagation(); rideBtn.blur(); toggleRide(); });
-  window.addEventListener('keydown',e=>{ if(G || (e.target && e.target.tagName==='INPUT')) return; if((e.key==='r'||e.key==='R') && CHOICE.cvStrider && !dlgIsOpen()){ e.preventDefault(); toggleRide(); } });
-  setInterval(()=>{ try{ const show=!!CHOICE.cvStrider && !!player.opts && canRide() && !dlgIsOpen() && !G; rideBtn.style.display=show?'block':'none'; if(show) rideBtn.textContent=CHOICE.cvRiding?'⚙ Dismount (R)':'⚙ Strider (R)';
-    // a Packling carries eight more
-    const want=30+(CHOICE.cvPack?8:0); if(INV_SIZE<want && player.inv){ INV_SIZE=want; INV_RAW=true; try{ while(player.inv.length<INV_SIZE) player.inv.push(null); } finally{ INV_RAW=false; }
-      if(typeof invBuilt!=='undefined' && invBuilt){ const n=invGrid.querySelectorAll('.slot').length||invGrid.children.length; for(let i=n;i<INV_SIZE;i++) invGrid.appendChild(makeSlot('inv',i)); if(invOverlay.classList.contains('open')) refreshInventory(); } } }catch(e){} },300);
-  // followers: a little hauler and a glassy skitter, trailing you like the drake does
-  const FOL={pack:null,hush:null,strider:null}; let folArea=null;
-  const folOn=k=>k==='pack'?!!CHOICE.cvPack && !(AREAS[areaId]||{}).inside : k==='hush'?hushOn() : k==='strider'?!!CHOICE.cvStrider && !riding() && openGround() : false;
-  { const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{ if(!running || !player.opts) return r; if(G){ player.path=[]; } const reset=folArea!==areaId; folArea=areaId; const fd=DIR_DELTA[player.dir||0]||[1,1];
-      [['pack',1.7,0.7],['hush',1.0,-0.6],['strider',2.4,-0.3]].forEach(([k,back,side])=>{ if(!folOn(k)){ FOL[k]=null; return; }
-        const n=Math.hypot(fd[0],fd[1])||1, tx=player.x-fd[0]/n*back+(-fd[1]/n)*side, ty=player.y-fd[1]/n*back+(fd[0]/n)*side; let F=FOL[k];
-        if(!F||reset){ F=FOL[k]={x:tx,y:ty,dir:player.dir||0,moving:false}; }
-        const dx=tx-F.x, dy=ty-F.y, d=Math.hypot(dx,dy); if(d>7){ F.x=tx; F.y=ty; } else if(d>0.3){ const sp=Math.min(d*3.2,6.5)*dt; F.x+=dx/d*sp; F.y+=dy/d*sp; F.dir=dirFromDelta(dx,dy); F.moving=true; } else F.moving=false; }); }catch(e){ console.error(e); } return r; }; }
-  { const _pd=pupDrawItems; pupDrawItems=function(items){ _pd(items); try{
-      const F1=FOL.pack; if(F1) items.push({d:F1.x+F1.y, ax:F1.x, ay:F1.y, fn:()=>{ const q=P(F1.x,F1.y); CVM3.hauler(g,q.x,q.y,0.6,F1.dir,F1.moving?gt*9:null); }});
-      const F3=FOL.strider; if(F3) items.push({d:F3.x+F3.y, ax:F3.x, ay:F3.y, fn:()=>{ const q=P(F3.x,F3.y); CVM3.strutter(g,q.x,q.y,1.3,F3.dir,F3.moving?gt*7:null,false,CHOICE.cvPaint); }});
-      const F2=FOL.hush; if(F2) items.push({d:F2.x+F2.y, ax:F2.x, ay:F2.y, fn:()=>{ const q=P(F2.x,F2.y); g.save(); g.globalAlpha*=0.5+Math.sin(gt*2.4)*0.12; CVM3.skitter(g,q.x,q.y,0.55,F2.dir,F2.moving?gt*12:null); g.restore();
-        const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(q.x,q.y-14,22,14,'190,230,255',0.18+Math.sin(gt*3)*0.06); g.globalCompositeOperation=gs; }}); }catch(e){} }; }
-  // the Hushling works on you, too: a faint shimmer at your edges while lesser foes are near
-  { const _w=drawPlayerWading; drawPlayerWading=function(e){ const r=_w.apply(this,arguments); try{ if(hushOn() && mobs.some(m=>m.hostile && !m.dead && cvHush(m) && cheb(tileOf(m),tileOf(player))<=5)){ const q=P(player.x,player.y);
-        const gs=g.globalCompositeOperation; g.globalCompositeOperation='lighter'; glow(q.x,q.y-50,34,60,'180,220,255',0.06+Math.sin(gt*4)*0.025); g.globalCompositeOperation=gs; } }catch(e){} return r; }; }
-
-  // ════ the talk ════
-  const B='Brannock the Fused', T='Tinny', O='Ashmother Odra';
-  const extra=(old,fn)=>()=>{ const _sd=showDialog; let done=false; showDialog=function(name,text,opts,purse){ if(!done){ done=true; showDialog=_sd; try{ const ex=fn(); if(ex.length && Array.isArray(opts)){ opts=[...opts]; const k=opts.indexOf(bye); opts.splice(k<0?opts.length:k,0,...ex); } }catch(e){ console.error(e); } } return _sd.call(this,name,text,opts,purse); };
-    try{ old(); } finally{ showDialog=_sd; } };
-  // the Strider's lacquer: Brannock boils it from beetle-shell, three colours, and the dust takes all of them
-  TALKERS.cvbrannock=extra(TALKERS.cvbrannock,()=>{ if(!CHOICE.cvStrider) return []; const back=()=>TALKERS.cvbrannock();
-    const pick=(k,nm)=>({label:nm+(((CHOICE.cvPaint||'moss')===k)?' <small>(as it is now)</small>':''), fn:()=>{ CHOICE.cvPaint=k; logMsg('Brannock daubs your Strider '+nm.toLowerCase()+' with a rag. By evening the dust has found it.','#c8a860'); say(B,"“Done. Give it a week of road and you will not tell it from the ground.”",[{label:'Back.',fn:back},bye]); }});
-    return [{label:'“Could my Strider wear another colour?”', fn:()=>say(B,"“Paint. Ochre and soot and boiled beetle-shell, slapped on with a rag. Moss, amber, or ember-black.” <i>He shrugs.</i> “The dust has them all soon enough.”",[pick('moss','Moss green'),pick('amber','Amber'),pick('ember','Ember black'),{label:'Back.',fn:back},bye])}]; });
-  // A · Brannock and the Strider
-  TALKERS.cvbrannock=extra(TALKERS.cvbrannock,()=>{ const s=qA(), o=[], back=()=>TALKERS.cvbrannock();
-    if(!kin()){ if(trust()>=1) o.push({label:'“That Strider of yours. Could I ride one?”', fn:()=>say(B,"“Ride one? No. Kin build their own. You are a road-friend. Road-friends walk.”",[{label:'Back.',fn:back},bye])}); return o; }
-    if(!s && !seasoned()){ o.push({label:'“Kin build their own legs, you said.”', fn:()=>say(B,"“I said it. Not yet.” <i>He looks at your boots.</i> “Your feet still have things to learn. Walk the long roads, go up the Pass. Come back with dust from far off, and we build.”",[{label:'Back.',fn:back},bye])}); return o; }
-    if(!s) o.push({label:'“Kin build their own legs, you said.”', fn:()=>{ CHOICE.cvA='poles'; remember('cvstrider','poles',"Brannock will help you build a Strider of your own. First: four seasoned ash poles, from the woodcutters' stacks in the Fellings.");
-      say(B,["<i>He sets the hammer down, which he does not do.</i> “I said it. So. Legs first. Ash, seasoned, straight. The woodcutters stack it in the Fellings. Four poles.”","“Then a mainspring. Then the forge, then teaching it to walk, then a run to prove it. It is a long road. Every Strider is.”"],[{label:'Back.',fn:back},bye]); }});
-    if(s==='poles' && invCount('cv_ashpole')>=4) o.push({label:'Hand over the four ash poles and thirty Salvage.'+(scrap()<30?' ('+scrap()+'/30)':''), off:scrap()<30, fn:()=>{ take('cv_ashpole',4); take('cv_scrap',30); CHOICE.cvA='spring'; updateHud(); remember('cvstrider','spring0',"Brannock has the legs. Now a mainspring: there is a dead hauler on Greywater Heath, and feral Skitters nest in it.");
-      say(B,["<i>He sights down each pole like a crossbow.</i> “Good wood.”","“A spring now. There is a dead hauler on the Greywater Heath, out in the heather. Its spring is good, but things live in it. Skitters, gone wild, no maker. Be quick with them. They are only iron.”"],[{label:'Back.',fn:back},bye]); }});
-    if(s==='spring' && hasItem('cv_spring')) o.push({label:'Give him the mainspring.', fn:()=>{ take('cv_spring',1); CHOICE.cvA='forge'; updateHud(); remember('cvstrider','forge',"Temper the mainspring at Brannock's anvil.");
-      say(B,"“Black and sound.” <i>He drops it into the fire.</i> “You hold the hammer. I am too old to hold your Strider's heart for you.”",[{label:'Take the hammer.',fn:()=>cvGame('forge',()=>{ CHOICE.cvA='gait'; remember('cvstrider','gait',"The mainspring is tempered. Next, teach the frame its gait, with Brannock."); },null)},bye]); }});
-    if(s==='forge') o.push({label:'Temper the mainspring.', fn:()=>cvGame('forge',()=>{ CHOICE.cvA='gait'; remember('cvstrider','gait',"The mainspring is tempered. Next, teach the frame its gait, with Brannock."); },null)});
-    if(s==='gait') o.push({label:'Teach the frame its gait.', fn:()=>{ say(B,"“It knows how to stand. It does not know how to walk. You show it, leg by leg, and it remembers.”",[{label:'Begin.',fn:()=>cvGame('gait',()=>{ CHOICE.cvA='race'; remember('cvstrider','race',"The Strider walks. Now prove it: a timed run past the flags on the Long Meadow, from Brannock's trial post."); },null)},bye]); }});
-    if(s==='race') o.push({label:'“What now?”', fn:()=>say(B,"“Now you ride it. Long Meadow. I have set flags. Every flag and back to the post before I lose patience.”",[{label:'Back.',fn:back},bye])});
-    if(s==='done') o.push({label:'“How is my Strider?”', fn:()=>say(B,["“Oiled. Watched. Like I watch mine.” <i>Pause.</i> “Ride it. Legs that stand still forget.”"],[{label:'Back.',fn:back},bye])});
-    return o; });
-  // B · Tinny and the Packling
-  TALKERS.cvtinny=extra(TALKERS.cvtinny,()=>{ const s=qB(), o=[], back=()=>TALKERS.cvtinny(), pel=invCount('pelt');
-    if(!kin()) return o;
-    if(!s && !seasoned()){ o.push({label:'“What are you always carrying?”', fn:()=>say(T,"“Everything. One day you'll need a Packling of your own, for all the junk you'll find out there.” <i>She looks you up and down.</i> “Not yet, though. You've not found enough junk yet. Go further.”",[{label:'Back.',fn:back},bye])}); return o; }
-    if(!s) o.push({label:'“What are you always carrying?”', fn:()=>{ CHOICE.cvB='frame'; remember('cvpack','frame',"Tinny will build you a Packling, a little hauler that carries for you. There is a small hauler frame half-buried in the south of the Scrublands. Wreck-pickers were at it.");
-      say(T,["“Everything. You should too, you are kin now. You need a Packling.” <i>She sketches one in the dust with a boot: small, four-legged, all back.</i>","“There is a little frame half-buried down the south of the Scrublands. Wreck-pickers found it first. Unfind them.”"],[{label:'Back.',fn:back},bye]); }});
-    if(s==='frame') o.push({label:'“About that frame…”', fn:()=>say(T,"“South Scrublands, west side, past the old ruin. Mind the wreck-pickers. They bite.”",[{label:'Back.',fn:back},bye])});
-    if(s==='parts') o.push({label:'Bring fifteen Salvage and two wolf pelts.'+(scrap()<15||pel<2?' ('+scrap()+'/15, '+pel+'/2 pelts)':''), off:scrap()<15||pel<2, fn:()=>{ take('cv_scrap',15); take('pelt',2); CHOICE.cvB='balance'; updateHud(); remember('cvpack','balance',"Tinny has the parts. Now help her load the Packling and keep it level.");
-      say(T,["<i>Iron for the ribs, pelts for the saddle-pads. She works fast and hums.</i>","“There. Now the hard part. It has to learn its own weight, or it falls over every time you buy a turnip.”"],[{label:'Load it up.',fn:()=>cvGame('balance',()=>{ CHOICE.cvB='heart'; remember('cvpack','heart',"The Packling knows its weight. All it needs now is a heart: an ember core, for Tinny."); },null)},bye]); }});
-    if(s==='balance') o.push({label:'Load the Packling.', fn:()=>cvGame('balance',()=>{ CHOICE.cvB='heart'; remember('cvpack','heart',"The Packling knows its weight. All it needs now is a heart: an ember core, for Tinny."); },null)});
-    if(s==='heart') o.push({label:'Give her an ember core.'+(invCount('ember_core')?'':' (none)'), off:!invCount('ember_core'), fn:()=>{ take('ember_core',1); CHOICE.cvB='done'; CHOICE.cvPack=true; updateHud();
-      remember('cvpack','done',"Your Packling follows you: a little hauler that carries eight more things than you could."); banner('The Packling','#c8a860',2600);
-      say(T,["<i>The core goes in. The Packling shudders, stands, and walks three steps to stand beside you, as if it always had.</i>","“It's yours. It carries. It doesn't fight, it doesn't go indoors, it doesn't like geese. Give it a name, if you like. We don't.”"],[bye]); autosaveSoon(800); }});
-    if(s==='done') o.push({label:'“The Packling is doing well.”', fn:()=>say(T,"“Course it is. I built it.” <i>A pause.</i> “We built it.”",[{label:'Back.',fn:back},bye])});
-    return o; });
-  // C · Odra and the Hushling
-  TALKERS.cvodra=extra(TALKERS.cvodra,()=>{ const s=qC(), o=[], back=()=>TALKERS.cvodra();
-    if(!kin()) return o;
-    if(!s && !seasoned()){ o.push({label:'“How do you go unseen on the roads?”', fn:()=>say(O,"“We go unnoticed. It is a thing you learn by being noticed first, many times, by many things that wanted to kill you.” <i>The mask tilts.</i> “You have not been noticed enough yet. Come back when you have.”",[{label:'Back.',fn:back},bye])}); return o; }
-    if(!s) o.push({label:'“How do you go unseen on the roads?”', fn:()=>{ CHOICE.cvC='glass'; remember('cvhush','glass',"Ashmother Odra will make you a Hushling, a little engine that hides you from lesser foes. First, clear glass from the Glass Crater.");
-      say(O,["“We do not. We go <i>unnoticed</i>. That is different, and harder.” <i>Something glassy shifts in the folds of her coat.</i>","“A Hushling. A small thing, and fussy. It needs a lens, and the lens needs glass: clear, from the Glass Crater, where the old fire fused the sand. Bring me some.”"],[{label:'Back.',fn:back},bye]); }});
-    if(s==='glass' && hasItem('cv_lensglass')) o.push({label:'Show her the crater glass.', fn:()=>{ CHOICE.cvC='grind'; remember('cvhush','grind',"Grind the crater glass into a lens at Odra's wheel.");
-      say(O,"“Good. Now grind it. Slowly. A lens remembers every hurry.”",[{label:'Sit at the wheel.',fn:()=>grind()},bye]); }});
-    if(s==='grind') o.push({label:'Grind the lens.', fn:()=>grind()});
-    if(s==='moths') o.push({label:'Bring three nightmoth cocoons and fifteen Salvage.'+(invCount('cv_cocoon')<3||scrap()<15?' ('+invCount('cv_cocoon')+'/3, '+scrap()+'/15)':''), off:invCount('cv_cocoon')<3||scrap()<15, fn:()=>{ take('cv_cocoon',3); take('cv_scrap',15); take('cv_lens',1); CHOICE.cvC='trial'; updateHud(); remember('cvhush','trial',"The Hushling is built. Last, Odra's trial: at night, carry her lantern out of the Ember Yard without waking a single warden.");
-      say(O,["<i>She spins the cocoon-silk around the lens with three fingers, very fast. When she opens her hand, a small skitter of smoked glass sits in it, and you can see the fire through it.</i>","“It will not go with just anyone. Show it you can be quiet. Come at night: I will hang my lantern in the Ember Yard, among the sleeping wardens. Bring it back and wake no one.”"],[{label:'Back.',fn:back},bye]); }});
-    if(s==='trial') o.push({label:night()?'Take the trial in the Ember Yard.':'Take the trial. (only at night)', off:!night(), fn:trialStart});
-    return o; });
-  const grind=()=>{ if(!hasItem('cv_lensglass')) return say(O,"“No glass, no lens.”",[bye]); cvGame('lens',()=>{ take('cv_lensglass',1); give('cv_lens'); CHOICE.cvC='moths'; remember('cvhush','moths',"The lens is ground. Now three nightmoth cocoons from the Mistmere: they only shine, and only come away clean, at night."); updateHud();
-      say(O,"“There. Look through it: the world goes soft at the edges. The Hushling will need silk to hold it, nightmoth silk, from the Mistmere. Three cocoons. They only shine after dark.”",[bye]); },null); };
-
-  // marks over their heads
-  { const _h=npcHasNews; npcHasNews=function(n){ try{ if(n && kin()){
-        if(n.id==='cvbrannock'){ const s=qA(); if(!s) return seasoned()?'!':null; if((s==='poles'&&invCount('cv_ashpole')>=4&&invCount('cv_scrap')>=30)||(s==='spring'&&hasItem('cv_spring'))||s==='forge'||s==='gait') return '?'; }
-        if(n.id==='cvtinny'){ const s=qB(); if(!s) return seasoned()?'!':null; if((s==='parts'&&scrap()>=15&&invCount('pelt')>=2)||s==='balance'||(s==='heart'&&invCount('ember_core'))) return '?'; }
-        if(n.id==='cvodra'){ const s=qC(); if(!s) return seasoned()?'!':_h(n); if((s==='glass'&&hasItem('cv_lensglass'))||s==='grind'||(s==='moths'&&invCount('cv_cocoon')>=3&&invCount('cv_scrap')>=15)||(s==='trial'&&night())) return '?'; } } }catch(e){} return _h(n); }; }
-  // the journal
-  JOURNAL.push(['A Strider of Your Own', ()=>{ const s=qA(); if(!s) return null; return s==='done' ? ['done',"You built a Strider with Brannock. It carries you faster on open ground (R to mount)."] : ['active', {
-      poles:"Gather four seasoned ash poles from the woodcutters' stacks in the Fellings ("+invCount('cv_ashpole')+"/4), for Brannock.",
-      spring:hasItem('cv_spring')?"Bring the mainspring to Brannock.":"Pry the mainspring out of the dead hauler on Greywater Heath. Feral Skitters nest in it.",
-      forge:"Temper the mainspring at Brannock's anvil.", gait:"Teach the Strider frame its gait, with Brannock.", race:"Ride the trial on the Long Meadow: every flag and back to Brannock's post, in time." }[s]]; }]);
-  JOURNAL.push(['The Packling', ()=>{ const s=qB(); if(!s) return null; return s==='done' ? ['done',"Tinny built you a Packling. It follows you and carries eight more things."] : ['active', {
-      frame:"Dig out the little hauler frame in the south of the Scrublands. Wreck-pickers are at it.", parts:"Bring Tinny eight Salvage ("+scrap()+"/8) and two wolf pelts ("+invCount('pelt')+"/2).",
-      balance:"Help Tinny load the Packling, and keep it level.", heart:"Give Tinny an ember core, for the Packling's heart." }[s]]; }]);
-  JOURNAL.push(['The Hushling', ()=>{ const s=qC(); if(!s) return null; return s==='done' ? ['done',"Odra gave you a Hushling. Foes ten levels or more below you do not notice you pass."] : ['active', {
-      glass:hasItem('cv_lensglass')?"Take the crater glass to Ashmother Odra.":"Find clear glass in the Glass Crater, for Ashmother Odra.", grind:"Grind the crater glass into a lens at Odra's wheel.",
-      moths:"Cut three nightmoth cocoons in the Mistmere, at night ("+invCount('cv_cocoon')+"/3).", trial:"At night, take Odra's trial: carry her lantern out of the Ember Yard without waking a warden." }[s]]; }]);
-}
 
 // ════════ the quest-complete window: what you earned in coin, and the gear you pick (with icons you can hover) ════════
 { const css=document.createElement('style'); css.textContent=`#rw-ov{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;background:rgba(10,6,2,0.45)}
@@ -32203,35 +31278,6 @@ OBJ_DRAW.edricremains=o=>{ const q=P(o.i+0.5,o.j+0.5), R=k=>rnd01(k,o.i,4411); g
 
 NEAR_NAME.edricremains='What is left of a man';
 
-// ════════ icons that were missing: the tinker's harness and the Cinderveil scarves ════════
-ICON_EXTRA.cv_harness=g2=>{ g2.lineCap='round';
-  [[8,6,30,34],[32,6,10,34]].forEach(([a,b,c,d])=>{ g2.strokeStyle='#2a1a0e'; g2.lineWidth=5.6; g2.beginPath(); g2.moveTo(a,b); g2.lineTo(c,d); g2.stroke(); g2.strokeStyle='#6a4628'; g2.lineWidth=4; g2.stroke(); });   // crossed leather straps
-  g2.strokeStyle='#5a3a20'; g2.lineWidth=4; g2.beginPath(); g2.moveTo(6,24); g2.quadraticCurveTo(20,30,34,24); g2.stroke();   // the belt
-  g2.fillStyle='#b0884a'; g2.strokeStyle='#5a4420'; g2.lineWidth=1; g2.fillRect(17,17,6,6); g2.strokeRect(17,17,6,6); g2.fillStyle='#4a3a20'; g2.fillRect(19,19,2,2);   // the buckle where they cross
-  g2.fillStyle='#7a7470'; g2.fillRect(9,25,2.4,9); g2.fillStyle='#4a4440'; g2.fillRect(7,24,6.4,3);   // a hammer in a loop
-  g2.strokeStyle='#8a8580'; g2.lineWidth=1.6; g2.beginPath(); g2.moveTo(29,25); g2.lineTo(31,34); g2.stroke(); g2.beginPath(); g2.arc(28.6,24.4,1.8,0,Math.PI*2); g2.stroke(); };   // and a spanner
-const scarfIcon=(main,dk,stripe)=>g2=>{ g2.fillStyle=dk; g2.beginPath(); g2.ellipse(20,15,13,7,0,0,Math.PI*2); g2.fill();
-  g2.fillStyle=main; g2.beginPath(); g2.ellipse(20,14,12,5.6,0,0,Math.PI*2); g2.fill(); g2.fillStyle=dk; g2.beginPath(); g2.ellipse(20,13,7,2.6,0,0,Math.PI*2); g2.fill();   // wound round and round
-  g2.fillStyle=main; g2.beginPath(); g2.moveTo(23,17); g2.quadraticCurveTo(28,25,25,34); g2.lineTo(19,33); g2.quadraticCurveTo(21,25,17,18); g2.closePath(); g2.fill();   // a hanging tail
-  g2.strokeStyle=stripe; g2.lineWidth=1.2; [[10,12,30,12],[20,22,25,22],[19,28,25,28]].forEach(([a,b,c,d])=>{ g2.beginPath(); g2.moveTo(a,b); g2.lineTo(c,d); g2.stroke(); });
-  g2.strokeStyle=dk; g2.lineWidth=0.9; for(let k=0;k<5;k++){ g2.beginPath(); g2.moveTo(19.5+k*1.3,33); g2.lineTo(19+k*1.3,37); g2.stroke(); } };   // fringe
-ICON_EXTRA.cv_scarf=scarfIcon('#8a3a2a','#4a1e16','#c8904a'); ICON_EXTRA.cv_scarf_grey=scarfIcon('#7a7670','#3e3c38','#b8b0a0');
-
-// ════════ Cinderveil trade: Brannock sells what he forges, Tinny what she carries; Ashmother Odra sells nothing, she gives ════════
-{ const trust=()=>CHOICE.cvTrust||0, disc=()=>trust()>=2?0.8:1;
-  const BRANN=['cv_mask_weld','cv_mask_resp','cv_gauntlets','cv_harness'], TINNY=['cv_mask_plain','cv_duster','cv_duster_rust','cv_duster_red','cv_wrap','cv_wrapboots','cv_scarf','cv_scarf_grey'];
-  const addOpt=(id,fn)=>{ const old=TALKERS[id]; TALKERS[id]=()=>{ const _sd=showDialog; let done=false; showDialog=function(name,text,opts,purse){ if(!done){ done=true; showDialog=_sd; try{ const ex=fn(); if(ex.length && Array.isArray(opts)){ opts=[...opts]; const k=opts.indexOf(bye); opts.splice(k<0?opts.length:k,0,...ex); } }catch(e){ console.error(e); } } return _sd.call(this,name,text,opts,purse); };
-      try{ old(); } finally{ showDialog=_sd; } }; };
-  addOpt('cvbrannock',()=> trust()>=1 ? [{label:'“What do you forge?”', fn:()=>shopFrom('Brannock the Fused',BRANN.filter(i=>ITEMS[i]),disc(),["“Masks with iron in them. Gloves that take a forge. A harness to carry your tools.” <i>He does not look up.</i> “Good iron. There is no bad iron.”"],()=>TALKERS.cvbrannock())}] : []);
-  addOpt('cvtinny',()=> trust()>=1 ? [{label:'“What is in the pack?”', fn:()=>shopFrom('Tinny',TINNY.filter(i=>ITEMS[i]),disc(),["“Coats, wraps, scarves, boots. And a plain mask, if you want to look like the rest of us.” <i>She grins, or her mask does.</i>"],()=>TALKERS.cvtinny())}] : []);
-  // Odra's gifts: the elder's mask when she names you kin, the elder's coat once you have seen her face
-  { const _r=remember; remember=function(k,v,msg){ const r=_r.apply(this,arguments); try{
-      if(k==='cvjob' && v==='done2' && !CHOICE.cvGiftMask){ CHOICE.cvGiftMask=true; giveQuestItem('cv_mask_elder',true); }
-      if(k==='cvface' && v==='seen' && !CHOICE.cvGiftCoat){ CHOICE.cvGiftCoat=true; giveQuestItem('cv_duster_elder',true); } }catch(e){} return r; }; }
-  // a save from before this: kin already, or her face already seen, and nothing given yet
-  addOpt('cvodra',()=>{ try{ if(trust()>=2 && !CHOICE.cvGiftMask){ CHOICE.cvGiftMask=true; giveQuestItem('cv_mask_elder',true); logMsg("Ashmother Odra presses an elder's mask into your hands. “Kin wear these.”",'#c8a0e0'); }
-      if(CHOICE.cvFace && !CHOICE.cvGiftCoat){ CHOICE.cvGiftCoat=true; giveQuestItem('cv_duster_elder',true); logMsg("Ashmother Odra gives you an elder's coat. “Now you know what it hides. Wear it.”",'#c8a0e0'); } }catch(e){} return []; });
-}
 
 // ════════ Corwin's road, kept whole: wherever roads were laid between two of his stops, he walks them too ════════
 { const nb=a=>{ let l=[]; try{ l=AREAS[a].objects().filter(o=>o.type==='teleporter' && o.to && AREAS[o.to] && !AREAS[o.to].inside).map(o=>o.to); }catch(e){} return [...new Set(l)]; };
@@ -32293,7 +31339,7 @@ const REGIONS={ 'Dunhollow Valley':['farm','road','lane','village','graveyard','
   'The Elvenwood':['mistmere','silvergate','sylvhaven','fellings','ruin','elfroad','warren','bearden','willowpool','hollowrite'],
   'Hollowmere':['kingsroad','citygate','market','lowstreets','keepward','docks','ratdrain','portfearn','gbtunnel'],
   'The Fen':['fenpath','fen','blackwater','sunkenwood','reedbank'], 'The Foothills':['heath','foothills','northroad','varrowpass'],
-  'The Scrublands':['scrubland','cvcamp','cvyard'], 'The Desert':['drywash','waystation','oasis','glassdunes','redmesa','singingdunes','saltpan','crater','bonewaste'] };
+  'The Scrublands':['scrubland'], 'The Desert':['drywash','waystation','oasis','glassdunes','redmesa','singingdunes','saltpan','crater','bonewaste'] };
 const REGION_OF={}; for(const R in REGIONS) REGIONS[R].forEach(id=>REGION_OF[id]=R);
 const regionOf=id=> REGION_OF[id] || (/^uc_/.test(id)?'The Undercity': /^(vm_|ow_|varrow(mine|tomb))/.test(id)?'Varrowdeep': /^rc_/.test(id)?'The Rootdeep':null);
 const RLV_CACHE={}; function regionLv(R){ if(R in RLV_CACHE) return RLV_CACHE[R]; const L=Object.keys(AREAS).filter(id=>regionOf(id)===R).map(zoneLv).filter(Boolean); return RLV_CACHE[R]=L.length?[Math.min(...L),Math.max(...L)]:null; }
@@ -32302,23 +31348,6 @@ function qLvBadge(t,txt){ const L=questLv(t,txt); return L ? ` <span class="qlv"
 window.ZLV_ON=true;
 { const css=document.createElement('style'); css.textContent='.qlv{font:600 11px Georgia,serif;margin-left:6px;letter-spacing:0.5px;white-space:nowrap}'; document.head.appendChild(css); }
 
-// the Cinderveil's tents: patched with whatever cloth came to hand, stained, the dust worked into them (painted only over the canvas itself)
-function cvTentWear(X,Y,v=0){ g.save(); g.globalCompositeOperation='source-atop'; let q=1777+v*211; const r=()=>(q=(q*577+101)%997)/997;
-  const FAB=['#8a3a2a','#3e4a5e','#5a4a2e','#a07a3a','#4e5e32','#6a4a5a','#7a6a52'];
-  const gd=g.createLinearGradient(0,Y-150,0,Y-20); gd.addColorStop(0,'rgba(190,166,120,0.04)'); gd.addColorStop(1,'rgba(196,170,124,0.32)'); g.fillStyle=gd; g.fillRect(X-150,Y-170,300,150);   // dust worked up from the ground
-  for(let k=0;k<6;k++){ const x=X-120+r()*240, y=Y-140+r()*110, rr=6+r()*14; const gg=g.createRadialGradient(x,y,0,x,y,rr); gg.addColorStop(0,'rgba(70,46,26,0.32)'); gg.addColorStop(1,'rgba(70,46,26,0)'); g.fillStyle=gg; g.fillRect(x-rr,y-rr,rr*2,rr*2); }   // stains
-  for(let k=0;k<12;k++){ const w=16+r()*28, h=12+r()*20, x=X-115+r()*230, y=Y-150+r()*115; g.save(); g.translate(x,y); g.rotate((r()-0.5)*0.7); g.globalAlpha=0.92; g.fillStyle=FAB[Math.floor(r()*FAB.length)]; g.fillRect(-w/2,-h/2,w,h);
-    if(r()<0.4){ g.fillStyle='rgba(255,240,210,0.18)'; for(let t=-w/2+3;t<w/2;t+=6) g.fillRect(t,-h/2,2,h); }   // a striped one now and then
-    g.globalAlpha=1; g.strokeStyle='rgba(30,20,12,0.75)'; g.lineWidth=0.9; g.setLineDash([2.2,2]); g.strokeRect(-w/2+1.5,-h/2+1.5,w-3,h-3); g.setLineDash([]); g.strokeStyle='rgba(30,20,12,0.5)'; g.lineWidth=0.7; g.strokeRect(-w/2,-h/2,w,h); g.restore(); }   // patches, stitched round
-  g.restore(); }
-
-// ════════ the Cinderveil's gear, sold mid-game: light and nimble (health and agility), the elder pieces a step finer ════════
-Object.assign(ITEM_LEVEL_FIX,{ cv_mask_resp:3, cv_mask_weld:3, cv_mask_plain:3, cv_mask_elder:4, cv_duster:3, cv_duster_rust:3, cv_duster_red:3, cv_duster_elder:4, cv_wrap:3, cv_harness:3, cv_gauntlets:3, cv_wrapboots:3, cv_scarf:3, cv_scarf_grey:3 });
-Object.assign(ITEM_STATS,{ cv_mask_resp:{hp:4,agi:1}, cv_mask_weld:{hp:5,ap:1}, cv_mask_plain:{hp:4,agi:1}, cv_mask_elder:{hp:7,agi:1,magic:1},
-  cv_duster:{hp:8,agi:1}, cv_duster_rust:{hp:8,agi:1}, cv_duster_red:{hp:7,agi:1,ap:1}, cv_duster_elder:{hp:12,agi:2,magic:1}, cv_wrap:{hp:6,agi:2},
-  cv_harness:{hp:3,ap:1}, cv_gauntlets:{hp:3,ap:1,agi:1}, cv_wrapboots:{hp:3,agi:1}, cv_scarf:{agi:1}, cv_scarf_grey:{agi:1} });
-Object.assign(GEAR_HP,{ cv_mask_resp:4, cv_mask_weld:5, cv_mask_plain:4, cv_mask_elder:7, cv_duster:8, cv_duster_rust:8, cv_duster_red:7, cv_duster_elder:12, cv_wrap:6, cv_harness:3, cv_gauntlets:3, cv_wrapboots:3, cv_scarf:0, cv_scarf_grey:0 });
-Object.assign(PRICES,{ cv_mask_resp:70, cv_mask_weld:75, cv_mask_plain:60, cv_mask_elder:220, cv_duster:110, cv_duster_rust:110, cv_duster_red:120, cv_duster_elder:260, cv_wrap:95, cv_harness:80, cv_gauntlets:70, cv_wrapboots:60, cv_scarf:30, cv_scarf_grey:30 });
 
 // Old Gwen's flock: a good spread of sheep grazing round her on the heath, on the days she is out with them
 wrap('heath','objects',l=>{ if(!encounter('shepherd',0.6)) return l; const out=[], cols=FAUNA_COL.sheep||[null];
@@ -32340,33 +31369,6 @@ wrap('heath','objects',l=>{ if(!encounter('shepherd',0.6)) return l; const out=[
       else last=f.state;
       if(html){ if(el.innerHTML!==html) el.innerHTML=html; el.style.display='block'; } else el.style.display='none'; }catch(e){} },60); }
 
-// ════════ the Cinderveil and the shaking ground: Odra's people fled a waking thing once before, and their fire keeps its dreams away ════════
-ITEMS.cv_ember_ward={ name:'Ember Ward', slot:'misc', title:"An ember core in a cage of brass wire, on a sooty cord. Ashmother Odra says the Hollow's dreams cannot stand its warmth. Carried into the Hollow, its blows land a little softer." };
-PRICES.cv_ember_ward=0; QUEST_ITEMS.add('cv_ember_ward');
-{ const _p=paintEmberArt; paintEmberArt=function(g2,id,size){ if(id!=='cv_ember_ward') return _p.apply(this,arguments);
-    g2.save(); g2.scale(size/40,size/40);
-    g2.strokeStyle='#4a3a2a'; g2.lineWidth=1.3; g2.beginPath(); g2.moveTo(9,4); g2.quadraticCurveTo(20,14,31,4); g2.stroke();   // the cord
-    const gl=g2.createRadialGradient(20,24,0,20,24,13); gl.addColorStop(0,'rgba(255,170,60,0.65)'); gl.addColorStop(1,'rgba(255,90,20,0)'); g2.fillStyle=gl; g2.fillRect(6,10,28,28);
-    g2.fillStyle='#2a1a16'; g2.beginPath(); g2.moveTo(20,14); g2.lineTo(27,19); g2.lineTo(26,29); g2.lineTo(19,33); g2.lineTo(13,27); g2.lineTo(14,18); g2.closePath(); g2.fill();
-    g2.strokeStyle='#ffb050'; g2.lineWidth=1.1; g2.beginPath(); g2.moveTo(17,19); g2.lineTo(20,24); g2.lineTo(18,29); g2.moveTo(20,24); g2.lineTo(24,22); g2.stroke();
-    g2.strokeStyle='#b8864a'; g2.lineWidth=1.2; [[14,18,26,29],[26,18,14,30],[20,13,20,34]].forEach(([a,b,c,d])=>{ g2.beginPath(); g2.moveTo(a,b); g2.lineTo(c,d); g2.stroke(); });   // the brass cage
-    g2.strokeStyle='rgba(30,20,10,0.6)'; g2.lineWidth=0.9; g2.beginPath(); g2.moveTo(20,14); g2.lineTo(27,19); g2.lineTo(26,29); g2.lineTo(19,33); g2.lineTo(13,27); g2.lineTo(14,18); g2.closePath(); g2.stroke();
-    g2.restore(); return true; }; }
-{ const trust=()=>CHOICE.cvTrust||0, inHollow=()=>/^hollow(stair|roots|heart)$/.test(areaId||'');
-  const _fd=foeDmgMult; foeDmgMult=function(f){ const m=_fd.apply(this,arguments); return (inHollow() && hasItem('cv_ember_ward')) ? m*0.88 : m; };
-  const old=TALKERS.cvodra; TALKERS.cvodra=()=>{ const _sd=showDialog; let done=false;
-    showDialog=function(name,text,opts,purse){ if(!done){ done=true; showDialog=_sd;
-        if(SEAL() && !CHOICE.cvWard && Array.isArray(opts)){ opts=[...opts]; const k=opts.indexOf(bye);
-          opts.splice(k<0?opts.length:k,0,{label:'“The ground shook. Do the Cinderveil know what it is?”', fn:()=>{
-            if(!trust()){ say('Ashmother Odra',["“Kin ask that.” <i>The mask tilts.</i> “You are not kin. Bring us salvage, and we will see.”"],[{label:'Back.', fn:()=>TALKERS.cvodra()}]); return; }
-            say('Ashmother Odra',["<i>She is quiet a long while.</i> “Our grandmothers' grandmothers lived in the Sunscar. The ground there shook for a year. Then the wells went bitter, and the dreams came.”",
-              "“Dreams of a mouth under the old stones, turning over in its sleep. They walked north and never went back. The masks were for the dust, they say. They were also for the dreams.”",
-              "“Fire keeps it out. Fire and brass and stubbornness.” <i>She lifts a caged ember from her own neck and holds it out.</i> “If you mean to go down to it, take this. It will not like you, carrying it. Good.”"],
-              [{label:'Take the Ember Ward.', fn:()=>{ closeDialog(); CHOICE.cvWard=true; giveQuestItem('cv_ember_ward',true); remember('cvward','given',"Ashmother Odra gave you an Ember Ward against the Hollow."); logMsg("Ember Ward: carried into the Hollow, its blows land softer.",'#ffb050'); try{ autosaveSoon(300); }catch(e){} }}]); } }); } }
-      return _sd.call(this,name,text,opts,purse); };
-    try{ old(); } finally{ showDialog=_sd; } };
-  const _h=npcHasNews; npcHasNews=function(n){ if(n && n.id==='cvodra' && SEAL() && !CHOICE.cvWard && trust()>=1 && !SEAL().done) return '!'; return _h.apply(this,arguments); };
-  const vs=JOURNAL.find(e=>e[0]==='The Valley Seal'); if(vs){ const f=vs[1]; vs[1]=()=>{ const r=f(); if(r && r[0]==='active' && !CHOICE.cvWard) r[1]+="<br><i>The Cinderveil of the Scrublands felt the ground shake too. Ashmother Odra may know something.</i>"; return r; }; } }
 
 // ════════ the Halfway Lantern's troubles: three small jobs on the road north, for a hero still finding their feet (Lv 4-7) ════════
 { const HL=()=>CHOICE.hl||null, M='Marta of the Halfway Lantern', dead=k=>defeatedMobs.has(k);
@@ -32639,11 +31641,11 @@ function spawnCrab(i,j,big){ try{ const m={ name:big?'Wreck Crab':'Mud Crab', ty
     return out; }
   // the harbour folk (more come later); for now the three who explain the tide
   function wrackNpcs(){ return [
-    { id:'snitchkin', name:'Old Snitchkin, the Tide-Warden', i:25, j:10, dir:1, opts:GOBLIN({skin:22, hair:0, equip:{head:'tricorn',torso:'shirt',armor:'cv_duster_rust',hands:null,legs:'trousers',feet:null,weapon:null,offhand:null}}) },
+    { id:'snitchkin', name:'Old Snitchkin, the Tide-Warden', i:25, j:10, dir:1, opts:GOBLIN({skin:22, hair:0, equip:{head:'tricorn',torso:'shirt',armor:'pirate_coat',hands:null,legs:'trousers',feet:null,weapon:null,offhand:null}}) },
     { id:'ysolde', name:'Ysolde Brine, Harbourmistress', i:18, j:4, dir:1, opts:{race:'human',gender:'f',skin:3,hair:5,hairColor:1,face:1,equip:{head:'tricorn',torso:'tunic_linen',armor:'pirate_coat',hands:'gloves',legs:'breeches',feet:'riding_boots',weapon:'scimitar',offhand:null}} },
     { id:'wenna_wrack', name:'Wenna Wrack, Beachcomber', i:31, j:14, dir:7, opts:{race:'human',gender:'f',skin:1,hair:4,hairColor:7,face:0,equip:{head:'straw_hat',torso:'smock',armor:null,hands:null,legs:'hose_grey',feet:null,weapon:null,offhand:null}} },
     { id:'wr_deck1', name:'A Deckhand', i:8, j:11, dir:2, named:true, opts:{race:'human',gender:'m',skin:2,hair:2,hairColor:2,beard:3,face:2,equip:{head:null,torso:'shirt',armor:null,hands:null,legs:'trousers',feet:null,weapon:'dagger',offhand:null}} },
-    { id:'wr_gob1', name:'A Goblin Bosun', i:15, j:12, dir:6, named:true, opts:GOBLIN({skin:20, equip:{head:'tricorn',torso:'shirt',armor:'cv_duster_red',hands:null,legs:'trousers',feet:null,weapon:'scimitar',offhand:null}}) } ]; }
+    { id:'wr_gob1', name:'A Goblin Bosun', i:15, j:12, dir:6, named:true, opts:GOBLIN({skin:20, equip:{head:'tricorn',torso:'shirt',armor:'pirate_coat',hands:null,legs:'trousers',feet:null,weapon:'scimitar',offhand:null}}) } ]; }
   TALKERS.snitchkin=()=>{ const lv=tideLevel();
     say('Old Snitchkin, the Tide-Warden',[CHOICE.tideMet?"“Still dry? Good. The sea's a lender, not a giver.”":"“New face. Listen, new face, because I only say it once and then I ring the bell at you.”",
       "“Twice a day the sea walks out past the harbour wall and leaves the Wrack Flats: wrecks, pools, the bones of ships, whatever the deep coughed up. Twice a day it comes back. Fast. Faster than you.”",
@@ -33024,13 +32026,6 @@ setTimeout(()=>{ const K='#1e1610';
     g.strokeStyle='#5a3e22'; g.lineWidth=2.2; [[22,10,30,4],[22,10,15,5],[22,10,28,13]].forEach(([a,b,c2,d])=>{ g.beginPath(); g.moveTo(a,b); g.quadraticCurveTo((a+c2)/2+2,(b+d)/2-2,c2,d); g.stroke(); });   // roots splaying at the head
     g.fillStyle='#6aa84a'; g.beginPath(); g.ellipse(26,18,4,2,0.6,0,Math.PI*2); g.fill(); ink(g,0.8); g.strokeStyle='#3a6a2a'; g.lineWidth=0.6; g.beginPath(); g.moveTo(23,16); g.lineTo(29,20); g.stroke(); });   // a leaf open on it
   try{ ICON_CACHE.clear && ICON_CACHE.clear(); }catch(e){} },0);
-// the Hushling's ring: wear it and the little glass Skitter comes with you and bends the light round you; take it off and it stays at home, and you are seen again
-Object.assign(ITEMS,{ hush_ring:{ name:"The Hushling's Ring", slot:'special', title:"A ring of smoked glass on a copper band. While you wear it, the Hushling follows you and foes ten levels or more below you do not notice you pass. Take it off to be seen." } });
-PRICES.hush_ring=0; QUEST_ITEMS.add('hush_ring');
-ITEM_ICON.hush_ring=(g2,id,size)=>{ g2.save(); g2.scale(size/40,size/40); g2.strokeStyle='#1e1610'; g2.lineWidth=5.4; g2.beginPath(); g2.ellipse(20,24,10,8,0,0,Math.PI*2); g2.stroke(); g2.strokeStyle='#b8743c'; g2.lineWidth=3.4; g2.stroke(); g2.strokeStyle='rgba(255,220,170,0.6)'; g2.lineWidth=1; g2.beginPath(); g2.ellipse(20,24,10,8,0,Math.PI*1.1,Math.PI*1.6); g2.stroke();
-  const gr=g2.createRadialGradient(18,12,1,20,14,8); gr.addColorStop(0,'rgba(220,230,240,0.95)'); gr.addColorStop(0.6,'rgba(110,120,140,0.8)'); gr.addColorStop(1,'rgba(40,44,56,0.9)'); g2.fillStyle=gr; g2.beginPath(); g2.moveTo(20,6); g2.lineTo(27,13); g2.lineTo(20,20); g2.lineTo(13,13); g2.closePath(); g2.fill(); g2.strokeStyle='#1e1610'; g2.lineWidth=1.1; g2.stroke(); g2.restore(); };
-setInterval(()=>{ try{ if(!running || !CHOICE.cvHush || CHOICE.hushRingGiven) return; CHOICE.hushRingGiven=1; const E=player.opts.equip, have=invFlat().includes('hush_ring') || E.special==='hush_ring'; if(have) return;
-    if(!E.special){ E.special='hush_ring'; } else giveQuestItem('hush_ring',true); logMsg("The Hushling's Ring: wear it in your ring slot to have the Hushling with you, take it off to be seen again.",'#b8c8e0'); try{ updateHud(); }catch(e){} }catch(e){} },2000);   // saves from before the ring: hand it over, worn if the finger is free
 OBJ_DRAW.rug2=o=>{ const [fw,fh]=o.fp, ci=o.i+fw/2, cj=o.j+fh/2, sh=o.shape, k=o.kind, c0=o.col;
   const poly=pts=>{ g.beginPath(); pts.forEach((q,n)=>n?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.closePath(); };
   const ell=(sc)=>{ const p=[]; for(let n=0;n<32;n++){ const a=n/32*Math.PI*2; p.push(P(ci+Math.cos(a)*fw/2*sc*0.92, cj+Math.sin(a)*fh/2*sc*0.92)); } return p; };
@@ -33113,7 +32108,7 @@ OBJ_DRAW.apecage=o=>{ const q=P(o.i+0.5,o.j+0.5), open=CHOICE.deep==='spared'||C
       if(!spared()){ if(!killed()) m.push({ name:'Grey-Back', type:'gorilla', i:30, j:6, faction:'troop', tier:6, hpMul:2.1, size:1.3, opts:APE() });
         m.push({ name:'Troop Gorilla', type:'gorilla', i:27, j:4, faction:'troop', tier:6, hpMul:1.1, daily:true, opts:APE() }, { name:'Troop Gorilla', type:'gorilla', i:33, j:9, faction:'troop2', tier:6, hpMul:1.1, daily:true, opts:APE(), key:'troop2@'+Math.floor(dayClock/DAY_LEN) }); }
       if(CHOICE.deep!=='done_spared' && CHOICE.deep!=='spared'){ m.push(
-        { name:'Captain Skrag', type:'brute', i:5, j:13, faction:'poachers', tier:6, hpMul:1.6, opts:GOBLIN({skin:22, equip:{head:'tricorn',torso:'shirt',armor:'cv_duster_red',hands:'gloves',legs:'trousers',feet:null,weapon:'scimitar',offhand:null}}) },
+        { name:'Captain Skrag', type:'brute', i:5, j:13, faction:'poachers', tier:6, hpMul:1.6, opts:GOBLIN({skin:22, equip:{head:'tricorn',torso:'shirt',armor:'pirate_coat',hands:'gloves',legs:'trousers',feet:null,weapon:'scimitar',offhand:null}}) },
         { name:"Skrag's Poacher", type:'goblin', i:7, j:14, faction:'poachers', tier:6, opts:GOBLIN({skin:20, equip:{head:'bandana',torso:'shirt',armor:'jerkin',hands:null,legs:'trousers',feet:null,weapon:'spear',offhand:null}}) },
         { name:"Skrag's Netter", type:'goblin', i:3, j:12, faction:'poachers', tier:6, opts:GOBLIN({skin:21, equip:{head:'hood',torso:'shirt',armor:null,hands:null,legs:'trousers',feet:null,weapon:'dagger',offhand:null}}) }); }
       if(CHOICE.stripe!=='slain' && CHOICE.stripe!=='done' && !hasItem('tiger_pelt')) m.push({ name:'Old Stripe', type:'wolf', cat:true, coat:'#c06a22', stripes:'#140c06', size:1.55, i:36, j:12, faction:'stripe', tier:6, hpMul:2.3 });
@@ -33607,6 +32602,20 @@ function unstickPlayer(){ try{ if(typeof running!=='undefined' && !running) retu
     try{ if(typeof centerCamera==='function') centerCamera(); }catch(e){} console.warn('[unstick] moved the player out of a wall to',pick.join(',')); return true; }catch(e){ return false; } }
 { const _as=applySave; applySave=function(...a){ const r=_as.apply(this,a); setTimeout(unstickPlayer,60); return r; }; }
 { const _sw2=switchArea; switchArea=function(...a){ const r=_sw2.apply(this,a); unstickPlayer(); return r; }; }
+
+// ════════ the Cinderveil are gone from the world: an older save sheds their gear (sold back for its worth) and the Packling's eight extra pack spaces ════════
+function dropGone(){ try{ if(!player || !player.opts) return; let coin=0, n=0; const gone=id=>typeof id==='string' && !ITEMS[unWoven(id)] && !ITEMS[id];
+    const worth=id=>Math.round((PRICES[unWoven(id)]||PRICES[id]||20)*0.5)||10;
+    (player.inv||[]).forEach((id,k)=>{ if(gone(id)){ coin+=worth(id); n++; player.inv[k]=null; } });
+    const E=player.opts.equip||{}; Object.keys(E).forEach(sl=>{ if(gone(E[sl])){ coin+=worth(E[sl]); n++; E[sl]=null; } });
+    if(Array.isArray(CHOICE.stash)) CHOICE.stash.forEach((id,k)=>{ if(gone(id)){ coin+=worth(id); n++; CHOICE.stash[k]=null; } });
+    if(player.opts.mog) Object.keys(player.opts.mog).forEach(k=>{ if(gone(k)||gone(player.opts.mog[k])) delete player.opts.mog[k]; });
+    if(player.inv && player.inv.length>INV_SIZE){ const extra=player.inv.splice(INV_SIZE);   /* what sat in the Packling's spaces moves into the pack, then the cellar crate, else it is sold */
+      extra.forEach(id=>{ if(!id) return; let k=player.inv.indexOf(null); if(k>=0){ player.inv[k]=id; return; } const S=stashArr(); k=S.findIndex((v,i)=>!v && i<stashCap()); if(k>=0){ S[k]=id; return; } coin+=worth(id); n++; }); }
+    if(n){ player.purse=(player.purse||0)+coin; delete player.opts._ck; try{ updateHud(); }catch(e){}
+      logMsg('The Cinderveil have left the valley for good. Their gear you carried ('+n+' piece'+(n>1?'s':'')+') was sold off for '+formatCoin(coin)+'.','#c8a860'); }
+  }catch(e){ console.warn(e); } }
+{ const _as2=applySave; applySave=function(...a){ const r=_as2.apply(this,a); try{ dropGone(); }catch(e){} return r; }; }
 </script>
 </body>
 </html>

@@ -20449,7 +20449,7 @@ function drawMule3D(X,Y,phi,ph,moving,pack,harness,seed){
       const path=()=>{ g.beginPath(); Q.forEach((q,k2)=>k2?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); }; g.lineCap='round'; g.lineJoin='round';
       path(); g.strokeStyle='#2a180c'; g.lineWidth=(w+0.5)*S; g.stroke(); path(); g.strokeStyle='#5a3a1e'; g.lineWidth=w*S; g.stroke();
       g.save(); g.translate(0,-w*S*0.22); path(); g.strokeStyle='rgba(176,128,78,0.75)'; g.lineWidth=w*S*0.3; g.stroke(); g.restore(); } }); };
-  const buckle=(c,sharp)=>{ const P0=pr(...c); parts.push({ d:P0.d+0.5, sharp, fn:pass=>{ if(!pass) return; const r=0.75*S; g.strokeStyle='#d8b058'; g.lineWidth=0.5*S; g.strokeRect(P0.x-r,P0.y-r*0.8,r*2,r*1.6); g.fillStyle='rgba(255,236,170,0.8)'; g.fillRect(P0.x-r,P0.y-r*0.8,r*0.6,0.5*S); } }); };
+  const buckle=(c,sharp,bz=0)=>{ const P0=pr(...c); parts.push({ d:P0.d+0.5+bz, sharp, fn:pass=>{ if(!pass) return; const r=0.75*S; g.strokeStyle='#d8b058'; g.lineWidth=0.5*S; g.strokeRect(P0.x-r,P0.y-r*0.8,r*2,r*1.6); g.fillStyle='rgba(255,236,170,0.8)'; g.fillRect(P0.x-r,P0.y-r*0.8,r*0.6,0.5*S); } }); };
   const C=K.c, D=K.d, Lc=K.l, by=bob;
   // the barrel, rump to chest, and the withers
   cap([-18,31.5+by,0],[-3,30.5+by,0],10.6,11.4,C,D,Lc,{nosep:true}); cap([-3,30.5+by,0],[13,31.5+by,0],11.4,10.8,C,D,Lc,{nosep:true}); ball([14,37.5+by,0],6.6,C,D,Lc);
@@ -20547,6 +20547,7 @@ const HORSE_COATS=[ {c:'#7a4a2c', d:'#4a2a16', l:'#a8704a', m:'#8a5a3a', mane:'#
   {c:'#b89a6a', d:'#7a6440', l:'#dcc496', m:'#c8aa7a', mane:'#2a2016', stripe:'#2a2016', socks:0, blaze:0, dun:true},   // dun
   {c:'#c89a4a', d:'#8a6428', l:'#ecc87a', m:'#d8aa5a', mane:'#f0e6c8', stripe:'#8a6428', socks:0b0101, blaze:2} ];   // palomino
 
+const SKEL_COAT={c:'#2a2236', d:'#120e1a', l:'#463a56', m:'#3a3046', mane:'#8affc8', stripe:'#2a2236', socks:0, blaze:0, skel:true};
 function drawHorse3D(X,Y,phi,ph,moving,pack,harness,seed,coatK){   // pack: a riding saddle; harness: a bridle and reins
   const K=coatK||HORSE_COATS[Math.abs(seed|0)%HORSE_COATS.length], S=1.5, cf=Math.cos(phi), sf=Math.sin(phi);
   const hy_=y=>y<26?y*1.32:y+8.3;   /* a horse stands taller than a mule: everything below the belly is drawn out longer, the rest lifted with it */
@@ -20554,7 +20555,7 @@ function drawHorse3D(X,Y,phi,ph,moving,pack,harness,seed,coatK){   // pack: a ri
   { const LK=drawHorse3D.look=drawHorse3D.look||{}; let yawT=0;                                                // where it is looking: at you, if you are near (worked out before the cache, which depends on it)
     if(!moving && typeof player!=='undefined'){ const pp=P(player.x,player.y), dx=pp.x-X, dy=(pp.y-Y)*2, dd=Math.hypot(dx,dy); if(dd<260 && dd>10){ let rel=Math.atan2(dy,dx)-phi; while(rel>Math.PI) rel-=Math.PI*2; while(rel<-Math.PI) rel+=Math.PI*2; if(Math.abs(rel)<1.9) yawT=Math.max(-0.65,Math.min(0.65,rel*0.6)); } }
     LK[seed]=(LK[seed]||0)+(yawT-(LK[seed]||0))*0.06; }
-  const bob=moving?Math.abs(Math.cos(ph))*1.1:0, idle=Math.sin(gt*0.9+seed), gph=(gt*0.045+seed*0.37)%1, gRaw=gph<0.5?Math.min(1,Math.min(gph,0.5-gph)*9):0, graze=moving||drawHorse3D.ridden||Math.abs((drawHorse3D.look||{})[seed]||0)>0.12?0:gRaw*gRaw*(3-2*gRaw);   // spells of grazing, spells of looking about (and never while it is watching you)
+  const bob=moving?Math.abs(Math.cos(ph))*1.1:0, idle=Math.sin(gt*0.9+seed), gph=(gt*0.045+seed*0.37)%1, gRaw=gph<0.5?Math.min(1,Math.min(gph,0.5-gph)*9):0, graze=moving||K.skel||drawHorse3D.ridden||Math.abs((drawHorse3D.look||{})[seed]||0)>0.12?0:gRaw*gRaw*(3-2*gRaw);   // spells of grazing, spells of looking about (and never while it is watching you)
   { const sp=pr(-1.5,46.5+(moving?Math.abs(Math.cos(ph))*1.1:0),0); drawHorse3D.seat={x:sp.x,y:sp.y}; }
   const parts=[];      // {d, draw(pass)}: pass 0 draws a dark rim, pass 1 the fill
   let coatG=null; const coat=()=>{ if(!coatG){ coatG=g.createLinearGradient(X-34*S,Y-74*S,X+28*S,Y-4*S); coatG.addColorStop(0,K.l); coatG.addColorStop(0.42,K.c); coatG.addColorStop(0.78,tone(K.c,-0.16)); coatG.addColorStop(1,K.d); } return coatG; };   // one light over the whole coat: overlapping parts are the very same colour, so no seams
@@ -20580,8 +20581,25 @@ function drawHorse3D(X,Y,phi,ph,moving,pack,harness,seed,coatK){   // pack: a ri
       const path=()=>{ g.beginPath(); Q.forEach((q,k2)=>k2?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); }; g.lineCap='round'; g.lineJoin='round';
       path(); g.strokeStyle=LEAD; g.lineWidth=(w+0.5)*S; g.stroke(); path(); g.strokeStyle=LEA; g.lineWidth=w*S; g.stroke();
       g.save(); g.translate(0,-w*S*0.22); path(); g.strokeStyle='rgba(176,128,78,0.75)'; g.lineWidth=w*S*0.3; g.stroke(); g.restore(); } }); };
-  const buckle=(c,sharp)=>{ const P0=pr(...c); parts.push({ d:P0.d+0.5, sharp, fn:pass=>{ if(!pass) return; const r=0.75*S; g.strokeStyle='#d8b058'; g.lineWidth=0.5*S; g.strokeRect(P0.x-r,P0.y-r*0.8,r*2,r*1.6); g.fillStyle='rgba(255,236,170,0.8)'; g.fillRect(P0.x-r,P0.y-r*0.8,r*0.6,0.5*S); } }); };
+  const buckle=(c,sharp,bz=0)=>{ const P0=pr(...c); parts.push({ d:P0.d+0.5+bz, sharp, fn:pass=>{ if(!pass) return; const r=0.75*S; g.strokeStyle='#d8b058'; g.lineWidth=0.5*S; g.strokeRect(P0.x-r,P0.y-r*0.8,r*2,r*1.6); g.fillStyle='rgba(255,236,170,0.8)'; g.fillRect(P0.x-r,P0.y-r*0.8,r*0.6,0.5*S); } }); };
+  const B_CRY='#8ac8ff', BARD=GR&&GR.barding||null, NB=sd=>BARD&&sd*cf>-0.05?24:0;
+  const panel=(top,hem,col,opt={})=>{ const T=top.map(p=>pr(...p)), Hm=hem.map(p=>pr(...p)), all=[...T,...Hm];   /* a hanging cloth: a top edge and a hem, filled between */
+    const D=opt.D!=null?opt.D:opt.near===true?Math.max(...all.map(q=>q.d))+1:opt.near===false?Math.min(...all.map(q=>q.d))-1:all.reduce((a,q)=>a+q.d,0)/all.length+(opt.dz||0);
+    parts.push({ d:D, sharp:opt.sharp, fn:pass=>{ const path=()=>{ g.beginPath(); T.forEach((q,k)=>k?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); for(let k=Hm.length-1;k>=0;k--) g.lineTo(Hm[k].x,Hm[k].y); g.closePath(); };
+      g.lineJoin='round'; if(!pass){ path(); g.strokeStyle='rgba(20,12,6,0.96)'; g.lineWidth=2.3; g.stroke(); return; }
+      path(); const y0=Math.min(...all.map(q=>q.y)), y1=Math.max(...all.map(q=>q.y)), gr=g.createLinearGradient(0,y0,0,y1); gr.addColorStop(0,tone(col,0.16)); gr.addColorStop(0.55,col); gr.addColorStop(1,tone(col,-0.38)); g.fillStyle=gr; g.fill();
+      if(opt.far){ g.fillStyle='rgba(10,6,16,0.22)'; g.fill(); } if(opt.after) opt.after(T,Hm); } }); };
+  const star4=(x,y,r,col)=>{ g.fillStyle=col; g.beginPath(); g.moveTo(x,y-r); g.lineTo(x+r*0.28,y-r*0.28); g.lineTo(x+r,y); g.lineTo(x+r*0.28,y+r*0.28); g.lineTo(x,y+r); g.lineTo(x-r*0.28,y+r*0.28); g.lineTo(x-r,y); g.lineTo(x-r*0.28,y-r*0.28); g.closePath(); g.fill(); };
+  const hemTrim=(T,Hm,B)=>{ g.save(); g.lineCap='round'; g.lineJoin='round';   /* a dark band above the hem, gold edging, silver stars, and gold tassels at the points */
+    const band=Hm.map((q,k)=>{ const t=T[Math.min(k,T.length-1)]; return {x:q.x+(t.x-q.x)*0.2,y:q.y+(t.y-q.y)*0.2}; });
+    g.beginPath(); Hm.forEach((q,k)=>k?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); for(let k=band.length-1;k>=0;k--) g.lineTo(band[k].x,band[k].y); g.closePath(); g.fillStyle=tone(B.col,-0.45,0.9); g.fill();
+    g.strokeStyle=B.trim; g.lineWidth=0.9; g.beginPath(); band.forEach((q,k)=>k?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.stroke();
+    g.lineWidth=0.7; g.beginPath(); Hm.forEach((q,k)=>k?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.stroke();
+    for(let k=1;k<Hm.length-1;k+=2){ const a=Hm[k], b=band[k]; star4((a.x+b.x)/2,(a.y+b.y)/2-0.2,1.5,B.star); }
+    for(let k=0;k<Hm.length;k++) if(k%2===0){ const q=Hm[k]; g.strokeStyle=B.trim; g.lineWidth=0.6; g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(q.x,q.y+2.2); g.stroke(); g.fillStyle=B.trim; g.beginPath(); g.arc(q.x,q.y+2.6,0.75,0,Math.PI*2); g.fill(); }
+    g.restore(); };
   const C=K.c, D=K.d, Lc=K.l, by=bob;
+  if(!K.skel){
   // the barrel, rump to chest, and the withers
   cap([-19,32+by,0],[-3,31+by,0],9.8,10.4,C,D,Lc,{nosep:true}); cap([-3,31+by,0],[14,32.5+by,0],10.4,10,C,D,Lc,{nosep:true}); ball([15,38.5+by,0],6.4,C,D,Lc);
   ball([-19,34+by,0],9.6,C,D,Lc,{dz:0.1}); [1,-1].forEach(sd=>{ ball([-21,32.5+by,4*sd],7.6,C,tone(C,-0.18),tone(C,0.06),{dz:0.05}); ball([15,28.8+by,3.8*sd],6.4,C,tone(C,-0.18),tone(C,0.06),{dz:0.05}); });   // the two halves of the rump, the breast muscles                                                              // the round of the rump
@@ -20600,6 +20618,23 @@ function drawHorse3D(X,Y,phi,ph,moving,pack,harness,seed,coatK){   // pack: a ri
   // tail: a bare dock, then a switch of long hair
   const tw=idle*0.35+(moving?Math.sin(ph)*0.25:0); cap([-25.5,40+by,0],[-29,37+by,tw*2],2.2,1.8,K.mane,tone(K.mane,-0.3),tone(K.mane,0.25));
   for(let h=0;h<16;h++){ const o=(h-7.5)*0.42, sw2=Math.sin(gt*2.2+h*0.7)*0.3+(moving?Math.sin(ph*0.5+h*0.2)*0.6:0); line([[-28.5,38+by,tw*2],[-33+o*0.4+sw2,28+by,tw*4+o],[-34+o*0.7+sw2*1.6,17+by,tw*6+o*1.3],[-33.5+o+sw2*2,5+by-Math.abs(o)*0.5,tw*7+o*1.6]],h%3?K.mane:tone(K.mane,0.22),0.95,-0.2); }   // a long, full tail of hair from a high-set dock
+  }
+  else { const BN='#d8ceb2', BDk='#6e6450', BLt='#f8f0dc', bone=(a,b,ra,rb,o)=>cap(a,b,ra,rb,BN,BDk,BLt,o||{}), knob=(c,r,o)=>ball(c,r,BN,BDk,BLt,o||{});   /* the pale steed: bones, and the dark that holds them together */
+    cap([-18,33.5+by,0],[12,35+by,0],7.4,8,C,D,Lc,{nosep:true}); ball([-19,35+by,0],6.4,C,D,Lc); ball([14,38+by,0],5.4,C,D,Lc);   /* shadow-flesh inside the ribs */
+    const sp=[[-26,40.5],[-22.5,42.6],[-19,43.4],[-14,42.6],[-9,42],[-4,41.8],[1,42],[6,42.8],[10.5,44.2],[14.5,45.4]];
+    sp.forEach(([x,y],k)=>{ knob([x,y+by,0],1.55,{dz:0.3}); line([[x,y+by+0.6,0],[x-0.8,y+by+(k>6?3.6:2.2),0]],BN,1.05,0.35); });   /* the spine, each vertebra with its spur */
+    for(let x=-11;x<=12.1;x+=2.55){ const t=(x+11)/23, R=8+Math.sin(t*Math.PI)*1.8; [1,-1].forEach(sd=>line([[x,41.6+by,1.2*sd],[x-1.2,38.4+by,R*0.86*sd],[x-2.8,32+by,R*sd],[x-4.2,26+by,R*0.66*sd],[x-4.8,23.8+by,1.4*sd]],BN,1.15,0.15)); }   /* ribs */
+    bone([-14,23.4+by,0],[8,24.6+by,0],1.1,1.4);   /* the breastbone */
+    knob([-20,38.6+by,0],3.2); [1,-1].forEach(sd=>{ bone([-15.5,40.4+by,2.6*sd],[-24.5,35+by,4.8*sd],2.4,1.5); knob([-21,32.5+by,4.8*sd],2.1); });   /* the pelvis and hip sockets */
+    [1,-1].forEach(sd=>bone([12,43.4+by,5*sd],[15,30.5+by,6.6*sd],2.5,1.3,{dz:0.2}));   /* shoulder blades */
+    const legs=[ {x:15,z:5.4,f:true,p:0}, {x:15,z:-5.4,f:true,p:Math.PI}, {x:-20,z:5.6,f:false,p:Math.PI}, {x:-20,z:-5.6,f:false,p:0} ], cockZ=(seed|0)%2?5.6:-5.6;
+    legs.forEach(l=>{ const sw=moving?Math.sin(ph+l.p):0, lift=moving?Math.max(0,Math.cos(ph+l.p))*2.6:0, cock=!moving && !l.f && l.z===cockZ, swing=sw*5.6;
+      const knee=l.f?[l.x+swing*0.5+lift*0.5,12+lift,l.z]:cock?[l.x-0.8,13.4,l.z]:[l.x-3+swing*0.5-lift*0.3,12.5+lift,l.z], fet=cock?[l.x+1.6,4.6,l.z]:[l.x+swing+(l.f?lift*0.3:-lift*0.6),2.8+lift,l.z], hoof=cock?[l.x+2.6,1.2,l.z]:[fet[0]+0.4,0.6+lift*0.9,l.z];
+      const el=l.f?[l.x+0.8,21.5+by,l.z]:[l.x-2.2,22.5+by,l.z];
+      if(l.f) bone([l.x+0.4,31+by,l.z*1.08],el,1.8,1.4); else bone([l.x-0.8,32.5+by,l.z*0.95],el,2,1.5);   /* upper arm, thigh-bone */
+      knob(el,1.9,{dz:0.02}); bone(el,knee,1.3,1.05); knob(knee,1.55,{dz:0.02}); bone(knee,fet,0.9,0.75); knob(fet,1.15,{dz:0.02}); cap(fet,hoof,1.0,1.8,'#3a342a','#16120c','#5e5646'); });
+    const tw=idle*0.35+(moving?Math.sin(ph)*0.25:0); for(let k=0;k<7;k++) knob([-27-k*1.3,39.4-k*2.7+by,tw*k*0.7],1.3-k*0.11,{dz:0.1});   /* the tail bones */
+    for(let q=0;q<9;q++){ const o=(q-4)*0.45, fl=Math.sin(gt*5+q*1.7)*1.2; line([[-28,37+by,tw*2],[-32+o*0.5+fl*0.4,27+by,tw*4+o],[-33.5+o+fl,17+by+Math.abs(fl),tw*6+o*1.4]],'rgba(140,255,200,'+(q%2?0.38:0.24)+')',q%3?1.1:1.7,-0.15); }   /* and a ghost-fire switch */ }
   // neck and head, dipping to graze, and turning to look at whoever is near
   const HEAD0=parts.length;
   const yaw=(drawHorse3D.look||{})[seed]||0, cy=Math.cos(yaw), syw=Math.sin(yaw);
@@ -20609,6 +20644,7 @@ function drawHorse3D(X,Y,phi,ph,moving,pack,harness,seed,coatK){   // pack: a ri
   const hx0=30+gN*3, hy0=58+by-gN*46, mx0=43.5-gN*7, my0=50.5+by-gN*52+chew, th=0.78*gN, ct=Math.cos(th), st=Math.sin(th);   // grazing: the neck goes down and the face tips toward the ground
   const hp=(dx,dy,z)=>hr(hx0+dx*ct+dy*st, hy0-dx*st+dy*ct, z), hm=(dx,dy,z)=>hr(mx0+dx*ct+dy*st, my0-dx*st+dy*ct, z);   // points on the head, tipped with it
   const poll=hp(0,0,0), muz=hm(0,0,0), crest=hr(23.5+gN*0.5,53+by-gN*22,0);  // the crest arches up between withers and poll
+  if(!K.skel){
   ball([17.5,37+by,0],7.4,C,D,Lc,{dz:-0.05});                                                            // the base of the neck, filling out into withers and chest
   cap(nb,crest,6.8,5.2,C,D,Lc); cap(crest,poll,5.2,3.7,C,D,Lc);                                         // a neck that narrows toward the head, with an arched crest
   cap(hr(nb[0]+3.5,nb[1]-4,0),hp(2.6,-4.6,0),5.2,3.4,C,D,Lc,{dz:-0.2,nosep:true});   // the throat, from the jaw down into the chest
@@ -20617,14 +20653,21 @@ function drawHorse3D(X,Y,phi,ph,moving,pack,harness,seed,coatK){   // pack: a ri
       const root=hr(a[0],a[1],0), len=6.2-t*2.2+(q%3)*0.6; line([root,hr(a[0]-1.2+sw3,a[1]-len*0.55,mz+0.5),hr(a[0]-1.9+sw3*1.4,a[1]-len,mz+1.2)],q%3===1?tone(K.mane,0.18):K.mane,2.1,0.12-2*sf); }
     cap(hr(nb[0]-1.6,nb[1]+5.8,0),hp(-0.8,3.6,0),1.15,0.9,K.mane,tone(K.mane,-0.3),tone(K.mane,0.3),{dz:0.15-2*sf});
     line([hp(0.4,3.4,0),hp(2.2,0.6,0.6),hp(3,-1.4,0.2)],K.mane,1.3,0.7); }   // the forelock over the brow
+  }
+  else { const BN='#d8ceb2', BDk='#6e6450', BLt='#f8f0dc';   /* neck bones, and a mane of cold green fire */
+    ball([17.5,37+by,0],5.2,C,D,Lc); cap(nb,crest,4.4,3.2,C,D,Lc); cap(crest,poll,3.2,2.4,C,D,Lc);
+    const L2=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];
+    for(let q=0;q<=8;q++){ const t=q/8, v=t<0.5?L2(nb,crest,t*2):L2(crest,poll,(t-0.5)*2); ball([v[0],v[1]+1.4,v[2]],2.2-t*0.6,BN,BDk,BLt,{dz:0.25});
+      const fl=Math.sin(gt*6+q*1.3)*1.1; line([[v[0],v[1]+2.6,v[2]],hr(v[0]-1.4+fl*0.5,v[1]+6-t*1.5,0.6),hr(v[0]-3+fl,v[1]+9.5-t*2.5+Math.abs(fl),1)],'rgba(140,255,200,'+(q%2?0.42:0.28)+')',q%2?1.6:2.2,0.1-2*sf); } }
   if(gN>0.55){ const gp=hr(mx0+0.8,0.2,0); const Q=pr(...gp); parts.push({ d:Q.d+0.5, fn:pass=>{ if(!pass) return; g.lineCap='round';   // the grass it is pulling at
       for(let b2=0;b2<7;b2++){ const ox2=(b2-3)*1.1*S, h2=(3+((b2*37+seed*11)%5))*S*(0.8+0.2*Math.sin(gt*3+b2)), lean=(b2-3)*0.5*S+(chew<-1?-1.5*S:0);
         g.strokeStyle=b2%2?'#5a8a34':'#7aa848'; g.lineWidth=0.7*S; g.beginPath(); g.moveTo(Q.x+ox2,Q.y+1.4*S); g.quadraticCurveTo(Q.x+ox2+lean*0.3,Q.y-h2*0.6,Q.x+ox2+lean,Q.y-h2); g.stroke(); } } }); }
   const mid=[(poll[0]+muz[0])/2,(poll[1]+muz[1])/2-0.3,(poll[2]+muz[2])/2];
+  const eyeN=sd=>[0.3*cy-sd*syw, 0.3*syw+sd*cy];   // which way each eye now faces
+  if(!K.skel){
   ball(hp(0.6,0.4,0),4.1,C,D,Lc);                                                    // the broad forehead
   cap(poll,mid,3.9,3.2,C,D,Lc); cap(mid,muz,3.2,2.8,C,D,Lc,{along:K.m,dz:0.3});                          // the long face, paling to a mealy nose
   ball(hp(2.6,-3.8,0),4.1,C,D,Lc,{dz:-0.3});                                             // the round of the cheek and jaw
-  const eyeN=sd=>[0.3*cy-sd*syw, 0.3*syw+sd*cy];   // which way each eye now faces
   [1,-1].forEach(sd=>{ const ey=hy0-0.2;
     ball(hp(3,-0.2,3.6*sd),1.55,tone(C,0.18),tone(C,0.18),tone(C,0.18),{flat:true,norim:true,dz:0.6,sharp:eyeN(sd)});      // a paler ring of hair round the eye
     ball(hp(3.15,-0.2,3.75*sd),1.0,'#120a06','#120a06','#120a06',{flat:true,norim:true,dz:0.8,sharp:eyeN(sd)});           // the dark eye
@@ -20634,24 +20677,47 @@ function drawHorse3D(X,Y,phi,ph,moving,pack,harness,seed,coatK){   // pack: a ri
     cap(base,emid,1.1,1.25,C,D,Lc); cap(emid,tip,1.25,0.3,C,D,Lc);                                       // short, neat, pointed ears
     line([[base[0]+0.2,base[1]+0.8,base[2]*1.05],[emid[0]+0.2,emid[1],emid[2]*1.05]],tone(C,-0.35),0.8,0.15); });
   if(K.blaze) line([hp(1.6,1.8,0),mid,hm(-0.4,0.6,0)],'#ece6da',K.blaze===2?2.2:1.1,0.9,[1,0]);   // a white blaze, or a narrow strip, down the face
+  }
+  else { const BN='#d8ceb2', BDk='#6e6450', BLt='#f8f0dc';   /* the long skull: hollow eyes lit from inside, the bared teeth */
+    ball(hp(0.6,0.6,0),3.5,BN,BDk,BLt); cap(poll,mid,3.2,2.4,BN,BDk,BLt); cap(mid,muz,2.4,1.8,BN,BDk,BLt,{dz:0.3});
+    cap(hp(2.2,-3,0),hm(-0.4,-1.9,0),1.8,0.9,BN,BDk,BLt,{dz:-0.3});   /* the jaw */
+    [1,-1].forEach(sd=>{ ball(hp(3,-0.2,3.0*sd),1.55,'#100a12','#100a12','#100a12',{flat:true,norim:true,dz:0.6,sharp:eyeN(sd)}); ball(hp(3.1,-0.2,3.2*sd),0.85,'#a8ffd0','#a8ffd0','#a8ffd0',{flat:true,norim:true,dz:0.8,sharp:eyeN(sd)});
+      const gq=pr(...hp(3.1,-0.2,3.2*sd)); parts.push({ d:gq.d+0.9, sharp:eyeN(sd), fn:pass=>{ if(!pass) return; g.save(); g.globalCompositeOperation='lighter'; const rg=g.createRadialGradient(gq.x,gq.y,0,gq.x,gq.y,4.5*S); rg.addColorStop(0,'rgba(140,255,200,0.55)'); rg.addColorStop(1,'rgba(140,255,200,0)'); g.fillStyle=rg; g.fillRect(gq.x-5*S,gq.y-5*S,10*S,10*S); g.restore(); } });
+      ball(hm(0.6,0.5,0.9*sd),0.6,'#1a1218','#1a1218','#1a1218',{flat:true,norim:true,dz:0.9,sharp:[cy-0.4*sd*syw,syw+0.4*sd*cy]});
+      line([hm(-3.2,-1.05,1.7*sd),hm(0.6,-1.05,1.15*sd)],'#f2ead2',0.75,0.7,eyeN(sd)); line([hm(-3,-1.05,1.75*sd),hm(0.4,-1.05,1.2*sd)],'rgba(40,30,20,0.6)',0.25,0.75,eyeN(sd)); });
+    [1,-1].forEach(sd=>cap(hp(-0.6,3,1.6*sd),hp(-1.4,4.6,1.9*sd),0.8,0.3,BN,BDk,BLt)); }
   if(harness||pack){ [1,-1].forEach(sd=>{ const hs=eyeN(sd);                                              // a bridle: headstall, browband, noseband, a bit-ring at the mouth
       strap([hp(1.4,3.2,3*sd),hp(1.8,-4.6,3.6*sd)],0.4,hs,0.7); strap([hm(-1.2,-0.8,3*sd),hm(-1.2,2.4,3*sd)],0.4,hs,0.7); strap([hp(0.6,3,3*sd),hp(1.2,3.4,0)],0.35,hs,0.7);
       ball(hm(0.6,-0.9,2.8*sd),0.55,'#c8ccd2','#7a7e86','#ffffff',{flat:false,dz:0.8,sharp:hs}); });
     const bit=hm(0.6,-0.9,0), withers=[13,46+by,0]; [1,-1].forEach(sd=>{ const a=hm(0.6,-0.9,2.8*sd), sag=[(a[0]+withers[0])/2,(a[1]+withers[1])/2-4,(a[2]+5*sd)/2];   // reins, sagging back to the saddle
       strap([a,sag,[withers[0]-2,withers[1]-1,4.2*sd]],0.45,[0,sd],0.4); }); }
+  if(BARD){ const M='#b8c0cc', MD='#5a6270', ML='#f0f4fa';   /* a silvered chanfron down the face, a crystal on the brow and a short crystal spike */
+    cap(hp(0.2,2.9,0),[mid[0],mid[1]+2.3*ct,mid[2]],2.1,1.7,M,MD,ML,{dz:1.2,sharp:[1,0]}); cap([mid[0],mid[1]+2.3*ct,mid[2]],hm(-0.6,1.5,0),1.7,1.3,M,MD,ML,{dz:1.3,sharp:[1,0]});
+    [1,-1].forEach(sd=>cap(hp(1.2,1.6,2.2*sd),hp(2.8,-1.4,3.1*sd),0.9,0.7,M,MD,ML,{dz:0.7,sharp:eyeN(sd)}));
+    cap(hp(0.5,3.6,0),hp(-0.6,7.4,0),0.95,0.15,B_CRY,'#3a5a9a','#e8f6ff',{dz:1.5});
+    ball(hp(0.9,3.4,0),1.15,B_CRY,'#3a5a9a','#ffffff',{dz:1.6,sharp:[1,0]});
+    const gq=pr(...hp(0.9,3.4,0)); parts.push({ d:gq.d+1.7, head:true, fn:pass=>{ if(!pass) return; g.save(); g.globalCompositeOperation='lighter'; const rg=g.createRadialGradient(gq.x,gq.y,0,gq.x,gq.y,6*S); rg.addColorStop(0,'rgba(150,200,255,0.45)'); rg.addColorStop(1,'rgba(150,200,255,0)'); g.fillStyle=rg; g.fillRect(gq.x-6*S,gq.y-6*S,12*S,12*S); g.restore(); } }); }
   { const HEAD1=parts.length; for(let q=HEAD0;q<HEAD1;q++) parts[q].head=true; }
   if(pack){                                                                                               // a riding saddle: a wool blanket, the seat with pommel and cantle, girth, stirrups on their leathers
-    const backD=Math.max(...[[-18,0],[-3,0],[13,0]].map(([x])=>x*sf))+0.3, BL=(GR&&GR.blanket)||K.blanket||'#7a2a22', SEAT=tone(LEA,0.1);
-    [1,-1].forEach(sd=>{ cap([-10,42+by,7.4*sd],[8,42+by,7.4*sd],1.4,1.4,BL,tone(BL,-0.35),tone(BL,0.25),{D:backD-0.05+sd*cf*3,flat:false}); });   // the blanket's edges either side
-    cap([-10.5,43.4+by,0],[8.5,43.4+by,0],3.4,3.4,BL,tone(BL,-0.3),tone(BL,0.22),{D:backD,after:(A,B)=>{ g.strokeStyle='rgba(232,200,120,0.75)'; g.lineWidth=0.6; g.beginPath(); g.moveTo(A.x,A.y+2.6); g.lineTo(B.x,B.y+2.6); g.stroke(); }});
+    const backD=Math.max(...[[-18,0],[-3,0],[13,0]].map(([x])=>x*sf))+0.3+(BARD?30:0), BL=(GR&&GR.blanket)||K.blanket||'#7a2a22', SEAT=tone(LEA,0.1);
+    if(!BARD) [1,-1].forEach(sd=>{ cap([-10,42+by,7.4*sd],[8,42+by,7.4*sd],1.4,1.4,BL,tone(BL,-0.35),tone(BL,0.25),{D:backD-0.05+sd*cf*3,flat:false}); });   // the blanket's edges either side
+    if(!BARD) cap([-10.5,43.4+by,0],[8.5,43.4+by,0],3.4,3.4,BL,tone(BL,-0.3),tone(BL,0.22),{D:backD,after:(A,B)=>{ g.strokeStyle='rgba(232,200,120,0.75)'; g.lineWidth=0.6; g.beginPath(); g.moveTo(A.x,A.y+2.6); g.lineTo(B.x,B.y+2.6); g.stroke(); }});
     cap([-6.5,45.6+by,0],[4.5,45.4+by,0],3,2.7,SEAT,tone(SEAT,-0.45),tone(SEAT,0.4),{D:backD+0.2});                         // the seat
     cap([4.4,45.6+by,0],[6.4,49+by,0],1.7,1.3,SEAT,tone(SEAT,-0.45),tone(SEAT,0.4),{D:backD+0.3}); cap([-7.8,47.6+by,-3],[-7.8,47.6+by,3],1.5,1.5,tone(SEAT,-0.1),tone(SEAT,-0.5),tone(SEAT,0.3),{D:backD+0.25});
-    if(GR && GR.bags){ const big=GR.bags>1, r=big?4.4:3.4; [1,-1].forEach(sd=>{ cap([-15,37+by,9.2*sd],[-8.5,37+by,9.2*sd],r,r,tone(LEA,0.15),tone(LEA,-0.4),tone(LEA,0.4),{sharp:[0,sd],dz:0.3,after:(A,B2)=>{ g.strokeStyle=LEAD; g.lineWidth=0.6; g.beginPath(); g.moveTo(A.x,A.y-r*S*0.55); g.lineTo(B2.x,B2.y-r*S*0.55); g.stroke(); }});   /* saddlebags hung behind the saddle, a flap and a buckle */
-        buckle([-11.8,37.6+by-(big?0.6:0),(9.2+r*0.8)*sd],[0,sd]); strap([[-11.8,44.4+by,4*sd],[-11.8,40.5+by,(8+r*0.4)*sd]],0.5,[0,sd],0.5); }); if(big) cap([-14.5,45.2+by,-4],[-14.5,45.2+by,4],2.2,2.2,'#6a6450','#3a3628','#9a947a',{D:backD+0.15}); }   /* the big pair, and a rolled sack across */
+    if(BARD){ const xs=[]; for(let x=-25;x<=17.01;x+=3) xs.push(x); const N=xs.length;   /* the caparison: a cloth either side from the back to above the knee, dagged at the hem */
+      [1,-1].forEach(sd=>{ const top=xs.map(x=>[x,43.4+by+(x>9?(x-9)*0.22:0)+(x<-19?(x+19)*0.3:0),1.2*sd]), hem=xs.map((x,k)=>[x+(k%2?0:0.4),(k%2?14.2:12.4)+by*0.5+Math.sin(gt*1.4+x*0.3)*0.2,11.4*sd]);
+        const near=sd*cf>-0.05; panel(top,hem,BARD.col,{near, far:!near, after:(T,Hm)=>{ g.save(); g.lineCap='round'; for(let k=1;k<Hm.length-1;k++){ const t=T[k], q=Hm[k], dark=k%2; g.strokeStyle=dark?'rgba(8,6,20,0.28)':'rgba(255,255,255,0.08)'; g.lineWidth=dark?1.6:1.1; g.beginPath(); g.moveTo(t.x+(q.x-t.x)*0.35,t.y+(q.y-t.y)*0.35); g.quadraticCurveTo(t.x+(q.x-t.x)*0.7+(dark?0.4:-0.4),t.y+(q.y-t.y)*0.7,q.x,q.y-0.5); g.stroke(); } g.restore(); hemTrim(T,Hm,BARD); }}); });
+      const rT=[-6,-3,0,3,6].map(z=>[-25.4,42+by-Math.abs(z)*0.15,z*1.1]), rH=[-10,-5,0,5,10].map((z,k)=>[-27.6,(k%2?14.2:12.4)+by*0.5,z*1.12]);   /* over the rump behind */
+      panel(rT,rH,BARD.col,{D:-25*sf+(sf<0?6:-6),after:(T,Hm)=>{ hemTrim(T,Hm,BARD); const c0=pr(-26.6,30+by,0); if(sf<-0.2) star4(c0.x,c0.y,3.2,BARD.star); }});
+      const pT=[-7,-3.5,0,3.5,7].map(z=>[19.6,40.5+by-Math.abs(z)*0.25,z]), pH=[-9,-4.5,0,4.5,9].map((z,k)=>[22.2,(k%2?22.6:21)+by*0.5,z]);   /* the peytral across the breast */
+      panel(pT,pH,BARD.col,{D:21*sf+(sf>0?6:-6),after:(T,Hm)=>{ hemTrim(T,Hm,BARD); const c0=pr(21.4,31+by,0); if(sf>0.2) star4(c0.x,c0.y,3.2,BARD.star); }});
+      cap([6.4,49.4+by,0],[6.4,50.6+by,0],1.0,0.6,'#e0c070','#8a6a20','#fff4c0',{D:backD+0.4}); }   /* a gilt knob on the pommel */
+    if(GR && GR.bags){ const big=GR.bags>1, r=big?4.4:3.4; [1,-1].forEach(sd=>{ cap([-15,37+by,9.2*sd],[-8.5,37+by,9.2*sd],r,r,tone(LEA,0.15),tone(LEA,-0.4),tone(LEA,0.4),{sharp:[0,sd],dz:0.3+NB(sd),after:(A,B2)=>{ g.strokeStyle=LEAD; g.lineWidth=0.6; g.beginPath(); g.moveTo(A.x,A.y-r*S*0.55); g.lineTo(B2.x,B2.y-r*S*0.55); g.stroke(); }});   /* saddlebags hung behind the saddle, a flap and a buckle */
+        buckle([-11.8,37.6+by-(big?0.6:0),(9.2+r*0.8)*sd],[0,sd],NB(sd)); strap([[-11.8,44.4+by,4*sd],[-11.8,40.5+by,(8+r*0.4)*sd]],0.5,[0,sd],0.5+NB(sd)); }); if(big) cap([-14.5,45.2+by,-4],[-14.5,45.2+by,4],2.2,2.2,'#6a6450','#3a3628','#9a947a',{D:backD+0.15}); }   /* the big pair, and a rolled sack across */
     if(GR && GR.roll){ cap([-10.2,48.4+by,-5.4],[-10.2,48.4+by,5.4],2.1,2.1,'#8a7a5a','#4a3e28','#b8a87e',{D:backD+0.35,after:(A,B2)=>{ g.strokeStyle=LEAD; g.lineWidth=0.9; [0.28,0.72].forEach(t=>{ const x2=A.x+(B2.x-A.x)*t, y2=A.y+(B2.y-A.y)*t; g.beginPath(); g.moveTo(x2,y2-2.4*S); g.lineTo(x2,y2+2.4*S); g.stroke(); }); }}); }   /* the bedroll, strapped behind the cantle */   // pommel and cantle
-    [1,-1].forEach(sd=>{ strap([[-1,45+by,4.2*sd],[-1,36+by,9.8*sd],[-0.5,21.5+by,6.4*sd]],1.1,[0,sd],0.45); buckle([-0.8,30+by,9.6*sd],[0,sd]);   // the girth
-      strap([[-2.2,45.6+by,4.4*sd],[-2.4,30+by,10.6*sd],[-2.4,20+by,10.4*sd]],0.45,[0,sd],0.6);   // a stirrup leather
-      const st=pr(-2.4,18.8+by,10.4*sd); parts.push({ d:st.d+0.6, sharp:[0,sd], fn:pass=>{ if(!pass) return; g.strokeStyle='#8a8e96'; g.lineWidth=0.7*S; g.beginPath(); g.ellipse(st.x,st.y,1.4*S,1.1*S,0,0,Math.PI*2); g.stroke(); g.fillStyle='#5a5e66'; g.fillRect(st.x-1.4*S,st.y+0.6*S,2.8*S,0.6*S); } }); }); }   // the iron stirrup
+    [1,-1].forEach(sd=>{ if(!BARD){ strap([[-1,45+by,4.2*sd],[-1,36+by,9.8*sd],[-0.5,21.5+by,6.4*sd]],1.1,[0,sd],0.45); buckle([-0.8,30+by,9.6*sd],[0,sd]); }   // the girth
+      strap([[-2.2,45.6+by,4.4*sd],[-2.4,30+by,10.6*sd],[-2.4,20+by,10.4*sd]],0.45,[0,sd],0.6+NB(sd));   // a stirrup leather
+      const st=pr(-2.4,18.8+by,10.4*sd); parts.push({ d:st.d+0.6+NB(sd), sharp:[0,sd], fn:pass=>{ if(!pass) return; g.strokeStyle='#8a8e96'; g.lineWidth=0.7*S; g.beginPath(); g.ellipse(st.x,st.y,1.4*S,1.1*S,0,0,Math.PI*2); g.stroke(); g.fillStyle='#5a5e66'; g.fillRect(st.x-1.4*S,st.y+0.6*S,2.8*S,0.6*S); } }); }); }   // the iron stirrup
   // draw: a soft shadow, then far to near, each part's rim before its fill so the whole beast gets one outline
   const HO=!!drawHorse3D.headOnly; if(HO){ const hp2=parts.filter(p=>p.head); parts.length=0; parts.push(...hp2); }   /* the head and neck alone, laid over a rider when it faces you */
   const sh=g.createRadialGradient(X,Y+1,2,X,Y+1,34*S/1.5*1.2); sh.addColorStop(0,'rgba(10,6,2,0.4)'); sh.addColorStop(1,'rgba(10,6,2,0)');
@@ -20677,6 +20743,148 @@ function drawHorse3D(X,Y,phi,ph,moving,pack,harness,seed,coatK){   // pack: a ri
   oa.setTransform(k,0,0,k,-ox*k,-oy*k); g=oa; try{ parts.forEach(p=>{ if(p.sharp && (p.sharp[0]*sf+p.sharp[1]*cf)>0.2) p.fn(1); }); } finally{ g=G; }   // and the fine detail that faces us, crisp again
   g.drawImage(O.a,0,0,pw,ph2,ox,oy,W,H);
   if(CK){ let c=CACHE.get(CK); if(!c){ if(CACHE.size>24) CACHE.delete(CACHE.keys().next().value); c={cv:document.createElement('canvas')}; CACHE.set(CK,c); } if(c.cv.width<pw) c.cv.width=pw; if(c.cv.height<ph2) c.cv.height=ph2; const cc=c.cv.getContext('2d'); cc.clearRect(0,0,c.cv.width,c.cv.height); cc.drawImage(O.a,0,0); c.t=gt; } }
+
+function drawBear3D(X,Y,phi,ph,moving,o){   // o: {col, S, rear, jaw, swipe, down, sit, lunge, blink, tack, harness, seed}
+  o=o||{}; const S=o.S||1, cf=Math.cos(phi), sf=Math.sin(phi), seed=o.seed|0, BC=o.col||BEAR_COL;
+  const K={c:BC.coat, d:tone(BC.coat,-0.42), l:tone(BC.coat,0.28), m:BC.muzzle||'#a08462', mane:BC.legs||tone(BC.coat,-0.3), blanket:'#7a2a22'};
+  const rear=Math.max(o.rear||0,(o.sit||0)*0.62), down=o.down||0, lunge=o.lunge||0, jaw=o.jaw||0, swipe=o.swipe||0, sit=o.sit||0;
+  const RA=rear*1.05, rc=Math.cos(RA), rs=Math.sin(RA), PVX=-13, PVY=12; let RF=1;   /* rearing: everything forward of the hips tips up round them */
+  const pose=(x,y,z)=>{ x+=lunge; if(!down) y=y<14?y*1.3:y+4.2; if(RF && RA){ const dx=x-PVX, dy=y-PVY; x=PVX+dx*rc-dy*rs; y=PVY+dx*rs+dy*rc; } if(down) y=y-down*Math.min(y,10.5)*(y<16?0.95:1)+(y<16?0:0); return [x,y,z]; };
+  const pr=(x,y,z)=>{ [x,y,z]=pose(x,y,z); return { x:X+(x*cf - z*sf)*S, y:Y+((x*sf + z*cf)*0.5 - y)*S, d:(x*sf + z*cf) }; };
+  const bob=moving?Math.abs(Math.cos(ph))*1.0:0, idle=Math.sin(gt*0.9+seed);
+  { const sp=pr(-3.5,38.2+bob,0); drawBear3D.seat={x:sp.x,y:sp.y}; }
+  const parts=[];      // {d, draw(pass)}: pass 0 draws a dark rim, pass 1 the fill
+  let coatG=null; const coat=()=>{ if(!coatG){ coatG=g.createLinearGradient(X-34*S,Y-74*S,X+28*S,Y-4*S); coatG.addColorStop(0,K.l); coatG.addColorStop(0.42,K.c); coatG.addColorStop(0.78,tone(K.c,-0.16)); coatG.addColorStop(1,K.d); } return coatG; };   // one light over the whole coat: overlapping parts are the very same colour, so no seams
+  const softFX=!(typeof LOW_FX!=='undefined' && LOW_FX);
+  const sepShadow=(path,k2)=>{ if(!softFX || drawBear3D.noSep) return; g.save(); g.globalCompositeOperation='source-atop'; g.translate(0.5,0.8); path(); g.strokeStyle='rgba(18,10,4,0.11)'; g.lineJoin='round'; [5.2,3.6,2.2].forEach(w=>{ g.lineWidth=w; g.stroke(); }); g.restore(); };   // a soft fringe of shadow cast on what lies behind (stacked strokes: cheap, no blur)
+  const cap=(a,b,ra,rb,col,dark,light,opt={})=>{ const A=pr(...a), B=pr(...b); parts.push({ d:opt.D!=null?opt.D:(A.d+B.d)/2+(opt.dz||0), sharp:opt.sharp, fn:pass=>{
+      const dx=B.x-A.x, dy=B.y-A.y, L=Math.hypot(dx,dy)||0.001, nx=-dy/L, ny=dx/L, r1=ra*S+(pass?0:1.15), r2=rb*S+(pass?0:1.15);
+      g.beginPath(); const an=Math.atan2(dy,dx); g.arc(A.x,A.y,r1,an+Math.PI/2,an-Math.PI/2); g.arc(B.x,B.y,r2,an-Math.PI/2,an+Math.PI/2); g.closePath();
+      if(!pass){ g.fillStyle='rgba(20,12,6,0.96)'; g.fill(); return; }
+      const isCoat=col===C && !opt.flat, pathF=()=>{ g.beginPath(); g.arc(A.x,A.y,r1,an+Math.PI/2,an-Math.PI/2); g.arc(B.x,B.y,r2,an-Math.PI/2,an+Math.PI/2); g.closePath(); };
+      if(isCoat && !opt.nosep){ sepShadow(pathF,Math.max(1,Math.hypot(g.getTransform().a,g.getTransform().b))); pathF(); }
+      if(isCoat){ g.fillStyle=coat(); g.fill(); const far=(a[2]*cf)<-1; if(far){ g.fillStyle='rgba(20,12,6,0.18)'; g.fill(); } if(opt.along){ const ga=g.createLinearGradient(A.x,A.y,B.x,B.y); ga.addColorStop(0,'rgba(0,0,0,0)'); ga.addColorStop(0.45,'rgba(0,0,0,0)'); ga.addColorStop(1,opt.along); g.fillStyle=ga; g.fill(); } if(opt.after) opt.after(A,B); return; }
+      const mx=(A.x+B.x)/2, my=(A.y+B.y)/2, rr=Math.max(r1,r2)*1.1, lx=-0.55, ly=-0.83;               // one light for the whole beast, from the upper left, so neighbouring parts shade alike
+      const gr=g.createLinearGradient(mx+lx*rr,my+ly*rr,mx-lx*rr,my-ly*rr); gr.addColorStop(0,light); gr.addColorStop(0.45,col); gr.addColorStop(1,dark);
+      g.fillStyle=opt.flat?col:gr; g.fill(); if(opt.along){ const ga=g.createLinearGradient(A.x,A.y,B.x,B.y); ga.addColorStop(0,'rgba(0,0,0,0)'); ga.addColorStop(0.45,'rgba(0,0,0,0)'); ga.addColorStop(1,opt.along); g.fillStyle=ga; g.fill(); } if(opt.after) opt.after(A,B); } }); };
+  const ball=(c,r,col,dark,light,opt={})=>{ const P=pr(...c); parts.push({ d:opt.D!=null?opt.D:P.d+(opt.dz||0), sharp:opt.sharp, fn:pass=>{ const R=r*S+(pass?0:1.15); g.beginPath(); g.arc(P.x,P.y,R,0,Math.PI*2);
+      if(!pass){ if(opt.norim) return; g.fillStyle='rgba(20,12,6,0.96)'; g.fill(); return; }
+      if(col===C && !opt.flat){ g.fillStyle=coat(); g.fill(); if((c[2]*cf)<-1){ g.fillStyle='rgba(20,12,6,0.18)'; g.fill(); } return; }
+      const gr=g.createRadialGradient(P.x-R*0.35,P.y-R*0.45,R*0.1,P.x,P.y,R); gr.addColorStop(0,light); gr.addColorStop(0.55,col); gr.addColorStop(1,dark); g.fillStyle=opt.flat?col:gr; g.fill(); } }); };
+  const line=(pts,col,w,dz=0,sharp=null)=>{ const Q=pts.map(p=>pr(...p)); parts.push({ d:Q.reduce((a,q)=>a+q.d,0)/Q.length+dz, sharp, fn:pass=>{ if(!pass) return; g.strokeStyle=col; g.lineWidth=w*S; g.lineCap='round'; g.lineJoin='round'; g.beginPath(); Q.forEach((q,k)=>k?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.stroke(); } }); };
+  const GR=drawBear3D.gear||null, LEA=(GR&&GR.leather)||'#5a3a1e', LEAD=tone(LEA,-0.5), LEAL=tone(LEA,0.45);
+  const strap=(pts,w,sharp,dz=0.3)=>{ const Q=pts.map(p=>pr(...p)); parts.push({ d:Q.reduce((a,q)=>a+q.d,0)/Q.length+dz, sharp, fn:pass=>{ if(!pass) return;   // a leather strap: dark band, a lit edge along its top
+      const path=()=>{ g.beginPath(); Q.forEach((q,k2)=>k2?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); }; g.lineCap='round'; g.lineJoin='round';
+      path(); g.strokeStyle=LEAD; g.lineWidth=(w+0.5)*S; g.stroke(); path(); g.strokeStyle=LEA; g.lineWidth=w*S; g.stroke();
+      g.save(); g.translate(0,-w*S*0.22); path(); g.strokeStyle='rgba(176,128,78,0.75)'; g.lineWidth=w*S*0.3; g.stroke(); g.restore(); } }); };
+  const buckle=(c,sharp,bz=0)=>{ const P0=pr(...c); parts.push({ d:P0.d+0.5+bz, sharp, fn:pass=>{ if(!pass) return; const r=0.75*S; g.strokeStyle='#d8b058'; g.lineWidth=0.5*S; g.strokeRect(P0.x-r,P0.y-r*0.8,r*2,r*1.6); g.fillStyle='rgba(255,236,170,0.8)'; g.fillRect(P0.x-r,P0.y-r*0.8,r*0.6,0.5*S); } }); };
+  const B_CRY='#8ac8ff', BARD=GR&&GR.barding||null, NB=sd=>BARD&&sd*cf>-0.05?24:0;
+  const panel=(top,hem,col,opt={})=>{ const T=top.map(p=>pr(...p)), Hm=hem.map(p=>pr(...p)), all=[...T,...Hm];   /* a hanging cloth: a top edge and a hem, filled between */
+    const D=opt.D!=null?opt.D:opt.near===true?Math.max(...all.map(q=>q.d))+1:opt.near===false?Math.min(...all.map(q=>q.d))-1:all.reduce((a,q)=>a+q.d,0)/all.length+(opt.dz||0);
+    parts.push({ d:D, sharp:opt.sharp, fn:pass=>{ const path=()=>{ g.beginPath(); T.forEach((q,k)=>k?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); for(let k=Hm.length-1;k>=0;k--) g.lineTo(Hm[k].x,Hm[k].y); g.closePath(); };
+      g.lineJoin='round'; if(!pass){ path(); g.strokeStyle='rgba(20,12,6,0.96)'; g.lineWidth=2.3; g.stroke(); return; }
+      path(); const y0=Math.min(...all.map(q=>q.y)), y1=Math.max(...all.map(q=>q.y)), gr=g.createLinearGradient(0,y0,0,y1); gr.addColorStop(0,tone(col,0.16)); gr.addColorStop(0.55,col); gr.addColorStop(1,tone(col,-0.38)); g.fillStyle=gr; g.fill();
+      if(opt.far){ g.fillStyle='rgba(10,6,16,0.22)'; g.fill(); } if(opt.after) opt.after(T,Hm); } }); };
+  const star4=(x,y,r,col)=>{ g.fillStyle=col; g.beginPath(); g.moveTo(x,y-r); g.lineTo(x+r*0.28,y-r*0.28); g.lineTo(x+r,y); g.lineTo(x+r*0.28,y+r*0.28); g.lineTo(x,y+r); g.lineTo(x-r*0.28,y+r*0.28); g.lineTo(x-r,y); g.lineTo(x-r*0.28,y-r*0.28); g.closePath(); g.fill(); };
+  const hemTrim=(T,Hm,B)=>{ g.save(); g.lineCap='round'; g.lineJoin='round';   /* a dark band above the hem, gold edging, silver stars, and gold tassels at the points */
+    const band=Hm.map((q,k)=>{ const t=T[Math.min(k,T.length-1)]; return {x:q.x+(t.x-q.x)*0.2,y:q.y+(t.y-q.y)*0.2}; });
+    g.beginPath(); Hm.forEach((q,k)=>k?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); for(let k=band.length-1;k>=0;k--) g.lineTo(band[k].x,band[k].y); g.closePath(); g.fillStyle=tone(B.col,-0.45,0.9); g.fill();
+    g.strokeStyle=B.trim; g.lineWidth=0.9; g.beginPath(); band.forEach((q,k)=>k?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.stroke();
+    g.lineWidth=0.7; g.beginPath(); Hm.forEach((q,k)=>k?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.stroke();
+    for(let k=1;k<Hm.length-1;k+=2){ const a=Hm[k], b=band[k]; star4((a.x+b.x)/2,(a.y+b.y)/2-0.2,1.5,B.star); }
+    for(let k=0;k<Hm.length;k++) if(k%2===0){ const q=Hm[k]; g.strokeStyle=B.trim; g.lineWidth=0.6; g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(q.x,q.y+2.2); g.stroke(); g.fillStyle=B.trim; g.beginPath(); g.arc(q.x,q.y+2.6,0.75,0,Math.PI*2); g.fill(); }
+    g.restore(); };
+  const C=K.c, D=K.d, Lc=K.l;
+  const by=bob, MZ=K.m, PAW=tone(K.c,-0.5), CLAW='#e8dcc0';
+  // the barrel: a heavy rump, the shoulder hump that makes a bear a bear, a deep chest
+  ball([-13,24+by,0],10.8,C,D,Lc,{dz:0.1}); cap([-13,23.5+by,0],[-2,23+by,0],10.6,11.4,C,D,Lc,{nosep:true}); cap([-2,23+by,0],[7,24.2+by,0],11.4,10.6,C,D,Lc,{nosep:true});
+  ball([4.5,29.6+by,0],9.2,C,D,Lc,{dz:0.05}); ball([10,21.5+by,0],8.8,C,D,Lc); [1,-1].forEach(sd=>{ ball([-14,22.5+by,4.6*sd],8.4,C,tone(C,-0.18),tone(C,0.06),{dz:0.05}); ball([9,20+by,4.4*sd],6.8,C,tone(C,-0.18),tone(C,0.06),{dz:0.05}); });
+  cap([-12,15.5+by,0],[6,15.5+by,0],7.2,7,C,D,Lc,{dz:-0.4,nosep:true});   /* the low, shaggy belly */
+  for(let x=-16;x<=8;x+=3.1) [1,-1].forEach(sd=>{ const L2=1.6+((x*7+sd*3)&3)*0.5; line([[x,12.8+by,7.2*sd],[x-0.9,12.8+by-L2,7.7*sd]],tone(C,-0.18,0.8),2.2,0.05); });   /* a fringe of long fur under it */
+  for(let k=0;k<6;k++){ const x=-2+k*2.2; line([[x,38.4+by-Math.abs(x-4.5)*0.12,0.6],[x-1.6,36.8+by-Math.abs(x-4.5)*0.12,1.2]],tone(C,-0.28),1,0.4,[0,0]); }   /* the ruff on the hump */
+  // legs: thick, short, plantigrade; it ambles, both legs on one side nearly together
+  const legs=[ {x:8.6,z:6.2,f:true,p:0}, {x:8.6,z:-6.2,f:true,p:Math.PI}, {x:-14,z:6.4,f:false,p:0.6}, {x:-14,z:-6.4,f:false,p:Math.PI+0.6} ];
+  legs.forEach(l=>{ const sw=moving?Math.sin(ph+l.p):0, lift=moving?Math.max(0,Math.cos(ph+l.p))*3:0, swX=sw*5, sd=Math.sign(l.z);
+    RF=l.f?1:0;
+    if(down){ const fx=l.f?l.x+7:l.x+4; cap([l.x,20+by,l.z*1.05],[fx,7,l.z*1.1],l.f?5.4:6.8,4.2,C,D,Lc); cap([fx,6,l.z*1.1],[fx+5,4.4,l.z*1.05],3.6,3,PAW,tone(PAW,-0.3),tone(PAW,0.25)); return; }   /* lying: legs folded under, forepaws out in front */
+    if(sit && !l.f){ RF=0; cap([-13,22+by,l.z*1.1],[-6,8,l.z*1.15],7.4,5,C,D,Lc); cap([-6,7,l.z*1.15],[-1,3,l.z*1.05],4.4,3.6,C,D,Lc); cap([-1,2.4,l.z*1.05],[2.6,2,l.z],3.6,3,PAW,tone(PAW,-0.3),tone(PAW,0.25)); RF=1; return; }   /* sitting back on its haunches */
+    const SW=(l.f && sd>0 && swipe)?swipe:0;
+    if(l.f){ const sh=[l.x,22+by,l.z*1.05], el=SW?[l.x+6*SW,15+6*SW,l.z]:[l.x+swX*0.4+lift*0.4,11.5+lift*0.7,l.z], ft=SW?[l.x+12*SW,10+12*SW,l.z]:[l.x+swX+0.8,3.4+lift,l.z];
+      cap(sh,el,5.8,4.6,C,D,Lc); cap(el,ft,4.6,3.9,C,D,Lc); ball(el,4.5,C,D,Lc,{dz:0.02});
+      const pd=SW?[ft[0]+3,ft[1]+1.2,l.z]:[ft[0]+3.2,ft[1]-1.4,l.z]; cap([ft[0],ft[1]-0.9,l.z],pd,3.8,3.1,PAW,tone(PAW,-0.3),tone(PAW,0.25),{dz:0.1});
+      for(let c2=-1;c2<=1;c2++) line([[pd[0]+1.8,pd[1]+0.2,l.z+c2*1.4],[pd[0]+3.6,pd[1]-(SW?-0.6:0.9),l.z+c2*1.5]],CLAW,0.75,0.3,[1,0]); }   /* the claws */
+    else { RF=0; const hx=l.x+1, hy=24.5+by; const kn=[l.x-1.5+swX*0.4-lift*0.3,12+lift*0.6,l.z], ft=[l.x+swX+0.6,3.4+lift,l.z];
+      cap([hx,hy,l.z*1.05],kn,7.4,5,C,D,Lc); cap(kn,ft,4.8,4,C,D,Lc); ball(kn,4.8,C,D,Lc,{dz:0.02});
+      const pd=[ft[0]+3,ft[1]-1.4,l.z]; cap([ft[0]-0.6,ft[1]-1,l.z],pd,4,3.2,PAW,tone(PAW,-0.3),tone(PAW,0.25),{dz:0.1});
+      for(let c2=-1;c2<=1;c2++) line([[pd[0]+1.8,pd[1]+0.2,l.z+c2*1.4],[pd[0]+3.4,pd[1]-0.9,l.z+c2*1.5]],CLAW,0.7,0.3,[1,0]); RF=1; } });
+  RF=1;
+  ball([-23.2,27+by,0],2.6,C,D,Lc,{dz:-0.1});   /* the stub of a tail */
+  // the head: low on a thick neck, a dished brow, a pale muzzle, small round ears
+  const HEAD0=parts.length, hd=down?-6:0, nod=moving?Math.sin(ph*2)*0.6:idle*0.3;
+  cap([9,26+by,0],[18,26.6+by+hd*0.5+nod,0],8,6.8,C,D,Lc);
+  const hx=21.4, hy=27+by+hd+nod, J=jaw*0.55;
+  ball([hx,hy,0],6.6,C,D,Lc); ball([hx+1.2,hy+2.4,0],4.9,C,D,Lc,{dz:0.1}); [1,-1].forEach(sd=>ball([hx+0.4,hy-1.2,3.4*sd],4.2,C,tone(C,-0.15),tone(C,0.05),{dz:0.05}));   /* skull, brow and cheeks */
+  const mA=[hx+2.4,hy-1.6,0], mB=[hx+8.2,hy-2.8,0];
+  cap(mA,mB,3.6,2.5,MZ,tone(MZ,-0.4),tone(MZ,0.25),{dz:0.4});   /* the muzzle */
+  const jA=[hx+1.6,hy-3.6,0], jB=[hx+1.6+5.4*Math.cos(J),hy-3.6-1.2-5.4*Math.sin(J),0];
+  if(jaw>0.05) cap([hx+2.6,hy-3.2,0],[jB[0]+0.4,jB[1]+0.9,0],2.2,1.6,'#5a1410','#2a0806','#8a2a20',{dz:0.3});   /* the open mouth */
+  cap(jA,jB,2.4,1.5,MZ,tone(MZ,-0.45),tone(MZ,0.15),{dz:0.2});   /* the lower jaw */
+  if(jaw>0.2) [1,-1].forEach(sd=>{ line([[mB[0]-0.6,mB[1]-1.6,1*sd],[mB[0]-0.8,mB[1]-2.8,1*sd]],'#f4eedc',0.7,0.6,[1,0]); line([[jB[0]-0.2,jB[1]+1.2,0.9*sd],[jB[0]-0.3,jB[1]+2.2,0.9*sd]],'#f4eedc',0.6,0.6,[1,0]); });   /* fangs */
+  ball([mB[0]+0.6,mB[1]+0.4,0],1.5,'#1a1210','#0a0606','#4a3a34',{dz:0.6,sharp:[1,0]});   /* the nose */
+  [1,-1].forEach(sd=>{ const sh=[0.5,sd];
+    ball([hx+3.9,hy+1.0,2.9*sd],0.85,'#120a06','#120a06','#120a06',{flat:true,norim:true,dz:0.8,sharp:sh});
+    if(!o.blink) ball([hx+3.7,hy+1.3,3.05*sd],0.28,'#f0e8dc','#f0e8dc','#f0e8dc',{flat:true,norim:true,dz:0.9,sharp:sh});
+    ball([hx-1.6,hy+5.4,3.9*sd],2.3,C,D,Lc,{dz:-0.2}); ball([hx-1.3,hy+5.4,4.25*sd],1.2,tone(C,-0.45),tone(C,-0.55),tone(C,-0.3),{flat:true,norim:true,dz:0.1,sharp:[0.6,sd]}); });   /* eyes and round ears */
+  if(o.harness||o.tack){ [1,-1].forEach(sd=>{ const hs=[0.5,sd]; strap([[hx+5.6,hy-0.4,2.6*sd],[hx+5.6,hy-3.6,2.4*sd]],0.45,hs,0.7); strap([[hx-0.8,hy+5,3.4*sd],[hx-1.2,hy-3.6,4.4*sd]],0.5,hs,0.7); strap([[hx-1,hy+0.6,4.6*sd],[hx+5.6,hy-1.6,3*sd]],0.45,hs,0.7);
+      buckle([hx-1.1,hy+0.4,4.8*sd],hs); ball([hx+5.8,hy-2.2,2.9*sd],0.6,'#c8ccd2','#7a7e86','#ffffff',{dz:0.8,sharp:hs}); });
+    [1,-1].forEach(sd=>{ const a=[hx+5.8,hy-2.2,2.9*sd], w=[-0.5,37.5+by,4*sd]; strap([a,[(a[0]+w[0])/2,(a[1]+w[1])/2-3,(a[2]+5*sd)/2],w],0.45,[0,sd],0.4); }); }
+  if(BARD){ const M='#b8c0cc', MD='#5a6270', ML='#f0f4fa';   /* a silvered brow-plate, the crystal, and cheek-pieces */
+    cap([hx+0.6,hy+5.6,0],[hx+6.4,hy+1.1,0],1.9,1.3,M,MD,ML,{dz:1.2,sharp:[1,0]}); [1,-1].forEach(sd=>cap([hx+1,hy+1.4,3.9*sd],[hx+3.2,hy-1.6,4.1*sd],1,0.8,M,MD,ML,{dz:0.7,sharp:[0.5,sd]}));
+    cap([hx+0.8,hy+6.4,0],[hx-0.2,hy+9.8,0],0.95,0.15,B_CRY,'#3a5a9a','#e8f6ff',{dz:1.5}); ball([hx+1.2,hy+6,0],1.15,B_CRY,'#3a5a9a','#ffffff',{dz:1.6,sharp:[1,0]});
+    const gq=pr(hx+1.2,hy+6,0); parts.push({ d:gq.d+1.7, fn:pass=>{ if(!pass) return; g.save(); g.globalCompositeOperation='lighter'; const rg=g.createRadialGradient(gq.x,gq.y,0,gq.x,gq.y,6*S); rg.addColorStop(0,'rgba(150,200,255,0.45)'); rg.addColorStop(1,'rgba(150,200,255,0)'); g.fillStyle=rg; g.fillRect(gq.x-6*S,gq.y-6*S,12*S,12*S); g.restore(); } }); }
+  { const HEAD1=parts.length; for(let q=HEAD0;q<HEAD1;q++) parts[q].head=true; }
+  // the riding tack: a broad saddle behind the hump, girth round the barrel, stirrups; bags, bedroll, blanket or the magister's caparison
+  if(o.tack){ const backD=Math.max(...[-13,-2,7].map(x=>x*sf))+0.3+(BARD?30:0), BL=(GR&&GR.blanket)||'#7a2a22', SEAT=tone(LEA,0.1);
+    if(BARD){ const xs=[]; for(let x=-23;x<=13.01;x+=3) xs.push(x);
+      [1,-1].forEach(sd=>{ const top=xs.map(x=>[x,35+by+(x>-2?Math.min(3.6,(x+2)*0.5):0)-(x>9?(x-9)*0.6:0)+(x<-15?(x+15)*0.35:0),1.2*sd]), hem=xs.map((x,k)=>[x+(k%2?0:0.4),(k%2?11.6:10)+by*0.5+Math.sin(gt*1.4+x*0.3)*0.2,12.2*sd]);
+        const near=sd*cf>-0.05; panel(top,hem,BARD.col,{near, far:!near, after:(T,Hm)=>{ g.save(); g.lineCap='round'; for(let k=1;k<Hm.length-1;k++){ const t=T[k], q=Hm[k], dark=k%2; g.strokeStyle=dark?'rgba(8,6,20,0.28)':'rgba(255,255,255,0.08)'; g.lineWidth=dark?1.6:1.1; g.beginPath(); g.moveTo(t.x+(q.x-t.x)*0.35,t.y+(q.y-t.y)*0.35); g.quadraticCurveTo(t.x+(q.x-t.x)*0.7,t.y+(q.y-t.y)*0.7,q.x,q.y-0.5); g.stroke(); } g.restore(); hemTrim(T,Hm,BARD); }}); });
+      const rT=[-6,-3,0,3,6].map(z=>[-23.6,31+by-Math.abs(z)*0.2,z*1.2]), rH=[-11,-5.5,0,5.5,11].map((z,k)=>[-25.4,(k%2?11.6:10)+by*0.5,z*1.1]);
+      panel(rT,rH,BARD.col,{D:-24*sf+(sf<0?6:-6),after:(T,Hm)=>{ hemTrim(T,Hm,BARD); const c0=pr(-24.6,22+by,0); if(sf<-0.2) star4(c0.x,c0.y,3.2,BARD.star); }});
+      const pT=[-6,-3,0,3,6].map(z=>[17.4,27+by-Math.abs(z)*0.3,z]), pH=[-8.5,-4.2,0,4.2,8.5].map((z,k)=>[19.6,(k%2?13.6:12)+by*0.5,z]);
+      panel(pT,pH,BARD.col,{D:19*sf+(sf>0?6:-6),after:(T,Hm)=>{ hemTrim(T,Hm,BARD); const c0=pr(18.8,20+by,0); if(sf>0.2) star4(c0.x,c0.y,3.2,BARD.star); }}); }
+    else { [1,-1].forEach(sd=>cap([-11,34+by,8*sd],[2,34.6+by,8*sd],1.5,1.5,BL,tone(BL,-0.35),tone(BL,0.25),{D:backD-0.05+sd*cf*3})); cap([-11.5,35.2+by,0],[2.5,35.8+by,0],3.6,3.6,BL,tone(BL,-0.3),tone(BL,0.22),{D:backD}); }
+    cap([-8,37.2+by,0],[0.5,37.6+by,0],3.1,2.8,SEAT,tone(SEAT,-0.45),tone(SEAT,0.4),{D:backD+0.2}); cap([0.4,37.8+by,0],[2.2,41+by,0],1.8,1.3,SEAT,tone(SEAT,-0.45),tone(SEAT,0.4),{D:backD+0.3}); cap([-9.2,39+by,-3.2],[-9.2,39+by,3.2],1.6,1.6,tone(SEAT,-0.1),tone(SEAT,-0.5),tone(SEAT,0.3),{D:backD+0.25});
+    if(BARD) cap([2.2,41+by,0],[2.2,42.2+by,0],1,0.6,'#e0c070','#8a6a20','#fff4c0',{D:backD+0.4});
+    if(GR && GR.bags){ const big=GR.bags>1, r=big?4.4:3.4; [1,-1].forEach(sd=>{ cap([-17,28+by,10.6*sd],[-10.5,28.4+by,10.6*sd],r,r,tone(LEA,0.15),tone(LEA,-0.4),tone(LEA,0.4),{sharp:[0,sd],dz:0.3+NB(sd),after:(A,B2)=>{ g.strokeStyle=LEAD; g.lineWidth=0.6; g.beginPath(); g.moveTo(A.x,A.y-r*S*0.55); g.lineTo(B2.x,B2.y-r*S*0.55); g.stroke(); }});
+        buckle([-13.8,28.6+by-(big?0.6:0),(10.6+r*0.8)*sd],[0,sd],NB(sd)); strap([[-13.8,35.4+by,4*sd],[-13.8,31.5+by,(9.4+r*0.4)*sd]],0.5,[0,sd],0.5+NB(sd)); }); if(big) cap([-15.5,36.6+by,-4],[-15.5,36.6+by,4],2.2,2.2,'#6a6450','#3a3628','#9a947a',{D:backD+0.15}); }
+    if(GR && GR.roll) cap([-11.8,40.2+by,-5.4],[-11.8,40.2+by,5.4],2.1,2.1,'#8a7a5a','#4a3e28','#b8a87e',{D:backD+0.35,after:(A,B2)=>{ g.strokeStyle=LEAD; g.lineWidth=0.9; [0.28,0.72].forEach(t=>{ const x2=A.x+(B2.x-A.x)*t, y2=A.y+(B2.y-A.y)*t; g.beginPath(); g.moveTo(x2,y2-2.4*S); g.lineTo(x2,y2+2.4*S); g.stroke(); }); }});
+    [1,-1].forEach(sd=>{ if(!BARD){ strap([[-3,36.4+by,4.4*sd],[-3,26+by,11.6*sd],[-3,10+by,6.6*sd]],1.2,[0,sd],0.45); buckle([-3,20+by,10.6*sd],[0,sd]); }
+      strap([[-4.2,37.4+by,4.6*sd],[-4.4,24+by,12.4*sd],[-4.4,15+by,12.2*sd]],0.45,[0,sd],0.6+NB(sd));
+      const st=pr(-4.4,13.8+by,12.2*sd); parts.push({ d:st.d+0.6+NB(sd), sharp:[0,sd], fn:pass=>{ if(!pass) return; g.strokeStyle='#8a8e96'; g.lineWidth=0.7*S; g.beginPath(); g.ellipse(st.x,st.y,1.4*S,1.1*S,0,0,Math.PI*2); g.stroke(); g.fillStyle='#5a5e66'; g.fillRect(st.x-1.4*S,st.y+0.6*S,2.8*S,0.6*S); } }); }); }
+  const HO=!!drawBear3D.headOnly; if(HO){ const hp2=parts.filter(p=>p.head); parts.length=0; parts.push(...hp2); }
+  if(!HO && !(typeof SPRITE_PASS!=='undefined' && SPRITE_PASS)){ const sh=g.createRadialGradient(X,Y+1,2,X,Y+1,34*S); sh.addColorStop(0,'rgba(10,6,2,0.4)'); sh.addColorStop(1,'rgba(10,6,2,0)'); g.fillStyle=sh; g.beginPath(); g.ellipse(X,Y+1,(Math.abs(cf)*26+13)*S,(Math.abs(sf)*13+8)*S,0,0,Math.PI*2); g.fill(); }
+  const T=g.getTransform(), k=Math.max(1,Math.hypot(T.a,T.b)), W=Math.ceil(110*S), H=Math.ceil(110*S), ox=X-W/2, oy=Y-H+20*S, pw=Math.ceil(W*k), ph2=Math.ceil(H*k);
+  const still=!moving && !HO && !rear && !jaw && !swipe && !lunge;
+  const CK=still?['B',GR?JSON.stringify(GR):'',o.tack?1:0,o.harness?1:0,down.toFixed(2),o.blink?1:0,BC.coat,phi.toFixed(2),S,k.toFixed(2),(gt*2|0)].join('|'):null, CACHE=drawBear3D.cache=drawBear3D.cache||new Map();
+  if(CK){ const c=CACHE.get(CK); if(c){ g.drawImage(c.cv,0,0,pw,ph2,ox,oy,W,H); return; } }
+  parts.sort((a,b)=>a.d-b.d);
+  const O=drawBear3D.off=drawBear3D.off||{a:document.createElement('canvas'), t:document.createElement('canvas')};
+  [O.a,O.t].forEach(c=>{ if(c.width<pw) c.width=pw; if(c.height<ph2) c.height=ph2; });
+  const oa=O.a.getContext('2d'), ot=O.t.getContext('2d'); oa.setTransform(1,0,0,1,0,0); oa.clearRect(0,0,pw,ph2); oa.setTransform(k,0,0,k,-ox*k,-oy*k);
+  const G=g; g=oa; try{ parts.forEach(p=>p.fn(0)); parts.forEach(p=>p.fn(1)); } finally{ g=G; }
+  if(!(typeof LOW_FX!=='undefined' && LOW_FX)){                                                          // roundness from the silhouette itself: lit edges toward the light, shaded edges away from it (no seams, it is one shape)
+    O.m=O.m||document.createElement('canvas'); if(O.m.width<pw) O.m.width=pw; if(O.m.height<ph2) O.m.height=ph2; const om=O.m.getContext('2d');
+    ot.setTransform(1,0,0,1,0,0); ot.clearRect(0,0,pw,ph2); ot.drawImage(O.a,0,0);
+    const band=(col,dx,dy,alpha,blur)=>{ om.setTransform(1,0,0,1,0,0); om.globalCompositeOperation='source-over'; om.clearRect(0,0,pw,ph2); om.fillStyle=col; om.fillRect(0,0,pw,ph2);
+      om.globalCompositeOperation='destination-out'; om.drawImage(O.t,dx*k,dy*k); om.globalCompositeOperation='source-over';
+      oa.setTransform(1,0,0,1,0,0); oa.globalCompositeOperation='source-atop'; oa.globalAlpha=alpha; oa.filter='blur('+(blur*k).toFixed(2)+'px)'; oa.drawImage(O.m,0,0); oa.filter='none'; oa.globalAlpha=1; oa.globalCompositeOperation='source-over'; };
+    band('rgba(16,10,4,1)',-3.0,-3.8,0.5,1.1);                                                          // the shaded side, lower right of every limb and the barrel
+    band('rgba(255,246,226,1)',2.2,2.8,0.12,1.0); }                                                       // and the lit side, upper left
+  ot.setTransform(1,0,0,1,0,0); ot.clearRect(0,0,pw,ph2); ot.drawImage(O.a,0,0);                          // soften the inside: the blurred beast laid back over itself, only within its own outline
+  
+  oa.setTransform(k,0,0,k,-ox*k,-oy*k); g=oa; try{ parts.forEach(p=>{ if(p.sharp && (p.sharp[0]*sf+p.sharp[1]*cf)>0.2) p.fn(1); }); } finally{ g=G; }   // and the fine detail that faces us, crisp again
+  g.drawImage(O.a,0,0,pw,ph2,ox,oy,W,H);
+  if(CK){ let c=CACHE.get(CK); if(!c){ if(CACHE.size>24) CACHE.delete(CACHE.keys().next().value); c={cv:document.createElement('canvas')}; CACHE.set(CK,c); } if(c.cv.width<pw) c.cv.width=pw; if(c.cv.height<ph2) c.cv.height=ph2; const cc=c.cv.getContext('2d'); cc.clearRect(0,0,c.cv.width,c.cv.height); cc.drawImage(O.a,0,0); } }
 
 // ════════ Odds and ends: the junk in crates and barrels, worth a few coppers to any trader ════════
 const JUNK_DEF={   // id: [name, price, what it is]
@@ -24679,7 +24887,9 @@ const QUAD={
   wolf:{L:17,H:33,D:12.5,bw:6.8,legW:3.6,wr:3.5,hk:8,stride:6,lift:3.5,neckL:8,neckA:0.55,neckW:[11,8],head:'wolf',hs:1.75,ears:'wolf',tail:'brush',ruff:1,saddle:1},
   lion:{L:20,H:27,D:12,bw:7.2,legW:4.2,wr:3.5,hk:8,stride:7,lift:3,neckL:7,neckA:0.35,neckW:[11,8],head:'lion',hs:1.9,ears:'round',tail:'lion'},
   cat:{L:8,H:11,D:6,legW:1.8,wr:1.6,hk:3.2,stride:3,lift:2,neckL:2.6,neckA:0.8,neckW:[4.2,3.2],head:'cat',hs:0.85,ears:'cat',tail:'cat'} };
-function quadDraw(x,B,kind,o){ const K=QUAD[kind], C=o.col, T=gt, mv=o.mv||0, ph=o.ph||0, graze=o.graze||0, sit=o.sit||0;
+function quadDraw(x,B,kind,o){ if(kind==='bear' && !o.flat2d){ const dir=o.dir!=null?o.dir:(o.fl?6:2), V=VIEW[dirView(dir)], An=V.ang*Math.PI/180, fl=dirMirrored(dir), sa=Math.sin(An), ca=Math.cos(An);   /* bears: the 3D model, turned to the same heading */
+    drawBear3D(x,B,Math.atan2(ca,fl?-sa:sa),o.ph||0,!!o.mv,{col:o.col,rear:o.rear,jaw:o.jaw,swipe:o.swipe,down:o.down,sit:o.sit,lunge:o.lunge,blink:o.blink,seed:o.seed}); return; }
+  const K=QUAD[kind], C=o.col, T=gt, mv=o.mv||0, ph=o.ph||0, graze=o.graze||0, sit=o.sit||0;
   const coat=C.coat, dk=tone(coat,-0.3), dk2=tone(coat,-0.5), lt=tone(coat,0.2), belly=C.belly||tone(coat,0.25), legC=C.legs||coat;
   const L=K.L, H=K.H, D=K.D, top=-H, bot=-H+D, aY=-H+D*0.55, bw=K.bw||D*0.42, lunge=o.lunge||0, lower=o.lower||0;
   // which way it faces: 8 directions like everyone else (old callers only know left and right)
@@ -32809,37 +33019,56 @@ function dropGone(){ try{ if(!player || !player.opts) return; let coin=0, n=0; c
       tack:"Bring Garrow three wolf pelts ("+invCount('pelt')+"/3) and "+formatCoin(SADDLE_COST)+" for the mare's saddle and bridle." }[s]]; }]);
   if(typeof QUEST_AT!=='undefined') QUEST_AT['A Horse of Your Own']='citygate';
 
-  // ── riding ──
-  const openGround=()=>{ const A=AREAS[areaId]; return !!A && !A.inside && !A.cave && A.theme!=='interior' && !/^(uc_|vm_|rc_|varrow(mine|tomb|hall|gate))/.test(areaId); };
-  const canRide=()=>owned() && openGround() && !combat.active && !player.sitChair && !(typeof FISH!=='undefined' && FISH) && !(typeof RIDE!=='undefined' && RIDE) && !(typeof CS!=='undefined' && CS.on);
+  // ── riding: the mare, the pale steed, the bear ──
+  const BEAR_MOUNT_COL={coat:'#54443a',belly:'#43362c',legs:'#2e2620',muzzle:'#8e7c66'};
+  const HAS={ horse:()=>owned(), skel:()=>owned() && CHOICE.paleQ==='done', bear:()=>CHOICE.bearQ==='done' };
+  const MOUNTS=()=>['horse','skel','bear'].filter(k=>HAS[k]());
+  const MOUNT=()=>{ const L=MOUNTS(); return L.includes(CHOICE.mount)?CHOICE.mount:(L[0]||null); };
+  const MNAME=k=>({horse:HNAME(), skel:CHOICE.paleName||'the pale steed', bear:CHOICE.bearName||'your bear'})[k||MOUNT()]||HNAME();
+  const MICON=k=>({horse:'🐎', skel:'💀', bear:'🐻'})[k||MOUNT()]||'🐎';
+  window.mountName=()=>MNAME(); window.mountKind=MOUNT;
+  const outdoors=()=>{ const A=AREAS[areaId]; return !!A && !A.inside && !A.cave && A.theme!=='interior' && !/^(uc_|vm_|rc_|varrow(mine|tomb|hall|gate))/.test(areaId); };
+  const openGround=()=>{ if(outdoors()) return true; const A=AREAS[areaId]; return MOUNT()==='bear' && !!A && !!(A.cave||A.mine);   /* a Varrow bear goes underground as happily as above */ };
+  const anyMount=()=>MOUNTS().length>0;
+  const canRide=()=>anyMount() && openGround() && !combat.active && !player.sitChair && !(typeof FISH!=='undefined' && FISH) && !(typeof RIDE!=='undefined' && RIDE) && !(typeof CS!=='undefined' && CS.on);
   const riding=()=>!!CHOICE.riding && canRide();
-  window.cvRiding=riding; window.cvRideMul=()=>riding()?1.45:1;   // the walking code already asks these
+  const SPEED={horse:1.45, skel:1.5, bear:1.35};
+  window.cvRiding=riding; window.cvRideMul=()=>riding()?(SPEED[MOUNT()]||1.45):1;   // the walking code already asks these
   window.horseRiding=riding;
   const phiOf=d=>(90-d*45)*Math.PI/180;
+  const drawMount=(x,y,phi,ph,mv,tack,headOnly,ridden,kind)=>{ const M=kind||MOUNT()||'horse', G=horseGear();
+    if(M==='bear'){ drawBear3D.gear=tack?G:null; drawBear3D.headOnly=!!headOnly; try{ drawBear3D(x,y,phi,ph,mv,{col:BEAR_MOUNT_COL,S:1.8,tack,harness:tack,seed:21}); } finally{ drawBear3D.gear=null; drawBear3D.headOnly=false; } return drawBear3D.seat; }
+    drawHorse3D.ridden=!!ridden; drawHorse3D.headOnly=!!headOnly; drawHorse3D.gear=tack?G:null; try{ drawHorse3D(x,y,phi,ph,mv,tack,tack,11,M==='skel'?SKEL_COAT:ASH_COAT); } finally{ drawHorse3D.ridden=false; drawHorse3D.headOnly=false; drawHorse3D.gear=null; } return drawHorse3D.seat; };
+  window.drawMount=drawMount;
   { const _w=drawPlayerWading; drawPlayerWading=function(e){ if(!riding()) return _w.apply(this,arguments);
-      const q=P(player.x,player.y), d=player.dir||0, mv=player.path.length>0||player.moving, ph=mv?gt*8:0;
-      drawHorse3D.ridden=true; drawHorse3D.gear=horseGear(); try{ drawHorse3D(q.x,q.y,phiOf(d),ph,mv,true,true,11,ASH_COAT); } finally{ drawHorse3D.ridden=false; drawHorse3D.gear=null; } const st=drawHorse3D.seat||{x:q.x,y:q.y-70}, SY=st.y+CHAIR_SEAT+5;
+      const q=P(player.x,player.y), d=player.dir||0, mv=player.path.length>0||player.moving, ph=mv?gt*(MOUNT()==='bear'?7:8):0;
+      const st=drawMount(q.x,q.y,phiOf(d),ph,mv,true,false,true)||{x:q.x,y:q.y-70}, SY=st.y+CHAIR_SEAT+5;
       SADDLE_SWAY=mv?Math.sin(ph)*2:0; drawLitSprite(st.x,SY,()=>drawSitting(g,st.x,SY,player.opts,d,'saddle'));
-      if(d===0||d===1||d===7){ drawHorse3D.ridden=true; drawHorse3D.headOnly=true; drawHorse3D.gear=horseGear(); try{ drawHorse3D(q.x,q.y,phiOf(d),ph,mv,true,true,11,ASH_COAT); } finally{ drawHorse3D.ridden=false; drawHorse3D.headOnly=false; drawHorse3D.gear=null; } } }; }
-  // she follows you on foot, a few steps behind, wherever there is open ground
+      if(d===0||d===1||d===7) drawMount(q.x,q.y,phiOf(d),ph,mv,true,true,true); }; }
+  // your mount follows on foot, a few steps behind, wherever it can go
   const FH={x:0,y:0,dir:0,mv:false,area:null};
-  { const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{ if(!running || !player.opts || !(owned()||HQ()==='found') || riding() || !openGround()){ FH.area=null; return r; }
+  const follows=()=>anyMount()||HQ()==='found';
+  { const _u=update; update=function(dt){ const r=_u.apply(this,arguments); try{ if(!running || !player.opts || !follows() || riding() || !(anyMount()?openGround():outdoors())){ FH.area=null; return r; }
       const fd=DIR_DELTA[player.dir||0]||[1,1], n=Math.hypot(fd[0],fd[1])||1, tx=player.x-fd[0]/n*2.4+(-fd[1]/n)*-0.4, ty=player.y-fd[1]/n*2.4+(fd[0]/n)*-0.4;
       if(FH.area!==areaId){ FH.area=areaId; FH.x=tx; FH.y=ty; }
       const dx=tx-FH.x, dy=ty-FH.y, dd=Math.hypot(dx,dy); if(dd>8){ FH.x=tx; FH.y=ty; } else if(dd>0.35){ const sp=Math.min(dd*3,6)*dt; FH.x+=dx/dd*sp; FH.y+=dy/dd*sp; FH.dir=dirFromDelta(dx,dy); FH.mv=true; } else FH.mv=false; }catch(e){} return r; }; }
-  { const _pd=pupDrawItems; pupDrawItems=function(items){ _pd(items); try{ if(FH.area===areaId && (owned()||HQ()==='found') && !riding() && openGround()) items.push({d:FH.x+FH.y, ax:FH.x, ay:FH.y, fn:()=>{ const q=P(FH.x,FH.y), t=owned(); drawHorse3D.gear=t?horseGear():null; try{ drawHorse3D(q.x,q.y,phiOf(FH.dir),FH.mv?gt*8:0,FH.mv,t,t,11,ASH_COAT); } finally{ drawHorse3D.gear=null; } }});   /* bare-backed until Garrow tacks her */ }catch(e){} }; }
-  // mount and dismount: R, or the button
+  { const _pd=pupDrawItems; pupDrawItems=function(items){ _pd(items); try{ if(FH.area===areaId && follows() && !riding()) items.push({d:FH.x+FH.y, ax:FH.x, ay:FH.y, fn:()=>{ const q=P(FH.x,FH.y), M=MOUNT(); drawMount(q.x,q.y,phiOf(FH.dir),FH.mv?gt*8:0,FH.mv,!!M,false,false,M||'horse'); }});   /* bare-backed until Garrow tacks her */ }catch(e){} }; }
+  // mount and dismount: R, or the button; with more than one to ride, you choose
   const rideBtn=document.createElement('button'); rideBtn.id='ride-btn'; rideBtn.style.cssText='position:fixed;left:12px;bottom:64px;z-index:40;display:none;padding:6px 12px;border-radius:8px;border:1px solid #8a6a3a;background:rgba(24,16,8,0.92);color:#f0dca0;font:13px Georgia,serif;cursor:pointer';
   document.body.appendChild(rideBtn);
-  const toggleRide=()=>{ if(!owned()) return; if(!CHOICE.riding && !canRide()){ logMsg(HNAME()+' waits outside. You can only ride on open ground.','#c8a860'); return; } CHOICE.riding=!CHOICE.riding;
-    logMsg(CHOICE.riding?'You swing up into '+HNAME()+"'s saddle.":'You climb down. '+HNAME()+' follows on her own.','#c8a860'); };
+  const mountUp=k=>{ CHOICE.mount=k; if(!canRide()){ CHOICE.riding=false; logMsg(MNAME(k)+(k==='bear'?' waits outside. A bear goes anywhere but indoors.':' waits outside. You can only ride on open ground.'),'#c8a860'); return; } CHOICE.riding=true;
+    logMsg({horse:'You swing up into '+MNAME(k)+"'s saddle.", skel:'You climb onto '+MNAME(k)+'. The bones are cold through the saddle, and steady as stone.', bear:'You haul yourself up onto '+MNAME(k)+"'s back. The bear grunts, and goes."}[k],'#c8a860'); };
+  const toggleRide=()=>{ if(!anyMount()) return;
+    if(CHOICE.riding){ CHOICE.riding=false; logMsg('You climb down. '+MNAME()+' follows on '+(MOUNT()==='horse'?'her':'its')+' own.','#c8a860'); return; }
+    const L=MOUNTS(); if(L.length<2){ mountUp(L[0]); return; }
+    say('Ride',["<i>Which will you ride?</i>"],[...L.map(k=>({label:MICON(k)+' '+MNAME(k)+(k===MOUNT()?' <small>(last ridden)</small>':''), fn:()=>{ closeDialog(); mountUp(k); }})),{label:'Not now.',fn:closeDialog}],true); };
   rideBtn.addEventListener('click',e=>{ e.stopPropagation(); rideBtn.blur(); toggleRide(); });
-  window.addEventListener('keydown',e=>{ if(e.target && e.target.tagName==='INPUT') return; if((e.key==='r'||e.key==='R') && owned() && !dlgIsOpen()){ e.preventDefault(); toggleRide(); } });
-  setInterval(()=>{ try{ const show=owned() && !!player.opts && canRide() && !dlgIsOpen(); rideBtn.style.display=show?'block':'none'; if(show) rideBtn.textContent=CHOICE.riding?'🐎 Dismount (R)':'🐎 '+HNAME()+' (R)'; }catch(e){} },300);
+  window.addEventListener('keydown',e=>{ if(e.target && e.target.tagName==='INPUT') return; if((e.key==='r'||e.key==='R') && anyMount() && !dlgIsOpen()){ e.preventDefault(); toggleRide(); } });
+  setInterval(()=>{ try{ const show=anyMount() && !!player.opts && canRide() && !dlgIsOpen(); rideBtn.style.display=show?'block':'none'; if(show) rideBtn.textContent=CHOICE.riding?MICON()+' Dismount (R)':(MOUNTS().length>1?'🐾 Ride (R)':MICON()+' '+MNAME()+' (R)'); }catch(e){} },300);
 }
 
 // ════════ the horse's tack: saddlebags (more room in your pack, everywhere), a bedroll to camp on open ground, blankets and leather to suit ════════
-function bagSlots(){ return CHOICE.horseQ!=='done' ? 0 : CHOICE.horseBags===2 ? 12 : CHOICE.horseBags===1 ? 6 : 0; }
+function bagSlots(){ return CHOICE.horseQ!=='done' && CHOICE.bearQ!=='done' ? 0 : CHOICE.horseBags===2 ? 12 : CHOICE.horseBags===1 ? 6 : 0; }
 function applyBagSize(){ const want=30+bagSlots(); if(!player || !player.inv || INV_SIZE>=want) return; INV_SIZE=want; INV_RAW=true; try{ while(player.inv.length<INV_SIZE) player.inv.push(null); } finally{ INV_RAW=false; }
   if(typeof invBuilt!=='undefined' && invBuilt){ const n=invGrid.querySelectorAll('.slot').length; for(let i=n;i<INV_SIZE;i++) invGrid.appendChild(makeSlot('inv',i)); if(invOverlay.classList.contains('open')) refreshInventory(); } markBagSlots(); }
 function markBagSlots(){ try{ invGrid.querySelectorAll('.slot').forEach(el=>{ const k=+el.dataset.key; el.classList.toggle('bagslot', k>=30); if(k>=30) el.title=k<36?'Saddlebags':'The big saddlebags'; }); }catch(e){} }
@@ -32847,8 +33076,9 @@ function markBagSlots(){ try{ invGrid.querySelectorAll('.slot').forEach(el=>{ co
 setInterval(()=>{ try{ if(typeof running!=='undefined' && running) applyBagSize(); }catch(e){} },400);
 const HORSE_BLANKETS={ red:['Madder red','#7a2a22'], blue:['Woad blue','#2e4a7a'], green:['Forest green','#3a5a32'], black:['Black and gold','#1e1a18'], plain:['Undyed wool','#b8a888'], plum:['Bilberry','#4e2a48'] };
 const HORSE_LEATHERS={ brown:['Saddle brown','#5a3a1e'], black:['Black','#26201c'], oxblood:['Oxblood','#5a1e1a'], tan:['Pale tan','#8a6a42'] };
-function horseGear(){ return { bags:CHOICE.horseBags||0, roll:!!CHOICE.horseRoll, blanket:(HORSE_BLANKETS[CHOICE.horseBlanket]||HORSE_BLANKETS.red)[1], leather:(HORSE_LEATHERS[CHOICE.horseLeather]||HORSE_LEATHERS.brown)[1] }; }
-function horseShop(){ const G='Garrow the Horse-Dealer', nm=CHOICE.horseName||'Ash', o=[], back=()=>horseShop(), pay=(c,fn)=>{ player.purse-=c; updateHud(); fn(); autosaveSoon(200); };
+const HORSE_BARDING={ arcane:['Magister blue',{col:'#26346a',trim:'#d8bc68',star:'#dce6ff'}], amethyst:['Amethyst',{col:'#45265e',trim:'#d8bc68',star:'#f0dcff'}], night:['Starless night',{col:'#1a1a22',trim:'#c8ccd8',star:'#9ab8ff'}], ember:['Ember',{col:'#6a2216',trim:'#e0b050',star:'#ffd08a'}] };
+function horseGear(){ return { barding:CHOICE.horseBarding&&HORSE_BARDING[CHOICE.horseBarding]?HORSE_BARDING[CHOICE.horseBarding][1]:null, bags:CHOICE.horseBags||0, roll:!!CHOICE.horseRoll, blanket:(HORSE_BLANKETS[CHOICE.horseBlanket]||HORSE_BLANKETS.red)[1], leather:(HORSE_LEATHERS[CHOICE.horseLeather]||HORSE_LEATHERS.brown)[1] }; }
+function horseShop(){ const G='Garrow the Horse-Dealer', nm=(window.mountName&&mountName())||CHOICE.horseName||'Ash', o=[], back=()=>horseShop(), pay=(c,fn)=>{ player.purse-=c; updateHud(); fn(); autosaveSoon(200); };
   if(!CHOICE.horseBags) o.push({label:'Leather saddlebags. (+6 pack spaces)', note:'-'+formatCoin(200), off:player.purse<200, fn:()=>pay(200,()=>{ CHOICE.horseBags=1; applyBagSize(); logMsg('Saddlebags on '+nm+': six more spaces in your pack.','#e8d8a8');
       say(G,"“Two good bags, oiled, buckled. Don't fill them with rocks, she'll know.”",[{label:'Back.',fn:back},bye]); })});
   else if(CHOICE.horseBags===1){ const fur=invCount('bear_fur'), ok=player.purse>=450 && fur>=2;
@@ -32856,6 +33086,10 @@ function horseShop(){ const G='Garrow the Horse-Dealer', nm=CHOICE.horseName||'A
       logMsg('The big saddlebags on '+nm+': twelve more spaces in your pack in all.','#e8d8a8'); say(G,"“Bearskin-lined, double-stitched. A drover's bags. She'll carry half a market and never notice.”",[{label:'Back.',fn:back},bye]); })}); }
   if(!CHOICE.horseRoll) o.push({label:'A bedroll and tinderbox, strapped behind the saddle. (camp once a day)', note:'-'+formatCoin(120), off:player.purse<120, fn:()=>pay(120,()=>{ CHOICE.horseRoll=true; logMsg('A bedroll behind '+nm+'\'s saddle: make camp on open ground, once a day.','#e8d8a8');
       say(G,"“Wool, oilcloth, flint and steel. You'll sleep under the sky like a drover. Mind the dew.”",[{label:'Back.',fn:back},bye]); })});
+  if(!CHOICE.horseBardOwned) o.push({label:'The magister’s caparison: star-sewn barding, a silver chanfron, a crystal on the brow. (looks only)', note:'-'+formatCoin(600), off:player.purse<600, fn:()=>pay(600,()=>{ CHOICE.horseBardOwned=true; CHOICE.horseBarding='arcane';
+      logMsg(nm+' wears the magister’s caparison.','#c8d8ff'); say(G,["<i>He drags a chest out from under the hay and lifts out a fold of deep blue cloth, sewn all over with silver stars.</i>","“A magister from the College ordered this. Paid half, never came back for it. Exploded, I heard.” <i>He shrugs.</i> “Nobody else is fool enough to dress a horse like a wizard. It's yours.”"],[{label:'Back.',fn:back},bye]); })});
+  else o.push({label:'Change the caparison.', fn:()=>say(G,"“I've the same cut in other cloth. Forty copper to swap, or take it off and use the plain blanket.”",[...Object.entries(HORSE_BARDING).map(([k,[n2]])=>({label:n2+(CHOICE.horseBarding===k?' <small>(now)</small>':''), off:player.purse<40||CHOICE.horseBarding===k, note:'-'+formatCoin(40), fn:()=>pay(40,()=>{ CHOICE.horseBarding=k; logMsg(nm+' wears the '+n2.toLowerCase()+' caparison now.','#c8d8ff'); horseShop(); })})),
+      {label:'No caparison, just the blanket.'+(!CHOICE.horseBarding?' <small>(now)</small>':''), off:!CHOICE.horseBarding, fn:()=>{ CHOICE.horseBarding=null; autosaveSoon(200); horseShop(); }},{label:'Back.',fn:back}],true)});
   o.push({label:'Change her saddle blanket.', fn:()=>say(G,"“Dyed wool. Forty copper, and I'll throw the old one in the wash.”",[...Object.entries(HORSE_BLANKETS).map(([k,[n2]])=>({label:n2+((CHOICE.horseBlanket||'red')===k?' <small>(now)</small>':''), off:player.purse<40||(CHOICE.horseBlanket||'red')===k, note:'-'+formatCoin(40), fn:()=>pay(40,()=>{ CHOICE.horseBlanket=k; logMsg(nm+' wears a '+n2.toLowerCase()+' blanket now.','#e8d8a8'); horseShop(); })})),{label:'Back.',fn:back}],true)});
   o.push({label:'Change the leather of her tack.', fn:()=>say(G,"“Saddle, bridle, bags: all of it re-dyed. Thirty copper.”",[...Object.entries(HORSE_LEATHERS).map(([k,[n2]])=>({label:n2+((CHOICE.horseLeather||'brown')===k?' <small>(now)</small>':''), off:player.purse<30||(CHOICE.horseLeather||'brown')===k, note:'-'+formatCoin(30), fn:()=>pay(30,()=>{ CHOICE.horseLeather=k; logMsg(nm+'\'s tack is '+n2.toLowerCase()+' now.','#e8d8a8'); horseShop(); })})),{label:'Back.',fn:back}],true)});
   say(G,["<i>He looks "+nm+" over and pats the saddle.</i> “Everything a horse carries, I make. What'll it be?”"],[...o,{label:'Back.',fn:()=>TALKERS.garrow()},bye],true); }
@@ -32871,6 +33105,117 @@ function horseShop(){ const G='Garrow the Horse-Dealer', nm=CHOICE.horseName||'A
   const btn=document.createElement('button'); btn.id='camp-btn'; btn.style.cssText='position:fixed;left:12px;bottom:100px;z-index:40;display:none;padding:6px 12px;border-radius:8px;border:1px solid #8a6a3a;background:rgba(24,16,8,0.92);color:#f0dca0;font:13px Georgia,serif;cursor:pointer';
   btn.textContent='⛺ Make camp'; document.body.appendChild(btn); btn.addEventListener('click',e=>{ e.stopPropagation(); btn.blur(); camp(); });
   setInterval(()=>{ try{ const show=!!player.opts && canCamp() && !dlgIsOpen(); btn.style.display=show?'block':'none'; if(show){ const used=CHOICE.campDay===today(); btn.style.opacity=used?0.55:1; btn.title=used?'You have camped today already':'Rest here until morning, midday or evening'; } }catch(e){} },400); }
+
+// ════════ THE BEAR-RITE OF VARROWDEEP: the Bear Pens off the Great Hall, Hjalma Bearward, a lost cub in the Lowest Gallery, five days of feeding, the matriarch's test ════════
+{ const HJ='Hjalma Bearward', BQ=()=>CHOICE.bearQ||null, today=()=>Math.floor(dayClock/DAY_LEN);
+  const FOOD=['fish','trout','perch','carp','eel','meat','raw_meat'], food=()=>FOOD.reduce((a,id)=>a+invCount(id),0);
+  const eat=n=>{ for(let k=0;k<n;k++){ const id=FOOD.find(f=>invCount(f)>0); if(!id) return; const j=player.inv.indexOf(id); if(j>=0) player.inv[j]=null; } updateHud(); };
+  const take=(id,n)=>{ for(let k=0;k<n;k++){ const j=player.inv.indexOf(id); if(j>=0) player.inv[j]=null; } updateHud(); };
+  const CAVE_COL={coat:'#54443a',belly:'#43362c',legs:'#2e2620',muzzle:'#8e7c66'}, CUB_COL={coat:'#6a5848',belly:'#55463a',legs:'#3a3028',muzzle:'#a8967e'}, OLD_COL={coat:'#5e5650',belly:'#4a4440',legs:'#34302c',muzzle:'#9a9086'};
+  const FED=()=>CHOICE.cubFed||0, SADDLE=450;
+  AREAS.varrowpens=VCAVE('Varrowdeep · The Bear Pens',14,12, ()=>[ {type:'teleporter', i:13, j:6, to:'varrowhall', entry:'fromPens'},
+      {type:'pen', part:'back', i:1, j:1, fp:[5,4], noblock:true, dz:9.6}, {type:'pen', part:'front', i:1, j:1, fp:[5,4], noblock:true, dz:12.8},
+      {type:'pen', part:'back', i:1, j:7, fp:[5,4], noblock:true, dz:9.6}, {type:'pen', part:'front', i:1, j:7, fp:[5,4], noblock:true, dz:12.8},
+      ...(BQ()==='trial' ? [] : [{type:'cavebear', i:2, j:2, phi:0.5, seed:1, old:true}]), {type:'cavebear', i:4, j:3, phi:2.4, seed:2},
+      {type:'bearnest', i:3, j:9, noblock:true}, ...(['raise','grown','trial','saddle'].includes(BQ()) ? [{type:'bearcub', i:3, j:9}] : []),
+      {type:'trough', i:7, j:3}, {type:'sacks', i:8, j:1}, {type:'barrel', i:11, j:1}, {type:'barrel', i:12, j:1}, {type:'stooks', i:8, j:10}, {type:'crates', i:12, j:10},
+      {type:'brazier', i:7, j:9}, {type:'brazier', i:11, j:4}, {type:'chainlamp', i:6, j:6, noblock:true}, {type:'chainlamp', i:10, j:8, noblock:true},
+      {type:'rune', i:0, j:6, text:"Bears carved into the rock, walking in a line nose to tail, each with a little dwarf on its back. The last one in the line is a cub, with no rider at all. Somebody has rubbed it smooth with their thumb."} ],
+    ()=>[{ id:'hjalma', name:HJ, i:8, j:6, dir:1, opts:DWARFO({gender:'f', skin:1, hair:6, hairColor:3, face:3, equip:{torso:'tunic_deep', armor:'dwarf_harness', hands:'gloves', legs:'trousers', feet:'hobnail_boots'}}) }],
+    { mobs:()=> BQ()==='trial' ? [ { name:'Grymhild the Matriarch', type:'bear', i:3, j:5, faction:'grymhild', hpMul:3.4, opts:BEAR('brumm_paw') } ] : [], entries:{ fromHall:{i:12,j:6} } });
+  AREA_TIER.varrowpens=5; AREA_PATHS.varrowpens=[]; AREAS.varrowpens.layer=-2;
+  wrap('varrowhall','objects',l=>[...l,{type:'teleporter', i:0, j:9, to:'varrowpens', entry:'fromHall'}]); AREAS.varrowhall.entries.fromPens={i:1,j:9};
+  if(typeof REGIONS!=='undefined'){ for(const R in REGIONS) if(REGIONS[R].includes('varrowhall')){ REGIONS[R].push('varrowpens'); REGION_OF.varrowpens=R; } }
+  OBJ_DRAW.cavebear=o=>{ const q=P(o.i+0.5,o.j+0.5), sl=Math.sin(gt*0.3+o.seed*2)>0.55; drawBear3D(q.x,q.y,o.phi+Math.sin(gt*0.2+o.seed)*0.25,0,false,{col:o.old?OLD_COL:CAVE_COL,S:o.old?1.75:1.5,down:sl?1:0,blink:sl,seed:o.seed}); };
+  NEAR_NAME.cavebear='A Varrow cave bear';
+  onUse(['cavebear'],o=>say('A Varrow cave bear',[o.old?"<i>An old she-bear, grey about the muzzle, as big as a hay-cart. She opens one small eye, looks at you for a long time, and shuts it again. You have been weighed.</i>":"<i>A great dark bear in a harness of riveted leather. It sniffs at your hand, finds nothing in it, and snorts its contempt.</i>"],[bye]));
+  OBJ_DRAW.bearnest=o=>{ const q=P(o.i+0.5,o.j+0.5); g.save(); g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(q.x,q.y+2,30,13,0,0,Math.PI*2); g.fill();
+    for(let k=0;k<26;k++){ const a=k*2.4, r=10+(k%5)*3.6, x=q.x+Math.cos(a)*r, y=q.y+Math.sin(a)*r*0.42; g.strokeStyle=k%3?'#a88a4a':'#c8aa62'; g.lineWidth=1.6; g.beginPath(); g.moveTo(x-5,y); g.quadraticCurveTo(x,y-2.5,x+5,y+0.5); g.stroke(); }
+    g.fillStyle='#6a4a2e'; g.beginPath(); g.ellipse(q.x,q.y,15,6,0,0,Math.PI*2); g.fill(); g.restore(); };
+  NEAR_NAME.bearnest='A nest of straw and bearskin';
+  OBJ_DRAW.bearcub=o=>{ const q=P(o.i+0.5,o.j+0.5), f=Math.min(5,FED()), sl=Math.sin(gt*0.35)>0.4; drawBear3D(q.x,q.y,0.9+Math.sin(gt*0.25)*0.6,0,false,{col:CUB_COL,S:0.72+f*0.12,down:sl?1:0,blink:sl,seed:5}); };
+  NEAR_NAME.bearcub='The cub';
+  onUse(['bearcub'],o=>{ const s=BQ(), f=FED();
+    if(s!=='raise'){ say('The cub',["<i>"+(f>=5?"Not much of a cub any more. It comes and leans its whole weight against your legs, which nearly knocks you over.":"It is asleep, paws twitching.")+"</i>"],[bye]); return; }
+    if(CHOICE.cubDay===today()){ say('The cub',["<i>It is curled up full and sleepy. It has eaten today. Hjalma says once a day, or it grows fat and stupid.</i> ("+f+"/5 days)"],[bye]); return; }
+    if(food()<1){ say('The cub',["<i>It snuffles at your empty hands and complains, loudly. Fish or meat: it is not fussy.</i> ("+f+"/5 days)"],[bye]); return; }
+    const lines=["It takes the food from your hand and drops it, and picks it up, and eats it in the straw with its back to you. But afterwards it comes and sniffs your boots.","It hears you coming before you are through the door and is at the rail, bawling. It eats from your hand and licks your fingers clean.","It eats, and then it climbs into your lap, all of it, and goes to sleep there. Hjalma laughs at you, and does not help.","It meets you at the gate and walks beside you, matching your steps. Hjalma watches with her arms folded and says nothing, which from her is a great deal.","It is too big for your lap now. It eats, and puts its heavy head on your knee instead, and hums. Hjalma says that is the sound they make for their mothers."];
+    eat(1); CHOICE.cubFed=f+1; CHOICE.cubDay=today(); if(CHOICE.cubFed>=5) CHOICE.bearQ='grown'; autosaveSoon(200);
+    say('The cub',["<i>"+lines[Math.min(4,f)]+"</i>",CHOICE.cubFed>=5?"<i>Five days. It has taken your scent for its own. Go and tell Hjalma.</i>":"<i>Come back tomorrow. ("+CHOICE.cubFed+"/5 days)</i>"],[bye]); });
+  // the lost cub, and what killed its mother: a troll in the Lowest Gallery
+  wrap('vm_low','mobs',l=> BQ()==='cub' && !CHOICE.gnawerDead ? [...l.filter(m=>m.type!=='troll'), { name:'Bone-Gnawer', type:'troll', i:4, j:9, faction:'gnawer', hpMul:2.8, opts:TROLL() }] : l);
+  wrap('vm_low','objects',l=> BQ()==='cub' ? [...l, {type:'lostcub', i:6, j:10}, {type:'bones', i:5, j:11, noblock:true}] : l);
+  OBJ_DRAW.lostcub=o=>{ const q=P(o.i+0.5,o.j+0.5); drawBear3D(q.x,q.y,2.4,0,false,{col:CUB_COL,S:0.7,down:CHOICE.gnawerDead?0:1,seed:6}); };
+  NEAR_NAME.lostcub='A bear cub, hiding';
+  onUse(['lostcub'],()=>{ if(!CHOICE.gnawerDead){ say('A bear cub',["<i>It is pressed into a crack in the rock behind the boulders, as small as it can make itself, and will not come out. Whatever it is hiding from is still close. You can smell it.</i>"],[bye]); return; }
+    if(food()<2){ say('A bear cub',["<i>It watches you from the crack, shivering. It is starving, and it is not stupid: it wants to see food before it trusts a hand. Two bits of fish or meat.</i> ("+food()+"/2)"],[bye]); return; }
+    say('A bear cub',["<i>You lay the food down and back away and sit. It comes out the way a cat comes out, a bit at a time, and eats, and eats the second, and then sits down in front of you and looks at you.</i>","<i>When you pick it up it does not fight. It is heavier than it looks and smells terrible, and it holds onto your coat with all four paws.</i>"],
+      [{label:'Carry it up to Hjalma.', fn:()=>{ eat(2); closeDialog(); CHOICE.bearQ='raise'; CHOICE.cubFed=0; CHOICE.cubDay=null; remember('bearQ','raise',"You found the lost cub. Hjalma has made it a nest in the Bear Pens: feed it fish or meat once a day, for five days."); banner('The cub is yours to raise','#d8c8a8',2400); }}]); });
+  { const _v=victory; victory=function(faction){ const r=_v.apply(this,arguments);
+      if(faction==='gnawer' && !CHOICE.gnawerDead){ CHOICE.gnawerDead=true; logMsg('The Bone-Gnawer falls. Somewhere behind the boulders, something small whimpers.','#d8c8a8'); }
+      if(faction==='grymhild' && BQ()==='trial'){ CHOICE.bearQ='saddle'; logMsg('Grymhild sits back on her haunches and huffs, and does not come on again. She has had her answer.','#d8c8a8'); banner('The matriarch yields','#e8d8a8',2600); }
+      return r; }; }
+  TALKERS.hjalma=()=>{ const s=BQ(), o=[], back=()=>TALKERS.hjalma(), lv=typeof playerLevel==='function'?playerLevel():99;
+    if(!s) o.push({label:'“Do dwarves ride these?”', fn:()=>say(HJ,["“Ride them? We are carried by them. There's a difference, and the bears know it even if you don't.”",
+        "“No one from up top has sat a Varrow bear in three hundred years. They don't take to surface folk. Too much sky on you.”",lv<12?"<i>She looks you up and down.</i> “And you're soft yet. Come back when you've some scars worth showing a bear.” (Lv 12)":"<i>She looks at you longer than you'd like.</i> “Hm. Maybe. A bear chooses its rider young, as a cub. Before I put a cub near you I want to know you understand bears. Have you faced one? Truly faced one?”"],
+        lv<12?[{label:'Back.',fn:back},bye]:[{label:'“Tell me what you need.”', fn:()=>{ CHOICE.bearQ='nest'; remember('bearQ','nest',"Hjalma Bearward in Varrowdeep's Bear Pens will put a cub near you if you prove you know bears: kill Old Brumm, the great bear of the Wolfwood, and bring four bear furs for a nest."); say(HJ,["“Old Brumm. The big brown up past the Wolfwood. Every bear in the valley knows his smell. Kill him and they'll know yours.”","“And four bearskins, for a nest. A cub sleeps on the furs of its kin or it does not sleep.”"],[bye]); }},{label:'Back.',fn:back},bye])});
+    if(s==='nest'){ const fur=invCount('bear_fur'), ok=CHOICE.bear==='dead' && fur>=4;
+      o.push({label:ok?'Lay four bear furs in her arms.':'“About the nest…”'+(fur<4?' ('+fur+'/4 bear furs)':'')+(CHOICE.bear!=='dead'?' (Old Brumm lives)':''), fn:()=>{ if(!ok){ say(HJ,"“Old Brumm dead, and four furs. Not three. Not a promise.”",[{label:'Back.',fn:back},bye]); return; }
+        take('bear_fur',4); CHOICE.bearQ='cub'; remember('bearQ','cub',"Hjalma's nest is ready, but the pens have no cub. One she-bear died in the Lowest Gallery; her cub was never found. Find it, past whatever killed its mother, and bring food to coax it out.");
+        say(HJ,["<i>She lays the furs in a hollow of straw and tramps them down, and smells your hands, and grunts.</i> “Brumm. Yes. Good.”","“Now the hard part. Two months back a she-bear of ours went down into the Lowest Gallery after the beetles and didn't come up. The halls went quiet after that and no one went to look. Her cub was with her.”",
+          "“Something down there killed a full-grown Varrow bear. Whatever it is, it's still there, and the cub, if it's alive, is hiding from it. Kill the thing, coax the cub out (it'll be starving: take fish, or meat), and bring it home.”","“You'll need Halvard's key for the lowest gallery. If he hasn't given it you, you haven't earned the deep yet.”"],[bye]); }}); }
+    if(s==='cub') o.push({label:'“About the cub…”', fn:()=>say(HJ,CHOICE.gnawerDead?"“It's dead, the thing? Then the cub will be close by, in some crack. Food, and patience. Two pieces.”":"“The Lowest Gallery, past the flooded stope. Kill what's down there first. A cub won't come out while it can still smell it.”",[{label:'Back.',fn:back},bye])});
+    if(s==='raise') o.push({label:'“How is the cub?”', fn:()=>say(HJ,"“Feed it. Once a day, fish or meat, from your own hand. Five days. It has to learn your smell is the smell of food and safety, and that takes as long as it takes.” ("+FED()+"/5)",[{label:'Back.',fn:back},bye])});
+    if(s==='grown') o.push({label:'“Five days. It knows me.”', fn:()=>say(HJ,["<i>She watches the cub follow you to the rail and lean on you, and nods slowly.</i> “It does. The cub's chosen. Now the pens must agree.”","“Grymhild. The old grey she-bear. Every bear here is her get, or her get's get. She'll test you. Not to the death, if you're lucky. If you're not, I'll tell your people you were brave.”","“Come back when you're ready, and stand in the pens, and don't run.”"],
+        [{label:'“I’m ready now.”', fn:()=>{ CHOICE.bearQ='trial'; remember('bearQ','trial',"Grymhild, the old matriarch of the Bear Pens, must accept you. Stand in the pens and face her. Don't run."); closeDialog(); if(areaId==='varrowpens') switchArea('varrowpens','fromHall'); }},{label:'“Not yet.”',fn:closeDialog}])});
+    if(s==='trial') o.push({label:'“Grymhild…”', fn:()=>say(HJ,"“She's waiting. In the pens. Don't keep her.”",[{label:'Back.',fn:back},bye])});
+    if(s==='saddle'){ const fur=invCount('bear_fur'), ok=fur>=3 && player.purse>=SADDLE;
+      o.push({label:'“She yielded. What now?”'+(ok?'':' ('+fur+'/3 bear furs, '+formatCoin(SADDLE)+')'), note:'-'+formatCoin(SADDLE), off:!ok, fn:()=>{ take('bear_fur',3); player.purse-=SADDLE; updateHud();
+        say(HJ,["<i>Hjalma has the saddle ready before you are up the steps: broad and flat, built for a back the width of a table, the girth as long as you are tall. She buckles it on herself.</i>","“There. Grown in a season: they do, if they're fed right. It'll carry you in the deep and out of it, though never through a door: they hate doors. What'll you call it?”"],
+          ['Brakka','Mossback','Ursk','Grum'].map(nm=>({label:'“'+nm+'.”', fn:()=>{ CHOICE.bearName=nm; CHOICE.bearQ='done'; CHOICE.mount='bear'; CHOICE.riding=false; remember('bearQ','done',"Your Varrow bear, "+nm+", is saddled. Press R to ride, above ground or below it (never indoors). With more than one mount, R lets you choose.");
+            banner(nm+' is yours','#e8d8a8',2600); say(HJ,"“"+nm+". A good name. A bear name.” <i>She slaps its shoulder and it doesn't notice.</i> “First surface rider in three hundred years. Don't make me sorry.”",[bye]); }}))); }}); }
+    if(s==='done') o.push({label:'“Can I get tack for '+(CHOICE.bearName||'my bear')+'?”', fn:()=>say(HJ,"“Bags and blankets? The horse-dealer in Hollowmere, Garrow, cuts for any beast. He's done work for us. It all fits.”",[{label:'Back.',fn:back},bye])});
+    say(HJ,[!s?"<i>A broad dwarf woman with a scarred forearm and a bucket of fish heads.</i> “Mind the bears. They mind you.”":"“Well?”"],[...o,bye]); };
+  { const _h=npcHasNews; npcHasNews=function(n){ if(n && n.id==='hjalma'){ const s=BQ(); if(!s) return (typeof playerLevel!=='function'||playerLevel()>=12)?'!':null; if(s==='nest') return CHOICE.bear==='dead'&&invCount('bear_fur')>=4?'?':null; if(s==='grown') return '?'; if(s==='saddle') return invCount('bear_fur')>=3&&player.purse>=SADDLE?'?':null; return null; } return _h.apply(this,arguments); }; }
+  JOURNAL.push(['The Bear-Rite', ()=>{ const s=BQ(); if(!s) return null; if(s==='done') return ['done',"Hjalma Bearward raised you a Varrow bear, "+(CHOICE.bearName||'')+". Press R to ride: in the deep, too."];
+    return ['active',{ nest:"Prove you know bears to Hjalma in Varrowdeep's Bear Pens: kill Old Brumm"+(CHOICE.bear==='dead'?' (done)':'')+" and bring four bear furs ("+invCount('bear_fur')+"/4).",
+      cub:CHOICE.gnawerDead?"The thing in the Lowest Gallery is dead. Find the cub hiding nearby and coax it out with two pieces of fish or meat ("+food()+"/2).":"A cub was lost in Varrowdeep's Lowest Gallery when something killed its mother. Kill what lurks there and find the cub. (You need Foreman Halvard's key.)",
+      raise:"Feed the cub in the Bear Pens once a day, fish or meat, for five days ("+FED()+"/5)."+(CHOICE.cubDay===today()?' Fed today.':''), grown:"The cub knows you. Tell Hjalma.",
+      trial:"Face Grymhild, the old matriarch, in the Bear Pens. Don't run.", saddle:"Grymhild yielded. Bring Hjalma three bear furs ("+invCount('bear_fur')+"/3) and "+formatCoin(SADDLE)+" for the saddle." }[s]]; }]);
+  if(typeof QUEST_AT!=='undefined') QUEST_AT['The Bear-Rite']='varrowhall';
+}
+
+// ════════ THE PALE STEED: for those who speak to the dead. A drowned war-horse in the fen, and Vesna's rite at night ════════
+{ const V='Vesna the Grave-Speaker', PQ=()=>CHOICE.paleQ||null;
+  const eligible=()=>CHOICE.horseQ==='done' && (CHOICE.cls==='necro' || NECRO()>=1);
+  wrap('fen','objects',l=> PQ()==='seek' ? [...l,{type:'drownedsteed', i:10, j:11, noblock:true}] : l);
+  OBJ_DRAW.drownedsteed=o=>{ const q=P(o.i+0.5,o.j+0.5), n=nightAmt(); g.save();
+    g.fillStyle='rgba(30,36,22,0.85)'; g.beginPath(); g.ellipse(q.x,q.y,40,15,0,0,Math.PI*2); g.fill(); g.fillStyle='rgba(60,70,44,0.6)'; g.beginPath(); g.ellipse(q.x-4,q.y-2,30,9,0,0,Math.PI*2); g.fill();
+    g.strokeStyle='#cfc6a8'; g.lineCap='round'; g.lineWidth=2.2; for(let k=0;k<6;k++){ const x=q.x-16+k*6.5; g.beginPath(); g.moveTo(x,q.y+2); g.quadraticCurveTo(x-1,q.y-12,x+5,q.y-15); g.stroke(); }   /* ribs out of the mud */
+    g.lineWidth=2.6; g.beginPath(); g.moveTo(q.x-20,q.y-13); g.lineTo(q.x+20,q.y-15); g.stroke();
+    g.fillStyle='#d8ceb2'; g.beginPath(); g.moveTo(q.x+22,q.y-12); g.quadraticCurveTo(q.x+30,q.y-20,q.x+40,q.y-10); g.quadraticCurveTo(q.x+32,q.y-6,q.x+22,q.y-8); g.closePath(); g.fill(); g.strokeStyle='#5a5240'; g.lineWidth=1; g.stroke();   /* the long skull */
+    g.fillStyle='#120c10'; g.beginPath(); g.arc(q.x+27,q.y-13,2,0,Math.PI*2); g.fill();
+    if(n>0.5){ g.globalCompositeOperation='lighter'; const rg=g.createRadialGradient(q.x+27,q.y-13,0,q.x+27,q.y-13,10); rg.addColorStop(0,'rgba(140,255,200,'+(0.5*n)+')'); rg.addColorStop(1,'rgba(140,255,200,0)'); g.fillStyle=rg; g.fillRect(q.x+15,q.y-25,24,24); }
+    g.restore(); };
+  NEAR_NAME.drownedsteed='Bones in the mud';
+  onUse(['drownedsteed'],()=>{ if(nightAmt()<0.5){ say('Bones in the mud',["<i>A horse, or what the fen has left of one: a great war-horse by the size of it, sunk to the ribs. The bones are cold and quiet. Vesna said: at night.</i>"],[bye]); return; }
+    say('Bones in the mud',["<i>In the dark the skull's eye-hole is not empty. Something green and patient looks out of it, at you, and at the living horse behind you.</i>","<i>When you put your hands into the mud the bones come up easily, as if they have been waiting to be asked. Every one. You wrap them in your cloak.</i>"],
+      [{label:'Take them to Vesna.', fn:()=>{ closeDialog(); CHOICE.paleQ='bones'; remember('paleQ','bones',"You lifted the drowned war-horse's bones out of the Drowning Fen. Take them to Vesna, after dark."); banner('The bones are yours','#b8f0d0',2200); }}]); });
+  { const oV=TALKERS.vesna; TALKERS.vesna=function(){ const s=PQ(), other={label:'Something else.', fn:()=>oV()};
+      if(!eligible() || s==='done') return oV();
+      if(!s){ say(V,["<i>She is looking past you, at "+(CHOICE.horseName||'your horse')+".</i> “Pretty thing. She will die, you know. In ten years, or twenty, or in a ditch next week. The living always do.”","“There is a horse in the fen that already has. A war-horse, drowned under a knight two hundred years ago. The knight went to the crows. The horse is still down there, waiting for someone to tell it what to do next.”","“Bring me its bones. At night: by day it is only mud and sticks.”"],
+          [{label:'“I will bring them.”', fn:()=>{ CHOICE.paleQ='seek'; remember('paleQ','seek',"Vesna wants the bones of a drowned war-horse from the Drowning Fen, west of the Sunken Hollow, among the old marsh pools. Go at night."); closeDialog(); }}, other, bye]); return; }
+      if(s==='seek'){ say(V,"“The old marsh, west of the Hollow, among the pools. At night it will be easy to find. It will be looking for you.”",[other,bye]); return; }
+      if(s==='bones'){ if(nightAmt()<0.5){ say(V,"“Not in daylight. Come back when the fen is dark.”",[other,bye]); return; }
+        say(V,["<i>She lays the bones out on the wet ground in the shape of a horse, quickly, without looking, as if she has done it before. Then she cuts her thumb and draws a line down the long skull, and speaks to it, very low, and not in any language you know.</i>","<i>The bones stand up.</i>","<i>They stand up and shake themselves like a horse coming out of a river, and green fire runs along the neck where a mane should be. It turns its empty face to you. Your own horse does not even shy.</i>",
+          "“There. It is bound to you, not to me. It will carry your saddle when you want it to, and go back to the dark when you don't, and it will never die again, which is more than I can promise you.” <i>She sucks her thumb.</i> “Name it. The dead like names.”"],
+          ['Marrow','Gloam','Rattle','Hollow'].map(nm=>({label:'“'+nm+'.”', fn:()=>{ CHOICE.paleName=nm; CHOICE.paleQ='done'; CHOICE.mount='skel'; remember('paleQ','done',"Vesna bound a drowned war-horse to you: "+nm+", the pale steed. Press R to ride; with more than one mount, you choose."); banner(nm+' rises','#b8f0d0',2600); closeDialog(); }})), true); return; }
+      return oV(); }; }
+  { const _h=npcHasNews; npcHasNews=function(n){ if(n && n.id==='vesna' && !n._lesson && eligible()){ const s=PQ(); if(!s) return '!'; if(s==='bones') return '?'; } return _h.apply(this,arguments); }; }
+  JOURNAL.push(['The Pale Steed', ()=>{ const s=PQ(); if(!s) return null; if(s==='done') return ['done',"Vesna bound a drowned war-horse to you: "+(CHOICE.paleName||'')+". Press R to ride it."];
+    return ['active',{ seek:"Find the drowned war-horse in the Drowning Fen's old marsh, west of the Sunken Hollow, at night, and bring its bones to Vesna.", bones:"Bring the war-horse's bones to Vesna the Grave-Speaker, after dark." }[s]]; }]);
+  if(typeof QUEST_AT!=='undefined') QUEST_AT['The Pale Steed']='fen';
+}
 </script>
 </body>
 </html>

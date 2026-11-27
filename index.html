@@ -15343,6 +15343,7 @@ function impact(f){                                   // a foe's swing lands (or
   const hurt=player.hp<hp0 && player.hp>0;
   if(hurt && !combat.practice){                     // what the blow leaves behind
     if(f.type==='wolf'){ addStatus(player,'bleed',4.2,1); logMsg('The bite tears. You are bleeding.','#d0342c'); }
+    else if(f.type==='magmite'){ addStatus(player,'burn',4,1); logMsg('The burning fist sears you. You are on fire.','#f08a30'); }
     else if(f.type==='bear'){ const big=f.boss||/^Old /.test(f.name||''); addStatus(player,'bleed',big?6:5,big?2:1); logMsg(big?'The claws rake you open. You are bleeding badly.':'The claws rake you. You are bleeding.','#d0342c'); }   // a bear's claws tear like a wolf's teeth, and worse
     else if(f.opts && BLEEDERS.has(f.opts.equip&&f.opts.equip.weapon) && Math.random()<0.25) addStatus(player,'bleed',3.2,1); }
   if(f.phase2 && hurt && f.type==='wolf') addStatus(player,'bleed',5,2);   // an enraged Greymaw's bites tear
@@ -16000,6 +16001,7 @@ function drawActorBase(e){
   else if(e.type==='scorpion') drawScorpion(s.x,B,e,poseFor(e));
   else if(e.type==='sandworm') drawSandworm(s.x,B,e,poseFor(e));
   else if(e.type==='scarab') drawScarab(s.x,B,e,poseFor(e));
+  else if(e.type==='magmite') drawMagmite(s.x,B,e,poseFor(e));
   else if(e.type==='shardling') drawShardling(s.x,B,e,poseFor(e));
   else if(e.type==='ember') drawEmber(s.x,B,e,poseFor(e));
   else if(e.type==='rootmother') drawRootMother(s.x,B,e,poseFor(e));
@@ -20598,6 +20600,22 @@ function drawHorse3D(X,Y,phi,ph,moving,pack,harness,seed,coatK){   // pack: a ri
     for(let k=1;k<Hm.length-1;k+=2){ const a=Hm[k], b=band[k]; star4((a.x+b.x)/2,(a.y+b.y)/2-0.2,1.5,B.star); }
     for(let k=0;k<Hm.length;k++) if(k%2===0){ const q=Hm[k]; g.strokeStyle=B.trim; g.lineWidth=0.6; g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(q.x,q.y+2.2); g.stroke(); g.fillStyle=B.trim; g.beginPath(); g.arc(q.x,q.y+2.6,0.75,0,Math.PI*2); g.fill(); }
     g.restore(); };
+  const plateTrim=(T,Hm,B)=>{ g.save(); g.lineCap='round'; g.lineJoin='round'; const n=Hm.length, st=n>=12?4:n>=9?3:2, pl=0.7+0.3*Math.sin(gt*3), L=(a,b,t)=>({x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t});   /* cinder plate: overlapping lames, each with its own sheen and a raised ridge, fire in the gaps */
+    const cuts=[]; for(let a=0;a<n-1;a+=st) cuts.push([a,Math.min(n-1,a+st)]);
+    cuts.forEach(([a,b],ci)=>{ g.beginPath(); for(let k=a;k<=b;k++) k===a?g.moveTo(T[k].x,T[k].y):g.lineTo(T[k].x,T[k].y); for(let k=b;k>=a;k--) g.lineTo(Hm[k].x,Hm[k].y); g.closePath();
+      const gr=g.createLinearGradient(T[a].x,T[a].y,Hm[b].x,Hm[b].y); gr.addColorStop(0,ci%2?'#4e4a58':'#5a5664'); gr.addColorStop(0.45,B.col); gr.addColorStop(1,'#09080c'); g.fillStyle=gr; g.fill();
+      const mT=L(T[a],T[b],0.5), mH=L(Hm[a],Hm[b],0.5); g.strokeStyle='rgba(215,210,235,0.22)'; g.lineWidth=1.6; g.beginPath(); g.moveTo(mT.x,mT.y+1); g.lineTo(L(mT,mH,0.85).x,L(mT,mH,0.85).y); g.stroke();
+      g.strokeStyle='rgba(230,225,245,0.4)'; g.lineWidth=0.9; g.beginPath(); for(let k=a;k<=b;k++) k===a?g.moveTo(T[k].x,T[k].y+0.6):g.lineTo(T[k].x,T[k].y+0.6); g.stroke();
+      [a,b].forEach(k=>{ const q=L(T[k],Hm[k],0.12), sx=k===a?1.6:-1.6; g.fillStyle='#a6a2ae'; g.beginPath(); g.arc(q.x+sx,q.y,0.8,0,Math.PI*2); g.fill(); }); });
+    g.globalCompositeOperation='lighter';
+    cuts.slice(1).forEach(([a])=>{ const t=T[a], q=Hm[a]; g.beginPath(); g.moveTo(t.x+(q.x-t.x)*0.06,t.y+(q.y-t.y)*0.06); g.lineTo(q.x,q.y); g.strokeStyle=`rgba(255,100,20,${0.4*pl})`; g.lineWidth=3; g.stroke(); g.strokeStyle=`rgba(255,190,95,${0.9*pl})`; g.lineWidth=0.8; g.stroke(); });
+    g.beginPath(); Hm.forEach((q,k)=>k?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.strokeStyle=`rgba(255,110,25,${0.5*pl})`; g.lineWidth=3.6; g.stroke(); g.strokeStyle=`rgba(255,205,120,${0.95*pl})`; g.lineWidth=1; g.stroke();
+    g.restore(); };
+  const flames=(pts,h0)=>{ g.save(); g.globalCompositeOperation='lighter'; pts.forEach((q,k)=>{ const f=Math.sin(gt*9+k*2.1)*0.5+0.5, hh=h0*(0.6+0.7*f)*S, w=2*S, sw=Math.sin(gt*5+k*1.3)*w*0.9;   /* tongues of fire licking up off the plate */
+      const gr=g.createLinearGradient(q.x,q.y,q.x,q.y-hh); gr.addColorStop(0,'rgba(255,215,110,0.9)'); gr.addColorStop(0.45,'rgba(255,120,30,0.6)'); gr.addColorStop(1,'rgba(190,40,10,0)'); g.fillStyle=gr;
+      g.beginPath(); g.moveTo(q.x-w,q.y); g.quadraticCurveTo(q.x-w*0.7+sw*0.3,q.y-hh*0.55,q.x+sw,q.y-hh); g.quadraticCurveTo(q.x+w*0.7+sw*0.3,q.y-hh*0.55,q.x+w,q.y); g.closePath(); g.fill(); }); g.restore(); };
+  const trimFor=(T,Hm,B)=>B.plate?plateTrim(T,Hm,B):hemTrim(T,Hm,B);
+  const fireFoot=c=>{ if(!BARD || !BARD.plate || drawHorse3D.noFire) return; const P0=pr(...c); parts.push({ d:P0.d+0.6, fn:pass=>{ if(!pass) return; g.save(); g.globalCompositeOperation='lighter'; const rg=g.createRadialGradient(P0.x,P0.y,0,P0.x,P0.y,5*S); rg.addColorStop(0,'rgba(255,130,40,0.5)'); rg.addColorStop(1,'rgba(255,90,20,0)'); g.fillStyle=rg; g.fillRect(P0.x-5*S,P0.y-5*S,10*S,10*S); g.restore(); flames([{x:P0.x-1.5*S,y:P0.y+0.4*S},{x:P0.x,y:P0.y-0.2*S},{x:P0.x+1.4*S,y:P0.y+0.2*S}],6.5); } }); };   /* the cinder plate's fire runs down to the feet */
   const C=K.c, D=K.d, Lc=K.l, by=bob;
   if(!K.skel){
   // the barrel, rump to chest, and the withers
@@ -20614,7 +20632,7 @@ function drawHorse3D(X,Y,phi,ph,moving,pack,harness,seed,coatK){   // pack: a ri
     const li=legs.indexOf(l), sock=K.socks&&(K.socks>>li)&1, SW='#ece6da';
     cap(top,knee,3,2.1,C,D,Lc); ball(knee,2.2,C,tone(C,-0.2),tone(C,0.05),{dz:0.02}); cap(knee,fet,1.6,1.25,sock?SW:C,sock?'#b8b0a2':D,sock?'#ffffff':Lc,{flat:false}); ball(fet,1.55,sock?SW:C,sock?'#b8b0a2':tone(C,-0.2),sock?'#ffffff':tone(C,0.05),{dz:0.02});   // knee (or hock) and fetlock joints; a white sock below the knee on some
     if(!sock) line([[fet[0]-0.2,fet[1]-0.2,fet[2]],[hoof[0],hoof[1]+0.8,hoof[2]]],tone(K.mane,0.1),1.6,0.3);   // feathering at the fetlock
-    cap([fet[0]+0.1,fet[1]-0.6,fet[2]],hoof,1.45,2.1,'#2a221a','#120c08','#4a3e32'); });
+    cap([fet[0]+0.1,fet[1]-0.6,fet[2]],hoof,1.45,2.1,'#2a221a','#120c08','#4a3e32'); fireFoot(hoof); });
   // tail: a bare dock, then a switch of long hair
   const tw=idle*0.35+(moving?Math.sin(ph)*0.25:0); cap([-25.5,40+by,0],[-29,37+by,tw*2],2.2,1.8,K.mane,tone(K.mane,-0.3),tone(K.mane,0.25));
   for(let h=0;h<16;h++){ const o=(h-7.5)*0.42, sw2=Math.sin(gt*2.2+h*0.7)*0.3+(moving?Math.sin(ph*0.5+h*0.2)*0.6:0); line([[-28.5,38+by,tw*2],[-33+o*0.4+sw2,28+by,tw*4+o],[-34+o*0.7+sw2*1.6,17+by,tw*6+o*1.3],[-33.5+o+sw2*2,5+by-Math.abs(o)*0.5,tw*7+o*1.6]],h%3?K.mane:tone(K.mane,0.22),0.95,-0.2); }   // a long, full tail of hair from a high-set dock
@@ -20632,7 +20650,7 @@ function drawHorse3D(X,Y,phi,ph,moving,pack,harness,seed,coatK){   // pack: a ri
       const knee=l.f?[l.x+swing*0.5+lift*0.5,12+lift,l.z]:cock?[l.x-0.8,13.4,l.z]:[l.x-3+swing*0.5-lift*0.3,12.5+lift,l.z], fet=cock?[l.x+1.6,4.6,l.z]:[l.x+swing+(l.f?lift*0.3:-lift*0.6),2.8+lift,l.z], hoof=cock?[l.x+2.6,1.2,l.z]:[fet[0]+0.4,0.6+lift*0.9,l.z];
       const el=l.f?[l.x+0.8,21.5+by,l.z]:[l.x-2.2,22.5+by,l.z];
       if(l.f) bone([l.x+0.4,31+by,l.z*1.08],el,1.8,1.4); else bone([l.x-0.8,32.5+by,l.z*0.95],el,2,1.5);   /* upper arm, thigh-bone */
-      knob(el,1.9,{dz:0.02}); bone(el,knee,1.3,1.05); knob(knee,1.55,{dz:0.02}); bone(knee,fet,0.9,0.75); knob(fet,1.15,{dz:0.02}); cap(fet,hoof,1.0,1.8,'#3a342a','#16120c','#5e5646'); });
+      knob(el,1.9,{dz:0.02}); bone(el,knee,1.3,1.05); knob(knee,1.55,{dz:0.02}); bone(knee,fet,0.9,0.75); knob(fet,1.15,{dz:0.02}); cap(fet,hoof,1.0,1.8,'#3a342a','#16120c','#5e5646'); fireFoot(hoof); });
     const tw=idle*0.35+(moving?Math.sin(ph)*0.25:0); for(let k=0;k<7;k++) knob([-27-k*1.3,39.4-k*2.7+by,tw*k*0.7],1.3-k*0.11,{dz:0.1});   /* the tail bones */
     for(let q=0;q<9;q++){ const o=(q-4)*0.45, fl=Math.sin(gt*5+q*1.7)*1.2; line([[-28,37+by,tw*2],[-32+o*0.5+fl*0.4,27+by,tw*4+o],[-33.5+o+fl,17+by+Math.abs(fl),tw*6+o*1.4]],'rgba(140,255,200,'+(q%2?0.38:0.24)+')',q%3?1.1:1.7,-0.15); }   /* and a ghost-fire switch */ }
   // neck and head, dipping to graze, and turning to look at whoever is near
@@ -20695,13 +20713,13 @@ function drawHorse3D(X,Y,phi,ph,moving,pack,harness,seed,coatK){   // pack: a ri
     [1,-1].forEach(sd=>{ const top=[], hm2=[]; for(let q=0;q<=7;q++){ const t=q/7, v=t<0.5?L2(nb,crest,t*2):L2(crest,poll,(t-0.5)*2), r=6.8*(1-t)+3.9*t;
         const A=t<0.5?nb:crest, B2=t<0.5?crest:poll, ax=B2[0]-A[0], ay=B2[1]-A[1], al=Math.hypot(ax,ay)||1, nx=ay/al, ny=-ax/al, dag=q%2?1.5:0;   /* across the neck, toward the throat, whichever way the head is held */
         top.push([v[0]-nx*r*0.9+lat[0]*0.6*sd, v[1]-ny*r*0.9, v[2]+lat[2]*0.6*sd]); hm2.push([v[0]+nx*(r*0.35+dag)+lat[0]*r*1.04*sd, v[1]+ny*(r*0.35+dag), v[2]+lat[2]*r*1.04*sd]); }
-      const near=sd*latD>-0.05; panel(top,hm2,BARD.col,{near, far:!near, after:(T,Hm)=>hemTrim(T,Hm,BARD)}); }); }
-  if(BARD){ const M='#b8c0cc', MD='#5a6270', ML='#f0f4fa';   /* a silvered chanfron down the face, a crystal on the brow and a short crystal spike */
+      const near=sd*latD>-0.05; panel(top,hm2,BARD.col,{near, far:!near, after:(T,Hm)=>{ trimFor(T,Hm,BARD); if(BARD.plate && near) flames(T,6.5); }}); }); }
+  if(BARD){ const PL=BARD.plate, M=PL?'#3c3842':'#b8c0cc', MD=PL?'#121016':'#5a6270', ML=PL?'#8e8898':'#f0f4fa', CR=PL?'#ff7a28':B_CRY, CRD=PL?'#7a2008':'#3a5a9a', CRL=PL?'#fff0b0':'#e8f6ff';   /* a silvered chanfron down the face, a crystal on the brow and a short crystal spike */
     cap(hp(0.2,2.9,0),[mid[0],mid[1]+2.3*ct,mid[2]],2.1,1.7,M,MD,ML,{dz:1.2,sharp:[1,0]}); cap([mid[0],mid[1]+2.3*ct,mid[2]],hm(-0.6,1.5,0),1.7,1.3,M,MD,ML,{dz:1.3,sharp:[1,0]});
     [1,-1].forEach(sd=>cap(hp(1.2,1.6,2.2*sd),hp(2.8,-1.4,3.1*sd),0.9,0.7,M,MD,ML,{dz:0.7,sharp:eyeN(sd)}));
-    cap(hp(0.5,3.6,0),hp(-0.6,7.4,0),0.95,0.15,B_CRY,'#3a5a9a','#e8f6ff',{dz:1.5});
-    ball(hp(0.9,3.4,0),1.15,B_CRY,'#3a5a9a','#ffffff',{dz:1.6,sharp:[1,0]});
-    const gq=pr(...hp(0.9,3.4,0)); parts.push({ d:gq.d+1.7, head:true, fn:pass=>{ if(!pass) return; g.save(); g.globalCompositeOperation='lighter'; const rg=g.createRadialGradient(gq.x,gq.y,0,gq.x,gq.y,6*S); rg.addColorStop(0,'rgba(150,200,255,0.45)'); rg.addColorStop(1,'rgba(150,200,255,0)'); g.fillStyle=rg; g.fillRect(gq.x-6*S,gq.y-6*S,12*S,12*S); g.restore(); } }); }
+    cap(hp(0.5,3.6,0),hp(-0.6,7.4,0),0.95,0.15,PL?M:CR,PL?MD:CRD,PL?ML:CRL,{dz:1.5});
+    ball(hp(0.9,3.4,0),1.15,CR,CRD,'#ffffff',{dz:1.6,sharp:[1,0]});
+    const gq=pr(...hp(0.9,3.4,0)); parts.push({ d:gq.d+1.7, head:true, fn:pass=>{ if(!pass) return; g.save(); g.globalCompositeOperation='lighter'; const rg=g.createRadialGradient(gq.x,gq.y,0,gq.x,gq.y,6*S); rg.addColorStop(0,PL?'rgba(255,130,40,0.55)':'rgba(150,200,255,0.45)'); rg.addColorStop(1,PL?'rgba(255,130,40,0)':'rgba(150,200,255,0)'); g.fillStyle=rg; g.fillRect(gq.x-6*S,gq.y-6*S,12*S,12*S); g.restore(); } }); }
   { const HEAD1=parts.length; for(let q=HEAD0;q<HEAD1;q++) parts[q].head=true; }
   if(pack){                                                                                               // a riding saddle: a wool blanket, the seat with pommel and cantle, girth, stirrups on their leathers
     const backD=Math.max(...[[-18,0],[-3,0],[13,0]].map(([x])=>x*sf))+0.3+(BARD?30:0), BL=(GR&&GR.blanket)||K.blanket||'#7a2a22', SEAT=tone(LEA,0.1);
@@ -20710,12 +20728,12 @@ function drawHorse3D(X,Y,phi,ph,moving,pack,harness,seed,coatK){   // pack: a ri
     cap([-6.5,45.6+by,0],[4.5,45.4+by,0],3,2.7,SEAT,tone(SEAT,-0.45),tone(SEAT,0.4),{D:backD+0.2});                         // the seat
     cap([4.4,45.6+by,0],[6.4,49+by,0],1.7,1.3,SEAT,tone(SEAT,-0.45),tone(SEAT,0.4),{D:backD+0.3}); cap([-7.8,47.6+by,-3],[-7.8,47.6+by,3],1.5,1.5,tone(SEAT,-0.1),tone(SEAT,-0.5),tone(SEAT,0.3),{D:backD+0.25});
     if(BARD){ const cols=[[-28.6,5.4,3.2],[-27.4,9,2.2]]; for(let x=-25;x<=17.01;x+=3) cols.push([x,11.4,1.2]); cols.push([19.8,9.4,2.2],[21.8,6,3.4]);   /* the caparison: a cloth either side from the back to above the knee, wrapping round the chest and the rump, dagged at the hem */
-      [1,-1].forEach(sd=>{ const top=cols.map(([x,zh,zt])=>[x,43.4+by+(x>9?Math.min(9,(x-9)*0.22):0)+(x<-19?Math.max(-4,(x+19)*0.3):0)-(zt-1.2)*0.9,zt*sd]), hem=cols.map(([x,zh],k)=>[x+(k%2?0:0.4),(k%2?14.2:12.4)+by*0.5+Math.sin(gt*1.4+x*0.3)*0.2,zh*sd]);
-        const near=sd*cf>-0.05; panel(top,hem,BARD.col,{near, far:!near, after:(T,Hm)=>{ g.save(); g.lineCap='round'; for(let k=1;k<Hm.length-1;k++){ const t=T[k], q=Hm[k], dark=k%2; g.strokeStyle=dark?'rgba(8,6,20,0.28)':'rgba(255,255,255,0.08)'; g.lineWidth=dark?1.6:1.1; g.beginPath(); g.moveTo(t.x+(q.x-t.x)*0.35,t.y+(q.y-t.y)*0.35); g.quadraticCurveTo(t.x+(q.x-t.x)*0.7+(dark?0.4:-0.4),t.y+(q.y-t.y)*0.7,q.x,q.y-0.5); g.stroke(); } g.restore(); hemTrim(T,Hm,BARD); }}); });
-      const rT=[-4,-2,0,2,4].map(z=>[-26.6,40.6+by-Math.abs(z)*0.2,z]), rH=[-6.4,-3.2,0,3.2,6.4].map((z,k)=>[-29.2,(k%2?14.2:12.4)+by*0.5,z]);   /* over the rump behind */
-      panel(rT,rH,BARD.col,{D:-27*sf+(sf<0?6:-6),after:(T,Hm)=>{ hemTrim(T,Hm,BARD); const c0=pr(-26.6,30+by,0); if(sf<-0.2) star4(c0.x,c0.y,3.2,BARD.star); }});
-      const pT=[-6.4,-3.2,0,3.2,6.4].map(z=>[21.6,45.4+by-Math.abs(z)*0.3,z]), pH=[-7.4,-3.7,0,3.7,7.4].map((z,k)=>[23.6,(k%2?14.2:12.4)+by*0.5,z]);   /* the peytral across the breast */
-      panel(pT,pH,BARD.col,{D:23*sf+(sf>0?6:-6),after:(T,Hm)=>{ hemTrim(T,Hm,BARD); const c0=pr(22.8,30+by,0); if(sf>0.2) star4(c0.x,c0.y,3.2,BARD.star); }});
+      [1,-1].forEach(sd=>{ const top=cols.map(([x,zh,zt])=>[x,43.4+by+(x>9?Math.min(9,(x-9)*0.22):0)+(x<-19?Math.max(-4,(x+19)*0.3):0)-(zt-1.2)*0.9,zt*sd]), hem=cols.map(([x,zh],k)=>[x+(k%2?0:0.4),(BARD.plate?18:(k%2?14.2:12.4))+by*0.5+Math.sin(gt*1.4+x*0.3)*0.2,zh*sd]);
+        const near=sd*cf>-0.05; panel(top,hem,BARD.col,{near, far:!near, after:(T,Hm)=>{ g.save(); g.lineCap='round'; if(!BARD.plate) for(let k=1;k<Hm.length-1;k++){ const t=T[k], q=Hm[k], dark=k%2; g.strokeStyle=dark?'rgba(8,6,20,0.28)':'rgba(255,255,255,0.08)'; g.lineWidth=dark?1.6:1.1; g.beginPath(); g.moveTo(t.x+(q.x-t.x)*0.35,t.y+(q.y-t.y)*0.35); g.quadraticCurveTo(t.x+(q.x-t.x)*0.7+(dark?0.4:-0.4),t.y+(q.y-t.y)*0.7,q.x,q.y-0.5); g.stroke(); } g.restore(); trimFor(T,Hm,BARD); if(BARD.plate && near) flames(T.slice(-6,-1),3.6); }}); });
+      const rT=[-4,-2,0,2,4].map(z=>[-26.6,40.6+by-Math.abs(z)*0.2,z]), rH=[-6.4,-3.2,0,3.2,6.4].map((z,k)=>[-29.2,(BARD.plate?18:(k%2?14.2:12.4))+by*0.5,z]);   /* over the rump behind */
+      panel(rT,rH,BARD.col,{D:-27*sf+(sf<0?6:-6),after:(T,Hm)=>{ trimFor(T,Hm,BARD); const c0=pr(-26.6,30+by,0); if(sf<-0.2 && !BARD.plate) star4(c0.x,c0.y,3.2,BARD.star); }});
+      const pT=[-6.4,-3.2,0,3.2,6.4].map(z=>[21.6,45.4+by-Math.abs(z)*0.3,z]), pH=[-7.4,-3.7,0,3.7,7.4].map((z,k)=>[23.6,(BARD.plate?18:(k%2?14.2:12.4))+by*0.5,z]);   /* the peytral across the breast */
+      panel(pT,pH,BARD.col,{D:23*sf+(sf>0?6:-6),after:(T,Hm)=>{ trimFor(T,Hm,BARD); const c0=pr(22.8,30+by,0); if(sf>0.2 && !BARD.plate) star4(c0.x,c0.y,3.2,BARD.star); }});
       cap([6.4,49.4+by,0],[6.4,50.6+by,0],1.0,0.6,'#e0c070','#8a6a20','#fff4c0',{D:backD+0.4}); }   /* a gilt knob on the pommel */
     if(GR && GR.bags){ const big=GR.bags>1, r=big?4.4:3.4; [1,-1].forEach(sd=>{ cap([-15,37+by,9.2*sd],[-8.5,37+by,9.2*sd],r,r,tone(LEA,0.15),tone(LEA,-0.4),tone(LEA,0.4),{sharp:[0,sd],dz:0.3+NB(sd),after:(A,B2)=>{ g.strokeStyle=LEAD; g.lineWidth=0.6; g.beginPath(); g.moveTo(A.x,A.y-r*S*0.55); g.lineTo(B2.x,B2.y-r*S*0.55); g.stroke(); }});   /* saddlebags hung behind the saddle, a flap and a buckle */
         buckle([-11.8,37.6+by-(big?0.6:0),(9.2+r*0.8)*sd],[0,sd],NB(sd)); strap([[-11.8,44.4+by,4*sd],[-11.8,40.5+by,(8+r*0.4)*sd]],0.5,[0,sd],0.5+NB(sd)); }); if(big) cap([-14.5,45.2+by,-4],[-14.5,45.2+by,4],2.2,2.2,'#6a6450','#3a3628','#9a947a',{D:backD+0.15}); }   /* the big pair, and a rolled sack across */
@@ -20799,6 +20817,22 @@ function drawBear3D(X,Y,phi,ph,moving,o){   // o: {col, S, rear, jaw, swipe, dow
     for(let k=1;k<Hm.length-1;k+=2){ const a=Hm[k], b=band[k]; star4((a.x+b.x)/2,(a.y+b.y)/2-0.2,1.5,B.star); }
     for(let k=0;k<Hm.length;k++) if(k%2===0){ const q=Hm[k]; g.strokeStyle=B.trim; g.lineWidth=0.6; g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(q.x,q.y+2.2); g.stroke(); g.fillStyle=B.trim; g.beginPath(); g.arc(q.x,q.y+2.6,0.75,0,Math.PI*2); g.fill(); }
     g.restore(); };
+  const plateTrim=(T,Hm,B)=>{ g.save(); g.lineCap='round'; g.lineJoin='round'; const n=Hm.length, st=n>=12?4:n>=9?3:2, pl=0.7+0.3*Math.sin(gt*3), L=(a,b,t)=>({x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t});   /* cinder plate: overlapping lames, each with its own sheen and a raised ridge, fire in the gaps */
+    const cuts=[]; for(let a=0;a<n-1;a+=st) cuts.push([a,Math.min(n-1,a+st)]);
+    cuts.forEach(([a,b],ci)=>{ g.beginPath(); for(let k=a;k<=b;k++) k===a?g.moveTo(T[k].x,T[k].y):g.lineTo(T[k].x,T[k].y); for(let k=b;k>=a;k--) g.lineTo(Hm[k].x,Hm[k].y); g.closePath();
+      const gr=g.createLinearGradient(T[a].x,T[a].y,Hm[b].x,Hm[b].y); gr.addColorStop(0,ci%2?'#4e4a58':'#5a5664'); gr.addColorStop(0.45,B.col); gr.addColorStop(1,'#09080c'); g.fillStyle=gr; g.fill();
+      const mT=L(T[a],T[b],0.5), mH=L(Hm[a],Hm[b],0.5); g.strokeStyle='rgba(215,210,235,0.22)'; g.lineWidth=1.6; g.beginPath(); g.moveTo(mT.x,mT.y+1); g.lineTo(L(mT,mH,0.85).x,L(mT,mH,0.85).y); g.stroke();
+      g.strokeStyle='rgba(230,225,245,0.4)'; g.lineWidth=0.9; g.beginPath(); for(let k=a;k<=b;k++) k===a?g.moveTo(T[k].x,T[k].y+0.6):g.lineTo(T[k].x,T[k].y+0.6); g.stroke();
+      [a,b].forEach(k=>{ const q=L(T[k],Hm[k],0.12), sx=k===a?1.6:-1.6; g.fillStyle='#a6a2ae'; g.beginPath(); g.arc(q.x+sx,q.y,0.8,0,Math.PI*2); g.fill(); }); });
+    g.globalCompositeOperation='lighter';
+    cuts.slice(1).forEach(([a])=>{ const t=T[a], q=Hm[a]; g.beginPath(); g.moveTo(t.x+(q.x-t.x)*0.06,t.y+(q.y-t.y)*0.06); g.lineTo(q.x,q.y); g.strokeStyle=`rgba(255,100,20,${0.4*pl})`; g.lineWidth=3; g.stroke(); g.strokeStyle=`rgba(255,190,95,${0.9*pl})`; g.lineWidth=0.8; g.stroke(); });
+    g.beginPath(); Hm.forEach((q,k)=>k?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)); g.strokeStyle=`rgba(255,110,25,${0.5*pl})`; g.lineWidth=3.6; g.stroke(); g.strokeStyle=`rgba(255,205,120,${0.95*pl})`; g.lineWidth=1; g.stroke();
+    g.restore(); };
+  const flames=(pts,h0)=>{ g.save(); g.globalCompositeOperation='lighter'; pts.forEach((q,k)=>{ const f=Math.sin(gt*9+k*2.1)*0.5+0.5, hh=h0*(0.6+0.7*f)*S, w=2*S, sw=Math.sin(gt*5+k*1.3)*w*0.9;   /* tongues of fire licking up off the plate */
+      const gr=g.createLinearGradient(q.x,q.y,q.x,q.y-hh); gr.addColorStop(0,'rgba(255,215,110,0.9)'); gr.addColorStop(0.45,'rgba(255,120,30,0.6)'); gr.addColorStop(1,'rgba(190,40,10,0)'); g.fillStyle=gr;
+      g.beginPath(); g.moveTo(q.x-w,q.y); g.quadraticCurveTo(q.x-w*0.7+sw*0.3,q.y-hh*0.55,q.x+sw,q.y-hh); g.quadraticCurveTo(q.x+w*0.7+sw*0.3,q.y-hh*0.55,q.x+w,q.y); g.closePath(); g.fill(); }); g.restore(); };
+  const trimFor=(T,Hm,B)=>B.plate?plateTrim(T,Hm,B):hemTrim(T,Hm,B);
+  const fireFoot=c=>{ if(!BARD || !BARD.plate || drawHorse3D.noFire) return; const P0=pr(...c); parts.push({ d:P0.d+0.6, fn:pass=>{ if(!pass) return; g.save(); g.globalCompositeOperation='lighter'; const rg=g.createRadialGradient(P0.x,P0.y,0,P0.x,P0.y,5*S); rg.addColorStop(0,'rgba(255,130,40,0.5)'); rg.addColorStop(1,'rgba(255,90,20,0)'); g.fillStyle=rg; g.fillRect(P0.x-5*S,P0.y-5*S,10*S,10*S); g.restore(); flames([{x:P0.x-1.5*S,y:P0.y+0.4*S},{x:P0.x,y:P0.y-0.2*S},{x:P0.x+1.4*S,y:P0.y+0.2*S}],6.5); } }); };   /* the cinder plate's fire runs down to the feet */
   const C=K.c, D=K.d, Lc=K.l;
   const by=bob, MZ=K.m, PAW=tone(K.c,-0.5), CLAW='#e8dcc0';
   // the barrel: a heavy rump, the shoulder hump that makes a bear a bear, a deep chest
@@ -20818,12 +20852,12 @@ function drawBear3D(X,Y,phi,ph,moving,o){   // o: {col, S, rear, jaw, swipe, dow
     if(l.f){ const sh=[l.x+0.6,22+by,l.z*1.05], el=SW?[l.x+6*SW,15+6*SW,l.z]:[l.x-1.4+swX*0.4+lift*0.4,12.4+lift*0.7,l.z], wr=SW?null:[l.x+0.4+swX*0.85+lift*0.5,5.6+lift,l.z], ft=SW?[l.x+12*SW,10+12*SW,l.z]:[l.x+swX+1,3.4+lift,l.z];   /* elbow back, wrist forward: a bear's foreleg is never a post */
       cap(sh,el,6,4.6,C,D,Lc,{nosep:true}); if(wr){ cap(el,wr,4.6,3.9,C,D,Lc); cap(wr,ft,3.9,3.7,C,D,Lc); } else cap(el,ft,4.6,3.9,C,D,Lc);
       for(let t2=0;t2<3;t2++) line([[el[0]-2.4,el[1]+2-t2*2.4,l.z*1.04],[el[0]-4,el[1]-0.6-t2*2.4,l.z*1.06]],tone(C,-0.16,0.9),1.7,0.05);   /* long hair at the back of the foreleg */
-      const pd=SW?[ft[0]+3,ft[1]+1.2,l.z]:[ft[0]+3.2,ft[1]-1.4,l.z]; cap([ft[0],ft[1]-0.9,l.z],pd,3.8,3.1,PAW,tone(PAW,-0.3),tone(PAW,0.25),{dz:0.1});
+      const pd=SW?[ft[0]+3,ft[1]+1.2,l.z]:[ft[0]+3.2,ft[1]-1.4,l.z]; cap([ft[0],ft[1]-0.9,l.z],pd,3.8,3.1,PAW,tone(PAW,-0.3),tone(PAW,0.25),{dz:0.1}); fireFoot(pd);
       for(let c2=-1;c2<=1;c2++) line([[pd[0]+1.8,pd[1]+0.2,l.z+c2*1.4],[pd[0]+3.6,pd[1]-(SW?-0.6:0.9),l.z+c2*1.5]],CLAW,0.75,0.3,[1,0]); }   /* the claws */
     else { RF=0; const hx=l.x+1, hy=24.5+by; const kn=[l.x+1.6+swX*0.4-lift*0.3,13+lift*0.6,l.z], hk=[l.x-1.6+swX*0.7-lift*0.6,6.4+lift*0.9,l.z], ft=[l.x+swX+0.6,3.4+lift,l.z];   /* stifle forward, hock back */
       cap([hx,hy,l.z*1.05],kn,7.4,5,C,D,Lc,{nosep:true}); cap(kn,hk,5,4.3,C,D,Lc); cap(hk,ft,4.3,3.9,C,D,Lc);
       for(let t2=0;t2<3;t2++) line([[hx-4,hy-3-t2*3.2,l.z*1.04],[hx-5.6,hy-5.6-t2*3.2,l.z*1.06]],tone(C,-0.16,0.9),1.8,0.05);   /* shaggy breeches */
-      const pd=[ft[0]+3,ft[1]-1.4,l.z]; cap([ft[0]-0.6,ft[1]-1,l.z],pd,4,3.2,PAW,tone(PAW,-0.3),tone(PAW,0.25),{dz:0.1});
+      const pd=[ft[0]+3,ft[1]-1.4,l.z]; cap([ft[0]-0.6,ft[1]-1,l.z],pd,4,3.2,PAW,tone(PAW,-0.3),tone(PAW,0.25),{dz:0.1}); fireFoot(pd);
       for(let c2=-1;c2<=1;c2++) line([[pd[0]+1.8,pd[1]+0.2,l.z+c2*1.4],[pd[0]+3.4,pd[1]-0.9,l.z+c2*1.5]],CLAW,0.7,0.3,[1,0]); RF=1; } });
   RF=1;
   ball([-23.2,27+by,0],2.6,C,D,Lc,{dz:-0.1});   /* the stub of a tail */
@@ -20847,20 +20881,20 @@ function drawBear3D(X,Y,phi,ph,moving,o){   // o: {col, S, rear, jaw, swipe, dow
   if(o.harness||o.tack){ [1,-1].forEach(sd=>{ const hs=[0.5,sd]; strap([[hx+5.6,hy-0.4,2.6*sd],[hx+5.6,hy-3.6,2.4*sd]],0.45,hs,0.7); strap([[hx-0.8,hy+5,3.4*sd],[hx-1.2,hy-3.6,4.4*sd]],0.5,hs,0.7); strap([[hx-1,hy+0.6,4.6*sd],[hx+5.6,hy-1.6,3*sd]],0.45,hs,0.7);
       buckle([hx-1.1,hy+0.4,4.8*sd],hs); ball([hx+5.8,hy-2.2,2.9*sd],0.6,'#c8ccd2','#7a7e86','#ffffff',{dz:0.8,sharp:hs}); });
     [1,-1].forEach(sd=>{ const a=[hx+5.8,hy-2.2,2.9*sd], w=[-0.5,37.5+by,4*sd]; strap([a,[(a[0]+w[0])/2,(a[1]+w[1])/2-3,(a[2]+5*sd)/2],w],0.45,[0,sd],0.4); }); }
-  if(BARD){ const M='#b8c0cc', MD='#5a6270', ML='#f0f4fa';   /* a silvered brow-plate, the crystal, and cheek-pieces */
+  if(BARD){ const PL=BARD.plate, M=PL?'#3c3842':'#b8c0cc', MD=PL?'#121016':'#5a6270', ML=PL?'#8e8898':'#f0f4fa', CR=PL?'#ff7a28':B_CRY, CRD=PL?'#7a2008':'#3a5a9a', CRL=PL?'#fff0b0':'#e8f6ff';   /* a silvered brow-plate, the crystal, and cheek-pieces */
     cap([hx+0.6,hy+5.6,0],[hx+6.4,hy+1.1,0],1.9,1.3,M,MD,ML,{dz:1.2,sharp:[1,0]}); [1,-1].forEach(sd=>cap([hx+1,hy+1.4,3.9*sd],[hx+3.2,hy-1.6,4.1*sd],1,0.8,M,MD,ML,{dz:0.7,sharp:[0.5,sd]}));
-    cap([hx+0.8,hy+6.4,0],[hx-0.2,hy+9.8,0],0.95,0.15,B_CRY,'#3a5a9a','#e8f6ff',{dz:1.5}); ball([hx+1.2,hy+6,0],1.15,B_CRY,'#3a5a9a','#ffffff',{dz:1.6,sharp:[1,0]});
-    const gq=pr(hx+1.2,hy+6,0); parts.push({ d:gq.d+1.7, fn:pass=>{ if(!pass) return; g.save(); g.globalCompositeOperation='lighter'; const rg=g.createRadialGradient(gq.x,gq.y,0,gq.x,gq.y,6*S); rg.addColorStop(0,'rgba(150,200,255,0.45)'); rg.addColorStop(1,'rgba(150,200,255,0)'); g.fillStyle=rg; g.fillRect(gq.x-6*S,gq.y-6*S,12*S,12*S); g.restore(); } }); }
+    cap([hx+0.8,hy+6.4,0],[hx-0.2,hy+9.8,0],0.95,0.15,PL?M:CR,PL?MD:CRD,PL?ML:CRL,{dz:1.5}); ball([hx+1.2,hy+6,0],1.15,CR,CRD,'#ffffff',{dz:1.6,sharp:[1,0]});
+    const gq=pr(hx+1.2,hy+6,0); parts.push({ d:gq.d+1.7, fn:pass=>{ if(!pass) return; g.save(); g.globalCompositeOperation='lighter'; const rg=g.createRadialGradient(gq.x,gq.y,0,gq.x,gq.y,6*S); rg.addColorStop(0,PL?'rgba(255,130,40,0.55)':'rgba(150,200,255,0.45)'); rg.addColorStop(1,PL?'rgba(255,130,40,0)':'rgba(150,200,255,0)'); g.fillStyle=rg; g.fillRect(gq.x-6*S,gq.y-6*S,12*S,12*S); g.restore(); } }); }
   { const HEAD1=parts.length; for(let q=HEAD0;q<HEAD1;q++) parts[q].head=true; }
   // the riding tack: a broad saddle behind the hump, girth round the barrel, stirrups; bags, bedroll, blanket or the magister's caparison
   if(o.tack){ const backD=Math.max(...[-13,-2,7].map(x=>x*sf))+0.3+(BARD?30:0), BL=(GR&&GR.blanket)||'#7a2a22', SEAT=tone(LEA,0.1);
     if(BARD){ const cols=[[-26.4,6,3.2],[-25.2,9.8,2.2]]; for(let x=-23;x<=13.01;x+=3) cols.push([x,12.2,1.2]); cols.push([15.6,10,2.2],[17.4,6.4,3.4]);
-      [1,-1].forEach(sd=>{ const top=cols.map(([x,zh,zt])=>[x,35+by+(x>-2?Math.min(3.6,(x+2)*0.5):0)-(x>9?Math.min(6,(x-9)*0.6):0)+(x<-15?Math.max(-4,(x+15)*0.35):0)-(zt-1.2)*0.9,zt*sd]), hem=cols.map(([x,zh],k)=>[x+(k%2?0:0.4),(k%2?11.6:10)+by*0.5+Math.sin(gt*1.4+x*0.3)*0.2,zh*sd]);
-        const near=sd*cf>-0.05; panel(top,hem,BARD.col,{near, far:!near, after:(T,Hm)=>{ g.save(); g.lineCap='round'; for(let k=1;k<Hm.length-1;k++){ const t=T[k], q=Hm[k], dark=k%2; g.strokeStyle=dark?'rgba(8,6,20,0.28)':'rgba(255,255,255,0.08)'; g.lineWidth=dark?1.6:1.1; g.beginPath(); g.moveTo(t.x+(q.x-t.x)*0.35,t.y+(q.y-t.y)*0.35); g.quadraticCurveTo(t.x+(q.x-t.x)*0.7,t.y+(q.y-t.y)*0.7,q.x,q.y-0.5); g.stroke(); } g.restore(); hemTrim(T,Hm,BARD); }}); });
-      const rT=[-4,-2,0,2,4].map(z=>[-25,30.4+by-Math.abs(z)*0.2,z]), rH=[-6.6,-3.3,0,3.3,6.6].map((z,k)=>[-27,(k%2?11.6:10)+by*0.5,z]);
-      panel(rT,rH,BARD.col,{D:-24*sf+(sf<0?6:-6),after:(T,Hm)=>{ hemTrim(T,Hm,BARD); const c0=pr(-24.6,22+by,0); if(sf<-0.2) star4(c0.x,c0.y,3.2,BARD.star); }});
-      const pT=[-6.4,-3.2,0,3.2,6.4].map(z=>[18.6,28+by-Math.abs(z)*0.3,z]), pH=[-7.4,-3.7,0,3.7,7.4].map((z,k)=>[20.2,(k%2?11.6:10)+by*0.5,z]);
-      panel(pT,pH,BARD.col,{D:19*sf+(sf>0?6:-6),after:(T,Hm)=>{ hemTrim(T,Hm,BARD); const c0=pr(18.8,20+by,0); if(sf>0.2) star4(c0.x,c0.y,3.2,BARD.star); }}); }
+      [1,-1].forEach(sd=>{ const top=cols.map(([x,zh,zt])=>[x,35+by+(x>-2?Math.min(3.6,(x+2)*0.5):0)-(x>9?Math.min(6,(x-9)*0.6):0)+(x<-15?Math.max(-4,(x+15)*0.35):0)-(zt-1.2)*0.9,zt*sd]), hem=cols.map(([x,zh],k)=>[x+(k%2?0:0.4),(BARD.plate?16:(k%2?14.4:12.8))+by*0.5+Math.sin(gt*1.4+x*0.3)*0.2,zh*sd]);
+        const near=sd*cf>-0.05; panel(top,hem,BARD.col,{near, far:!near, after:(T,Hm)=>{ g.save(); g.lineCap='round'; if(!BARD.plate) for(let k=1;k<Hm.length-1;k++){ const t=T[k], q=Hm[k], dark=k%2; g.strokeStyle=dark?'rgba(8,6,20,0.28)':'rgba(255,255,255,0.08)'; g.lineWidth=dark?1.6:1.1; g.beginPath(); g.moveTo(t.x+(q.x-t.x)*0.35,t.y+(q.y-t.y)*0.35); g.quadraticCurveTo(t.x+(q.x-t.x)*0.7,t.y+(q.y-t.y)*0.7,q.x,q.y-0.5); g.stroke(); } g.restore(); trimFor(T,Hm,BARD); if(BARD.plate && near) flames(T.slice(-6,-1),3.6); }}); });
+      const rT=[-4,-2,0,2,4].map(z=>[-25,30.4+by-Math.abs(z)*0.2,z]), rH=[-6.6,-3.3,0,3.3,6.6].map((z,k)=>[-27,(BARD.plate?16:(k%2?14.4:12.8))+by*0.5,z]);
+      panel(rT,rH,BARD.col,{D:-24*sf+(sf<0?6:-6),after:(T,Hm)=>{ trimFor(T,Hm,BARD); const c0=pr(-24.6,22+by,0); if(sf<-0.2 && !BARD.plate) star4(c0.x,c0.y,3.2,BARD.star); }});
+      const pT=[-6.4,-3.2,0,3.2,6.4].map(z=>[18.6,28+by-Math.abs(z)*0.3,z]), pH=[-7.4,-3.7,0,3.7,7.4].map((z,k)=>[20.2,(BARD.plate?16:(k%2?14.4:12.8))+by*0.5,z]);
+      panel(pT,pH,BARD.col,{D:19*sf+(sf>0?6:-6),after:(T,Hm)=>{ trimFor(T,Hm,BARD); const c0=pr(18.8,20+by,0); if(sf>0.2 && !BARD.plate) star4(c0.x,c0.y,3.2,BARD.star); }}); }
     else { [1,-1].forEach(sd=>cap([-11,34+by,8*sd],[2,34.6+by,8*sd],1.5,1.5,BL,tone(BL,-0.35),tone(BL,0.25),{D:backD-0.05+sd*cf*3})); cap([-11.5,35.2+by,0],[2.5,35.8+by,0],3.6,3.6,BL,tone(BL,-0.3),tone(BL,0.22),{D:backD}); }
     cap([-8,37.2+by,0],[0.5,37.6+by,0],3.1,2.8,SEAT,tone(SEAT,-0.45),tone(SEAT,0.4),{D:backD+0.2}); cap([0.4,37.8+by,0],[2.2,41+by,0],1.8,1.3,SEAT,tone(SEAT,-0.45),tone(SEAT,0.4),{D:backD+0.3}); cap([-9.2,39+by,-3.2],[-9.2,39+by,3.2],1.6,1.6,tone(SEAT,-0.1),tone(SEAT,-0.5),tone(SEAT,0.3),{D:backD+0.25});
     if(BARD) cap([2.2,41+by,0],[2.2,42.2+by,0],1,0.6,'#e0c070','#8a6a20','#fff4c0',{D:backD+0.4});
@@ -22505,7 +22539,7 @@ const SND=(()=>{
     else { noise(0.28,0.18,'bandpass',2200*k,1400*k,0.7,sfx,{a:0.06}); noise(0.2,0.08,'highpass',5000,5000,0,sfx,{a:0.05,at:0.08}); } }   // cloth: a soft rustle
   // a grunt, a cry, a groan: a buzzing voice through two mouth-shapes, so it sounds like a throat and not a whistle
   function voiceOf(e){ if(!e) return {kind:'m',f:120}; const o=e.opts||{}, t=e.type||'', nm=e.name||'';
-    if(t==='troll') return {kind:'troll'}; if(t==='bear') return {kind:'bear'}; if(t==='wolf' && e.cat) return {kind:'lion'};
+    if(t==='troll'||t==='magmite') return {kind:'troll'}; if(t==='bear') return {kind:'bear'}; if(t==='wolf' && e.cat) return {kind:'lion'};
     if(t==='wolf' || /wolf|hound|greymaw/i.test(nm)) return {kind:'wolf'};
     if(/skelet|risen|bones|wight|barrow-?king|dead\b/i.test(nm) || t==='skeleton' || t==='barrowking') return {kind:'bone'};
     if(/ember|wisp|sprite|shade|spirit/i.test(nm) || t==='ember') return {kind:'hiss'};
@@ -33085,7 +33119,7 @@ function markBagSlots(){ try{ invGrid.querySelectorAll('.slot').forEach(el=>{ co
 setInterval(()=>{ try{ if(typeof running!=='undefined' && running) applyBagSize(); }catch(e){} },400);
 const HORSE_BLANKETS={ red:['Madder red','#7a2a22'], blue:['Woad blue','#2e4a7a'], green:['Forest green','#3a5a32'], black:['Black and gold','#1e1a18'], plain:['Undyed wool','#b8a888'], plum:['Bilberry','#4e2a48'] };
 const HORSE_LEATHERS={ brown:['Saddle brown','#5a3a1e'], black:['Black','#26201c'], oxblood:['Oxblood','#5a1e1a'], tan:['Pale tan','#8a6a42'] };
-const HORSE_BARDING={ arcane:['Magister blue',{col:'#26346a',trim:'#d8bc68',star:'#dce6ff'}], amethyst:['Amethyst',{col:'#45265e',trim:'#d8bc68',star:'#f0dcff'}], night:['Starless night',{col:'#1a1a22',trim:'#c8ccd8',star:'#9ab8ff'}], ember:['Ember',{col:'#6a2216',trim:'#e0b050',star:'#ffd08a'}] };
+const HORSE_BARDING={ arcane:['Magister blue',{col:'#26346a',trim:'#d8bc68',star:'#dce6ff'}], amethyst:['Amethyst',{col:'#45265e',trim:'#d8bc68',star:'#f0dcff'}], night:['Starless night',{col:'#1a1a22',trim:'#c8ccd8',star:'#9ab8ff'}], ember:['Ember',{col:'#6a2216',trim:'#e0b050',star:'#ffd08a'}], cinder:['Cinderforged plate',{plate:true,col:'#26232a',trim:'#ff7a28',star:'#ffb060'}] };
 function horseGear(){ return { barding:CHOICE.horseBarding&&HORSE_BARDING[CHOICE.horseBarding]?HORSE_BARDING[CHOICE.horseBarding][1]:null, bags:CHOICE.horseBags||0, roll:!!CHOICE.horseRoll, blanket:(HORSE_BLANKETS[CHOICE.horseBlanket]||HORSE_BLANKETS.red)[1], leather:(HORSE_LEATHERS[CHOICE.horseLeather]||HORSE_LEATHERS.brown)[1] }; }
 function horseShop(){ const G='Garrow the Horse-Dealer', nm=(window.mountName&&mountName())||CHOICE.horseName||'Ash', o=[], back=()=>horseShop(), pay=(c,fn)=>{ player.purse-=c; updateHud(); fn(); autosaveSoon(200); };
   if(!CHOICE.horseBags) o.push({label:'Leather saddlebags. (+6 pack spaces)', note:'-'+formatCoin(200), off:player.purse<200, fn:()=>pay(200,()=>{ CHOICE.horseBags=1; applyBagSize(); logMsg('Saddlebags on '+nm+': six more spaces in your pack.','#e8d8a8');
@@ -33097,7 +33131,7 @@ function horseShop(){ const G='Garrow the Horse-Dealer', nm=(window.mountName&&m
       say(G,"“Wool, oilcloth, flint and steel. You'll sleep under the sky like a drover. Mind the dew.”",[{label:'Back.',fn:back},bye]); })});
   if(!CHOICE.horseBardOwned) o.push({label:'The magister’s caparison: star-sewn barding, a silver chanfron, a crystal on the brow. (looks only)', note:'-'+formatCoin(600), off:player.purse<600, fn:()=>pay(600,()=>{ CHOICE.horseBardOwned=true; CHOICE.horseBarding='arcane';
       logMsg(nm+' wears the magister’s caparison.','#c8d8ff'); say(G,["<i>He drags a chest out from under the hay and lifts out a fold of deep blue cloth, sewn all over with silver stars.</i>","“A magister from the College ordered this. Paid half, never came back for it. Exploded, I heard.” <i>He shrugs.</i> “Nobody else is fool enough to dress a horse like a wizard. It's yours.”"],[{label:'Back.',fn:back},bye]); })});
-  else o.push({label:'Change the caparison.', fn:()=>say(G,"“I've the same cut in other cloth. Forty copper to swap, or take it off and use the plain blanket.”",[...Object.entries(HORSE_BARDING).map(([k,[n2]])=>({label:n2+(CHOICE.horseBarding===k?' <small>(now)</small>':''), off:player.purse<40||CHOICE.horseBarding===k, note:'-'+formatCoin(40), fn:()=>pay(40,()=>{ CHOICE.horseBarding=k; logMsg(nm+' wears the '+n2.toLowerCase()+' caparison now.','#c8d8ff'); horseShop(); })})),
+  else o.push({label:'Change the caparison.', fn:()=>say(G,"“I've the same cut in other cloth. Forty copper to swap, or take it off and use the plain blanket.”",[...Object.entries(HORSE_BARDING).filter(([k])=>k!=='cinder'||CHOICE.cinderOwned).map(([k,[n2]])=>({label:n2+(CHOICE.horseBarding===k?' <small>(now)</small>':''), off:player.purse<40||CHOICE.horseBarding===k, note:'-'+formatCoin(40), fn:()=>pay(40,()=>{ CHOICE.horseBarding=k; logMsg(nm+' wears the '+n2.toLowerCase()+' caparison now.','#c8d8ff'); horseShop(); })})),
       {label:'No caparison, just the blanket.'+(!CHOICE.horseBarding?' <small>(now)</small>':''), off:!CHOICE.horseBarding, fn:()=>{ CHOICE.horseBarding=null; autosaveSoon(200); horseShop(); }},{label:'Back.',fn:back}],true)});
   o.push({label:'Change her saddle blanket.', fn:()=>say(G,"“Dyed wool. Forty copper, and I'll throw the old one in the wash.”",[...Object.entries(HORSE_BLANKETS).map(([k,[n2]])=>({label:n2+((CHOICE.horseBlanket||'red')===k?' <small>(now)</small>':''), off:player.purse<40||(CHOICE.horseBlanket||'red')===k, note:'-'+formatCoin(40), fn:()=>pay(40,()=>{ CHOICE.horseBlanket=k; logMsg(nm+' wears a '+n2.toLowerCase()+' blanket now.','#e8d8a8'); horseShop(); })})),{label:'Back.',fn:back}],true)});
   o.push({label:'Change the leather of her tack.', fn:()=>say(G,"“Saddle, bridle, bags: all of it re-dyed. Thirty copper.”",[...Object.entries(HORSE_LEATHERS).map(([k,[n2]])=>({label:n2+((CHOICE.horseLeather||'brown')===k?' <small>(now)</small>':''), off:player.purse<30||(CHOICE.horseLeather||'brown')===k, note:'-'+formatCoin(30), fn:()=>pay(30,()=>{ CHOICE.horseLeather=k; logMsg(nm+'\'s tack is '+n2.toLowerCase()+' now.','#e8d8a8'); horseShop(); })})),{label:'Back.',fn:back}],true)});
@@ -33224,6 +33258,95 @@ function horseShop(){ const G='Garrow the Horse-Dealer', nm=(window.mountName&&m
   JOURNAL.push(['The Pale Steed', ()=>{ const s=PQ(); if(!s) return null; if(s==='done') return ['done',"Vesna bound a drowned war-horse to you: "+(CHOICE.paleName||'')+". Press R to ride it."];
     return ['active',{ seek:"Find the drowned war-horse in the Drowning Fen's old marsh, west of the Sunken Hollow, at night, and bring its bones to Vesna.", bones:"Bring the war-horse's bones to Vesna the Grave-Speaker, after dark." }[s]]; }]);
   if(typeof QUEST_AT!=='undefined') QUEST_AT['The Pale Steed']='fen';
+}
+
+// ════════ MAGMA CRAWLERS: living lumps of basalt with fire in their cracks, crawling up out of the Ember Stair's vents. Their hearts are what Gorm wants for cinder plate ════════
+FOES.magmite={ label:'Magma Crawler', base:66, stagger:1.05, unguarded:true, shell:0.3, pattern:[
+  {wait:1.1, wind:0.7, after:0.5, dir:'left'}, {wait:0.35, wind:0.6, after:0.5, dir:'right'}, {wait:1.3, wind:1.15, after:1.0, dir:'up', charge:true} ]};
+Object.assign(WEAPONS,{ magma_fist:{ wind:0.32, dmg:14, len:18 } });
+const MAGMA=o=>({gender:'m',skin:0,hair:0,hairColor:0,beard:0,face:0,beast:true,equip:{head:null,torso:null,armor:null,hands:null,legs:null,feet:null,weapon:'magma_fist',offhand:null},...o});
+BEASTS.push({ k:'magmite', is:f=>f.type==='magmite', name:'Magma Crawlers', kind:'Living rock · the Ember Stair under Hollowmere',
+  how:'Two swipes of its burning fists, left and right, then it rears and slams down from above.', res:'Its basalt hide turns some of every blow.', aff:'Its blows set you burning.', ans:'Parry the slam. Gorm in Varrowdeep forges their hearts into cinder plate.' });
+function drawMagmite(x,B,e,pose){ const o=e.opts||{}, big=o.big?1.4:1, raise=pose&&pose.kind==='raise'?Math.min(1,pose.t):0, strike=pose&&pose.kind==='strike'?Math.min(1,pose.t):0, dead=!!e.dead;
+  const pp=P(player.x??player.i+0.5,player.y??player.j+0.5), face=(combat.active&&combat.foe===e)?(pp.x>=x?1:-1):((e.dir||0)>=2&&(e.dir||0)<=5?-1:1);
+  const ph=(e.i||0)*1.7+(e.j||0), bob=dead?0:Math.sin(gt*2.2+ph)*1.1, pulse=dead?0.15:0.72+0.28*Math.sin(gt*3.2+ph), lean=dead?0:strike*10-raise*5;
+  g.save(); g.translate(x,B); g.scale(big*face,big);
+  g.fillStyle='rgba(0,0,0,0.35)'; g.beginPath(); g.ellipse(0,1,34,10,0,0,Math.PI*2); g.fill();
+  if(!dead){ g.save(); g.globalCompositeOperation='lighter'; try{ glow(lean*0.5,-6,46,16,'255,110,30',0.32*pulse); glow(lean,-28,40,30,'255,120,40',0.12+0.18*strike); }catch(err){} g.restore(); }
+  if(dead){ g.translate(0,8); g.scale(1.15,0.62); }
+  const rock=(pts,c0,c1)=>{ g.beginPath(); pts.forEach(([px,py],k)=>k?g.lineTo(px,py):g.moveTo(px,py)); g.closePath(); const gr=g.createLinearGradient(0,-50,0,0); gr.addColorStop(0,c0); gr.addColorStop(1,c1); g.fillStyle=gr; g.fill(); g.strokeStyle='#0c0806'; g.lineWidth=1.6; g.lineJoin='round'; g.stroke(); };
+  const crack=(pts,w)=>{ if(dead){ g.strokeStyle='rgba(90,40,20,0.7)'; g.lineWidth=w*0.6; } else { g.save(); g.globalCompositeOperation='lighter'; g.strokeStyle=`rgba(255,120,30,${0.35*pulse})`; g.lineWidth=w*3; g.beginPath(); pts.forEach(([px,py],k)=>k?g.lineTo(px,py):g.moveTo(px,py)); g.stroke(); g.restore(); g.strokeStyle=`rgb(255,${150+60*pulse|0},${60+40*pulse|0})`; g.lineWidth=w; }
+    g.lineCap='round'; g.lineJoin='round'; g.beginPath(); pts.forEach(([px,py],k)=>k?g.lineTo(px,py):g.moveTo(px,py)); g.stroke(); };
+  // four thick legs of rock, the far pair darker, half hidden under the bulk
+  [[-15,0,1],[11,0,1],[-9,2,0],[17,2,0]].forEach(([lx,ly,far],k)=>{ const st=e.moving?Math.sin(gt*7+k*1.6)*3:0; rock([[lx-6+lean*0.2,-18+bob],[lx+6+lean*0.2,-18+bob],[lx+7+st,ly-2],[lx+4+st,ly],[lx-5+st,ly],[lx-7+st,ly-3]],far?'#2a2220':'#40362f',far?'#140e0c':'#1a120e'); });
+  const fist=(near)=>{ const sx=near?15:7, sy=-34+bob, fx=sx+13+strike*13+lean*0.4-raise*6, fy=-11-raise*32+strike*4+(near?0:-3);
+    rock([[sx-6,sy-5],[sx+6,sy-3],[fx+5,fy-4],[fx-5,fy+3]],near?'#4a3c35':'#2e2624',near?'#1c1410':'#120c0a');
+    rock([[fx-8,fy-7],[fx+2,fy-10],[fx+10,fy-3],[fx+8,fy+5],[fx-1,fy+8],[fx-7,fy+5]],near?'#54443c':'#30282a',near?'#1e1410':'#140e0c');
+    crack([[fx-4,fy-5],[fx,fy-1],[fx+6,fy-4],[fx+3,fy+3]],1.2); };
+  fist(false);
+  // the body: a lumpy boulder of basalt, higher at the shoulders
+  const N=14, body=[]; for(let k=0;k<=N;k++){ const t=k/N, a=Math.PI+t*Math.PI, r=24+[0,3,-2,4,1,-3,5,2,-1,4,-2,3,0,2,-1][k]*1.1, hump=Math.sin(t*Math.PI*0.9+0.4)*6;
+    body.push([Math.cos(a)*r*1.18+lean*0.6, -16+Math.sin(a)*(r*1.08+hump)+bob]); }
+  body.push([24+lean*0.6,-8+bob],[8+lean*0.6,-5+bob],[-12+lean*0.6,-6+bob],[-26+lean*0.6,-9+bob]);
+  rock(body,'#564840','#170f0c');
+  g.save(); g.beginPath(); body.forEach(([a,b2],k)=>k?g.lineTo(a,b2):g.moveTo(a,b2)); g.closePath(); g.clip();   /* facets: lit planes and shadowed ones */
+    [[-22,-34,-6,-48,4,-30],[4,-50,22,-40,10,-26],[-8,-26,8,-24,-2,-12]].forEach(([a,b2,c2,d2,e2,f2],k)=>{ g.fillStyle=k===1?'rgba(255,230,210,0.07)':'rgba(0,0,0,0.22)'; g.beginPath(); g.moveTo(a+lean*0.6,b2+bob); g.lineTo(c2+lean*0.6,d2+bob); g.lineTo(e2+lean*0.6,f2+bob); g.closePath(); g.fill(); });
+  g.restore();
+  [[-14,-44,5],[0,-52,6],[13,-46,5],[-24,-30,4],[20,-34,4]].forEach(([bx,by2,s2],k)=>rock([[bx+lean*0.6-s2,by2+bob+s2*0.7],[bx+lean*0.6-s2*0.3,by2+bob-s2],[bx+lean*0.6+s2*0.6,by2+bob-s2*0.4],[bx+lean*0.6+s2,by2+bob+s2*0.6]],k%2?'#5e4e44':'#463830','#1e1612'));   /* crags along its back */
+  const C2=([a,b2])=>[a+lean*0.6,b2+bob];
+  crack([[-22,-22],[-16,-27],[-17,-34],[-10,-38],[-4,-46]].map(C2),1.6); crack([[-16,-27],[-8,-24],[-2,-30],[6,-28]].map(C2),1.2); crack([[6,-28],[10,-36],[16,-40]].map(C2),1.4);
+  crack([[-4,-12],[1,-17],[8,-15],[14,-20],[20,-17]].map(C2),1.3); crack([[1,-17],[0,-22]].map(C2),0.9); crack([[-24,-14],[-18,-11]].map(C2),1);
+  // the head: a heavy wedge thrust forward, a jaw full of fire, two slits for eyes
+  const hx=22+lean, hy=-28+bob-raise*4, jw=strike*3+raise*2;
+  rock([[hx-7,hy-9],[hx+6,hy-10],[hx+14,hy-4],[hx+15,hy+1],[hx+6,hy+2],[hx-6,hy+3]],'#5a4a42','#221814');
+  rock([[hx-5,hy+2],[hx+6,hy+2+jw*0.4],[hx+13,hy+3+jw],[hx+8,hy+8+jw],[hx-4,hy+7]],'#3e322c','#160e0a');   /* the jaw */
+  if(!dead){ g.save(); g.globalCompositeOperation='lighter'; glow(hx+6,hy-3,12,7,'255,160,60',0.6*pulse); glow(hx+8,hy+3+jw*0.5,10,5,'255,120,40',0.5*pulse+0.3*strike); g.restore(); }
+  g.fillStyle=dead?'#3a2018':'#ffd070'; g.beginPath(); g.ellipse(hx+4,hy-4,2.4,0.9,0.15,0,Math.PI*2); g.ellipse(hx+9.5,hy-3,2,0.8,0.15,0,Math.PI*2); g.fill();
+  crack([[hx,hy+2.4],[hx+7,hy+2.6+jw*0.4],[hx+13,hy+3+jw]],1.4+strike);
+  fist(true);
+  // drips of lava from its underside, and sparks off its back
+  if(!dead){ for(let k=0;k<3;k++){ const t=((gt*0.7+k*0.37+ph)%1), dx=-12+k*12+lean*0.5; g.fillStyle=`rgba(255,${150-t*80|0},40,${1-t})`; g.beginPath(); g.arc(dx,-11+bob+t*11,1.6*(1-t*0.5),0,Math.PI*2); g.fill(); }
+    g.save(); g.globalCompositeOperation='lighter'; for(let k=0;k<4;k++){ const t=((gt*0.5+k*0.27+ph*0.3)%1); g.fillStyle=`rgba(255,180,80,${0.8*(1-t)})`; g.fillRect(-10+k*7+Math.sin(gt*3+k)*4,-46+bob-t*26,1.6,1.6); } g.restore(); }
+  g.restore(); }
+// the Magma Heart: what's left glowing in one when it dies
+ITEMS.magma_heart={ name:'Magma Heart', slot:'misc', stack:true }; PRICES.magma_heart=30;
+if(typeof ITEM_DESC!=='undefined') ITEM_DESC.magma_heart="A fist-sized lump of rock with a slow fire still turning inside it. It is warm through your gloves, and it never cools. Gorm the smith of Varrowdeep can work these.";
+{ const _pe=paintEmberArt; paintEmberArt=function(g2,id,size){ if(id!=='magma_heart') return _pe.apply(this,arguments); g2.save(); g2.scale(size/40,size/40);
+    const gl=g2.createRadialGradient(20,21,0,20,21,17); gl.addColorStop(0,'rgba(255,120,30,0.75)'); gl.addColorStop(1,'rgba(255,60,10,0)'); g2.fillStyle=gl; g2.fillRect(2,3,36,36);
+    g2.fillStyle='#1e1412'; g2.beginPath(); g2.moveTo(20,6); g2.lineTo(31,12); g2.lineTo(33,25); g2.lineTo(24,34); g2.lineTo(12,33); g2.lineTo(7,21); g2.lineTo(11,10); g2.closePath(); g2.fill(); g2.strokeStyle='#050302'; g2.lineWidth=1.2; g2.stroke();
+    g2.strokeStyle='#ff9a30'; g2.lineWidth=1.6; g2.lineJoin='round'; g2.beginPath(); g2.moveTo(12,14); g2.lineTo(19,20); g2.lineTo(14,29); g2.moveTo(19,20); g2.lineTo(29,16); g2.moveTo(19,20); g2.lineTo(26,30); g2.moveTo(19,20); g2.lineTo(21,8); g2.stroke();
+    const core=g2.createRadialGradient(19,20,0,19,20,7); core.addColorStop(0,'#fff8d0'); core.addColorStop(0.5,'#ffb040'); core.addColorStop(1,'rgba(255,90,20,0)'); g2.fillStyle=core; g2.beginPath(); g2.arc(19,20,7,0,Math.PI*2); g2.fill(); g2.restore(); return true; }; }
+// where they crawl: about half the ordinary chambers of the Ember Stair, and a Magma Brute in the big ones
+['Magma Crawler','Magma Brute'].forEach(n=>{ RESPAWNS.add(n); RESPAWNS.add(n+' '); });
+{ const _um=ucMobs; ucMobs=function(r){ const l=_um.apply(this,arguments); if(r.q!=='under_se' || UC_OUT[r.id]) return l;
+    const h=r.hs>>>0, add=[]; if(r.square || r.kind==='hall') add.push({ name:'Magma Brute', type:'magmite', hpMul:1.9, faction:'magma_'+r.id, daily:true, opts:MAGMA({big:true}) });
+    if(h%2===0 && l.length<2) add.push({ name:'Magma Crawler', type:'magmite', hpMul:1.1, faction:'magma_'+r.id, daily:true, opts:MAGMA({}) });
+    if(h%5===0 && add.length) add.push({ name:'Magma Crawler ', type:'magmite', hpMul:1.1, faction:'magma_'+r.id, daily:true, opts:MAGMA({}) });
+    if(!add.length) return l; const busy=new Set(l.map(m=>m.i+','+m.j));
+    try{ (AREAS[r.id].objects?AREAS[r.id].objects():ucObjects(r)).forEach(o=>{ if(o.noblock && o.type!=='pickup') return; const fp=o.fp||[1,1]; for(let a=0;a<fp[0];a++) for(let b=0;b<fp[1];b++) busy.add((o.i+a)+','+(o.j+b)); }); }catch(e){}
+    const W=ucWalk(r).filter(([i,j])=>!ucNearDoor(r,i,j) && !busy.has(i+','+j)); if(!W.length) return l;
+    add.forEach((m,k)=>{ const s=W[Math.floor((k+0.5)*W.length/(add.length+0.5))%W.length]; m.i=s[0]; m.j=s[1]; m.spawn=[s[0],s[1]]; });
+    return [...l,...ucPlace(r,add).map((m,k)=>({...m, i:add[k].i, j:add[k].j, spawn:[add[k].i,add[k].j]}))]; }; }
+{ const _v=victory; victory=function(faction){ const r=_v.apply(this,arguments);
+    if(typeof faction==='string' && faction.startsWith('magma_')){ let n=0; (typeof mobs!=='undefined'?mobs:[]).filter(m=>m.faction===faction && m.type==='magmite').forEach(m=>{ const big=m.opts&&m.opts.big; if(big || Math.random()<0.45) n++; if(big && Math.random()<0.5) n++; });
+      for(let k=0;k<n;k++) giveQuestItem('magma_heart',true); if(n) logMsg((n>1?n+' magma hearts, still turning with fire,':'A magma heart, still turning with fire,')+' left in the cooling rock. ('+invCount('magma_heart')+(CHOICE.cinderOwned?'':'/'+CINDER_HEARTS)+')','#ffa050'); }
+    return r; }; }
+// Gorm forges cinder plate for a horse or a bear: dark steel, ember-lit seams, flame along the crest
+const CINDER_HEARTS=10, CINDER_COST=800;
+{ const G='Master Smith Gorm', hasMount=()=>CHOICE.horseQ==='done'||CHOICE.bearQ==='done';
+  const cinderTalk=()=>{ CHOICE.cinderAsked=true; const n=invCount('magma_heart'), back=()=>TALKERS.gorm();
+    if(CHOICE.cinderOwned){ const on=CHOICE.horseBarding==='cinder';
+      say(G,["“The cinder plate. Still burning, is it? Good. It will burn when we are all dust.”"],[{label:on?'Take the plate off. (keep it here)':'Buckle the cinder plate on.', fn:()=>{ CHOICE.horseBarding=on?null:'cinder'; autosaveSoon(200); logMsg(on?'Gorm unbuckles the cinder plate and hangs it by the forge.':'Gorm buckles the cinder plate on. The seams wake, and glow.','#ffa050'); cinderTalk(); }},{label:'Back.',fn:back},bye]); return; }
+    const ok=n>=CINDER_HEARTS && player.purse>=CINDER_COST;
+    say(G,["<i>He turns a magma heart over in his bare hand and does not seem to feel it.</i> “The Ember Stair spits these up, inside the crawling rocks. Down under Hollowmere, past the cellars, where the old city sits on fire.”",
+      "“Ten of them, quenched in the plate as it's beaten, and the steel never cools. Black plate with fire in every seam, flame running along the crest. For a horse, or one of Hjalma's bears: I'll cut it to fit whatever you ride.”","“Ten hearts, and "+formatCoin(CINDER_COST)+" for the steel and my arm.” ("+n+"/"+CINDER_HEARTS+")"],
+      [{label:'Give him ten magma hearts and '+formatCoin(CINDER_COST)+'.'+(n<CINDER_HEARTS?' ('+n+'/'+CINDER_HEARTS+')':''), note:'-'+formatCoin(CINDER_COST), off:!ok, fn:()=>{ for(let k=0;k<CINDER_HEARTS;k++){ const j=player.inv.indexOf('magma_heart'); if(j>=0) player.inv[j]=null; } player.purse-=CINDER_COST; updateHud();
+          CHOICE.cinderOwned=true; CHOICE.horseBarding='cinder'; remember('cinderPlate','done',"Gorm forged you cinder plate: black barding with fire in its seams, for your horse or your bear. Gorm puts it on or takes it off, or Garrow can swap it for a caparison."); banner('Cinderforged barding','#ffa050',2600);
+          say(G,["<i>It takes him three days and he does not sleep. When he wheels it out of the forge the seams are still glowing, and they never stop.</i>","“There. Fits the horse, fits the bear: the plates lace on either. Don't stand too close to anything that burns.”"],[bye]); }},{label:'Back.',fn:back},bye]); };
+  { const _g=TALKERS.gorm; TALKERS.gorm=function(){ if(!hasMount()) return _g.apply(this,arguments); return withExtraOpt(()=>_g.apply(this,arguments), {label:CHOICE.cinderOwned?'“About the cinder plate…”':'“Can you armour a horse? Or a bear?”'+(invCount('magma_heart')>=CINDER_HEARTS && player.purse>=CINDER_COST?' (?)':''), fn:cinderTalk}); }; gormTalk=TALKERS.gorm; }
+  JOURNAL.push(['Cinderforged Barding', ()=>{ if(!hasMount() || (!CHOICE.cinderAsked && !invCount('magma_heart') && !CHOICE.cinderOwned)) return null; if(CHOICE.cinderOwned) return ['done',"Gorm forged cinder plate for your mount. He puts it on or takes it off."];
+    return ['active',"Gorm, the master smith of Varrowdeep, can forge burning plate barding for your horse or bear from ten magma hearts ("+invCount('magma_heart')+"/"+CINDER_HEARTS+") and "+formatCoin(CINDER_COST)+". Magma Crawlers carry them, in the Ember Stair under Hollowmere."]; }]);
+  { const _h=npcHasNews; npcHasNews=function(n){ if(n && n.id==='gorm' && hasMount() && !CHOICE.cinderOwned && invCount('magma_heart')>=CINDER_HEARTS && player.purse>=CINDER_COST) return '?'; return _h.apply(this,arguments); }; }
 }
 </script>
 </body>
